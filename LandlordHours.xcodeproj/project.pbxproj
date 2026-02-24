@@ -1,0 +1,462 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 63;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		12BA2B1FF6DA34B9708EABF4 /* ExportPDFView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37718C6C352F5146B1B19AAA /* ExportPDFView.swift */; };
+		19BD84C3A545BA2935D9A7CF /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFF3C2F4E4EAC2D09DCB3F5B /* ContentView.swift */; };
+		1A2A80F489BB65C766EBA321 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5490464EB91A5699EED6EFCE /* ReportsView.swift */; };
+		24B4A91548115D49515C797B /* PropertiesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D91BDD921FD02E42B58FE334 /* PropertiesView.swift */; };
+		3B7CC2060463C21BC9ECAD07 /* TasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 368AC8C360A71EB0FAFB1D52 /* TasksView.swift */; };
+		571691826C340E4E727303CA /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1552DA58D14D98D9473D352A /* SubscriptionManager.swift */; };
+		691B932AEB4ECA321D667151 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7002A4C1E561833705DE3B43 /* PaywallView.swift */; };
+		93C20D864969D6F6EC85B191 /* TimeLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11377EC6BD95D70E1AF5A9A6 /* TimeLogView.swift */; };
+		98B8F1C68BDAB98363098499 /* TrialBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6479CEE1FE815563D8292734 /* TrialBannerView.swift */; };
+		A47503D607E3D15AB9B78D16 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 754B9E894A2C95D4E5C635B0 /* HistoryView.swift */; };
+		A72762E0F4CE4DEFA07D9C28 /* AITimeEntryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63814CFFD3A0284AC85988D /* AITimeEntryService.swift */; };
+		BFF6F8AE069FE01CE9E5414F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE13F908989158FDAB28BF57 /* Models.swift */; };
+		C033DAA5B2F3EB1B50CDA1CE /* LandlordHoursApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9CB28BC741E54912DBB35F /* LandlordHoursApp.swift */; };
+		C6B50842EA064CEACA38BA96 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFBF76FD610DF2D0CDA40C0A /* AppViewModel.swift */; };
+		CB4A4FF6CB46CB23A628AA19 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD25AA91ABB5FB4C307E491 /* DashboardView.swift */; };
+		CC3AD4AEC85263A4DB7CC2EE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7987DD5DAFB64A0DD0B89D /* SettingsView.swift */; };
+		D0FB50644A3E4250418CF25F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8F16B919639EBDE7C821FEC2 /* Assets.xcassets */; };
+		EA9388030050C4067B4212BE /* AppleSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = C85EE25AEEEC23C7341BEA7B /* AppleSignIn.swift */; };
+		F20713D35465CC3396393B14 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2CA9BA1AD53F0ABA92A9F2F /* OnboardingView.swift */; };
+		AA1111110000000000000001 /* LHIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000001 /* LHIcons.swift */; };
+		AA1111110000000000000002 /* LHLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000002 /* LHLogo.swift */; };
+		AA1111110000000000000003 /* CategoryManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000003 /* CategoryManagementView.swift */; };
+		AA1111110000000000000004 /* CategoryPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000004 /* CategoryPickerSheet.swift */; };
+		AA1111110000000000000005 /* ContactSupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000005 /* ContactSupportView.swift */; };
+		AA1111110000000000000006 /* TaxYearView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000006 /* TaxYearView.swift */; };
+		AA1111110000000000000007 /* WeeklySummaryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000007 /* WeeklySummaryService.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		11377EC6BD95D70E1AF5A9A6 /* TimeLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeLogView.swift; sourceTree = "<group>"; };
+		1552DA58D14D98D9473D352A /* SubscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
+		368AC8C360A71EB0FAFB1D52 /* TasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksView.swift; sourceTree = "<group>"; };
+		37718C6C352F5146B1B19AAA /* ExportPDFView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPDFView.swift; sourceTree = "<group>"; };
+		5490464EB91A5699EED6EFCE /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
+		5F9CB28BC741E54912DBB35F /* LandlordHoursApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordHoursApp.swift; sourceTree = "<group>"; };
+		6479CEE1FE815563D8292734 /* TrialBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrialBannerView.swift; sourceTree = "<group>"; };
+		6D7987DD5DAFB64A0DD0B89D /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		7002A4C1E561833705DE3B43 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		74E7F35CA9ADFE290A5D0420 /* LandlordHours.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LandlordHours.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		754B9E894A2C95D4E5C635B0 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		8F16B919639EBDE7C821FEC2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		9AD25AA91ABB5FB4C307E491 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		A2CA9BA1AD53F0ABA92A9F2F /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		AFF3C2F4E4EAC2D09DCB3F5B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		C85EE25AEEEC23C7341BEA7B /* AppleSignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignIn.swift; sourceTree = "<group>"; };
+		CFBF76FD610DF2D0CDA40C0A /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
+		D91BDD921FD02E42B58FE334 /* PropertiesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertiesView.swift; sourceTree = "<group>"; };
+		DE13F908989158FDAB28BF57 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		F63814CFFD3A0284AC85988D /* AITimeEntryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITimeEntryService.swift; sourceTree = "<group>"; };
+		AA2222220000000000000001 /* LHIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHIcons.swift; sourceTree = "<group>"; };
+		AA2222220000000000000002 /* LHLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHLogo.swift; sourceTree = "<group>"; };
+		AA2222220000000000000003 /* CategoryManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryManagementView.swift; sourceTree = "<group>"; };
+		AA2222220000000000000004 /* CategoryPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryPickerSheet.swift; sourceTree = "<group>"; };
+		AA2222220000000000000005 /* ContactSupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactSupportView.swift; sourceTree = "<group>"; };
+		AA2222220000000000000006 /* TaxYearView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaxYearView.swift; sourceTree = "<group>"; };
+		AA2222220000000000000007 /* WeeklySummaryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklySummaryService.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0C4465A88F3803561609E98F /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				DE13F908989158FDAB28BF57 /* Models.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		396398AA798125B67EFC1B2A /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				BB5791F5978AAAD88BED36D1 /* App */,
+				0C4465A88F3803561609E98F /* Models */,
+				D1B41408B74FB81271AE7A5B /* Services */,
+				69E1FC2BCD8DEC6A7949E13D /* ViewModels */,
+				E0F8AC95A77E6D771AE995AE /* Views */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		69E1FC2BCD8DEC6A7949E13D /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				CFBF76FD610DF2D0CDA40C0A /* AppViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		84A0BC1146FDB95F03019DC3 = {
+			isa = PBXGroup;
+			children = (
+				8F16B919639EBDE7C821FEC2 /* Assets.xcassets */,
+				396398AA798125B67EFC1B2A /* Sources */,
+				F152E78B546CB481CAD1B0FA /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		BB5791F5978AAAD88BED36D1 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				5F9CB28BC741E54912DBB35F /* LandlordHoursApp.swift */,
+				AA2222220000000000000001 /* LHIcons.swift */,
+				AA2222220000000000000002 /* LHLogo.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		D1B41408B74FB81271AE7A5B /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				F63814CFFD3A0284AC85988D /* AITimeEntryService.swift */,
+				C85EE25AEEEC23C7341BEA7B /* AppleSignIn.swift */,
+				1552DA58D14D98D9473D352A /* SubscriptionManager.swift */,
+				AA2222220000000000000007 /* WeeklySummaryService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		E0F8AC95A77E6D771AE995AE /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				AA2222220000000000000003 /* CategoryManagementView.swift */,
+				AA2222220000000000000004 /* CategoryPickerSheet.swift */,
+				AA2222220000000000000005 /* ContactSupportView.swift */,
+				AFF3C2F4E4EAC2D09DCB3F5B /* ContentView.swift */,
+				9AD25AA91ABB5FB4C307E491 /* DashboardView.swift */,
+				37718C6C352F5146B1B19AAA /* ExportPDFView.swift */,
+				754B9E894A2C95D4E5C635B0 /* HistoryView.swift */,
+				A2CA9BA1AD53F0ABA92A9F2F /* OnboardingView.swift */,
+				7002A4C1E561833705DE3B43 /* PaywallView.swift */,
+				D91BDD921FD02E42B58FE334 /* PropertiesView.swift */,
+				5490464EB91A5699EED6EFCE /* ReportsView.swift */,
+				6D7987DD5DAFB64A0DD0B89D /* SettingsView.swift */,
+				368AC8C360A71EB0FAFB1D52 /* TasksView.swift */,
+				AA2222220000000000000006 /* TaxYearView.swift */,
+				11377EC6BD95D70E1AF5A9A6 /* TimeLogView.swift */,
+				6479CEE1FE815563D8292734 /* TrialBannerView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		F152E78B546CB481CAD1B0FA /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				74E7F35CA9ADFE290A5D0420 /* LandlordHours.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		7A7EED730EC6B964D229DF99 /* LandlordHours */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 222E14293F8F3A971526B8FB /* Build configuration list for PBXNativeTarget "LandlordHours" */;
+			buildPhases = (
+				564AB252F72433AEA9CF6925 /* Sources */,
+				43885D2E8463DEC7C849BE66 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = LandlordHours;
+			packageProductDependencies = (
+			);
+			productName = LandlordHours;
+			productReference = 74E7F35CA9ADFE290A5D0420 /* LandlordHours.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D0C874CA0683032090187EC6 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1500;
+			};
+			buildConfigurationList = 08680678E847D977FB6AC205 /* Build configuration list for PBXProject "LandlordHours" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 84A0BC1146FDB95F03019DC3;
+			minimizedProjectReferenceProxies = 1;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				7A7EED730EC6B964D229DF99 /* LandlordHours */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		43885D2E8463DEC7C849BE66 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D0FB50644A3E4250418CF25F /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		564AB252F72433AEA9CF6925 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A72762E0F4CE4DEFA07D9C28 /* AITimeEntryService.swift in Sources */,
+				C6B50842EA064CEACA38BA96 /* AppViewModel.swift in Sources */,
+				EA9388030050C4067B4212BE /* AppleSignIn.swift in Sources */,
+				AA1111110000000000000003 /* CategoryManagementView.swift in Sources */,
+				AA1111110000000000000004 /* CategoryPickerSheet.swift in Sources */,
+				AA1111110000000000000005 /* ContactSupportView.swift in Sources */,
+				19BD84C3A545BA2935D9A7CF /* ContentView.swift in Sources */,
+				CB4A4FF6CB46CB23A628AA19 /* DashboardView.swift in Sources */,
+				12BA2B1FF6DA34B9708EABF4 /* ExportPDFView.swift in Sources */,
+				A47503D607E3D15AB9B78D16 /* HistoryView.swift in Sources */,
+				C033DAA5B2F3EB1B50CDA1CE /* LandlordHoursApp.swift in Sources */,
+				AA1111110000000000000001 /* LHIcons.swift in Sources */,
+				AA1111110000000000000002 /* LHLogo.swift in Sources */,
+				BFF6F8AE069FE01CE9E5414F /* Models.swift in Sources */,
+				F20713D35465CC3396393B14 /* OnboardingView.swift in Sources */,
+				691B932AEB4ECA321D667151 /* PaywallView.swift in Sources */,
+				24B4A91548115D49515C797B /* PropertiesView.swift in Sources */,
+				1A2A80F489BB65C766EBA321 /* ReportsView.swift in Sources */,
+				CC3AD4AEC85263A4DB7CC2EE /* SettingsView.swift in Sources */,
+				571691826C340E4E727303CA /* SubscriptionManager.swift in Sources */,
+				3B7CC2060463C21BC9ECAD07 /* TasksView.swift in Sources */,
+				AA1111110000000000000006 /* TaxYearView.swift in Sources */,
+				93C20D864969D6F6EC85B191 /* TimeLogView.swift in Sources */,
+				98B8F1C68BDAB98363098499 /* TrialBannerView.swift in Sources */,
+				AA1111110000000000000007 /* WeeklySummaryService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		84C783BE25DAF3EF66062947 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		8B762220F1C1D3351F7E78B1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = LandlordHours.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = G68NLC3DA3;
+				INFOPLIST_KEY_CFBundleDisplayName = LandlordHours;
+				INFOPLIST_KEY_CFBundleIcons_AppIcon = AppIcon;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_BackgroundColor = LaunchBackground;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.landlordhours;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B89BC0F4E0C7011D8FFFA57F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = LandlordHours.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = G68NLC3DA3;
+				INFOPLIST_KEY_CFBundleDisplayName = LandlordHours;
+				INFOPLIST_KEY_CFBundleIcons_AppIcon = AppIcon;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_BackgroundColor = LaunchBackground;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.landlordhours;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D5E3F826FA075EC3FC56FA43 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		08680678E847D977FB6AC205 /* Build configuration list for PBXProject "LandlordHours" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				84C783BE25DAF3EF66062947 /* Debug */,
+				D5E3F826FA075EC3FC56FA43 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		222E14293F8F3A971526B8FB /* Build configuration list for PBXNativeTarget "LandlordHours" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8B762220F1C1D3351F7E78B1 /* Debug */,
+				B89BC0F4E0C7011D8FFFA57F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = D0C874CA0683032090187EC6 /* Project object */;
+}
