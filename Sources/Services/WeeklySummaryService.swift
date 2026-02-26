@@ -80,8 +80,8 @@ class WeeklySummaryService {
 class SmartReminderService {
     static let shared = SmartReminderService()
     
-    private let lastLogKey = "lastLogDate"
-    private let reminderEnabledKey = "smartRemindersEnabled"
+    private var lastLogKey: String { UserScope.key("lastLogDate") }
+    private var reminderEnabledKey: String { UserScope.key("smartRemindersEnabled") }
     
     private init() {}
     

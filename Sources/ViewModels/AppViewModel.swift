@@ -1,50 +1,69 @@
 import Foundation
 import SwiftUI
-import CloudKit
 import AuthenticationServices
+
+// MARK: - Per-User Key Scoping
+
+/// Scopes UserDefaults keys to the current signed-in user.
+/// Auth keys (appleUserId, emailUserId, etc.) remain unscoped.
+enum UserScope {
+    /// Current userId, read directly from UserDefaults auth keys
+    static var userId: String? {
+        UserDefaults.standard.string(forKey: "appleUserId")
+        ?? UserDefaults.standard.string(forKey: "emailUserId")
+    }
+
+    /// Returns a user-scoped key. Falls back to unscoped if no user signed in.
+    static func key(_ base: String) -> String {
+        guard let id = userId else { return base }
+        return "u.\(id).\(base)"
+    }
+}
 
 @MainActor
 class AppViewModel: ObservableObject {
     @Published var properties: [RentalProperty] = []
     @Published var timeEntries: [TimeEntry] = []
     @Published var selectedYear: Int = Calendar.current.component(.year, from: Date())
-    @Published var iCloudSynced = false
     @Published var isInitializing = true
-    @Published var lastSyncDate: Date?
     @Published var isSignedIn = false
     @Published var userName: String = ""
-    
+
+    // CloudKit sync service
+    let syncService = CloudKitSyncService()
+    var iCloudSynced: Bool { syncService.accountAvailable }
+    var lastSyncDate: Date? { syncService.lastSyncDate }
+
+    // Celebration state
+    @Published var activeCelebration: CelebrationType?
+    var suppressCelebrations = false
+
     // Timer state
     @Published var isTimerRunning = false
     @Published var timerStartTime: Date?
     @Published var timerPropertyId: UUID?
     @Published var timerCategory: ActivityCategory = .repairs
-    
-    // Data persistence
-    private let propertiesKey = "LandlordHours.properties"
-    private let entriesKey = "LandlordHours.entries"
-    private let timerKey = "LandlordHours.timer"
-    
-    // CloudKit - lazy init to avoid blocking UI
-    private lazy var container: CKContainer = {
-        CKContainer(identifier: "iCloud.com.openclaw.landlordhours")
-    }()
-    private var database: CKDatabase { container.privateCloudDatabase }
-    
+
+    // Data persistence (user-scoped)
+    private var propertiesKey: String { UserScope.key("LandlordHours.properties") }
+    private var entriesKey: String { UserScope.key("LandlordHours.entries") }
+    private var timerKey: String { UserScope.key("LandlordHours.timer") }
+
     init() {
         loadData()
         loadTimerState()
         checkSignInState()
+        syncService.delegate = self
         // Show branded splash screen for 1.5s, then animate into the app
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             withAnimation(.easeOut(duration: 0.4)) {
                 self.isInitializing = false
             }
         }
-        // iCloud check after splash
+        // Start CloudKit sync after splash if signed in
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            Task {
-                await self.checkiCloudStatusAsync()
+            if self.isSignedIn {
+                Task { await self.syncService.start() }
             }
         }
     }
@@ -61,6 +80,16 @@ class AppViewModel: ObservableObject {
 
     func signIn() {
         isSignedIn = true
+        // Load user-scoped data (UserScope.userId is now set via auth keys)
+        loadData()
+        loadTimerState()
+        // Reload all singleton managers for this user
+        SubscriptionManager.shared.reload()
+        GoalManager.shared.loadGoals()
+        CategoryManager.shared.loadCategories()
+        TaxProfileManager.shared.reload()
+        MilestoneTracker.shared.reload()
+
         if let name = UserDefaults.standard.string(forKey: "appleUserName"), !name.isEmpty {
             userName = name
         } else if let name = UserDefaults.standard.string(forKey: "emailUserName"), !name.isEmpty {
@@ -68,16 +97,58 @@ class AppViewModel: ObservableObject {
         } else {
             userName = "User"
         }
+
+        // Start CloudKit sync
+        Task { await syncService.start() }
     }
     
+    /// Call when a new account is created (not for returning sign-in).
+    func signUp() {
+        // Clear onboarding flag so new user sees onboarding flow
+        UserDefaults.standard.removeObject(forKey: UserScope.key("hasCompletedOnboarding"))
+        signIn()
+    }
+
     func signOut() {
+        // Stop CloudKit sync
+        syncService.stop()
+
+        // Clear auth keys (unscoped — shared on device)
         UserDefaults.standard.removeObject(forKey: "appleUserId")
         UserDefaults.standard.removeObject(forKey: "appleUserName")
         UserDefaults.standard.removeObject(forKey: "appleUserEmail")
+        UserDefaults.standard.removeObject(forKey: "emailUserId")
+        UserDefaults.standard.removeObject(forKey: "emailUserName")
+        UserDefaults.standard.removeObject(forKey: "emailUserEmail")
+        UserDefaults.standard.removeObject(forKey: "loginType")
+        // Note: per-user data stays in UserDefaults under scoped keys (u.<userId>.*)
+
+        // Reset in-memory state
+        properties = []
+        timeEntries = []
+        isTimerRunning = false
+        timerStartTime = nil
+        timerPropertyId = nil
+        activeCelebration = nil
         isSignedIn = false
         userName = ""
+
+        // Reset singleton managers in memory
+        SubscriptionManager.shared.resetForSignOut()
+        GoalManager.shared.resetForSignOut()
+        CategoryManager.shared.resetForSignOut()
+        TaxProfileManager.shared.resetForSignOut()
+        MilestoneTracker.shared.reload()
     }
     
+    // MARK: - Sync Now (manual trigger for Settings)
+    func syncNow() {
+        Task {
+            await syncService.pushAll()
+            await syncService.pullChanges()
+        }
+    }
+
     // MARK: - Subscription Features
     func canAddProperty() -> Bool {
         if SubscriptionManager.shared.isPro { return true }
@@ -106,265 +177,28 @@ class AppViewModel: ObservableObject {
         return "Upgrade to Pro for unlimited access"
     }
     
-    // MARK: - iCloud Sync
-    func checkiCloudStatus() {
-        // Sync version - calls async version
-        Task {
-            await checkiCloudStatusAsync()
-        }
-    }
-    
-    private func checkiCloudStatusAsync() async {
-        do {
-            let status = try await container.accountStatus()
-            await MainActor.run {
-                self.iCloudSynced = (status == .available)
-            }
-        } catch {
-            print("CloudKit account status error: \(error)")
-            await MainActor.run {
-                self.iCloudSynced = false
-            }
-        }
-    }
-    
-    func syncToiCloud() {
-        guard iCloudSynced else { return }
-        
-        // Save properties
-        for property in properties {
-            savePropertyToCloud(property)
-        }
-        
-        // Save time entries
-        for entry in timeEntries {
-            saveEntryToCloud(entry)
-        }
-        
-        lastSyncDate = Date()
-    }
-    
-    func syncToiCloudAsync() async {
-        guard iCloudSynced else { return }
-        
-        // Save properties
-        for property in properties {
-            await savePropertyToCloudAsync(property)
-        }
-        
-        // Save time entries
-        for entry in timeEntries {
-            await saveEntryToCloudAsync(entry)
-        }
-        
-        await MainActor.run {
-            lastSyncDate = Date()
-        }
-    }
-    
-    private func savePropertyToCloudAsync(_ property: RentalProperty) async {
-        let record = CKRecord(recordType: "Property", recordID: CKRecord.ID(recordName: property.id.uuidString))
-        record["name"] = property.name
-        record["address"] = property.address
-        record["propertyType"] = property.propertyType.rawValue
-        record["createdAt"] = property.createdAt
-        
-        do {
-            _ = try await database.save(record)
-        } catch {
-            print("CloudKit save error: \(error.localizedDescription)")
-        }
-    }
-    
-    private func saveEntryToCloudAsync(_ entry: TimeEntry) async {
-        let record = CKRecord(recordType: "TimeEntry", recordID: CKRecord.ID(recordName: entry.id.uuidString))
-        record["propertyId"] = entry.propertyId.uuidString
-        record["participant"] = entry.participant.rawValue
-        record["category"] = entry.category.rawValue
-        record["hours"] = entry.hours
-        record["date"] = entry.date
-        record["notes"] = entry.notes
-        record["createdAt"] = entry.createdAt
-        
-        do {
-            _ = try await database.save(record)
-        } catch {
-            print("CloudKit save error: \(error.localizedDescription)")
-        }
-    }
-    
-    private func savePropertyToCloud(_ property: RentalProperty) {
-        let record = CKRecord(recordType: "Property", recordID: CKRecord.ID(recordName: property.id.uuidString))
-        record["name"] = property.name
-        record["address"] = property.address
-        record["propertyType"] = property.propertyType.rawValue
-        record["createdAt"] = property.createdAt
-        
-        database.save(record) { _, error in
-            if let error = error {
-                print("CloudKit save error: \(error.localizedDescription)")
-            }
-        }
-    }
-    
-    private func saveEntryToCloud(_ entry: TimeEntry) {
-        let record = CKRecord(recordType: "TimeEntry", recordID: CKRecord.ID(recordName: entry.id.uuidString))
-        record["propertyId"] = entry.propertyId.uuidString
-        record["participant"] = entry.participant.rawValue
-        record["category"] = entry.category.rawValue
-        record["hours"] = entry.hours
-        record["date"] = entry.date
-        record["notes"] = entry.notes
-        record["createdAt"] = entry.createdAt
-        
-        database.save(record) { _, error in
-            if let error = error {
-                print("CloudKit save error: \(error.localizedDescription)")
-            }
-        }
-    }
-    
-    func loadFromiCloud() {
-        guard iCloudSynced else { return }
-        
-        // Load properties
-        let propertyQuery = CKQuery(recordType: "Property", predicate: NSPredicate(value: true))
-        database.fetch(withQuery: propertyQuery) { [weak self] result in
-            if case .success(let matchResults) = result {
-                for (_, recordResult) in matchResults.matchResults {
-                    if case .success(let record) = recordResult {
-                        if let name = record["name"] as? String,
-                           let address = record["address"] as? String,
-                           let typeRaw = record["propertyType"] as? String,
-                           let type = PropertyType(rawValue: typeRaw),
-                           let idString = record.recordID.recordName as String?,
-                           let id = UUID(uuidString: idString) {
-                            let property = RentalProperty(id: id, name: name, address: address, propertyType: type)
-                            Task { @MainActor in
-                                if !(self?.properties.contains(where: { $0.id == property.id }) ?? false) {
-                                    self?.properties.append(property)
-                                    self?.saveData()
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Load time entries
-        let entryQuery = CKQuery(recordType: "TimeEntry", predicate: NSPredicate(value: true))
-        database.fetch(withQuery: entryQuery) { [weak self] result in
-            if case .success(let matchResults) = result {
-                for (_, recordResult) in matchResults.matchResults {
-                    if case .success(let record) = recordResult {
-                        if let propertyIdString = record["propertyId"] as? String,
-                           let propertyId = UUID(uuidString: propertyIdString),
-                           let participantRaw = record["participant"] as? String,
-                           let participant = Participant(rawValue: participantRaw),
-                           let categoryRaw = record["category"] as? String,
-                           let category = ActivityCategory(rawValue: categoryRaw),
-                           let hours = record["hours"] as? Double,
-                           let date = record["date"] as? Date,
-                           let idString = record.recordID.recordName as String?,
-                           let id = UUID(uuidString: idString) {
-                            let notes = record["notes"] as? String ?? ""
-                            Task { @MainActor in
-                                guard let propertyName = self?.properties.first(where: { $0.id == propertyId })?.name else { return }
-                                let entry = TimeEntry(id: id, propertyId: propertyId, participant: participant, category: category, hours: hours, date: date, notes: notes)
-                                if !(self?.timeEntries.contains(where: { $0.id == entry.id }) ?? false) {
-                                    self?.timeEntries.append(entry)
-                                    self?.saveData()
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    func loadFromiCloudAsync() async {
-        guard iCloudSynced else { return }
-        
-        // Load properties
-        let propertyQuery = CKQuery(recordType: "Property", predicate: NSPredicate(value: true))
-        do {
-            let propertyResult = try await database.records(matching: propertyQuery)
-            for (_, recordResult) in propertyResult.matchResults {
-                if case .success(let record) = recordResult {
-                    if let name = record["name"] as? String,
-                       let address = record["address"] as? String,
-                       let typeRaw = record["propertyType"] as? String,
-                       let type = PropertyType(rawValue: typeRaw),
-                       let idString = record.recordID.recordName as String?,
-                       let id = UUID(uuidString: idString) {
-                        let property = RentalProperty(id: id, name: name, address: address, propertyType: type)
-                        await MainActor.run {
-                            if !self.properties.contains(where: { $0.id == property.id }) {
-                                self.properties.append(property)
-                            }
-                        }
-                    }
-                }
-            }
-        } catch {
-            print("CloudKit fetch error: \(error)")
-        }
-        
-        // Load time entries
-        let entryQuery = CKQuery(recordType: "TimeEntry", predicate: NSPredicate(value: true))
-        do {
-            let entryResult = try await database.records(matching: entryQuery)
-            for (_, recordResult) in entryResult.matchResults {
-                if case .success(let record) = recordResult {
-                    if let propertyIdString = record["propertyId"] as? String,
-                       let propertyId = UUID(uuidString: propertyIdString),
-                       let participantRaw = record["participant"] as? String,
-                       let participant = Participant(rawValue: participantRaw),
-                       let categoryRaw = record["category"] as? String,
-                       let category = ActivityCategory(rawValue: categoryRaw),
-                       let hours = record["hours"] as? Double,
-                       let date = record["date"] as? Date,
-                       let idString = record.recordID.recordName as String?,
-                       let id = UUID(uuidString: idString) {
-                        let notes = record["notes"] as? String ?? ""
-                        let propertyName = self.properties.first { $0.id == propertyId }?.name ?? "Unknown"
-                        let entry = TimeEntry(id: id, propertyId: propertyId, participant: participant, category: category, hours: hours, date: date, notes: notes)
-                        await MainActor.run {
-                            if !self.timeEntries.contains(where: { $0.id == entry.id }) {
-                                self.timeEntries.append(entry)
-                            }
-                        }
-                    }
-                }
-            }
-            await MainActor.run {
-                self.saveData()
-            }
-        } catch {
-            print("CloudKit fetch error: \(error)")
-        }
-    }
-    
     // MARK: - Property Management
     func addProperty(name: String, address: String, type: PropertyType) {
         let property = RentalProperty(name: name, address: address, propertyType: type)
         properties.append(property)
         saveData()
+        triggerCelebration(.propertyAdded)
     }
     
     func updateProperty(_ property: RentalProperty) {
         if let index = properties.firstIndex(where: { $0.id == property.id }) {
-            properties[index] = property
+            var updated = property
+            updated.modifiedAt = Date()
+            properties[index] = updated
             saveData()
         }
     }
-    
+
     func deleteProperty(_ property: RentalProperty) {
         properties.removeAll { $0.id == property.id }
         timeEntries.removeAll { $0.propertyId == property.id }
         saveData()
+        Task { await syncService.deletePropertyFromCloud(property) }
     }
     
     // MARK: - Time Entry Management
@@ -388,11 +222,13 @@ class AppViewModel: ObservableObject {
         )
         timeEntries.append(entry)
         saveData()
+        checkHourMilestones()
     }
     
     func deleteTimeEntry(_ entry: TimeEntry) {
         timeEntries.removeAll { $0.id == entry.id }
         saveData()
+        Task { await syncService.deleteEntryFromCloud(entry) }
     }
     
     // MARK: - Timer Functions
@@ -438,6 +274,39 @@ class AppViewModel: ObservableObject {
         return Date().timeIntervalSince(startTime)
     }
     
+    // MARK: - Milestone Celebrations
+
+    func triggerCelebration(_ type: CelebrationType) {
+        guard !suppressCelebrations else { return }
+        let year = Calendar.current.component(.year, from: Date())
+        let tracker = MilestoneTracker.shared
+        guard tracker.shouldCelebrate(type, year: year) else { return }
+        tracker.markCelebrated(type, year: year)
+        activeCelebration = type
+    }
+
+    private func checkHourMilestones() {
+        let year = Calendar.current.component(.year, from: Date())
+        let total = totalHoursAllParticipants(year: year)
+        let goalType = GoalManager.shared.globalGoalType
+        let target = goalType.hoursRequired
+
+        // Check goal met first (highest priority)
+        if total >= target {
+            triggerCelebration(.goalMet)
+            return
+        }
+
+        // Check hour milestones: 10, 50, 100, 250, 500
+        let milestones: [Int] = [500, 250, 100, 50, 10]
+        for milestone in milestones {
+            if total >= Double(milestone) {
+                triggerCelebration(.hoursLogged(milestone: milestone))
+                return
+            }
+        }
+    }
+
     // MARK: - REPS Calculations
     func entriesForYear(_ year: Int) -> [TimeEntry] {
         let calendar = Calendar.current
@@ -495,6 +364,8 @@ class AppViewModel: ObservableObject {
         if let entriesData = try? JSONEncoder().encode(timeEntries) {
             UserDefaults.standard.set(entriesData, forKey: entriesKey)
         }
+        // Trigger debounced cloud push
+        syncService.schedulePush()
     }
     
     private func loadData() {
@@ -510,22 +381,107 @@ class AppViewModel: ObservableObject {
     
     private func saveTimerState() {
         if let startTime = timerStartTime {
-            UserDefaults.standard.set(startTime, forKey: "timerStartTime")
+            UserDefaults.standard.set(startTime, forKey: UserScope.key("timerStartTime"))
         }
         UserDefaults.standard.set(isTimerRunning, forKey: timerKey)
         if let propertyId = timerPropertyId {
-            UserDefaults.standard.set(propertyId.uuidString, forKey: "timerPropertyId")
+            UserDefaults.standard.set(propertyId.uuidString, forKey: UserScope.key("timerPropertyId"))
         }
     }
-    
+
     private func loadTimerState() {
         isTimerRunning = UserDefaults.standard.bool(forKey: timerKey)
-        if let startTime = UserDefaults.standard.object(forKey: "timerStartTime") as? Date {
+        if let startTime = UserDefaults.standard.object(forKey: UserScope.key("timerStartTime")) as? Date {
             timerStartTime = startTime
         }
-        if let propertyIdStr = UserDefaults.standard.string(forKey: "timerPropertyId"),
+        if let propertyIdStr = UserDefaults.standard.string(forKey: UserScope.key("timerPropertyId")),
            let propertyId = UUID(uuidString: propertyIdStr) {
             timerPropertyId = propertyId
+        }
+    }
+}
+
+// MARK: - CloudKit Sync Delegate
+
+extension AppViewModel: CloudKitSyncDelegate {
+
+    func syncDidReceiveProperties(_ remoteProperties: [RentalProperty]) {
+        for remote in remoteProperties {
+            if let idx = properties.firstIndex(where: { $0.id == remote.id }) {
+                // Last-write-wins: replace if remote is newer
+                if remote.modifiedAt > properties[idx].modifiedAt {
+                    properties[idx] = remote
+                }
+            } else {
+                properties.append(remote)
+            }
+        }
+        saveDataLocal()
+    }
+
+    func syncDidReceiveEntries(_ remoteEntries: [TimeEntry]) {
+        for remote in remoteEntries {
+            if let idx = timeEntries.firstIndex(where: { $0.id == remote.id }) {
+                if remote.modifiedAt > timeEntries[idx].modifiedAt {
+                    timeEntries[idx] = remote
+                }
+            } else {
+                timeEntries.append(remote)
+            }
+        }
+        saveDataLocal()
+    }
+
+    func syncDidDeletePropertyIds(_ ids: Set<UUID>) {
+        properties.removeAll { ids.contains($0.id) }
+        timeEntries.removeAll { ids.contains($0.propertyId) }
+        saveDataLocal()
+    }
+
+    func syncDidDeleteEntryIds(_ ids: Set<UUID>) {
+        timeEntries.removeAll { ids.contains($0.id) }
+        saveDataLocal()
+    }
+
+    func syncDidReceiveCategories(_ remoteCategories: [CustomCategory]) {
+        let mgr = CategoryManager.shared
+        for remote in remoteCategories {
+            if let idx = mgr.customCategories.firstIndex(where: { $0.id == remote.id }) {
+                if remote.modifiedAt > mgr.customCategories[idx].modifiedAt {
+                    mgr.customCategories[idx] = remote
+                }
+            } else {
+                mgr.customCategories.append(remote)
+            }
+        }
+        mgr.saveCategories()
+    }
+
+    func syncDidReceiveGoalSettings(globalGoalType: HourGoalType, propertyGoals: [PropertyGoal]) {
+        let mgr = GoalManager.shared
+        mgr.globalGoalType = globalGoalType
+        mgr.propertyGoals = propertyGoals
+        mgr.saveGoals()
+    }
+
+    func syncDidReceiveTaxProfile(_ fields: TaxProfileFields) {
+        let mgr = TaxProfileManager.shared
+        if let status = FilingStatus(rawValue: fields.filingStatus) {
+            mgr.filingStatus = status
+        }
+        mgr.spouseTracking = fields.spouseTracking
+        mgr.taxYear = fields.taxYear
+        mgr.groupingElection = fields.groupingElection
+        mgr.nonREWorkHours = fields.nonREWorkHours
+    }
+
+    /// Save to UserDefaults only (no cloud push — avoids loop when merging remote data)
+    private func saveDataLocal() {
+        if let propertiesData = try? JSONEncoder().encode(properties) {
+            UserDefaults.standard.set(propertiesData, forKey: propertiesKey)
+        }
+        if let entriesData = try? JSONEncoder().encode(timeEntries) {
+            UserDefaults.standard.set(entriesData, forKey: entriesKey)
         }
     }
 }

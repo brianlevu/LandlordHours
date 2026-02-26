@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Milestone Celebration — Interactive Preview</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --cream: #FAF7F2;
+    --warm-white: #FFFFFF;
+    --violet: #7B68EE;
+    --violet-soft: #B8AFFE;
+    --charcoal: #1A1A2E;
+    --ink: #2D2D3F;
+    --slate: #6E6E82;
+    --mist: #A8A8BC;
+    --snow: #F0EFF4;
+  }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: #E5E0D8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    min-height: 100vh;
+  }
+
+  .page-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .page-header h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    color: var(--charcoal);
+    margin-bottom: 6px;
+  }
+  .page-header p {
+    font-size: 14px;
+    color: var(--slate);
+  }
+
+  /* ===== Phone Frame ===== */
+  .phone-area {
+    display: flex;
+    align-items: flex-start;
+    gap: 40px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .phone {
+    width: 393px; height: 852px;
+    background: var(--cream);
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 30px 80px rgba(26,26,46,0.15), 0 0 0 1px rgba(0,0,0,0.04);
+  }
+  .phone::before {
+    content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 126px; height: 34px; background: #000; border-radius: 0 0 22px 22px; z-index: 200;
+  }
+
+  .phone-inner {
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 40px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* ===== Trigger buttons inside phone ===== */
+  .trigger-list {
+    display: flex; flex-direction: column; gap: 12px;
+    width: 100%; max-width: 280px;
+  }
+  .trigger-label {
+    font-size: 14px; font-weight: 600; color: var(--slate);
+    text-align: center; margin-bottom: 4px;
+  }
+  .trigger-btn {
+    width: 100%; padding: 16px;
+    border-radius: 16px; border: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: transform 0.15s ease;
+    display: flex; align-items: center; gap: 12px;
+    justify-content: center;
+  }
+  .trigger-btn:active { transform: scale(0.97); }
+  .trigger-btn svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+  .btn-violet { background: #7B68EE; color: #fff; }
+  .btn-green  { background: #34D399; color: #fff; }
+  .btn-gold   { background: #F5C563; color: #2D2D3F; }
+  .btn-coral  { background: #FF8A7A; color: #fff; }
+  .btn-sky    { background: #6CB4EE; color: #fff; }
+
+  /* ===== Celebration Overlay ===== */
+  .celebration-overlay {
+    position: absolute; inset: 0; z-index: 100;
+    display: none; /* shown via JS */
+    cursor: pointer;
+    border-radius: 44px;
+    overflow: hidden;
+  }
+  .celebration-overlay.active { display: block; }
+
+  /* Radial gradient bg */
+  .celebration-bg {
+    position: absolute; inset: 0;
+    opacity: 0;
+    transition: opacity 0.3s ease-out;
+  }
+  .celebration-overlay.animate-in .celebration-bg { opacity: 1; }
+  .celebration-overlay.animate-out .celebration-bg { opacity: 0; transition: opacity 0.3s ease-in; }
+
+  /* Confetti canvas */
+  .confetti-canvas {
+    position: absolute; inset: 0;
+    pointer-events: none;
+  }
+
+  /* Hero content */
+  .celebration-hero {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 20px;
+    pointer-events: none;
+  }
+
+  .hero-icon {
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    transform: scale(0); opacity: 0;
+    /* spring-like overshoot via cubic-bezier */
+    transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.4), opacity 0.2s ease-out;
+  }
+  .celebration-overlay.animate-in .hero-icon {
+    transform: scale(1); opacity: 1;
+  }
+  .hero-icon svg { width: 44px; height: 44px; fill: white; }
+
+  .hero-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px; color: white;
+    transform: translateY(20px); opacity: 0;
+    transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.1), opacity 0.4s ease-out;
+    transition-delay: 0.35s;
+  }
+  .celebration-overlay.animate-in .hero-title {
+    transform: translateY(0); opacity: 1;
+  }
+
+  .hero-subtitle {
+    font-size: 15px; font-weight: 500;
+    color: rgba(255,255,255,0.7);
+    transform: translateY(15px); opacity: 0;
+    transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.1), opacity 0.4s ease-out;
+    transition-delay: 0.5s;
+  }
+  .celebration-overlay.animate-in .hero-subtitle {
+    transform: translateY(0); opacity: 1;
+  }
+
+  /* Dismiss animation */
+  .celebration-overlay.animate-out {
+    transform: scale(0.85);
+    opacity: 0;
+    transition: transform 0.3s ease-in, opacity 0.3s ease-in;
+  }
+
+  /* ===== Static Snapshots Column ===== */
+  .snapshots-area {
+    margin-top: 48px;
+    width: 100%;
+  }
+  .snapshots-title {
+    font-size: 13px; font-weight: 600; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--slate);
+    text-align: center; margin-bottom: 24px;
+  }
+  .snapshots-row {
+    display: flex; gap: 24px; justify-content: center; flex-wrap: wrap;
+  }
+  .snapshot-wrap {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .snapshot-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--mist);
+  }
+  .snapshot {
+    width: 200px; height: 360px;
+    border-radius: 28px; overflow: hidden;
+    position: relative;
+    box-shadow: 0 12px 40px rgba(26,26,46,0.12);
+  }
+  .snapshot-bg { position: absolute; inset: 0; }
+  .snapshot-hero {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 14px;
+  }
+  .snap-icon {
+    width: 64px; height: 64px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .snap-icon svg { width: 30px; height: 30px; fill: white; }
+  .snap-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 18px; color: white;
+  }
+  .snap-subtitle {
+    font-size: 12px; color: rgba(255,255,255,0.65);
+  }
+  /* Decorative confetti dots on snapshots */
+  .snap-confetti {
+    position: absolute; border-radius: 50%;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Milestone Celebration</h1>
+  <p>Tap a button to preview each celebration type with live confetti &amp; spring animations</p>
+</div>
+
+<div class="phone-area">
+
+  <!-- Interactive phone -->
+  <div class="phone-wrap">
+    <div class="phone" id="interactivePhone">
+      <div class="phone-inner">
+        <div class="trigger-label">Tap to celebrate</div>
+        <div class="trigger-list">
+          <button class="trigger-btn btn-violet" onclick="triggerCelebration('propertyAdded')">
+            <svg viewBox="0 0 1024 1024" style="border-radius:5px;"><defs><clipPath id="tb-h"><path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z"/></clipPath></defs><rect width="1024" height="1024" fill="rgba(255,255,255,0.25)"/><g clip-path="url(#tb-h)"><rect width="1024" height="1024" fill="rgba(255,255,255,0.4)"/><path d="M0 450 Q250 370 500 450 Q750 530 1024 440 L1024 1024 L0 1024Z" fill="rgba(255,255,255,0.55)"/><path d="M0 650 Q300 570 550 650 Q800 730 1024 640 L1024 1024 L0 1024Z" fill="rgba(255,255,255,0.7)"/></g></svg>
+            Property Added
+          </button>
+          <button class="trigger-btn btn-green" onclick="triggerCelebration('goalMet')">
+            <svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+            Goal Met
+          </button>
+          <button class="trigger-btn btn-gold" onclick="triggerCelebration('taskDone')">
+            <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>
+            Great Work
+          </button>
+          <button class="trigger-btn btn-coral" onclick="triggerCelebration('weeklyStreak')">
+            <svg viewBox="0 0 24 24"><path d="M12 2c.5 3.5 3 6 5 7.5C19 11.5 20 14 20 16a8 8 0 01-16 0c0-2 1-4.5 3-6.5 2-1.5 4.5-4 5-7.5z"/></svg>
+            On Fire
+          </button>
+          <button class="trigger-btn btn-sky" onclick="triggerCelebration('hoursLogged')">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            Hours Logged
+          </button>
+        </div>
+      </div>
+
+      <!-- Overlay (hidden until triggered) -->
+      <div class="celebration-overlay" id="celebOverlay">
+        <div class="celebration-bg" id="celebBg"></div>
+        <canvas class="confetti-canvas" id="confettiCanvas"></canvas>
+        <div class="celebration-hero">
+          <div class="hero-icon" id="heroIcon"></div>
+          <div class="hero-title" id="heroTitle"></div>
+          <div class="hero-subtitle" id="heroSubtitle"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Static snapshots of all 5 types -->
+<div class="snapshots-area">
+  <div class="snapshots-title">All 5 Celebration Types &mdash; Static Reference</div>
+  <div class="snapshots-row" id="snapshotsRow"></div>
+</div>
+
+<script>
+// ===== Celebration Data =====
+const celebrations = {
+  propertyAdded: {
+    icon: `<svg viewBox="0 0 1024 1024"><defs><clipPath id="hero-h"><path d="M512 100 L128 380 L128 900 Q128 940 168 940 L856 940 Q896 940 896 900 L896 380 Z"/></clipPath></defs><rect width="1024" height="1024" fill="none"/><g clip-path="url(#hero-h)"><rect width="1024" height="1024" fill="rgba(255,255,255,0.5)"/><path d="M0 420 Q250 340 500 420 Q750 500 1024 400 L1024 1024 L0 1024Z" fill="rgba(255,255,255,0.65)"/><path d="M0 620 Q300 540 550 620 Q800 700 1024 600 L1024 1024 L0 1024Z" fill="rgba(255,255,255,0.8)"/><path d="M0 780 Q250 720 500 780 Q750 840 1024 760 L1024 1024 L0 1024Z" fill="white"/></g></svg>`,
+    title: 'Property Added!',
+    subtitle: 'Your journey begins',
+    accent: '#7B68EE',
+    gradient: '#A78BFA',
+    confetti: ['#7B68EE','#A78BFA','#EDE8FF','#B8AFFE','#FFFFFF']
+  },
+  goalMet: {
+    icon: `<svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>`,
+    title: 'Goal Met!',
+    subtitle: "You've qualified — amazing work",
+    accent: '#34D399',
+    gradient: '#6EE7B7',
+    confetti: ['#34D399','#6EE7B7','#ECFDF5','#059669','#FFFFFF']
+  },
+  taskDone: {
+    icon: `<svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg>`,
+    title: 'Great Work!',
+    subtitle: 'Keep up the momentum',
+    accent: '#F5C563',
+    gradient: '#FDE68A',
+    confetti: ['#F5C563','#FDE68A','#FFF4DA','#D97706','#FFFFFF']
+  },
+  weeklyStreak: {
+    icon: `<svg viewBox="0 0 24 24"><path d="M12 2c.5 3.5 3 6 5 7.5C19 11.5 20 14 20 16a8 8 0 01-16 0c0-2 1-4.5 3-6.5 2-1.5 4.5-4 5-7.5z"/></svg>`,
+    title: 'On Fire!',
+    subtitle: '3 weeks in a row',
+    accent: '#FF8A7A',
+    gradient: '#FFB4A9',
+    confetti: ['#FF8A7A','#FFB4A9','#FFE8E4','#E55A4A','#FFFFFF']
+  },
+  hoursLogged: {
+    icon: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`,
+    title: 'Hours Logged!',
+    subtitle: 'Every hour counts',
+    accent: '#6CB4EE',
+    gradient: '#93C5FD',
+    confetti: ['#6CB4EE','#93C5FD','#E0F0FF','#3B82F6','#FFFFFF']
+  }
+};
+
+// ===== Confetti Physics Engine =====
+let particles = [];
+let animFrame = null;
+let canvas, ctx;
+const GRAVITY = 400;
+const PARTICLE_COUNT = 45;
+const LIFESPAN = 2.5;
+const FADE_START = 1.5;
+
+function spawnConfetti(colors) {
+  canvas = document.getElementById('confettiCanvas');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+  ctx = canvas.getContext('2d');
+
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  particles = [];
+
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 200 + Math.random() * 300;
+    const isCircle = Math.random() > 0.5;
+
+    particles.push({
+      x: cx, y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      rotation: Math.random() * Math.PI * 2,
+      rotSpeed: (Math.random() - 0.5) * 16,
+      opacity: 1,
+      scale: 0.8 + Math.random() * 0.4,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      isCircle: isCircle,
+      size: isCircle ? (3 + Math.random() * 2) : (2 + Math.random()),
+      age: 0
+    });
+  }
+
+  let lastTime = performance.now();
+
+  function step(now) {
+    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    lastTime = now;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    let alive = 0;
+    for (const p of particles) {
+      if (p.opacity <= 0.01) continue;
+      alive++;
+
+      p.age += dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += GRAVITY * dt;
+      p.vx *= (1 - 0.3 * dt);
+      p.rotation += p.rotSpeed * dt;
+
+      if (p.age > FADE_START) {
+        const progress = (p.age - FADE_START) / (LIFESPAN - FADE_START);
+        p.opacity = Math.max(0, 1 - progress);
+      }
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation);
+      ctx.scale(p.scale, p.scale);
+      ctx.globalAlpha = p.opacity;
+      ctx.fillStyle = p.color;
+
+      if (p.isCircle) {
+        ctx.beginPath();
+        ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillRect(-1, -4, 2, 8);
+      }
+      ctx.restore();
+    }
+
+    if (alive > 0) {
+      animFrame = requestAnimationFrame(step);
+    }
+  }
+
+  if (animFrame) cancelAnimationFrame(animFrame);
+  animFrame = requestAnimationFrame(step);
+}
+
+// ===== Celebration Trigger =====
+let dismissTimeout = null;
+
+function triggerCelebration(type) {
+  const data = celebrations[type];
+  const overlay = document.getElementById('celebOverlay');
+  const bg = document.getElementById('celebBg');
+  const icon = document.getElementById('heroIcon');
+  const title = document.getElementById('heroTitle');
+  const subtitle = document.getElementById('heroSubtitle');
+
+  // Clear any previous
+  overlay.className = 'celebration-overlay';
+  if (dismissTimeout) clearTimeout(dismissTimeout);
+  if (animFrame) cancelAnimationFrame(animFrame);
+
+  // Set content
+  bg.style.background = `radial-gradient(circle at center, ${data.gradient}99 0%, ${data.accent}4D 50%, rgba(0,0,0,0.75) 100%)`;
+  icon.style.background = data.accent;
+  icon.style.boxShadow = `0 8px 30px ${data.accent}66`;
+  icon.innerHTML = data.icon;
+  title.textContent = data.title;
+  subtitle.textContent = data.subtitle;
+
+  // Show
+  overlay.classList.add('active');
+
+  // Stagger: 0ms bg, 100ms icon, 200ms confetti, 350ms title, 500ms subtitle
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      overlay.classList.add('animate-in');
+    });
+  });
+
+  // 200ms - confetti burst
+  setTimeout(() => spawnConfetti(data.confetti), 200);
+
+  // Click to dismiss
+  overlay.onclick = () => dismissCelebration();
+
+  // Auto-dismiss after 3s
+  dismissTimeout = setTimeout(() => dismissCelebration(), 3000);
+}
+
+function dismissCelebration() {
+  const overlay = document.getElementById('celebOverlay');
+  if (overlay.classList.contains('animate-out')) return;
+
+  overlay.classList.remove('animate-in');
+  overlay.classList.add('animate-out');
+
+  if (dismissTimeout) clearTimeout(dismissTimeout);
+
+  setTimeout(() => {
+    overlay.className = 'celebration-overlay';
+    if (animFrame) cancelAnimationFrame(animFrame);
+    const ctx2 = document.getElementById('confettiCanvas').getContext('2d');
+    if (ctx2) ctx2.clearRect(0, 0, 9999, 9999);
+  }, 350);
+}
+
+// ===== Generate Static Snapshots =====
+function buildSnapshots() {
+  const row = document.getElementById('snapshotsRow');
+  const types = ['propertyAdded','goalMet','taskDone','weeklyStreak','hoursLogged'];
+  const labels = ['Property Added','Goal Met','Task Done','Weekly Streak','Hours Logged'];
+
+  types.forEach((type, i) => {
+    const d = celebrations[type];
+    const confetti = d.confetti;
+
+    // Generate random confetti dots
+    let dotsHtml = '';
+    for (let j = 0; j < 20; j++) {
+      const x = 10 + Math.random() * 80;
+      const y = 15 + Math.random() * 70;
+      const size = 3 + Math.random() * 5;
+      const color = confetti[Math.floor(Math.random() * confetti.length)];
+      const opacity = 0.3 + Math.random() * 0.5;
+      const isCircle = Math.random() > 0.4;
+      if (isCircle) {
+        dotsHtml += `<div class="snap-confetti" style="left:${x}%;top:${y}%;width:${size}px;height:${size}px;background:${color};opacity:${opacity};"></div>`;
+      } else {
+        const rot = Math.random() * 180;
+        dotsHtml += `<div class="snap-confetti" style="left:${x}%;top:${y}%;width:${size*0.4}px;height:${size*1.5}px;background:${color};opacity:${opacity};border-radius:1px;transform:rotate(${rot}deg);"></div>`;
+      }
+    }
+
+    row.innerHTML += `
+      <div class="snapshot-wrap">
+        <div class="snapshot-label">${labels[i]}</div>
+        <div class="snapshot">
+          <div class="snapshot-bg" style="background:radial-gradient(circle at center, ${d.gradient}99 0%, ${d.accent}4D 50%, rgba(0,0,0,0.8) 100%);"></div>
+          ${dotsHtml}
+          <div class="snapshot-hero">
+            <div class="snap-icon" style="background:${d.accent};box-shadow:0 6px 20px ${d.accent}55;">${d.icon}</div>
+            <div class="snap-title">${d.title}</div>
+            <div class="snap-subtitle">${d.subtitle}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+}
+
+buildSnapshots();
+</script>
+</body>
+</html>

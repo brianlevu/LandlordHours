@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Learning Center — LandlordHours</title>
+<script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=DM+Serif+Display&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --cream: #FAF7F2;
+    --warm-white: #FFFFFF;
+    --violet: #7B68EE;
+    --violet-soft: #B8AFFE;
+    --violet-wash: #EDE8FF;
+    --violet-deep: #5B4BC9;
+    --coral: #FF8A7A;
+    --coral-wash: #FFE8E4;
+    --sage: #7EC8A0;
+    --sage-wash: #E4F5EC;
+    --honey: #F5C563;
+    --honey-wash: #FFF4DA;
+    --sky: #6CB4EE;
+    --sky-wash: #E0F0FF;
+    --rose: #E88CA5;
+    --rose-wash: #FFE4EC;
+    --charcoal: #1A1A2E;
+    --ink: #2D2D3F;
+    --slate: #6E6E82;
+    --mist: #A8A8BC;
+    --cloud: #D4D4E0;
+    --snow: #F0EFF4;
+    --success: #34D399;
+  }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: #E5E0D8;
+    padding: 60px;
+    display: flex;
+    gap: 48px;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  .screen-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .screen-title { font-size: 13px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--slate); }
+
+  .phone {
+    width: 393px; height: 852px; background: var(--cream);
+    border-radius: 44px; overflow: hidden; position: relative;
+    box-shadow: 0 30px 80px rgba(26,26,46,0.15), 0 0 0 1px rgba(0,0,0,0.04);
+  }
+  .phone::before {
+    content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 126px; height: 34px; background: #000; border-radius: 0 0 22px 22px; z-index: 100;
+  }
+
+  .status-bar {
+    height: 58px; padding: 14px 28px 0; display: flex; justify-content: space-between;
+    align-items: center; font-size: 15px; font-weight: 600; color: var(--charcoal);
+  }
+
+  .scroll-area { height: calc(100% - 58px); overflow-y: auto; scrollbar-width: none; position: relative; }
+  .scroll-area::-webkit-scrollbar { display: none; }
+
+  /* ===== Atmospheric aurora background — Hub only ===== */
+  .aurora-bg {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; z-index: 0; overflow: hidden;
+  }
+  /* Peach / muted orange glow — top right */
+  .aurora-bg .blob-peach {
+    position: absolute;
+    top: -60px; right: -80px;
+    width: 320px; height: 320px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #FFE4D6 0%, rgba(255,228,214,0.5) 40%, rgba(255,228,214,0) 70%);
+    filter: blur(60px);
+    opacity: 0.7;
+  }
+  /* Secondary peach — smaller, offset, adds organic shape */
+  .aurora-bg .blob-peach-sm {
+    position: absolute;
+    top: 80px; right: 20px;
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,210,185,0.5) 0%, rgba(255,210,185,0) 70%);
+    filter: blur(50px);
+    opacity: 0.5;
+  }
+  /* Lavender / soft blue glow — bottom left, very faint */
+  .aurora-bg .blob-lavender {
+    position: absolute;
+    bottom: -40px; left: -70px;
+    width: 280px; height: 280px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #DDD8F0 0%, rgba(221,216,240,0.35) 40%, rgba(221,216,240,0) 70%);
+    filter: blur(65px);
+    opacity: 0.5;
+  }
+  /* Hint of cool blue — extremely faint, adds depth */
+  .aurora-bg .blob-blue {
+    position: absolute;
+    bottom: 100px; left: 40px;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(192,210,240,0.4) 0%, rgba(192,210,240,0) 70%);
+    filter: blur(55px);
+    opacity: 0.4;
+  }
+
+  /* Content inside hub needs to sit above the blobs */
+  .hub-scroll-content { position: relative; z-index: 1; }
+
+  /* Nav row with back button */
+  .nav-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 20px 0;
+  }
+  .back-btn {
+    width: 36px; height: 36px; border-radius: 12px;
+    background: var(--warm-white); display: flex; align-items: center; justify-content: center;
+    border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(26,26,46,0.06);
+    color: var(--charcoal);
+  }
+  .back-btn svg { width: 18px; height: 18px; stroke: var(--charcoal); stroke-width: 2; stroke-linecap: round; fill: none; }
+
+  .search-btn {
+    width: 36px; height: 36px; border-radius: 12px;
+    background: var(--warm-white); display: flex; align-items: center; justify-content: center;
+    border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(26,26,46,0.06);
+    color: var(--charcoal);
+  }
+  .search-btn svg { width: 18px; height: 18px; stroke: var(--charcoal); stroke-width: 2; stroke-linecap: round; fill: none; }
+
+  /* ==================== HUB SCREEN ==================== */
+
+  .hub-header {
+    padding: 24px 20px 0;
+  }
+  .hub-kicker {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 2px; color: var(--mist); margin-bottom: 6px;
+    font-variant: small-caps;
+  }
+  .hub-headline {
+    font-family: 'DM Serif Display', serif; font-size: 28px; font-weight: 400;
+    color: var(--charcoal); line-height: 1.2; margin-bottom: 4px;
+  }
+  .hub-sub {
+    font-size: 13px; color: var(--slate); line-height: 1.4;
+  }
+
+  .hub-content { padding: 20px 20px 40px; }
+
+  /* Section blocks */
+  .section-block { margin-bottom: 28px; }
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .section-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--mist);
+  }
+  .section-name {
+    font-size: 17px; font-weight: 700; color: var(--charcoal); margin-top: 2px;
+  }
+  .see-all {
+    font-size: 12px; font-weight: 600; color: var(--violet);
+    text-decoration: none; display: flex; align-items: center; gap: 2px;
+  }
+  .see-all svg { width: 14px; height: 14px; stroke: var(--violet); stroke-width: 2.5; stroke-linecap: round; fill: none; }
+
+  /* ===== FEATURED CARD — Horizontal, Tiimo-style ===== */
+  .featured-card {
+    background: var(--warm-white); border-radius: 28px;
+    display: flex; align-items: stretch; overflow: hidden;
+    margin-bottom: 14px;
+    border: 1px solid #F0F0F0;
+    box-shadow: 0 2px 12px rgba(26,26,46,0.04);
+    cursor: pointer; transition: transform 0.2s cubic-bezier(0.25,0.46,0.45,0.94);
+    position: relative;
+  }
+  .featured-card:active { transform: scale(0.975); }
+
+  /* Small icon badge — top-left corner like Tiimo */
+  .card-badge {
+    position: absolute; top: 14px; left: 14px; z-index: 2;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--charcoal); display: flex;
+    align-items: center; justify-content: center;
+    color: #fff;
+  }
+  .card-badge svg {
+    width: 14px; height: 14px; stroke: #fff; stroke-width: 2;
+    stroke-linecap: round; fill: none;
+  }
+
+  .featured-illust {
+    width: 155px; min-height: 160px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+  }
+
+  .featured-body {
+    flex: 1; padding: 24px 24px 24px 4px;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .featured-cat {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1.2px; margin-bottom: 8px;
+  }
+  .featured-title {
+    font-size: 17px; font-weight: 700; color: var(--charcoal);
+    line-height: 1.35; margin-bottom: 6px;
+  }
+  .featured-desc {
+    font-size: 12px; color: var(--slate); line-height: 1.5; margin-bottom: 10px;
+  }
+  .featured-meta {
+    font-size: 11px; color: var(--mist); display: flex; align-items: center; gap: 5px;
+  }
+  .featured-meta svg { width: 13px; height: 13px; stroke: var(--mist); stroke-width: 2; fill: none; }
+
+  /* ===== VERTICAL BLOCK CARDS — Two-column grid ===== */
+  .article-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  }
+  .article-card {
+    background: var(--warm-white); border-radius: 24px;
+    overflow: hidden;
+    border: 1px solid #F0F0F0;
+    box-shadow: 0 2px 10px rgba(26,26,46,0.035);
+    cursor: pointer; transition: transform 0.2s cubic-bezier(0.25,0.46,0.45,0.94);
+    position: relative;
+  }
+  .article-card:active { transform: scale(0.975); }
+
+  .article-icon-area {
+    height: 110px; display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  /* Badge on vertical cards */
+  .article-card .card-badge { top: 12px; left: 12px; width: 26px; height: 26px; }
+  .article-card .card-badge svg { width: 12px; height: 12px; }
+
+  .article-card-body { padding: 4px 20px 20px; }
+  .article-cat {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 6px;
+  }
+  .article-title {
+    font-size: 15px; font-weight: 700; color: var(--charcoal);
+    line-height: 1.35; margin-bottom: 8px;
+  }
+  .article-time { font-size: 11px; color: var(--mist); }
+
+  /* ===== HORIZONTAL LIST ITEM ===== */
+  .list-item {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--warm-white); border-radius: 20px;
+    padding: 16px 18px; margin-bottom: 8px;
+    border: 1px solid #F0F0F0;
+    box-shadow: 0 1px 6px rgba(26,26,46,0.03);
+    cursor: pointer; transition: transform 0.2s cubic-bezier(0.25,0.46,0.45,0.94);
+  }
+  .list-item:active { transform: scale(0.98); }
+  .list-icon {
+    width: 40px; height: 40px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .list-icon svg { width: 20px; height: 20px; stroke-width: 1.8; stroke-linecap: round; fill: none; }
+  .list-item .setting-text { flex: 1; }
+  .list-item-title { font-size: 14px; font-weight: 600; color: var(--charcoal); }
+  .list-item-sub { font-size: 11px; color: var(--mist); margin-top: 1px; }
+  .list-chev { width: 16px; height: 16px; color: var(--cloud); flex-shrink: 0; }
+  .list-chev svg { stroke: var(--cloud); stroke-width: 2; stroke-linecap: round; fill: none; }
+
+  /* Guide horizontal scroll */
+  .guide-scroll {
+    display: flex; gap: 12px; overflow-x: auto;
+    scrollbar-width: none; margin-right: -20px; padding-bottom: 4px;
+  }
+  .guide-scroll::-webkit-scrollbar { display: none; }
+
+  .guide-card {
+    min-width: 220px; height: 170px; border-radius: 24px;
+    padding: 20px; display: flex; flex-direction: column;
+    justify-content: space-between; flex-shrink: 0;
+    cursor: pointer; transition: transform 0.15s ease;
+    position: relative; overflow: hidden;
+  }
+  .guide-card:active { transform: scale(0.98); }
+  .guide-card::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.15) 100%);
+    pointer-events: none;
+  }
+
+  .guide-meta {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; color: rgba(255,255,255,0.7);
+    position: relative; z-index: 1;
+  }
+  .guide-title {
+    font-size: 16px; font-weight: 700; color: #fff;
+    line-height: 1.3; position: relative; z-index: 1;
+  }
+  .guide-bottom {
+    display: flex; align-items: center; justify-content: space-between;
+    position: relative; z-index: 1;
+  }
+  .guide-duration { font-size: 11px; color: rgba(255,255,255,0.65); }
+  .play-circle {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.7);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .play-tri {
+    width: 0; height: 0; border-style: solid;
+    border-width: 5px 0 5px 9px;
+    border-color: transparent transparent transparent rgba(255,255,255,0.9);
+    margin-left: 2px;
+  }
+
+  /* Quick links row */
+  .quick-links {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px;
+  }
+  .quick-chip {
+    padding: 8px 14px; border-radius: 999px;
+    background: var(--warm-white); font-size: 12px; font-weight: 600;
+    color: var(--slate); box-shadow: 0 1px 4px rgba(26,26,46,0.04);
+    cursor: pointer; transition: all 0.15s ease;
+  }
+  .quick-chip:active { transform: scale(0.98); }
+  .quick-chip.active { background: var(--violet); color: #fff; }
+
+  /* ==================== ARTICLE DETAIL SCREEN ==================== */
+
+  .detail-gradient {
+    background: linear-gradient(180deg, var(--violet-wash) 0%, var(--cream) 100%);
+    padding: 0 20px 20px; margin-top: -4px;
+  }
+  .detail-badge {
+    display: inline-block; padding: 4px 10px;
+    background: var(--warm-white); color: var(--violet);
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; border-radius: 999px; margin-bottom: 10px;
+  }
+  .detail-title {
+    font-family: 'DM Serif Display', serif; font-size: 26px; font-weight: 400;
+    color: var(--charcoal); line-height: 1.25; margin-bottom: 10px;
+  }
+  .detail-meta { font-size: 12px; color: var(--mist); }
+
+  .article-body { padding: 20px 20px 40px; }
+  .body-section-title {
+    font-size: 16px; font-weight: 700; color: var(--charcoal);
+    padding-left: 14px; border-left: 3px solid var(--violet);
+    margin-bottom: 12px; line-height: 1.3;
+  }
+  .body-section-title.green { border-left-color: var(--success); }
+
+  .body-text {
+    font-size: 13px; color: var(--ink); line-height: 1.7; margin-bottom: 20px;
+  }
+
+  .callout-box {
+    background: var(--violet-wash); border-radius: 16px;
+    padding: 16px; margin-bottom: 20px;
+  }
+  .callout-box h4 {
+    font-size: 13px; font-weight: 700; color: var(--charcoal); margin-bottom: 10px;
+  }
+  .callout-list { list-style: none; counter-reset: cl; }
+  .callout-list li {
+    counter-increment: cl; font-size: 12px; color: var(--ink);
+    line-height: 1.5; padding: 4px 0 4px 24px; position: relative;
+  }
+  .callout-list li::before {
+    content: counter(cl) "."; position: absolute; left: 0;
+    font-weight: 700; color: var(--violet);
+  }
+
+  .activity-chips {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px;
+  }
+  .act-chip {
+    background: var(--snow); border-radius: 12px;
+    padding: 8px 12px; font-size: 11px; color: var(--ink);
+  }
+
+  .related-section h4 {
+    font-size: 14px; font-weight: 700; color: var(--charcoal); margin-bottom: 10px;
+  }
+  .related-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--warm-white); border-radius: 14px;
+    padding: 14px 16px; margin-bottom: 8px;
+    box-shadow: 0 1px 4px rgba(26,26,46,0.03);
+  }
+  .related-title { font-size: 13px; font-weight: 600; color: var(--charcoal); }
+  .related-time { font-size: 11px; color: var(--mist); flex-shrink: 0; margin-left: 12px; }
+
+  /* ==================== GUIDE DETAIL SCREEN ==================== */
+
+  .guide-hero {
+    height: 180px;
+    background: linear-gradient(135deg, var(--violet-deep) 0%, var(--violet) 50%, var(--violet-soft) 100%);
+    position: relative; display: flex; flex-direction: column;
+    justify-content: flex-end; padding: 20px;
+  }
+  .guide-hero .nav-row { position: absolute; top: 62px; left: 0; right: 0; }
+  .guide-hero .back-btn { background: rgba(255,255,255,0.2); color: #fff; }
+  .guide-hero .back-btn svg { stroke: #fff; }
+  .guide-hero .search-btn { background: rgba(255,255,255,0.2); }
+
+  .watch-pill {
+    position: absolute; top: 66px; right: 20px;
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border: 1.5px solid rgba(255,255,255,0.7);
+    border-radius: 999px; background: transparent;
+    color: #fff; font-size: 11px; font-weight: 600; cursor: pointer;
+  }
+  .watch-pill .play-sm {
+    width: 0; height: 0; border-style: solid;
+    border-width: 4px 0 4px 7px;
+    border-color: transparent transparent transparent #fff;
+  }
+  .guide-hero-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: rgba(255,255,255,0.85);
+  }
+  /* floating blobs in hero */
+  .hero-blob {
+    position: absolute; border-radius: 50%; opacity: 0.15;
+    pointer-events: none;
+  }
+
+  .guide-detail-body { padding: 24px 20px 40px; }
+  .guide-detail-body h1 {
+    font-family: 'DM Serif Display', serif; font-size: 26px; font-weight: 400;
+    color: var(--charcoal); line-height: 1.25; margin-bottom: 8px;
+  }
+  .guide-detail-body .guide-desc {
+    font-size: 13px; color: var(--slate); line-height: 1.6; margin-bottom: 20px;
+  }
+
+  .start-btn {
+    display: block; width: 100%; padding: 16px;
+    background: var(--violet); color: #fff;
+    font-size: 16px; font-weight: 600; text-align: center;
+    border: none; border-radius: 999px; cursor: pointer;
+    margin-bottom: 28px; font-family: 'DM Sans', sans-serif;
+    box-shadow: 0 4px 16px rgba(123,104,238,0.25);
+  }
+
+  .lessons-label {
+    font-size: 14px; font-weight: 700; color: var(--charcoal); margin-bottom: 16px;
+  }
+  .lesson-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 0; border-bottom: 1px solid var(--snow);
+  }
+  .lesson-row:last-child { border-bottom: none; }
+
+  .lesson-num {
+    width: 30px; height: 30px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; flex-shrink: 0;
+  }
+  .lesson-num.done { background: var(--sage-wash); color: var(--sage); }
+  .lesson-num.active { background: var(--violet); color: #fff; }
+  .lesson-num.locked { background: var(--snow); color: var(--mist); }
+
+  .lesson-info { flex: 1; min-width: 0; }
+  .lesson-name { font-size: 13px; font-weight: 600; color: var(--charcoal); line-height: 1.3; }
+  .lesson-dur { font-size: 11px; color: var(--mist); margin-top: 2px; }
+  .lesson-chevron { color: var(--cloud); font-size: 16px; flex-shrink: 0; }
+
+  .source-card {
+    background: var(--warm-white); border-radius: 16px;
+    padding: 16px; margin-top: 24px;
+    box-shadow: 0 1px 4px rgba(26,26,46,0.03);
+  }
+  .source-card .src-label { font-size: 12px; color: var(--slate); margin-bottom: 4px; }
+  .source-card .src-text { font-size: 10px; color: var(--mist); }
+
+  /* White status bar for hero screen */
+  .white-status .status-bar { color: #fff; }
+
+  /* ===== Lucide icon sizing overrides ===== */
+  .lesson-num.done svg { width: 14px; height: 14px; }
+  .lesson-chevron svg { width: 16px; height: 16px; }
+
+  /* Illustration icon wrappers for article icon areas */
+  .illust-icon {
+    display: flex; align-items: center; justify-content: center;
+    width: 68px; height: 68px; border-radius: 50%;
+  }
+  .illust-icon svg { width: 32px; height: 32px; }
+  .illust-icon-lg {
+    display: flex; align-items: center; justify-content: center;
+    width: 90px; height: 90px; border-radius: 50%;
+  }
+  .illust-icon-lg svg { width: 44px; height: 44px; }
+</style>
+</head>
+<body>
+
+<!-- ==================== SCREEN 1: Learning Center Hub ==================== -->
+<div class="screen-wrap">
+  <span class="screen-title">Learning Center &mdash; Hub</span>
+  <div class="phone">
+    <div class="status-bar">
+      <span>9:41</span>
+      <span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="scroll-area">
+
+      <!-- Atmospheric aurora blobs -->
+      <div class="aurora-bg">
+        <div class="blob-peach"></div>
+        <div class="blob-peach-sm"></div>
+        <div class="blob-lavender"></div>
+        <div class="blob-blue"></div>
+      </div>
+
+      <div class="hub-scroll-content">
+
+      <!-- Navigation -->
+      <div class="nav-row">
+        <button class="back-btn">
+          <i data-lucide="chevron-left"></i>
+        </button>
+        <button class="search-btn">
+          <i data-lucide="search"></i>
+        </button>
+      </div>
+
+      <!-- Header -->
+      <div class="hub-header">
+        <div class="hub-kicker">Guides, Strategy &amp; Growth</div>
+        <h1 class="hub-headline">Master Property<br>Management</h1>
+        <p class="hub-sub">Everything you need to save on taxes and grow your portfolio.</p>
+      </div>
+
+      <!-- Quick filter chips -->
+      <div style="padding: 16px 20px 0;">
+        <div class="quick-links">
+          <div class="quick-chip active">All</div>
+          <div class="quick-chip">Tax Strategy</div>
+          <div class="quick-chip">IRS Basics</div>
+          <div class="quick-chip">Record Keeping</div>
+          <div class="quick-chip">Growth</div>
+        </div>
+      </div>
+
+      <div class="hub-content">
+
+        <!-- Section 1: Featured -->
+        <div class="section-block">
+          <div class="section-header">
+            <div>
+              <div class="section-label">IRS BASICS</div>
+              <div class="section-name">Understanding REPS</div>
+            </div>
+            <a href="#" class="see-all">See all <i data-lucide="chevron-right"></i></a>
+          </div>
+
+          <!-- Featured full-width card -->
+          <div class="featured-card">
+            <div class="card-badge">
+              <i data-lucide="book-open"></i>
+            </div>
+            <div class="featured-illust" style="background: linear-gradient(135deg, var(--violet-wash), #F5F3FF);">
+              <div class="illust-icon-lg" style="background: rgba(123,104,238,0.08); color: var(--violet);">
+                <i data-lucide="house"></i>
+              </div>
+            </div>
+            <div class="featured-body">
+              <div class="featured-cat" style="color: var(--violet);">IRS BASICS</div>
+              <div class="featured-title">What is Real Estate Professional Status?</div>
+              <div class="featured-desc">The 750-hour rule, 50% test, and how to qualify for REPS</div>
+              <div class="featured-meta">
+                <i data-lucide="clock"></i>
+                5 min read
+              </div>
+            </div>
+          </div>
+
+          <!-- Two-column grid -->
+          <div class="article-grid">
+            <div class="article-card">
+              <div class="card-badge">
+                <i data-lucide="book-open"></i>
+              </div>
+              <div class="article-icon-area" style="background: linear-gradient(135deg, var(--sage-wash), #F0FFF6);">
+                <div class="illust-icon" style="background: rgba(126,200,160,0.12); color: var(--sage);">
+                  <i data-lucide="check-circle"></i>
+                </div>
+              </div>
+              <div class="article-card-body">
+                <div class="article-cat" style="color: #059669;">TAX STRATEGY</div>
+                <div class="article-title">The 50% Rule Explained</div>
+                <div class="article-time">4 min read</div>
+              </div>
+            </div>
+            <div class="article-card">
+              <div class="card-badge">
+                <i data-lucide="book-open"></i>
+              </div>
+              <div class="article-icon-area" style="background: linear-gradient(135deg, var(--coral-wash), #FFF5F3);">
+                <div class="illust-icon" style="background: rgba(255,138,122,0.1); color: var(--coral);">
+                  <i data-lucide="file-text"></i>
+                </div>
+              </div>
+              <div class="article-card-body">
+                <div class="article-cat" style="color: var(--coral);">RECORD KEEPING</div>
+                <div class="article-title">Hours That Count for IRS</div>
+                <div class="article-time">5 min read</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Tax Strategy -->
+        <div class="section-block">
+          <div class="section-header">
+            <div>
+              <div class="section-label">TAX STRATEGY</div>
+              <div class="section-name">Smart Tax Moves</div>
+            </div>
+            <a href="#" class="see-all">See all <i data-lucide="chevron-right"></i></a>
+          </div>
+
+          <div class="article-grid">
+            <div class="article-card">
+              <div class="card-badge">
+                <i data-lucide="book-open"></i>
+              </div>
+              <div class="article-icon-area" style="background: linear-gradient(135deg, var(--violet-wash), #F5F0FF);">
+                <div class="illust-icon" style="background: rgba(123,104,238,0.08); color: var(--violet);">
+                  <i data-lucide="house"></i>
+                </div>
+              </div>
+              <div class="article-card-body">
+                <div class="article-cat" style="color: var(--violet);">TAX STRATEGY</div>
+                <div class="article-title">STR vs LTR: Tax Differences</div>
+                <div class="article-time">6 min read</div>
+              </div>
+            </div>
+            <div class="article-card">
+              <div class="card-badge">
+                <i data-lucide="book-open"></i>
+              </div>
+              <div class="article-icon-area" style="background: linear-gradient(135deg, var(--honey-wash), #FFFBF0);">
+                <div class="illust-icon" style="background: rgba(245,197,99,0.1); color: var(--honey);">
+                  <i data-lucide="users"></i>
+                </div>
+              </div>
+              <div class="article-card-body">
+                <div class="article-cat" style="color: #D4A843;">TAX STRATEGY</div>
+                <div class="article-title">Spouse Hours Strategy</div>
+                <div class="article-time">4 min read</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Guides & Courses -->
+        <div class="section-block">
+          <div class="section-header">
+            <div>
+              <div class="section-label">GUIDES &amp; COURSES</div>
+              <div class="section-name">Expert Guides</div>
+            </div>
+            <a href="#" class="see-all">See all <i data-lucide="chevron-right"></i></a>
+          </div>
+
+          <div class="guide-scroll">
+            <!-- Guide 1: Violet -->
+            <div class="guide-card" style="background: linear-gradient(135deg, var(--violet-deep), var(--violet));">
+              <div class="hero-blob" style="width:60px;height:60px;background:var(--violet-soft);top:-10px;right:-10px;"></div>
+              <div>
+                <div class="guide-meta">GUIDE &middot; 5 LESSONS</div>
+              </div>
+              <div class="guide-title">REPS Qualification Roadmap</div>
+              <div class="guide-bottom">
+                <span class="guide-duration">25 min</span>
+                <div class="play-circle"><div class="play-tri"></div></div>
+              </div>
+            </div>
+            <!-- Guide 2: Green -->
+            <div class="guide-card" style="background: linear-gradient(135deg, #059669, var(--success));">
+              <div class="hero-blob" style="width:50px;height:50px;background:#6EE7B7;top:-8px;right:-8px;"></div>
+              <div>
+                <div class="guide-meta">GUIDE &middot; 4 LESSONS</div>
+              </div>
+              <div class="guide-title">First-Year Landlord Tax Guide</div>
+              <div class="guide-bottom">
+                <span class="guide-duration">20 min</span>
+                <div class="play-circle"><div class="play-tri"></div></div>
+              </div>
+            </div>
+            <!-- Guide 3: Coral -->
+            <div class="guide-card" style="background: linear-gradient(135deg, #E06A5C, var(--coral));">
+              <div class="hero-blob" style="width:45px;height:45px;background:rgba(255,255,255,0.2);bottom:-6px;left:-6px;"></div>
+              <div>
+                <div class="guide-meta">GUIDE &middot; 3 LESSONS</div>
+              </div>
+              <div class="guide-title">Audit-Proof Your Records</div>
+              <div class="guide-bottom">
+                <span class="guide-duration">15 min</span>
+                <div class="play-circle"><div class="play-tri"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: More articles -->
+        <div class="section-block">
+          <div class="section-header">
+            <div>
+              <div class="section-label">PROPERTY MANAGEMENT</div>
+              <div class="section-name">Grow Your Portfolio</div>
+            </div>
+            <a href="#" class="see-all">See all <i data-lucide="chevron-right"></i></a>
+          </div>
+
+          <div class="article-grid">
+            <div class="article-card">
+              <div class="card-badge">
+                <i data-lucide="book-open"></i>
+              </div>
+              <div class="article-icon-area" style="background: linear-gradient(135deg, var(--sky-wash), #F0F8FF);">
+                <div class="illust-icon" style="background: rgba(108,180,238,0.1); color: var(--sky);">
+                  <i data-lucide="trending-up"></i>
+                </div>
+              </div>
+              <div class="article-card-body">
+                <div class="article-cat" style="color: var(--sky);">GROWTH</div>
+                <div class="article-title">When to Add Property #2</div>
+                <div class="article-time">7 min read</div>
+              </div>
+            </div>
+            <div class="article-card">
+              <div class="card-badge">
+                <i data-lucide="book-open"></i>
+              </div>
+              <div class="article-icon-area" style="background: linear-gradient(135deg, var(--rose-wash), #FFF5F8);">
+                <div class="illust-icon" style="background: rgba(232,140,165,0.1); color: var(--rose);">
+                  <i data-lucide="file-text"></i>
+                </div>
+              </div>
+              <div class="article-card-body">
+                <div class="article-cat" style="color: var(--rose);">MANAGEMENT</div>
+                <div class="article-title">Grouping Election Guide</div>
+                <div class="article-time">5 min read</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 5: Quick Reads — Horizontal list items -->
+        <div class="section-block">
+          <div class="section-header">
+            <div>
+              <div class="section-label">QUICK READS</div>
+              <div class="section-name">Bite-Sized Tips</div>
+            </div>
+            <a href="#" class="see-all">See all <i data-lucide="chevron-right"></i></a>
+          </div>
+
+          <div class="list-item">
+            <div class="list-icon" style="background: var(--violet-wash); color: var(--violet);">
+              <i data-lucide="clock"></i>
+            </div>
+            <div class="setting-text">
+              <div class="list-item-title">What Counts as an Hour?</div>
+              <div class="list-item-sub">2 min read</div>
+            </div>
+            <span class="list-chev"><i data-lucide="chevron-right"></i></span>
+          </div>
+
+          <div class="list-item">
+            <div class="list-icon" style="background: var(--sage-wash); color: var(--sage);">
+              <i data-lucide="file-text"></i>
+            </div>
+            <div class="setting-text">
+              <div class="list-item-title">Receipt Best Practices</div>
+              <div class="list-item-sub">3 min read</div>
+            </div>
+            <span class="list-chev"><i data-lucide="chevron-right"></i></span>
+          </div>
+
+          <div class="list-item">
+            <div class="list-icon" style="background: var(--honey-wash); color: var(--honey);">
+              <i data-lucide="shield"></i>
+            </div>
+            <div class="setting-text">
+              <div class="list-item-title">Audit Red Flags to Avoid</div>
+              <div class="list-item-sub">2 min read</div>
+            </div>
+            <span class="list-chev"><i data-lucide="chevron-right"></i></span>
+          </div>
+        </div>
+
+      </div>
+      </div><!-- /hub-scroll-content -->
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SCREEN 2: Article Detail ==================== -->
+<div class="screen-wrap">
+  <span class="screen-title">Article Detail</span>
+  <div class="phone">
+    <div class="status-bar">
+      <span>9:41</span>
+      <span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="scroll-area">
+
+      <!-- Nav -->
+      <div class="nav-row">
+        <button class="back-btn">
+          <i data-lucide="chevron-left"></i>
+        </button>
+        <button class="search-btn" style="opacity:0; pointer-events:none;">
+          <i data-lucide="search"></i>
+        </button>
+      </div>
+
+      <!-- Gradient header -->
+      <div class="detail-gradient">
+        <span class="detail-badge">IRS BASICS</span>
+        <h1 class="detail-title">What is Real Estate Professional Status?</h1>
+        <div class="detail-meta">5 min read &middot; Updated Feb 2026</div>
+      </div>
+
+      <!-- Body -->
+      <div class="article-body">
+
+        <div class="body-section-title">The Basics</div>
+        <p class="body-text">
+          Real Estate Professional Status (REPS) is an IRS designation that allows qualifying taxpayers to treat all rental real estate losses as non-passive. This means losses can offset your active income&nbsp;&mdash; W-2 wages, business income, etc.
+        </p>
+
+        <div class="callout-box">
+          <h4>&#128161; Key Requirements</h4>
+          <ol class="callout-list">
+            <li>750+ hours in real estate activities per year</li>
+            <li>More than 50% of total working hours in real estate</li>
+            <li>Material participation in each rental property</li>
+          </ol>
+        </div>
+
+        <div class="body-section-title green">What Counts as RE Hours?</div>
+        <p class="body-text">
+          The IRS considers these qualifying activities: property management, repairs, tenant screening, bookkeeping, travel to properties, lease negotiations, and more.
+        </p>
+
+        <div class="activity-chips">
+          <div class="act-chip">&#128295; Repairs</div>
+          <div class="act-chip">&#128203; Management</div>
+          <div class="act-chip">&#128196; Leasing</div>
+          <div class="act-chip">&#128210; Bookkeeping</div>
+          <div class="act-chip">&#9878;&#65039; Legal</div>
+          <div class="act-chip">&#128663; Travel</div>
+        </div>
+
+        <div class="related-section">
+          <h4>Related Articles</h4>
+          <div class="related-row">
+            <span class="related-title">The 50% Rule Explained</span>
+            <span class="related-time">4 min</span>
+          </div>
+          <div class="related-row">
+            <span class="related-title">Spouse Hours Strategy</span>
+            <span class="related-time">4 min</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SCREEN 3: Guide Detail ==================== -->
+<div class="screen-wrap">
+  <span class="screen-title">Guide Detail</span>
+  <div class="phone white-status">
+    <div class="status-bar" style="color: #fff;">
+      <span>9:41</span>
+      <span style="display:flex;gap:5px;font-size:13px;color:#fff;">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="scroll-area">
+
+      <!-- Hero -->
+      <div class="guide-hero">
+        <div class="hero-blob" style="width:80px;height:80px;background:var(--violet-soft);top:10px;right:-20px;"></div>
+        <div class="hero-blob" style="width:50px;height:50px;background:var(--violet-soft);bottom:20px;left:-10px;opacity:0.1;"></div>
+        <div class="nav-row">
+          <button class="back-btn">
+            <i data-lucide="chevron-left"></i>
+          </button>
+        </div>
+        <button class="watch-pill">
+          <span class="play-sm"></span>
+          Watch Overview
+        </button>
+        <div class="guide-hero-label">GUIDE &middot; 5 LESSONS &middot; 25 MIN</div>
+      </div>
+
+      <!-- Content -->
+      <div class="guide-detail-body">
+        <h1>REPS Qualification Roadmap</h1>
+        <span class="detail-badge" style="margin-bottom: 12px;">IRS BASICS</span>
+        <p class="guide-desc">
+          A step-by-step guide to achieving Real Estate Professional Status. Learn the requirements, build your tracking habits, and prepare for tax season.
+        </p>
+
+        <button class="start-btn">Start Guide</button>
+
+        <div class="lessons-label">Lessons</div>
+
+        <!-- Lesson 1 — completed -->
+        <div class="lesson-row">
+          <div class="lesson-num done">
+            <i data-lucide="check"></i>
+          </div>
+          <div class="lesson-info">
+            <div class="lesson-name">Understanding REPS Requirements</div>
+            <div class="lesson-dur">5 min</div>
+          </div>
+          <span class="lesson-chevron"><i data-lucide="chevron-right"></i></span>
+        </div>
+
+        <!-- Lesson 2 — active -->
+        <div class="lesson-row">
+          <div class="lesson-num active">2</div>
+          <div class="lesson-info">
+            <div class="lesson-name">The 750-Hour Threshold</div>
+            <div class="lesson-dur">6 min</div>
+          </div>
+          <span class="lesson-chevron"><i data-lucide="chevron-right"></i></span>
+        </div>
+
+        <!-- Lesson 3 — locked -->
+        <div class="lesson-row">
+          <div class="lesson-num locked">3</div>
+          <div class="lesson-info">
+            <div class="lesson-name">Meeting the 50% Rule</div>
+            <div class="lesson-dur">4 min</div>
+          </div>
+          <span class="lesson-chevron"><i data-lucide="chevron-right"></i></span>
+        </div>
+
+        <!-- Lesson 4 — locked -->
+        <div class="lesson-row">
+          <div class="lesson-num locked">4</div>
+          <div class="lesson-info">
+            <div class="lesson-name">Tracking Hours Effectively</div>
+            <div class="lesson-dur">5 min</div>
+          </div>
+          <span class="lesson-chevron"><i data-lucide="chevron-right"></i></span>
+        </div>
+
+        <!-- Lesson 5 — locked -->
+        <div class="lesson-row">
+          <div class="lesson-num locked">5</div>
+          <div class="lesson-info">
+            <div class="lesson-name">Tax Season Preparation</div>
+            <div class="lesson-dur">5 min</div>
+          </div>
+          <span class="lesson-chevron"><i data-lucide="chevron-right"></i></span>
+        </div>
+
+        <div class="source-card">
+          <div class="src-label">Created with IRS guidance</div>
+          <div class="src-text">Sources: IRS Publication 925, IRC &sect;469</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

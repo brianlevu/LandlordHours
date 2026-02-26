@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LandlordHours — App Icon Exploration</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=DM+Serif+Display&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: #E5E0D8;
+    padding: 60px 40px 80px;
+    min-height: 100vh;
+  }
+
+  .page-header {
+    text-align: center;
+    margin-bottom: 56px;
+  }
+
+  .page-kicker {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #7B68EE;
+    margin-bottom: 12px;
+  }
+
+  .page-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 42px;
+    color: #1A1A2E;
+    line-height: 1.15;
+    margin-bottom: 10px;
+  }
+
+  .page-sub {
+    font-size: 15px;
+    color: #6E6E82;
+    line-height: 1.6;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+
+  /* ===== Variant Row ===== */
+  .variant {
+    margin-bottom: 64px;
+    background: #FFFFFF;
+    border-radius: 28px;
+    padding: 40px;
+    box-shadow: 0 4px 20px rgba(26,26,46,0.06), 0 0 0 1px rgba(0,0,0,0.03);
+  }
+
+  .variant-header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 8px;
+  }
+
+  .variant-letter {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #7B68EE;
+    background: rgba(123,104,238,0.08);
+    padding: 4px 12px;
+    border-radius: 6px;
+  }
+
+  .variant-name {
+    font-family: 'DM Serif Display', serif;
+    font-size: 24px;
+    color: #1A1A2E;
+  }
+
+  .variant-desc {
+    font-size: 13px;
+    color: #6E6E82;
+    line-height: 1.6;
+    margin-bottom: 32px;
+    max-width: 640px;
+  }
+
+  .icon-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 40px;
+  }
+
+  .icon-size {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .icon-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #A8A8BC;
+    letter-spacing: 0.5px;
+  }
+
+  /* iOS squircle clip */
+  .icon-frame {
+    position: relative;
+    overflow: hidden;
+    /* iOS superellipse ≈ 22.37% border-radius */
+    border-radius: 22.37%;
+    box-shadow: 0 4px 16px rgba(26,26,46,0.10), 0 0 0 0.5px rgba(0,0,0,0.06);
+  }
+
+  .icon-frame svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .sz-1024 { width: 280px; height: 280px; }
+  .sz-180 { width: 180px; height: 180px; }
+  .sz-120 { width: 120px; height: 120px; }
+  .sz-60 { width: 60px; height: 60px; }
+
+  /* ===== Reference row ===== */
+  .ref-section {
+    text-align: center;
+    padding: 32px;
+    border: 2px dashed rgba(123,104,238,0.2);
+    border-radius: 20px;
+    margin-bottom: 64px;
+  }
+
+  .ref-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #A8A8BC;
+    margin-bottom: 16px;
+  }
+
+  .ref-img {
+    width: 180px;
+    height: 180px;
+    border-radius: 22.37%;
+    box-shadow: 0 4px 16px rgba(26,26,46,0.10);
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="page-kicker">Brand Identity</div>
+  <h1 class="page-title">App Icon Exploration</h1>
+  <p class="page-sub">Wave-layer style icons using the LandlordHours house silhouette and brand color palette. Each variant at App Store, iPhone, Spotlight, and badge sizes.</p>
+</div>
+
+<!-- ===== VARIANT A: Violet Waves ===== -->
+<div class="variant">
+  <div class="variant-header">
+    <span class="variant-letter">A</span>
+    <h2 class="variant-name">Violet Gradient Waves</h2>
+  </div>
+  <p class="variant-desc">House silhouette with flowing wave layers from Violet Soft (#B8AFFE) through Violet (#7B68EE) to Violet Deep (#5B4BC9). Pure brand-identity expression.</p>
+  <div class="icon-row">
+    <div class="icon-size">
+      <div class="icon-frame sz-1024">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <!-- Background gradient -->
+            <linearGradient id="a-bg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#D8D0FF"/>
+              <stop offset="100%" stop-color="#B8AFFE"/>
+            </linearGradient>
+            <!-- Wave 1 (lightest) -->
+            <linearGradient id="a-w1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#A899F7"/>
+              <stop offset="100%" stop-color="#9485F0"/>
+            </linearGradient>
+            <!-- Wave 2 (mid) -->
+            <linearGradient id="a-w2" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#8B78F0"/>
+              <stop offset="100%" stop-color="#7B68EE"/>
+            </linearGradient>
+            <!-- Wave 3 (deepest) -->
+            <linearGradient id="a-w3" x1="0" y1="0" x2="0.5" y2="1">
+              <stop offset="0%" stop-color="#6B58DE"/>
+              <stop offset="100%" stop-color="#4A38B0"/>
+            </linearGradient>
+            <!-- House clip -->
+            <clipPath id="a-house">
+              <!-- House silhouette: wide base, peaked roof, chimney -->
+              <path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/>
+            </clipPath>
+          </defs>
+          <!-- Subtle background -->
+          <rect width="1024" height="1024" fill="#F4F1FF"/>
+          <!-- House shape filled with waves -->
+          <g clip-path="url(#a-house)">
+            <!-- Base fill -->
+            <rect width="1024" height="1024" fill="url(#a-bg)"/>
+            <!-- Wave 1 — top flowing wave -->
+            <path d="M0 380 Q200 310 400 370 Q600 430 800 360 Q900 330 1024 350 L1024 1024 L0 1024 Z" fill="url(#a-w1)"/>
+            <!-- Wave 2 — middle wave -->
+            <path d="M0 520 Q250 440 480 510 Q700 580 900 480 Q980 450 1024 470 L1024 1024 L0 1024 Z" fill="url(#a-w2)"/>
+            <!-- Wave 3 — bottom wave -->
+            <path d="M0 660 Q220 590 420 650 Q650 720 850 620 Q950 580 1024 610 L1024 1024 L0 1024 Z" fill="url(#a-w3)"/>
+          </g>
+          <!-- Subtle inner shadow on house shape for depth -->
+          <path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z" fill="none" stroke="rgba(0,0,0,0.04)" stroke-width="2"/>
+        </svg>
+      </div>
+      <span class="icon-label">1024px — App Store</span>
+    </div>
+    <div class="icon-size">
+      <div class="icon-frame sz-180">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="a2-house">
+              <path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/>
+            </clipPath>
+          </defs>
+          <rect width="1024" height="1024" fill="#F4F1FF"/>
+          <g clip-path="url(#a2-house)">
+            <rect width="1024" height="1024" fill="url(#a-bg)"/>
+            <path d="M0 380 Q200 310 400 370 Q600 430 800 360 Q900 330 1024 350 L1024 1024 L0 1024 Z" fill="url(#a-w1)"/>
+            <path d="M0 520 Q250 440 480 510 Q700 580 900 480 Q980 450 1024 470 L1024 1024 L0 1024 Z" fill="url(#a-w2)"/>
+            <path d="M0 660 Q220 590 420 650 Q650 720 850 620 Q950 580 1024 610 L1024 1024 L0 1024 Z" fill="url(#a-w3)"/>
+          </g>
+        </svg>
+      </div>
+      <span class="icon-label">180px — iPhone</span>
+    </div>
+    <div class="icon-size">
+      <div class="icon-frame sz-120">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="a3-house">
+              <path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/>
+            </clipPath>
+          </defs>
+          <rect width="1024" height="1024" fill="#F4F1FF"/>
+          <g clip-path="url(#a3-house)">
+            <rect width="1024" height="1024" fill="url(#a-bg)"/>
+            <path d="M0 380 Q200 310 400 370 Q600 430 800 360 Q900 330 1024 350 L1024 1024 L0 1024 Z" fill="url(#a-w1)"/>
+            <path d="M0 520 Q250 440 480 510 Q700 580 900 480 Q980 450 1024 470 L1024 1024 L0 1024 Z" fill="url(#a-w2)"/>
+            <path d="M0 660 Q220 590 420 650 Q650 720 850 620 Q950 580 1024 610 L1024 1024 L0 1024 Z" fill="url(#a-w3)"/>
+          </g>
+        </svg>
+      </div>
+      <span class="icon-label">120px — Spotlight</span>
+    </div>
+    <div class="icon-size">
+      <div class="icon-frame sz-60">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="a4-house">
+              <path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/>
+            </clipPath>
+          </defs>
+          <rect width="1024" height="1024" fill="#F4F1FF"/>
+          <g clip-path="url(#a4-house)">
+            <rect width="1024" height="1024" fill="url(#a-bg)"/>
+            <path d="M0 380 Q200 310 400 370 Q600 430 800 360 Q900 330 1024 350 L1024 1024 L0 1024 Z" fill="url(#a-w1)"/>
+            <path d="M0 520 Q250 440 480 510 Q700 580 900 480 Q980 450 1024 470 L1024 1024 L0 1024 Z" fill="url(#a-w2)"/>
+            <path d="M0 660 Q220 590 420 650 Q650 720 850 620 Q950 580 1024 610 L1024 1024 L0 1024 Z" fill="url(#a-w3)"/>
+          </g>
+        </svg>
+      </div>
+      <span class="icon-label">60px — Badge</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== VARIANT B: Warm Sunset Waves ===== -->
+<div class="variant">
+  <div class="variant-header">
+    <span class="variant-letter">B</span>
+    <h2 class="variant-name">Warm Sunset Waves</h2>
+  </div>
+  <p class="variant-desc">House silhouette with warm-to-cool gradient waves flowing from Coral (#FF8A7A) through Rose (#E88CA5) into Violet (#7B68EE). Inviting, warm, distinctive on the home screen.</p>
+  <div class="icon-row">
+    <div class="icon-size">
+      <div class="icon-frame sz-1024">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="b-bg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FFD4CC"/>
+              <stop offset="100%" stop-color="#FFB8AE"/>
+            </linearGradient>
+            <linearGradient id="b-w1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#FF9E90"/>
+              <stop offset="100%" stop-color="#F08880"/>
+            </linearGradient>
+            <linearGradient id="b-w2" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#E07898"/>
+              <stop offset="100%" stop-color="#C06AAE"/>
+            </linearGradient>
+            <linearGradient id="b-w3" x1="0" y1="0" x2="0.5" y2="1">
+              <stop offset="0%" stop-color="#9B6ADE"/>
+              <stop offset="100%" stop-color="#5B4BC9"/>
+            </linearGradient>
+            <clipPath id="b-house">
+              <path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/>
+            </clipPath>
+          </defs>
+          <rect width="1024" height="1024" fill="#FFF5F3"/>
+          <g clip-path="url(#b-house)">
+            <rect width="1024" height="1024" fill="url(#b-bg)"/>
+            <path d="M0 370 Q180 300 380 360 Q580 420 780 340 Q900 290 1024 330 L1024 1024 L0 1024 Z" fill="url(#b-w1)"/>
+            <path d="M0 500 Q260 420 500 500 Q720 570 920 470 Q990 440 1024 460 L1024 1024 L0 1024 Z" fill="url(#b-w2)"/>
+            <path d="M0 640 Q200 570 440 640 Q670 710 870 610 Q960 570 1024 600 L1024 1024 L0 1024 Z" fill="url(#b-w3)"/>
+          </g>
+        </svg>
+      </div>
+      <span class="icon-label">1024px — App Store</span>
+    </div>
+    <div class="icon-size">
+      <div class="icon-frame sz-180">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="b2-house">
+              <path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/>
+            </clipPath>
+          </defs>
+          <rect width="1024" height="1024" fill="#FFF5F3"/>
+          <g clip-path="url(#b2-house)">
+            <rect width="1024" height="1024" fill="url(#b-bg)"/>
+            <path d="M0 370 Q180 300 380 360 Q580 420 780 340 Q900 290 1024 330 L1024 1024 L0 1024 Z" fill="url(#b-w1)"/>
+            <path d="M0 500 Q260 420 500 500 Q720 570 920 470 Q990 440 1024 460 L1024 1024 L0 1024 Z" fill="url(#b-w2)"/>
+            <path d="M0 640 Q200 570 440 640 Q670 710 870 610 Q960 570 1024 600 L1024 1024 L0 1024 Z" fill="url(#b-w3)"/>
+          </g>
+        </svg>
+      </div>
+      <span class="icon-label">180px — iPhone</span>
+    </div>
+    <div class="icon-size">
+      <div class="icon-frame sz-120">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="b3-house">
+              <path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/>
+            </clipPath>
+          </defs>
+          <rect width="1024" height="1024" fill="#FFF5F3"/>
+          <g clip-path="url(#b3-house)">
+            <rect width="1024" height="1024" fill="url(#b-bg)"/>
+            <path d="M0 370 Q180 300 380 360 Q580 420 780 340 Q900 290 1024 330 L1024 1024 L0 1024 Z" fill="url(#b-w1)"/>
+            <path d="M0 500 Q260 420 500 500 Q720 570 920 470 Q990 440 1024 460 L1024 1024 L0 1024 Z" fill="url(#b-w2)"/>
+            <path d="M0 640 Q200 570 440 640 Q670 710 870 610 Q960 570 1024 600 L1024 1024 L0 1024 Z" fill="url(#b-w3)"/>
+          </g>
+        </svg>
+      </div>
+      <span class="icon-label">120px — Spotlight</span>
+    </div>
+    <div class="icon-size">
+      <div class="icon-frame sz-60">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="b4-house">
+              <path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/>
+            </clipPath>
+          </defs>
+          <rect width="1024" height="1024" fill="#FFF5F3"/>
+          <g clip-path="url(#b4-house)">
+            <rect width="1024" height="1024" fill="url(#b-bg)"/>
+            <path d="M0 370 Q180 300 380 360 Q580 420 780 340 Q900 290 1024 330 L1024 1024 L0 1024 Z" fill="url(#b-w1)"/>
+            <path d="M0 500 Q260 420 500 500 Q720 570 920 470 Q990 440 1024 460 L1024 1024 L0 1024 Z" fill="url(#b-w2)"/>
+            <path d="M0 640 Q200 570 440 640 Q670 710 870 610 Q960 570 1024 600 L1024 1024 L0 1024 Z" fill="url(#b-w3)"/>
+          </g>
+        </svg>
+      </div>
+      <span class="icon-label">60px — Badge</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== VARIANT C: House + Clock Waves ===== -->
+<div class="variant">
+  <div class="variant-header">
+    <span class="variant-letter">C</span>
+    <h2 class="variant-name">House + Clock Combined</h2>
+  </div>
+  <p class="variant-desc">The brand mark — house silhouette with an integrated clock cutout in the roof area. Violet-to-Sage wave gradient represents the journey from tracking to qualification. White clock face creates a focal point.</p>
+  <div class="icon-row">
+    <div class="icon-size">
+      <div class="icon-frame sz-1024">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="c-bg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#C8E6D5"/>
+              <stop offset="100%" stop-color="#A8D8B8"/>
+            </linearGradient>
+            <linearGradient id="c-w1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#7EC8A0"/>
+              <stop offset="100%" stop-color="#6AB8A0"/>
+            </linearGradient>
+            <linearGradient id="c-w2" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#6A9ECA"/>
+              <stop offset="100%" stop-color="#7B88EE"/>
+            </linearGradient>
+            <linearGradient id="c-w3" x1="0" y1="0" x2="0.5" y2="1">
+              <stop offset="0%" stop-color="#7B68EE"/>
+              <stop offset="100%" stop-color="#4A38B0"/>
+            </linearGradient>
+            <clipPath id="c-house">
+              <path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/>
+            </clipPath>
+            <!-- Clock mask — cut out a circle for the clock face -->
+            <mask id="c-clock-mask">
+              <rect width="1024" height="1024" fill="white"/>
+              <circle cx="512" cy="480" r="140" fill="black"/>
+            </mask>
+          </defs>
+          <rect width="1024" height="1024" fill="#F0F9F4"/>
+          <!-- House with waves, masked to exclude clock circle -->
+          <g clip-path="url(#c-house)">
+            <g mask="url(#c-clock-mask)">
+              <rect width="1024" height="1024" fill="url(#c-bg)"/>
+              <path d="M0 390 Q220 320 440 380 Q660 440 860 350 Q950 310 1024 340 L1024 1024 L0 1024 Z" fill="url(#c-w1)"/>
+              <path d="M0 530 Q240 450 480 530 Q700 600 900 500 Q980 460 1024 490 L1024 1024 L0 1024 Z" fill="url(#c-w2)"/>
+              <path d="M0 670 Q210 600 440 660 Q680 730 880 630 Q970 590 1024 620 L1024 1024 L0 1024 Z" fill="url(#c-w3)"/>
+            </g>
+            <!-- White clock face -->
+            <circle cx="512" cy="480" r="140" fill="white"/>
+            <circle cx="512" cy="480" r="140" fill="none" stroke="rgba(123,104,238,0.12)" stroke-width="4"/>
+            <!-- Hour markers -->
+            <circle cx="512" cy="352" r="8" fill="#7B68EE"/><!-- 12 -->
+            <circle cx="640" cy="480" r="8" fill="#7B68EE"/><!-- 3 -->
+            <circle cx="512" cy="608" r="8" fill="#7B68EE"/><!-- 6 -->
+            <circle cx="384" cy="480" r="8" fill="#7B68EE"/><!-- 9 -->
+            <circle cx="574" cy="358" r="5" fill="#D4D4E0"/>
+            <circle cx="620" cy="402" r="5" fill="#D4D4E0"/>
+            <circle cx="634" cy="542" r="5" fill="#D4D4E0"/>
+            <circle cx="578" cy="598" r="5" fill="#D4D4E0"/>
+            <circle cx="450" cy="598" r="5" fill="#D4D4E0"/>
+            <circle cx="398" cy="542" r="5" fill="#D4D4E0"/>
+            <circle cx="398" cy="418" r="5" fill="#D4D4E0"/>
+            <circle cx="450" cy="362" r="5" fill="#D4D4E0"/>
+            <!-- Clock hands -->
+            <line x1="512" y1="480" x2="512" y2="382" stroke="#1A1A2E" stroke-width="12" stroke-linecap="round"/>
+            <line x1="512" y1="480" x2="584" y2="440" stroke="#7B68EE" stroke-width="9" stroke-linecap="round"/>
+            <!-- Center dot -->
+            <circle cx="512" cy="480" r="10" fill="#1A1A2E"/>
+          </g>
+        </svg>
+      </div>
+      <span class="icon-label">1024px — App Store</span>
+    </div>
+    <div class="icon-size">
+      <div class="icon-frame sz-180">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="c2-house">
+              <path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/>
+            </clipPath>
+            <mask id="c2-clock-mask">
+              <rect width="1024" height="1024" fill="white"/>
+              <circle cx="512" cy="480" r="140" fill="black"/>
+            </mask>
+          </defs>
+          <rect width="1024" height="1024" fill="#F0F9F4"/>
+          <g clip-path="url(#c2-house)">
+            <g mask="url(#c2-clock-mask)">
+              <rect width="1024" height="1024" fill="url(#c-bg)"/>
+              <path d="M0 390 Q220 320 440 380 Q660 440 860 350 Q950 310 1024 340 L1024 1024 L0 1024 Z" fill="url(#c-w1)"/>
+              <path d="M0 530 Q240 450 480 530 Q700 600 900 500 Q980 460 1024 490 L1024 1024 L0 1024 Z" fill="url(#c-w2)"/>
+              <path d="M0 670 Q210 600 440 660 Q680 730 880 630 Q970 590 1024 620 L1024 1024 L0 1024 Z" fill="url(#c-w3)"/>
+            </g>
+            <circle cx="512" cy="480" r="140" fill="white"/>
+            <circle cx="512" cy="352" r="8" fill="#7B68EE"/>
+            <circle cx="640" cy="480" r="8" fill="#7B68EE"/>
+            <circle cx="512" cy="608" r="8" fill="#7B68EE"/>
+            <circle cx="384" cy="480" r="8" fill="#7B68EE"/>
+            <line x1="512" y1="480" x2="512" y2="382" stroke="#1A1A2E" stroke-width="12" stroke-linecap="round"/>
+            <line x1="512" y1="480" x2="584" y2="440" stroke="#7B68EE" stroke-width="9" stroke-linecap="round"/>
+            <circle cx="512" cy="480" r="10" fill="#1A1A2E"/>
+          </g>
+        </svg>
+      </div>
+      <span class="icon-label">180px — iPhone</span>
+    </div>
+    <div class="icon-size">
+      <div class="icon-frame sz-120">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="c3-house">
+              <path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/>
+            </clipPath>
+            <mask id="c3-clock-mask">
+              <rect width="1024" height="1024" fill="white"/>
+              <circle cx="512" cy="480" r="140" fill="black"/>
+            </mask>
+          </defs>
+          <rect width="1024" height="1024" fill="#F0F9F4"/>
+          <g clip-path="url(#c3-house)">
+            <g mask="url(#c3-clock-mask)">
+              <rect width="1024" height="1024" fill="url(#c-bg)"/>
+              <path d="M0 390 Q220 320 440 380 Q660 440 860 350 Q950 310 1024 340 L1024 1024 L0 1024 Z" fill="url(#c-w1)"/>
+              <path d="M0 530 Q240 450 480 530 Q700 600 900 500 Q980 460 1024 490 L1024 1024 L0 1024 Z" fill="url(#c-w2)"/>
+              <path d="M0 670 Q210 600 440 660 Q680 730 880 630 Q970 590 1024 620 L1024 1024 L0 1024 Z" fill="url(#c-w3)"/>
+            </g>
+            <circle cx="512" cy="480" r="140" fill="white"/>
+            <circle cx="512" cy="352" r="10" fill="#7B68EE"/>
+            <circle cx="640" cy="480" r="10" fill="#7B68EE"/>
+            <circle cx="512" cy="608" r="10" fill="#7B68EE"/>
+            <circle cx="384" cy="480" r="10" fill="#7B68EE"/>
+            <line x1="512" y1="480" x2="512" y2="382" stroke="#1A1A2E" stroke-width="16" stroke-linecap="round"/>
+            <line x1="512" y1="480" x2="584" y2="440" stroke="#7B68EE" stroke-width="12" stroke-linecap="round"/>
+            <circle cx="512" cy="480" r="12" fill="#1A1A2E"/>
+          </g>
+        </svg>
+      </div>
+      <span class="icon-label">120px — Spotlight</span>
+    </div>
+    <div class="icon-size">
+      <div class="icon-frame sz-60">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="c4-house">
+              <path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/>
+            </clipPath>
+            <mask id="c4-clock-mask">
+              <rect width="1024" height="1024" fill="white"/>
+              <circle cx="512" cy="480" r="150" fill="black"/>
+            </mask>
+          </defs>
+          <rect width="1024" height="1024" fill="#F0F9F4"/>
+          <g clip-path="url(#c4-house)">
+            <g mask="url(#c4-clock-mask)">
+              <rect width="1024" height="1024" fill="url(#c-bg)"/>
+              <path d="M0 390 Q220 320 440 380 Q660 440 860 350 Q950 310 1024 340 L1024 1024 L0 1024 Z" fill="url(#c-w1)"/>
+              <path d="M0 530 Q240 450 480 530 Q700 600 900 500 Q980 460 1024 490 L1024 1024 L0 1024 Z" fill="url(#c-w2)"/>
+              <path d="M0 670 Q210 600 440 660 Q680 730 880 630 Q970 590 1024 620 L1024 1024 L0 1024 Z" fill="url(#c-w3)"/>
+            </g>
+            <circle cx="512" cy="480" r="150" fill="white"/>
+            <circle cx="512" cy="345" r="14" fill="#7B68EE"/>
+            <circle cx="647" cy="480" r="14" fill="#7B68EE"/>
+            <circle cx="512" cy="615" r="14" fill="#7B68EE"/>
+            <circle cx="377" cy="480" r="14" fill="#7B68EE"/>
+            <line x1="512" y1="480" x2="512" y2="375" stroke="#1A1A2E" stroke-width="20" stroke-linecap="round"/>
+            <line x1="512" y1="480" x2="590" y2="436" stroke="#7B68EE" stroke-width="16" stroke-linecap="round"/>
+            <circle cx="512" cy="480" r="16" fill="#1A1A2E"/>
+          </g>
+        </svg>
+      </div>
+      <span class="icon-label">60px — Badge</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== VARIANT D: Full Spectrum Aurora ===== -->
+<div class="variant">
+  <div class="variant-header">
+    <span class="variant-letter">D</span>
+    <h2 class="variant-name">Full Spectrum Aurora</h2>
+  </div>
+  <p class="variant-desc">House silhouette filled with aurora-like waves spanning the complete brand palette — Honey (#F5C563) through Coral (#FF8A7A), Rose (#E88CA5), into Violet Deep (#5B4BC9). The full personality of LandlordHours in one icon.</p>
+  <div class="icon-row">
+    <div class="icon-size">
+      <div class="icon-frame sz-1024">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="d-bg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FFF0C8"/>
+              <stop offset="100%" stop-color="#FFE4A8"/>
+            </linearGradient>
+            <linearGradient id="d-w1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#F5C563"/>
+              <stop offset="100%" stop-color="#FFAA70"/>
+            </linearGradient>
+            <linearGradient id="d-w2" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#FF8A7A"/>
+              <stop offset="100%" stop-color="#E88CA5"/>
+            </linearGradient>
+            <linearGradient id="d-w3" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#C878D8"/>
+              <stop offset="100%" stop-color="#7B68EE"/>
+            </linearGradient>
+            <linearGradient id="d-w4" x1="0" y1="0" x2="0.5" y2="1">
+              <stop offset="0%" stop-color="#6858D8"/>
+              <stop offset="100%" stop-color="#3D2E8A"/>
+            </linearGradient>
+            <clipPath id="d-house">
+              <path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/>
+            </clipPath>
+          </defs>
+          <rect width="1024" height="1024" fill="#FFFBF0"/>
+          <g clip-path="url(#d-house)">
+            <rect width="1024" height="1024" fill="url(#d-bg)"/>
+            <!-- Wave 1 — warm honey/orange -->
+            <path d="M0 340 Q200 270 420 340 Q640 400 840 310 Q940 270 1024 300 L1024 1024 L0 1024 Z" fill="url(#d-w1)"/>
+            <!-- Wave 2 — coral/rose -->
+            <path d="M0 460 Q240 380 480 460 Q700 530 900 440 Q980 400 1024 430 L1024 1024 L0 1024 Z" fill="url(#d-w2)"/>
+            <!-- Wave 3 — purple/violet -->
+            <path d="M0 590 Q220 520 450 590 Q680 660 880 560 Q970 520 1024 560 L1024 1024 L0 1024 Z" fill="url(#d-w3)"/>
+            <!-- Wave 4 — deep violet -->
+            <path d="M0 720 Q240 650 470 720 Q690 790 880 690 Q960 650 1024 680 L1024 1024 L0 1024 Z" fill="url(#d-w4)"/>
+          </g>
+        </svg>
+      </div>
+      <span class="icon-label">1024px — App Store</span>
+    </div>
+    <div class="icon-size">
+      <div class="icon-frame sz-180">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="d2-house">
+              <path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/>
+            </clipPath>
+          </defs>
+          <rect width="1024" height="1024" fill="#FFFBF0"/>
+          <g clip-path="url(#d2-house)">
+            <rect width="1024" height="1024" fill="url(#d-bg)"/>
+            <path d="M0 340 Q200 270 420 340 Q640 400 840 310 Q940 270 1024 300 L1024 1024 L0 1024 Z" fill="url(#d-w1)"/>
+            <path d="M0 460 Q240 380 480 460 Q700 530 900 440 Q980 400 1024 430 L1024 1024 L0 1024 Z" fill="url(#d-w2)"/>
+            <path d="M0 590 Q220 520 450 590 Q680 660 880 560 Q970 520 1024 560 L1024 1024 L0 1024 Z" fill="url(#d-w3)"/>
+            <path d="M0 720 Q240 650 470 720 Q690 790 880 690 Q960 650 1024 680 L1024 1024 L0 1024 Z" fill="url(#d-w4)"/>
+          </g>
+        </svg>
+      </div>
+      <span class="icon-label">180px — iPhone</span>
+    </div>
+    <div class="icon-size">
+      <div class="icon-frame sz-120">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="d3-house">
+              <path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/>
+            </clipPath>
+          </defs>
+          <rect width="1024" height="1024" fill="#FFFBF0"/>
+          <g clip-path="url(#d3-house)">
+            <rect width="1024" height="1024" fill="url(#d-bg)"/>
+            <path d="M0 340 Q200 270 420 340 Q640 400 840 310 Q940 270 1024 300 L1024 1024 L0 1024 Z" fill="url(#d-w1)"/>
+            <path d="M0 460 Q240 380 480 460 Q700 530 900 440 Q980 400 1024 430 L1024 1024 L0 1024 Z" fill="url(#d-w2)"/>
+            <path d="M0 590 Q220 520 450 590 Q680 660 880 560 Q970 520 1024 560 L1024 1024 L0 1024 Z" fill="url(#d-w3)"/>
+            <path d="M0 720 Q240 650 470 720 Q690 790 880 690 Q960 650 1024 680 L1024 1024 L0 1024 Z" fill="url(#d-w4)"/>
+          </g>
+        </svg>
+      </div>
+      <span class="icon-label">120px — Spotlight</span>
+    </div>
+    <div class="icon-size">
+      <div class="icon-frame sz-60">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <clipPath id="d4-house">
+              <path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/>
+            </clipPath>
+          </defs>
+          <rect width="1024" height="1024" fill="#FFFBF0"/>
+          <g clip-path="url(#d4-house)">
+            <rect width="1024" height="1024" fill="url(#d-bg)"/>
+            <path d="M0 340 Q200 270 420 340 Q640 400 840 310 Q940 270 1024 300 L1024 1024 L0 1024 Z" fill="url(#d-w1)"/>
+            <path d="M0 460 Q240 380 480 460 Q700 530 900 440 Q980 400 1024 430 L1024 1024 L0 1024 Z" fill="url(#d-w2)"/>
+            <path d="M0 590 Q220 520 450 590 Q680 660 880 560 Q970 520 1024 560 L1024 1024 L0 1024 Z" fill="url(#d-w3)"/>
+            <path d="M0 720 Q240 650 470 720 Q690 790 880 690 Q960 650 1024 680 L1024 1024 L0 1024 Z" fill="url(#d-w4)"/>
+          </g>
+        </svg>
+      </div>
+      <span class="icon-label">60px — Badge</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

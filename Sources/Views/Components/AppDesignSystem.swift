@@ -1,3 +1,4 @@
+import SwiftUI
 
 // MARK: - Form Dark Background Modifier
 extension View {

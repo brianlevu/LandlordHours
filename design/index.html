@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LandlordHours — Design System & App Screens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+/* ─── Reset & Base ─── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  /* Light tokens */
+  --bg:#F5F5F5;--bg2:#FFFFFF;--bg3:#EBEBEB;
+  --primary:#7C6FF7;--primary-light:#A78BFA;--primary-surface:#EDE9FE;--primary-dark:#6355E8;
+  --success:#34D399;--warning:#FBBF24;--error:#F472B6;--info:#60A5FA;
+  --text1:#0D0D0D;--text2:#6B7280;--text3:#9CA3AF;
+  --border:#D1D5DB;--border-light:#E5E7EB;
+  /* Dark tokens */
+  --d-bg:#0D0D0D;--d-bg2:#1C1C1C;--d-bg3:#2A2A2A;
+  --d-primary:#9D8FF5;--d-primary-surface:#2D2A4A;
+  --d-text1:#FFFFFF;--d-text2:#ADB1BD;--d-text3:#7A7E8A;
+  --d-border:rgba(71,71,77,1);
+  /* Spacing */
+  --sp-xxs:4px;--sp-xs:8px;--sp-sm:12px;--sp-md:16px;--sp-lg:20px;--sp-xl:24px;--sp-xxl:32px;
+  /* Radius */
+  --r-sm:8px;--r-md:12px;--r-lg:16px;--r-xl:20px;
+  /* Transitions */
+  --ease:cubic-bezier(.4,0,.2,1);
+}
+html{font-size:16px}
+body{
+  font-family:'DM Sans',system-ui,-apple-system,sans-serif;
+  background:#0A0A0F;color:#E8E8ED;
+  min-height:100vh;overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ─── Outer Layout ─── */
+.showcase{display:flex;flex-direction:column;align-items:center;padding:48px 24px 80px}
+.showcase-header{text-align:center;margin-bottom:56px;max-width:700px}
+.showcase-header h1{
+  font-family:'DM Serif Display',serif;font-size:clamp(2rem,5vw,3.5rem);
+  line-height:1.1;margin-bottom:16px;
+  background:linear-gradient(135deg,#A78BFA 0%,#7C6FF7 40%,#34D399 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.showcase-header p{font-size:1.05rem;color:#9CA3AF;line-height:1.6}
+
+/* ─── Screen Navigation ─── */
+.screen-nav{
+  display:flex;flex-wrap:wrap;gap:8px;justify-content:center;
+  margin-bottom:48px;max-width:960px;
+}
+.screen-nav button{
+  padding:8px 18px;border-radius:100px;border:1px solid rgba(124,111,247,.25);
+  background:transparent;color:#A78BFA;font-size:13px;font-weight:600;
+  cursor:pointer;transition:all .25s var(--ease);font-family:inherit;
+  letter-spacing:.3px;
+}
+.screen-nav button:hover{background:rgba(124,111,247,.12);border-color:rgba(124,111,247,.5)}
+.screen-nav button.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* ─── Phone Frame ─── */
+.phone-stage{display:flex;gap:48px;align-items:flex-start;justify-content:center;flex-wrap:wrap}
+.phone-col{display:flex;flex-direction:column;align-items:center;gap:16px}
+.phone-col .mode-label{
+  font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;
+  color:#6B7280;
+}
+.phone-frame{
+  width:375px;height:812px;border-radius:52px;overflow:hidden;position:relative;
+  box-shadow:0 0 0 12px #1A1A2E,0 0 0 14px #2D2D44,0 40px 80px rgba(0,0,0,.6);
+  flex-shrink:0;
+}
+.phone-frame::before{
+  content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:160px;height:34px;background:#1A1A2E;border-radius:0 0 20px 20px;z-index:100;
+}
+.phone-screen{
+  width:100%;height:100%;overflow-y:auto;overflow-x:hidden;position:relative;
+  scrollbar-width:none;
+}
+.phone-screen::-webkit-scrollbar{display:none}
+
+/* ─── Theme Containers ─── */
+.light-theme{
+  --t-bg:var(--bg);--t-bg2:var(--bg2);--t-bg3:var(--bg3);
+  --t-primary:var(--primary);--t-primary-surface:var(--primary-surface);
+  --t-text1:var(--text1);--t-text2:var(--text2);--t-text3:var(--text3);
+  --t-border:var(--border);--t-success:var(--success);--t-warning:var(--warning);
+  --t-error:var(--error);--t-info:var(--info);
+}
+.dark-theme{
+  --t-bg:var(--d-bg);--t-bg2:var(--d-bg2);--t-bg3:var(--d-bg3);
+  --t-primary:var(--d-primary);--t-primary-surface:var(--d-primary-surface);
+  --t-text1:var(--d-text1);--t-text2:var(--d-text2);--t-text3:var(--d-text3);
+  --t-border:var(--d-border);--t-success:#4ADE80;--t-warning:#FCD34D;
+  --t-error:#F472B6;--t-info:#60A5FA;
+}
+
+/* ─── Shared Screen Styles ─── */
+.screen{
+  background:var(--t-bg);min-height:100%;padding:60px 20px 100px;
+  display:none;flex-direction:column;
+}
+.screen.active{display:flex}
+
+.screen h2.page-title{
+  font-family:'DM Serif Display',serif;font-size:28px;color:var(--t-text1);
+}
+.screen .date-sub{font-size:14px;color:var(--t-text2);margin-top:3px}
+
+.card{
+  background:var(--t-bg2);border-radius:var(--r-xl);padding:20px;
+  box-shadow:0 2px 12px rgba(0,0,0,.06);
+}
+.dark-theme .card{box-shadow:none}
+
+.capsule-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 10px;border-radius:100px;font-size:10px;font-weight:700;
+  letter-spacing:.6px;text-transform:uppercase;
+  background:var(--t-primary-surface);color:var(--t-primary);
+}
+
+.section-pill{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:5px 10px;border-radius:100px;font-size:11px;font-weight:600;
+  letter-spacing:.5px;text-transform:uppercase;
+  background:var(--t-bg3);color:var(--t-text2);
+}
+
+/* Icon badge */
+.icon-badge{
+  width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.icon-badge svg{width:20px;height:20px}
+.icon-badge-sm{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.icon-badge-sm svg{width:16px;height:16px}
+.soft-badge{
+  width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+}
+.soft-badge svg{width:32px;height:32px}
+.entry-badge{
+  width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.entry-badge svg{width:20px;height:20px}
+
+/* Buttons */
+.btn-primary{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:14px 28px;border-radius:100px;border:none;cursor:pointer;
+  font-size:16px;font-weight:600;font-family:inherit;
+  background:var(--t-primary);color:#fff;
+}
+.btn-dark{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:10px 22px;border-radius:100px;border:none;cursor:pointer;
+  font-size:15px;font-weight:600;font-family:inherit;
+  background:#1A1A1A;color:#fff;
+}
+.dark-theme .btn-dark{background:#fff;color:#0D0D0D}
+
+/* Tab bar */
+.tab-bar{
+  position:absolute;bottom:0;left:0;right:0;height:83px;
+  display:flex;align-items:flex-start;justify-content:space-around;
+  padding:10px 0 0;
+  background:var(--t-bg2);border-top:1px solid var(--t-border);
+  z-index:50;
+}
+.tab-item{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  font-size:10px;color:var(--t-text3);font-weight:500;cursor:pointer;
+  transition:color .15s;padding:0 4px;
+}
+.tab-item svg{width:22px;height:22px;fill:var(--t-text3);transition:fill .15s}
+.tab-item.active{color:var(--t-primary)}
+.tab-item.active svg{fill:var(--t-primary)}
+
+/* Progress ring */
+.progress-ring{position:relative;width:190px;height:190px;margin:0 auto}
+.progress-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.progress-ring .ring-bg{fill:none;stroke:var(--t-primary-surface);stroke-width:22}
+.progress-ring .ring-fg{
+  fill:none;stroke:url(#ringGrad);stroke-width:22;stroke-linecap:round;
+  stroke-dasharray:534;stroke-dashoffset:267;
+  transition:stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1);
+}
+.progress-ring .ring-center{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+.progress-ring .ring-value{font-size:46px;font-weight:700;color:var(--t-text1);font-variant-numeric:tabular-nums}
+.progress-ring .ring-label{font-size:13px;color:var(--t-text2)}
+
+/* Stat cards */
+.stat-row{display:flex;gap:12px}
+.stat-card{
+  flex:1;padding:18px;border-radius:var(--r-xl);background:var(--t-bg2);
+}
+.stat-card .stat-label{font-size:12px;font-weight:500;color:var(--t-text2);margin-top:10px}
+.stat-card .stat-val{font-size:30px;font-weight:700;color:var(--t-text1)}
+.stat-card .stat-unit{font-size:13px;color:var(--t-text2);margin-left:3px}
+
+/* Entry rows */
+.entry-row{display:flex;align-items:center;gap:14px;padding:13px 16px}
+.entry-row .entry-info{flex:1;min-width:0}
+.entry-row .entry-title{font-size:15px;font-weight:500;color:var(--t-text1)}
+.entry-row .entry-sub{font-size:13px;color:var(--t-text2)}
+.entry-row .entry-hours{font-size:15px;font-weight:600;color:var(--t-text1);text-align:right}
+.entry-row .entry-date{font-size:12px;color:var(--t-text2);text-align:right}
+.entry-divider{height:1px;background:var(--t-border);opacity:.4;margin-left:72px}
+
+/* Chip row */
+.chip-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chip-row::-webkit-scrollbar{display:none}
+.chip{
+  padding:8px 14px;border-radius:100px;font-size:12px;font-weight:500;
+  white-space:nowrap;cursor:pointer;border:none;font-family:inherit;
+  background:var(--t-bg3);color:var(--t-text1);transition:all .15s;
+}
+.chip.active{background:var(--t-primary);color:#fff}
+
+/* Filter chip */
+.filter-chip{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:8px 12px;border-radius:100px;font-size:13px;font-weight:500;
+  background:var(--t-bg2);color:var(--t-text2);
+  box-shadow:0 2px 4px rgba(0,0,0,.04);
+}
+.filter-chip.active{background:var(--t-primary-surface);color:var(--t-primary)}
+
+/* Summary chips */
+.summary-row{display:flex;gap:12px}
+.summary-chip{
+  flex:1;padding:10px;border-radius:var(--r-md);text-align:center;
+}
+.summary-chip .sum-val{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+.summary-chip .sum-label{font-size:11px;color:var(--t-text2)}
+
+/* Form rows */
+.form-row{
+  display:flex;align-items:center;gap:14px;
+  padding:12px 16px;
+}
+.form-row .form-icon{width:24px;text-align:center;color:var(--t-primary)}
+.form-row .form-label{font-size:15px;color:var(--t-text1);flex:1}
+.form-row .form-value{font-size:15px;color:var(--t-text2)}
+.form-divider{height:1px;background:var(--t-border);opacity:.3;margin-left:52px}
+
+/* Category grid */
+.cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.cat-cell{
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  padding:18px 8px;border-radius:18px;background:var(--t-bg2);
+}
+.cat-cell .cat-badge{
+  width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;
+}
+.cat-cell .cat-badge svg{width:22px;height:22px}
+.cat-cell .cat-name{font-size:11px;font-weight:500;color:var(--t-text1);text-align:center;line-height:1.3}
+
+/* Bar chart */
+.bar-row{display:flex;align-items:center;gap:12px;padding:12px}
+.bar-row .bar-label{font-size:14px;color:var(--t-text1);width:100px;flex-shrink:0}
+.bar-track{flex:1;height:8px;border-radius:4px;background:var(--t-bg3);overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width .8s var(--ease)}
+.bar-row .bar-val{font-size:14px;color:var(--t-text2);width:50px;text-align:right;flex-shrink:0}
+
+/* List group */
+.list-group{border-radius:var(--r-md);overflow:hidden;background:var(--t-bg2)}
+.list-row{
+  display:flex;align-items:center;gap:12px;padding:14px 16px;
+}
+.list-row .list-icon{width:24px;display:flex;justify-content:center}
+.list-row .list-icon svg{width:18px;height:18px;fill:var(--t-primary)}
+.list-row .list-text{flex:1;font-size:15px;color:var(--t-text1)}
+.list-row .list-detail{font-size:14px;color:var(--t-text2)}
+.list-divider{height:1px;background:var(--t-border);opacity:.3;margin-left:52px}
+
+/* Section header */
+.section-header{font-size:17px;font-weight:600;color:var(--t-text1);margin:24px 0 12px}
+
+/* Paywall hero */
+.pw-hero{text-align:center;padding:32px 0}
+.pw-price{font-size:48px;font-weight:700;color:var(--t-text1);font-variant-numeric:tabular-nums}
+.pw-price-sub{font-size:13px;color:var(--t-text2)}
+
+/* Onboarding */
+.ob-dots{display:flex;gap:6px;justify-content:center;margin:20px 0}
+.ob-dot{width:100%;height:4px;border-radius:100px;background:var(--t-border)}
+.ob-dot.active{background:var(--t-primary)}
+
+/* Splash */
+.splash-screen{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100%;
+  background:linear-gradient(180deg,#fff 0%,var(--primary-surface) 100%);
+}
+.dark-theme .splash-screen{
+  background:linear-gradient(180deg,var(--d-bg) 0%,var(--d-primary-surface) 100%);
+}
+
+/* Segmented control */
+.segmented{
+  display:inline-flex;border-radius:8px;overflow:hidden;background:var(--t-bg3);
+}
+.seg-btn{
+  padding:6px 16px;font-size:13px;font-weight:500;border:none;cursor:pointer;
+  font-family:inherit;color:var(--t-text2);background:transparent;
+}
+.seg-btn.active{background:var(--t-bg2);color:var(--t-text1);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+
+/* Property card */
+.property-card{
+  padding:16px;border-radius:var(--r-xl);background:var(--t-bg2);
+  display:flex;align-items:center;gap:14px;
+}
+.property-card .prop-info{flex:1;min-width:0}
+.property-card .prop-name{font-size:16px;font-weight:600;color:var(--t-text1)}
+.property-card .prop-addr{font-size:13px;color:var(--t-text2);margin-top:2px}
+.prop-type-badge{
+  display:inline-block;padding:3px 10px;border-radius:100px;font-size:10px;
+  font-weight:700;letter-spacing:.5px;margin-top:6px;
+}
+
+/* Feature row (paywall) */
+.feature-row{
+  display:flex;align-items:center;gap:14px;
+  padding:14px;border-radius:18px;background:var(--t-bg2);
+}
+.feature-row .feat-text{flex:1}
+.feature-row .feat-title{font-size:15px;font-weight:600;color:var(--t-text1)}
+.feature-row .feat-desc{font-size:13px;color:var(--t-text2)}
+
+/* Textarea mock */
+.mock-textarea{
+  background:var(--t-bg);border-radius:var(--r-md);padding:16px;
+  font-size:16px;color:var(--t-text3);min-height:80px;
+}
+
+/* ─── Responsive ─── */
+@media(max-width:860px){
+  .phone-stage{flex-direction:column;align-items:center}
+  .phone-frame{transform:scale(.85);transform-origin:top center}
+}
+@media(max-width:420px){
+  .phone-frame{transform:scale(.7);transform-origin:top center}
+}
+
+/* ─── Animations ─── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.animate-in{animation:fadeUp .5s var(--ease) both}
+.animate-in-d1{animation:fadeUp .5s var(--ease) .1s both}
+.animate-in-d2{animation:fadeUp .5s var(--ease) .2s both}
+.animate-in-d3{animation:fadeUp .5s var(--ease) .3s both}
+.animate-in-d4{animation:fadeUp .5s var(--ease) .4s both}
+.animate-in-d5{animation:fadeUp .5s var(--ease) .5s both}
+</style>
+</head>
+<body>
+
+<!-- SVG Defs -->
+<svg style="position:absolute;width:0;height:0">
+<defs>
+  <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#7C6FF7"/><stop offset="100%" stop-color="#A78BFA"/>
+  </linearGradient>
+  <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#8B5CF6"/><stop offset="100%" stop-color="#6D28D9"/>
+  </linearGradient>
+</defs>
+</svg>
+
+<div class="showcase">
+  <!-- Header -->
+  <div class="showcase-header animate-in">
+    <h1>LandlordHours Design System</h1>
+    <p>Complete screen designs for the iOS app. Tiimo-inspired, soft &amp; modern. Click a screen below to preview light and dark modes side by side.</p>
+  </div>
+
+  <!-- Screen Nav -->
+  <div class="screen-nav animate-in-d1" id="screenNav">
+    <button class="active" data-screen="splash">Splash</button>
+    <button data-screen="onboarding">Onboarding</button>
+    <button data-screen="dashboard">Dashboard</button>
+    <button data-screen="properties">Properties</button>
+    <button data-screen="track">Track Time</button>
+    <button data-screen="history">History</button>
+    <button data-screen="reports">Reports</button>
+    <button data-screen="settings">Settings</button>
+    <button data-screen="paywall">Paywall</button>
+  </div>
+
+  <!-- Phone Stage -->
+  <div class="phone-stage animate-in-d2" id="phoneStage">
+    <!-- Light -->
+    <div class="phone-col">
+      <span class="mode-label">Light Mode</span>
+      <div class="phone-frame">
+        <div class="phone-screen light-theme" id="lightPhone"></div>
+      </div>
+    </div>
+    <!-- Dark -->
+    <div class="phone-col">
+      <span class="mode-label">Dark Mode</span>
+      <div class="phone-frame">
+        <div class="phone-screen dark-theme" id="darkPhone"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── SVG Icons ───
+const icons = {
+  home: `<svg viewBox="0 0 24 24"><path d="M12 3L2.5 11H5v9a1 1 0 001 1h12a1 1 0 001-1v-9h2.5L12 3z"/><rect x="9.5" y="14.5" width="5" height="6.5" rx="1.5" fill="currentColor" style="mix-blend-mode:difference"/></svg>`,
+  properties: `<svg viewBox="0 0 24 24"><rect x="2" y="4" width="11" height="17" rx="2"/><rect x="14.5" y="9" width="7.5" height="12" rx="1.5"/><rect x="4.5" y="7" width="2.5" height="2.5" rx=".5" style="mix-blend-mode:difference"/><rect x="8.5" y="7" width="2.5" height="2.5" rx=".5" style="mix-blend-mode:difference"/><rect x="4.5" y="11.5" width="2.5" height="2.5" rx=".5" style="mix-blend-mode:difference"/><rect x="8.5" y="11.5" width="2.5" height="2.5" rx=".5" style="mix-blend-mode:difference"/><rect x="5.5" y="16" width="4" height="5" rx="1" style="mix-blend-mode:difference"/><rect x="16.5" y="11.5" width="2.5" height="2.5" rx=".5" style="mix-blend-mode:difference"/><rect x="16.5" y="15.5" width="2.5" height="2.5" rx=".5" style="mix-blend-mode:difference"/></svg>`,
+  track: `<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8.5"/><rect x="10.5" y="1.5" width="3" height="3.5" rx="1"/><rect x="11.3" y="7.5" width="1.4" height="5.5" rx=".7" style="mix-blend-mode:difference"/><rect x="12" y="12.3" width="4.5" height="1.4" rx=".7" style="mix-blend-mode:difference"/><circle cx="12" cy="13" r="1.2" style="mix-blend-mode:difference"/></svg>`,
+  reports: `<svg viewBox="0 0 24 24"><rect x="3" y="14" width="4.5" height="7" rx="1.5"/><rect x="9.75" y="8" width="4.5" height="13" rx="1.5"/><rect x="16.5" y="3" width="4.5" height="18" rx="1.5"/></svg>`,
+  settings: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3" style="mix-blend-mode:difference"/><rect x="10.25" y="1" width="3.5" height="3.5" rx=".8"/><rect x="10.25" y="19.5" width="3.5" height="3.5" rx=".8"/><rect x="1" y="10.25" width="3.5" height="3.5" rx=".8"/><rect x="19.5" y="10.25" width="3.5" height="3.5" rx=".8"/><rect x="3.5" y="3.5" width="3.5" height="3.5" rx=".8" transform="rotate(0 5.25 5.25)"/><rect x="17" y="17" width="3.5" height="3.5" rx=".8"/></svg>`,
+  bolt: `<svg viewBox="0 0 24 24"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></svg>`,
+  calendar: `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="3"/><rect x="3" y="4" width="18" height="6" rx="3" style="mix-blend-mode:difference"/><rect x="7" y="2" width="2" height="4" rx="1" style="mix-blend-mode:difference"/><rect x="15" y="2" width="2" height="4" rx="1" style="mix-blend-mode:difference"/></svg>`,
+  clock: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><rect x="11.2" y="6" width="1.6" height="6.5" rx=".8" style="mix-blend-mode:difference"/><rect x="11.5" y="11.2" width="5" height="1.6" rx=".8" style="mix-blend-mode:difference"/></svg>`,
+  crown: `<svg viewBox="0 0 24 24"><path d="M4 17l-1-10 5 4 4-7 4 7 5-4-1 10H4z"/><rect x="4" y="18" width="16" height="3" rx="1.5"/></svg>`,
+  checkmark: `<svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  seal: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M8 12l3 3 5-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="mix-blend-mode:difference"/></svg>`,
+  person: `<svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>`,
+  person2: `<svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="3.5"/><circle cx="17" cy="8" r="2.5"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M15 21c0-2.8 1.8-5 4-5s3.5 2.2 3.5 5"/></svg>`,
+  share: `<svg viewBox="0 0 24 24"><path d="M4 14v5a2 2 0 002 2h12a2 2 0 002-2v-5M12 3v12M8 7l4-4 4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  sparkles: `<svg viewBox="0 0 24 24"><path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/><path d="M19 14l1 3 3 1-3 1-1 3-1-3-3-1 3-1z" opacity=".6"/></svg>`,
+  wrench: `<svg viewBox="0 0 24 24"><path d="M5 7c-2 3 0 6 3 5l7 7c0 2 3 4 5 2s0-5-2-3L11 11c1-3-2-5-5-3z"/></svg>`,
+  key: `<svg viewBox="0 0 24 24"><circle cx="7.5" cy="8" r="4.5"/><circle cx="7.5" cy="8" r="1.8" style="mix-blend-mode:difference"/><rect x="11" y="6.8" width="10" height="2.4" rx="1.2"/><rect x="16" y="9.2" width="1.8" height="3" rx=".5"/><rect x="19.2" y="9.2" width="1.8" height="4" rx=".5"/></svg>`,
+  doc: `<svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="3"/><rect x="8" y="7" width="8" height="1.5" rx=".75" style="mix-blend-mode:difference"/><rect x="8" y="11" width="6" height="1.5" rx=".75" style="mix-blend-mode:difference"/><rect x="8" y="15" width="4" height="1.5" rx=".75" style="mix-blend-mode:difference"/></svg>`,
+  camera: `<svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="14" rx="3"/><circle cx="12" cy="13" r="4"/><circle cx="12" cy="13" r="2" style="mix-blend-mode:difference"/><rect x="9" y="4" width="6" height="3" rx="1.5"/></svg>`,
+  icloud: `<svg viewBox="0 0 24 24"><path d="M6.5 19A4.5 4.5 0 016 10a6 6 0 0111.2-2A4.5 4.5 0 0118 17.5H6.5z"/></svg>`,
+  info: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><rect x="11" y="10" width="2" height="6" rx="1" style="mix-blend-mode:difference"/><circle cx="12" cy="7.5" r="1.2" style="mix-blend-mode:difference"/></svg>`,
+  close: `<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>`,
+  chevronR: `<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  chevronL: `<svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  chevronD: `<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  target: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5" style="mix-blend-mode:difference"/><circle cx="12" cy="12" r="1.5"/></svg>`,
+  trash: `<svg viewBox="0 0 24 24"><rect x="5" y="6" width="14" height="15" rx="2"/><rect x="3" y="4" width="18" height="2.5" rx="1.25"/><rect x="9" y="2" width="6" height="3" rx="1.5"/><rect x="9" y="10" width="1.5" height="7" rx=".75" style="mix-blend-mode:difference"/><rect x="13.5" y="10" width="1.5" height="7" rx=".75" style="mix-blend-mode:difference"/></svg>`,
+  signout: `<svg viewBox="0 0 24 24"><path d="M9 3H5a2 2 0 00-2 2v14a2 2 0 002 2h4M16 17l5-5-5-5M21 12H9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  percent: `<svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/><path d="M19 5L5 19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+};
+
+function ic(name, color='currentColor') {
+  const svg = icons[name] || icons.home;
+  return svg.replace(/currentColor/g, color);
+}
+
+// ─── Logo SVG ───
+function logoMark(size=80) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 80 80">
+    <defs><linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#8B5CF6"/><stop offset="100%" stop-color="#6D28D9"/></linearGradient></defs>
+    <circle cx="40" cy="40" r="40" fill="url(#lg)"/>
+    <g transform="translate(18,18) scale(1.83)" fill="white">
+      <path d="M12 1.5L1 11h2.5v10c0 .83.67 1.5 1.5 1.5h14c.83 0 1.5-.67 1.5-1.5V11H23L12 1.5z"/>
+      <circle cx="12" cy="16" r="4.5" fill="#6D28D9"/>
+      <rect x="11.5" y="12.8" width="1" height="3.2" rx=".5" fill="white"/>
+      <rect x="12" y="15.5" width="2.8" height="1" rx=".5" fill="white"/>
+      <circle cx="12" cy="16" r=".8" fill="white"/>
+    </g>
+  </svg>`;
+}
+
+// ─── Screen Templates ───
+const screens = {
+  splash: () => `
+    <div class="splash-screen" style="padding:60px 20px 100px">
+      <div style="margin-bottom:32px;animation:pulse 3s ease-in-out infinite">
+        <div style="width:160px;height:160px;border-radius:50%;background:var(--t-primary-surface);display:flex;align-items:center;justify-content:center">
+          ${logoMark(96)}
+        </div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:30px;font-weight:700;color:var(--t-text1);margin-bottom:8px">
+          <span>Landlord</span><span style="color:var(--t-primary)">Hours</span>
+        </div>
+        <div style="font-size:15px;color:var(--t-text3)">Track your path to tax qualification</div>
+      </div>
+      <div style="margin-top:60px">
+        <div style="width:28px;height:28px;border:3px solid var(--t-primary);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite"></div>
+      </div>
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+    </div>`,
+
+  onboarding: () => `
+    <div class="screen active" style="background:var(--t-bg2);padding:60px 24px 40px">
+      <div class="ob-dots" style="display:flex;gap:6px">
+        <div class="ob-dot active" style="flex:1"></div>
+        <div class="ob-dot active" style="flex:1"></div>
+        <div class="ob-dot" style="flex:1"></div>
+        <div class="ob-dot" style="flex:1"></div>
+        <div class="ob-dot" style="flex:1"></div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:32px;padding:40px 0">
+        <div class="soft-badge" style="background:var(--t-primary-surface)">
+          <div style="fill:var(--t-primary)">${ic('track')}</div>
+        </div>
+        <div>
+          <div style="font-family:'DM Serif Display',serif;font-size:32px;line-height:1.15;color:var(--t-text1);margin-bottom:12px">Log Your<br>Activities</div>
+          <div style="font-size:15px;color:var(--t-text2);line-height:1.6;max-width:280px;margin:0 auto">Record time on repairs, management, leasing, travel, and more &mdash; all IRS-qualified categories.</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;padding-bottom:20px">
+        <button class="btn-dark" style="width:100%;justify-content:center;padding:16px;border-radius:16px;font-size:17px">Next</button>
+        <button style="background:none;border:none;color:var(--t-text3);font-size:14px;font-family:inherit;cursor:pointer;padding:8px">Skip</button>
+      </div>
+    </div>`,
+
+  dashboard: () => `
+    <div class="screen active">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+        <div>
+          <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--t-text1)">Good morning</div>
+          <div class="date-sub">Monday, February 24</div>
+        </div>
+        <div class="icon-badge" style="background:var(--t-primary)">
+          <div style="fill:#fff">${ic('home')}</div>
+        </div>
+      </div>
+      <!-- Progress Ring Card -->
+      <div class="card" style="text-align:center;padding:28px 20px;margin-bottom:24px;border-radius:24px">
+        <div class="progress-ring">
+          <svg viewBox="0 0 190 190"><circle class="ring-bg" cx="95" cy="95" r="85"/><circle class="ring-fg" cx="95" cy="95" r="85"/></svg>
+          <div class="ring-center">
+            <div class="ring-value">342</div>
+            <div class="ring-label">of 750h</div>
+            <div class="capsule-badge" style="margin-top:6px">REPS</div>
+          </div>
+        </div>
+        <div style="font-size:14px;color:var(--t-text2);margin-top:16px">408 hours remaining this year</div>
+      </div>
+      <!-- Quick Stats -->
+      <div class="stat-row" style="margin-bottom:24px">
+        <div class="stat-card">
+          <div class="icon-badge-sm" style="background:var(--t-primary-surface)">
+            <div style="fill:var(--t-primary)">${ic('bolt')}</div>
+          </div>
+          <div class="stat-label">This Week</div>
+          <div><span class="stat-val">8.5</span><span class="stat-unit">hrs</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="icon-badge-sm" style="background:var(--t-primary-surface)">
+            <div style="fill:var(--t-primary)">${ic('calendar')}</div>
+          </div>
+          <div class="stat-label">This Month</div>
+          <div><span class="stat-val">32.0</span><span class="stat-unit">hrs</span></div>
+        </div>
+      </div>
+      <!-- Recent Entries -->
+      <div class="section-pill" style="margin-bottom:12px">${ic('clock')} RECENT ENTRIES</div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="entry-row">
+          <div class="entry-badge" style="background:#8B5CF6"><div style="fill:#fff">${ic('wrench')}</div></div>
+          <div class="entry-info"><div class="entry-title">Repairs & Maintenance</div><div class="entry-sub">Oak Street Duplex</div></div>
+          <div><div class="entry-hours">2.5h</div><div class="entry-date">Feb 24</div></div>
+        </div>
+        <div class="entry-divider"></div>
+        <div class="entry-row">
+          <div class="entry-badge" style="background:#60A5FA"><div style="fill:#fff">${ic('key')}</div></div>
+          <div class="entry-info"><div class="entry-title">Leasing & Tenant</div><div class="entry-sub">Main Ave Unit</div></div>
+          <div><div class="entry-hours">1.0h</div><div class="entry-date">Feb 23</div></div>
+        </div>
+        <div class="entry-divider"></div>
+        <div class="entry-row">
+          <div class="entry-badge" style="background:#34D399"><div style="fill:#fff">${ic('doc')}</div></div>
+          <div class="entry-info"><div class="entry-title">Bookkeeping</div><div class="entry-sub">All Properties</div></div>
+          <div><div class="entry-hours">3.0h</div><div class="entry-date">Feb 22</div></div>
+        </div>
+      </div>
+    </div>
+    ${tabBar('home')}`,
+
+  properties: () => `
+    <div class="screen active">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+        <div class="page-title" style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--t-text1)">Properties</div>
+        <div style="fill:var(--t-primary);cursor:pointer"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="10"/><rect x="11" y="7" width="2" height="10" rx="1" style="mix-blend-mode:difference"/><rect x="7" y="11" width="10" height="2" rx="1" style="mix-blend-mode:difference"/></svg></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="property-card">
+          <div class="icon-badge" style="background:#60A5FA20"><div style="fill:#3B82F6">${ic('home')}</div></div>
+          <div class="prop-info">
+            <div class="prop-name">Oak Street Duplex</div>
+            <div class="prop-addr">1234 Oak St, Austin TX</div>
+            <div class="prop-type-badge" style="background:#60A5FA20;color:#3B82F6">LTR</div>
+          </div>
+          <div style="text-align:right"><div style="font-size:20px;font-weight:700;color:var(--t-text1)">186h</div><div style="font-size:11px;color:var(--t-text2)">logged</div></div>
+        </div>
+        <div class="property-card">
+          <div class="icon-badge" style="background:#F59E0B20"><div style="fill:#F59E0B">${ic('properties')}</div></div>
+          <div class="prop-info">
+            <div class="prop-name">Main Ave Unit</div>
+            <div class="prop-addr">567 Main Ave, Austin TX</div>
+            <div class="prop-type-badge" style="background:#F59E0B20;color:#D97706">STR</div>
+          </div>
+          <div style="text-align:right"><div style="font-size:20px;font-weight:700;color:var(--t-text1)">98h</div><div style="font-size:11px;color:var(--t-text2)">logged</div></div>
+        </div>
+        <div class="property-card">
+          <div class="icon-badge" style="background:#60A5FA20"><div style="fill:#3B82F6">${ic('home')}</div></div>
+          <div class="prop-info">
+            <div class="prop-name">Elm Creek House</div>
+            <div class="prop-addr">890 Elm Creek Rd, Dallas TX</div>
+            <div class="prop-type-badge" style="background:#60A5FA20;color:#3B82F6">LTR</div>
+          </div>
+          <div style="text-align:right"><div style="font-size:20px;font-weight:700;color:var(--t-text1)">58h</div><div style="font-size:11px;color:var(--t-text2)">logged</div></div>
+        </div>
+      </div>
+    </div>
+    ${tabBar('properties')}`,
+
+  track: () => `
+    <div class="screen active">
+      <!-- Header -->
+      <div style="margin-bottom:20px">
+        <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--t-text1)">Track Time</div>
+        <div class="date-sub">February 24, 2026</div>
+      </div>
+      <!-- Stats strip -->
+      <div style="display:flex;gap:12px;margin-bottom:24px">
+        <div style="flex:1;text-align:center;padding:14px;border-radius:16px;background:var(--t-bg2)">
+          <div style="font-size:20px;font-weight:700;color:var(--t-text1)">2.5h</div>
+          <div style="font-size:11px;color:var(--t-text2)">Today</div>
+        </div>
+        <div style="flex:1;text-align:center;padding:14px;border-radius:16px;background:var(--t-bg2)">
+          <div style="font-size:20px;font-weight:700;color:var(--t-text1)">8.5h</div>
+          <div style="font-size:11px;color:var(--t-text2)">This Week</div>
+        </div>
+        <div style="flex:1;text-align:center;padding:14px;border-radius:16px;background:var(--t-bg2)">
+          <div style="font-size:20px;font-weight:700;color:var(--t-text1)">32.0h</div>
+          <div style="font-size:11px;color:var(--t-text2)">This Month</div>
+        </div>
+      </div>
+      <!-- Log Time Section -->
+      <div class="section-pill" style="margin-bottom:10px"><svg viewBox="0 0 24 24" width="11" height="11" fill="var(--t-text2)"><circle cx="12" cy="12" r="10"/><rect x="11" y="7" width="2" height="10" rx="1" style="mix-blend-mode:difference"/><rect x="7" y="11" width="10" height="2" rx="1" style="mix-blend-mode:difference"/></svg> LOG TIME</div>
+      <div class="card" style="padding:0;margin-bottom:24px">
+        <div class="mock-textarea" style="margin:16px 16px 0">What did you work on?</div>
+        <!-- Category chips -->
+        <div style="padding:12px 16px 4px">
+          <div style="font-size:12px;font-weight:500;color:var(--t-text2);margin-bottom:8px">Category</div>
+          <div class="chip-row">
+            <div class="chip active">Repairs & Maintenance</div>
+            <div class="chip">Management</div>
+            <div class="chip">Leasing</div>
+            <div class="chip">Bookkeeping</div>
+            <div class="chip">Travel</div>
+          </div>
+        </div>
+        <div style="height:1px;background:var(--t-border);opacity:.3;margin:8px 16px"></div>
+        <!-- Form rows -->
+        <div class="form-row">
+          <div class="form-icon" style="fill:var(--t-primary)">${ic('clock')}</div>
+          <div class="form-label">Hours</div>
+          <div style="display:flex;align-items:center;gap:18px">
+            <div style="width:24px;height:24px;border-radius:50%;background:var(--t-bg3);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--t-text3)">−</div>
+            <span style="font-size:16px;font-weight:600;color:var(--t-text1)">1.0h</span>
+            <div style="width:24px;height:24px;border-radius:50%;background:var(--t-primary);display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff">+</div>
+          </div>
+        </div>
+        <div class="form-divider"></div>
+        <div class="form-row">
+          <div class="form-icon" style="fill:var(--t-primary)">${ic('calendar')}</div>
+          <div class="form-label">Date</div>
+          <div class="form-value">Feb 24, 2026</div>
+        </div>
+        <div class="form-divider"></div>
+        <div class="form-row">
+          <div class="form-icon" style="fill:var(--t-primary)">${ic('person')}</div>
+          <div class="form-label">For</div>
+          <div class="segmented"><div class="seg-btn active">Self</div><div class="seg-btn">Spouse</div></div>
+        </div>
+        <div style="height:1px;background:var(--t-border);opacity:.3;margin:0 16px"></div>
+        <!-- Bottom actions -->
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 16px">
+          <div style="padding:9px 14px;border-radius:100px;background:var(--t-bg3);font-size:13px;color:var(--t-text2);display:flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" width="15" height="15" fill="var(--t-text2)"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" fill="none" stroke="currentColor" stroke-width="2"/></svg></div>
+          <div style="padding:9px 14px;border-radius:100px;background:var(--t-primary-surface);font-size:13px;font-weight:500;color:var(--t-primary);display:flex;align-items:center;gap:5px"><div style="fill:var(--t-primary);width:13px;height:13px">${ic('sparkles')}</div> AI</div>
+          <div style="flex:1"></div>
+          <button class="btn-dark">Log Time</button>
+        </div>
+      </div>
+      <!-- Quick Log -->
+      <div class="section-pill" style="margin-bottom:10px">${ic('bolt')} QUICK LOG</div>
+      <div class="cat-grid">
+        <div class="cat-cell"><div class="cat-badge" style="background:#8B5CF6"><div style="fill:#fff">${ic('wrench')}</div></div><div class="cat-name">Repairs</div></div>
+        <div class="cat-cell"><div class="cat-badge" style="background:#34D399"><div style="fill:#fff">${ic('properties')}</div></div><div class="cat-name">Management</div></div>
+        <div class="cat-cell"><div class="cat-badge" style="background:#60A5FA"><div style="fill:#fff">${ic('key')}</div></div><div class="cat-name">Leasing</div></div>
+        <div class="cat-cell"><div class="cat-badge" style="background:#FBBF24"><div style="fill:#fff">${ic('doc')}</div></div><div class="cat-name">Bookkeeping</div></div>
+        <div class="cat-cell"><div class="cat-badge" style="background:#F472B6"><div style="fill:#fff">${ic('doc')}</div></div><div class="cat-name">Legal</div></div>
+        <div class="cat-cell"><div class="cat-badge" style="background:#3B82F6"><div style="fill:#fff">${ic('home')}</div></div><div class="cat-name">Travel</div></div>
+      </div>
+    </div>
+    ${tabBar('track')}`,
+
+  history: () => `
+    <div class="screen active" style="padding-bottom:100px">
+      <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--t-text1);margin-bottom:16px">History</div>
+      <!-- Filters -->
+      <div style="display:flex;gap:8px;margin-bottom:12px;overflow-x:auto">
+        <div class="filter-chip active"><div style="fill:var(--t-primary);width:11px;height:11px">${ic('calendar')}</div> 2026 <div style="fill:var(--t-primary);width:10px;height:10px">${ic('chevronD')}</div></div>
+        <div class="filter-chip"><div style="fill:var(--t-text2);width:11px;height:11px">${ic('person')}</div> All People <div style="fill:var(--t-text2);width:10px;height:10px">${ic('chevronD')}</div></div>
+        <div class="filter-chip"><div style="fill:var(--t-text2);width:11px;height:11px">${ic('home')}</div> All <div style="fill:var(--t-text2);width:10px;height:10px">${ic('chevronD')}</div></div>
+      </div>
+      <!-- Summary -->
+      <div class="summary-row" style="margin-bottom:16px">
+        <div class="summary-chip" style="background:rgba(52,211,153,.08)"><div class="sum-val" style="color:var(--t-success)">296.5h</div><div class="sum-label">REPS Hours</div></div>
+        <div class="summary-chip" style="background:rgba(251,191,36,.08)"><div class="sum-val" style="color:var(--t-warning)">45.5h</div><div class="sum-label">Non-REPS</div></div>
+        <div class="summary-chip" style="background:rgba(124,111,247,.08)"><div class="sum-val" style="color:var(--t-primary)">87</div><div class="sum-label">Entries</div></div>
+      </div>
+      <!-- Entries -->
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="entry-row">
+          <div class="entry-badge" style="background:#8B5CF6"><div style="fill:#fff">${ic('wrench')}</div></div>
+          <div class="entry-info"><div class="entry-title">Repairs & Maintenance</div><div class="entry-sub">Oak Street Duplex</div></div>
+          <div><div class="entry-hours">2.5h</div><div class="entry-date">Feb 24</div></div>
+        </div>
+        <div class="entry-divider"></div>
+        <div class="entry-row">
+          <div class="entry-badge" style="background:#60A5FA"><div style="fill:#fff">${ic('key')}</div></div>
+          <div class="entry-info"><div class="entry-title">Leasing & Tenant</div><div class="entry-sub">Main Ave Unit</div></div>
+          <div><div class="entry-hours">1.0h</div><div class="entry-date">Feb 23</div></div>
+        </div>
+        <div class="entry-divider"></div>
+        <div class="entry-row">
+          <div class="entry-badge" style="background:#34D399"><div style="fill:#fff">${ic('doc')}</div></div>
+          <div class="entry-info"><div class="entry-title">Bookkeeping</div><div class="entry-sub">All Properties</div></div>
+          <div><div class="entry-hours">3.0h</div><div class="entry-date">Feb 22</div></div>
+        </div>
+        <div class="entry-divider"></div>
+        <div class="entry-row">
+          <div class="entry-badge" style="background:#3B82F6"><div style="fill:#fff">${ic('home')}</div></div>
+          <div class="entry-info"><div class="entry-title">Travel to Property</div><div class="entry-sub">Elm Creek House</div></div>
+          <div><div class="entry-hours">0.5h</div><div class="entry-date">Feb 21</div></div>
+        </div>
+        <div class="entry-divider"></div>
+        <div class="entry-row">
+          <div class="entry-badge" style="background:#F472B6"><div style="fill:#fff">${ic('doc')}</div></div>
+          <div class="entry-info"><div class="entry-title">Legal & Compliance</div><div class="entry-sub">Oak Street Duplex</div></div>
+          <div><div class="entry-hours">1.5h</div><div class="entry-date">Feb 20</div></div>
+        </div>
+        <div class="entry-divider"></div>
+        <div class="entry-row">
+          <div class="entry-badge" style="background:#FBBF24"><div style="fill:#fff">${ic('wrench')}</div></div>
+          <div class="entry-info"><div class="entry-title">Renovations</div><div class="entry-sub">Main Ave Unit</div></div>
+          <div><div class="entry-hours">4.0h</div><div class="entry-date">Feb 19</div></div>
+        </div>
+      </div>
+    </div>
+    ${tabBar('home')}`,
+
+  reports: () => `
+    <div class="screen active">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--t-text1)">Reports</div>
+        <div style="fill:var(--t-primary);cursor:pointer">${ic('share')}</div>
+      </div>
+      <!-- Year selector -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:12px;background:var(--t-bg2);margin-bottom:20px">
+        <div style="fill:var(--t-primary);width:16px;height:16px">${ic('chevronL')}</div>
+        <div style="font-size:20px;font-weight:700;color:var(--t-text1)">2026</div>
+        <div style="fill:var(--t-primary);width:16px;height:16px">${ic('chevronR')}</div>
+      </div>
+      <!-- REPS Progress -->
+      <div class="card" style="margin-bottom:20px;border-radius:20px;padding:24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div style="font-size:17px;font-weight:600;color:var(--t-text1)">REPS Progress</div>
+          <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--t-success)"><div style="fill:var(--t-success);width:14px;height:14px">${ic('seal')}</div> 50% Rule Met</div>
+        </div>
+        <div class="progress-ring" style="width:170px;height:170px;margin:0 auto 16px">
+          <svg viewBox="0 0 170 170"><circle cx="85" cy="85" r="75" fill="none" stroke="var(--t-primary-surface)" stroke-width="18"/><circle cx="85" cy="85" r="75" fill="none" stroke="url(#ringGrad)" stroke-width="18" stroke-linecap="round" stroke-dasharray="471" stroke-dashoffset="236" transform="rotate(-90 85 85)"/></svg>
+          <div class="ring-center"><div style="font-size:42px;font-weight:700;color:var(--t-text1)">342</div><div style="font-size:14px;color:var(--t-text2)">of 750 hours</div></div>
+        </div>
+        <div style="display:flex;text-align:center">
+          <div style="flex:1"><div style="fill:var(--t-primary);width:24px;height:24px;margin:0 auto 6px">${ic('person')}</div><div style="font-size:13px;color:var(--t-text2)">You</div><div style="font-size:20px;font-weight:700;color:var(--t-text1)">210.5h</div></div>
+          <div style="width:1px;background:var(--t-border);opacity:.4"></div>
+          <div style="flex:1"><div style="fill:#A78BFA;width:24px;height:24px;margin:0 auto 6px">${ic('person2')}</div><div style="font-size:13px;color:var(--t-text2)">Spouse</div><div style="font-size:20px;font-weight:700;color:var(--t-text1)">131.5h</div></div>
+        </div>
+      </div>
+      <!-- Quick stats -->
+      <div class="stat-row" style="margin-bottom:20px">
+        <div style="flex:1;text-align:center;padding:12px;border-radius:10px;background:var(--t-bg2)">
+          <div style="font-size:15px;font-weight:700;color:var(--t-text1)">8.5h</div>
+          <div style="font-size:11px;color:var(--t-text2)">This Week</div>
+        </div>
+        <div style="flex:1;text-align:center;padding:12px;border-radius:10px;background:var(--t-bg2)">
+          <div style="font-size:15px;font-weight:700;color:var(--t-text1)">32.0h</div>
+          <div style="font-size:11px;color:var(--t-text2)">This Month</div>
+        </div>
+      </div>
+      <!-- By Property -->
+      <div style="font-size:17px;font-weight:600;color:var(--t-text1);margin-bottom:12px">By Property</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
+        <div style="padding:12px;border-radius:12px;background:var(--t-bg2)">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:14px;font-weight:500;color:var(--t-text1)">Oak Street Duplex</span><span style="font-size:14px;color:var(--t-text2)">186.0h</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:54%;background:#3B82F6"></div></div>
+        </div>
+        <div style="padding:12px;border-radius:12px;background:var(--t-bg2)">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:14px;font-weight:500;color:var(--t-text1)">Main Ave Unit</span><span style="font-size:14px;color:var(--t-text2)">98.0h</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:29%;background:#F59E0B"></div></div>
+        </div>
+        <div style="padding:12px;border-radius:12px;background:var(--t-bg2)">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:14px;font-weight:500;color:var(--t-text1)">Elm Creek House</span><span style="font-size:14px;color:var(--t-text2)">58.0h</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:17%;background:#3B82F6"></div></div>
+        </div>
+      </div>
+      <!-- By Category -->
+      <div style="font-size:17px;font-weight:600;color:var(--t-text1);margin-bottom:12px">By Category</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="padding:12px;border-radius:12px;background:var(--t-bg2)">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:14px;color:var(--t-text1)">Repairs & Maintenance</span><span style="font-size:14px;color:var(--t-text2)">124.0h</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:60%;background:#8B5CF6"></div></div>
+        </div>
+        <div style="padding:12px;border-radius:12px;background:var(--t-bg2)">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:14px;color:var(--t-text1)">Property Management</span><span style="font-size:14px;color:var(--t-text2)">86.5h</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:42%;background:#8B5CF6"></div></div>
+        </div>
+        <div style="padding:12px;border-radius:12px;background:var(--t-bg2)">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:14px;color:var(--t-text1)">Leasing & Tenant</span><span style="font-size:14px;color:var(--t-text2)">52.0h</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:25%;background:#8B5CF6"></div></div>
+        </div>
+      </div>
+    </div>
+    ${tabBar('reports')}`,
+
+  settings: () => `
+    <div class="screen active" style="padding-left:0;padding-right:0">
+      <div style="font-family:'DM Serif Display',serif;font-size:28px;color:var(--t-text1);padding:0 20px;margin-bottom:20px">Settings</div>
+      <!-- Membership -->
+      <div style="padding:0 16px;margin-bottom:16px">
+        <div style="padding:16px;border-radius:16px;background:var(--t-bg2)">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="fill:var(--t-warning);width:24px;height:24px">${ic('clock')}</div>
+            <div style="flex:1"><div style="font-size:17px;font-weight:600;color:var(--t-text1)">Free Trial</div><div style="font-size:12px;color:var(--t-warning)">12 days remaining</div></div>
+            <div style="padding:8px 16px;border-radius:8px;background:var(--t-warning);color:#000;font-size:14px;font-weight:600">Upgrade</div>
+          </div>
+        </div>
+      </div>
+      <!-- Profile -->
+      <div style="font-size:12px;font-weight:600;color:var(--t-text2);padding:0 32px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Profile</div>
+      <div class="list-group" style="margin:0 16px 16px">
+        <div class="list-row">
+          <div class="icon-badge" style="background:var(--t-primary);width:50px;height:50px"><div style="fill:#fff;width:22px;height:22px">${ic('person')}</div></div>
+          <div style="flex:1"><div style="font-size:17px;font-weight:600;color:var(--t-text1)">Brian</div><div style="font-size:12px;color:var(--t-text2)">brian@email.com</div></div>
+          <div style="fill:var(--t-text3);width:14px;height:14px">${ic('chevronR')}</div>
+        </div>
+      </div>
+      <!-- Goals -->
+      <div style="font-size:12px;font-weight:600;color:var(--t-text2);padding:0 32px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Goals & Settings</div>
+      <div class="list-group" style="margin:0 16px 16px">
+        <div class="list-row">
+          <div class="list-icon"><div style="fill:var(--t-primary)">${ic('target')}</div></div>
+          <div class="list-text">Tax Goal</div>
+          <div class="list-detail">REPS</div>
+        </div>
+        <div class="list-divider"></div>
+        <div class="list-row">
+          <div class="list-icon"><div style="fill:var(--t-primary)">${ic('home')}</div></div>
+          <div class="list-text">Property Goals</div>
+          <div class="list-detail">3 properties</div>
+        </div>
+        <div class="list-divider"></div>
+        <div class="list-row">
+          <div class="list-icon"><div style="fill:var(--t-primary)">${ic('clock')}</div></div>
+          <div class="list-text">Annual Hour Goal</div>
+          <div class="list-detail">750 hours</div>
+        </div>
+        <div class="list-divider"></div>
+        <div class="list-row">
+          <div class="list-icon"><div style="fill:var(--t-primary)">${ic('percent')}</div></div>
+          <div class="list-text">Working Time Rule</div>
+          <div class="list-detail">50%</div>
+        </div>
+      </div>
+      <!-- AI -->
+      <div style="font-size:12px;font-weight:600;color:var(--t-text2);padding:0 32px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">AI Features</div>
+      <div class="list-group" style="margin:0 16px 16px">
+        <div class="list-row">
+          <div class="list-icon"><div style="fill:var(--t-primary)">${ic('sparkles')}</div></div>
+          <div class="list-text">Smart Entry</div>
+          <div style="font-size:12px;color:var(--t-text3)">Pro Only</div>
+        </div>
+      </div>
+      <!-- Data -->
+      <div style="font-size:12px;font-weight:600;color:var(--t-text2);padding:0 32px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Data</div>
+      <div class="list-group" style="margin:0 16px 16px">
+        <div class="list-row">
+          <div class="list-icon"><div style="fill:var(--t-primary)">${ic('share')}</div></div>
+          <div class="list-text">Export Data</div>
+          <div style="fill:var(--t-text3);width:14px;height:14px">${ic('chevronR')}</div>
+        </div>
+        <div class="list-divider"></div>
+        <div class="list-row">
+          <div class="list-icon"><div style="fill:var(--t-primary)">${ic('icloud')}</div></div>
+          <div class="list-text">iCloud Backup</div>
+          <div style="width:44px;height:26px;border-radius:13px;background:var(--t-bg3);position:relative"><div style="width:22px;height:22px;border-radius:50%;background:var(--t-bg2);position:absolute;top:2px;left:2px;box-shadow:0 1px 3px rgba(0,0,0,.15)"></div></div>
+        </div>
+      </div>
+      <!-- Danger -->
+      <div class="list-group" style="margin:0 16px 16px">
+        <div class="list-row">
+          <div class="list-icon"><div style="fill:var(--t-error)">${ic('trash')}</div></div>
+          <div class="list-text" style="color:var(--t-error)">Reset All Data</div>
+        </div>
+        <div class="list-divider"></div>
+        <div class="list-row">
+          <div class="list-icon"><div style="fill:var(--t-error)">${ic('signout')}</div></div>
+          <div class="list-text" style="color:var(--t-error)">Sign Out</div>
+        </div>
+      </div>
+    </div>
+    ${tabBar('settings')}`,
+
+  paywall: () => `
+    <div class="screen active" style="padding:56px 24px 40px;position:relative">
+      <!-- Close button -->
+      <div style="position:absolute;top:16px;right:20px;width:32px;height:32px;border-radius:50%;background:var(--t-bg3);display:flex;align-items:center;justify-content:center">
+        <div style="fill:var(--t-text2);width:12px;height:12px">${ic('close')}</div>
+      </div>
+      <!-- Hero -->
+      <div class="pw-hero">
+        <div style="margin:0 auto 20px;width:112px;height:112px;border-radius:50%;background:var(--t-primary-surface);display:flex;align-items:center;justify-content:center;position:relative">
+          <div style="position:absolute;width:148px;height:148px;border-radius:50%;background:var(--t-primary);opacity:.07;animation:pulse 3s ease-in-out infinite"></div>
+          <div style="fill:var(--t-primary);width:48px;height:48px">${ic('crown')}</div>
+        </div>
+        <div style="font-size:32px;font-weight:700;color:var(--t-text1)">Go Pro</div>
+        <div style="font-size:16px;color:var(--t-text2);margin-top:8px;line-height:1.5">Track every hour.<br>Keep every deduction.</div>
+      </div>
+      <!-- Features -->
+      <div class="section-pill" style="margin-bottom:12px">${ic('sparkles')} WHAT'S INCLUDED</div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px">
+        ${[
+          {icon:'sparkles',title:'AI Smart Entry',desc:'Describe your work, AI does the rest',color:'#7C6FF7'},
+          {icon:'camera',title:'Photo Evidence',desc:'Attach photos to every time entry',color:'#EF4444'},
+          {icon:'icloud',title:'iCloud Backup',desc:'Your records, safe and synced forever',color:'#60A5FA'},
+          {icon:'doc',title:'Audit-Ready Reports',desc:'Clean PDF exports for tax filing',color:'#34D399'},
+          {icon:'properties',title:'Unlimited Properties',desc:'Track every rental you own',color:'#FBBF24'},
+        ].map(f => `
+          <div class="feature-row">
+            <div style="width:48px;height:48px;border-radius:14px;background:${f.color};display:flex;align-items:center;justify-content:center;flex-shrink:0"><div style="fill:#fff;width:22px;height:22px">${ic(f.icon)}</div></div>
+            <div class="feat-text"><div class="feat-title">${f.title}</div><div class="feat-desc">${f.desc}</div></div>
+            <div style="fill:var(--t-success);width:18px;height:18px;flex-shrink:0">${ic('checkmark')}</div>
+          </div>
+        `).join('')}
+      </div>
+      <!-- Free notice -->
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;background:var(--t-bg2);margin-bottom:32px">
+        <div style="fill:var(--t-text3);width:14px;height:14px">${ic('info')}</div>
+        <div style="font-size:13px;color:var(--t-text2)">Free plan: 1 property &middot; 20 entries/month</div>
+      </div>
+      <!-- Pricing -->
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="display:flex;align-items:baseline;justify-content:center;gap:6px">
+          <span class="pw-price">$30</span>
+          <div style="text-align:left"><div style="font-size:13px;font-weight:500;color:var(--t-text2)">one-time</div><div style="font-size:11px;font-weight:500;color:var(--t-success)">yours forever</div></div>
+        </div>
+        <div style="font-size:13px;color:var(--t-text2);margin-top:4px">Less than one hour of billable time</div>
+      </div>
+      <!-- Trial badge -->
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:100px;background:rgba(251,191,36,.1)">
+          <div style="fill:var(--t-warning);width:12px;height:12px">${ic('clock')}</div>
+          <span style="font-size:13px;font-weight:500;color:var(--t-text2)">12 days left in free trial</span>
+        </div>
+      </div>
+      <!-- CTA -->
+      <button class="btn-dark" style="width:100%;justify-content:center;padding:18px;border-radius:18px;font-size:17px">Unlock Pro &middot; $30</button>
+      <div style="text-align:center;margin-top:16px"><span style="font-size:14px;color:var(--t-text3);cursor:pointer">Maybe Later</span></div>
+    </div>`,
+};
+
+function tabBar(active) {
+  const tabs = [
+    {id:'home',icon:'home',label:'Home'},
+    {id:'properties',icon:'properties',label:'Properties'},
+    {id:'track',icon:'track',label:'Track'},
+    {id:'reports',icon:'reports',label:'Reports'},
+    {id:'settings',icon:'settings',label:'Settings'},
+  ];
+  return `<div class="tab-bar">${tabs.map(t =>
+    `<div class="tab-item ${t.id===active?'active':''}" data-tab="${t.id}">
+      <div style="width:22px;height:22px">${ic(t.icon)}</div>
+      <span>${t.label}</span>
+    </div>`
+  ).join('')}</div>`;
+}
+
+// ─── Render Logic ───
+const lightPhone = document.getElementById('lightPhone');
+const darkPhone = document.getElementById('darkPhone');
+const navBtns = document.querySelectorAll('.screen-nav button');
+
+function showScreen(name) {
+  const gen = screens[name];
+  if (!gen) return;
+  lightPhone.innerHTML = gen();
+  darkPhone.innerHTML = gen();
+
+  // Wire tab clicks
+  document.querySelectorAll('.tab-item[data-tab]').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.dataset.tab;
+      const screenMap = {home:'dashboard',properties:'properties',track:'track',reports:'reports',settings:'settings'};
+      const screenName = screenMap[target];
+      if (screenName && screens[screenName]) {
+        showScreen(screenName);
+        navBtns.forEach(b => b.classList.toggle('active', b.dataset.screen === screenName));
+      }
+    });
+  });
+}
+
+navBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    navBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    showScreen(btn.dataset.screen);
+  });
+});
+
+// Initial
+showScreen('splash');
+</script>
+</body>
+</html>

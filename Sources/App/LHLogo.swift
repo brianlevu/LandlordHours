@@ -1,8 +1,8 @@
 import SwiftUI
 
 // MARK: - LandlordHours Logo
-// A custom SwiftUI-rendered logo combining a house + clock motif
-// in a soft, modern, Tiimo-inspired style
+// Wave-house icon — house silhouette filled with flowing violet gradient waves
+// Matches the app icon (Variant A) from figma-redesign/app-icons.html
 
 struct LHLogo: View {
     var size: CGFloat = 80
@@ -20,7 +20,7 @@ struct LHLogo: View {
         }
         .onAppear {
             if animated {
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.1)) {
+                withAnimation(AppAnimation.logoEntrance.delay(0.1)) {
                     appeared = true
                 }
             } else {
@@ -29,91 +29,114 @@ struct LHLogo: View {
         }
     }
 
-    // MARK: - Logo Mark (Icon)
+    // MARK: - Logo Mark (Wave House Icon)
     private var logoMark: some View {
-        ZStack {
-            // Background circle with gradient
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(hex: "8B5CF6"),
-                            Color(hex: "6D28D9")
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: size, height: size)
-                .shadow(color: Color(hex: "8B5CF6").opacity(0.35), radius: size * 0.15, y: size * 0.06)
-
-            // House + Clock composite icon
-            LogoShape()
-                .fill(.white)
-                .frame(width: size * 0.52, height: size * 0.52)
-        }
-        .scaleEffect(appeared ? 1 : 0.3)
-        .opacity(appeared ? 1 : 0)
+        WaveHouseIcon(size: size)
+            .shadow(color: AppColors.primary.opacity(0.3), radius: size * 0.15, y: size * 0.06)
+            .scaleEffect(appeared ? 1 : 0.3)
+            .opacity(appeared ? 1 : 0)
     }
 
     // MARK: - Logo Text
     private var logoText: some View {
         VStack(spacing: size * 0.04) {
-            Text("Landlord")
-                .font(.system(size: size * 0.28, weight: .bold, design: .rounded))
-            +
-            Text("Hours")
-                .font(.system(size: size * 0.28, weight: .bold, design: .rounded))
-                .foregroundColor(Color(hex: "8B5CF6"))
+            (
+                Text("Landlord")
+                    .foregroundColor(AppColors.charcoal)
+                +
+                Text("Hours")
+                    .foregroundColor(AppColors.primary)
+            )
+            .font(.system(size: size * 0.28, weight: .bold, design: .rounded))
         }
         .opacity(appeared ? 1 : 0)
         .offset(y: appeared ? 0 : 10)
     }
 }
 
-// MARK: - Logo Shape (House with clock hands)
-struct LogoShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        let s = min(rect.width, rect.height)
-        let ox = rect.minX + (rect.width - s) / 2
-        let oy = rect.minY + (rect.height - s) / 2
+// MARK: - Wave House Icon (self-contained, any size)
+/// The primary brand mark — a house silhouette clipped with flowing violet gradient waves
+struct WaveHouseIcon: View {
+    var size: CGFloat = 80
 
-        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: ox + x / 24 * s, y: oy + y / 24 * s)
+    var body: some View {
+        Canvas { context, canvasSize in
+            let s = canvasSize.width
+            let scale = s / 1024
+
+            // Helper to scale points from 1024 coordinate space
+            func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+                CGPoint(x: x * scale, y: y * scale)
+            }
+
+            // 1. Background fill
+            let bgRect = CGRect(origin: .zero, size: canvasSize)
+            context.fill(Path(bgRect), with: .color(Color(hex: "F4F1FF")))
+
+            // 2. House clip path
+            var housePath = Path()
+            housePath.move(to: p(512, 140))
+            housePath.addLine(to: p(168, 390))
+            housePath.addLine(to: p(168, 880))
+            housePath.addQuadCurve(to: p(198, 910), control: p(168, 910))
+            housePath.addLine(to: p(826, 910))
+            housePath.addQuadCurve(to: p(856, 880), control: p(856, 910))
+            housePath.addLine(to: p(856, 390))
+            housePath.closeSubpath()
+            // Chimney
+            housePath.move(to: p(700, 180))
+            housePath.addLine(to: p(700, 280))
+            housePath.addLine(to: p(780, 280))
+            housePath.addLine(to: p(780, 250))
+            housePath.addQuadCurve(to: p(740, 180), control: p(780, 180))
+            housePath.closeSubpath()
+
+            context.clipToLayer { ctx in
+                ctx.fill(housePath, with: .color(.white))
+            }
+
+            // 3. Base gradient (lightest violet)
+            let bgGradient = Gradient(colors: [Color(hex: "D8D0FF"), Color(hex: "B8AFFE")])
+            context.fill(Path(bgRect), with: .linearGradient(bgGradient, startPoint: .zero, endPoint: CGPoint(x: 0, y: s)))
+
+            // 4. Wave 1 — light violet
+            var wave1 = Path()
+            wave1.move(to: p(0, 380))
+            wave1.addQuadCurve(to: p(400, 370), control: p(200, 310))
+            wave1.addQuadCurve(to: p(800, 360), control: p(600, 430))
+            wave1.addQuadCurve(to: p(1024, 350), control: p(900, 330))
+            wave1.addLine(to: p(1024, 1024))
+            wave1.addLine(to: p(0, 1024))
+            wave1.closeSubpath()
+            let w1Gradient = Gradient(colors: [Color(hex: "A899F7"), Color(hex: "9485F0")])
+            context.fill(wave1, with: .linearGradient(w1Gradient, startPoint: .zero, endPoint: CGPoint(x: s, y: s)))
+
+            // 5. Wave 2 — mid violet
+            var wave2 = Path()
+            wave2.move(to: p(0, 520))
+            wave2.addQuadCurve(to: p(480, 510), control: p(250, 440))
+            wave2.addQuadCurve(to: p(900, 480), control: p(700, 580))
+            wave2.addQuadCurve(to: p(1024, 470), control: p(980, 450))
+            wave2.addLine(to: p(1024, 1024))
+            wave2.addLine(to: p(0, 1024))
+            wave2.closeSubpath()
+            let w2Gradient = Gradient(colors: [Color(hex: "8B78F0"), Color(hex: "7B68EE")])
+            context.fill(wave2, with: .linearGradient(w2Gradient, startPoint: .zero, endPoint: CGPoint(x: s, y: s)))
+
+            // 6. Wave 3 — deep violet
+            var wave3 = Path()
+            wave3.move(to: p(0, 660))
+            wave3.addQuadCurve(to: p(420, 650), control: p(220, 590))
+            wave3.addQuadCurve(to: p(850, 620), control: p(650, 720))
+            wave3.addQuadCurve(to: p(1024, 610), control: p(950, 580))
+            wave3.addLine(to: p(1024, 1024))
+            wave3.addLine(to: p(0, 1024))
+            wave3.closeSubpath()
+            let w3Gradient = Gradient(colors: [Color(hex: "6B58DE"), Color(hex: "4A38B0")])
+            context.fill(wave3, with: .linearGradient(w3Gradient, startPoint: .zero, endPoint: CGPoint(x: s * 0.5, y: s)))
         }
-        func v(_ x: CGFloat) -> CGFloat { x / 24 * s }
-
-        var path = Path()
-
-        // House roof (pointed)
-        path.move(to: p(12, 1.5))
-        path.addLine(to: p(1, 11))
-        path.addLine(to: p(3.5, 11))
-        path.addLine(to: p(3.5, 21))
-        path.addQuadCurve(to: p(5, 22.5), control: p(3.5, 22.5))
-        path.addLine(to: p(19, 22.5))
-        path.addQuadCurve(to: p(20.5, 21), control: p(20.5, 22.5))
-        path.addLine(to: p(20.5, 11))
-        path.addLine(to: p(23, 11))
-        path.closeSubpath()
-
-        // Clock circle cutout in the house body
-        let clockCx = ox + v(12)
-        let clockCy = oy + v(16)
-        let clockR = v(4.5)
-        path.addEllipse(in: CGRect(x: clockCx - clockR, y: clockCy - clockR, width: clockR * 2, height: clockR * 2))
-
-        // Clock hands (drawn as separate filled paths for the cutout)
-        // Hour hand (pointing up-left ~ 10 o'clock)
-        path.addRoundedRect(in: CGRect(x: clockCx - v(0.5), y: clockCy - v(3.2), width: v(1), height: v(3.2)), cornerSize: CGSize(width: v(0.5), height: v(0.5)))
-
-        // Minute hand (pointing right ~ 3 o'clock)
-        path.addRoundedRect(in: CGRect(x: clockCx, y: clockCy - v(0.5), width: v(2.8), height: v(1)), cornerSize: CGSize(width: v(0.5), height: v(0.5)))
-
-        // Center dot
-        path.addEllipse(in: CGRect(x: clockCx - v(0.8), y: clockCy - v(0.8), width: v(1.6), height: v(1.6)))
-
-        return path
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
     }
 }
 
@@ -122,25 +145,8 @@ struct LHCompactLogo: View {
     var size: CGFloat = 32
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(hex: "8B5CF6"),
-                            Color(hex: "6D28D9")
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: size, height: size)
-                .shadow(color: Color(hex: "8B5CF6").opacity(0.25), radius: size * 0.12, y: size * 0.05)
-
-            LogoShape()
-                .fill(.white)
-                .frame(width: size * 0.52, height: size * 0.52)
-        }
+        WaveHouseIcon(size: size)
+            .shadow(color: AppColors.primary.opacity(0.25), radius: size * 0.12, y: size * 0.05)
     }
 }
 
@@ -152,9 +158,10 @@ struct LHWordmark: View {
         HStack(spacing: 0) {
             Text("Landlord")
                 .font(.system(size: fontSize, weight: .bold, design: .rounded))
+                .foregroundColor(AppColors.charcoal)
             Text("Hours")
                 .font(.system(size: fontSize, weight: .bold, design: .rounded))
-                .foregroundColor(Color(hex: "8B5CF6"))
+                .foregroundColor(AppColors.primary)
         }
     }
 }
@@ -165,12 +172,13 @@ struct LHWordmark: View {
         LHLogo(size: 120, showText: true, animated: true)
 
         HStack(spacing: 24) {
-            LHLogo(size: 64, showText: false)
-            LHLogo(size: 48, showText: false)
+            WaveHouseIcon(size: 64)
+            WaveHouseIcon(size: 48)
             LHCompactLogo(size: 32)
         }
 
         LHWordmark(fontSize: 28)
     }
     .padding()
+    .background(Color(hex: "FAF7F2"))
 }

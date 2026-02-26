@@ -12,13 +12,13 @@ class SubscriptionManager: ObservableObject {
     @Published var purchaseError: String?
     
     private let proProductID = "com.openclaw.landlordhours.pro"
-    private let trialStartKey = "trialStartDate"
-    private let isProKey = "isProUser"
-    private let hasPurchasedKey = "hasPurchasedPro"
-    
+    private var trialStartKey: String { UserScope.key("trialStartDate") }
+    private var isProKey: String { UserScope.key("isProUser") }
+    private var hasPurchasedKey: String { UserScope.key("hasPurchasedPro") }
+
     private init() {
         // Load purchased status
-        hasPurchased = UserDefaults.standard.bool(forKey: hasPurchasedKey)
+        hasPurchased = UserDefaults.standard.bool(forKey: UserScope.key("hasPurchasedPro"))
         checkSubscriptionStatus()
         
         // Load products from App Store
@@ -114,6 +114,19 @@ class SubscriptionManager: ObservableObject {
         return trialDaysRemaining > 0 && !hasPurchased
     }
     
+    /// Reload subscription state for the current user (call after sign-in)
+    func reload() {
+        hasPurchased = UserDefaults.standard.bool(forKey: hasPurchasedKey)
+        checkSubscriptionStatus()
+    }
+
+    /// Reset subscription state on sign-out without starting a new trial
+    func resetForSignOut() {
+        isPro = false
+        hasPurchased = false
+        trialDaysRemaining = 0
+    }
+
     var showPaywall: Bool {
         return !isPro
     }

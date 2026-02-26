@@ -1,4 +1,5 @@
 import SwiftUI
+import LucideIcons
 
 struct HistoryView: View {
     @EnvironmentObject var viewModel: AppViewModel
@@ -39,7 +40,7 @@ struct HistoryView: View {
                                 Button(String(year)) { selectedYear = year }
                             }
                         } label: {
-                            filterChip(text: String(selectedYear), icon: "calendar", isActive: true)
+                            filterChip(text: String(selectedYear), icon: Lucide.calendar, isActive: true)
                         }
 
                         Menu {
@@ -50,7 +51,7 @@ struct HistoryView: View {
                         } label: {
                             filterChip(
                                 text: selectedParticipant?.rawValue ?? "All People",
-                                icon: "person.fill",
+                                icon: Lucide.user,
                                 isActive: selectedParticipant != nil
                             )
                         }
@@ -63,7 +64,7 @@ struct HistoryView: View {
                         } label: {
                             filterChip(
                                 text: selectedProperty?.name ?? "All Properties",
-                                icon: "house.fill",
+                                icon: Lucide.house,
                                 isActive: selectedProperty != nil
                             )
                         }
@@ -75,8 +76,8 @@ struct HistoryView: View {
 
                 // Summary strip
                 HStack(spacing: 12) {
-                    summaryChip(label: "REPS Hours", value: String(format: "%.1fh", totalREPSHours), color: AppColors.success)
-                    summaryChip(label: "Non-REPS", value: String(format: "%.1fh", totalNonREPSHours), color: AppColors.warning)
+                    summaryChip(label: "REPS Hours", value: String(format: "%.1fh", totalREPSHours), color: AppColors.sage)
+                    summaryChip(label: "Non-REPS", value: String(format: "%.1fh", totalNonREPSHours), color: AppColors.honey)
                     summaryChip(label: "Entries", value: "\(filteredEntries.count)", color: AppColors.primary)
                 }
                 .padding(.horizontal, 20)
@@ -90,12 +91,12 @@ struct HistoryView: View {
                 // Entries
                 if filteredEntries.isEmpty {
                     VStack(spacing: 16) {
-                        LHSoftBadge(icon: .clock, color: AppColors.primary, size: 64)
+                        JellyBadge(systemName: "clock", color: AppColors.primary, wash: colors.primarySurface, size: 64)
                         Text("No Entries")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(AppTypography.subheadline)
                             .foregroundStyle(colors.textPrimary)
                         Text("No time entries match your filters")
-                            .font(.system(size: 14))
+                            .font(AppTypography.bodySmall)
                             .foregroundStyle(colors.textSecondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -112,7 +113,7 @@ struct HistoryView: View {
                                     Button(role: .destructive) {
                                         viewModel.deleteTimeEntry(entry)
                                     } label: {
-                                        Label("Delete", systemImage: "trash")
+                                        Label { Text("Delete") } icon: { lucideImage(Lucide.trash2) }
                                     }
                                 }
                                 if index < filteredEntries.count - 1 {
@@ -122,7 +123,7 @@ struct HistoryView: View {
                             }
                         }
                         .background(colors.backgroundSecondary)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
                         .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.05), radius: 12, x: 0, y: 2)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 16)
@@ -136,13 +137,15 @@ struct HistoryView: View {
         }
     }
 
-    private func filterChip(text: String, icon: String, isActive: Bool) -> some View {
+    private func filterChip(text: String, icon: UIImage, isActive: Bool) -> some View {
         HStack(spacing: 5) {
-            DynamicIconView(name: icon, size: 11, color: isActive ? AppColors.primary : colors.textSecondary)
+            LucideIcon(image: icon, size: 11)
+                .foregroundStyle(isActive ? AppColors.primary : colors.textSecondary)
             Text(text)
-                .font(.system(size: 13, weight: .medium))
+                .font(AppTypography.caption)
                 .lineLimit(1)
-            LHIconView(icon: .chevronDown, size: 10, color: isActive ? AppColors.primary : colors.textSecondary, strokeStyle: true)
+            LucideIcon(image: Lucide.chevronDown, size: 10)
+                .foregroundStyle(isActive ? AppColors.primary : colors.textSecondary)
         }
         .foregroundStyle(isActive ? AppColors.primary : colors.textSecondary)
         .padding(.horizontal, 12)
@@ -158,13 +161,13 @@ struct HistoryView: View {
                 .font(.system(size: 16, weight: .bold, design: .rounded))
                 .foregroundStyle(color)
             Text(label)
-                .font(.system(size: 11))
+                .font(AppTypography.label)
                 .foregroundStyle(colors.textSecondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
         .background(color.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
     }
 }
 

@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LandlordHours — Complete Onboarding Flow</title>
+<script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: #E5E0D8;
+    padding: 60px 32px;
+    display: flex;
+    gap: 40px;
+    justify-content: center;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .screen-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .screen-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #6E6E82;
+  }
+
+  .phone {
+    width: 393px;
+    height: 852px;
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    background: #FFFFFF;
+    box-shadow: 0 30px 80px rgba(26,26,46,0.15), 0 0 0 1px rgba(0,0,0,0.04);
+  }
+
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 126px;
+    height: 34px;
+    background: rgba(0,0,0,0.15);
+    border-radius: 0 0 22px 22px;
+    z-index: 100;
+  }
+
+  .status-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 58px;
+    padding: 14px 28px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 600;
+    z-index: 50;
+  }
+
+  .sb-dark { color: rgba(26,26,46,0.5); }
+  .sb-light { color: rgba(255,255,255,0.8); }
+
+  /* ============================================== */
+  /* SHARED FTUE LAYOUT                              */
+  /* ============================================== */
+  .ftue-screen {
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: #FFFFFF;
+  }
+
+  .progress-bar {
+    position: absolute;
+    top: 62px;
+    left: 28px;
+    right: 28px;
+    height: 4px;
+    border-radius: 2px;
+    z-index: 50;
+    display: flex;
+    gap: 4px;
+  }
+
+  .progress-segment {
+    flex: 1; height: 100%;
+    border-radius: 2px;
+    background: #F0EFF4;
+  }
+
+  .progress-segment.active,
+  .progress-segment.completed { background: #7B68EE; }
+
+  .ftue-top {
+    padding: 92px 28px 0;
+  }
+
+  .ftue-heading {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    color: #1A1A2E;
+    line-height: 1.15;
+    margin-bottom: 10px;
+  }
+
+  .ftue-desc {
+    font-size: 15px;
+    color: #6E6E82;
+    line-height: 1.5;
+  }
+
+  .ftue-middle {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 28px;
+    position: relative;
+  }
+
+  .ftue-cta {
+    padding: 0 28px 48px;
+    z-index: 20;
+  }
+
+  .cta-btn {
+    width: 100%;
+    padding: 18px;
+    border-radius: 999px;
+    font-size: 17px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .cta-primary { background: #1A1A2E; color: white; }
+
+  .cta-primary svg {
+    width: 18px; height: 18px;
+    fill: none; stroke: white;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  .cta-skip {
+    width: 100%;
+    padding: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: #A8A8BC;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  /* Ambient glows */
+  .ambient-glow {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(30px);
+    pointer-events: none;
+  }
+
+  /* Mockup phone frame */
+  .mockup-phone {
+    width: 240px;
+    border-radius: 32px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(123,104,238,0.14);
+    border: 3px solid rgba(255,255,255,0.6);
+    position: relative;
+  }
+
+  /* ============================================== */
+  /* A. SPLASH                                       */
+  /* ============================================== */
+  .splash {
+    width: 100%; height: 100%;
+    background: linear-gradient(180deg, #C4B5FD 0%, #DDD6FE 25%, #EDE9FE 50%, #F5F3FF 75%, #FFFFFF 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .splash::after {
+    content: '';
+    position: absolute;
+    top: 30%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 300px; height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(123,104,238,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .splash-logo-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    margin-top: -60px;
+    position: relative;
+    z-index: 10;
+  }
+
+  .splash-logo {
+    width: 120px; height: 120px;
+    border-radius: 30px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(123,104,238,0.3), 0 4px 20px rgba(91,75,201,0.2);
+    position: relative;
+  }
+
+  .splash-logo svg {
+    width: 100%; height: 100%;
+    display: block;
+  }
+
+  .splash-ring {
+    position: absolute;
+    border: 1.5px solid rgba(123,104,238,0.15);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .splash-ring-1 { width: 148px; height: 148px; border-radius: 44px; }
+  .splash-ring-2 { width: 176px; height: 176px; border-radius: 52px; border-width: 1px; border-color: rgba(123,104,238,0.07); }
+
+  .splash-wordmark { text-align: center; }
+
+  .splash-wm-text {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .w-landlord { color: #1A1A2E; }
+  .w-hours { color: #7B68EE; }
+
+  .splash-tagline {
+    font-size: 15px;
+    color: #6E6E82;
+    margin-top: 4px;
+  }
+
+  .anim-note {
+    position: absolute;
+    top: 22%; right: 32px;
+    font-size: 10px; color: #7B68EE;
+    background: rgba(255,255,255,0.8);
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(123,104,238,0.15);
+    backdrop-filter: blur(4px);
+    z-index: 20;
+  }
+
+  .social-proof {
+    position: absolute;
+    bottom: 60px;
+    left: 0; right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    z-index: 10;
+  }
+
+  .sp-stars { display: flex; gap: 3px; }
+  .sp-star { width: 16px; height: 16px; color: #F5C563; font-size: 14px; }
+  .sp-text { font-size: 13px; color: #6E6E82; font-weight: 500; }
+
+  .sp-badges { display: flex; align-items: center; gap: 24px; }
+  .sp-badge { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #A8A8BC; font-weight: 500; }
+  .sp-badge-icon { font-size: 12px; }
+  .sp-divider { width: 1px; height: 20px; background: #D4D4E0; }
+
+  /* ============================================== */
+  /* B. LOGIN                                        */
+  /* ============================================== */
+  .login-screen {
+    width: 100%; height: 100%;
+    background: #FFFFFF;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .login-bg {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 55%;
+    overflow: hidden;
+  }
+
+  .float-card {
+    position: absolute;
+    width: 280px;
+    background: rgba(255,255,255,0.35);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 24px;
+    border: 1px solid rgba(255,255,255,0.5);
+    padding: 24px;
+    box-shadow: 0 8px 32px rgba(123,104,238,0.08);
+  }
+
+  .fc-1 { top: 20px; left: 10px; transform: rotate(-6deg); }
+  .fc-2 { top: 60px; right: -20px; transform: rotate(4deg); width: 240px; padding: 20px; }
+
+  .fc-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+
+  .fc-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .fc-icon svg {
+    width: 18px; height: 18px;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none;
+  }
+
+  .fc-title { font-size: 14px; font-weight: 600; color: #1A1A2E; }
+  .fc-subtitle { font-size: 11px; color: #6E6E82; }
+
+  .fc-bar { height: 6px; border-radius: 3px; margin-bottom: 8px; }
+  .fc-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .fc-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .fc-label { font-size: 11px; color: #6E6E82; flex: 1; }
+  .fc-val { font-size: 11px; font-weight: 600; color: #1A1A2E; }
+
+  .login-gradient-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 55%;
+    background: linear-gradient(180deg, rgba(196,181,253,0.4) 0%, rgba(221,214,254,0.5) 30%, rgba(237,233,254,0.6) 60%, rgba(255,255,255,0.85) 85%, rgba(255,255,255,1) 100%);
+    z-index: 2;
+  }
+
+  .login-blob {
+    position: absolute;
+    border-radius: 50%;
+    z-index: 1;
+  }
+
+  .login-content {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 0 28px 60px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .login-logo-small {
+    width: 56px; height: 56px;
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    box-shadow: 0 8px 24px rgba(123,104,238,0.2);
+  }
+
+  .login-logo-small svg {
+    width: 100%; height: 100%;
+    display: block;
+  }
+
+  .login-headline {
+    font-family: 'DM Serif Display', serif;
+    font-size: 26px; color: #1A1A2E;
+    text-align: center; line-height: 1.2;
+    margin-bottom: 6px;
+  }
+
+  .login-subline {
+    font-size: 15px; color: #6E6E82;
+    text-align: center; line-height: 1.5;
+    margin-bottom: 32px;
+  }
+
+  .auth-btn {
+    width: 100%;
+    padding: 16px;
+    border-radius: 999px;
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+    border: none;
+    margin-bottom: 12px;
+  }
+
+  .auth-apple { background: #1A1A2E; color: white; }
+  .auth-apple svg { width: 18px; height: 18px; fill: white; }
+  .auth-email { background: transparent; color: #7B68EE; border: 2px solid #7B68EE; }
+
+  .auth-login-link { margin-top: 8px; font-size: 14px; color: #6E6E82; }
+  .auth-login-link a { color: #7B68EE; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+
+  /* ============================================== */
+  /* C. GOAL SELECTION                               */
+  /* ============================================== */
+  .goal-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 0 28px;
+    margin-top: 24px;
+  }
+
+  .goal-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 20px;
+    border-radius: 16px;
+    border: 2px solid #F0EFF4;
+    cursor: pointer;
+  }
+
+  .goal-card.selected { border-color: #7B68EE; background: #F8F6FF; }
+
+  .goal-icon {
+    width: 48px; height: 48px;
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .goal-icon svg {
+    width: 22px; height: 22px;
+    fill: none; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  .goal-text { flex: 1; }
+  .goal-title { font-size: 16px; font-weight: 600; color: #1A1A2E; margin-bottom: 2px; }
+  .goal-desc { font-size: 13px; color: #6E6E82; line-height: 1.4; }
+
+  .goal-radio {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 2px solid #D4D4E0;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .goal-card.selected .goal-radio { border-color: #7B68EE; background: #7B68EE; }
+  .goal-radio-inner { width: 8px; height: 8px; border-radius: 50%; background: white; display: none; }
+  .goal-card.selected .goal-radio-inner { display: block; }
+
+  /* ============================================== */
+  /* D. PROPERTY                                     */
+  /* ============================================== */
+  .form-area { padding: 0 28px; margin-top: 24px; }
+
+  .prop-type-row { display: flex; gap: 10px; margin-bottom: 20px; }
+
+  .prop-type-chip {
+    flex: 1;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 2px solid #F0EFF4;
+    font-size: 14px; font-weight: 600;
+    color: #6E6E82;
+    text-align: center;
+    cursor: pointer;
+    background: transparent;
+  }
+
+  .prop-type-chip.selected { border-color: #7B68EE; background: #F8F6FF; color: #7B68EE; }
+
+  .form-group { margin-bottom: 14px; }
+
+  .form-label {
+    font-size: 12px; font-weight: 600;
+    color: #A8A8BC;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 2px solid #F0EFF4;
+    font-size: 16px;
+    font-family: 'DM Sans', sans-serif;
+    color: #1A1A2E;
+    background: #FAFAFA;
+    outline: none;
+  }
+
+  .form-input.filled { border-color: #7B68EE; background: #FDFCFF; }
+  .form-input::placeholder { color: #C4C4D4; }
+
+  .form-row { display: flex; gap: 10px; }
+  .form-row .form-group { flex: 1; }
+
+  /* Selection cards (management options) */
+  .select-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .select-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 2px solid #F0EFF4;
+    cursor: pointer;
+  }
+
+  .select-card.selected {
+    border-color: #7B68EE;
+    background: #F8F6FF;
+  }
+
+  .sc-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .sc-icon svg {
+    width: 18px; height: 18px;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .sc-text { flex: 1; }
+
+  .sc-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1A1A2E;
+  }
+
+  .sc-desc {
+    font-size: 11px;
+    color: #A8A8BC;
+    margin-top: 1px;
+  }
+
+  .sc-radio {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 2px solid #D4D4E0;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .select-card.selected .sc-radio {
+    border-color: #7B68EE;
+    background: #7B68EE;
+  }
+
+  .sc-radio-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: white;
+    display: none;
+  }
+
+  .select-card.selected .sc-radio-dot { display: block; }
+
+  .section-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6E6E82;
+    margin-bottom: 8px;
+  }
+
+  .section-divider {
+    height: 1px;
+    background: #F0EFF4;
+    margin: 4px 0 14px;
+  }
+
+  /* ============================================== */
+  /* E. PAYWALL                                      */
+  /* ============================================== */
+  .paywall-screen {
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    /* Soft multi-color pastel gradient */
+    background: linear-gradient(160deg, #E0E7FF 0%, #EDE9FE 30%, #F5F3FF 55%, #E0F2FE 80%, #F0FDFA 100%);
+  }
+
+  /* Organic depth blobs */
+  .pw-blob {
+    position: absolute;
+    border-radius: 50%;
+    z-index: 1;
+  }
+
+  .pw-blob-1 {
+    width: 320px; height: 320px;
+    background: rgba(196, 181, 253, 0.35);
+    filter: blur(80px);
+    top: -80px; left: -60px;
+  }
+
+  .pw-blob-2 {
+    width: 280px; height: 280px;
+    background: rgba(147, 197, 253, 0.3);
+    filter: blur(70px);
+    top: 180px; right: -80px;
+  }
+
+  .pw-blob-3 {
+    width: 240px; height: 240px;
+    background: rgba(196, 181, 253, 0.2);
+    filter: blur(60px);
+    bottom: 60px; left: -40px;
+  }
+
+  /* Close button */
+  .pw-close {
+    position: absolute;
+    top: 62px; right: 24px;
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.5);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 60;
+    border: 1px solid rgba(255,255,255,0.6);
+  }
+
+  .pw-close svg {
+    width: 16px; height: 16px;
+    stroke: #6E6E82; stroke-width: 2;
+    stroke-linecap: round; fill: none;
+  }
+
+  /* Paywall content — sits above blobs */
+  .paywall-content {
+    flex: 1;
+    padding: 100px 28px 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 10;
+  }
+
+  .pw-headline {
+    font-family: 'DM Serif Display', serif;
+    font-size: 26px;
+    color: #1A1A2E;
+    line-height: 1.15;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+
+  /* Value props */
+  .pw-props {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .pw-prop {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .pw-prop-check {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .pw-prop-check svg {
+    width: 12px; height: 12px;
+    fill: none; stroke: #7B68EE;
+    stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  .pw-prop-text {
+    font-size: 15px;
+    color: #1A1A2E;
+    font-weight: 500;
+  }
+
+  /* Plan cards */
+  .pw-plans {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .pw-plan {
+    flex: 1;
+    padding: 20px 16px;
+    border-radius: 16px;
+    border: 2px solid rgba(255,255,255,0.6);
+    text-align: center;
+    position: relative;
+    cursor: pointer;
+    background: rgba(255,255,255,0.5);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  .pw-plan.popular {
+    border-color: #7B68EE;
+    background: rgba(255,255,255,0.7);
+  }
+
+  .pw-plan-badge {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #7B68EE;
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .pw-plan-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6E6E82;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+  }
+
+  .pw-plan-price {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1A1A2E;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .pw-plan-period {
+    font-size: 12px;
+    color: #A8A8BC;
+    margin-bottom: 4px;
+  }
+
+  .pw-plan-trial {
+    font-size: 12px;
+    font-weight: 600;
+    color: #7B68EE;
+  }
+
+  .pw-plan-no-trial {
+    font-size: 12px;
+    color: #A8A8BC;
+  }
+
+  /* Social proof */
+  .pw-social {
+    text-align: center;
+    margin-bottom: 16px;
+  }
+
+  .pw-social-stars {
+    color: #F5C563;
+    font-size: 16px;
+    letter-spacing: 2px;
+    margin-bottom: 4px;
+  }
+
+  .pw-social-text {
+    font-size: 13px;
+    color: #6E6E82;
+    font-weight: 500;
+  }
+
+  /* Paywall CTA */
+  .pw-cta-area {
+    margin-top: auto;
+    padding-bottom: 48px;
+  }
+
+  .pw-cta-btn {
+    width: 100%;
+    padding: 18px;
+    border-radius: 999px;
+    font-size: 17px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    background: #1A1A2E;
+    color: white;
+    margin-bottom: 8px;
+  }
+
+  .pw-fine-print {
+    text-align: center;
+    font-size: 12px;
+    color: #A8A8BC;
+    line-height: 1.5;
+  }
+
+  .pw-fine-print strong {
+    color: #6E6E82;
+  }
+
+  /* ============================================== */
+  /* F. NOTIFICATIONS                                */
+  /* ============================================== */
+  .notif-mockup {
+    background: linear-gradient(180deg, #E8E0FF 0%, #F5F3FF 60%, #FAF7F2 100%);
+    padding-bottom: 20px;
+  }
+
+  .lock-date { text-align: center; padding-top: 40px; }
+  .lock-day { font-size: 11px; color: #6E6E82; font-weight: 500; }
+
+  .lock-time {
+    font-size: 52px; font-weight: 700;
+    color: #1A1A2E;
+    letter-spacing: -2px;
+    line-height: 1;
+    margin-top: 2px;
+  }
+
+  .notif-card {
+    margin: 24px 14px 0;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .notif-icon {
+    width: 36px; height: 36px;
+    border-radius: 9px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .notif-icon svg {
+    width: 100%; height: 100%;
+    display: block;
+  }
+
+  .notif-text { flex: 1; }
+  .notif-app { font-size: 11px; font-weight: 600; color: #7B68EE; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .notif-title { font-size: 13px; font-weight: 600; color: #1A1A2E; margin-bottom: 2px; }
+  .notif-body { font-size: 11px; color: #6E6E82; line-height: 1.4; }
+  .notif-time { font-size: 10px; color: #A8A8BC; flex-shrink: 0; }
+
+  .notif-card-2 {
+    margin: 8px 14px 0;
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(20px);
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.03);
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+
+  /* ============================================== */
+  /* G. CALENDAR                                     */
+  /* ============================================== */
+  .cal-mockup-inner { background: #FFFFFF; }
+
+  .cal-header {
+    background: linear-gradient(180deg, #E8E0FF 0%, #F0ECFF 100%);
+    padding: 40px 16px 12px;
+    text-align: center;
+  }
+
+  .cal-month { font-size: 15px; font-weight: 700; color: #1A1A2E; margin-bottom: 4px; }
+
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    padding: 4px 6px;
+  }
+
+  .cal-day-header { font-size: 9px; font-weight: 600; color: #A8A8BC; text-align: center; padding: 4px 0; }
+
+  .cal-day {
+    font-size: 10px; color: #6E6E82;
+    text-align: center;
+    padding: 5px 0;
+    border-radius: 8px;
+    position: relative;
+  }
+
+  .cal-day.today { background: #7B68EE; color: white; font-weight: 700; }
+
+  .cal-day.has-hours::after {
+    content: '';
+    position: absolute;
+    bottom: 1px; left: 50%;
+    transform: translateX(-50%);
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: #7B68EE;
+  }
+
+  .cal-entries { padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; }
+
+  .cal-entry {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px;
+    background: #FAF7F2;
+    border-radius: 12px;
+  }
+
+  .cal-entry-bar { width: 4px; height: 28px; border-radius: 2px; flex-shrink: 0; }
+  .cal-entry-info { flex: 1; }
+  .cal-entry-title { font-size: 11px; font-weight: 600; color: #1A1A2E; }
+  .cal-entry-time { font-size: 9px; color: #A8A8BC; }
+  .cal-entry-hrs { font-size: 12px; font-weight: 700; color: #7B68EE; }
+
+  .cal-stat {
+    margin: 8px 14px 14px;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, #F8F6FF, #EDE8FF);
+    border-radius: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .cal-stat-icon {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: rgba(123,104,238,0.15);
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .cal-stat-icon svg {
+    width: 14px; height: 14px;
+    fill: none; stroke: #7B68EE;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  .cal-stat-text { font-size: 11px; color: #1A1A2E; font-weight: 500; }
+  .cal-stat-text strong { color: #7B68EE; }
+</style>
+</head>
+<body>
+
+<!-- ============================================== -->
+<!-- A. SPLASH / LOADING                             -->
+<!-- ============================================== -->
+<div class="screen-wrap">
+  <div class="screen-title">A. Splash</div>
+  <div class="phone">
+    <div class="status-bar sb-light">
+      <span>9:41</span>
+      <span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="splash">
+      <div class="anim-note">Breathing animation</div>
+      <div class="splash-logo-area">
+        <div style="position:relative;">
+          <div class="splash-ring splash-ring-2"></div>
+          <div class="splash-ring splash-ring-1"></div>
+          <div class="splash-logo">
+            <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="sl-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#D8D0FF"/><stop offset="100%" stop-color="#B8AFFE"/></linearGradient>
+                <linearGradient id="sl-w1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#A899F7"/><stop offset="100%" stop-color="#9485F0"/></linearGradient>
+                <linearGradient id="sl-w2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#8B78F0"/><stop offset="100%" stop-color="#7B68EE"/></linearGradient>
+                <linearGradient id="sl-w3" x1="0" y1="0" x2="0.5" y2="1"><stop offset="0%" stop-color="#6B58DE"/><stop offset="100%" stop-color="#4A38B0"/></linearGradient>
+                <clipPath id="sl-house"><path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/></clipPath>
+              </defs>
+              <rect width="1024" height="1024" fill="#F4F1FF"/>
+              <g clip-path="url(#sl-house)">
+                <rect width="1024" height="1024" fill="url(#sl-bg)"/>
+                <path d="M0 380 Q200 310 400 370 Q600 430 800 360 Q900 330 1024 350 L1024 1024 L0 1024 Z" fill="url(#sl-w1)"/>
+                <path d="M0 520 Q250 440 480 510 Q700 580 900 480 Q980 450 1024 470 L1024 1024 L0 1024 Z" fill="url(#sl-w2)"/>
+                <path d="M0 660 Q220 590 420 650 Q650 720 850 620 Q950 580 1024 610 L1024 1024 L0 1024 Z" fill="url(#sl-w3)"/>
+              </g>
+            </svg>
+          </div>
+        </div>
+        <div class="splash-wordmark">
+          <div class="splash-wm-text"><span class="w-landlord">Landlord</span><span class="w-hours">Hours</span></div>
+          <div class="splash-tagline">Track your path to tax qualification</div>
+        </div>
+      </div>
+      <div class="social-proof">
+        <div class="sp-stars">
+          <span class="sp-star">&#9733;</span><span class="sp-star">&#9733;</span><span class="sp-star">&#9733;</span><span class="sp-star">&#9733;</span><span class="sp-star">&#9733;</span>
+        </div>
+        <div class="sp-text">Trusted by 2,000+ landlords</div>
+        <div class="sp-badges">
+          <div class="sp-badge"><span class="sp-badge-icon">&#63743;</span><span>Featured on<br>App Store</span></div>
+          <div class="sp-divider"></div>
+          <div class="sp-badge"><span class="sp-badge-icon">&#128274;</span><span>Tax-grade<br>accuracy</span></div>
+          <div class="sp-divider"></div>
+          <div class="sp-badge"><span class="sp-badge-icon">&#9729;</span><span>iCloud<br>encrypted</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<!-- B. LOGIN                                        -->
+<!-- ============================================== -->
+<div class="screen-wrap">
+  <div class="screen-title">B. Login</div>
+  <div class="phone">
+    <div class="status-bar sb-dark">
+      <span>9:41</span>
+      <span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="login-screen">
+      <div class="login-blob" style="top:60px;right:-40px;width:200px;height:200px;background:rgba(123,104,238,0.12);filter:blur(50px);"></div>
+      <div class="login-blob" style="top:140px;left:-60px;width:180px;height:180px;background:rgba(184,175,254,0.15);filter:blur(40px);"></div>
+
+      <div class="login-bg">
+        <div class="float-card fc-1">
+          <div class="fc-header">
+            <div class="fc-icon" style="background:#EDE8FF;">
+              <i data-lucide="clock" style="color:#7B68EE;"></i>
+            </div>
+            <div>
+              <div class="fc-title">REPS Progress</div>
+              <div class="fc-subtitle">262.5 of 750 hours</div>
+            </div>
+          </div>
+          <div class="fc-bar" style="background:#F0EFF4;"><div style="width:35%;height:100%;border-radius:3px;background:linear-gradient(90deg,#7B68EE,#B8AFFE);"></div></div>
+          <div class="fc-row"><div class="fc-dot" style="background:#FF8A7A;"></div><span class="fc-label">Repairs</span><span class="fc-val">105.0h</span></div>
+          <div class="fc-row"><div class="fc-dot" style="background:#7EC8A0;"></div><span class="fc-label">Management</span><span class="fc-val">65.5h</span></div>
+        </div>
+
+        <div class="float-card fc-2">
+          <div class="fc-header">
+            <div class="fc-icon" style="background:#FFE8E4;">
+              <i data-lucide="wrench" style="color:#FF8A7A;"></i>
+            </div>
+            <div>
+              <div class="fc-title">2.5h logged</div>
+              <div class="fc-subtitle">123 Oak St &bull; Today</div>
+            </div>
+          </div>
+          <div style="font-size:11px;color:#6E6E82;line-height:1.5;">Fixed leaky faucet and replaced bathroom fixtures</div>
+        </div>
+      </div>
+
+      <div class="login-gradient-overlay"></div>
+
+      <div class="login-content">
+        <div class="login-logo-small">
+          <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="ll-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#D8D0FF"/><stop offset="100%" stop-color="#B8AFFE"/></linearGradient>
+              <linearGradient id="ll-w1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#A899F7"/><stop offset="100%" stop-color="#9485F0"/></linearGradient>
+              <linearGradient id="ll-w2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#8B78F0"/><stop offset="100%" stop-color="#7B68EE"/></linearGradient>
+              <linearGradient id="ll-w3" x1="0" y1="0" x2="0.5" y2="1"><stop offset="0%" stop-color="#6B58DE"/><stop offset="100%" stop-color="#4A38B0"/></linearGradient>
+              <clipPath id="ll-house"><path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/></clipPath>
+            </defs>
+            <rect width="1024" height="1024" fill="#F4F1FF"/>
+            <g clip-path="url(#ll-house)">
+              <rect width="1024" height="1024" fill="url(#ll-bg)"/>
+              <path d="M0 380 Q200 310 400 370 Q600 430 800 360 Q900 330 1024 350 L1024 1024 L0 1024 Z" fill="url(#ll-w1)"/>
+              <path d="M0 520 Q250 440 480 510 Q700 580 900 480 Q980 450 1024 470 L1024 1024 L0 1024 Z" fill="url(#ll-w2)"/>
+              <path d="M0 660 Q220 590 420 650 Q650 720 850 620 Q950 580 1024 610 L1024 1024 L0 1024 Z" fill="url(#ll-w3)"/>
+            </g>
+          </svg>
+        </div>
+        <div class="login-headline">Track your hours.<br>Qualify with confidence.</div>
+        <div class="login-subline">750 hours to Real Estate Professional Status — we make every hour count.</div>
+        <button class="auth-btn auth-apple">
+          <svg viewBox="0 0 24 24"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+          Sign in with Apple
+        </button>
+        <button class="auth-btn auth-email">Continue with email</button>
+        <div class="auth-login-link">Already have an account? <a href="#">Log in here</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<!-- C. GOAL SELECTION                               -->
+<!-- ============================================== -->
+<div class="screen-wrap">
+  <div class="screen-title">C. Goal</div>
+  <div class="phone">
+    <div class="status-bar sb-dark">
+      <span>9:41</span>
+      <span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="ftue-screen">
+      <div class="progress-bar" style="right:28px;">
+        <div class="progress-segment active"></div>
+        <div class="progress-segment"></div>
+        <div class="progress-segment"></div>
+        <div class="progress-segment"></div>
+        <div class="progress-segment"></div>
+        <div class="progress-segment"></div>
+      </div>
+      <div class="ftue-top">
+        <div class="ftue-heading">What's your<br>main goal?</div>
+        <div class="ftue-desc">We'll customize your experience based on what you're tracking toward.</div>
+      </div>
+      <div class="goal-options">
+        <div class="goal-card selected">
+          <div class="goal-icon" style="background:#EDE8FF;"><i data-lucide="target" style="color:#7B68EE;"></i></div>
+          <div class="goal-text"><div class="goal-title">Real Estate Professional Status</div><div class="goal-desc">Track 750+ hours for REPS tax benefits</div></div>
+          <div class="goal-radio"><div class="goal-radio-inner"></div></div>
+        </div>
+        <div class="goal-card">
+          <div class="goal-icon" style="background:#FFE8E4;"><i data-lucide="clock" style="color:#FF8A7A;"></i></div>
+          <div class="goal-text"><div class="goal-title">Material Participation</div><div class="goal-desc">Meet IRS tests for active involvement</div></div>
+          <div class="goal-radio"><div class="goal-radio-inner"></div></div>
+        </div>
+        <div class="goal-card">
+          <div class="goal-icon" style="background:#E0F5E8;"><i data-lucide="award" style="color:#7EC8A0;"></i></div>
+          <div class="goal-text"><div class="goal-title">General Hour Tracking</div><div class="goal-desc">Keep organized property work records</div></div>
+          <div class="goal-radio"><div class="goal-radio-inner"></div></div>
+        </div>
+        <div class="goal-card">
+          <div class="goal-icon" style="background:#FFF4E0;"><i data-lucide="info" style="color:#F5C563;"></i></div>
+          <div class="goal-text"><div class="goal-title">Not sure yet</div><div class="goal-desc">Help me understand my options</div></div>
+          <div class="goal-radio"><div class="goal-radio-inner"></div></div>
+        </div>
+      </div>
+      <div style="flex:1;"></div>
+      <div class="ftue-cta">
+        <button class="cta-btn cta-primary">Continue <i data-lucide="arrow-right"></i></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<!-- D. ADD PROPERTY                                  -->
+<!-- ============================================== -->
+<div class="screen-wrap">
+  <div class="screen-title">D. Property</div>
+  <div class="phone">
+    <div class="status-bar sb-dark">
+      <span>9:41</span>
+      <span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="ftue-screen">
+      <div class="progress-bar" style="right:28px;">
+        <div class="progress-segment completed"></div>
+        <div class="progress-segment active"></div>
+        <div class="progress-segment"></div>
+        <div class="progress-segment"></div>
+        <div class="progress-segment"></div>
+        <div class="progress-segment"></div>
+      </div>
+      <div class="ftue-top">
+        <div class="ftue-heading">Add your first<br>property</div>
+        <div class="ftue-desc">We'll tailor your tracking based on property type and who manages it.</div>
+      </div>
+      <div class="form-area">
+        <!-- Property type -->
+        <div class="section-label">Property Type</div>
+        <div class="prop-type-row">
+          <div class="prop-type-chip selected">Long-Term Rental</div>
+          <div class="prop-type-chip">Short-Term Rental</div>
+        </div>
+
+        <!-- Who manages -->
+        <div class="section-label">Who manages this property?</div>
+        <div class="select-cards">
+          <div class="select-card selected">
+            <div class="sc-icon" style="background:#EDE8FF;">
+              <i data-lucide="user" style="color:#7B68EE;"></i>
+            </div>
+            <div class="sc-text">
+              <div class="sc-title">Just me</div>
+              <div class="sc-desc">I self-manage this property</div>
+            </div>
+            <div class="sc-radio"><div class="sc-radio-dot"></div></div>
+          </div>
+          <div class="select-card">
+            <div class="sc-icon" style="background:#FFE8E4;">
+              <i data-lucide="users" style="color:#FF8A7A;"></i>
+            </div>
+            <div class="sc-text">
+              <div class="sc-title">Me & my spouse</div>
+              <div class="sc-desc">We both manage and log hours</div>
+            </div>
+            <div class="sc-radio"><div class="sc-radio-dot"></div></div>
+          </div>
+          <div class="select-card">
+            <div class="sc-icon" style="background:#FFF4E0;">
+              <i data-lucide="building" style="color:#F5C563;"></i>
+            </div>
+            <div class="sc-text">
+              <div class="sc-title">Property manager</div>
+              <div class="sc-desc">A third party handles day-to-day</div>
+            </div>
+            <div class="sc-radio"><div class="sc-radio-dot"></div></div>
+          </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Address -->
+        <div class="form-group"><label class="form-label">Property Name</label><input type="text" class="form-input filled" value="Oak Street Duplex"></div>
+        <div class="form-group"><label class="form-label">Street Address</label><input type="text" class="form-input filled" value="123 Oak Street"></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">City</label><input type="text" class="form-input filled" value="Austin"></div>
+          <div class="form-group" style="max-width:80px;"><label class="form-label">State</label><input type="text" class="form-input filled" value="TX"></div>
+          <div class="form-group" style="max-width:100px;"><label class="form-label">Zip</label><input type="text" class="form-input filled" value="78701"></div>
+        </div>
+      </div>
+      <div style="flex:1;"></div>
+      <div class="ftue-cta">
+        <button class="cta-btn cta-primary">Continue <i data-lucide="arrow-right"></i></button>
+        <button class="cta-skip">Skip for now</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<!-- E. PAYWALL                                      -->
+<!-- ============================================== -->
+<div class="screen-wrap">
+  <div class="screen-title">E. Paywall</div>
+  <div class="phone">
+    <div class="status-bar sb-light">
+      <span>9:41</span>
+      <span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="paywall-screen">
+      <!-- Organic depth blobs -->
+      <div class="pw-blob pw-blob-1"></div>
+      <div class="pw-blob pw-blob-2"></div>
+      <div class="pw-blob pw-blob-3"></div>
+
+      <!-- Close button -->
+      <div class="pw-close">
+        <i data-lucide="x"></i>
+      </div>
+
+      <!-- Content -->
+      <div class="paywall-content">
+        <div class="pw-headline">Track every hour<br>toward tax qualification</div>
+
+        <!-- 3 tight value props -->
+        <div class="pw-props">
+          <div class="pw-prop">
+            <div class="pw-prop-check"><i data-lucide="check"></i></div>
+            <div class="pw-prop-text">AI-powered time logging & categorization</div>
+          </div>
+          <div class="pw-prop">
+            <div class="pw-prop-check"><i data-lucide="check"></i></div>
+            <div class="pw-prop-text">IRS-ready PDF reports for your CPA</div>
+          </div>
+          <div class="pw-prop">
+            <div class="pw-prop-check"><i data-lucide="check"></i></div>
+            <div class="pw-prop-text">Unlimited properties & iCloud sync</div>
+          </div>
+        </div>
+
+        <!-- Plan cards -->
+        <div class="pw-plans">
+          <div class="pw-plan">
+            <div class="pw-plan-label">Monthly</div>
+            <div class="pw-plan-price">$9.99</div>
+            <div class="pw-plan-period">per month</div>
+            <div class="pw-plan-no-trial">No trial</div>
+          </div>
+          <div class="pw-plan popular">
+            <div class="pw-plan-badge">Most Popular</div>
+            <div class="pw-plan-label">Annual</div>
+            <div class="pw-plan-price">$59.99</div>
+            <div class="pw-plan-period">per year</div>
+            <div class="pw-plan-trial">7-day free trial</div>
+          </div>
+        </div>
+
+        <!-- Social proof -->
+        <div class="pw-social">
+          <div class="pw-social-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+          <div class="pw-social-text">Trusted by 2,000+ landlords</div>
+        </div>
+
+        <!-- CTA -->
+        <div class="pw-cta-area">
+          <button class="pw-cta-btn">Start 7-day free trial</button>
+          <div class="pw-fine-print">7 days free, then <strong>$59.99/year</strong>.<br>No commitment. Cancel anytime.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<!-- F. NOTIFICATIONS                                -->
+<!-- ============================================== -->
+<div class="screen-wrap">
+  <div class="screen-title">F. Notifications</div>
+  <div class="phone">
+    <div class="status-bar sb-dark">
+      <span>9:41</span>
+      <span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="ftue-screen">
+      <div class="progress-bar" style="right:28px;">
+        <div class="progress-segment completed"></div>
+        <div class="progress-segment completed"></div>
+        <div class="progress-segment completed"></div>
+        <div class="progress-segment completed"></div>
+        <div class="progress-segment active"></div>
+        <div class="progress-segment"></div>
+      </div>
+      <div class="ftue-top">
+        <div class="ftue-heading">Never miss a task!<br>Turn on notifications</div>
+        <div class="ftue-desc">Smart reminders so you stay on track for qualification.</div>
+      </div>
+      <div class="ftue-middle">
+        <div class="ambient-glow" style="width:120px;height:120px;background:rgba(123,104,238,0.08);top:10px;right:0;"></div>
+        <div class="ambient-glow" style="width:80px;height:80px;background:rgba(255,138,122,0.06);bottom:20px;left:10px;"></div>
+        <div class="mockup-phone notif-mockup">
+          <div class="lock-date">
+            <div class="lock-day">Monday, February 24</div>
+            <div class="lock-time">9:41</div>
+          </div>
+          <div class="notif-card">
+            <div class="notif-icon">
+              <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="ni-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#D8D0FF"/><stop offset="100%" stop-color="#B8AFFE"/></linearGradient>
+                  <linearGradient id="ni-w1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#A899F7"/><stop offset="100%" stop-color="#9485F0"/></linearGradient>
+                  <linearGradient id="ni-w2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#8B78F0"/><stop offset="100%" stop-color="#7B68EE"/></linearGradient>
+                  <linearGradient id="ni-w3" x1="0" y1="0" x2="0.5" y2="1"><stop offset="0%" stop-color="#6B58DE"/><stop offset="100%" stop-color="#4A38B0"/></linearGradient>
+                  <clipPath id="ni-house"><path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/></clipPath>
+                </defs>
+                <rect width="1024" height="1024" fill="#F4F1FF"/>
+                <g clip-path="url(#ni-house)">
+                  <rect width="1024" height="1024" fill="url(#ni-bg)"/>
+                  <path d="M0 380 Q200 310 400 370 Q600 430 800 360 Q900 330 1024 350 L1024 1024 L0 1024 Z" fill="url(#ni-w1)"/>
+                  <path d="M0 520 Q250 440 480 510 Q700 580 900 480 Q980 450 1024 470 L1024 1024 L0 1024 Z" fill="url(#ni-w2)"/>
+                  <path d="M0 660 Q220 590 420 650 Q650 720 850 620 Q950 580 1024 610 L1024 1024 L0 1024 Z" fill="url(#ni-w3)"/>
+                </g>
+              </svg>
+            </div>
+            <div class="notif-text">
+              <div class="notif-app">LandlordHours</div>
+              <div class="notif-title">Don't forget to log today!</div>
+              <div class="notif-body">You visited 123 Oak St earlier. Tap to log your hours.</div>
+            </div>
+            <div class="notif-time">now</div>
+          </div>
+          <div class="notif-card-2">
+            <div class="notif-icon" style="background:linear-gradient(135deg,#7EC8A0,#5BA87E);">
+              <i data-lucide="check-circle" style="color:white;"></i>
+            </div>
+            <div class="notif-text">
+              <div class="notif-app" style="color:#7EC8A0;">Weekly Summary</div>
+              <div class="notif-title">Great week! 18.5h logged</div>
+              <div class="notif-body">You're on track for REPS. Keep it up!</div>
+            </div>
+            <div class="notif-time">2h</div>
+          </div>
+        </div>
+      </div>
+      <div class="ftue-cta">
+        <button class="cta-btn cta-primary">Enable Notifications <i data-lucide="arrow-right"></i></button>
+        <button class="cta-skip">Skip for now</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<!-- G. CALENDAR                                     -->
+<!-- ============================================== -->
+<div class="screen-wrap">
+  <div class="screen-title">G. Calendar</div>
+  <div class="phone">
+    <div class="status-bar sb-dark">
+      <span>9:41</span>
+      <span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="ftue-screen">
+      <div class="progress-bar" style="right:28px;">
+        <div class="progress-segment completed"></div>
+        <div class="progress-segment completed"></div>
+        <div class="progress-segment completed"></div>
+        <div class="progress-segment completed"></div>
+        <div class="progress-segment completed"></div>
+        <div class="progress-segment active"></div>
+      </div>
+      <div class="ftue-top">
+        <div class="ftue-heading">Import your calendar<br>for a quick start</div>
+        <div class="ftue-desc">We'll auto-detect property appointments and pre-fill your hours.</div>
+      </div>
+      <div class="ftue-middle">
+        <div class="ambient-glow" style="width:100px;height:100px;background:rgba(126,200,160,0.08);top:0;right:10px;"></div>
+        <div class="ambient-glow" style="width:70px;height:70px;background:rgba(245,197,99,0.06);bottom:10px;left:20px;"></div>
+        <div class="mockup-phone cal-mockup-inner">
+          <div class="cal-header">
+            <div class="cal-month">February 2026</div>
+            <div class="cal-grid">
+              <div class="cal-day-header">S</div><div class="cal-day-header">M</div><div class="cal-day-header">T</div><div class="cal-day-header">W</div><div class="cal-day-header">T</div><div class="cal-day-header">F</div><div class="cal-day-header">S</div>
+              <div class="cal-day">1</div><div class="cal-day has-hours">2</div><div class="cal-day has-hours">3</div><div class="cal-day">4</div><div class="cal-day has-hours">5</div><div class="cal-day">6</div><div class="cal-day">7</div>
+              <div class="cal-day">8</div><div class="cal-day has-hours">9</div><div class="cal-day has-hours">10</div><div class="cal-day">11</div><div class="cal-day has-hours">12</div><div class="cal-day">13</div><div class="cal-day">14</div>
+              <div class="cal-day">15</div><div class="cal-day has-hours">16</div><div class="cal-day has-hours">17</div><div class="cal-day">18</div><div class="cal-day has-hours">19</div><div class="cal-day">20</div><div class="cal-day">21</div>
+              <div class="cal-day">22</div><div class="cal-day has-hours">23</div><div class="cal-day today">24</div><div class="cal-day">25</div><div class="cal-day">26</div><div class="cal-day">27</div><div class="cal-day">28</div>
+            </div>
+          </div>
+          <div class="cal-entries">
+            <div class="cal-entry"><div class="cal-entry-bar" style="background:#FF8A7A;"></div><div class="cal-entry-info"><div class="cal-entry-title">Plumber at Oak St</div><div class="cal-entry-time">10:00 AM - 12:00 PM</div></div><div class="cal-entry-hrs">2h</div></div>
+            <div class="cal-entry"><div class="cal-entry-bar" style="background:#7B68EE;"></div><div class="cal-entry-info"><div class="cal-entry-title">Tenant meeting</div><div class="cal-entry-time">2:00 PM - 3:00 PM</div></div><div class="cal-entry-hrs">1h</div></div>
+          </div>
+          <div class="cal-stat">
+            <div class="cal-stat-icon"><i data-lucide="sparkles" style="color:#7B68EE;"></i></div>
+            <div class="cal-stat-text"><strong>3 hours</strong> detected today</div>
+          </div>
+        </div>
+      </div>
+      <div class="ftue-cta">
+        <button class="cta-btn cta-primary">Import Calendar <i data-lucide="arrow-right"></i></button>
+        <button class="cta-skip">Skip for now</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Icon Design Language System — LandlordHours</title>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=DM+Serif+Display&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --cream: #FAF7F2;
+    --warm-white: #FFFFFF;
+    --violet: #7B68EE;
+    --violet-soft: #B8AFFE;
+    --violet-wash: #EDE8FF;
+    --violet-deep: #5B4BC9;
+    --coral: #FF8A7A;
+    --coral-wash: #FFE8E4;
+    --sage: #7EC8A0;
+    --sage-wash: #E4F5EC;
+    --honey: #F5C563;
+    --honey-wash: #FFF4DA;
+    --sky: #6CB4EE;
+    --sky-wash: #E0F0FF;
+    --rose: #E88CA5;
+    --rose-wash: #FFE4EC;
+    --charcoal: #1A1A2E;
+    --ink: #2D2D3F;
+    --slate: #6E6E82;
+    --mist: #A8A8BC;
+    --cloud: #D4D4E0;
+    --snow: #F0EFF4;
+    --dark-bg: #0C0C18;
+    --dark-surface: #161626;
+  }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: var(--dark-bg);
+    color: #E0E0F0;
+    min-height: 100vh;
+  }
+
+  /* ===== Layout ===== */
+  .page-header { padding: 80px 60px 40px; max-width: 1400px; margin: 0 auto; }
+  .page-kicker { font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--violet-soft); margin-bottom: 12px; }
+  .page-title { font-family: 'DM Serif Display', serif; font-size: 48px; color: white; line-height: 1.15; margin-bottom: 12px; }
+  .page-sub { font-size: 16px; color: var(--mist); line-height: 1.6; max-width: 640px; }
+
+  .section { padding: 40px 60px; max-width: 1400px; margin: 0 auto; }
+  .section-label { font-size: 10px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: var(--violet-soft); margin-bottom: 8px; }
+  .section-title { font-family: 'DM Serif Display', serif; font-size: 28px; color: white; margin-bottom: 8px; }
+  .section-desc { font-size: 14px; color: var(--mist); line-height: 1.6; margin-bottom: 32px; max-width: 560px; }
+
+  .divider { height: 1px; background: rgba(255,255,255,0.06); margin: 20px 60px; max-width: 1280px; }
+
+  /* ===== Principles Grid ===== */
+  .principles-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .principle-card { background: var(--dark-surface); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; padding: 28px 24px; }
+  .principle-num { font-size: 11px; font-weight: 700; color: var(--violet); letter-spacing: 1px; margin-bottom: 10px; }
+  .principle-name { font-size: 16px; font-weight: 700; color: white; margin-bottom: 8px; }
+  .principle-desc { font-size: 12px; color: var(--mist); line-height: 1.6; }
+
+  /* ===== Jelly-Glass Container ===== */
+  .jelly {
+    width: 64px; height: 64px;
+    border-radius: 22%;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    color: white;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .jelly-body {
+    position: absolute; inset: 0;
+    border-radius: 22%;
+    opacity: 0.8;
+  }
+  /* Glass highlight */
+  .jelly::after {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 22%;
+    background: linear-gradient(170deg, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.06) 40%, rgba(0,0,0,0.04) 100%);
+    pointer-events: none;
+  }
+  .jelly svg {
+    position: relative; z-index: 1;
+  }
+
+  /* Size variants */
+  .jelly.sm { width: 44px; height: 44px; }
+  .jelly.sm svg { width: 22px !important; height: 22px !important; }
+  .jelly.md { width: 56px; height: 56px; }
+  .jelly.md svg { width: 26px !important; height: 26px !important; }
+  .jelly.lg { width: 72px; height: 72px; }
+  .jelly.lg svg { width: 34px !important; height: 34px !important; }
+  .jelly.xl { width: 96px; height: 96px; }
+  .jelly.xl svg { width: 44px !important; height: 44px !important; }
+
+  /* ===== Anatomy Row ===== */
+  .anatomy-row {
+    display: flex; align-items: center; gap: 48px;
+    background: var(--dark-surface); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 24px; padding: 40px;
+  }
+  .anatomy-layers { display: flex; gap: 20px; align-items: center; flex-shrink: 0; }
+  .anatomy-labels { flex: 1; }
+  .anatomy-layer { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+  .layer-dot { width: 10px; height: 10px; border-radius: 4px; flex-shrink: 0; }
+  .layer-name { font-size: 13px; font-weight: 600; color: white; }
+  .layer-spec { font-size: 11px; color: var(--mist); margin-left: 4px; }
+
+  /* Exploded layers */
+  .layer-preview {
+    width: 64px; height: 64px; border-radius: 22%;
+    position: relative;
+  }
+
+  /* ===== Icon Grid ===== */
+  .icon-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+  .icon-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+  .icon-grid.cols-3 { grid-template-columns: repeat(3, 1fr); max-width: 780px; }
+  .icon-grid.cols-2 { grid-template-columns: repeat(2, 1fr); max-width: 520px; }
+
+  .icon-cell {
+    background: var(--dark-surface); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 20px; padding: 24px 16px 18px;
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+  }
+  .icon-name { font-size: 13px; font-weight: 600; color: white; text-align: center; }
+  .icon-lucide { font-size: 10px; color: var(--violet-soft); font-family: monospace; text-align: center; }
+  .icon-role { font-size: 10px; color: var(--mist); text-align: center; margin-top: 1px; }
+
+  /* ===== Naked Stroke Mode (tab bar, inline) ===== */
+  .stroke-row {
+    display: flex; gap: 32px; align-items: center;
+    background: var(--dark-surface); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 20px; padding: 28px 32px;
+  }
+  .stroke-item {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    color: var(--mist);
+  }
+  .stroke-item.active { color: var(--violet); }
+  .stroke-item svg { width: 24px !important; height: 24px !important; }
+  .stroke-label { font-size: 10px; font-weight: 500; }
+
+  /* ===== Light strip ===== */
+  .light-strip {
+    background: var(--cream); border-radius: 20px; padding: 32px 40px;
+    display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
+    margin-top: 16px;
+  }
+  .light-strip-label {
+    font-size: 11px; font-weight: 600; color: var(--slate);
+    letter-spacing: 1px; text-transform: uppercase;
+    writing-mode: vertical-rl; transform: rotate(180deg);
+  }
+
+  /* ===== Size scale ===== */
+  .size-row {
+    display: flex; align-items: flex-end; gap: 32px;
+    background: var(--dark-surface); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 24px; padding: 40px;
+  }
+  .size-item { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .size-label { font-size: 11px; color: var(--mist); font-weight: 600; }
+  .size-use { font-size: 10px; color: var(--slate); }
+
+  /* ===== Color swatches ===== */
+  .color-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .color-swatch { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .color-name { font-size: 10px; color: var(--mist); font-weight: 500; }
+
+  /* ===== Map Table ===== */
+  .map-table {
+    width: 100%; border-collapse: collapse;
+    background: var(--dark-surface);
+    border-radius: 16px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .map-table th {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--violet-soft);
+    padding: 14px 16px; text-align: left;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .map-table td {
+    font-size: 13px; padding: 10px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    vertical-align: middle;
+  }
+  .map-table td:first-child { color: white; font-weight: 500; }
+  .map-table td:nth-child(2) { color: var(--violet-soft); font-family: monospace; font-size: 12px; }
+  .map-table td:nth-child(3) { color: var(--mist); font-size: 12px; }
+  .map-table .map-icon { color: var(--mist); display: flex; align-items: center; }
+  .map-table .map-icon svg { width: 18px !important; height: 18px !important; margin-right: 10px; }
+
+  /* ===== Spec cards ===== */
+  .spec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 800px; }
+  .spec-card { background: var(--dark-surface); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 20px; }
+  .spec-card-title { font-size: 14px; font-weight: 700; color: white; margin-bottom: 10px; }
+  .spec-card-body { font-family: monospace; font-size: 11px; line-height: 1.9; color: var(--violet-soft); }
+</style>
+</head>
+<body>
+
+<!-- ===================== HEADER ===================== -->
+<header class="page-header">
+  <div class="page-kicker">Design Language System</div>
+  <h1 class="page-title">Icon System:<br/>Organic-Soft</h1>
+  <p class="page-sub">A unified icon language for LandlordHours powered by <strong style="color:white;">Lucide</strong> — an open-source icon library with rounded, friendly strokes. Every icon lives in a jelly-glass squircle container. White strokes on translucent color.</p>
+</header>
+
+<div class="divider"></div>
+
+<!-- ===================== 1. VISUAL DNA ===================== -->
+<section class="section">
+  <div class="section-label">01 · Foundation</div>
+  <div class="section-title">Visual DNA</div>
+  <div class="section-desc">Four principles that define how icons appear across the entire app.</div>
+
+  <div class="principles-grid">
+    <div class="principle-card">
+      <div class="principle-num">01</div>
+      <div class="principle-name">Lucide Icons</div>
+      <div class="principle-desc">All icons come from the Lucide library — pixel-perfect, consistent 24x24 grid, rounded caps and joins. No hand-drawn paths. One source of truth.</div>
+    </div>
+    <div class="principle-card">
+      <div class="principle-num">02</div>
+      <div class="principle-name">Squircle Container</div>
+      <div class="principle-desc">Category and feature icons live inside a squircle (border-radius: 22%). Continuous curvature, softer than a rounded rect. Container takes the category color.</div>
+    </div>
+    <div class="principle-card">
+      <div class="principle-num">03</div>
+      <div class="principle-name">Jelly-Glass Depth</div>
+      <div class="principle-desc">Three-layer container: colored body at 80% opacity, a linear glass highlight (white 30% top to transparent), and a colored drop-shadow. Icons float like soft candy.</div>
+    </div>
+    <div class="principle-card">
+      <div class="principle-num">04</div>
+      <div class="principle-name">Two Modes</div>
+      <div class="principle-desc">
+        <strong style="color:white;">Naked Stroke</strong> — tab bar, inline actions, navigation. Just the icon, no container.<br/><br/>
+        <strong style="color:white;">Jelly Container</strong> — activity rows, category badges, settings, cards, empty states.
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===================== 2. ANATOMY ===================== -->
+<section class="section">
+  <div class="section-label">02 · Construction</div>
+  <div class="section-title">Jelly-Glass Anatomy</div>
+  <div class="section-desc">The container is built with CSS, not SVG filters. Three layers create the floating, translucent depth.</div>
+
+  <div class="anatomy-row">
+    <div class="anatomy-layers">
+      <!-- Layer 1: Shadow -->
+      <div class="layer-preview" style="background:rgba(123,104,238,0.25); filter:blur(8px); transform:translateY(4px);"></div>
+      <!-- Layer 2: Body -->
+      <div class="layer-preview" style="background:var(--violet); opacity:0.8;"></div>
+      <!-- Layer 3: Glass -->
+      <div class="layer-preview" style="background: linear-gradient(170deg, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.06) 40%, rgba(0,0,0,0.04) 100%); border: 1px solid rgba(255,255,255,0.1);"></div>
+      <!-- Layer 4: Icon -->
+      <div class="layer-preview" style="display:flex;align-items:center;justify-content:center;color:white;">
+        <i data-lucide="house"></i>
+      </div>
+      <!-- = Assembled -->
+      <div style="font-size:24px;color:var(--mist);margin:0 8px;">=</div>
+      <div class="jelly lg" style="box-shadow: 0 6px 18px rgba(123,104,238,0.35);">
+        <div class="jelly-body" style="background:var(--violet);"></div>
+        <i data-lucide="house" width="34" height="34"></i>
+      </div>
+    </div>
+
+    <div class="anatomy-labels">
+      <div class="anatomy-layer">
+        <div class="layer-dot" style="background:white;opacity:0.8;"></div>
+        <span class="layer-name">4 · Lucide Icon</span>
+        <span class="layer-spec">— stroke="currentColor", color: white</span>
+      </div>
+      <div class="anatomy-layer">
+        <div class="layer-dot" style="background:rgba(255,255,255,0.3);"></div>
+        <span class="layer-name">3 · Glass Highlight</span>
+        <span class="layer-spec">— linear-gradient 170deg, white 30% → 0%</span>
+      </div>
+      <div class="anatomy-layer">
+        <div class="layer-dot" style="background:var(--violet);"></div>
+        <span class="layer-name">2 · Body Fill</span>
+        <span class="layer-spec">— category color, opacity 0.8</span>
+      </div>
+      <div class="anatomy-layer">
+        <div class="layer-dot" style="background:rgba(0,0,0,0.25);"></div>
+        <span class="layer-name">1 · Drop Shadow</span>
+        <span class="layer-spec">— box-shadow, category color at 35%, blur 18px</span>
+      </div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.06);">
+        <div class="anatomy-layer">
+          <div class="layer-dot" style="background:var(--violet-soft);border-radius:2px;"></div>
+          <span class="layer-name">Container</span>
+          <span class="layer-spec">— border-radius: 22%, overflow: hidden</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===================== 3. NAKED STROKE MODE ===================== -->
+<section class="section">
+  <div class="section-label">03 · Mode 1</div>
+  <div class="section-title">Naked Stroke</div>
+  <div class="section-desc">Tab bar, navigation, and inline contexts. Just the icon — no container, no shadow. Color inherited from parent via currentColor.</div>
+
+  <div class="stroke-row" style="margin-bottom:16px;">
+    <div class="stroke-item active">
+      <i data-lucide="house"></i>
+      <div class="stroke-label">Home</div>
+    </div>
+    <div class="stroke-item">
+      <i data-lucide="building-2"></i>
+      <div class="stroke-label">Properties</div>
+    </div>
+    <div class="stroke-item">
+      <i data-lucide="clock"></i>
+      <div class="stroke-label">Track</div>
+    </div>
+    <div class="stroke-item">
+      <i data-lucide="bar-chart-3"></i>
+      <div class="stroke-label">Reports</div>
+    </div>
+    <div class="stroke-item">
+      <i data-lucide="settings"></i>
+      <div class="stroke-label">Settings</div>
+    </div>
+    <div style="width:1px;height:36px;background:rgba(255,255,255,0.06);margin:0 8px;"></div>
+    <div class="stroke-item">
+      <i data-lucide="bell"></i>
+      <div class="stroke-label">Notify</div>
+    </div>
+    <div class="stroke-item">
+      <i data-lucide="search"></i>
+      <div class="stroke-label">Search</div>
+    </div>
+    <div class="stroke-item">
+      <i data-lucide="chevron-left"></i>
+      <div class="stroke-label">Back</div>
+    </div>
+    <div class="stroke-item">
+      <i data-lucide="chevron-right"></i>
+      <div class="stroke-label">Forward</div>
+    </div>
+    <div class="stroke-item">
+      <i data-lucide="x"></i>
+      <div class="stroke-label">Close</div>
+    </div>
+    <div class="stroke-item">
+      <i data-lucide="share-2"></i>
+      <div class="stroke-label">Share</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===================== 4. JELLY CONTAINER MODE ===================== -->
+<section class="section">
+  <div class="section-label">04 · Mode 2</div>
+  <div class="section-title">Jelly-Glass Container</div>
+  <div class="section-desc">Activity categories, settings rows, feature cards, and empty states. The icon wears a colored squircle with the jelly-glass depth treatment.</div>
+
+  <!-- Core Navigation -->
+  <div style="margin-bottom:12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Core Navigation</div>
+  <div class="icon-grid" style="margin-bottom:32px;">
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(123,104,238,0.35);"><div class="jelly-body" style="background:var(--violet);"></div><i data-lucide="house" width="28" height="28"></i></div>
+      <div><div class="icon-name">Home</div><div class="icon-lucide">house</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(108,180,238,0.35);"><div class="jelly-body" style="background:var(--sky);"></div><i data-lucide="building-2" width="28" height="28"></i></div>
+      <div><div class="icon-name">Properties</div><div class="icon-lucide">building-2</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(255,138,122,0.35);"><div class="jelly-body" style="background:var(--coral);"></div><i data-lucide="clock" width="28" height="28"></i></div>
+      <div><div class="icon-name">Track</div><div class="icon-lucide">clock</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(126,200,160,0.35);"><div class="jelly-body" style="background:var(--sage);"></div><i data-lucide="bar-chart-3" width="28" height="28"></i></div>
+      <div><div class="icon-name">Reports</div><div class="icon-lucide">bar-chart-3</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(168,168,188,0.25);"><div class="jelly-body" style="background:var(--mist);"></div><i data-lucide="settings" width="28" height="28"></i></div>
+      <div><div class="icon-name">Settings</div><div class="icon-lucide">settings</div></div>
+    </div>
+  </div>
+
+  <!-- Maintenance -->
+  <div style="margin-bottom:12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Maintenance Categories</div>
+  <div class="icon-grid" style="margin-bottom:32px;">
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(255,138,122,0.35);"><div class="jelly-body" style="background:var(--coral);"></div><i data-lucide="wrench" width="28" height="28"></i></div>
+      <div><div class="icon-name">Repairs</div><div class="icon-lucide">wrench</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(108,180,238,0.35);"><div class="jelly-body" style="background:var(--sky);"></div><i data-lucide="droplets" width="28" height="28"></i></div>
+      <div><div class="icon-name">Plumbing</div><div class="icon-lucide">droplets</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(245,197,99,0.35);"><div class="jelly-body" style="background:var(--honey);"></div><i data-lucide="zap" width="28" height="28"></i></div>
+      <div><div class="icon-name">Electrical</div><div class="icon-lucide">zap</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(126,200,160,0.35);"><div class="jelly-body" style="background:var(--sage);"></div><i data-lucide="leaf" width="28" height="28"></i></div>
+      <div><div class="icon-name">Landscaping</div><div class="icon-lucide">leaf</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(232,140,165,0.35);"><div class="jelly-body" style="background:var(--rose);"></div><i data-lucide="thermometer" width="28" height="28"></i></div>
+      <div><div class="icon-name">HVAC</div><div class="icon-lucide">thermometer</div></div>
+    </div>
+  </div>
+
+  <!-- Financial -->
+  <div style="margin-bottom:12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Financial Categories</div>
+  <div class="icon-grid" style="margin-bottom:32px;">
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(123,104,238,0.35);"><div class="jelly-body" style="background:var(--violet);"></div><i data-lucide="circle-dollar-sign" width="28" height="28"></i></div>
+      <div><div class="icon-name">Rent</div><div class="icon-lucide">circle-dollar-sign</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(232,140,165,0.35);"><div class="jelly-body" style="background:var(--rose);"></div><i data-lucide="receipt" width="28" height="28"></i></div>
+      <div><div class="icon-name">Expenses</div><div class="icon-lucide">receipt</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(245,197,99,0.35);"><div class="jelly-body" style="background:var(--honey);"></div><i data-lucide="book-open" width="28" height="28"></i></div>
+      <div><div class="icon-name">Bookkeeping</div><div class="icon-lucide">book-open</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(108,180,238,0.35);"><div class="jelly-body" style="background:var(--sky);"></div><i data-lucide="file-text" width="28" height="28"></i></div>
+      <div><div class="icon-name">Leasing</div><div class="icon-lucide">file-text</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(126,200,160,0.35);"><div class="jelly-body" style="background:var(--sage);"></div><i data-lucide="car" width="28" height="28"></i></div>
+      <div><div class="icon-name">Travel</div><div class="icon-lucide">car</div></div>
+    </div>
+  </div>
+
+  <!-- Management & Legal -->
+  <div style="margin-bottom:12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Management & Legal</div>
+  <div class="icon-grid" style="margin-bottom:32px;">
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(126,200,160,0.35);"><div class="jelly-body" style="background:var(--sage);"></div><i data-lucide="clipboard-check" width="28" height="28"></i></div>
+      <div><div class="icon-name">Management</div><div class="icon-lucide">clipboard-check</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(232,140,165,0.35);"><div class="jelly-body" style="background:var(--rose);"></div><i data-lucide="scale" width="28" height="28"></i></div>
+      <div><div class="icon-name">Legal</div><div class="icon-lucide">scale</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(108,180,238,0.35);"><div class="jelly-body" style="background:var(--sky);"></div><i data-lucide="shield-check" width="28" height="28"></i></div>
+      <div><div class="icon-name">Insurance</div><div class="icon-lucide">shield-check</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(255,138,122,0.35);"><div class="jelly-body" style="background:var(--coral);"></div><i data-lucide="hard-hat" width="28" height="28"></i></div>
+      <div><div class="icon-name">Renovations</div><div class="icon-lucide">hard-hat</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(245,197,99,0.35);"><div class="jelly-body" style="background:var(--honey);"></div><i data-lucide="trending-up" width="28" height="28"></i></div>
+      <div><div class="icon-name">Investing</div><div class="icon-lucide">trending-up</div></div>
+    </div>
+  </div>
+
+  <!-- Settings Icons -->
+  <div style="margin-bottom:12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Settings & System</div>
+  <div class="icon-grid" style="margin-bottom:16px;">
+    <div class="icon-cell">
+      <div class="jelly sm" style="box-shadow:0 4px 12px rgba(123,104,238,0.3);"><div class="jelly-body" style="background:var(--violet);"></div><i data-lucide="badge-check" width="22" height="22"></i></div>
+      <div><div class="icon-name">Subscription</div><div class="icon-lucide">badge-check</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly sm" style="box-shadow:0 4px 12px rgba(255,138,122,0.3);"><div class="jelly-body" style="background:var(--coral);"></div><i data-lucide="target" width="22" height="22"></i></div>
+      <div><div class="icon-name">Tax Goal</div><div class="icon-lucide">target</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly sm" style="box-shadow:0 4px 12px rgba(108,180,238,0.3);"><div class="jelly-body" style="background:var(--sky);"></div><i data-lucide="calendar" width="22" height="22"></i></div>
+      <div><div class="icon-name">Tax Year</div><div class="icon-lucide">calendar</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly sm" style="box-shadow:0 4px 12px rgba(126,200,160,0.3);"><div class="jelly-body" style="background:var(--sage);"></div><i data-lucide="users" width="22" height="22"></i></div>
+      <div><div class="icon-name">Spouse</div><div class="icon-lucide">users</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly sm" style="box-shadow:0 4px 12px rgba(245,197,99,0.3);"><div class="jelly-body" style="background:var(--honey);"></div><i data-lucide="bell" width="22" height="22"></i></div>
+      <div><div class="icon-name">Notifications</div><div class="icon-lucide">bell</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly sm" style="box-shadow:0 4px 12px rgba(232,140,165,0.3);"><div class="jelly-body" style="background:var(--rose);"></div><i data-lucide="sun" width="22" height="22"></i></div>
+      <div><div class="icon-name">Appearance</div><div class="icon-lucide">sun</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly sm" style="box-shadow:0 4px 12px rgba(123,104,238,0.3);"><div class="jelly-body" style="background:var(--violet);"></div><i data-lucide="download" width="22" height="22"></i></div>
+      <div><div class="icon-name">Export</div><div class="icon-lucide">download</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly sm" style="box-shadow:0 4px 12px rgba(108,180,238,0.3);"><div class="jelly-body" style="background:var(--sky);"></div><i data-lucide="circle-help" width="22" height="22"></i></div>
+      <div><div class="icon-name">Help</div><div class="icon-lucide">circle-help</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly sm" style="box-shadow:0 4px 12px rgba(168,168,188,0.2);"><div class="jelly-body" style="background:var(--mist);"></div><i data-lucide="log-out" width="22" height="22"></i></div>
+      <div><div class="icon-name">Sign Out</div><div class="icon-lucide">log-out</div></div>
+    </div>
+    <div class="icon-cell">
+      <div class="jelly sm" style="box-shadow:0 4px 12px rgba(126,200,160,0.3);"><div class="jelly-body" style="background:var(--sage);"></div><i data-lucide="star" width="22" height="22"></i></div>
+      <div><div class="icon-name">Rate App</div><div class="icon-lucide">star</div></div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===================== 5. SIZE SCALE ===================== -->
+<section class="section">
+  <div class="section-label">05 · Scale</div>
+  <div class="section-title">Size Variants</div>
+  <div class="section-desc">Icons scale from 24px inline to 96px hero. Smaller sizes drop the shadow. All use the same Lucide source.</div>
+
+  <div class="size-row">
+    <!-- Naked 22px -->
+    <div class="size-item">
+      <div style="color:var(--violet);"><i data-lucide="house" width="22" height="22"></i></div>
+      <div class="size-label">22px</div>
+      <div class="size-use">Tab bar (naked)</div>
+    </div>
+    <!-- Jelly 36px -->
+    <div class="size-item">
+      <div class="jelly" style="width:36px;height:36px;box-shadow:0 3px 8px rgba(123,104,238,0.3);"><div class="jelly-body" style="background:var(--violet);"></div><i data-lucide="house" width="18" height="18"></i></div>
+      <div class="size-label">36px</div>
+      <div class="size-use">Settings row</div>
+    </div>
+    <!-- Jelly 44px -->
+    <div class="size-item">
+      <div class="jelly sm" style="box-shadow:0 4px 12px rgba(123,104,238,0.3);"><div class="jelly-body" style="background:var(--violet);"></div><i data-lucide="house" width="22" height="22"></i></div>
+      <div class="size-label">44px</div>
+      <div class="size-use">Activity row</div>
+    </div>
+    <!-- Jelly 64px -->
+    <div class="size-item">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(123,104,238,0.35);"><div class="jelly-body" style="background:var(--violet);"></div><i data-lucide="house" width="28" height="28"></i></div>
+      <div class="size-label">64px</div>
+      <div class="size-use">Category picker</div>
+    </div>
+    <!-- Jelly 72px -->
+    <div class="size-item">
+      <div class="jelly lg" style="box-shadow:0 8px 20px rgba(123,104,238,0.35);"><div class="jelly-body" style="background:var(--violet);"></div><i data-lucide="house" width="34" height="34"></i></div>
+      <div class="size-label">72px</div>
+      <div class="size-use">Empty state</div>
+    </div>
+    <!-- Jelly 96px -->
+    <div class="size-item">
+      <div class="jelly xl" style="box-shadow:0 10px 28px rgba(123,104,238,0.35);"><div class="jelly-body" style="background:var(--violet);"></div><i data-lucide="house" width="44" height="44"></i></div>
+      <div class="size-label">96px</div>
+      <div class="size-use">Onboarding hero</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===================== 6. COLOR MATRIX ===================== -->
+<section class="section">
+  <div class="section-label">06 · Palette</div>
+  <div class="section-title">Color Application</div>
+  <div class="section-desc">Any Lucide icon can wear any color. The container body takes the category color at 80% opacity. Shadow matches. Icon strokes stay white.</div>
+
+  <div class="color-row" style="margin-bottom:24px;">
+    <div class="color-swatch">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(123,104,238,0.35);"><div class="jelly-body" style="background:var(--violet);"></div><i data-lucide="wrench" width="28" height="28"></i></div>
+      <div class="color-name">Violet</div>
+    </div>
+    <div class="color-swatch">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(255,138,122,0.35);"><div class="jelly-body" style="background:var(--coral);"></div><i data-lucide="wrench" width="28" height="28"></i></div>
+      <div class="color-name">Coral</div>
+    </div>
+    <div class="color-swatch">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(126,200,160,0.35);"><div class="jelly-body" style="background:var(--sage);"></div><i data-lucide="wrench" width="28" height="28"></i></div>
+      <div class="color-name">Sage</div>
+    </div>
+    <div class="color-swatch">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(245,197,99,0.35);"><div class="jelly-body" style="background:var(--honey);"></div><i data-lucide="wrench" width="28" height="28"></i></div>
+      <div class="color-name">Honey</div>
+    </div>
+    <div class="color-swatch">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(108,180,238,0.35);"><div class="jelly-body" style="background:var(--sky);"></div><i data-lucide="wrench" width="28" height="28"></i></div>
+      <div class="color-name">Sky</div>
+    </div>
+    <div class="color-swatch">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(232,140,165,0.35);"><div class="jelly-body" style="background:var(--rose);"></div><i data-lucide="wrench" width="28" height="28"></i></div>
+      <div class="color-name">Rose</div>
+    </div>
+    <div class="color-swatch">
+      <div class="jelly" style="box-shadow:0 6px 16px rgba(26,26,46,0.35);"><div class="jelly-body" style="background:var(--charcoal);"></div><i data-lucide="wrench" width="28" height="28"></i></div>
+      <div class="color-name">Charcoal</div>
+    </div>
+  </div>
+
+  <!-- On Light -->
+  <div class="light-strip">
+    <div class="light-strip-label">On Light</div>
+    <div class="jelly" style="box-shadow:0 6px 16px rgba(123,104,238,0.25);"><div class="jelly-body" style="background:#7B68EE;"></div><i data-lucide="house" width="28" height="28"></i></div>
+    <div class="jelly" style="box-shadow:0 6px 16px rgba(255,138,122,0.25);"><div class="jelly-body" style="background:#FF8A7A;"></div><i data-lucide="wrench" width="28" height="28"></i></div>
+    <div class="jelly" style="box-shadow:0 6px 16px rgba(126,200,160,0.25);"><div class="jelly-body" style="background:#7EC8A0;"></div><i data-lucide="clipboard-check" width="28" height="28"></i></div>
+    <div class="jelly" style="box-shadow:0 6px 16px rgba(245,197,99,0.25);"><div class="jelly-body" style="background:#F5C563;"></div><i data-lucide="book-open" width="28" height="28"></i></div>
+    <div class="jelly" style="box-shadow:0 6px 16px rgba(108,180,238,0.25);"><div class="jelly-body" style="background:#6CB4EE;"></div><i data-lucide="file-text" width="28" height="28"></i></div>
+    <div class="jelly" style="box-shadow:0 6px 16px rgba(232,140,165,0.25);"><div class="jelly-body" style="background:#E88CA5;"></div><i data-lucide="scale" width="28" height="28"></i></div>
+    <div class="jelly" style="box-shadow:0 6px 16px rgba(26,26,46,0.15);"><div class="jelly-body" style="background:#1A1A2E;"></div><i data-lucide="settings" width="28" height="28"></i></div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===================== 7. COMPLETE MAP ===================== -->
+<section class="section">
+  <div class="section-label">07 · Reference</div>
+  <div class="section-title">Complete Icon Map</div>
+  <div class="section-desc">Every icon used in the app, mapped to its Lucide name and default color.</div>
+
+  <table class="map-table">
+    <thead>
+      <tr><th>Function</th><th>Lucide Name</th><th>Default Color</th><th style="width:40px;"></th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Home tab</td><td>house</td><td>violet</td><td class="map-icon"><i data-lucide="house"></i></td></tr>
+      <tr><td>Properties tab</td><td>building-2</td><td>sky</td><td class="map-icon"><i data-lucide="building-2"></i></td></tr>
+      <tr><td>Track tab</td><td>clock</td><td>coral</td><td class="map-icon"><i data-lucide="clock"></i></td></tr>
+      <tr><td>Reports tab</td><td>bar-chart-3</td><td>sage</td><td class="map-icon"><i data-lucide="bar-chart-3"></i></td></tr>
+      <tr><td>Settings tab</td><td>settings</td><td>mist</td><td class="map-icon"><i data-lucide="settings"></i></td></tr>
+      <tr><td colspan="4" style="height:1px;padding:0;background:rgba(255,255,255,0.06);"></td></tr>
+      <tr><td>Notification bell</td><td>bell</td><td>charcoal</td><td class="map-icon"><i data-lucide="bell"></i></td></tr>
+      <tr><td>Search</td><td>search</td><td>charcoal</td><td class="map-icon"><i data-lucide="search"></i></td></tr>
+      <tr><td>Back navigation</td><td>chevron-left</td><td>charcoal</td><td class="map-icon"><i data-lucide="chevron-left"></i></td></tr>
+      <tr><td>See all / forward</td><td>chevron-right</td><td>violet</td><td class="map-icon"><i data-lucide="chevron-right"></i></td></tr>
+      <tr><td colspan="4" style="height:1px;padding:0;background:rgba(255,255,255,0.06);"></td></tr>
+      <tr><td>Repairs</td><td>wrench</td><td>coral</td><td class="map-icon"><i data-lucide="wrench"></i></td></tr>
+      <tr><td>Plumbing</td><td>droplets</td><td>sky</td><td class="map-icon"><i data-lucide="droplets"></i></td></tr>
+      <tr><td>Electrical</td><td>zap</td><td>honey</td><td class="map-icon"><i data-lucide="zap"></i></td></tr>
+      <tr><td>Landscaping</td><td>leaf</td><td>sage</td><td class="map-icon"><i data-lucide="leaf"></i></td></tr>
+      <tr><td>HVAC</td><td>thermometer</td><td>rose</td><td class="map-icon"><i data-lucide="thermometer"></i></td></tr>
+      <tr><td>Renovations</td><td>hard-hat</td><td>coral</td><td class="map-icon"><i data-lucide="hard-hat"></i></td></tr>
+      <tr><td colspan="4" style="height:1px;padding:0;background:rgba(255,255,255,0.06);"></td></tr>
+      <tr><td>Management</td><td>clipboard-check</td><td>sage</td><td class="map-icon"><i data-lucide="clipboard-check"></i></td></tr>
+      <tr><td>Tenant screening</td><td>user-check</td><td>sage</td><td class="map-icon"><i data-lucide="user-check"></i></td></tr>
+      <tr><td>Leasing</td><td>file-text</td><td>sky</td><td class="map-icon"><i data-lucide="file-text"></i></td></tr>
+      <tr><td>Bookkeeping</td><td>book-open</td><td>honey</td><td class="map-icon"><i data-lucide="book-open"></i></td></tr>
+      <tr><td>Legal</td><td>scale</td><td>rose</td><td class="map-icon"><i data-lucide="scale"></i></td></tr>
+      <tr><td>Insurance</td><td>shield-check</td><td>sky</td><td class="map-icon"><i data-lucide="shield-check"></i></td></tr>
+      <tr><td>Travel / driving</td><td>car</td><td>sage</td><td class="map-icon"><i data-lucide="car"></i></td></tr>
+      <tr><td colspan="4" style="height:1px;padding:0;background:rgba(255,255,255,0.06);"></td></tr>
+      <tr><td>Rent collection</td><td>circle-dollar-sign</td><td>violet</td><td class="map-icon"><i data-lucide="circle-dollar-sign"></i></td></tr>
+      <tr><td>Expenses</td><td>receipt</td><td>rose</td><td class="map-icon"><i data-lucide="receipt"></i></td></tr>
+      <tr><td>Investing</td><td>trending-up</td><td>honey</td><td class="map-icon"><i data-lucide="trending-up"></i></td></tr>
+      <tr><td>Financing</td><td>landmark</td><td>violet</td><td class="map-icon"><i data-lucide="landmark"></i></td></tr>
+      <tr><td colspan="4" style="height:1px;padding:0;background:rgba(255,255,255,0.06);"></td></tr>
+      <tr><td>Profile</td><td>user</td><td>violet</td><td class="map-icon"><i data-lucide="user"></i></td></tr>
+      <tr><td>Spouse / people</td><td>users</td><td>sage</td><td class="map-icon"><i data-lucide="users"></i></td></tr>
+      <tr><td>Tax goal</td><td>target</td><td>coral</td><td class="map-icon"><i data-lucide="target"></i></td></tr>
+      <tr><td>Calendar / tax year</td><td>calendar</td><td>sky</td><td class="map-icon"><i data-lucide="calendar"></i></td></tr>
+      <tr><td>Notifications</td><td>bell</td><td>honey</td><td class="map-icon"><i data-lucide="bell"></i></td></tr>
+      <tr><td>Appearance</td><td>sun</td><td>rose</td><td class="map-icon"><i data-lucide="sun"></i></td></tr>
+      <tr><td>Data export</td><td>download</td><td>violet</td><td class="map-icon"><i data-lucide="download"></i></td></tr>
+      <tr><td>Help center</td><td>circle-help</td><td>sky</td><td class="map-icon"><i data-lucide="circle-help"></i></td></tr>
+      <tr><td>Contact support</td><td>mail</td><td>violet</td><td class="map-icon"><i data-lucide="mail"></i></td></tr>
+      <tr><td>Rate app</td><td>star</td><td>honey</td><td class="map-icon"><i data-lucide="star"></i></td></tr>
+      <tr><td>Privacy</td><td>shield</td><td>sage</td><td class="map-icon"><i data-lucide="shield"></i></td></tr>
+      <tr><td>Terms</td><td>scroll-text</td><td>mist</td><td class="map-icon"><i data-lucide="scroll-text"></i></td></tr>
+      <tr><td>Sign out</td><td>log-out</td><td>mist</td><td class="map-icon"><i data-lucide="log-out"></i></td></tr>
+      <tr><td>Restore purchase</td><td>badge-check</td><td>violet</td><td class="map-icon"><i data-lucide="badge-check"></i></td></tr>
+      <tr><td colspan="4" style="height:1px;padding:0;background:rgba(255,255,255,0.06);"></td></tr>
+      <tr><td>AI sparkle</td><td>sparkles</td><td>violet</td><td class="map-icon"><i data-lucide="sparkles"></i></td></tr>
+      <tr><td>Attach file</td><td>paperclip</td><td>slate</td><td class="map-icon"><i data-lucide="paperclip"></i></td></tr>
+      <tr><td>Camera</td><td>camera</td><td>slate</td><td class="map-icon"><i data-lucide="camera"></i></td></tr>
+      <tr><td>Share</td><td>share-2</td><td>slate</td><td class="map-icon"><i data-lucide="share-2"></i></td></tr>
+      <tr><td>Bookmark</td><td>bookmark</td><td>violet</td><td class="map-icon"><i data-lucide="bookmark"></i></td></tr>
+      <tr><td>Check / done</td><td>check</td><td>sage</td><td class="map-icon"><i data-lucide="check"></i></td></tr>
+      <tr><td>Plus / add</td><td>plus</td><td>violet</td><td class="map-icon"><i data-lucide="plus"></i></td></tr>
+      <tr><td>Delete</td><td>trash-2</td><td>coral</td><td class="map-icon"><i data-lucide="trash-2"></i></td></tr>
+      <tr><td>Edit</td><td>pencil</td><td>slate</td><td class="map-icon"><i data-lucide="pencil"></i></td></tr>
+      <tr><td>Lock</td><td>lock</td><td>mist</td><td class="map-icon"><i data-lucide="lock"></i></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===================== 8. SPECS ===================== -->
+<section class="section" style="padding-bottom:80px;">
+  <div class="section-label">08 · Spec Sheet</div>
+  <div class="section-title">Implementation Reference</div>
+
+  <div class="spec-grid">
+    <div class="spec-card">
+      <div class="spec-card-title">Lucide Source</div>
+      <div class="spec-card-body">
+        CDN: unpkg.com/lucide@latest<br/>
+        viewBox: 0 0 24 24<br/>
+        stroke: currentColor<br/>
+        stroke-width: 2<br/>
+        stroke-linecap: round<br/>
+        stroke-linejoin: round<br/>
+        fill: none
+      </div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-card-title">Jelly Container CSS</div>
+      <div class="spec-card-body">
+        border-radius: 22%<br/>
+        overflow: hidden<br/>
+        body opacity: 0.8<br/>
+        glass: linear-gradient(170deg,<br/>
+        &nbsp;&nbsp;rgba(255,255,255,0.30) 0%,<br/>
+        &nbsp;&nbsp;rgba(255,255,255,0.06) 40%,<br/>
+        &nbsp;&nbsp;rgba(0,0,0,0.04) 100%)<br/>
+        shadow: 0 6px 16px [color @ 35%]
+      </div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-card-title">Size Scale</div>
+      <div class="spec-card-body">
+        22px — tab bar (naked stroke)<br/>
+        36px — settings row (jelly)<br/>
+        44px — activity row (jelly)<br/>
+        64px — category picker (jelly)<br/>
+        72px — empty state (jelly)<br/>
+        96px — onboarding hero (jelly)
+      </div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-card-title">Color via currentColor</div>
+      <div class="spec-card-body">
+        Naked mode: set color on parent<br/>
+        &nbsp;&nbsp;.tab.on { color: var(--violet); }<br/><br/>
+        Jelly mode: always color: white<br/>
+        &nbsp;&nbsp;Container takes category color<br/>
+        &nbsp;&nbsp;Shadow matches body color @ 35%<br/><br/>
+        Activity rows: set color on .icon div<br/>
+        &nbsp;&nbsp;style="color: var(--coral);"
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

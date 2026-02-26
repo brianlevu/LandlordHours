@@ -1,6 +1,7 @@
 import SwiftUI
 import MapKit
 import CoreLocation
+import LucideIcons
 
 struct PropertiesView: View {
     @EnvironmentObject var viewModel: AppViewModel
@@ -9,20 +10,29 @@ struct PropertiesView: View {
     @State private var showingAddProperty = false
     @State private var selectedProperty: RentalProperty?
     @State private var showingPaywall = false
-    
+
     var body: some View {
         NavigationStack {
             Group {
                 if viewModel.properties.isEmpty {
+                    // MARK: - Empty State
                     VStack(spacing: 20) {
-                        LHSoftBadge(icon: .properties, color: AppColors.primary, size: 72)
+                        JellyBadge(
+                            systemName: "building-2",
+                            color: AppColors.primary,
+                            wash: colors.primarySurface,
+                            size: 72
+                        )
+
                         Text("No Properties Yet")
-                            .font(.system(size: 22, weight: .bold))
+                            .font(AppTypography.headline)
                             .foregroundStyle(colors.textPrimary)
+
                         Text("Add your first rental property\nto start tracking time")
-                            .font(.system(size: 15))
+                            .font(AppTypography.body)
                             .foregroundStyle(colors.textSecondary)
                             .multilineTextAlignment(.center)
+
                         Button {
                             if viewModel.canAddProperty() {
                                 showingAddProperty = true
@@ -30,19 +40,21 @@ struct PropertiesView: View {
                                 showingPaywall = true
                             }
                         } label: {
-                            Label("Add Property", systemImage: "plus")
-                                .font(.system(size: 16, weight: .semibold))
-                                .padding(.horizontal, 28)
+                            Label { Text("Add Property") } icon: { lucideImage(Lucide.plus) }
+                                .font(AppTypography.button)
+                                .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
                                 .background(AppColors.primary)
                                 .foregroundStyle(Color.white)
                                 .clipShape(Capsule())
                         }
+                        .padding(.horizontal, 40)
                         .padding(.top, 4)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(colors.background)
                 } else {
+                    // MARK: - Property List
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 12) {
                             ForEach(viewModel.properties) { property in
@@ -53,6 +65,24 @@ struct PropertiesView: View {
                                     selectedProperty = property
                                 }
                             }
+
+                            // Add Property button at bottom of list
+                            Button {
+                                if viewModel.canAddProperty() {
+                                    showingAddProperty = true
+                                } else {
+                                    showingPaywall = true
+                                }
+                            } label: {
+                                Label { Text("Add Property") } icon: { lucideImage(Lucide.plus) }
+                                    .font(AppTypography.button)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .background(AppColors.primary)
+                                    .foregroundStyle(Color.white)
+                                    .clipShape(Capsule())
+                            }
+                            .padding(.top, 4)
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 16)
@@ -69,7 +99,8 @@ struct PropertiesView: View {
                         showingPaywall = true
                     }
                 } label: {
-                    LHIconView(icon: .plusCircle, size: 24, color: AppColors.primary)
+                    LucideIcon(image: Lucide.circlePlus, size: 22)
+                        .foregroundStyle(AppColors.primary)
                 }
             }
             .sheet(isPresented: $showingAddProperty) {
@@ -85,6 +116,7 @@ struct PropertiesView: View {
     }
 }
 
+// MARK: - Property List Card
 struct PropertyListCard: View {
     @Environment(\.colorScheme) var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
@@ -93,32 +125,46 @@ struct PropertyListCard: View {
     let hours: Double
     let onDelete: () -> Void
 
-    private var typeColor: Color { property.propertyType == .str ? AppColors.warning : AppColors.primary }
+    private var typeColor: Color {
+        property.propertyType == .str ? AppColors.honey : AppColors.primary
+    }
 
     var body: some View {
-        HStack(spacing: 16) {
-            LHIconBadge(icon: property.propertyType == .str ? .properties : .home, bgColor: typeColor, fgColor: .white, size: 56)
+        HStack(spacing: 14) {
+            // Jelly icon badge
+            JellyBadge(
+                systemName: property.propertyType == .str ? "bed-double" : "house",
+                color: typeColor,
+                wash: property.propertyType == .str ? colors.honeyWash : colors.primarySurface,
+                size: 52
+            )
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(property.name)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
+
                 Text(property.address)
-                    .font(.system(size: 13))
+                    .font(AppTypography.bodySmall)
                     .foregroundStyle(colors.textSecondary)
                     .lineLimit(1)
 
                 HStack(spacing: 8) {
+                    // Type badge capsule
                     Text(property.propertyType.rawValue)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(AppTypography.label)
                         .foregroundStyle(typeColor)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(typeColor.opacity(0.1))
+                        .background(
+                            property.propertyType == .str
+                                ? colors.honeyWash
+                                : colors.primarySurface
+                        )
                         .clipShape(Capsule())
 
                     Text(String(format: "%.1fh total", hours))
-                        .font(.system(size: 11))
+                        .font(AppTypography.caption)
                         .foregroundStyle(colors.textSecondary)
                 }
             }
@@ -126,29 +172,33 @@ struct PropertyListCard: View {
             Spacer()
 
             Button(action: onDelete) {
-                LHIconView(icon: .trash, size: 14, color: .red.opacity(0.6))
+                LucideIcon(image: Lucide.trash2, size: 14)
+                    .foregroundStyle(AppColors.coral.opacity(0.8))
             }
         }
         .padding(16)
         .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
         .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.05), radius: 10, x: 0, y: 2)
     }
 }
 
+// MARK: - Add Property View
 struct AddPropertyView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @Environment(\.dismiss) var dismiss
-    
+    @Environment(\.colorScheme) var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
     let editingProperty: RentalProperty?
-    
+
     @State private var name = ""
     @State private var address = ""
     @State private var propertyType: PropertyType = .ltr
     @State private var addressResults: [MKMapItem] = []
     @State private var isSearching = false
     @FocusState private var isAddressFocused: Bool
-    
+
     init(property: RentalProperty? = nil) {
         self.editingProperty = property
         if let property = property {
@@ -157,13 +207,13 @@ struct AddPropertyView: View {
             _propertyType = State(initialValue: property.propertyType)
         }
     }
-    
+
     var body: some View {
         NavigationStack {
             Form {
                 Section {
                     TextField("Property Name", text: $name)
-                    
+
                     // Address with autocomplete
                     ZStack(alignment: .topLeading) {
                         TextField("Address", text: $address)
@@ -175,7 +225,7 @@ struct AddPropertyView: View {
                                     addressResults = []
                                 }
                             }
-                        
+
                         if !addressResults.isEmpty && isAddressFocused {
                             VStack(spacing: 0) {
                                 ForEach(addressResults.prefix(5), id: \.self) { item in
@@ -184,41 +234,43 @@ struct AddPropertyView: View {
                                     } label: {
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(item.name ?? "Unknown")
-                                                .font(.subheadline)
-                                                .foregroundStyle(.primary)
+                                                .font(AppTypography.body)
+                                                .foregroundStyle(colors.textPrimary)
                                             if let addr = item.placemark.title {
                                                 Text(addr)
-                                                    .font(.caption)
-                                                    .foregroundStyle(.secondary)
+                                                    .font(AppTypography.caption)
+                                                    .foregroundStyle(colors.textSecondary)
                                             }
                                         }
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                         .padding(.vertical, 10)
                                         .padding(.horizontal, 12)
-                                        .background(Color(.systemBackground))
+                                        .background(colors.backgroundSecondary)
                                     }
                                     .buttonStyle(.plain)
-                                    
+
                                     Divider()
                                 }
                             }
-                            .background(Color(.systemBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .background(colors.backgroundSecondary)
+                            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.small))
                             .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
                         }
                     }
                 }
-                
+
                 Section("Property Type") {
                     Picker("Type", selection: $propertyType) {
                         HStack {
-                            LHIconView(icon: .home, size: 18, color: AppColors.primary)
+                            LucideIcon(image: Lucide.house, size: 16)
+                                .foregroundStyle(AppColors.primary)
                             Text("Long-Term Rental")
                         }
                         .tag(PropertyType.ltr)
 
                         HStack {
-                            LHIconView(icon: .home, size: 18, color: AppColors.primary)
+                            LucideIcon(image: Lucide.bedDouble, size: 16)
+                                .foregroundStyle(AppColors.honey)
                             Text("Short-Term (Airbnb/VRBO)")
                         }
                         .tag(PropertyType.str)
@@ -227,13 +279,16 @@ struct AddPropertyView: View {
                     .labelsHidden()
                 }
             }
-            .navigationTitle("Add Property")
+            .scrollContentBackground(.hidden)
+            .background(colors.background)
+            .navigationTitle(editingProperty != nil ? "Edit Property" : "Add Property")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .foregroundStyle(colors.textSecondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -251,17 +306,18 @@ struct AddPropertyView: View {
                         dismiss()
                     }
                     .disabled(name.isEmpty || address.isEmpty)
+                    .foregroundStyle(name.isEmpty || address.isEmpty ? colors.textTertiary : AppColors.primary)
                 }
             }
         }
     }
-    
+
     func searchAddress(query: String) {
         isSearching = true
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = query
         request.resultTypes = .address
-        
+
         let search = MKLocalSearch(request: request)
         search.start { response, error in
             isSearching = false
@@ -270,11 +326,11 @@ struct AddPropertyView: View {
             }
         }
     }
-    
+
     func selectAddress(_ item: MKMapItem) {
         let placemark = item.placemark
         var addressString = ""
-        
+
         if let streetNumber = placemark.subThoroughfare {
             addressString += streetNumber + " "
         }
@@ -290,7 +346,7 @@ struct AddPropertyView: View {
         if let zip = placemark.postalCode {
             addressString += zip
         }
-        
+
         address = addressString.trimmingCharacters(in: CharacterSet(charactersIn: ", "))
         addressResults = []
         isAddressFocused = false
@@ -301,8 +357,10 @@ struct AddPropertyView: View {
 struct PropertyDetailView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     let property: RentalProperty
-    
+
     @State private var name: String
     @State private var address: String
     @State private var propertyType: PropertyType
@@ -311,21 +369,48 @@ struct PropertyDetailView: View {
     @State private var showingEditSheet = false
     @State private var addressResults: [MKMapItem] = []
     @FocusState private var isAddressFocusedDetail: Bool
-    
+
     init(property: RentalProperty) {
         self.property = property
         _name = State(initialValue: property.name)
         _address = State(initialValue: property.address)
         _propertyType = State(initialValue: property.propertyType)
     }
-    
+
+    private var typeColor: Color {
+        propertyType == .str ? AppColors.honey : AppColors.primary
+    }
+
     var body: some View {
         NavigationStack {
             List {
+                // Property header with JellyBadge
+                Section {
+                    HStack(spacing: 14) {
+                        JellyBadge(
+                            systemName: propertyType == .str ? "bed-double" : "house",
+                            color: typeColor,
+                            wash: propertyType == .str ? colors.honeyWash : colors.primarySurface,
+                            size: 48
+                        )
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(name)
+                                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                .foregroundStyle(colors.textPrimary)
+                            Text(address)
+                                .font(AppTypography.bodySmall)
+                                .foregroundStyle(colors.textSecondary)
+                                .lineLimit(2)
+                        }
+                    }
+                    .listRowBackground(colors.backgroundSecondary)
+                }
+
                 Section("Property Details") {
                     TextField("Name", text: $name)
                         .onChange(of: name) { _, _ in hasChanges = true }
-                    
+
                     // Address with autocomplete
                     ZStack(alignment: .topLeading) {
                         TextField("Address", text: $address)
@@ -338,7 +423,7 @@ struct PropertyDetailView: View {
                                     addressResults = []
                                 }
                             }
-                        
+
                         if !addressResults.isEmpty && isAddressFocusedDetail {
                             VStack(spacing: 0) {
                                 ForEach(addressResults.prefix(5), id: \.self) { item in
@@ -347,60 +432,71 @@ struct PropertyDetailView: View {
                                     } label: {
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(item.name ?? "Unknown")
-                                                .font(.subheadline)
-                                                .foregroundStyle(.primary)
+                                                .font(AppTypography.body)
+                                                .foregroundStyle(colors.textPrimary)
                                             if let addr = item.placemark.title {
                                                 Text(addr)
-                                                    .font(.caption)
-                                                    .foregroundStyle(.secondary)
+                                                    .font(AppTypography.caption)
+                                                    .foregroundStyle(colors.textSecondary)
                                             }
                                         }
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                         .padding(.vertical, 10)
                                         .padding(.horizontal, 12)
-                                        .background(Color(.systemBackground))
+                                        .background(colors.backgroundSecondary)
                                     }
                                     .buttonStyle(.plain)
-                                    
+
                                     Divider()
                                 }
                             }
-                            .background(Color(.systemBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .background(colors.backgroundSecondary)
+                            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.small))
                             .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
                         }
                     }
-                    
+
                     Picker("Type", selection: $propertyType) {
                         Text("Long-Term Rental").tag(PropertyType.ltr)
                         Text("Short-Term Rental").tag(PropertyType.str)
                     }
                     .onChange(of: propertyType) { _, _ in hasChanges = true }
                 }
-                
+                .listRowBackground(colors.backgroundSecondary)
+
                 Section("Statistics") {
                     HStack {
                         Text("Total Hours Logged")
+                            .font(AppTypography.body)
+                            .foregroundStyle(colors.textPrimary)
                         Spacer()
                         Text(String(format: "%.1f hours", totalHours))
-                            .foregroundStyle(.secondary)
+                            .font(AppTypography.body)
+                            .foregroundStyle(colors.textSecondary)
                     }
-                    
+
                     HStack {
                         Text("This Year")
+                            .font(AppTypography.body)
+                            .foregroundStyle(colors.textPrimary)
                         Spacer()
                         Text(String(format: "%.1f hours", yearHours))
-                            .foregroundStyle(.secondary)
+                            .font(AppTypography.body)
+                            .foregroundStyle(colors.textSecondary)
                     }
-                    
+
                     HStack {
                         Text("Time Entries")
+                            .font(AppTypography.body)
+                            .foregroundStyle(colors.textPrimary)
                         Spacer()
                         Text("\(entryCount)")
-                            .foregroundStyle(.secondary)
+                            .font(AppTypography.body)
+                            .foregroundStyle(colors.textSecondary)
                     }
                 }
-                
+                .listRowBackground(colors.backgroundSecondary)
+
                 Section("Location") {
                     if let coordinate = coordinate {
                         Map(initialPosition: .region(MKCoordinateRegion(
@@ -408,27 +504,40 @@ struct PropertyDetailView: View {
                             span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
                         ))) {
                             Annotation("", coordinate: coordinate) {
-                                Image(systemName: "house.fill")
-                                    .foregroundStyle(.blue)
+                                LucideIcon(image: Lucide.house, size: 16)
+                                    .foregroundStyle(AppColors.primary)
                             }
                         }
                         .frame(height: 200)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
                     } else {
-                        ProgressView("Loading location...")
+                        HStack {
+                            Spacer()
+                            ProgressView("Loading location...")
+                                .foregroundStyle(colors.textSecondary)
+                            Spacer()
+                        }
                     }
                 }
-                
+                .listRowBackground(colors.backgroundSecondary)
+
                 if hasChanges {
                     Section {
-                        Button("Save Changes") {
+                        Button {
                             saveChanges()
+                        } label: {
+                            Text("Save Changes")
+                                .font(AppTypography.button)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .foregroundStyle(Color.white)
                         }
-                        .frame(maxWidth: .infinity)
-                        .buttonStyle(.borderedProminent)
+                        .listRowBackground(AppColors.primary)
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(colors.background)
             .navigationTitle("Property Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -436,11 +545,13 @@ struct PropertyDetailView: View {
                     Button("Close") {
                         dismiss()
                     }
+                    .foregroundStyle(colors.textSecondary)
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button("Edit") {
                         showingEditSheet = true
                     }
+                    .foregroundStyle(AppColors.primary)
                 }
             }
             .sheet(isPresented: $showingEditSheet) {
@@ -451,7 +562,7 @@ struct PropertyDetailView: View {
             }
         }
     }
-    
+
     func loadCoordinate() {
         let geocoder = CLGeocoder()
         geocoder.geocodeAddressString(address) { placemarks, _ in
@@ -462,25 +573,25 @@ struct PropertyDetailView: View {
             }
         }
     }
-    
+
     var totalHours: Double {
         viewModel.totalHoursForProperty(property.id)
     }
-    
+
     var yearHours: Double {
         let currentYear = Calendar.current.component(.year, from: Date())
         return viewModel.hoursForProperty(property, year: currentYear)
     }
-    
+
     var entryCount: Int {
         viewModel.timeEntries.filter { $0.propertyId == property.id }.count
     }
-    
+
     func searchAddress(query: String) {
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = query
         request.resultTypes = .address
-        
+
         let search = MKLocalSearch(request: request)
         search.start { response, error in
             if let response = response {
@@ -490,11 +601,11 @@ struct PropertyDetailView: View {
             }
         }
     }
-    
+
     func selectAddress(_ item: MKMapItem) {
         let placemark = item.placemark
         var addressString = ""
-        
+
         if let streetNumber = placemark.subThoroughfare {
             addressString += streetNumber + " "
         }
@@ -510,13 +621,13 @@ struct PropertyDetailView: View {
         if let zip = placemark.postalCode {
             addressString += zip
         }
-        
+
         address = addressString.trimmingCharacters(in: CharacterSet(charactersIn: ", "))
         addressResults = []
         isAddressFocusedDetail = false
         hasChanges = true
     }
-    
+
     func saveChanges() {
         var updated = property
         updated.name = name

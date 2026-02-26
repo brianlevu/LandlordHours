@@ -1,9 +1,10 @@
 import SwiftUI
 import AuthenticationServices
+import LucideIcons
 
 @available(iOS 16.0, *)
 struct AppleSignInButton: View {
-    let onCompletion: () -> Void
+    let onCompletion: (_ isNewUser: Bool) -> Void
     @State private var errorMessage: String?
     @State private var showError = false
 
@@ -15,6 +16,7 @@ struct AppleSignInButton: View {
             case .success(let authorization):
                 if let appleIdCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
                     let userId = appleIdCredential.user
+                    let isNewUser = UserDefaults.standard.string(forKey: "appleUserId") != userId
                     UserDefaults.standard.set(userId, forKey: "appleUserId")
 
                     AppleSignInManager.shared.userId = userId
@@ -38,7 +40,7 @@ struct AppleSignInButton: View {
                         AppleSignInManager.shared.email = existingEmail
                     }
 
-                    onCompletion()
+                    onCompletion(isNewUser)
                 }
             case .failure(let error):
                 let nsError = error as NSError
@@ -157,110 +159,404 @@ class AppleSignInManager: ObservableObject {
     }
 }
 
+// MARK: - Login View (Redesigned — matches B. Login from onboarding-full.html)
+
 struct LoginView: View {
     @EnvironmentObject var viewModel: AppViewModel
-    @Binding var showLogin: Bool
-    @State private var showEmailLogin = false
-    @State private var email = ""
-    @State private var password = ""
-    @State private var name = ""
     @State private var appeared = false
+    @State private var showCreateAccount = false
+    @State private var showEmailLogin = false
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                Spacer()
+            GeometryReader { geo in
+                ZStack {
+                    // White base
+                    Color.white.ignoresSafeArea()
 
-                // Custom logo
-                LHLogo(size: 96, showText: true, animated: true)
-                    .padding(.bottom, 8)
+                    // Top half: lavender gradient + floating glass cards
+                    VStack(spacing: 0) {
+                        ZStack {
+                            // Lavender gradient background
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "C4B5FD").opacity(0.4),
+                                    Color(hex: "DDD6FE").opacity(0.5),
+                                    Color(hex: "EDE9FE").opacity(0.6),
+                                    Color.white.opacity(0.85),
+                                    Color.white
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
 
-                Text("Track your path to tax qualification")
-                    .font(.system(size: 15))
-                    .foregroundStyle(AppColors.textSecondary)
-                    .padding(.bottom, 8)
+                            // Decorative blobs
+                            Circle()
+                                .fill(Color(hex: "7B68EE").opacity(0.12))
+                                .frame(width: 200, height: 200)
+                                .blur(radius: 50)
+                                .offset(x: 60, y: -20)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
 
-                Spacer()
+                            Circle()
+                                .fill(Color(hex: "B8AFFE").opacity(0.15))
+                                .frame(width: 180, height: 180)
+                                .blur(radius: 40)
+                                .offset(x: -60, y: 40)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
-                // Sign in buttons
-                VStack(spacing: 14) {
-                    if #available(iOS 16.0, *) {
-                        AppleSignInButton {
-                            viewModel.signIn()
-                            showLogin = false
+                            // Floating glass cards
+                            floatingCards
+                                .opacity(appeared ? 1 : 0)
+                                .offset(y: appeared ? 0 : 20)
                         }
-                    } else {
-                        Button(action: {
-                            viewModel.signIn()
-                            showLogin = false
-                        }) {
-                            HStack(spacing: 10) {
-                                Image(systemName: "apple.logo")
-                                    .font(.system(size: 18))
-                                Text("Sign in with Apple")
-                                    .font(.system(size: 17, weight: .semibold))
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .background(Color.black)
-                            .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                        }
+                        .frame(height: geo.size.height * 0.48)
+
+                        Spacer()
                     }
 
-                    Button {
-                        showEmailLogin = true
-                    } label: {
-                        HStack(spacing: 10) {
-                            LHIconView(icon: .envelope, size: 18, color: .white)
-                            Text("Sign up with Email")
-                                .font(.system(size: 17, weight: .semibold))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                        .background(
-                            LinearGradient(
-                                colors: [AppColors.primary.opacity(0.9), AppColors.primary],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .shadow(color: AppColors.primary.opacity(0.3), radius: 8, y: 3)
+                    // Bottom content: logo, headline, auth buttons
+                    VStack(spacing: 0) {
+                        Spacer()
+
+                        loginContent
+                            .opacity(appeared ? 1 : 0)
+                            .offset(y: appeared ? 0 : 30)
                     }
                 }
-                .padding(.horizontal, 24)
-                .opacity(appeared ? 1 : 0)
-                .offset(y: appeared ? 0 : 20)
-
-                Text("Sign in to sync your data across devices")
-                    .font(.system(size: 12))
-                    .foregroundStyle(AppColors.textTertiary)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 16)
-
-                Spacer()
-                    .frame(height: 60)
             }
-            .padding()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(AppColors.background)
-            .navigationDestination(isPresented: $showEmailLogin) {
-                EmailSignUpView(showLogin: $showLogin)
+            .navigationDestination(isPresented: $showCreateAccount) {
+                EmailSignUpView()
+            }
+            .sheet(isPresented: $showEmailLogin) {
+                EmailLoginSheetView()
             }
             .onAppear {
-                withAnimation(.easeOut(duration: 0.5).delay(0.3)) {
+                withAnimation(.easeOut(duration: 0.7).delay(0.2)) {
                     appeared = true
                 }
             }
         }
     }
+
+    // MARK: - Floating Glass Cards
+
+    private var floatingCards: some View {
+        ZStack {
+            // Card 1: REPS Progress — top-left, rotated -6deg
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 10) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color(hex: "EDE8FF"))
+                            .frame(width: 36, height: 36)
+                        LucideIcon(image: Lucide.clock, size: 18)
+                            .foregroundStyle(AppColors.primary)
+                    }
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("REPS Progress")
+                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .foregroundStyle(AppColors.charcoal)
+                        Text("262.5 of 750 hours")
+                            .font(.system(size: 11, design: .rounded))
+                            .foregroundStyle(AppColors.slate)
+                    }
+                }
+                .padding(.bottom, 14)
+
+                // Progress bar
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(AppColors.snow)
+                        .frame(height: 6)
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(
+                            LinearGradient(
+                                colors: [AppColors.primary, Color(hex: "B8AFFE")],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: 88, height: 6) // ~35%
+                }
+                .padding(.bottom, 8)
+
+                // Category rows
+                HStack(spacing: 8) {
+                    Circle().fill(AppColors.coral).frame(width: 8, height: 8)
+                    Text("Repairs").font(.system(size: 11, design: .rounded)).foregroundStyle(AppColors.slate)
+                    Spacer()
+                    Text("105.0h").font(.system(size: 11, weight: .semibold, design: .rounded)).foregroundStyle(AppColors.charcoal)
+                }
+                .padding(.bottom, 6)
+                HStack(spacing: 8) {
+                    Circle().fill(AppColors.sage).frame(width: 8, height: 8)
+                    Text("Management").font(.system(size: 11, design: .rounded)).foregroundStyle(AppColors.slate)
+                    Spacer()
+                    Text("65.5h").font(.system(size: 11, weight: .semibold, design: .rounded)).foregroundStyle(AppColors.charcoal)
+                }
+            }
+            .padding(24)
+            .frame(width: 280)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .overlay(
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(Color.white.opacity(0.5), lineWidth: 1)
+            )
+            .shadow(color: AppColors.primary.opacity(0.08), radius: 32, y: 8)
+            .rotationEffect(.degrees(-6))
+            .offset(x: -40, y: -30)
+
+            // Card 2: Time Entry — top-right, rotated 4deg
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 10) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color(hex: "FFE8E4"))
+                            .frame(width: 36, height: 36)
+                        LucideIcon(image: Lucide.wrench, size: 18)
+                            .foregroundStyle(AppColors.coral)
+                    }
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("2.5h logged")
+                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .foregroundStyle(AppColors.charcoal)
+                        Text("123 Oak St \u{2022} Today")
+                            .font(.system(size: 11, design: .rounded))
+                            .foregroundStyle(AppColors.slate)
+                    }
+                }
+                .padding(.bottom, 10)
+
+                Text("Fixed leaky faucet and replaced bathroom fixtures")
+                    .font(.system(size: 11, design: .rounded))
+                    .foregroundStyle(AppColors.slate)
+                    .lineSpacing(2)
+            }
+            .padding(20)
+            .frame(width: 240)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .overlay(
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(Color.white.opacity(0.5), lineWidth: 1)
+            )
+            .shadow(color: AppColors.primary.opacity(0.08), radius: 32, y: 8)
+            .rotationEffect(.degrees(4))
+            .offset(x: 50, y: 60)
+        }
+        .padding(.top, 40)
+    }
+
+    // MARK: - Login Content (bottom half)
+
+    private var loginContent: some View {
+        VStack(spacing: 0) {
+            // Logo
+            WaveHouseIcon(size: 56)
+                .shadow(color: AppColors.primary.opacity(0.2), radius: 24, y: 8)
+                .padding(.bottom, 20)
+
+            // Headline
+            Text("Track your hours.\nQualify with confidence.")
+                .font(.system(size: 26, weight: .regular, design: .serif))
+                .foregroundStyle(AppColors.charcoal)
+                .multilineTextAlignment(.center)
+                .lineSpacing(2)
+                .padding(.bottom, 6)
+
+            // Subline
+            Text("750 hours to Real Estate Professional Status \u{2014} we make every hour count.")
+                .font(.system(size: 15))
+                .foregroundStyle(AppColors.slate)
+                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+                .padding(.bottom, 32)
+
+            // Auth buttons
+            VStack(spacing: 12) {
+                // Sign in with Apple
+                if #available(iOS 16.0, *) {
+                    AppleSignInButton { isNewUser in
+                        if isNewUser {
+                            viewModel.signUp()
+                        } else {
+                            viewModel.signIn()
+                        }
+                    }
+                    .clipShape(Capsule())
+                } else {
+                    Button {
+                        viewModel.signIn()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "apple.logo")
+                                .font(.system(size: 18))
+                            Text("Sign in with Apple")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(AppColors.charcoal)
+                        .foregroundColor(.white)
+                        .clipShape(Capsule())
+                    }
+                }
+
+                // Continue with email
+                Button {
+                    showCreateAccount = true
+                } label: {
+                    Text("Continue with email")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .foregroundStyle(AppColors.primary)
+                        .overlay(
+                            Capsule()
+                                .stroke(AppColors.primary, lineWidth: 2)
+                        )
+                }
+            }
+            .padding(.bottom, 12)
+
+            // Already have an account link
+            HStack(spacing: 0) {
+                Text("Already have an account? ")
+                    .foregroundStyle(AppColors.slate)
+                Button {
+                    showEmailLogin = true
+                } label: {
+                    Text("Log in here")
+                        .foregroundStyle(AppColors.primary)
+                        .fontWeight(.semibold)
+                        .underline(true, color: AppColors.primary)
+                }
+            }
+            .font(.system(size: 14))
+            .padding(.bottom, 60)
+        }
+        .padding(.horizontal, 28)
+    }
 }
+
+// MARK: - Email Login Sheet (for "Already have an account?")
+
+struct EmailLoginSheetView: View {
+    @EnvironmentObject var viewModel: AppViewModel
+    @Environment(\.dismiss) var dismiss
+    @State private var email = ""
+    @State private var password = ""
+    @State private var errorMessage = ""
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    WaveHouseIcon(size: 48)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .shadow(color: AppColors.primary.opacity(0.25), radius: 8, y: 3)
+                        .padding(.top, 8)
+
+                    Text("Welcome back")
+                        .font(.system(size: 22, weight: .regular, design: .serif))
+                        .foregroundStyle(AppColors.charcoal)
+
+                    VStack(spacing: 16) {
+                        loginFormField(label: "Email", placeholder: "your@email.com", text: $email, contentType: .emailAddress, keyboard: .emailAddress)
+                        loginSecureField(label: "Password", placeholder: "Password", text: $password)
+                    }
+
+                    if !errorMessage.isEmpty {
+                        HStack(spacing: 6) {
+                            LucideIcon(image: Lucide.circleAlert, size: 14)
+                                .foregroundStyle(AppColors.error)
+                            Text(errorMessage)
+                                .font(.system(size: 13))
+                                .foregroundStyle(AppColors.error)
+                        }
+                    }
+
+                    Button {
+                        guard !email.isEmpty, !password.isEmpty else {
+                            errorMessage = "Please fill in all fields"
+                            return
+                        }
+                        guard password.count >= 6 else {
+                            errorMessage = "Password must be at least 6 characters"
+                            return
+                        }
+                        AppleSignInManager.shared.signInWithEmail(email: email, password: password, name: "")
+                        viewModel.signIn()
+                        dismiss()
+                    } label: {
+                        Text("Log In")
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
+                            .background(AppColors.primary)
+                            .foregroundColor(.white)
+                            .clipShape(Capsule())
+                            .shadow(color: AppColors.primary.opacity(0.3), radius: 8, y: 3)
+                    }
+                    .padding(.top, 8)
+                }
+                .padding(AppSpacing.xl)
+            }
+            .background(AppColors.background)
+            .navigationTitle("Log In")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(AppColors.primary)
+                }
+            }
+        }
+    }
+
+    private func loginFormField(label: String, placeholder: String, text: Binding<String>, contentType: UITextContentType? = nil, keyboard: UIKeyboardType = .default) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.system(size: 12))
+                .foregroundStyle(AppColors.slate)
+            TextField(placeholder, text: text)
+                .textFieldStyle(.plain)
+                .textContentType(contentType)
+                .keyboardType(keyboard)
+                .autocapitalization(keyboard == .emailAddress ? .none : .words)
+                .font(.system(size: 16, design: .rounded))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(AppColors.snow)
+                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
+        }
+    }
+
+    private func loginSecureField(label: String, placeholder: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.system(size: 12))
+                .foregroundStyle(AppColors.slate)
+            SecureField(placeholder, text: text)
+                .textFieldStyle(.plain)
+                .textContentType(.password)
+                .font(.system(size: 16, design: .rounded))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(AppColors.snow)
+                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
+        }
+    }
+}
+
+// MARK: - Email Sign Up View (Redesigned)
 
 struct EmailSignUpView: View {
     @EnvironmentObject var viewModel: AppViewModel
-    @Binding var showLogin: Bool
+    @Environment(\.colorScheme) var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
@@ -271,11 +567,14 @@ struct EmailSignUpView: View {
         ScrollView {
             VStack(spacing: 20) {
                 // Header
-                LHCompactLogo(size: 48)
+                WaveHouseIcon(size: 48)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .shadow(color: AppColors.primary.opacity(0.25), radius: 8, y: 3)
                     .padding(.top, 8)
 
                 Text("Create Account")
-                    .font(.system(size: 26, weight: .bold))
+                    .font(.system(size: 22, weight: .regular, design: .serif))
+                    .foregroundStyle(AppColors.charcoal)
 
                 // Form fields
                 VStack(spacing: 16) {
@@ -287,9 +586,10 @@ struct EmailSignUpView: View {
 
                 if !errorMessage.isEmpty {
                     HStack(spacing: 6) {
-                        LHIconView(icon: .info, size: 14, color: AppColors.error)
+                        LucideIcon(image: Lucide.circleAlert, size: 14)
+                            .foregroundStyle(AppColors.error)
                         Text(errorMessage)
-                            .font(.system(size: 13))
+                            .font(AppTypography.bodySmall)
                             .foregroundStyle(AppColors.error)
                     }
                 }
@@ -309,28 +609,22 @@ struct EmailSignUpView: View {
                     }
 
                     AppleSignInManager.shared.signInWithEmail(email: email, password: password, name: name)
-                    viewModel.signIn()
-                    showLogin = false
+                    viewModel.signUp()
                 } label: {
                     Text("Create Account")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
-                        .background(
-                            LinearGradient(
-                                colors: [AppColors.primary.opacity(0.9), AppColors.primary],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .background(AppColors.primary)
                         .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .clipShape(Capsule())
                         .shadow(color: AppColors.primary.opacity(0.3), radius: 8, y: 3)
                 }
                 .padding(.top, 8)
             }
-            .padding(24)
+            .padding(AppSpacing.xl)
         }
+        .background(colors.background)
         .navigationTitle("Sign Up")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -338,34 +632,34 @@ struct EmailSignUpView: View {
     private func formField(label: String, placeholder: String, text: Binding<String>, contentType: UITextContentType? = nil, keyboard: UIKeyboardType = .default) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(AppColors.textSecondary)
+                .font(AppTypography.caption)
+                .foregroundStyle(colors.textSecondary)
             TextField(placeholder, text: text)
                 .textFieldStyle(.plain)
                 .textContentType(contentType)
                 .keyboardType(keyboard)
                 .autocapitalization(keyboard == .emailAddress ? .none : .words)
-                .font(.system(size: 16))
+                .font(.system(size: 16, design: .rounded))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
-                .background(AppColors.backgroundTertiary)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .background(colors.backgroundTertiary)
+                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
         }
     }
 
     private func secureFormField(label: String, placeholder: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(AppColors.textSecondary)
+                .font(AppTypography.caption)
+                .foregroundStyle(colors.textSecondary)
             SecureField(placeholder, text: text)
                 .textFieldStyle(.plain)
                 .textContentType(.newPassword)
-                .font(.system(size: 16))
+                .font(.system(size: 16, design: .rounded))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
-                .background(AppColors.backgroundTertiary)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .background(colors.backgroundTertiary)
+                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
         }
     }
 }

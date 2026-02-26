@@ -1263,3 +1263,26 @@ extension LHIcon {
     }
     .padding()
 }
+
+// MARK: - Lucide Icon Bridge
+import LucideIcons
+
+/// SwiftUI Image from a Lucide UIImage. Use `.renderingMode(.template)` to tint via `foregroundStyle`.
+struct LucideIcon: View {
+    let image: UIImage
+    var size: CGFloat = 24
+
+    var body: some View {
+        Image(uiImage: image)
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+    }
+}
+
+/// Convenience: map a Lucide static property name to a SwiftUI Image.
+/// Usage: `lucideImage(Lucide.house)` or just use `LucideIcon(image: Lucide.house)`
+func lucideImage(_ img: UIImage) -> Image {
+    Image(uiImage: img).renderingMode(.template)
+}

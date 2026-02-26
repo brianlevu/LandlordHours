@@ -1,4 +1,5 @@
 import SwiftUI
+import LucideIcons
 
 struct TasksView: View {
     @EnvironmentObject var viewModel: AppViewModel
@@ -31,7 +32,8 @@ struct TasksView: View {
                 Button {
                     // Add task
                 } label: {
-                    LHIconView(icon: .plusCircle, size: 24, color: AppColors.primary)
+                    LucideIcon(image: Lucide.circlePlus, size: 22)
+                        .foregroundStyle(AppColors.primary)
                 }
             }
         }
@@ -62,12 +64,12 @@ struct EmptyTasksView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            LHSoftBadge(icon: .checklist, color: AppColors.primary, size: 64)
+            JellyBadge(systemName: "clipboard-check", color: AppColors.primary, wash: colors.primarySurface, size: 56)
             Text("No Tasks Yet")
-                .font(.system(size: 18, weight: .bold))
+                .font(AppTypography.subheadline)
                 .foregroundStyle(colors.textPrimary)
             Text("Log time entries to see your tasks here")
-                .font(.system(size: 14))
+                .font(AppTypography.body)
                 .foregroundStyle(colors.textSecondary)
                 .multilineTextAlignment(.center)
         }

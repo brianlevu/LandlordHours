@@ -13,11 +13,23 @@
 		24B4A91548115D49515C797B /* PropertiesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D91BDD921FD02E42B58FE334 /* PropertiesView.swift */; };
 		3B7CC2060463C21BC9ECAD07 /* TasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 368AC8C360A71EB0FAFB1D52 /* TasksView.swift */; };
 		571691826C340E4E727303CA /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1552DA58D14D98D9473D352A /* SubscriptionManager.swift */; };
+		248FE0A34E510171590D2CA0 /* CloudKitSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D5650586AC0BFB4A2B259B /* CloudKitSyncService.swift */; };
 		691B932AEB4ECA321D667151 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7002A4C1E561833705DE3B43 /* PaywallView.swift */; };
 		93C20D864969D6F6EC85B191 /* TimeLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11377EC6BD95D70E1AF5A9A6 /* TimeLogView.swift */; };
 		98B8F1C68BDAB98363098499 /* TrialBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6479CEE1FE815563D8292734 /* TrialBannerView.swift */; };
 		A47503D607E3D15AB9B78D16 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 754B9E894A2C95D4E5C635B0 /* HistoryView.swift */; };
 		A72762E0F4CE4DEFA07D9C28 /* AITimeEntryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63814CFFD3A0284AC85988D /* AITimeEntryService.swift */; };
+		AA1111110000000000000001 /* LHIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000001 /* LHIcons.swift */; };
+		AA1111110000000000000002 /* LHLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000002 /* LHLogo.swift */; };
+		AA1111110000000000000003 /* CategoryManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000003 /* CategoryManagementView.swift */; };
+		AA1111110000000000000004 /* CategoryPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000004 /* CategoryPickerSheet.swift */; };
+		AA1111110000000000000005 /* ContactSupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000005 /* ContactSupportView.swift */; };
+		AA1111110000000000000006 /* TaxYearView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000006 /* TaxYearView.swift */; };
+		AA1111110000000000000007 /* WeeklySummaryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000007 /* WeeklySummaryService.swift */; };
+		AA1111110000000000000008 /* LearningCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000008 /* LearningCenterView.swift */; };
+		AA1111110000000000000009 /* CelebrationOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000009 /* CelebrationOverlayView.swift */; };
+		AA111111000000000000000A /* AppDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA222222000000000000000A /* AppDesignSystem.swift */; };
+		BB5555550000000000000001 /* LucideIcons in Frameworks */ = {isa = PBXBuildFile; productRef = BB3333330000000000000001 /* LucideIcons */; };
 		BFF6F8AE069FE01CE9E5414F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE13F908989158FDAB28BF57 /* Models.swift */; };
 		C033DAA5B2F3EB1B50CDA1CE /* LandlordHoursApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9CB28BC741E54912DBB35F /* LandlordHoursApp.swift */; };
 		C6B50842EA064CEACA38BA96 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFBF76FD610DF2D0CDA40C0A /* AppViewModel.swift */; };
@@ -26,18 +38,12 @@
 		D0FB50644A3E4250418CF25F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8F16B919639EBDE7C821FEC2 /* Assets.xcassets */; };
 		EA9388030050C4067B4212BE /* AppleSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = C85EE25AEEEC23C7341BEA7B /* AppleSignIn.swift */; };
 		F20713D35465CC3396393B14 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2CA9BA1AD53F0ABA92A9F2F /* OnboardingView.swift */; };
-		AA1111110000000000000001 /* LHIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000001 /* LHIcons.swift */; };
-		AA1111110000000000000002 /* LHLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000002 /* LHLogo.swift */; };
-		AA1111110000000000000003 /* CategoryManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000003 /* CategoryManagementView.swift */; };
-		AA1111110000000000000004 /* CategoryPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000004 /* CategoryPickerSheet.swift */; };
-		AA1111110000000000000005 /* ContactSupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000005 /* ContactSupportView.swift */; };
-		AA1111110000000000000006 /* TaxYearView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000006 /* TaxYearView.swift */; };
-		AA1111110000000000000007 /* WeeklySummaryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2222220000000000000007 /* WeeklySummaryService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		11377EC6BD95D70E1AF5A9A6 /* TimeLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeLogView.swift; sourceTree = "<group>"; };
 		1552DA58D14D98D9473D352A /* SubscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
+		F4D5650586AC0BFB4A2B259B /* CloudKitSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitSyncService.swift; sourceTree = "<group>"; };
 		368AC8C360A71EB0FAFB1D52 /* TasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksView.swift; sourceTree = "<group>"; };
 		37718C6C352F5146B1B19AAA /* ExportPDFView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPDFView.swift; sourceTree = "<group>"; };
 		5490464EB91A5699EED6EFCE /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
@@ -50,12 +56,6 @@
 		8F16B919639EBDE7C821FEC2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9AD25AA91ABB5FB4C307E491 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		A2CA9BA1AD53F0ABA92A9F2F /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
-		AFF3C2F4E4EAC2D09DCB3F5B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		C85EE25AEEEC23C7341BEA7B /* AppleSignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignIn.swift; sourceTree = "<group>"; };
-		CFBF76FD610DF2D0CDA40C0A /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
-		D91BDD921FD02E42B58FE334 /* PropertiesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertiesView.swift; sourceTree = "<group>"; };
-		DE13F908989158FDAB28BF57 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
-		F63814CFFD3A0284AC85988D /* AITimeEntryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITimeEntryService.swift; sourceTree = "<group>"; };
 		AA2222220000000000000001 /* LHIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHIcons.swift; sourceTree = "<group>"; };
 		AA2222220000000000000002 /* LHLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHLogo.swift; sourceTree = "<group>"; };
 		AA2222220000000000000003 /* CategoryManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryManagementView.swift; sourceTree = "<group>"; };
@@ -63,7 +63,27 @@
 		AA2222220000000000000005 /* ContactSupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactSupportView.swift; sourceTree = "<group>"; };
 		AA2222220000000000000006 /* TaxYearView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaxYearView.swift; sourceTree = "<group>"; };
 		AA2222220000000000000007 /* WeeklySummaryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklySummaryService.swift; sourceTree = "<group>"; };
+		AA2222220000000000000008 /* LearningCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningCenterView.swift; sourceTree = "<group>"; };
+		AA2222220000000000000009 /* CelebrationOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CelebrationOverlayView.swift; sourceTree = "<group>"; };
+		AA222222000000000000000A /* AppDesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDesignSystem.swift; sourceTree = "<group>"; };
+		AFF3C2F4E4EAC2D09DCB3F5B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		C85EE25AEEEC23C7341BEA7B /* AppleSignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignIn.swift; sourceTree = "<group>"; };
+		CFBF76FD610DF2D0CDA40C0A /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
+		D91BDD921FD02E42B58FE334 /* PropertiesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertiesView.swift; sourceTree = "<group>"; };
+		DE13F908989158FDAB28BF57 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		F63814CFFD3A0284AC85988D /* AITimeEntryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITimeEntryService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		BB6666660000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BB5555550000000000000001 /* LucideIcons in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		0C4465A88F3803561609E98F /* Models */ = {
@@ -119,14 +139,25 @@
 				F63814CFFD3A0284AC85988D /* AITimeEntryService.swift */,
 				C85EE25AEEEC23C7341BEA7B /* AppleSignIn.swift */,
 				1552DA58D14D98D9473D352A /* SubscriptionManager.swift */,
+				F4D5650586AC0BFB4A2B259B /* CloudKitSyncService.swift */,
 				AA2222220000000000000007 /* WeeklySummaryService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
 		};
+			AA3333330000000000000001 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				AA222222000000000000000A /* AppDesignSystem.swift */,
+				AA2222220000000000000009 /* CelebrationOverlayView.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
 		E0F8AC95A77E6D771AE995AE /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				AA3333330000000000000001 /* Components */,
 				AA2222220000000000000003 /* CategoryManagementView.swift */,
 				AA2222220000000000000004 /* CategoryPickerSheet.swift */,
 				AA2222220000000000000005 /* ContactSupportView.swift */,
@@ -134,6 +165,7 @@
 				9AD25AA91ABB5FB4C307E491 /* DashboardView.swift */,
 				37718C6C352F5146B1B19AAA /* ExportPDFView.swift */,
 				754B9E894A2C95D4E5C635B0 /* HistoryView.swift */,
+				AA2222220000000000000008 /* LearningCenterView.swift */,
 				A2CA9BA1AD53F0ABA92A9F2F /* OnboardingView.swift */,
 				7002A4C1E561833705DE3B43 /* PaywallView.swift */,
 				D91BDD921FD02E42B58FE334 /* PropertiesView.swift */,
@@ -163,6 +195,7 @@
 			buildConfigurationList = 222E14293F8F3A971526B8FB /* Build configuration list for PBXNativeTarget "LandlordHours" */;
 			buildPhases = (
 				564AB252F72433AEA9CF6925 /* Sources */,
+				BB6666660000000000000001 /* Frameworks */,
 				43885D2E8463DEC7C849BE66 /* Resources */,
 			);
 			buildRules = (
@@ -171,6 +204,7 @@
 			);
 			name = LandlordHours;
 			packageProductDependencies = (
+				BB3333330000000000000001 /* LucideIcons */,
 			);
 			productName = LandlordHours;
 			productReference = 74E7F35CA9ADFE290A5D0420 /* LandlordHours.app */;
@@ -183,7 +217,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1500;
+				LastUpgradeCheck = 2620;
 			};
 			buildConfigurationList = 08680678E847D977FB6AC205 /* Build configuration list for PBXProject "LandlordHours" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -195,6 +229,9 @@
 			);
 			mainGroup = 84A0BC1146FDB95F03019DC3;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				BB4444440000000000000001 /* XCRemoteSwiftPackageReference "lucide-icons-swift" */,
+			);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -239,11 +276,15 @@
 				1A2A80F489BB65C766EBA321 /* ReportsView.swift in Sources */,
 				CC3AD4AEC85263A4DB7CC2EE /* SettingsView.swift in Sources */,
 				571691826C340E4E727303CA /* SubscriptionManager.swift in Sources */,
+				248FE0A34E510171590D2CA0 /* CloudKitSyncService.swift in Sources */,
 				3B7CC2060463C21BC9ECAD07 /* TasksView.swift in Sources */,
 				AA1111110000000000000006 /* TaxYearView.swift in Sources */,
 				93C20D864969D6F6EC85B191 /* TimeLogView.swift in Sources */,
 				98B8F1C68BDAB98363098499 /* TrialBannerView.swift in Sources */,
 				AA1111110000000000000007 /* WeeklySummaryService.swift in Sources */,
+				AA1111110000000000000008 /* LearningCenterView.swift in Sources */,
+				AA1111110000000000000009 /* CelebrationOverlayView.swift in Sources */,
+				AA111111000000000000000A /* AppDesignSystem.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -254,6 +295,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -286,8 +328,10 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = G68NLC3DA3;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -310,6 +354,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.9;
@@ -321,10 +366,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = LandlordHours.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = G68NLC3DA3;
 				INFOPLIST_KEY_CFBundleDisplayName = LandlordHours;
 				INFOPLIST_KEY_CFBundleIcons_AppIcon = AppIcon;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
@@ -333,6 +378,7 @@
 				INFOPLIST_KEY_UILaunchScreen_BackgroundColor = LaunchBackground;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UIBackgroundModes = "remote-notification";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -341,8 +387,12 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.landlordhours;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -351,10 +401,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = LandlordHours.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = G68NLC3DA3;
 				INFOPLIST_KEY_CFBundleDisplayName = LandlordHours;
 				INFOPLIST_KEY_CFBundleIcons_AppIcon = AppIcon;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
@@ -363,6 +413,7 @@
 				INFOPLIST_KEY_UILaunchScreen_BackgroundColor = LaunchBackground;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UIBackgroundModes = "remote-notification";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -371,8 +422,12 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.landlordhours;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -380,6 +435,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -412,8 +468,10 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = G68NLC3DA3;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -429,6 +487,7 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.9;
@@ -457,6 +516,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		BB4444440000000000000001 /* XCRemoteSwiftPackageReference "lucide-icons-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/JakubMazur/lucide-icons-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.575.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BB3333330000000000000001 /* LucideIcons */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BB4444440000000000000001 /* XCRemoteSwiftPackageReference "lucide-icons-swift" */;
+			productName = LucideIcons;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D0C874CA0683032090187EC6 /* Project object */;
 }

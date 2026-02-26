@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Home</title>
+<script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=DM+Serif+Display&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --cream: #FAF7F2;
+    --warm-white: #FFFFFF;
+    --violet: #7B68EE;
+    --violet-soft: #B8AFFE;
+    --violet-wash: #EDE8FF;
+    --violet-deep: #5B4BC9;
+    --coral: #FF8A7A;
+    --coral-wash: #FFE8E4;
+    --sage: #7EC8A0;
+    --sage-wash: #E4F5EC;
+    --honey: #F5C563;
+    --honey-wash: #FFF4DA;
+    --sky: #6CB4EE;
+    --sky-wash: #E0F0FF;
+    --rose: #E88CA5;
+    --rose-wash: #FFE4EC;
+    --charcoal: #1A1A2E;
+    --ink: #2D2D3F;
+    --slate: #6E6E82;
+    --mist: #A8A8BC;
+    --cloud: #D4D4E0;
+    --snow: #F0EFF4;
+  }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: #E5E0D8;
+    padding: 60px;
+    display: flex;
+    gap: 48px;
+    justify-content: center;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .screen-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .screen-title { font-size: 13px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--slate); }
+
+  .phone {
+    width: 393px; height: 852px; background: var(--cream);
+    border-radius: 44px; overflow: hidden; position: relative;
+    box-shadow: 0 30px 80px rgba(26,26,46,0.15), 0 0 0 1px rgba(0,0,0,0.04);
+  }
+  .phone::before {
+    content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 126px; height: 34px; background: #000; border-radius: 0 0 22px 22px; z-index: 100;
+  }
+
+  .status-bar {
+    height: 58px; padding: 14px 28px 0; display: flex; justify-content: space-between;
+    align-items: center; font-size: 15px; font-weight: 600; color: var(--charcoal);
+  }
+  .scroll-area { height: calc(100% - 58px - 80px); overflow-y: auto; scrollbar-width: none; position: relative; }
+  .scroll-area::-webkit-scrollbar { display: none; }
+
+  /* ===== Aurora atmospheric background ===== */
+  .aurora-bg {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; z-index: 0; overflow: hidden;
+  }
+  .aurora-bg .blob-violet {
+    position: absolute; top: -50px; right: -70px;
+    width: 300px; height: 300px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(123,104,238,0.12) 0%, rgba(123,104,238,0.04) 45%, transparent 70%);
+    filter: blur(50px); opacity: 0.8;
+  }
+  .aurora-bg .blob-peach {
+    position: absolute; top: 180px; left: -80px;
+    width: 240px; height: 240px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,228,214,0.35) 0%, transparent 70%);
+    filter: blur(55px); opacity: 0.6;
+  }
+  .aurora-bg .blob-sage {
+    position: absolute; bottom: 60px; right: -30px;
+    width: 180px; height: 180px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(126,200,160,0.12) 0%, transparent 70%);
+    filter: blur(50px); opacity: 0.5;
+  }
+
+  .scroll-content { position: relative; z-index: 1; padding: 0 20px 40px; }
+
+  /* Tab bar */
+  .tab-bar {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 80px;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--snow);
+    display: flex; justify-content: space-around; align-items: flex-start; padding-top: 10px;
+    z-index: 10;
+  }
+  .tab { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; font-weight: 500; color: var(--mist); }
+  .tab.on { color: var(--violet); }
+  .tab-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--violet); margin-top: -2px; opacity: 0; }
+  .tab.on .tab-dot { opacity: 1; }
+  .tab svg { width: 22px; height: 22px; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+  .tab.on svg { stroke: var(--violet); }
+  .tab:not(.on) svg { stroke: var(--mist); }
+
+  /* ===== Greeting ===== */
+  .greeting { padding: 4px 0 20px; display: flex; align-items: flex-start; justify-content: space-between; }
+  .greeting-sub { font-size: 14px; color: var(--slate); }
+  .greeting-name { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--charcoal); margin-top: 2px; }
+  .greeting-right { display: flex; align-items: center; gap: 10px; }
+  .pro-badge { font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--violet); color: white; letter-spacing: 0.5px; }
+  .notif-btn {
+    width: 40px; height: 40px; border-radius: 14px;
+    background: var(--warm-white); display: flex; align-items: center; justify-content: center;
+    border: 1px solid #F0F0F0;
+    box-shadow: 0 2px 8px rgba(26,26,46,0.05);
+    position: relative;
+  }
+  .notif-btn svg { width: 20px; height: 20px; stroke: var(--charcoal); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+  .notif-dot {
+    position: absolute; top: 8px; right: 9px;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--coral); border: 1.5px solid var(--warm-white);
+  }
+
+  /* ===== Trial nudge — subtle, not salesy ===== */
+  .trial-nudge {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-radius: 14px;
+    background: var(--warm-white);
+    border: 1px solid #F0F0F0;
+    box-shadow: 0 1px 6px rgba(26,26,46,0.03);
+    margin-bottom: 18px;
+  }
+  .trial-icon {
+    width: 32px; height: 32px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .trial-icon svg { width: 18px; height: 18px; }
+  .trial-text { flex: 1; }
+  .trial-label { font-size: 12px; font-weight: 600; color: var(--charcoal); }
+  .trial-sub { font-size: 11px; color: var(--mist); margin-top: 1px; }
+  .trial-action {
+    font-size: 11px; font-weight: 700; color: var(--violet);
+    padding: 5px 12px; border-radius: 999px;
+    background: var(--violet-wash); flex-shrink: 0;
+    letter-spacing: 0.2px;
+  }
+
+  /* ===== Hero Progress — the emotional center ===== */
+  .hero-progress {
+    background: var(--warm-white); border-radius: 28px;
+    padding: 28px 24px 24px;
+    margin-bottom: 16px;
+    border: 1px solid #F0F0F0;
+    box-shadow: 0 2px 16px rgba(26,26,46,0.045);
+    display: flex; flex-direction: column; align-items: center;
+    position: relative; overflow: hidden;
+  }
+  /* Subtle ambient glow behind ring */
+  .hero-glow {
+    position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
+    width: 220px; height: 220px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(123,104,238,0.08) 0%, rgba(123,104,238,0.02) 50%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .ring-container {
+    position: relative; width: 180px; height: 180px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 6px;
+  }
+  .ring-center {
+    position: absolute; text-align: center;
+  }
+  .ring-hours {
+    font-size: 44px; font-weight: 800; color: var(--charcoal);
+    line-height: 1; letter-spacing: -2px;
+  }
+  .ring-hours span { font-size: 18px; font-weight: 600; color: var(--mist); letter-spacing: 0; }
+  .ring-goal { font-size: 12px; color: var(--mist); margin-top: 4px; }
+
+  .hero-message {
+    font-size: 15px; font-weight: 600; color: var(--charcoal);
+    text-align: center; margin-bottom: 4px; margin-top: 2px;
+  }
+  .hero-sub {
+    font-size: 12px; color: var(--slate); text-align: center;
+    line-height: 1.5; margin-bottom: 14px;
+  }
+
+  .pace-row {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%;
+  }
+  .pace-chip {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 8px; border-radius: 14px;
+    background: var(--cream);
+    border: 1px solid rgba(240,240,240,0.6);
+  }
+  .pace-chip-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .pace-chip-label { font-size: 11px; color: var(--slate); }
+  .pace-chip-val { font-size: 13px; font-weight: 700; margin-left: auto; }
+
+  /* ===== This Week ===== */
+  .card {
+    background: var(--warm-white); border-radius: 24px; padding: 22px;
+    margin-bottom: 16px;
+    border: 1px solid #F0F0F0;
+    box-shadow: 0 2px 12px rgba(26,26,46,0.04);
+  }
+  .week-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+  .week-title { font-size: 15px; font-weight: 700; color: var(--charcoal); }
+  .week-hours { font-size: 18px; font-weight: 800; color: var(--violet); letter-spacing: -0.5px; }
+  .week-days { display: flex; justify-content: space-between; }
+  .week-day { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .week-day-label { font-size: 10px; color: var(--mist); font-weight: 500; }
+  .week-day-dot {
+    width: 32px; height: 32px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+  }
+  .day-empty { background: var(--snow); color: var(--cloud); }
+  .day-filled { background: var(--violet-wash); color: var(--violet); }
+  .day-today { background: var(--violet); color: white; box-shadow: 0 2px 8px rgba(123,104,238,0.3); }
+
+  /* ===== Section header ===== */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .section-title { font-size: 17px; font-weight: 700; color: var(--charcoal); }
+  .section-link { font-size: 13px; font-weight: 600; color: var(--violet); display: flex; align-items: center; gap: 2px; }
+  .section-link svg { width: 14px; height: 14px; stroke: var(--violet); stroke-width: 2.5; stroke-linecap: round; fill: none; }
+
+  /* ===== Activity row ===== */
+  .activity-card { background: var(--warm-white); border-radius: 24px; padding: 4px 22px; margin-bottom: 16px; border: 1px solid #F0F0F0; box-shadow: 0 2px 12px rgba(26,26,46,0.04); }
+  .activity-row {
+    display: flex; align-items: center; gap: 14px; padding: 14px 0;
+    border-bottom: 1px solid var(--snow);
+  }
+  .activity-row:last-child { border-bottom: none; }
+  .activity-icon {
+    width: 40px; height: 40px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .activity-icon svg { width: 20px; height: 20px; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+  .activity-text { flex: 1; min-width: 0; }
+  .activity-name { font-size: 14px; font-weight: 600; color: var(--charcoal); }
+  .activity-meta { font-size: 11px; color: var(--mist); margin-top: 2px; }
+  .activity-hours { font-size: 15px; font-weight: 700; color: var(--charcoal); flex-shrink: 0; }
+
+  /* ===== Learn carousel — Tiimo-style ===== */
+  .learn-section { margin-top: 4px; }
+  .learn-kicker {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--mist); margin-bottom: 4px;
+  }
+  .learn-headline {
+    font-family: 'DM Serif Display', serif; font-size: 20px;
+    color: var(--charcoal); margin-bottom: 16px;
+  }
+  .learn-scroll {
+    display: flex; gap: 12px; overflow-x: auto;
+    margin: 0 -20px; padding: 0 20px 8px;
+    scrollbar-width: none;
+  }
+  .learn-scroll::-webkit-scrollbar { display: none; }
+  .learn-card {
+    width: 165px; min-height: 200px; border-radius: 24px; flex-shrink: 0;
+    background: var(--warm-white); overflow: hidden;
+    border: 1px solid #F0F0F0;
+    box-shadow: 0 2px 10px rgba(26,26,46,0.035);
+    transition: transform 0.2s cubic-bezier(0.25,0.46,0.45,0.94);
+  }
+  .learn-card:active { transform: scale(0.975); }
+  .learn-card-illust {
+    height: 100px; display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .learn-card-badge {
+    position: absolute; top: 10px; left: 10px; z-index: 2;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--charcoal); display: flex;
+    align-items: center; justify-content: center;
+    color: #fff;
+  }
+  .learn-card-badge svg {
+    width: 12px; height: 12px; stroke: #fff; stroke-width: 2;
+    stroke-linecap: round; fill: none;
+  }
+  .learn-card-body { padding: 4px 16px 16px; }
+  .learn-cat {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+  .learn-card-title { font-size: 14px; font-weight: 600; color: var(--charcoal); line-height: 1.35; margin-bottom: 6px; }
+  .learn-time { font-size: 10px; color: var(--mist); display: flex; align-items: center; gap: 4px; }
+  .learn-time svg { width: 11px; height: 11px; stroke: var(--mist); stroke-width: 2; fill: none; }
+
+  /* ===== Expired state — gentle, not scary ===== */
+  .expired-nudge {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; border-radius: 20px;
+    background: var(--warm-white);
+    border: 1px solid #F0F0F0;
+    box-shadow: 0 2px 12px rgba(26,26,46,0.04);
+    margin-bottom: 18px;
+  }
+  .expired-icon {
+    width: 44px; height: 44px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--violet-deep), var(--violet));
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    color: white;
+  }
+  .expired-icon svg { width: 22px; height: 22px; stroke: white; stroke-width: 1.8; fill: none; stroke-linecap: round; }
+  .expired-text { flex: 1; }
+  .expired-title { font-size: 14px; font-weight: 600; color: var(--charcoal); }
+  .expired-sub { font-size: 11px; color: var(--slate); margin-top: 2px; line-height: 1.4; }
+  .expired-btn {
+    padding: 8px 16px; border-radius: 999px;
+    background: var(--violet); color: white;
+    font-size: 12px; font-weight: 600; flex-shrink: 0;
+    font-family: 'DM Sans', sans-serif; border: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== SCREEN 1: Trial Active ==================== -->
+<div class="screen-wrap">
+  <div class="screen-title">Trial Active</div>
+  <div class="phone">
+    <div class="status-bar"><span>9:41</span><span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span></div>
+    <div class="scroll-area">
+      <div class="aurora-bg">
+        <div class="blob-violet"></div>
+        <div class="blob-peach"></div>
+        <div class="blob-sage"></div>
+      </div>
+      <div class="scroll-content">
+        <div class="greeting">
+          <div>
+            <div class="greeting-sub">Good morning,</div>
+            <div class="greeting-name">Brian</div>
+          </div>
+          <div class="notif-btn">
+            <i data-lucide="bell"></i>
+            <div class="notif-dot"></div>
+          </div>
+        </div>
+
+        <!-- Trial — gentle inline nudge -->
+        <div class="trial-nudge">
+          <div class="trial-icon" style="background:var(--violet-wash); color:var(--violet);">
+            <i data-lucide="sparkles"></i>
+          </div>
+          <div class="trial-text">
+            <div class="trial-label">Pro Trial · 5 days left</div>
+            <div class="trial-sub">All features unlocked</div>
+          </div>
+          <div class="trial-action">Upgrade</div>
+        </div>
+
+        <!-- Hero Progress Ring -->
+        <div class="hero-progress">
+          <div class="hero-glow"></div>
+          <div class="ring-container">
+            <svg width="180" height="180" viewBox="0 0 180 180" style="transform:rotate(-90deg);">
+              <!-- Outer track (segmented) -->
+              <circle cx="90" cy="90" r="78" fill="none" stroke="var(--violet-wash)" stroke-width="10" stroke-dasharray="3.5 5" stroke-linecap="round"/>
+              <!-- Outer progress: 262/750 ≈ 34.9% → 0.349 * 2π*78 ≈ 171 of 490 -->
+              <circle cx="90" cy="90" r="78" fill="none" stroke="url(#hero-grad-outer)" stroke-width="10" stroke-linecap="round" stroke-dasharray="171 490"/>
+              <!-- Inner track -->
+              <circle cx="90" cy="90" r="62" fill="none" stroke="var(--sage-wash)" stroke-width="7" stroke-dasharray="3 5" stroke-linecap="round"/>
+              <!-- Inner progress: 70% → 0.70 * 2π*62 ≈ 273 of 390 -->
+              <circle cx="90" cy="90" r="62" fill="none" stroke="url(#hero-grad-inner)" stroke-width="7" stroke-linecap="round" stroke-dasharray="273 390"/>
+              <defs>
+                <linearGradient id="hero-grad-outer" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#8B5CF6"/><stop offset="100%" stop-color="#A78BFA"/></linearGradient>
+                <linearGradient id="hero-grad-inner" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#34D399"/><stop offset="100%" stop-color="#6EE7B7"/></linearGradient>
+              </defs>
+            </svg>
+            <div class="ring-center">
+              <div class="ring-hours">262<span>h</span></div>
+              <div class="ring-goal">of 750 hours</div>
+            </div>
+          </div>
+          <div class="hero-message">You're building momentum</div>
+          <div class="hero-sub">488 hours to go — about 15h per week. You've got this.</div>
+          <div class="pace-row">
+            <div class="pace-chip">
+              <div class="pace-chip-dot" style="background:var(--sage);"></div>
+              <span class="pace-chip-label">Pace</span>
+              <span class="pace-chip-val" style="color:var(--sage);">On track</span>
+            </div>
+            <div class="pace-chip">
+              <div class="pace-chip-dot" style="background:var(--violet);"></div>
+              <span class="pace-chip-label">50% Rule</span>
+              <span class="pace-chip-val" style="color:var(--violet);">70%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="section-header">
+          <div class="section-title">Recent Activity</div>
+          <div class="section-link">See all <i data-lucide="chevron-right"></i></div>
+        </div>
+        <div class="activity-card">
+          <div class="activity-row">
+            <div class="activity-icon" style="background:var(--coral-wash); color:var(--coral);">
+              <i data-lucide="wrench"></i>
+            </div>
+            <div class="activity-text"><div class="activity-name">Faucet repair</div><div class="activity-meta">Oak Street · 2h ago</div></div>
+            <div class="activity-hours">2.0h</div>
+          </div>
+          <div class="activity-row">
+            <div class="activity-icon" style="background:var(--sage-wash); color:var(--sage);">
+              <i data-lucide="clipboard-check"></i>
+            </div>
+            <div class="activity-text"><div class="activity-name">Tenant screening</div><div class="activity-meta">Riverside · Yesterday</div></div>
+            <div class="activity-hours">1.5h</div>
+          </div>
+          <div class="activity-row">
+            <div class="activity-icon" style="background:var(--honey-wash); color:var(--honey);">
+              <i data-lucide="book-open"></i>
+            </div>
+            <div class="activity-text"><div class="activity-name">Bookkeeping</div><div class="activity-meta">All properties · 2 days ago</div></div>
+            <div class="activity-hours">1.0h</div>
+          </div>
+        </div>
+
+        <!-- Learn -->
+        <div class="learn-section">
+          <div class="learn-kicker">Learn</div>
+          <div class="learn-headline">Tax Essentials</div>
+          <div class="learn-scroll">
+            <div class="learn-card">
+              <div class="learn-card-illust" style="background:var(--violet-wash);">
+                <div class="learn-card-badge"><i data-lucide="book-open"></i></div>
+                <svg width="56" height="56" viewBox="0 0 60 60" fill="none">
+                  <rect x="12" y="8" width="36" height="44" rx="6" fill="#B8AFFE" opacity="0.5"/>
+                  <rect x="15" y="11" width="30" height="38" rx="4" fill="var(--violet-wash)"/>
+                  <rect x="20" y="18" width="20" height="3" rx="1.5" fill="var(--violet-soft)" opacity="0.7"/>
+                  <rect x="20" y="25" width="14" height="3" rx="1.5" fill="var(--violet-soft)" opacity="0.5"/>
+                  <circle cx="40" cy="42" r="8" fill="var(--violet)" opacity="0.2"/>
+                  <path d="M37 42l2 2 4-4" stroke="var(--violet)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="learn-card-body">
+                <div class="learn-cat" style="color:var(--violet);">IRS Basics</div>
+                <div class="learn-card-title">What is REPS Status?</div>
+                <div class="learn-time"><i data-lucide="clock"></i>5 min</div>
+              </div>
+            </div>
+            <div class="learn-card">
+              <div class="learn-card-illust" style="background:var(--sage-wash);">
+                <div class="learn-card-badge"><i data-lucide="book-open"></i></div>
+                <svg width="56" height="56" viewBox="0 0 60 60" fill="none">
+                  <circle cx="30" cy="30" r="22" fill="#7EC8A0" opacity="0.15"/>
+                  <circle cx="30" cy="30" r="16" fill="none" stroke="#7EC8A0" stroke-width="3" stroke-dasharray="50.2 50.2" stroke-linecap="round" opacity="0.7"/>
+                  <text x="30" y="34" text-anchor="middle" font-family="DM Sans" font-size="14" font-weight="700" fill="#7EC8A0">50%</text>
+                </svg>
+              </div>
+              <div class="learn-card-body">
+                <div class="learn-cat" style="color:var(--sage);">Tax Strategy</div>
+                <div class="learn-card-title">The 50% Rule Explained</div>
+                <div class="learn-time"><i data-lucide="clock"></i>4 min</div>
+              </div>
+            </div>
+            <div class="learn-card">
+              <div class="learn-card-illust" style="background:var(--coral-wash);">
+                <div class="learn-card-badge"><i data-lucide="book-open"></i></div>
+                <svg width="56" height="56" viewBox="0 0 60 60" fill="none">
+                  <path d="M30 8L48 18v12c0 11.5-8 20.5-18 24C20 50.5 12 41.5 12 30V18L30 8z" fill="#FF8A7A" opacity="0.15"/>
+                  <path d="M24 31l4 4 8-8" stroke="#FF8A7A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="learn-card-body">
+                <div class="learn-cat" style="color:var(--coral);">Record Keeping</div>
+                <div class="learn-card-title">Audit-Proof Your Records</div>
+                <div class="learn-time"><i data-lucide="clock"></i>7 min</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab on"><i data-lucide="house"></i>Home<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="building-2"></i>Properties<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="clock"></i>Track<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="bar-chart-3"></i>Reports<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="settings"></i>Settings<div class="tab-dot"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SCREEN 2: Paid User ==================== -->
+<div class="screen-wrap">
+  <div class="screen-title">Paid User</div>
+  <div class="phone">
+    <div class="status-bar"><span>9:41</span><span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span></div>
+    <div class="scroll-area">
+      <div class="aurora-bg">
+        <div class="blob-violet"></div>
+        <div class="blob-peach"></div>
+        <div class="blob-sage"></div>
+      </div>
+      <div class="scroll-content">
+        <div class="greeting">
+          <div>
+            <div class="greeting-sub">Good evening,</div>
+            <div class="greeting-name" style="display:flex;align-items:center;gap:10px;">Brian <span class="pro-badge">PRO</span></div>
+          </div>
+          <div class="notif-btn">
+            <i data-lucide="bell"></i>
+          </div>
+        </div>
+
+        <!-- Hero Progress Ring -->
+        <div class="hero-progress">
+          <div class="hero-glow"></div>
+          <div class="ring-container">
+            <svg width="180" height="180" viewBox="0 0 180 180" style="transform:rotate(-90deg);">
+              <circle cx="90" cy="90" r="78" fill="none" stroke="var(--violet-wash)" stroke-width="10" stroke-dasharray="3.5 5" stroke-linecap="round"/>
+              <!-- 312/750 ≈ 41.6% → 0.416 * 490 ≈ 204 -->
+              <circle cx="90" cy="90" r="78" fill="none" stroke="url(#hero-grad-outer2)" stroke-width="10" stroke-linecap="round" stroke-dasharray="204 490"/>
+              <circle cx="90" cy="90" r="62" fill="none" stroke="var(--sage-wash)" stroke-width="7" stroke-dasharray="3 5" stroke-linecap="round"/>
+              <!-- 72% → 0.72 * 390 ≈ 281 -->
+              <circle cx="90" cy="90" r="62" fill="none" stroke="url(#hero-grad-inner2)" stroke-width="7" stroke-linecap="round" stroke-dasharray="281 390"/>
+              <defs>
+                <linearGradient id="hero-grad-outer2" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#8B5CF6"/><stop offset="100%" stop-color="#A78BFA"/></linearGradient>
+                <linearGradient id="hero-grad-inner2" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#34D399"/><stop offset="100%" stop-color="#6EE7B7"/></linearGradient>
+              </defs>
+            </svg>
+            <div class="ring-center">
+              <div class="ring-hours">312<span>h</span></div>
+              <div class="ring-goal">of 750 hours</div>
+            </div>
+          </div>
+          <div class="hero-message">Great progress this week</div>
+          <div class="hero-sub">438 hours to go — about 13h per week at your pace.</div>
+          <div class="pace-row">
+            <div class="pace-chip">
+              <div class="pace-chip-dot" style="background:var(--sage);"></div>
+              <span class="pace-chip-label">Pace</span>
+              <span class="pace-chip-val" style="color:var(--sage);">On track</span>
+            </div>
+            <div class="pace-chip">
+              <div class="pace-chip-dot" style="background:var(--violet);"></div>
+              <span class="pace-chip-label">50% Rule</span>
+              <span class="pace-chip-val" style="color:var(--violet);">72%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- This Week -->
+        <div class="card">
+          <div class="week-header">
+            <div class="week-title">This Week</div>
+            <div class="week-hours">18.5h</div>
+          </div>
+          <div class="week-days">
+            <div class="week-day"><div class="week-day-dot day-filled">3</div><div class="week-day-label">Mon</div></div>
+            <div class="week-day"><div class="week-day-dot day-filled">5</div><div class="week-day-label">Tue</div></div>
+            <div class="week-day"><div class="week-day-dot day-today">4</div><div class="week-day-label">Wed</div></div>
+            <div class="week-day"><div class="week-day-dot day-empty">-</div><div class="week-day-label">Thu</div></div>
+            <div class="week-day"><div class="week-day-dot day-empty">-</div><div class="week-day-label">Fri</div></div>
+            <div class="week-day"><div class="week-day-dot day-empty">-</div><div class="week-day-label">Sat</div></div>
+            <div class="week-day"><div class="week-day-dot day-empty">-</div><div class="week-day-label">Sun</div></div>
+          </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="section-header">
+          <div class="section-title">Recent Activity</div>
+          <div class="section-link">See all <i data-lucide="chevron-right"></i></div>
+        </div>
+        <div class="activity-card">
+          <div class="activity-row">
+            <div class="activity-icon" style="background:var(--coral-wash); color:var(--coral);">
+              <i data-lucide="wrench"></i>
+            </div>
+            <div class="activity-text"><div class="activity-name">HVAC inspection</div><div class="activity-meta">Elm Street · Today</div></div>
+            <div class="activity-hours">3.0h</div>
+          </div>
+          <div class="activity-row">
+            <div class="activity-icon" style="background:var(--sage-wash); color:var(--sage);">
+              <i data-lucide="clipboard-check"></i>
+            </div>
+            <div class="activity-text"><div class="activity-name">Property walkthrough</div><div class="activity-meta">Oak Street · Today</div></div>
+            <div class="activity-hours">1.5h</div>
+          </div>
+          <div class="activity-row">
+            <div class="activity-icon" style="background:var(--sky-wash); color:var(--sky);">
+              <i data-lucide="file-text"></i>
+            </div>
+            <div class="activity-text"><div class="activity-name">Lease renewal</div><div class="activity-meta">Riverside · Yesterday</div></div>
+            <div class="activity-hours">2.0h</div>
+          </div>
+          <div class="activity-row">
+            <div class="activity-icon" style="background:var(--rose-wash); color:var(--rose);">
+              <i data-lucide="clock"></i>
+            </div>
+            <div class="activity-text"><div class="activity-name">Drive to property</div><div class="activity-meta">Oak Street · 2 days ago</div></div>
+            <div class="activity-hours">0.5h</div>
+          </div>
+        </div>
+
+        <!-- Learn -->
+        <div class="learn-section">
+          <div class="learn-kicker">Learn</div>
+          <div class="learn-headline">Tax Essentials</div>
+          <div class="learn-scroll">
+            <div class="learn-card">
+              <div class="learn-card-illust" style="background:var(--violet-wash);">
+                <div class="learn-card-badge"><i data-lucide="book-open"></i></div>
+                <svg width="56" height="56" viewBox="0 0 60 60" fill="none">
+                  <rect x="12" y="8" width="36" height="44" rx="6" fill="#B8AFFE" opacity="0.5"/>
+                  <rect x="15" y="11" width="30" height="38" rx="4" fill="var(--violet-wash)"/>
+                  <rect x="20" y="18" width="20" height="3" rx="1.5" fill="var(--violet-soft)" opacity="0.7"/>
+                  <rect x="20" y="25" width="14" height="3" rx="1.5" fill="var(--violet-soft)" opacity="0.5"/>
+                  <circle cx="40" cy="42" r="8" fill="var(--violet)" opacity="0.2"/>
+                  <path d="M37 42l2 2 4-4" stroke="var(--violet)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="learn-card-body">
+                <div class="learn-cat" style="color:var(--violet);">IRS Basics</div>
+                <div class="learn-card-title">What is REPS Status?</div>
+                <div class="learn-time"><i data-lucide="clock"></i>5 min</div>
+              </div>
+            </div>
+            <div class="learn-card">
+              <div class="learn-card-illust" style="background:var(--sage-wash);">
+                <div class="learn-card-badge"><i data-lucide="book-open"></i></div>
+                <svg width="56" height="56" viewBox="0 0 60 60" fill="none">
+                  <circle cx="30" cy="30" r="22" fill="#7EC8A0" opacity="0.15"/>
+                  <circle cx="30" cy="30" r="16" fill="none" stroke="#7EC8A0" stroke-width="3" stroke-dasharray="50.2 50.2" stroke-linecap="round" opacity="0.7"/>
+                  <text x="30" y="34" text-anchor="middle" font-family="DM Sans" font-size="14" font-weight="700" fill="#7EC8A0">50%</text>
+                </svg>
+              </div>
+              <div class="learn-card-body">
+                <div class="learn-cat" style="color:var(--sage);">Tax Strategy</div>
+                <div class="learn-card-title">The 50% Rule Explained</div>
+                <div class="learn-time"><i data-lucide="clock"></i>4 min</div>
+              </div>
+            </div>
+            <div class="learn-card">
+              <div class="learn-card-illust" style="background:var(--coral-wash);">
+                <div class="learn-card-badge"><i data-lucide="book-open"></i></div>
+                <svg width="56" height="56" viewBox="0 0 60 60" fill="none">
+                  <path d="M30 8L48 18v12c0 11.5-8 20.5-18 24C20 50.5 12 41.5 12 30V18L30 8z" fill="#FF8A7A" opacity="0.15"/>
+                  <path d="M24 31l4 4 8-8" stroke="#FF8A7A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="learn-card-body">
+                <div class="learn-cat" style="color:var(--coral);">Record Keeping</div>
+                <div class="learn-card-title">Audit-Proof Your Records</div>
+                <div class="learn-time"><i data-lucide="clock"></i>7 min</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab on"><i data-lucide="house"></i>Home<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="building-2"></i>Properties<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="clock"></i>Track<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="bar-chart-3"></i>Reports<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="settings"></i>Settings<div class="tab-dot"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SCREEN 3: Trial Expired ==================== -->
+<div class="screen-wrap">
+  <div class="screen-title">Trial Expired</div>
+  <div class="phone">
+    <div class="status-bar"><span>9:41</span><span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span></div>
+    <div class="scroll-area">
+      <div class="aurora-bg">
+        <div class="blob-violet"></div>
+        <div class="blob-peach"></div>
+        <div class="blob-sage"></div>
+      </div>
+      <div class="scroll-content">
+        <div class="greeting">
+          <div>
+            <div class="greeting-sub">Good morning,</div>
+            <div class="greeting-name">Brian</div>
+          </div>
+          <div class="notif-btn">
+            <i data-lucide="bell"></i>
+          </div>
+        </div>
+
+        <!-- Expired — gentle nudge, not a wall -->
+        <div class="expired-nudge">
+          <div class="expired-icon">
+            <i data-lucide="sparkles"></i>
+          </div>
+          <div class="expired-text">
+            <div class="expired-title">Your trial has ended</div>
+            <div class="expired-sub">Upgrade to keep all your data and unlock exports.</div>
+          </div>
+          <button class="expired-btn">Upgrade</button>
+        </div>
+
+        <!-- Hero Progress Ring -->
+        <div class="hero-progress">
+          <div class="hero-glow"></div>
+          <div class="ring-container">
+            <svg width="180" height="180" viewBox="0 0 180 180" style="transform:rotate(-90deg);">
+              <circle cx="90" cy="90" r="78" fill="none" stroke="var(--violet-wash)" stroke-width="10" stroke-dasharray="3.5 5" stroke-linecap="round"/>
+              <circle cx="90" cy="90" r="78" fill="none" stroke="url(#hero-grad-outer3)" stroke-width="10" stroke-linecap="round" stroke-dasharray="171 490"/>
+              <circle cx="90" cy="90" r="62" fill="none" stroke="var(--sage-wash)" stroke-width="7" stroke-dasharray="3 5" stroke-linecap="round"/>
+              <circle cx="90" cy="90" r="62" fill="none" stroke="url(#hero-grad-inner3)" stroke-width="7" stroke-linecap="round" stroke-dasharray="273 390"/>
+              <defs>
+                <linearGradient id="hero-grad-outer3" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#8B5CF6"/><stop offset="100%" stop-color="#A78BFA"/></linearGradient>
+                <linearGradient id="hero-grad-inner3" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#34D399"/><stop offset="100%" stop-color="#6EE7B7"/></linearGradient>
+              </defs>
+            </svg>
+            <div class="ring-center">
+              <div class="ring-hours">262<span>h</span></div>
+              <div class="ring-goal">of 750 hours</div>
+            </div>
+          </div>
+          <div class="hero-message">You've made real progress</div>
+          <div class="hero-sub">262 hours logged — that's dedication. Keep going.</div>
+          <div class="pace-row">
+            <div class="pace-chip">
+              <div class="pace-chip-dot" style="background:var(--sage);"></div>
+              <span class="pace-chip-label">Pace</span>
+              <span class="pace-chip-val" style="color:var(--sage);">On track</span>
+            </div>
+            <div class="pace-chip">
+              <div class="pace-chip-dot" style="background:var(--violet);"></div>
+              <span class="pace-chip-label">50% Rule</span>
+              <span class="pace-chip-val" style="color:var(--violet);">70%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="section-header">
+          <div class="section-title">Recent Activity</div>
+          <div class="section-link">See all <i data-lucide="chevron-right"></i></div>
+        </div>
+        <div class="activity-card">
+          <div class="activity-row">
+            <div class="activity-icon" style="background:var(--coral-wash); color:var(--coral);">
+              <i data-lucide="wrench"></i>
+            </div>
+            <div class="activity-text"><div class="activity-name">Faucet repair</div><div class="activity-meta">Oak Street · 2h ago</div></div>
+            <div class="activity-hours">2.0h</div>
+          </div>
+          <div class="activity-row">
+            <div class="activity-icon" style="background:var(--sage-wash); color:var(--sage);">
+              <i data-lucide="clipboard-check"></i>
+            </div>
+            <div class="activity-text"><div class="activity-name">Tenant screening</div><div class="activity-meta">Riverside · Yesterday</div></div>
+            <div class="activity-hours">1.5h</div>
+          </div>
+          <div class="activity-row">
+            <div class="activity-icon" style="background:var(--honey-wash); color:var(--honey);">
+              <i data-lucide="book-open"></i>
+            </div>
+            <div class="activity-text"><div class="activity-name">Bookkeeping</div><div class="activity-meta">All properties · 2 days ago</div></div>
+            <div class="activity-hours">1.0h</div>
+          </div>
+        </div>
+
+        <!-- Learn -->
+        <div class="learn-section">
+          <div class="learn-kicker">Learn</div>
+          <div class="learn-headline">Tax Essentials</div>
+          <div class="learn-scroll">
+            <div class="learn-card">
+              <div class="learn-card-illust" style="background:var(--violet-wash);">
+                <div class="learn-card-badge"><i data-lucide="book-open"></i></div>
+                <svg width="56" height="56" viewBox="0 0 60 60" fill="none">
+                  <rect x="12" y="8" width="36" height="44" rx="6" fill="#B8AFFE" opacity="0.5"/>
+                  <rect x="15" y="11" width="30" height="38" rx="4" fill="var(--violet-wash)"/>
+                  <rect x="20" y="18" width="20" height="3" rx="1.5" fill="var(--violet-soft)" opacity="0.7"/>
+                  <rect x="20" y="25" width="14" height="3" rx="1.5" fill="var(--violet-soft)" opacity="0.5"/>
+                  <circle cx="40" cy="42" r="8" fill="var(--violet)" opacity="0.2"/>
+                  <path d="M37 42l2 2 4-4" stroke="var(--violet)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="learn-card-body">
+                <div class="learn-cat" style="color:var(--violet);">IRS Basics</div>
+                <div class="learn-card-title">What is REPS Status?</div>
+                <div class="learn-time"><i data-lucide="clock"></i>5 min</div>
+              </div>
+            </div>
+            <div class="learn-card">
+              <div class="learn-card-illust" style="background:var(--sage-wash);">
+                <div class="learn-card-badge"><i data-lucide="book-open"></i></div>
+                <svg width="56" height="56" viewBox="0 0 60 60" fill="none">
+                  <circle cx="30" cy="30" r="22" fill="#7EC8A0" opacity="0.15"/>
+                  <circle cx="30" cy="30" r="16" fill="none" stroke="#7EC8A0" stroke-width="3" stroke-dasharray="50.2 50.2" stroke-linecap="round" opacity="0.7"/>
+                  <text x="30" y="34" text-anchor="middle" font-family="DM Sans" font-size="14" font-weight="700" fill="#7EC8A0">50%</text>
+                </svg>
+              </div>
+              <div class="learn-card-body">
+                <div class="learn-cat" style="color:var(--sage);">Tax Strategy</div>
+                <div class="learn-card-title">The 50% Rule Explained</div>
+                <div class="learn-time"><i data-lucide="clock"></i>4 min</div>
+              </div>
+            </div>
+            <div class="learn-card">
+              <div class="learn-card-illust" style="background:var(--coral-wash);">
+                <div class="learn-card-badge"><i data-lucide="book-open"></i></div>
+                <svg width="56" height="56" viewBox="0 0 60 60" fill="none">
+                  <path d="M30 8L48 18v12c0 11.5-8 20.5-18 24C20 50.5 12 41.5 12 30V18L30 8z" fill="#FF8A7A" opacity="0.15"/>
+                  <path d="M24 31l4 4 8-8" stroke="#FF8A7A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="learn-card-body">
+                <div class="learn-cat" style="color:var(--coral);">Record Keeping</div>
+                <div class="learn-card-title">Audit-Proof Your Records</div>
+                <div class="learn-time"><i data-lucide="clock"></i>7 min</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab on"><i data-lucide="house"></i>Home<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="building-2"></i>Properties<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="clock"></i>Track<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="bar-chart-3"></i>Reports<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="settings"></i>Settings<div class="tab-dot"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

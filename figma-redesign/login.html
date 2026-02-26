@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LandlordHours — Login</title>
+<script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=DM+Serif+Display&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: #E5E0D8;
+    padding: 60px 32px;
+    display: flex;
+    gap: 40px;
+    justify-content: center;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  /* ========== PHONE FRAME ========== */
+  .screen-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .screen-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #6E6E82;
+  }
+
+  .phone {
+    width: 393px;
+    height: 852px;
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    background: #FFFFFF;
+    box-shadow: 0 30px 80px rgba(26,26,46,0.15), 0 0 0 1px rgba(0,0,0,0.04);
+  }
+
+  /* Dynamic Island */
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 126px;
+    height: 34px;
+    background: #1A1A2E;
+    border-radius: 0 0 22px 22px;
+    z-index: 100;
+  }
+
+  /* Status Bar */
+  .status-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 58px;
+    padding: 14px 28px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 600;
+    z-index: 50;
+  }
+
+  .sb-dark { color: rgba(26,26,46,0.5); }
+
+  /* ========== LOGIN SCREEN ========== */
+  .login-screen {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Background: white/cream top fading to soft lavender bottom */
+  .login-bg-base {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(
+      180deg,
+      #FFFFFF 0%,
+      #FDFCFA 10%,
+      #FAF7F2 22%,
+      #F8F5F0 35%,
+      #F3F0FA 50%,
+      #EDE8FF 65%,
+      #DDD6FE 82%,
+      #C4B5FD 100%
+    );
+  }
+
+  /* Large decorative violet circle peeking from top-right */
+  .deco-circle {
+    position: absolute;
+    top: -160px;
+    right: -110px;
+    width: 340px;
+    height: 340px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 65%, rgba(123,104,238,0.30) 0%, rgba(184,175,254,0.18) 40%, rgba(237,232,255,0.06) 80%, transparent 100%);
+    z-index: 1;
+  }
+
+  /* Inner highlight for the decorative circle */
+  .deco-circle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 70%;
+    height: 70%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(123,104,238,0.12) 0%, transparent 70%);
+  }
+
+  /* Subtle ambient blobs */
+  .login-blob {
+    position: absolute;
+    border-radius: 50%;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .login-blob-1 {
+    width: 220px;
+    height: 220px;
+    bottom: 40px;
+    left: -70px;
+    background: radial-gradient(circle, rgba(123,104,238,0.12) 0%, transparent 70%);
+    filter: blur(35px);
+  }
+
+  .login-blob-2 {
+    width: 180px;
+    height: 180px;
+    bottom: 200px;
+    right: -50px;
+    background: radial-gradient(circle, rgba(184,175,254,0.14) 0%, transparent 70%);
+    filter: blur(30px);
+  }
+
+  /* ========== LOGIN CONTENT ========== */
+  .login-content {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    padding: 0 28px;
+    padding-top: 80px;
+  }
+
+  /* Logo Icon */
+  .login-logo-icon {
+    width: 64px; height: 64px;
+    border-radius: 16px;
+    overflow: hidden;
+    margin: 0 auto 20px;
+    box-shadow: 0 8px 24px rgba(123,104,238,0.2);
+  }
+  .login-logo-icon svg { width: 100%; height: 100%; display: block; }
+
+  /* Title Area */
+  .login-title-area {
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  .login-heading {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    line-height: 1.2;
+    color: #1A1A2E;
+    margin-bottom: 8px;
+  }
+
+  .login-heading .h-landlord { color: #1A1A2E; }
+  .login-heading .h-hours { color: #7B68EE; }
+
+  .login-subtitle {
+    font-size: 15px;
+    color: #6E6E82;
+    line-height: 1.5;
+  }
+
+  /* Continue with Apple */
+  .apple-btn {
+    width: 100%;
+    padding: 16px;
+    border-radius: 999px;
+    background: #1A1A2E;
+    color: white;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 28px;
+  }
+
+  .apple-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: white;
+  }
+
+  /* Divider */
+  .divider-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .divider-line {
+    flex: 1;
+    height: 1px;
+    background: #D4D4E0;
+  }
+
+  .divider-text {
+    font-size: 12px;
+    font-weight: 500;
+    color: #A8A8BC;
+    white-space: nowrap;
+  }
+
+  /* Form Fields */
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #A8A8BC;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .form-label .label-icon {
+    width: 14px;
+    height: 14px;
+    color: #A8A8BC;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1.5px solid #E0DFE8;
+    font-size: 15px;
+    font-family: 'DM Sans', sans-serif;
+    color: #1A1A2E;
+    background: #F8F7FC;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .form-input::placeholder {
+    color: #C4C4D4;
+  }
+
+  .form-input.filled {
+    border-color: #B8AFFE;
+    background: #FDFCFF;
+  }
+
+  .form-input.filled-value {
+    color: #1A1A2E;
+  }
+
+  /* Sign In Button */
+  .signin-btn {
+    width: 100%;
+    padding: 16px;
+    border-radius: 999px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background 0.3s, color 0.3s;
+  }
+
+  .signin-btn.muted {
+    background: #F0EFF4;
+    color: #A8A8BC;
+    cursor: default;
+  }
+
+  .signin-btn.active {
+    background: #7B68EE;
+    color: white;
+    box-shadow: 0 8px 24px rgba(123,104,238,0.3);
+  }
+
+  /* Links */
+  .links-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .link-forgot {
+    font-size: 14px;
+    font-weight: 500;
+    color: #7B68EE;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .link-forgot:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .link-create {
+    font-size: 14px;
+    color: #A8A8BC;
+  }
+
+  .link-create a {
+    color: #7B68EE;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .link-create a:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  /* Bottom Wordmark */
+  .bottom-wordmark {
+    position: absolute;
+    bottom: 36px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    z-index: 10;
+  }
+
+  .wm-text {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+
+  .wm-landlord { color: #1A1A2E; }
+  .wm-hours { color: #7B68EE; }
+
+  /* Password field wrapper for show/hide */
+  .password-wrap {
+    position: relative;
+  }
+
+  .password-wrap .form-input {
+    padding-right: 44px;
+  }
+
+  .password-toggle {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #A8A8BC;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+  }
+
+  .password-toggle .lucide {
+    width: 18px;
+    height: 18px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- STATE 1: EMPTY — Form is empty, Sign In button is muted      -->
+<!-- ============================================================ -->
+<div class="screen-wrap">
+  <div class="screen-title">Login — Empty State</div>
+  <div class="phone">
+    <!-- Status Bar -->
+    <div class="status-bar sb-dark">
+      <span>9:41</span>
+      <span style="display: flex; gap: 6px; align-items: center;">
+        <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><rect x="0" y="4" width="3" height="8" rx="1" opacity="0.3"/><rect x="4.5" y="3" width="3" height="9" rx="1" opacity="0.5"/><rect x="9" y="1" width="3" height="11" rx="1" opacity="0.7"/><rect x="13.5" y="0" width="3" height="12" rx="1"/></svg>
+        <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><path d="M8 2.4C5.6 2.4 3.4 3.3 1.8 4.8L0 3C2 1.1 4.9 0 8 0s6 1.1 8 3l-1.8 1.8C12.6 3.3 10.4 2.4 8 2.4zM8 7.2c-1.4 0-2.7.5-3.6 1.4L2.6 6.8C4 5.5 5.9 4.8 8 4.8s4 .7 5.4 2l-1.8 1.8c-.9-.9-2.2-1.4-3.6-1.4zM8 12l2.4-3c-.6-.7-1.5-1.2-2.4-1.2s-1.8.5-2.4 1.2L8 12z"/></svg>
+        <svg width="25" height="12" viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="21" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1"/><rect x="22" y="4" width="2" height="4" rx="1"/><rect x="1.5" y="2.5" width="14" height="7" rx="1"/></svg>
+      </span>
+    </div>
+
+    <div class="login-screen">
+      <!-- Background -->
+      <div class="login-bg-base"></div>
+      <div class="deco-circle"></div>
+      <div class="login-blob login-blob-1"></div>
+      <div class="login-blob login-blob-2"></div>
+
+      <!-- Content -->
+      <div class="login-content">
+        <!-- Logo + Title -->
+        <div class="login-logo-icon">
+          <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="lg-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#D8D0FF"/><stop offset="100%" stop-color="#B8AFFE"/></linearGradient>
+              <linearGradient id="lg-w1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#A899F7"/><stop offset="100%" stop-color="#9485F0"/></linearGradient>
+              <linearGradient id="lg-w2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#8B78F0"/><stop offset="100%" stop-color="#7B68EE"/></linearGradient>
+              <linearGradient id="lg-w3" x1="0" y1="0" x2="0.5" y2="1"><stop offset="0%" stop-color="#6B58DE"/><stop offset="100%" stop-color="#4A38B0"/></linearGradient>
+              <clipPath id="lg-house"><path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/></clipPath>
+            </defs>
+            <rect width="1024" height="1024" fill="#F4F1FF"/>
+            <g clip-path="url(#lg-house)">
+              <rect width="1024" height="1024" fill="url(#lg-bg)"/>
+              <path d="M0 380 Q200 310 400 370 Q600 430 800 360 Q900 330 1024 350 L1024 1024 L0 1024 Z" fill="url(#lg-w1)"/>
+              <path d="M0 520 Q250 440 480 510 Q700 580 900 480 Q980 450 1024 470 L1024 1024 L0 1024 Z" fill="url(#lg-w2)"/>
+              <path d="M0 660 Q220 590 420 650 Q650 720 850 620 Q950 580 1024 610 L1024 1024 L0 1024 Z" fill="url(#lg-w3)"/>
+            </g>
+          </svg>
+        </div>
+        <div class="login-title-area">
+          <div class="login-heading">
+            Sign in to<br>
+            <span class="h-landlord">Landlord</span><span class="h-hours">Hours</span>
+          </div>
+          <div class="login-subtitle">Ready to track where you left off?</div>
+        </div>
+
+        <!-- Continue with Apple -->
+        <button class="apple-btn">
+          <svg viewBox="0 0 17 20" xmlns="http://www.w3.org/2000/svg">
+            <path d="M13.545 10.239c-.022-2.234 1.823-3.308 1.905-3.36-.037-.054-1.493-1.576-1.905-1.576 0 0-.053-.002-.053-.002-.812-.12-2.038.478-2.57.478-.558 0-1.396-.467-2.304-.454-1.167.017-2.264.688-2.862 1.727-1.24 2.148-.316 5.309.874 7.048.594.854 1.29 1.808 2.2 1.775.893-.036 1.226-.572 2.304-.572 1.064 0 1.372.572 2.29.554.957-.015 1.558-.855 2.134-1.714.688-.99.963-1.961.977-2.012-.021-.008-1.868-.716-1.89-2.892zM11.76 3.682C12.249 3.087 12.584 2.27 12.494 1.44c-.698.03-1.576.478-2.08 1.058-.444.518-.848 1.37-.744 2.17.788.06 1.597-.39 2.09-.986z"/>
+          </svg>
+          Continue with Apple
+        </button>
+
+        <!-- Divider -->
+        <div class="divider-row">
+          <div class="divider-line"></div>
+          <span class="divider-text">or sign in with email</span>
+          <div class="divider-line"></div>
+        </div>
+
+        <!-- Email Field -->
+        <div class="form-group">
+          <label class="form-label">
+            <i data-lucide="mail" class="label-icon"></i>
+            Email
+          </label>
+          <input type="email" class="form-input" placeholder="e.g. hello@landlordhours.com" disabled>
+        </div>
+
+        <!-- Password Field -->
+        <div class="form-group">
+          <label class="form-label">
+            <i data-lucide="lock" class="label-icon"></i>
+            Password
+          </label>
+          <div class="password-wrap">
+            <input type="password" class="form-input" placeholder="Strong password" disabled>
+            <button class="password-toggle" tabindex="-1">
+              <i data-lucide="eye-off"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Sign In Button — Muted -->
+        <button class="signin-btn muted" disabled>Sign In</button>
+
+        <!-- Links -->
+        <div class="links-area">
+          <a class="link-forgot" href="#">Forgot password?</a>
+          <div class="link-create">Don't have an account? <a href="#">Create one</a></div>
+        </div>
+      </div>
+
+      <!-- Bottom Wordmark -->
+      <div class="bottom-wordmark">
+        <span class="wm-text">
+          <span class="wm-landlord">Landlord</span><span class="wm-hours">Hours</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- STATE 2: FILLED — Fields populated, Sign In button active     -->
+<!-- ============================================================ -->
+<div class="screen-wrap">
+  <div class="screen-title">Login — Filled State</div>
+  <div class="phone">
+    <!-- Status Bar -->
+    <div class="status-bar sb-dark">
+      <span>9:41</span>
+      <span style="display: flex; gap: 6px; align-items: center;">
+        <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><rect x="0" y="4" width="3" height="8" rx="1" opacity="0.3"/><rect x="4.5" y="3" width="3" height="9" rx="1" opacity="0.5"/><rect x="9" y="1" width="3" height="11" rx="1" opacity="0.7"/><rect x="13.5" y="0" width="3" height="12" rx="1"/></svg>
+        <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><path d="M8 2.4C5.6 2.4 3.4 3.3 1.8 4.8L0 3C2 1.1 4.9 0 8 0s6 1.1 8 3l-1.8 1.8C12.6 3.3 10.4 2.4 8 2.4zM8 7.2c-1.4 0-2.7.5-3.6 1.4L2.6 6.8C4 5.5 5.9 4.8 8 4.8s4 .7 5.4 2l-1.8 1.8c-.9-.9-2.2-1.4-3.6-1.4zM8 12l2.4-3c-.6-.7-1.5-1.2-2.4-1.2s-1.8.5-2.4 1.2L8 12z"/></svg>
+        <svg width="25" height="12" viewBox="0 0 25 12" fill="currentColor"><rect x="0" y="1" width="21" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1"/><rect x="22" y="4" width="2" height="4" rx="1"/><rect x="1.5" y="2.5" width="14" height="7" rx="1"/></svg>
+      </span>
+    </div>
+
+    <div class="login-screen">
+      <!-- Background -->
+      <div class="login-bg-base"></div>
+      <div class="deco-circle"></div>
+      <div class="login-blob login-blob-1"></div>
+      <div class="login-blob login-blob-2"></div>
+
+      <!-- Content -->
+      <div class="login-content">
+        <!-- Logo + Title -->
+        <div class="login-logo-icon">
+          <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="lg-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#D8D0FF"/><stop offset="100%" stop-color="#B8AFFE"/></linearGradient>
+              <linearGradient id="lg-w1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#A899F7"/><stop offset="100%" stop-color="#9485F0"/></linearGradient>
+              <linearGradient id="lg-w2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#8B78F0"/><stop offset="100%" stop-color="#7B68EE"/></linearGradient>
+              <linearGradient id="lg-w3" x1="0" y1="0" x2="0.5" y2="1"><stop offset="0%" stop-color="#6B58DE"/><stop offset="100%" stop-color="#4A38B0"/></linearGradient>
+              <clipPath id="lg-house"><path d="M512 140 L168 390 L168 880 Q168 910 198 910 L826 910 Q856 910 856 880 L856 390 Z M700 180 L700 280 L780 280 L780 250 Q780 180 740 180 Z"/></clipPath>
+            </defs>
+            <rect width="1024" height="1024" fill="#F4F1FF"/>
+            <g clip-path="url(#lg-house)">
+              <rect width="1024" height="1024" fill="url(#lg-bg)"/>
+              <path d="M0 380 Q200 310 400 370 Q600 430 800 360 Q900 330 1024 350 L1024 1024 L0 1024 Z" fill="url(#lg-w1)"/>
+              <path d="M0 520 Q250 440 480 510 Q700 580 900 480 Q980 450 1024 470 L1024 1024 L0 1024 Z" fill="url(#lg-w2)"/>
+              <path d="M0 660 Q220 590 420 650 Q650 720 850 620 Q950 580 1024 610 L1024 1024 L0 1024 Z" fill="url(#lg-w3)"/>
+            </g>
+          </svg>
+        </div>
+        <div class="login-title-area">
+          <div class="login-heading">
+            Sign in to<br>
+            <span class="h-landlord">Landlord</span><span class="h-hours">Hours</span>
+          </div>
+          <div class="login-subtitle">Ready to track where you left off?</div>
+        </div>
+
+        <!-- Continue with Apple -->
+        <button class="apple-btn">
+          <svg viewBox="0 0 17 20" xmlns="http://www.w3.org/2000/svg">
+            <path d="M13.545 10.239c-.022-2.234 1.823-3.308 1.905-3.36-.037-.054-1.493-1.576-1.905-1.576 0 0-.053-.002-.053-.002-.812-.12-2.038.478-2.57.478-.558 0-1.396-.467-2.304-.454-1.167.017-2.264.688-2.862 1.727-1.24 2.148-.316 5.309.874 7.048.594.854 1.29 1.808 2.2 1.775.893-.036 1.226-.572 2.304-.572 1.064 0 1.372.572 2.29.554.957-.015 1.558-.855 2.134-1.714.688-.99.963-1.961.977-2.012-.021-.008-1.868-.716-1.89-2.892zM11.76 3.682C12.249 3.087 12.584 2.27 12.494 1.44c-.698.03-1.576.478-2.08 1.058-.444.518-.848 1.37-.744 2.17.788.06 1.597-.39 2.09-.986z"/>
+          </svg>
+          Continue with Apple
+        </button>
+
+        <!-- Divider -->
+        <div class="divider-row">
+          <div class="divider-line"></div>
+          <span class="divider-text">or sign in with email</span>
+          <div class="divider-line"></div>
+        </div>
+
+        <!-- Email Field — Filled -->
+        <div class="form-group">
+          <label class="form-label">
+            <i data-lucide="mail" class="label-icon"></i>
+            Email
+          </label>
+          <input type="email" class="form-input filled filled-value" value="brian@landlordhours.com" disabled>
+        </div>
+
+        <!-- Password Field — Filled -->
+        <div class="form-group">
+          <label class="form-label">
+            <i data-lucide="lock" class="label-icon"></i>
+            Password
+          </label>
+          <div class="password-wrap">
+            <input type="password" class="form-input filled filled-value" value="strongpassword123" disabled>
+            <button class="password-toggle" tabindex="-1">
+              <i data-lucide="eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Sign In Button — Active -->
+        <button class="signin-btn active">Sign In</button>
+
+        <!-- Links -->
+        <div class="links-area">
+          <a class="link-forgot" href="#">Forgot password?</a>
+          <div class="link-create">Don't have an account? <a href="#">Create one</a></div>
+        </div>
+      </div>
+
+      <!-- Bottom Wordmark -->
+      <div class="bottom-wordmark">
+        <span class="wm-text">
+          <span class="wm-landlord">Landlord</span><span class="wm-hours">Hours</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

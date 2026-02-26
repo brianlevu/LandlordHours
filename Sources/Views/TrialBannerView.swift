@@ -1,4 +1,5 @@
 import SwiftUI
+import LucideIcons
 
 struct TrialBannerView: View {
     @ObservedObject var subscriptionManager = SubscriptionManager.shared
@@ -24,16 +25,19 @@ struct TrialBannerView: View {
     private var trialExpiringSoonBanner: some View {
         Button { showPaywall = true } label: {
             HStack(spacing: 10) {
-                LHIconView(icon: .clock, size: 16, color: AppColors.warning)
+                LucideIcon(image: Lucide.clock, size: 16)
+                    .foregroundStyle(AppColors.honey)
 
                 Text("\(subscriptionManager.trialDaysRemaining) day\(subscriptionManager.trialDaysRemaining == 1 ? "" : "s") left in free trial")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(AppTypography.body)
+                    .fontWeight(.medium)
                     .foregroundStyle(colors.textPrimary)
 
                 Spacer()
 
                 Text("Upgrade")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(AppTypography.bodySmall)
+                    .fontWeight(.semibold)
                     .foregroundStyle(AppColors.primary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -42,8 +46,8 @@ struct TrialBannerView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(AppColors.warning.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .background(AppColors.honeyWash)
+            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 20)
@@ -52,25 +56,28 @@ struct TrialBannerView: View {
     private var upgradeNowBanner: some View {
         Button { showPaywall = true } label: {
             HStack(spacing: 10) {
-                LHIconView(icon: .crown, size: 16, color: AppColors.primary)
+                LucideIcon(image: Lucide.crown, size: 16)
+                    .foregroundStyle(AppColors.primary)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Upgrade to Pro")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(AppTypography.body)
+                        .fontWeight(.semibold)
                         .foregroundStyle(colors.textPrimary)
-                    Text("Unlock all features · $30 one-time")
-                        .font(.system(size: 12))
+                    Text("Unlock all features \u{00B7} $30 one-time")
+                        .font(AppTypography.caption)
                         .foregroundStyle(colors.textSecondary)
                 }
 
                 Spacer()
 
-                LHIconView(icon: .chevronRight, size: 12, color: colors.textTertiary, strokeStyle: true)
+                LucideIcon(image: Lucide.chevronRight, size: 12)
+                    .foregroundStyle(colors.textTertiary)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(colors.primarySurface)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 20)

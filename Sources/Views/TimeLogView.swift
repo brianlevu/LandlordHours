@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import LucideIcons
 
 struct TimeLogView: View {
     @EnvironmentObject var viewModel: AppViewModel
@@ -87,7 +88,6 @@ struct TimeLogView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 24) {
                 headerSection
-                statsStrip
                 mainEntryCard
                 quickLogSection
             }
@@ -100,7 +100,7 @@ struct TimeLogView: View {
             if showingSaved {
                 savedBanner
                     .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showingSaved)
+                    .animation(AppAnimation.smooth, value: showingSaved)
                     .padding(.bottom, 16)
             }
         }
@@ -111,10 +111,10 @@ struct TimeLogView: View {
         HStack {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Track Time")
-                    .font(.system(size: 28, weight: .bold, design: .serif))
+                    .font(AppTypography.headline)
                     .foregroundStyle(colors.textPrimary)
                 Text(Date(), style: .date)
-                    .font(.system(size: 14))
+                    .font(AppTypography.caption)
                     .foregroundStyle(colors.textSecondary)
             }
             Spacer()
@@ -122,41 +122,47 @@ struct TimeLogView: View {
         .padding(.top, 4)
     }
 
-    // MARK: - Stats Strip
-    private var statsStrip: some View {
-        HStack(spacing: 12) {
-            TodayStatChip(label: "Today", value: String(format: "%.1fh", todayHours))
-            TodayStatChip(label: "This Week", value: String(format: "%.1fh", weeklyHours))
-            TodayStatChip(label: "This Month", value: String(format: "%.1fh", monthlyHours))
-        }
-    }
-
     // MARK: - Main Entry Card
     private var mainEntryCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionLabel(systemIcon: "plus.circle", text: "LOG TIME")
+            sectionLabel(lucideIcon: Lucide.circlePlus, text: "LOG TIME")
 
             VStack(spacing: 0) {
                 // Freeform text area
                 ZStack(alignment: .topLeading) {
                     if entryNotes.isEmpty {
-                        Text("What did you work on?")
-                            .foregroundStyle(colors.textTertiary)
-                            .font(.system(size: 16))
-                            .padding(.top, 16)
-                            .padding(.leading, 16)
-                            .allowsHitTesting(false)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("What did you work on?")
+                                .foregroundStyle(colors.textTertiary)
+                                .font(.system(size: 16, design: .rounded))
+                            HStack(spacing: 4) {
+                                LucideIcon(image: Lucide.sparkles, size: 11)
+                                Text("Describe your work and we'll fill in the details")
+                                    .font(AppTypography.caption)
+                            }
+                            .foregroundStyle(AppColors.mist)
+                        }
+                        .padding(.top, 16)
+                        .padding(.leading, 16)
+                        .allowsHitTesting(false)
                     }
                     TextEditor(text: $entryNotes)
                         .frame(minHeight: 80, maxHeight: 120)
-                        .font(.system(size: 16))
+                        .font(.system(size: 16, design: .rounded))
                         .foregroundStyle(colors.textPrimary)
                         .scrollContentBackground(.hidden)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                 }
-                .background(colors.background)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .background(colors.backgroundTertiary.opacity(0.5))
+                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
+                .overlay(
+                    RoundedRectangle(cornerRadius: AppCornerRadius.medium)
+                        .strokeBorder(
+                            entryNotes.isEmpty ? colors.border.opacity(0.3) : AppColors.primaryLight.opacity(0.5),
+                            lineWidth: 1.5
+                        )
+                )
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
 
@@ -186,7 +192,8 @@ struct TimeLogView: View {
                 bottomActionRow
             }
             .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.06), radius: 16, x: 0, y: 4)
         }
     }
 
@@ -194,37 +201,47 @@ struct TimeLogView: View {
     private var categoryChipsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Category")
-                .font(.system(size: 12, weight: .medium))
+                .font(AppTypography.caption)
                 .foregroundStyle(colors.textSecondary)
+                .textCase(.uppercase)
+                .tracking(0.5)
                 .padding(.horizontal, 16)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(ActivityCategory.allCases, id: \.self) { cat in
                         Button {
-                            withAnimation(.easeInOut(duration: 0.15)) {
+                            withAnimation(AppAnimation.quick) {
                                 entryCategory = cat
                             }
                         } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: cat.icon)
-                                    .font(.system(size: 11, weight: .medium))
-                                Text(cat.rawValue)
-                                    .font(.system(size: 12, weight: .medium))
+                            HStack(spacing: 7) {
+                                Circle()
+                                    .fill(entryCategory == cat
+                                          ? Color.white.opacity(0.5)
+                                          : categoryDotColor(for: cat))
+                                    .frame(width: 8, height: 8)
+                                Text(categoryChipLabel(for: cat))
+                                    .font(.system(size: 13, weight: .medium))
                                     .lineLimit(1)
-                                if !cat.countsForREPS {
-                                    Text("non-REPS")
-                                        .font(.system(size: 9))
-                                        .opacity(0.8)
-                                }
                             }
-                            .foregroundStyle(entryCategory == cat ? .white : colors.textPrimary)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(entryCategory == cat ? AppColors.primary : colors.backgroundTertiary)
+                            .foregroundStyle(entryCategory == cat ? .white : AppColors.slate)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(entryCategory == cat ? AppColors.primary : AppColors.snow)
                             .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .strokeBorder(Color.clear, lineWidth: 1.5)
+                            )
+                            .shadow(
+                                color: entryCategory == cat ? AppColors.primary.opacity(0.3) : .clear,
+                                radius: 6,
+                                y: 3
+                            )
                         }
                         .buttonStyle(.plain)
+                        .animation(AppAnimation.pillPop, value: entryCategory == cat)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -233,11 +250,44 @@ struct TimeLogView: View {
         }
     }
 
+    /// Returns a short chip label (not the full rawValue)
+    private func categoryChipLabel(for cat: ActivityCategory) -> String {
+        switch cat {
+        case .repairs: return "Repairs"
+        case .management: return "Management"
+        case .leasing: return "Leasing"
+        case .bookkeeping: return "Bookkeeping"
+        case .legal: return "Legal"
+        case .insurance: return "Insurance"
+        case .travel: return "Travel"
+        case .renovations: return "Renovations"
+        case .investing: return "Investing"
+        case .financing: return "Financing"
+        case .contractNegotiation: return "Contracts"
+        }
+    }
+
+    /// Returns the colored dot for each category, matching the HTML mockup
+    private func categoryDotColor(for cat: ActivityCategory) -> Color {
+        switch cat {
+        case .repairs: return AppColors.coral
+        case .management: return AppColors.sage
+        case .leasing: return AppColors.sky
+        case .bookkeeping: return AppColors.honey
+        case .legal: return AppColors.rose
+        case .insurance: return Color(hex: "8B7EC8")
+        case .travel: return Color(hex: "E8A87C")
+        case .renovations: return Color(hex: "7B8EC8")
+        case .investing: return AppColors.mist
+        case .financing: return AppColors.cloud
+        case .contractNegotiation: return AppColors.slate
+        }
+    }
+
     // MARK: - Form Rows
     private var propertyRow: some View {
         HStack(spacing: 14) {
-            Image(systemName: "house")
-                .font(.system(size: 16))
+            LucideIcon(image: Lucide.house, size: 16)
                 .foregroundStyle(AppColors.primary)
                 .frame(width: 24)
 
@@ -248,62 +298,84 @@ struct TimeLogView: View {
                 }
             }
             .tint(colors.textPrimary)
+            .font(AppTypography.body)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
 
     private var hoursRow: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "clock")
-                .font(.system(size: 16))
-                .foregroundStyle(AppColors.primary)
-                .frame(width: 24)
-
+        VStack(alignment: .leading, spacing: 10) {
             Text("Hours")
-                .font(.system(size: 15))
-                .foregroundStyle(colors.textPrimary)
+                .font(AppTypography.caption)
+                .foregroundStyle(colors.textSecondary)
+                .textCase(.uppercase)
+                .tracking(0.5)
+                .padding(.horizontal, 16)
 
-            Spacer()
+            HStack(spacing: 24) {
+                Spacer()
 
-            HStack(spacing: 18) {
                 Button {
-                    if entryHours > 0.25 { entryHours -= 0.25 }
+                    if entryHours > 0.25 {
+                        withAnimation(AppAnimation.quick) { entryHours -= 0.25 }
+                    }
                 } label: {
-                    Image(systemName: "minus.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundStyle(colors.textTertiary)
+                    LucideIcon(image: Lucide.minus, size: 16)
+                        .foregroundStyle(colors.textPrimary)
+                        .frame(width: 44, height: 44)
+                        .background(colors.backgroundSecondary)
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .strokeBorder(colors.border, lineWidth: 1.5)
+                        )
                 }
                 .buttonStyle(.plain)
 
-                Text(entryHours.formatted(.number.precision(.fractionLength(0...2))) + "h")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(colors.textPrimary)
-                    .frame(minWidth: 44, alignment: .center)
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text(entryHours.formatted(.number.precision(.fractionLength(0...2))))
+                        .font(.system(size: 40, weight: .regular, design: .serif))
+                        .foregroundStyle(colors.textPrimary)
+                        .contentTransition(.numericText())
+                    Text("h")
+                        .font(.system(size: 16))
+                        .foregroundStyle(AppColors.mist)
+                }
+                .frame(minWidth: 80, alignment: .center)
 
                 Button {
-                    if entryHours < 24 { entryHours += 0.25 }
+                    if entryHours < 24 {
+                        withAnimation(AppAnimation.quick) { entryHours += 0.25 }
+                    }
                 } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundStyle(AppColors.primary)
+                    LucideIcon(image: Lucide.plus, size: 16)
+                        .foregroundStyle(colors.textPrimary)
+                        .frame(width: 44, height: 44)
+                        .background(colors.backgroundSecondary)
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .strokeBorder(colors.border, lineWidth: 1.5)
+                        )
                 }
                 .buttonStyle(.plain)
+
+                Spacer()
             }
         }
-        .padding(.horizontal, 16)
         .padding(.vertical, 10)
     }
 
     private var dateRow: some View {
         HStack(spacing: 14) {
-            Image(systemName: "calendar")
-                .font(.system(size: 16))
-                .foregroundStyle(AppColors.primary)
+            LucideIcon(image: Lucide.calendar, size: 16)
+                .foregroundStyle(AppColors.sky)
                 .frame(width: 24)
 
             DatePicker("Date", selection: $entryDate, displayedComponents: .date)
                 .tint(AppColors.primary)
+                .font(AppTypography.body)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
@@ -311,13 +383,12 @@ struct TimeLogView: View {
 
     private var participantRow: some View {
         HStack(spacing: 14) {
-            Image(systemName: "person")
-                .font(.system(size: 16))
-                .foregroundStyle(AppColors.primary)
+            LucideIcon(image: Lucide.user, size: 16)
+                .foregroundStyle(AppColors.sage)
                 .frame(width: 24)
 
             Text("For")
-                .font(.system(size: 15))
+                .font(AppTypography.body)
                 .foregroundStyle(colors.textPrimary)
 
             Spacer()
@@ -334,74 +405,54 @@ struct TimeLogView: View {
     }
 
     private var bottomActionRow: some View {
-        HStack(spacing: 10) {
-            // Photo attachment
+        VStack(spacing: 0) {
+            // Attach receipt or document
             PhotosPicker(
                 selection: $entryPhotoItems,
                 maxSelectionCount: 5,
                 matching: .images
             ) {
-                HStack(spacing: 6) {
-                    Image(systemName: entryAttachments.isEmpty ? "paperclip" : "paperclip.badge.ellipsis")
-                        .font(.system(size: 15))
-                    if !entryAttachments.isEmpty {
-                        Text("\(entryAttachments.count)")
-                            .font(.system(size: 13, weight: .semibold))
-                    }
+                HStack(spacing: 8) {
+                    LucideIcon(image: Lucide.paperclip, size: 15)
+                    Text(entryAttachments.isEmpty ? "Attach receipt or document" : "Attached (\(entryAttachments.count))")
+                        .font(.system(size: 13, weight: .medium))
                 }
-                .foregroundStyle(entryAttachments.isEmpty ? colors.textSecondary : AppColors.primary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .background(colors.backgroundTertiary)
-                .clipShape(Capsule())
+                .foregroundStyle(entryAttachments.isEmpty ? AppColors.slate : AppColors.primary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(AppColors.snow)
+                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
             }
             .onChange(of: entryPhotoItems) { _, newItems in
                 Task { await loadPhotos(from: newItems) }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
 
-            // AI assist button
-            Button {
-                showingAIEntry = true
-            } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 13))
-                    Text("AI")
-                        .font(.system(size: 13, weight: .medium))
-                }
-                .foregroundStyle(AppColors.primary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .background(AppColors.primarySurface)
-                .clipShape(Capsule())
-            }
-            .buttonStyle(.plain)
-
-            Spacer()
-
-            // Log Time — black pill (Tiimo style)
+            // Log Time — full-width violet capsule
             Button {
                 saveMainEntry()
             } label: {
                 Text("Log Time")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 22)
-                    .padding(.vertical, 10)
-                    .background(effectivePropertyId == nil ? Color(hex: "CCCCCC") : Color(hex: "1A1A1A"))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(effectivePropertyId == nil ? AppColors.mist : AppColors.primary)
                     .clipShape(Capsule())
             }
             .buttonStyle(.plain)
             .disabled(effectivePropertyId == nil)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
     }
 
     // MARK: - Quick Log Section
     private var quickLogSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionLabel(systemIcon: "bolt", text: "QUICK LOG")
+            sectionLabel(lucideIcon: Lucide.bolt, text: "QUICK LOG")
 
             LazyVGrid(columns: [
                 GridItem(.flexible()),
@@ -425,33 +476,28 @@ struct TimeLogView: View {
     // MARK: - Saved Banner
     private var savedBanner: some View {
         HStack(spacing: 10) {
-            Image(systemName: "checkmark.circle.fill")
+            LucideIcon(image: Lucide.circleCheck, size: 18)
                 .foregroundStyle(.white)
             Text("Time logged!")
-                .font(.system(size: 15, weight: .semibold))
+                .font(AppTypography.button)
                 .foregroundStyle(.white)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .background(Color(hex: "1A1A1A"))
+        .background(AppColors.sage)
         .clipShape(Capsule())
-        .shadow(color: .black.opacity(0.2), radius: 12, y: 4)
+        .shadow(color: AppColors.sage.opacity(0.3), radius: 12, y: 4)
     }
 
     // MARK: - Section Label Helper
-    private func sectionLabel(systemIcon: String, text: String) -> some View {
+    private func sectionLabel(lucideIcon: UIImage, text: String) -> some View {
         HStack(spacing: 5) {
-            Image(systemName: systemIcon)
-                .font(.system(size: 11))
+            LucideIcon(image: lucideIcon, size: 11)
             Text(text)
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(0.5)
+                .font(AppTypography.label)
+                .tracking(1.5)
         }
         .foregroundStyle(colors.textSecondary)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(colors.backgroundTertiary)
-        .clipShape(Capsule())
     }
 
     // MARK: - Helpers
@@ -538,24 +584,24 @@ struct TimeLogView: View {
     // MARK: - Empty State
     private var emptyState: some View {
         VStack(spacing: 20) {
-            ZStack {
-                Circle()
-                    .fill(AppColors.primarySurface)
-                    .frame(width: 100, height: 100)
-                Image(systemName: "house")
-                    .font(.system(size: 36))
-                    .foregroundStyle(AppColors.primary)
-            }
+            JellyBadge(
+                systemName: "house",
+                color: AppColors.primary,
+                wash: colors.primarySurface,
+                size: 72
+            )
             Text("Add a Property First")
-                .font(.system(size: 22, weight: .bold))
+                .font(AppTypography.subheadline)
                 .foregroundStyle(colors.textPrimary)
             Text("You need at least one property\nbefore logging time")
-                .font(.system(size: 15))
+                .font(AppTypography.body)
                 .foregroundStyle(colors.textSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(colors.background)
+        .background {
+            AuroraBackground()
+        }
     }
 }
 
@@ -570,16 +616,25 @@ struct TodayStatChip: View {
     var body: some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(.system(size: 20, weight: .bold))
+                .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundStyle(colors.textPrimary)
             Text(label)
-                .font(.system(size: 11))
+                .font(AppTypography.label)
                 .foregroundStyle(colors.textSecondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .background(
+            colorScheme == .dark
+            ? Color.white.opacity(0.08)
+            : Color.white.opacity(0.65)
+        )
+        .background(
+            RoundedRectangle(cornerRadius: AppCornerRadius.large)
+                .fill(.ultraThinMaterial)
+                .opacity(0.5)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
     }
 }
 
@@ -596,9 +651,14 @@ struct CategoryGridButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 10) {
-                DynamicBadgeView(iconName: icon, bgColor: color, fgColor: .white, size: 52, iconScale: 0.42)
+                JellyBadge(
+                    systemName: icon,
+                    color: color,
+                    wash: color.opacity(0.15),
+                    size: 48
+                )
                 Text(title)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
@@ -609,7 +669,8 @@ struct CategoryGridButton: View {
             .padding(.vertical, 18)
             .padding(.horizontal, 8)
             .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.04), radius: 8, x: 0, y: 2)
         }
         .buttonStyle(.plain)
     }
@@ -622,24 +683,24 @@ struct QuickStatBadge: View {
 
     let title: String
     let value: String
-    let icon: String
+    let icon: UIImage
     let color: Color
 
     var body: some View {
         VStack(spacing: 6) {
-            DynamicIconView(name: icon, size: 16, color: color)
+            LucideIcon(image: icon, size: 16)
+                .foregroundStyle(color)
             Text(value)
-                .font(.headline)
-                .fontWeight(.bold)
+                .font(.system(size: 17, weight: .bold, design: .rounded))
                 .foregroundStyle(colors.textPrimary)
             Text(title)
-                .font(.caption2)
+                .font(AppTypography.label)
                 .foregroundStyle(colors.textSecondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
         .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
     }
 }
 
@@ -658,23 +719,28 @@ struct AIInputSheet: View {
             VStack(alignment: .leading, spacing: 24) {
                 // Header
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                            .foregroundStyle(AppColors.primary)
+                    HStack(spacing: 10) {
+                        JellyBadge(
+                            systemName: "sparkles",
+                            color: AppColors.primary,
+                            wash: colors.primarySurface,
+                            size: 36
+                        )
                         Text("AI Time Entry")
-                            .font(.system(size: 22, weight: .bold))
+                            .font(AppTypography.title2)
+                            .foregroundStyle(colors.textPrimary)
                     }
                     Text("Describe what you worked on in plain English. AI will parse the category, hours, and property.")
-                        .font(.system(size: 14))
+                        .font(AppTypography.body)
                         .foregroundStyle(colors.textSecondary)
                         .lineSpacing(3)
                 }
 
                 // Examples
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("EXAMPLES")
-                        .font(.system(size: 11, weight: .semibold))
-                        .tracking(0.5)
+                        .font(AppTypography.label)
+                        .tracking(1.5)
                         .foregroundStyle(colors.textSecondary)
 
                     ForEach([
@@ -686,12 +752,12 @@ struct AIInputSheet: View {
                             text = example
                         } label: {
                             Text(example)
-                                .font(.system(size: 13))
+                                .font(AppTypography.bodySmall)
                                 .foregroundStyle(AppColors.primary)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(AppColors.primarySurface)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(colors.primarySurface)
+                                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
                         }
                         .buttonStyle(.plain)
                     }
@@ -702,18 +768,18 @@ struct AIInputSheet: View {
                     if text.isEmpty {
                         Text("Type your entry here...")
                             .foregroundStyle(colors.textTertiary)
-                            .font(.system(size: 15))
+                            .font(AppTypography.body)
                             .padding(.top, 14)
                             .padding(.leading, 14)
                     }
                     TextEditor(text: $text)
                         .frame(height: 100)
-                        .font(.system(size: 15))
+                        .font(AppTypography.body)
                         .scrollContentBackground(.hidden)
                         .padding(10)
                 }
                 .background(colors.backgroundTertiary)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
 
                 Spacer()
 
@@ -730,25 +796,37 @@ struct AIInputSheet: View {
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 .scaleEffect(0.8)
                         } else {
-                            Image(systemName: "sparkles")
+                            LucideIcon(image: Lucide.sparkles, size: 16)
                         }
-                        Text(isProcessing ? "Processing..." : "Parse with AI →")
-                            .font(.system(size: 17, weight: .semibold))
+                        Text(isProcessing ? "Processing..." : "Parse with AI")
+                            .font(AppTypography.buttonLarge)
                     }
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
-                    .background(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color(hex: "CCCCCC") : Color(hex: "1A1A1A"))
+                    .background(
+                        text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        ? AppColors.mist
+                        : AppColors.primary
+                    )
                     .clipShape(Capsule())
+                    .shadow(
+                        color: text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        ? .clear
+                        : AppColors.primary.opacity(0.3),
+                        radius: 12,
+                        y: 4
+                    )
                 }
                 .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
             .padding(24)
-            .background(Color.white)
+            .background(colors.background)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { isPresented = false }
+                        .font(AppTypography.body)
                         .foregroundStyle(colors.textSecondary)
                 }
             }
@@ -806,7 +884,7 @@ struct QuickLogEntryView: View {
                             .foregroundStyle(.secondary)
                     } else if viewModel.properties.count == 1 {
                         HStack {
-                            Image(systemName: "house")
+                            LucideIcon(image: Lucide.house, size: 16)
                                 .foregroundStyle(AppColors.primary)
                             Text(viewModel.properties[0].name)
                         }
@@ -908,7 +986,7 @@ struct AIEntryReviewView: View {
             Form {
                 Section {
                     HStack(spacing: 10) {
-                        Image(systemName: "sparkles")
+                        LucideIcon(image: Lucide.sparkles, size: 16)
                             .foregroundStyle(AppColors.primary)
                         Text("Review the AI suggestion and adjust if needed.")
                             .font(.caption)
@@ -921,7 +999,7 @@ struct AIEntryReviewView: View {
                 Section("Property") {
                     if let property = selectedProperty {
                         HStack {
-                            Image(systemName: "house")
+                            LucideIcon(image: Lucide.house, size: 16)
                                 .foregroundStyle(AppColors.primary)
                             Text(property.name)
                         }

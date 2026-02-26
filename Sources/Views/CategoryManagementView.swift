@@ -1,55 +1,66 @@
 import SwiftUI
+import LucideIcons
 
 struct CategoryManagementView: View {
     @EnvironmentObject var categoryManager: CategoryManager
+    @Environment(\.colorScheme) var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     @State private var showingAddCategory = false
     @State private var editingCategory: CustomCategory?
-    
+
     var body: some View {
         List {
             Section {
                 ForEach(categoryManager.defaultCategories.map { CustomCategory(name: $0.name, iconName: $0.icon, colorHex: $0.color, countsForREPS: $0.countsForREPS) }) { category in
                     HStack {
-                        DynamicIconView(name: category.iconName, size: 20, color: Color(hex: category.colorHex))
+                        Image(systemName: category.iconName)
+                            .font(.system(size: 18))
+                            .foregroundStyle(Color(hex: category.colorHex))
                             .frame(width: 30)
                         Text(category.name)
-                            .foregroundStyle(AppColors.textPrimary)
+                            .font(AppTypography.body)
+                            .foregroundStyle(colors.textPrimary)
                         Spacer()
                         Text("Default")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.textTertiary)
+                            .font(AppTypography.caption)
+                            .foregroundStyle(colors.textTertiary)
                     }
                 }
             } header: {
                 Text("Default Categories")
+                    .font(AppTypography.label)
+                    .tracking(1.5)
             } footer: {
                 Text("These categories cannot be deleted but are used throughout the app.")
             }
-            
+
             Section {
                 if categoryManager.customCategories.isEmpty {
                     VStack(spacing: 12) {
-                        LHSoftBadge(icon: .tag, color: AppColors.primary, size: 56)
+                        JellyBadge(systemName: "tag", color: AppColors.primary, wash: colors.primarySurface, size: 56)
                         Text("No Custom Categories")
-                            .font(.headline)
-                            .foregroundStyle(AppColors.textSecondary)
+                            .font(AppTypography.subheadline)
+                            .foregroundStyle(colors.textSecondary)
                         Text("Tap + to add your own categories")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.textTertiary)
+                            .font(AppTypography.caption)
+                            .foregroundStyle(colors.textTertiary)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 20)
                 } else {
                     ForEach(categoryManager.customCategories) { category in
                         HStack {
-                            DynamicIconView(name: category.iconName, size: 20, color: Color(hex: category.colorHex))
+                            Image(systemName: category.iconName)
+                                .font(.system(size: 18))
+                                .foregroundStyle(Color(hex: category.colorHex))
                                 .frame(width: 30)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(category.name)
-                                    .foregroundStyle(AppColors.textPrimary)
+                                    .font(AppTypography.body)
+                                    .foregroundStyle(colors.textPrimary)
                                 Text(category.countsForREPS ? "Counts for REPS" : "Doesn't count")
-                                    .font(.caption)
-                                    .foregroundStyle(category.countsForREPS ? AppColors.success : AppColors.textTertiary)
+                                    .font(AppTypography.caption)
+                                    .foregroundStyle(category.countsForREPS ? AppColors.sage : colors.textTertiary)
                             }
                             Spacer()
                         }
@@ -67,6 +78,8 @@ struct CategoryManagementView: View {
                 }
             } header: {
                 Text("Custom Categories")
+                    .font(AppTypography.label)
+                    .tracking(1.5)
             } footer: {
                 Text("Swipe to delete or tap to edit custom categories.")
             }
@@ -77,7 +90,8 @@ struct CategoryManagementView: View {
                 Button {
                     showingAddCategory = true
                 } label: {
-                    LHIconView(icon: .plusCircle, size: 24, color: AppColors.primary)
+                    LucideIcon(image: Lucide.circlePlus, size: 24)
+                        .foregroundStyle(AppColors.primary)
                 }
             }
         }
@@ -94,37 +108,42 @@ struct CategoryManagementView: View {
 struct AddEditCategoryView: View {
     @EnvironmentObject var categoryManager: CategoryManager
     @Environment(\.dismiss) var dismiss
-    
+    @Environment(\.colorScheme) var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
     var editingCategory: CustomCategory?
-    
+
     @State private var name: String = ""
     @State private var selectedIcon: String = "star.fill"
     @State private var selectedColor: String = "8B5CF6"
     @State private var countsForREPS: Bool = true
-    
+
     var body: some View {
         NavigationStack {
             Form {
                 Section("Category Name") {
                     TextField("Enter name", text: $name)
+                        .font(AppTypography.body)
                 }
-                
+
                 Section("Icon") {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8), spacing: 12) {
                         ForEach(availableCategoryIcons, id: \.self) { icon in
                             Button {
                                 selectedIcon = icon
                             } label: {
-                                DynamicIconView(name: icon, size: 20, color: selectedIcon == icon ? Color(hex: selectedColor) : AppColors.textSecondary)
+                                Image(systemName: icon)
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(selectedIcon == icon ? Color(hex: selectedColor) : colors.textSecondary)
                                     .frame(width: 36, height: 36)
                                     .background(selectedIcon == icon ? Color(hex: selectedColor).opacity(0.2) : Color.clear)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.small))
                             }
                         }
                     }
                     .padding(.vertical, 8)
                 }
-                
+
                 Section("Color") {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8), spacing: 12) {
                         ForEach(availableCategoryColors, id: \.self) { color in
@@ -139,7 +158,8 @@ struct AddEditCategoryView: View {
                                             .stroke(selectedColor == color ? Color.white : Color.clear, lineWidth: 2)
                                     )
                                     .overlay(
-                                        LHIconView(icon: .checkmark, size: 10, color: .white)
+                                        LucideIcon(image: Lucide.check, size: 10)
+                                            .foregroundStyle(.white)
                                             .opacity(selectedColor == color ? 1 : 0)
                                     )
                             }
@@ -147,19 +167,23 @@ struct AddEditCategoryView: View {
                     }
                     .padding(.vertical, 8)
                 }
-                
+
                 Section {
                     Toggle("Count for REPS", isOn: $countsForREPS)
+                        .font(AppTypography.body)
                 } footer: {
                     Text("IRS requires 750 hours of material participation. Only activities marked as counting will contribute to this goal.")
                 }
-                
+
                 Section("Preview") {
                     HStack {
-                        DynamicIconView(name: selectedIcon, size: 20, color: Color(hex: selectedColor))
+                        Image(systemName: selectedIcon)
+                            .font(.system(size: 18))
+                            .foregroundStyle(Color(hex: selectedColor))
                             .frame(width: 30)
                         Text(name.isEmpty ? "Category Name" : name)
-                            .foregroundStyle(name.isEmpty ? AppColors.textTertiary : AppColors.textPrimary)
+                            .font(AppTypography.body)
+                            .foregroundStyle(name.isEmpty ? colors.textTertiary : colors.textPrimary)
                         Spacer()
                     }
                     .padding(.vertical, 8)
@@ -190,7 +214,7 @@ struct AddEditCategoryView: View {
             }
         }
     }
-    
+
     func saveCategory() {
         let category = CustomCategory(
             id: editingCategory?.id ?? UUID(),
@@ -199,13 +223,13 @@ struct AddEditCategoryView: View {
             colorHex: selectedColor,
             countsForREPS: countsForREPS
         )
-        
+
         if editingCategory != nil {
             categoryManager.updateCategory(category)
         } else {
             categoryManager.addCategory(category)
         }
-        
+
         dismiss()
     }
 }

@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Track Time — V3</title>
+<script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --cream: #FAF7F2;
+    --warm-white: #FFFFFF;
+    --violet: #7B68EE;
+    --violet-soft: #B8AFFE;
+    --violet-wash: #EDE8FF;
+    --violet-deep: #5B4BC9;
+    --coral: #FF8A7A;
+    --coral-wash: #FFE8E4;
+    --sage: #7EC8A0;
+    --sage-wash: #E4F5EC;
+    --honey: #F5C563;
+    --honey-wash: #FFF4DA;
+    --sky: #6CB4EE;
+    --sky-wash: #E0F0FF;
+    --rose: #E88CA5;
+    --rose-wash: #FFE4EC;
+    --charcoal: #1A1A2E;
+    --ink: #2D2D3F;
+    --slate: #6E6E82;
+    --mist: #A8A8BC;
+    --cloud: #D4D4E0;
+    --snow: #F0EFF4;
+  }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: #E5E0D8;
+    padding: 60px;
+    display: flex;
+    gap: 48px;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  .screen-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .screen-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--slate);
+  }
+
+  .phone {
+    width: 393px;
+    height: 852px;
+    background: var(--cream);
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 30px 80px rgba(26,26,46,0.15), 0 0 0 1px rgba(0,0,0,0.04);
+  }
+
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 126px;
+    height: 34px;
+    background: #000;
+    border-radius: 0 0 22px 22px;
+    z-index: 100;
+  }
+
+  .status-bar {
+    height: 58px;
+    padding: 14px 28px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--charcoal);
+  }
+
+  .scroll-area {
+    height: calc(100% - 58px - 80px);
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .scroll-area::-webkit-scrollbar { display: none; }
+
+  .scroll-content { padding: 0 20px 40px; }
+
+  /* Tab Bar */
+  .tab-bar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 80px;
+    background: var(--warm-white);
+    border-top: 1px solid var(--snow);
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-start;
+    padding-top: 10px;
+    padding-bottom: 26px;
+  }
+
+  .tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--mist);
+  }
+
+  .tab.on { color: var(--violet); }
+  .tab-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--violet); margin-top: -2px; opacity: 0; }
+  .tab.on .tab-dot { opacity: 1; }
+  .tab svg { width: 22px; height: 22px; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+  .tab.on svg { stroke: var(--violet); }
+  .tab:not(.on) svg { stroke: var(--mist); }
+
+  /* Card */
+  .card {
+    background: var(--warm-white);
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  /* Greeting */
+  .greeting { padding: 4px 0 20px; }
+  .greeting-name { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--charcoal); }
+  .greeting-sub { font-size: 14px; color: var(--slate); margin-top: 2px; }
+
+  /* Label */
+  .label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--slate);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+    display: block;
+  }
+
+  /* Textarea */
+  .textarea {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1.5px solid var(--violet-soft);
+    background: var(--cream);
+    font-size: 15px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--charcoal);
+    resize: none;
+    outline: none;
+  }
+
+  .textarea::placeholder { color: var(--mist); }
+
+  /* ===== AI SUGGESTION BAR ===== */
+  .ai-suggestion {
+    margin-top: 10px;
+    margin-bottom: 20px;
+    padding: 12px 14px;
+    background: var(--violet-wash);
+    border-radius: 14px;
+    border: 1.5px solid var(--violet-soft);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ai-sparkle {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: var(--violet);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: white;
+  }
+
+  .ai-sparkle svg {
+    width: 14px;
+    height: 14px;
+    stroke: white;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+  }
+
+  .ai-suggestion-body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ai-suggestion-text {
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.4;
+  }
+
+  .ai-suggestion-text strong {
+    color: var(--charcoal);
+    font-weight: 600;
+  }
+
+  .ai-suggestion-chips {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+  }
+
+  .ai-chip {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--warm-white);
+    color: var(--violet);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .ai-chip-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  .ai-fill-btn {
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: var(--violet);
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ===== AI EMPTY STATE (before typing) ===== */
+  .ai-hint {
+    margin-top: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--mist);
+  }
+
+  .ai-hint svg {
+    width: 14px;
+    height: 14px;
+    stroke: var(--violet-soft);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+  }
+
+  /* Category Chips */
+  .chips-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    margin: 0 -20px;
+    padding: 0 20px 4px;
+    scrollbar-width: none;
+  }
+  .chips-scroll::-webkit-scrollbar { display: none; }
+
+  .chip {
+    padding: 10px 16px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--snow);
+    color: var(--slate);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+  }
+
+  .chip.on { background: var(--violet); color: white; border-color: var(--violet); }
+  .chip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .chip.on .chip-dot { background: rgba(255,255,255,0.5) !important; }
+
+  /* Picker */
+  .picker {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1.5px solid var(--snow);
+    background: var(--cream);
+    margin-bottom: 20px;
+    font-size: 15px;
+    color: var(--charcoal);
+  }
+
+  .picker-left { display: flex; align-items: center; gap: 10px; }
+
+  .picker-icon {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+
+  .picker-chev { color: var(--cloud); font-size: 18px; }
+
+  /* Stepper */
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+
+  .stepper-btn {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1.5px solid var(--snow);
+    background: var(--warm-white);
+    font-size: 20px;
+    color: var(--charcoal);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+
+  .stepper-val {
+    font-family: 'DM Serif Display', serif;
+    font-size: 40px;
+    color: var(--charcoal);
+    min-width: 80px;
+    text-align: center;
+  }
+
+  .stepper-unit {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    color: var(--mist);
+    font-weight: 400;
+  }
+
+  /* Segment */
+  .seg {
+    display: flex;
+    background: var(--snow);
+    border-radius: 12px;
+    padding: 3px;
+    margin-bottom: 20px;
+  }
+
+  .seg-item {
+    flex: 1; text-align: center;
+    padding: 10px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--slate);
+  }
+
+  .seg-item.on {
+    background: var(--warm-white);
+    color: var(--charcoal);
+    font-weight: 600;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+
+  /* Attach Button */
+  .attach-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 12px;
+    background: var(--snow);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--slate);
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    margin-bottom: 20px;
+  }
+
+  .attach-btn svg {
+    width: 16px; height: 16px;
+    stroke: var(--slate);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+  }
+
+  /* Primary Button */
+  .btn-primary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px;
+    border-radius: 999px;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    background: var(--violet);
+    color: white;
+  }
+
+  /* Date row */
+  .date-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1.5px solid var(--snow);
+    background: var(--cream);
+    margin-bottom: 20px;
+  }
+
+  .date-left { display: flex; align-items: center; gap: 10px; font-size: 15px; color: var(--charcoal); }
+
+  .date-icon {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: var(--violet-wash);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--violet);
+  }
+
+  .date-icon svg {
+    width: 14px; height: 14px;
+    stroke: var(--violet);
+    stroke-width: 2;
+    stroke-linecap: round;
+    fill: none;
+  }
+
+  /* Annotation callouts */
+  .anno {
+    position: absolute;
+    font-size: 11px;
+    color: var(--violet);
+    font-weight: 500;
+    background: white;
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--violet-wash);
+    box-shadow: 0 2px 8px rgba(123,104,238,0.1);
+    white-space: nowrap;
+    z-index: 50;
+  }
+
+  .anno::before {
+    content: '';
+    position: absolute;
+    width: 1px;
+    background: var(--violet-soft);
+    opacity: 0.4;
+  }
+</style>
+</head>
+<body>
+
+<!-- =========================================== -->
+<!-- STATE 1: Empty — before typing               -->
+<!-- =========================================== -->
+<div class="screen-wrap">
+  <div class="screen-title">Empty State</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>9:41</span>
+      <span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="scroll-area">
+      <div class="scroll-content">
+        <div class="greeting">
+          <div class="greeting-name">Track Time</div>
+          <div class="greeting-sub">Monday, February 24</div>
+        </div>
+
+        <div class="card">
+          <!-- Notes - empty -->
+          <textarea class="textarea" rows="2" placeholder="What did you work on?" style="border-color: var(--snow);"></textarea>
+
+          <!-- AI hint - subtle prompt -->
+          <div class="ai-hint">
+            <i data-lucide="sparkles"></i>
+            <span>Describe your work and we'll fill in the details</span>
+          </div>
+
+          <!-- Category -->
+          <div class="label">Category</div>
+          <div class="chips-scroll">
+            <div class="chip"><div class="chip-dot" style="background: var(--coral);"></div>Repairs</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--sage);"></div>Management</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--sky);"></div>Leasing</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--honey);"></div>Bookkeeping</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--rose);"></div>Legal</div>
+            <div class="chip"><div class="chip-dot" style="background: #8B7EC8;"></div>Insurance</div>
+            <div class="chip"><div class="chip-dot" style="background: #E8A87C;"></div>Travel</div>
+            <div class="chip"><div class="chip-dot" style="background: #7B8EC8;"></div>Renovations</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--mist);"></div>Investing</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--cloud);"></div>Financing</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--slate);"></div>Contracts</div>
+          </div>
+
+          <!-- Property -->
+          <div style="margin-top: 16px;">
+            <div class="label">Property</div>
+            <div class="picker">
+              <div class="picker-left">
+                <div class="picker-icon" style="background: var(--snow);">&#127968;</div>
+                <span style="color: var(--mist);">Select property</span>
+              </div>
+              <span class="picker-chev">&#8250;</span>
+            </div>
+          </div>
+
+          <!-- Hours -->
+          <div class="label">Hours</div>
+          <div class="stepper">
+            <div class="stepper-btn">&minus;</div>
+            <div><div class="stepper-val">0.5<span class="stepper-unit">h</span></div></div>
+            <div class="stepper-btn">+</div>
+          </div>
+
+          <!-- Date -->
+          <div class="label">Date</div>
+          <div class="date-row">
+            <div class="date-left">
+              <div class="date-icon"><i data-lucide="calendar"></i></div>
+              <span>Today, Feb 24</span>
+            </div>
+            <span class="picker-chev">&#8250;</span>
+          </div>
+
+          <!-- Participant -->
+          <div class="label">Participant</div>
+          <div class="seg">
+            <div class="seg-item on">Self</div>
+            <div class="seg-item">Spouse</div>
+          </div>
+
+          <!-- Attach -->
+          <button class="attach-btn">
+            <i data-lucide="paperclip"></i>
+            Attach receipt or document
+          </button>
+
+          <!-- Log -->
+          <button class="btn-primary">Log Time</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab"><i data-lucide="house"></i>Home<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="building-2"></i>Properties<div class="tab-dot"></div></div>
+      <div class="tab on"><i data-lucide="clock"></i>Track<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="bar-chart-3"></i>Reports<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="settings"></i>Settings<div class="tab-dot"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- =========================================== -->
+<!-- STATE 2: Typed — AI suggestion appears       -->
+<!-- =========================================== -->
+<div class="screen-wrap">
+  <div class="screen-title">AI Suggestion Active</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>9:41</span>
+      <span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="scroll-area">
+      <div class="scroll-content">
+        <div class="greeting">
+          <div class="greeting-name">Track Time</div>
+          <div class="greeting-sub">Monday, February 24</div>
+        </div>
+
+        <div class="card">
+          <!-- Notes - filled -->
+          <textarea class="textarea" rows="2" style="border-color: var(--violet-soft);">Fixed the leaky faucet at Oak Street, took about 2 hours</textarea>
+
+          <!-- AI Suggestion Bar -->
+          <div class="ai-suggestion">
+            <div class="ai-sparkle">
+              <i data-lucide="sparkles"></i>
+            </div>
+            <div class="ai-suggestion-body">
+              <div class="ai-suggestion-text">We detected:</div>
+              <div class="ai-suggestion-chips">
+                <div class="ai-chip"><div class="ai-chip-dot" style="background: var(--coral);"></div>Repairs</div>
+                <div class="ai-chip">&#127968; 123 Oak St</div>
+                <div class="ai-chip">2.0h</div>
+              </div>
+            </div>
+            <button class="ai-fill-btn">Auto-fill</button>
+          </div>
+
+          <!-- Category - none selected yet -->
+          <div class="label">Category</div>
+          <div class="chips-scroll">
+            <div class="chip"><div class="chip-dot" style="background: var(--coral);"></div>Repairs</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--sage);"></div>Management</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--sky);"></div>Leasing</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--honey);"></div>Bookkeeping</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--rose);"></div>Legal</div>
+            <div class="chip"><div class="chip-dot" style="background: #8B7EC8;"></div>Insurance</div>
+            <div class="chip"><div class="chip-dot" style="background: #E8A87C;"></div>Travel</div>
+            <div class="chip"><div class="chip-dot" style="background: #7B8EC8;"></div>Renovations</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--mist);"></div>Investing</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--cloud);"></div>Financing</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--slate);"></div>Contracts</div>
+          </div>
+
+          <!-- Property -->
+          <div style="margin-top: 16px;">
+            <div class="label">Property</div>
+            <div class="picker">
+              <div class="picker-left">
+                <div class="picker-icon" style="background: var(--snow);">&#127968;</div>
+                <span style="color: var(--mist);">Select property</span>
+              </div>
+              <span class="picker-chev">&#8250;</span>
+            </div>
+          </div>
+
+          <!-- Hours -->
+          <div class="label">Hours</div>
+          <div class="stepper">
+            <div class="stepper-btn">&minus;</div>
+            <div><div class="stepper-val">0.5<span class="stepper-unit">h</span></div></div>
+            <div class="stepper-btn">+</div>
+          </div>
+
+          <!-- Date -->
+          <div class="label">Date</div>
+          <div class="date-row">
+            <div class="date-left">
+              <div class="date-icon"><i data-lucide="calendar"></i></div>
+              <span>Today, Feb 24</span>
+            </div>
+            <span class="picker-chev">&#8250;</span>
+          </div>
+
+          <!-- Participant -->
+          <div class="label">Participant</div>
+          <div class="seg">
+            <div class="seg-item on">Self</div>
+            <div class="seg-item">Spouse</div>
+          </div>
+
+          <!-- Attach -->
+          <button class="attach-btn">
+            <i data-lucide="paperclip"></i>
+            Attach receipt or document
+          </button>
+
+          <!-- Log -->
+          <button class="btn-primary">Log Time</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab"><i data-lucide="house"></i>Home<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="building-2"></i>Properties<div class="tab-dot"></div></div>
+      <div class="tab on"><i data-lucide="clock"></i>Track<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="bar-chart-3"></i>Reports<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="settings"></i>Settings<div class="tab-dot"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- =========================================== -->
+<!-- STATE 3: After Auto-fill — form populated    -->
+<!-- =========================================== -->
+<div class="screen-wrap">
+  <div class="screen-title">After Auto-fill</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>9:41</span>
+      <span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="scroll-area">
+      <div class="scroll-content">
+        <div class="greeting">
+          <div class="greeting-name">Track Time</div>
+          <div class="greeting-sub">Monday, February 24</div>
+        </div>
+
+        <div class="card">
+          <!-- Notes - filled -->
+          <textarea class="textarea" rows="2" style="border-color: var(--snow);">Fixed the leaky faucet at Oak Street, took about 2 hours</textarea>
+
+          <!-- AI confirmation - collapsed -->
+          <div style="margin-top: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--sage);">
+            <i data-lucide="check" style="width: 14px; height: 14px; stroke: var(--sage); stroke-width: 2;"></i>
+            <span>Auto-filled from your description</span>
+          </div>
+
+          <!-- Category - Repairs selected -->
+          <div class="label">Category</div>
+          <div class="chips-scroll">
+            <div class="chip on"><div class="chip-dot" style="background: var(--coral);"></div>Repairs</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--sage);"></div>Management</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--sky);"></div>Leasing</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--honey);"></div>Bookkeeping</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--rose);"></div>Legal</div>
+            <div class="chip"><div class="chip-dot" style="background: #8B7EC8;"></div>Insurance</div>
+            <div class="chip"><div class="chip-dot" style="background: #E8A87C;"></div>Travel</div>
+            <div class="chip"><div class="chip-dot" style="background: #7B8EC8;"></div>Renovations</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--mist);"></div>Investing</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--cloud);"></div>Financing</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--slate);"></div>Contracts</div>
+          </div>
+
+          <!-- Property - auto selected -->
+          <div style="margin-top: 16px;">
+            <div class="label">Property</div>
+            <div class="picker">
+              <div class="picker-left">
+                <div class="picker-icon" style="background: var(--violet-wash);">&#127968;</div>
+                <span>123 Oak Street</span>
+              </div>
+              <span class="picker-chev">&#8250;</span>
+            </div>
+          </div>
+
+          <!-- Hours - auto set to 2.0 -->
+          <div class="label">Hours</div>
+          <div class="stepper">
+            <div class="stepper-btn">&minus;</div>
+            <div><div class="stepper-val">2.0<span class="stepper-unit">h</span></div></div>
+            <div class="stepper-btn">+</div>
+          </div>
+
+          <!-- Date -->
+          <div class="label">Date</div>
+          <div class="date-row">
+            <div class="date-left">
+              <div class="date-icon"><i data-lucide="calendar"></i></div>
+              <span>Today, Feb 24</span>
+            </div>
+            <span class="picker-chev">&#8250;</span>
+          </div>
+
+          <!-- Participant -->
+          <div class="label">Participant</div>
+          <div class="seg">
+            <div class="seg-item on">Self</div>
+            <div class="seg-item">Spouse</div>
+          </div>
+
+          <!-- Attach -->
+          <button class="attach-btn">
+            <i data-lucide="paperclip"></i>
+            Attach receipt or document
+          </button>
+
+          <!-- Log - ready -->
+          <button class="btn-primary">Log Time</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab"><i data-lucide="house"></i>Home<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="building-2"></i>Properties<div class="tab-dot"></div></div>
+      <div class="tab on"><i data-lucide="clock"></i>Track<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="bar-chart-3"></i>Reports<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="settings"></i>Settings<div class="tab-dot"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

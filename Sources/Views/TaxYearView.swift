@@ -1,4 +1,5 @@
 import SwiftUI
+import LucideIcons
 
 struct TaxYearView: View {
     @EnvironmentObject var viewModel: AppViewModel
@@ -18,7 +19,8 @@ struct TaxYearView: View {
                                 .foregroundStyle(selectedYear == year ? AppColors.primary : AppColors.textPrimary)
                             Spacer()
                             if selectedYear == year {
-                                LHIconView(icon: .checkmark, size: 16, color: AppColors.primary)
+                                LucideIcon(image: Lucide.check, size: 14)
+                                    .foregroundStyle(AppColors.primary)
                             }
                         }
                     }
@@ -63,7 +65,8 @@ struct TaxYearView: View {
                 } else {
                     ForEach(properties, id: \.self) { property in
                         HStack {
-                            LHIconView(icon: .home, size: 18, color: AppColors.primary)
+                            LucideIcon(image: Lucide.house, size: 16)
+                            .foregroundStyle(AppColors.primary)
                             Text(property)
                                 .foregroundStyle(AppColors.textPrimary)
                         }
@@ -102,7 +105,7 @@ struct TaxYearView: View {
     
     func selectYear(_ year: Int) {
         selectedYear = year
-        UserDefaults.standard.set(year, forKey: "selectedTaxYear")
+        UserDefaults.standard.set(year, forKey: UserScope.key("selectedTaxYear"))
     }
 }
 

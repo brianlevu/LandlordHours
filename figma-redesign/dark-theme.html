@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LandlordHours — Dark Theme</title>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=DM+Serif+Display&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    /* Dark Theme Palette */
+    --dark-bg: #0C0C18;
+    --dark-surface: #161626;
+    --dark-elevated: #1E1E32;
+    --violet: #9D8FF5;
+    --violet-soft: #B8AFFE;
+    --violet-wash-dark: #2D2A4A;
+    --violet-deep: #7B68EE;
+    --coral: #FF8A7A;
+    --coral-wash-dark: #3A2222;
+    --sage: #7EC8A0;
+    --sage-wash-dark: #1E3328;
+    --honey: #F5C563;
+    --honey-wash-dark: #33291A;
+    --sky: #6CB4EE;
+    --sky-wash-dark: #1A2A3A;
+    --rose: #E88CA5;
+    --rose-wash-dark: #3A2230;
+    --text-primary: #E8E8F0;
+    --text-secondary: #A8A8BC;
+    --text-tertiary: #6E6E82;
+    --border-dark: rgba(255,255,255,0.08);
+    --divider: rgba(255,255,255,0.04);
+    --glass-dark: rgba(12,12,24,0.85);
+    --glass-card: rgba(255,255,255,0.06);
+  }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: #1A1A2E;
+    padding: 60px 40px;
+    display: flex;
+    gap: 40px;
+    justify-content: center;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    min-height: 100vh;
+  }
+
+  /* Page header */
+  .page-header {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .page-header h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 32px;
+    color: #E8E8F0;
+    margin-bottom: 6px;
+  }
+  .page-header p {
+    font-size: 14px;
+    color: #6E6E82;
+    letter-spacing: 0.5px;
+  }
+
+  .screen-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .screen-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 2.5px;
+    text-transform: uppercase; color: var(--text-tertiary);
+  }
+
+  .phone {
+    width: 393px; height: 852px; background: var(--dark-bg);
+    border-radius: 44px; overflow: hidden; position: relative;
+    box-shadow:
+      0 40px 100px rgba(0,0,0,0.6),
+      0 0 0 1px rgba(255,255,255,0.06),
+      0 0 80px rgba(157,143,245,0.04);
+  }
+  .phone::before {
+    content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 126px; height: 34px; background: rgba(255,255,255,0.15);
+    border-radius: 0 0 22px 22px; z-index: 100;
+  }
+
+  .status-bar {
+    height: 58px; padding: 14px 28px 0; display: flex; justify-content: space-between;
+    align-items: center; font-size: 15px; font-weight: 600; color: var(--text-primary);
+    position: relative; z-index: 10;
+  }
+
+  .scroll-area {
+    height: calc(100% - 58px - 80px); overflow-y: auto; scrollbar-width: none;
+    position: relative;
+  }
+  .scroll-area::-webkit-scrollbar { display: none; }
+
+  /* ===== Aurora atmospheric background (dark) ===== */
+  .aurora-bg {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; z-index: 0; overflow: hidden;
+  }
+  .aurora-bg .blob-violet {
+    position: absolute; top: -60px; right: -80px;
+    width: 320px; height: 320px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(157,143,245,0.08) 0%, rgba(157,143,245,0.03) 45%, transparent 70%);
+    filter: blur(50px);
+  }
+  .aurora-bg .blob-sage {
+    position: absolute; bottom: 80px; left: -60px;
+    width: 200px; height: 200px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(126,200,160,0.06) 0%, transparent 70%);
+    filter: blur(55px);
+  }
+  .aurora-bg .blob-subtle {
+    position: absolute; top: 220px; left: 50%;
+    width: 260px; height: 260px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(157,143,245,0.04) 0%, transparent 60%);
+    filter: blur(60px);
+  }
+
+  .scroll-content { position: relative; z-index: 1; padding: 0 20px 40px; }
+
+  /* ===== Tab bar — dark glass ===== */
+  .tab-bar {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 80px;
+    background: var(--glass-dark);
+    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border-top: 1px solid var(--border-dark);
+    display: flex; justify-content: space-around; align-items: flex-start; padding-top: 10px;
+    z-index: 50;
+  }
+  .tab {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 500; color: var(--text-tertiary);
+  }
+  .tab.on { color: var(--violet); }
+  .tab-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--violet); margin-top: -2px; opacity: 0; }
+  .tab.on .tab-dot { opacity: 1; }
+  .tab svg { width: 22px; height: 22px; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+  .tab.on svg { stroke: var(--violet); }
+  .tab:not(.on) svg { stroke: var(--text-tertiary); }
+
+  /* ===== Dashboard screen styles ===== */
+  .greeting { padding: 4px 0 20px; display: flex; align-items: flex-start; justify-content: space-between; }
+  .greeting-sub { font-size: 14px; color: var(--text-secondary); }
+  .greeting-name { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--text-primary); margin-top: 2px; }
+  .greeting-right { display: flex; align-items: center; gap: 10px; }
+
+  .notif-btn {
+    width: 40px; height: 40px; border-radius: 14px;
+    background: var(--dark-surface); display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border-dark);
+    position: relative;
+  }
+  .notif-btn svg { width: 20px; height: 20px; stroke: var(--text-secondary); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+  .notif-dot {
+    position: absolute; top: 8px; right: 9px;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--coral); border: 1.5px solid var(--dark-surface);
+  }
+
+  /* Trial nudge */
+  .trial-nudge {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-radius: 14px;
+    background: var(--dark-surface);
+    border: 1px solid var(--border-dark);
+    margin-bottom: 18px;
+  }
+  .trial-icon {
+    width: 32px; height: 32px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .trial-icon svg { width: 18px; height: 18px; }
+  .trial-text { flex: 1; }
+  .trial-label { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+  .trial-sub { font-size: 11px; color: var(--text-tertiary); margin-top: 1px; }
+  .trial-action {
+    font-size: 11px; font-weight: 700; color: var(--violet);
+    padding: 5px 12px; border-radius: 999px;
+    background: var(--violet-wash-dark); flex-shrink: 0;
+    letter-spacing: 0.2px;
+  }
+
+  /* Hero Progress */
+  .hero-progress {
+    background: var(--dark-surface); border-radius: 28px;
+    padding: 28px 24px 24px; margin-bottom: 16px;
+    border: 1px solid var(--border-dark);
+    display: flex; flex-direction: column; align-items: center;
+    position: relative; overflow: hidden;
+  }
+  .hero-glow {
+    position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
+    width: 220px; height: 220px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(157,143,245,0.12) 0%, rgba(157,143,245,0.04) 50%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .ring-container {
+    position: relative; width: 180px; height: 180px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 6px;
+  }
+  .ring-center { position: absolute; text-align: center; }
+  .ring-hours { font-size: 44px; font-weight: 800; color: var(--text-primary); line-height: 1; letter-spacing: -2px; }
+  .ring-hours span { font-size: 18px; font-weight: 600; color: var(--text-secondary); letter-spacing: 0; }
+  .ring-goal { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+
+  .hero-message { font-size: 15px; font-weight: 600; color: var(--text-primary); text-align: center; margin-bottom: 4px; margin-top: 2px; }
+  .hero-sub { font-size: 12px; color: var(--text-secondary); text-align: center; line-height: 1.5; margin-bottom: 14px; }
+
+  .pace-row { display: flex; align-items: center; gap: 12px; width: 100%; }
+  .pace-chip {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 8px; border-radius: 14px;
+    background: var(--dark-elevated);
+    border: 1px solid var(--border-dark);
+  }
+  .pace-chip-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .pace-chip-label { font-size: 11px; color: var(--text-tertiary); }
+  .pace-chip-val { font-size: 13px; font-weight: 700; margin-left: auto; }
+
+  /* Section header */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .section-title { font-size: 17px; font-weight: 700; color: var(--text-primary); }
+  .section-link { font-size: 13px; font-weight: 600; color: var(--violet); display: flex; align-items: center; gap: 2px; }
+  .section-link svg { width: 14px; height: 14px; stroke: var(--violet); stroke-width: 2.5; stroke-linecap: round; fill: none; }
+
+  /* Activity card */
+  .activity-card {
+    background: var(--dark-surface); border-radius: 24px; padding: 4px 22px;
+    margin-bottom: 16px; border: 1px solid var(--border-dark);
+  }
+  .activity-row {
+    display: flex; align-items: center; gap: 14px; padding: 14px 0;
+    border-bottom: 1px solid var(--divider);
+  }
+  .activity-row:last-child { border-bottom: none; }
+  .activity-icon {
+    width: 40px; height: 40px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .activity-icon svg { width: 20px; height: 20px; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+  .activity-text { flex: 1; min-width: 0; }
+  .activity-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .activity-meta { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+  .activity-hours { font-size: 15px; font-weight: 700; color: var(--text-primary); flex-shrink: 0; }
+
+  /* Week card */
+  .card {
+    background: var(--dark-surface); border-radius: 24px; padding: 22px;
+    margin-bottom: 16px; border: 1px solid var(--border-dark);
+  }
+  .week-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+  .week-title { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+  .week-hours { font-size: 18px; font-weight: 800; color: var(--violet); letter-spacing: -0.5px; }
+  .week-days { display: flex; justify-content: space-between; }
+  .week-day { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .week-day-label { font-size: 10px; color: var(--text-tertiary); font-weight: 500; }
+  .week-day-dot {
+    width: 32px; height: 32px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+  }
+  .day-empty { background: var(--dark-elevated); color: var(--text-tertiary); }
+  .day-filled { background: var(--violet-wash-dark); color: var(--violet); }
+  .day-today { background: var(--violet); color: white; box-shadow: 0 2px 12px rgba(157,143,245,0.35); }
+
+  /* ===== Track Time screen styles ===== */
+  .track-greeting { padding: 4px 0 20px; }
+  .track-title { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--text-primary); }
+  .track-sub { font-size: 14px; color: var(--text-secondary); margin-top: 2px; }
+
+  .label {
+    font-size: 12px; font-weight: 600; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 10px; display: block;
+  }
+
+  .textarea {
+    width: 100%; padding: 14px 16px; border-radius: 14px;
+    border: 1.5px solid var(--border-dark);
+    background: var(--dark-elevated);
+    font-size: 15px; font-family: 'DM Sans', sans-serif;
+    color: var(--text-primary); resize: none; outline: none;
+  }
+  .textarea::placeholder { color: var(--text-tertiary); }
+
+  .ai-hint {
+    margin-top: 8px; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--text-tertiary);
+  }
+  .ai-hint svg { width: 14px; height: 14px; stroke: var(--violet-soft); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+
+  .chips-scroll {
+    display: flex; gap: 8px; overflow-x: auto;
+    margin: 0 -20px; padding: 0 20px 4px;
+    scrollbar-width: none;
+  }
+  .chips-scroll::-webkit-scrollbar { display: none; }
+
+  .chip {
+    padding: 10px 16px; border-radius: 999px; font-size: 13px; font-weight: 500;
+    background: var(--dark-surface); color: var(--text-secondary);
+    display: flex; align-items: center; gap: 7px;
+    white-space: nowrap; flex-shrink: 0; cursor: pointer;
+    border: 1.5px solid var(--border-dark);
+  }
+  .chip.on { background: var(--violet); color: white; border-color: var(--violet); }
+  .chip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .chip.on .chip-dot { background: rgba(255,255,255,0.5) !important; }
+
+  .picker {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-radius: 14px;
+    border: 1.5px solid var(--border-dark);
+    background: var(--dark-elevated);
+    margin-bottom: 20px; font-size: 15px; color: var(--text-primary);
+  }
+  .picker-left { display: flex; align-items: center; gap: 10px; }
+  .picker-icon {
+    width: 28px; height: 28px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+  }
+  .picker-chev { color: var(--text-tertiary); font-size: 18px; }
+
+  .stepper {
+    display: flex; align-items: center; gap: 24px;
+    justify-content: center; margin-bottom: 20px;
+  }
+  .stepper-btn {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 1.5px solid var(--border-dark);
+    background: var(--dark-surface); font-size: 20px;
+    color: var(--text-secondary); display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .stepper-val {
+    font-family: 'DM Serif Display', serif; font-size: 40px;
+    color: var(--text-primary); min-width: 80px; text-align: center;
+  }
+  .stepper-unit { font-family: 'DM Sans', sans-serif; font-size: 16px; color: var(--text-tertiary); font-weight: 400; }
+
+  .btn-primary {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 16px; border-radius: 999px; font-size: 16px; font-weight: 600;
+    border: none; cursor: pointer; width: 100%;
+    background: var(--violet); color: white;
+    box-shadow: 0 4px 20px rgba(157,143,245,0.3);
+  }
+
+  .date-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-radius: 14px;
+    border: 1.5px solid var(--border-dark);
+    background: var(--dark-elevated); margin-bottom: 20px;
+  }
+  .date-left { display: flex; align-items: center; gap: 10px; font-size: 15px; color: var(--text-primary); }
+  .date-icon {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: var(--violet-wash-dark);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .date-icon svg { width: 14px; height: 14px; stroke: var(--violet); stroke-width: 2; stroke-linecap: round; fill: none; }
+
+  .seg {
+    display: flex; background: var(--dark-elevated);
+    border-radius: 12px; padding: 3px; margin-bottom: 20px;
+  }
+  .seg-item {
+    flex: 1; text-align: center; padding: 10px; border-radius: 10px;
+    font-size: 14px; font-weight: 500; color: var(--text-tertiary);
+  }
+  .seg-item.on {
+    background: var(--dark-surface); color: var(--text-primary); font-weight: 600;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+
+  .attach-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px; border-radius: 12px;
+    background: var(--dark-elevated);
+    font-size: 13px; font-weight: 500; color: var(--text-secondary);
+    border: 1px solid var(--border-dark); cursor: pointer; width: 100%; margin-bottom: 20px;
+  }
+  .attach-btn svg { width: 16px; height: 16px; stroke: var(--text-secondary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+
+  /* ===== Reports screen styles ===== */
+  .r-header {
+    padding: 4px 0 0; display: flex; align-items: center; justify-content: space-between;
+  }
+  .r-title { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--text-primary); }
+  .r-year {
+    font-size: 13px; font-weight: 700; padding: 6px 14px; border-radius: 999px;
+    letter-spacing: 0.3px; background: var(--violet-wash-dark); color: var(--violet);
+  }
+
+  .goal-pills { display: flex; gap: 8px; padding: 16px 0 0; }
+  .goal-pill {
+    padding: 10px 18px; border-radius: 999px; font-size: 13px; font-weight: 600;
+    white-space: nowrap; border: 1.5px solid var(--border-dark);
+    background: var(--dark-surface); color: var(--text-secondary);
+  }
+  .goal-pill.active {
+    background: var(--violet); color: white; border-color: transparent;
+    box-shadow: 0 4px 16px rgba(157,143,245,0.3);
+  }
+
+  .ring-hero {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 28px 0 4px; position: relative;
+  }
+  .ring-glow-report {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -55%);
+    width: 280px; height: 280px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(157,143,245,0.15) 0%, rgba(157,143,245,0.04) 50%, transparent 70%);
+    pointer-events: none;
+  }
+  .ring-container-lg {
+    position: relative; width: 240px; height: 240px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ring-number { font-size: 52px; font-weight: 800; color: var(--text-primary); line-height: 1; letter-spacing: -2px; }
+  .ring-label-text { font-size: 14px; font-weight: 500; color: var(--text-secondary); margin-top: 4px; }
+
+  .ring-legend { display: flex; gap: 20px; margin-top: 14px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-tertiary); font-weight: 500; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  .pace-indicator { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 0 0; }
+  .pace-badge {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 999px;
+    font-size: 13px; font-weight: 600;
+    background: var(--sage-wash-dark); color: var(--sage);
+  }
+  .pace-dot-sm { width: 6px; height: 6px; border-radius: 50%; background: var(--sage); }
+  .pace-text-sm { font-size: 13px; font-weight: 500; color: var(--text-tertiary); }
+
+  .stat-row { display: flex; gap: 8px; padding: 16px 0 0; }
+  .stat-chip {
+    flex: 1; padding: 14px 10px; border-radius: 16px;
+    background: var(--glass-card); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    text-align: center; border: 1px solid var(--border-dark);
+  }
+  .stat-value { font-size: 18px; font-weight: 700; color: var(--text-primary); line-height: 1; margin-bottom: 4px; }
+  .stat-label { font-size: 11px; color: var(--text-tertiary); font-weight: 500; }
+
+  .property-list { display: flex; flex-direction: column; gap: 8px; }
+  .prop-card {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 18px; background: var(--dark-surface);
+    border: 1px solid var(--border-dark); border-radius: 16px;
+  }
+  .prop-color-bar { width: 4px; height: 40px; border-radius: 2px; flex-shrink: 0; }
+  .prop-info { flex: 1; min-width: 0; }
+  .prop-name { font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+  .prop-meta { font-size: 12px; color: var(--text-tertiary); font-weight: 500; }
+  .prop-bar { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.06); margin-top: 10px; overflow: hidden; }
+  .prop-bar-fill { height: 100%; border-radius: 2px; }
+  .prop-right { text-align: right; flex-shrink: 0; }
+  .prop-hours { font-size: 18px; font-weight: 700; line-height: 1; margin-bottom: 2px; color: var(--text-primary); }
+  .prop-sub { font-size: 11px; color: var(--text-tertiary); font-weight: 500; }
+
+  /* ===== Settings screen styles ===== */
+  .page-title { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--text-primary); padding: 4px 0 24px; line-height: 1.2; }
+
+  .section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--text-tertiary); padding: 28px 0 10px;
+  }
+  .section-label:first-of-type { padding-top: 0; }
+
+  .setting-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 15px 0; border-bottom: 1px solid var(--divider);
+  }
+  .setting-row:last-child { border-bottom: none; }
+
+  .s-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .s-icon svg { width: 20px; height: 20px; }
+
+  .setting-text { flex: 1; min-width: 0; }
+  .setting-name { font-size: 15px; font-weight: 500; color: var(--text-primary); line-height: 1.4; }
+  .setting-sub { font-size: 12px; color: var(--text-tertiary); margin-top: 1px; line-height: 1.4; }
+  .setting-value { font-size: 13px; color: var(--text-tertiary); font-weight: 500; flex-shrink: 0; }
+  .setting-accent { color: var(--violet); font-weight: 600; }
+
+  .chev { width: 16px; height: 16px; flex-shrink: 0; color: var(--text-tertiary); }
+  .chev svg { width: 16px; height: 16px; }
+
+  .setting-danger .setting-name { color: var(--coral); }
+  .setting-danger .s-icon { background: var(--coral-wash-dark) !important; color: var(--coral) !important; }
+
+  .toggle { width: 44px; height: 26px; border-radius: 13px; position: relative; flex-shrink: 0; }
+  .toggle-on { background: var(--violet); }
+  .toggle-off { background: var(--dark-elevated); border: 1px solid var(--border-dark); }
+  .toggle-thumb {
+    width: 22px; height: 22px; border-radius: 50%; background: white;
+    position: absolute; top: 2px; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  .toggle-on .toggle-thumb { right: 2px; }
+  .toggle-off .toggle-thumb { left: 2px; }
+
+  .profile-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 18px 0; border-bottom: 1px solid var(--divider);
+  }
+  .profile-avatar {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--violet), var(--violet-soft));
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 20px; font-weight: 700; flex-shrink: 0;
+  }
+  .profile-name { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+  .profile-email { font-size: 12px; color: var(--text-tertiary); margin-top: 1px; }
+
+  .sub-card { border-radius: 16px; padding: 18px; margin-bottom: 4px; }
+  .sub-card-pro {
+    background: linear-gradient(135deg, #5B4BC9, var(--violet));
+    box-shadow: 0 4px 20px rgba(157,143,245,0.2);
+  }
+  .sub-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; color: rgba(255,255,255,0.6); }
+  .sub-title { font-size: 18px; font-weight: 700; color: white; margin-bottom: 4px; }
+  .sub-meta { font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 12px; }
+  .sub-btn-manage {
+    display: inline-flex; padding: 8px 16px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    background: rgba(255,255,255,0.2); color: white;
+  }
+
+  .version-text { text-align: center; font-size: 12px; color: var(--text-tertiary); padding: 20px 0; }
+</style>
+</head>
+<body>
+
+<!-- Page Header -->
+<div class="page-header">
+  <h1>LandlordHours</h1>
+  <p>DARK THEME EXPLORATION</p>
+</div>
+
+<!-- ==================== SCREEN 1: Dashboard (Dark) ==================== -->
+<div class="screen-wrap">
+  <div class="screen-title">Dashboard</div>
+  <div class="phone">
+    <div class="status-bar"><span>9:41</span><span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span></div>
+    <div class="scroll-area">
+      <div class="aurora-bg">
+        <div class="blob-violet"></div>
+        <div class="blob-sage"></div>
+        <div class="blob-subtle"></div>
+      </div>
+      <div class="scroll-content">
+        <div class="greeting">
+          <div>
+            <div class="greeting-sub">Good evening,</div>
+            <div class="greeting-name">Brian</div>
+          </div>
+          <div class="notif-btn">
+            <i data-lucide="bell"></i>
+            <div class="notif-dot"></div>
+          </div>
+        </div>
+
+        <!-- Trial nudge -->
+        <div class="trial-nudge">
+          <div class="trial-icon" style="background:var(--violet-wash-dark); color:var(--violet);">
+            <i data-lucide="sparkles"></i>
+          </div>
+          <div class="trial-text">
+            <div class="trial-label">Pro Trial · 5 days left</div>
+            <div class="trial-sub">All features unlocked</div>
+          </div>
+          <div class="trial-action">Upgrade</div>
+        </div>
+
+        <!-- Hero Progress Ring -->
+        <div class="hero-progress">
+          <div class="hero-glow"></div>
+          <div class="ring-container">
+            <svg width="180" height="180" viewBox="0 0 180 180" style="transform:rotate(-90deg);">
+              <circle cx="90" cy="90" r="78" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10" stroke-dasharray="3.5 5" stroke-linecap="round"/>
+              <circle cx="90" cy="90" r="78" fill="none" stroke="url(#dark-hero-outer)" stroke-width="10" stroke-linecap="round" stroke-dasharray="171 490"/>
+              <circle cx="90" cy="90" r="62" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="7" stroke-dasharray="3 5" stroke-linecap="round"/>
+              <circle cx="90" cy="90" r="62" fill="none" stroke="url(#dark-hero-inner)" stroke-width="7" stroke-linecap="round" stroke-dasharray="273 390"/>
+              <defs>
+                <linearGradient id="dark-hero-outer" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#9D8FF5"/><stop offset="100%" stop-color="#B8AFFE"/></linearGradient>
+                <linearGradient id="dark-hero-inner" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#34D399"/><stop offset="100%" stop-color="#6EE7B7"/></linearGradient>
+              </defs>
+            </svg>
+            <div class="ring-center">
+              <div class="ring-hours">262<span>h</span></div>
+              <div class="ring-goal">of 750 hours</div>
+            </div>
+          </div>
+          <div class="hero-message">You're building momentum</div>
+          <div class="hero-sub">488 hours to go — about 15h per week. You've got this.</div>
+          <div class="pace-row">
+            <div class="pace-chip">
+              <div class="pace-chip-dot" style="background:var(--sage);"></div>
+              <span class="pace-chip-label">Pace</span>
+              <span class="pace-chip-val" style="color:var(--sage);">On track</span>
+            </div>
+            <div class="pace-chip">
+              <div class="pace-chip-dot" style="background:var(--violet);"></div>
+              <span class="pace-chip-label">50% Rule</span>
+              <span class="pace-chip-val" style="color:var(--violet);">70%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- This Week -->
+        <div class="card">
+          <div class="week-header">
+            <div class="week-title">This Week</div>
+            <div class="week-hours">18.5h</div>
+          </div>
+          <div class="week-days">
+            <div class="week-day"><div class="week-day-dot day-filled">3</div><div class="week-day-label">Mon</div></div>
+            <div class="week-day"><div class="week-day-dot day-filled">5</div><div class="week-day-label">Tue</div></div>
+            <div class="week-day"><div class="week-day-dot day-today">4</div><div class="week-day-label">Wed</div></div>
+            <div class="week-day"><div class="week-day-dot day-empty">-</div><div class="week-day-label">Thu</div></div>
+            <div class="week-day"><div class="week-day-dot day-empty">-</div><div class="week-day-label">Fri</div></div>
+            <div class="week-day"><div class="week-day-dot day-empty">-</div><div class="week-day-label">Sat</div></div>
+            <div class="week-day"><div class="week-day-dot day-empty">-</div><div class="week-day-label">Sun</div></div>
+          </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="section-header">
+          <div class="section-title">Recent Activity</div>
+          <div class="section-link">See all <i data-lucide="chevron-right"></i></div>
+        </div>
+        <div class="activity-card">
+          <div class="activity-row">
+            <div class="activity-icon" style="background:var(--coral-wash-dark); color:var(--coral);">
+              <i data-lucide="wrench"></i>
+            </div>
+            <div class="activity-text"><div class="activity-name">Faucet repair</div><div class="activity-meta">Oak Street · 2h ago</div></div>
+            <div class="activity-hours">2.0h</div>
+          </div>
+          <div class="activity-row">
+            <div class="activity-icon" style="background:var(--sage-wash-dark); color:var(--sage);">
+              <i data-lucide="clipboard-check"></i>
+            </div>
+            <div class="activity-text"><div class="activity-name">Tenant screening</div><div class="activity-meta">Riverside · Yesterday</div></div>
+            <div class="activity-hours">1.5h</div>
+          </div>
+          <div class="activity-row">
+            <div class="activity-icon" style="background:var(--honey-wash-dark); color:var(--honey);">
+              <i data-lucide="book-open"></i>
+            </div>
+            <div class="activity-text"><div class="activity-name">Bookkeeping</div><div class="activity-meta">All properties · 2 days ago</div></div>
+            <div class="activity-hours">1.0h</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab on"><i data-lucide="house"></i>Home<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="building-2"></i>Properties<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="clock"></i>Track<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="bar-chart-3"></i>Reports<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="settings"></i>Settings<div class="tab-dot"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SCREEN 2: Track Time (Dark) ==================== -->
+<div class="screen-wrap">
+  <div class="screen-title">Track Time</div>
+  <div class="phone">
+    <div class="status-bar"><span>9:41</span><span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span></div>
+    <div class="scroll-area">
+      <div class="scroll-content">
+        <div class="track-greeting">
+          <div class="track-title">Track Time</div>
+          <div class="track-sub">Tuesday, February 25</div>
+        </div>
+
+        <div class="card" style="padding:20px;">
+          <!-- Notes -->
+          <textarea class="textarea" rows="2" placeholder="What did you work on?"></textarea>
+
+          <!-- AI hint -->
+          <div class="ai-hint">
+            <i data-lucide="sparkles"></i>
+            <span>Describe your work and we'll fill in the details</span>
+          </div>
+
+          <!-- Category -->
+          <div class="label">Category</div>
+          <div class="chips-scroll">
+            <div class="chip on"><div class="chip-dot" style="background: var(--coral);"></div>Repairs</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--sage);"></div>Management</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--sky);"></div>Leasing</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--honey);"></div>Bookkeeping</div>
+            <div class="chip"><div class="chip-dot" style="background: var(--rose);"></div>Legal</div>
+            <div class="chip"><div class="chip-dot" style="background: #A98BF5;"></div>Insurance</div>
+            <div class="chip"><div class="chip-dot" style="background: #E8A87C;"></div>Travel</div>
+          </div>
+
+          <!-- Property -->
+          <div style="margin-top: 16px;">
+            <div class="label">Property</div>
+            <div class="picker">
+              <div class="picker-left">
+                <div class="picker-icon" style="background: var(--dark-elevated);">&#127968;</div>
+                <span>123 Oak Street</span>
+              </div>
+              <span class="picker-chev">&#8250;</span>
+            </div>
+          </div>
+
+          <!-- Hours -->
+          <div class="label">Hours</div>
+          <div class="stepper">
+            <div class="stepper-btn">&minus;</div>
+            <div><div class="stepper-val">2.0<span class="stepper-unit">h</span></div></div>
+            <div class="stepper-btn">+</div>
+          </div>
+
+          <!-- Date -->
+          <div class="label">Date</div>
+          <div class="date-row">
+            <div class="date-left">
+              <div class="date-icon"><i data-lucide="calendar"></i></div>
+              <span>Today, Feb 25</span>
+            </div>
+            <span class="picker-chev">&#8250;</span>
+          </div>
+
+          <!-- Participant -->
+          <div class="label">Participant</div>
+          <div class="seg">
+            <div class="seg-item on">Self</div>
+            <div class="seg-item">Spouse</div>
+          </div>
+
+          <!-- Attach -->
+          <button class="attach-btn">
+            <i data-lucide="paperclip"></i>
+            Attach receipt or document
+          </button>
+
+          <!-- Log -->
+          <button class="btn-primary">Log Time</button>
+        </div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab"><i data-lucide="house"></i>Home<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="building-2"></i>Properties<div class="tab-dot"></div></div>
+      <div class="tab on"><i data-lucide="clock"></i>Track<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="bar-chart-3"></i>Reports<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="settings"></i>Settings<div class="tab-dot"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SCREEN 3: Reports (Dark) ==================== -->
+<div class="screen-wrap">
+  <div class="screen-title">Reports</div>
+  <div class="phone">
+    <div class="status-bar"><span>9:41</span><span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span></div>
+    <div class="scroll-area">
+      <div class="aurora-bg">
+        <div class="blob-violet" style="opacity: 0.7;"></div>
+        <div class="blob-sage" style="opacity: 0.5; bottom: 200px; left: -40px;"></div>
+      </div>
+      <div class="scroll-content">
+        <!-- Header -->
+        <div class="r-header">
+          <div class="r-title">Reports</div>
+          <div class="r-year">2026</div>
+        </div>
+
+        <!-- Goal pills -->
+        <div class="goal-pills">
+          <div class="goal-pill active">REPS · 750h</div>
+          <div class="goal-pill">500h</div>
+          <div class="goal-pill">100h</div>
+        </div>
+
+        <!-- Ring hero -->
+        <div class="ring-hero">
+          <div class="ring-glow-report"></div>
+          <div class="ring-container-lg">
+            <svg width="240" height="240" viewBox="0 0 260 260" style="transform:rotate(-90deg);">
+              <defs>
+                <linearGradient id="dark-rpt-outer" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#9D8FF5"/><stop offset="100%" stop-color="#B8AFFE"/></linearGradient>
+                <linearGradient id="dark-rpt-inner" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#34D399"/><stop offset="100%" stop-color="#6EE7B7"/></linearGradient>
+              </defs>
+              <!-- Outer track -->
+              <circle cx="130" cy="130" r="108" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="18" stroke-dasharray="3 5" stroke-linecap="round"/>
+              <!-- Outer progress: 262/750 ~35% of 679 ~237 -->
+              <circle cx="130" cy="130" r="108" fill="none" stroke="url(#dark-rpt-outer)" stroke-width="18" stroke-linecap="round" stroke-dasharray="237 679"/>
+              <!-- Inner track -->
+              <circle cx="130" cy="130" r="82" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10" stroke-dasharray="3 5" stroke-linecap="round"/>
+              <!-- Inner progress: 70% of 515 ~360 -->
+              <circle cx="130" cy="130" r="82" fill="none" stroke="url(#dark-rpt-inner)" stroke-width="10" stroke-linecap="round" stroke-dasharray="360 515"/>
+            </svg>
+            <div class="ring-center" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center;">
+              <div class="ring-number">262</div>
+              <div class="ring-label-text">of 750 hours</div>
+            </div>
+          </div>
+          <div class="ring-legend">
+            <div class="legend-item">
+              <div class="legend-dot" style="background:#9D8FF5;"></div>
+              <span>RE Hours</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background:#34D399;"></div>
+              <span>50% Rule</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pace -->
+        <div class="pace-indicator">
+          <div class="pace-badge">
+            <div class="pace-dot-sm"></div>
+            <span>On track</span>
+          </div>
+          <div class="pace-text-sm">~14.5h/week needed</div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stat-row">
+          <div class="stat-chip"><div class="stat-value">488h</div><div class="stat-label">Remaining</div></div>
+          <div class="stat-chip"><div class="stat-value">310</div><div class="stat-label">Days left</div></div>
+          <div class="stat-chip"><div class="stat-value" style="color:var(--sage);">70%</div><div class="stat-label">50% Rule</div></div>
+        </div>
+
+        <!-- Properties -->
+        <div class="section-header" style="margin-top:8px;">
+          <div class="section-title">By Property</div>
+          <div class="section-link">See all <i data-lucide="chevron-right"></i></div>
+        </div>
+
+        <div class="property-list">
+          <div class="prop-card">
+            <div class="prop-color-bar" style="background:linear-gradient(180deg,#9D8FF5,#B8AFFE);"></div>
+            <div class="prop-info">
+              <div class="prop-name">Oak Street Duplex</div>
+              <div class="prop-meta">LTR · Austin, TX</div>
+              <div class="prop-bar"><div class="prop-bar-fill" style="width:54%;background:linear-gradient(90deg,#9D8FF5,#B8AFFE);"></div></div>
+            </div>
+            <div class="prop-right">
+              <div class="prop-hours">142h</div>
+              <div class="prop-sub">54%</div>
+            </div>
+          </div>
+          <div class="prop-card">
+            <div class="prop-color-bar" style="background:linear-gradient(180deg,#F472B6,#F9A8D4);"></div>
+            <div class="prop-info">
+              <div class="prop-name">Riverside Condo</div>
+              <div class="prop-meta">LTR · Austin, TX</div>
+              <div class="prop-bar"><div class="prop-bar-fill" style="width:34%;background:linear-gradient(90deg,#F472B6,#F9A8D4);"></div></div>
+            </div>
+            <div class="prop-right">
+              <div class="prop-hours">88h</div>
+              <div class="prop-sub">34%</div>
+            </div>
+          </div>
+          <div class="prop-card">
+            <div class="prop-color-bar" style="background:linear-gradient(180deg,#34D399,#6EE7B7);"></div>
+            <div class="prop-info">
+              <div class="prop-name">Elm Street House</div>
+              <div class="prop-meta">STR · Galveston, TX</div>
+              <div class="prop-bar"><div class="prop-bar-fill" style="width:12%;background:linear-gradient(90deg,#34D399,#6EE7B7);"></div></div>
+            </div>
+            <div class="prop-right">
+              <div class="prop-hours">32h</div>
+              <div class="prop-sub">12%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab"><i data-lucide="house"></i>Home<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="building-2"></i>Properties<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="clock"></i>Track<div class="tab-dot"></div></div>
+      <div class="tab on"><i data-lucide="bar-chart-3"></i>Reports<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="settings"></i>Settings<div class="tab-dot"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SCREEN 4: Settings (Dark) ==================== -->
+<div class="screen-wrap">
+  <div class="screen-title">Settings</div>
+  <div class="phone">
+    <div class="status-bar"><span>9:41</span><span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span></div>
+    <div class="scroll-area">
+      <div class="scroll-content">
+        <div class="page-title">Settings</div>
+
+        <!-- Plan & Account -->
+        <div class="section-label">Plan &amp; Account</div>
+        <div class="sub-card sub-card-pro">
+          <div class="sub-label">PRO PLAN</div>
+          <div class="sub-title">LandlordHours Pro</div>
+          <div class="sub-meta">Active · Renews Mar 15, 2026</div>
+          <button class="sub-btn-manage">Manage Subscription</button>
+        </div>
+        <div class="setting-row">
+          <div class="s-icon" style="background:var(--violet-wash-dark); color:var(--violet);"><i data-lucide="badge-check"></i></div>
+          <div class="setting-text"><div class="setting-name">Restore Purchase</div></div>
+          <div class="chev"><i data-lucide="chevron-right"></i></div>
+        </div>
+
+        <!-- Profile & Tax -->
+        <div class="section-label">Profile &amp; Tax</div>
+        <div class="profile-row">
+          <div class="profile-avatar">B</div>
+          <div class="setting-text">
+            <div class="profile-name">Brian Nguyen</div>
+            <div class="profile-email">brian@email.com</div>
+          </div>
+          <div class="chev"><i data-lucide="chevron-right"></i></div>
+        </div>
+        <div class="setting-row">
+          <div class="s-icon" style="background:var(--violet-wash-dark); color:var(--violet);"><i data-lucide="target"></i></div>
+          <div class="setting-text"><div class="setting-name">Tax Goal</div></div>
+          <span class="setting-value setting-accent">REPS · 750h</span>
+          <div class="chev"><i data-lucide="chevron-right"></i></div>
+        </div>
+        <div class="setting-row">
+          <div class="s-icon" style="background:var(--sky-wash-dark); color:var(--sky);"><i data-lucide="calendar"></i></div>
+          <div class="setting-text"><div class="setting-name">Tax Profile</div><div class="setting-sub">Filing status, tax year</div></div>
+          <div class="chev"><i data-lucide="chevron-right"></i></div>
+        </div>
+        <div class="setting-row">
+          <div class="s-icon" style="background:var(--sage-wash-dark); color:var(--sage);"><i data-lucide="users"></i></div>
+          <div class="setting-text"><div class="setting-name">Spouse Tracking</div><div class="setting-sub">Counts toward 50% rule</div></div>
+          <div class="toggle toggle-on"><div class="toggle-thumb"></div></div>
+        </div>
+
+        <!-- Data & Export -->
+        <div class="section-label">Data &amp; Export</div>
+        <div class="setting-row">
+          <div class="s-icon" style="background:var(--sage-wash-dark); color:var(--sage);"><i data-lucide="download"></i></div>
+          <div class="setting-text"><div class="setting-name">Export Reports</div><div class="setting-sub">PDF for your accountant</div></div>
+          <div class="chev"><i data-lucide="chevron-right"></i></div>
+        </div>
+        <div class="setting-row">
+          <div class="s-icon" style="background:var(--sky-wash-dark); color:var(--sky);"><i data-lucide="cloud-upload"></i></div>
+          <div class="setting-text"><div class="setting-name">Backup Data</div><div class="setting-sub">Last backup: Today</div></div>
+          <div class="chev"><i data-lucide="chevron-right"></i></div>
+        </div>
+
+        <!-- Preferences -->
+        <div class="section-label">Preferences</div>
+        <div class="setting-row">
+          <div class="s-icon" style="background:var(--honey-wash-dark); color:var(--honey);"><i data-lucide="bell"></i></div>
+          <div class="setting-text"><div class="setting-name">Notifications</div></div>
+          <div class="chev"><i data-lucide="chevron-right"></i></div>
+        </div>
+        <div class="setting-row">
+          <div class="s-icon" style="background:var(--violet-wash-dark); color:var(--violet);"><i data-lucide="calendar-check"></i></div>
+          <div class="setting-text"><div class="setting-name">Calendar Sync</div></div>
+          <div class="toggle toggle-on"><div class="toggle-thumb"></div></div>
+        </div>
+        <div class="setting-row">
+          <div class="s-icon" style="background:var(--honey-wash-dark); color:var(--honey);"><i data-lucide="sun"></i></div>
+          <div class="setting-text"><div class="setting-name">Appearance</div></div>
+          <span class="setting-value">Dark</span>
+          <div class="chev"><i data-lucide="chevron-right"></i></div>
+        </div>
+        <div class="setting-row">
+          <div class="s-icon" style="background:var(--violet-wash-dark); color:var(--violet);"><i data-lucide="layout-grid"></i></div>
+          <div class="setting-text"><div class="setting-name">App Icon</div></div>
+          <div class="chev"><i data-lucide="chevron-right"></i></div>
+        </div>
+
+        <!-- Support -->
+        <div class="section-label">Support</div>
+        <div class="setting-row">
+          <div class="s-icon" style="background:var(--sky-wash-dark); color:var(--sky);"><i data-lucide="circle-help"></i></div>
+          <div class="setting-text"><div class="setting-name">Help Center</div></div>
+          <div class="chev"><i data-lucide="chevron-right"></i></div>
+        </div>
+        <div class="setting-row">
+          <div class="s-icon" style="background:var(--sage-wash-dark); color:var(--sage);"><i data-lucide="mail"></i></div>
+          <div class="setting-text"><div class="setting-name">Contact Support</div></div>
+          <div class="chev"><i data-lucide="chevron-right"></i></div>
+        </div>
+        <div class="setting-row">
+          <div class="s-icon" style="background:var(--dark-elevated); color:var(--text-secondary);"><i data-lucide="scroll-text"></i></div>
+          <div class="setting-text"><div class="setting-name">Terms &amp; Privacy</div></div>
+          <div class="chev"><i data-lucide="chevron-right"></i></div>
+        </div>
+        <div class="setting-row setting-danger">
+          <div class="s-icon" style="background:var(--coral-wash-dark); color:var(--coral);"><i data-lucide="log-out"></i></div>
+          <div class="setting-text"><div class="setting-name">Sign Out</div></div>
+        </div>
+
+        <div class="version-text">LandlordHours v1.0.0</div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab"><i data-lucide="house"></i>Home<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="building-2"></i>Properties<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="clock"></i>Track<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="bar-chart-3"></i>Reports<div class="tab-dot"></div></div>
+      <div class="tab on"><i data-lucide="settings"></i>Settings<div class="tab-dot"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

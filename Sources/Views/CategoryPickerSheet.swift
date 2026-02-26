@@ -19,7 +19,9 @@ struct CategoryPickerSheet: View {
                             showingQuickLog = true
                         } label: {
                             HStack {
-                                DynamicIconView(name: category.iconName, size: 20, color: Color(hex: category.colorHex))
+                                Image(systemName: category.iconName)
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(Color(hex: category.colorHex))
                                     .frame(width: 30)
                                 Text(category.name)
                                     .foregroundStyle(AppColors.textPrimary)
@@ -37,7 +39,9 @@ struct CategoryPickerSheet: View {
                                 showingQuickLog = true
                             } label: {
                                 HStack {
-                                    DynamicIconView(name: category.iconName, size: 20, color: Color(hex: category.colorHex))
+                                    Image(systemName: category.iconName)
+                                        .font(.system(size: 18))
+                                        .foregroundStyle(Color(hex: category.colorHex))
                                         .frame(width: 30)
                                     VStack(alignment: .leading) {
                                         Text(category.name)

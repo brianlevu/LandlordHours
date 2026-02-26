@@ -1,4 +1,5 @@
 import SwiftUI
+import LucideIcons
 
 struct PaywallView: View {
     @Environment(\.colorScheme) var colorScheme
@@ -18,12 +19,12 @@ struct PaywallView: View {
     @State private var bottomOffset: CGFloat = 40
     @State private var bottomOpacity: Double = 0
 
-    private let proFeatures: [(icon: LHIcon, title: String, desc: String, color: String)] = [
-        (.sparkles,   "AI Smart Entry",       "Describe your work, AI does the rest",   "7C6FF7"),
-        (.camera,     "Photo Evidence",        "Attach photos to every time entry",       "EF4444"),
-        (.icloud,     "iCloud Backup",         "Your records, safe and synced forever",   "60A5FA"),
-        (.doc,        "Audit-Ready Reports",   "Clean PDF exports for tax filing",        "34D399"),
-        (.properties, "Unlimited Properties",  "Track every rental you own",              "FBBF24"),
+    private let proFeatures: [(icon: String, title: String, desc: String, color: Color, wash: Color)] = [
+        ("sparkles",       "AI Smart Entry",       "Describe your work, AI does the rest",   AppColors.primary,  AppColors.primarySurface),
+        ("camera",         "Photo Evidence",        "Attach photos to every time entry",       AppColors.coral,    AppColors.coralWash),
+        ("cloud",          "iCloud Backup",         "Your records, safe and synced forever",   AppColors.sky,      AppColors.skyWash),
+        ("file-text",      "Audit-Ready Reports",   "Clean PDF exports for tax filing",        AppColors.sage,     AppColors.sageWash),
+        ("building-2",     "Unlimited Properties",  "Track every rental you own",              AppColors.honey,    AppColors.honeyWash),
     ]
 
     var body: some View {
@@ -59,7 +60,8 @@ struct PaywallView: View {
                     Circle()
                         .fill(colors.backgroundTertiary)
                         .frame(width: 32, height: 32)
-                    LHIconView(icon: .close, size: 12, color: colors.textSecondary)
+                    LucideIcon(image: Lucide.x, size: 12)
+                        .foregroundStyle(colors.textSecondary)
                 }
             }
             .padding(.top, 16)
@@ -83,18 +85,19 @@ struct PaywallView: View {
                     .fill(colors.primarySurface)
                     .frame(width: 112, height: 112)
 
-                LHIconView(icon: .crown, size: 48, color: AppColors.primary)
+                LucideIcon(image: Lucide.crown, size: 48)
+                    .foregroundStyle(AppColors.primary)
             }
             .scaleEffect(heroScale)
             .opacity(heroOpacity)
 
             VStack(spacing: 8) {
                 Text("Go Pro")
-                    .font(.system(size: 32, weight: .bold))
+                    .font(AppTypography.headline)
                     .foregroundStyle(colors.textPrimary)
 
                 Text("Track every hour.\nKeep every deduction.")
-                    .font(.system(size: 16))
+                    .font(AppTypography.body)
                     .foregroundStyle(colors.textSecondary)
                     .multilineTextAlignment(.center)
             }
@@ -105,7 +108,7 @@ struct PaywallView: View {
     // MARK: - Features
     private var featuresSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionPill(icon: .sparkles, label: "WHAT'S INCLUDED")
+            sectionPill(icon: Lucide.sparkles, label: "WHAT'S INCLUDED")
                 .padding(.bottom, 4)
 
             ForEach(Array(proFeatures.enumerated()), id: \.offset) { index, feature in
@@ -114,23 +117,25 @@ struct PaywallView: View {
         }
     }
 
-    private func featureRow(_ feature: (icon: LHIcon, title: String, desc: String, color: String), index: Int) -> some View {
+    private func featureRow(_ feature: (icon: String, title: String, desc: String, color: Color, wash: Color), index: Int) -> some View {
         HStack(spacing: 14) {
-            LHIconBadge(icon: feature.icon, bgColor: Color(hex: feature.color), fgColor: .white, size: 48)
+            JellyBadge(systemName: feature.icon, color: feature.color, wash: feature.wash, size: 48)
             VStack(alignment: .leading, spacing: 2) {
                 Text(feature.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(AppTypography.body)
+                    .fontWeight(.semibold)
                     .foregroundStyle(colors.textPrimary)
                 Text(feature.desc)
-                    .font(.system(size: 13))
+                    .font(AppTypography.bodySmall)
                     .foregroundStyle(colors.textSecondary)
             }
             Spacer()
-            LHIconView(icon: .checkmark, size: 18, color: AppColors.success)
+            LucideIcon(image: Lucide.check, size: 16)
+                .foregroundStyle(AppColors.sage)
         }
         .padding(14)
         .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
         .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.04), radius: 8, x: 0, y: 2)
         .offset(y: featureOffsets[index])
         .opacity(featureOpacities[index])
@@ -139,16 +144,17 @@ struct PaywallView: View {
     // MARK: - Free Notice
     private var freeNotice: some View {
         HStack(spacing: 10) {
-            LHIconView(icon: .info, size: 14, color: colors.textTertiary)
-            Text("Free plan: 1 property · 20 entries/month · basic reports")
-                .font(.system(size: 13))
+            LucideIcon(image: Lucide.info, size: 14)
+                .foregroundStyle(colors.textTertiary)
+            Text("Free plan: 1 property \u{00B7} 20 entries/month \u{00B7} basic reports")
+                .font(AppTypography.bodySmall)
                 .foregroundStyle(colors.textSecondary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
         .offset(y: bottomOffset)
         .opacity(bottomOpacity)
     }
@@ -160,19 +166,19 @@ struct PaywallView: View {
             VStack(spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("$30")
-                        .font(.system(size: 48, weight: .bold, design: .rounded))
+                        .font(AppTypography.heroNumber)
                         .foregroundStyle(colors.textPrimary)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("one-time")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(AppTypography.caption)
                             .foregroundStyle(colors.textSecondary)
-                        Text("yours forever ✓")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(AppColors.success)
+                        Text("yours forever \u{2713}")
+                            .font(AppTypography.label)
+                            .foregroundStyle(AppColors.sage)
                     }
                 }
                 Text("Less than one hour of billable time")
-                    .font(.system(size: 13))
+                    .font(AppTypography.bodySmall)
                     .foregroundStyle(colors.textSecondary)
             }
             .padding(.bottom, 4)
@@ -180,14 +186,16 @@ struct PaywallView: View {
             // Trial note
             if subscriptionManager.isTrialActive {
                 HStack(spacing: 6) {
-                    LHIconView(icon: .clock, size: 12, color: AppColors.warning)
+                    LucideIcon(image: Lucide.clock, size: 12)
+                        .foregroundStyle(AppColors.honey)
                     Text("\(subscriptionManager.trialDaysRemaining) day\(subscriptionManager.trialDaysRemaining == 1 ? "" : "s") left in free trial")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(AppTypography.caption)
+                        .fontWeight(.medium)
                         .foregroundStyle(colors.textSecondary)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
-                .background(AppColors.warning.opacity(0.1))
+                .background(AppColors.honeyWash)
                 .clipShape(Capsule())
             }
 
@@ -202,15 +210,16 @@ struct PaywallView: View {
                     onDismiss?()
                 } label: {
                     HStack(spacing: 8) {
-                        LHIconView(icon: .checkmark, size: 20, color: .white)
+                        LucideIcon(image: Lucide.check, size: 20)
+                            .foregroundStyle(.white)
                         Text("You're Pro! Tap to continue")
                     }
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(AppTypography.buttonLarge)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
-                    .background(AppColors.success)
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .background(AppColors.sage)
+                    .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
                 }
             } else {
                 Button {
@@ -218,17 +227,17 @@ struct PaywallView: View {
                 } label: {
                     Group {
                         if let product = subscriptionManager.proProduct {
-                            Text("Unlock Pro · \(product.displayPrice)")
+                            Text("Unlock Pro \u{00B7} \(product.displayPrice)")
                         } else {
-                            Text("Unlock Pro · $30")
+                            Text("Unlock Pro \u{00B7} $30")
                         }
                     }
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(AppTypography.buttonLarge)
                     .foregroundStyle(colorScheme == .dark ? Color.black : Color.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
-                    .background(colorScheme == .dark ? Color.white : Color.black)
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .background(colorScheme == .dark ? Color.white : AppColors.charcoal)
+                    .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
                 }
                 .disabled(subscriptionManager.products.isEmpty)
             }
@@ -236,8 +245,8 @@ struct PaywallView: View {
             // Error message
             if let error = subscriptionManager.purchaseError {
                 Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppColors.error)
                     .multilineTextAlignment(.center)
             }
 
@@ -247,7 +256,7 @@ struct PaywallView: View {
                 onDismiss?()
             } label: {
                 Text(subscriptionManager.hasPurchased ? "Close" : "Maybe Later")
-                    .font(.system(size: 14))
+                    .font(AppTypography.bodySmall)
                     .foregroundStyle(colors.textTertiary)
             }
         }
@@ -256,12 +265,13 @@ struct PaywallView: View {
     }
 
     // MARK: - Helpers
-    private func sectionPill(icon: LHIcon, label: String) -> some View {
+    private func sectionPill(icon: UIImage, label: String) -> some View {
         HStack(spacing: 5) {
-            LHIconView(icon: icon, size: 11, color: colors.textSecondary)
+            LucideIcon(image: icon, size: 11)
+                .foregroundStyle(colors.textSecondary)
             Text(label)
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(0.5)
+                .font(AppTypography.label)
+                .tracking(1.5)
         }
         .foregroundStyle(colors.textSecondary)
         .padding(.horizontal, 10)

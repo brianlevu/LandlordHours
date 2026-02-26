@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Property Setup + Tax Profile</title>
+<script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: #E5E0D8;
+    padding: 60px 32px;
+    display: flex;
+    gap: 40px;
+    justify-content: center;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .screen-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .screen-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #6E6E82;
+  }
+
+  .phone {
+    width: 393px;
+    height: 852px;
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    background: #FFFFFF;
+    box-shadow: 0 30px 80px rgba(26,26,46,0.15), 0 0 0 1px rgba(0,0,0,0.04);
+  }
+
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 126px; height: 34px;
+    background: rgba(0,0,0,0.15);
+    border-radius: 0 0 22px 22px;
+    z-index: 100;
+  }
+
+  .status-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 58px;
+    padding: 14px 28px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 600;
+    color: rgba(26,26,46,0.5);
+    z-index: 50;
+  }
+
+  /* ============================================== */
+  /* SHARED                                          */
+  /* ============================================== */
+  .progress-bar {
+    position: absolute;
+    top: 62px;
+    left: 28px;
+    right: 28px;
+    height: 4px;
+    border-radius: 2px;
+    z-index: 50;
+    display: flex;
+    gap: 4px;
+  }
+
+  .progress-segment {
+    flex: 1; height: 100%;
+    border-radius: 2px;
+    background: #F0EFF4;
+  }
+
+  .progress-segment.active,
+  .progress-segment.completed { background: #7B68EE; }
+
+  .ftue-screen {
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: #FFFFFF;
+  }
+
+  .ftue-top {
+    padding: 92px 28px 0;
+  }
+
+  .ftue-heading {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    color: #1A1A2E;
+    line-height: 1.15;
+    margin-bottom: 10px;
+  }
+
+  .ftue-desc {
+    font-size: 15px;
+    color: #6E6E82;
+    line-height: 1.5;
+  }
+
+  .ftue-cta {
+    padding: 0 28px 48px;
+    z-index: 20;
+  }
+
+  .cta-btn {
+    width: 100%;
+    padding: 18px;
+    border-radius: 999px;
+    font-size: 17px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: #1A1A2E;
+    color: white;
+  }
+
+  .cta-btn svg {
+    width: 18px; height: 18px;
+  }
+
+  .cta-skip {
+    width: 100%;
+    padding: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: #A8A8BC;
+    background: transparent;
+    border: none;
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  /* Form elements */
+  .form-area {
+    padding: 0 28px;
+    margin-top: 20px;
+  }
+
+  .form-group { margin-bottom: 14px; }
+
+  .form-label {
+    font-size: 12px; font-weight: 600;
+    color: #A8A8BC;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 2px solid #F0EFF4;
+    font-size: 16px;
+    font-family: 'DM Sans', sans-serif;
+    color: #1A1A2E;
+    background: #FAFAFA;
+    outline: none;
+  }
+
+  .form-input.filled { border-color: #7B68EE; background: #FDFCFF; }
+  .form-input::placeholder { color: #C4C4D4; }
+
+  .form-row { display: flex; gap: 10px; }
+  .form-row .form-group { flex: 1; }
+
+  /* Toggle chips (2-option) */
+  .chip-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .chip {
+    flex: 1;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 2px solid #F0EFF4;
+    font-size: 14px;
+    font-weight: 600;
+    color: #6E6E82;
+    text-align: center;
+    cursor: pointer;
+    background: transparent;
+  }
+
+  .chip.selected {
+    border-color: #7B68EE;
+    background: #F8F6FF;
+    color: #7B68EE;
+  }
+
+  /* Selection cards (3-option for management) */
+  .select-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .select-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 18px;
+    border-radius: 14px;
+    border: 2px solid #F0EFF4;
+    cursor: pointer;
+  }
+
+  .select-card.selected {
+    border-color: #7B68EE;
+    background: #F8F6FF;
+  }
+
+  .sc-icon {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .sc-icon svg {
+    width: 20px; height: 20px;
+  }
+
+  .sc-text { flex: 1; }
+
+  .sc-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1A1A2E;
+  }
+
+  .sc-desc {
+    font-size: 12px;
+    color: #A8A8BC;
+    margin-top: 1px;
+  }
+
+  .sc-radio {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    border: 2px solid #D4D4E0;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .select-card.selected .sc-radio {
+    border-color: #7B68EE;
+    background: #7B68EE;
+  }
+
+  .sc-radio-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: white;
+    display: none;
+  }
+
+  .select-card.selected .sc-radio-dot { display: block; }
+
+  /* Section divider */
+  .section-divider {
+    height: 1px;
+    background: #F0EFF4;
+    margin: 8px 0 16px;
+  }
+
+  .section-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1A1A2E;
+    margin-bottom: 12px;
+  }
+
+  /* ============================================== */
+  /* SETTINGS SCREEN                                 */
+  /* ============================================== */
+  .settings-screen {
+    width: 100%; height: 100%;
+    background: #FAF7F2;
+    overflow-y: auto;
+    padding-top: 58px;
+  }
+
+  .settings-nav {
+    padding: 12px 20px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .settings-back {
+    color: #1A1A2E;
+  }
+
+  .settings-back svg {
+    width: 22px; height: 22px;
+  }
+
+  .settings-nav-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 24px;
+    color: #1A1A2E;
+  }
+
+  /* Settings sections */
+  .s-section {
+    margin: 20px 20px 0;
+  }
+
+  .s-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #A8A8BC;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
+    padding-left: 4px;
+  }
+
+  .s-card {
+    background: #FFFFFF;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+  }
+
+  .s-row {
+    display: flex;
+    align-items: center;
+    padding: 16px 18px;
+    gap: 14px;
+  }
+
+  .s-row + .s-row {
+    border-top: 1px solid #F0EFF4;
+  }
+
+  .s-row-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .s-row-icon svg {
+    width: 18px; height: 18px;
+  }
+
+  .s-row-content { flex: 1; }
+
+  .s-row-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1A1A2E;
+  }
+
+  .s-row-value {
+    font-size: 13px;
+    color: #A8A8BC;
+    margin-top: 1px;
+  }
+
+  .s-row-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .s-row-right-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: #7B68EE;
+  }
+
+  .s-chevron {
+    color: #C4C4D4;
+  }
+
+  .s-chevron svg {
+    width: 16px; height: 16px;
+  }
+
+  /* Toggle switch */
+  .toggle {
+    width: 48px; height: 28px;
+    border-radius: 14px;
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .toggle.on { background: #7B68EE; }
+  .toggle.off { background: #E0E0E8; }
+
+  .toggle-knob {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: white;
+    position: absolute;
+    top: 3px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    transition: left 0.2s ease;
+  }
+
+  .toggle.on .toggle-knob { left: 23px; }
+  .toggle.off .toggle-knob { left: 3px; }
+
+  /* Info tip */
+  .s-info {
+    margin: 12px 0 0;
+    padding: 12px 16px;
+    background: #F8F6FF;
+    border-radius: 12px;
+    border: 1px solid #EDE8FF;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .s-info-icon {
+    width: 20px; height: 20px;
+    border-radius: 6px;
+    background: #EDE8FF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: #7B68EE;
+  }
+
+  .s-info-icon svg {
+    width: 10px; height: 10px;
+  }
+
+  .s-info-text {
+    font-size: 12px;
+    color: #6E6E82;
+    line-height: 1.5;
+  }
+
+  .s-info-text strong { color: #1A1A2E; }
+
+  /* Property mini cards in settings */
+  .s-prop-row {
+    display: flex;
+    align-items: center;
+    padding: 14px 18px;
+    gap: 12px;
+  }
+
+  .s-prop-row + .s-prop-row {
+    border-top: 1px solid #F0EFF4;
+  }
+
+  .s-prop-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .s-prop-icon svg {
+    width: 18px; height: 18px;
+  }
+
+  .s-prop-info { flex: 1; }
+
+  .s-prop-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1A1A2E;
+  }
+
+  .s-prop-meta {
+    font-size: 12px;
+    color: #A8A8BC;
+    margin-top: 1px;
+  }
+
+  .s-prop-badges {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .s-prop-badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 3px 8px;
+    border-radius: 6px;
+  }
+
+  .badge-ltr { background: #EDE8FF; color: #7B68EE; }
+  .badge-str { background: #FFF4E0; color: #D4870E; }
+  .badge-self { background: #E0F5E8; color: #34A876; }
+  .badge-spouse { background: #FFE8E4; color: #E85D4A; }
+
+  /* Tab bar */
+  .tab-bar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 84px;
+    background: #FFFFFF;
+    border-top: 1px solid #F0EFF4;
+    display: flex;
+    align-items: flex-start;
+    padding-top: 10px;
+    z-index: 50;
+  }
+
+  .tab-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .tab-icon svg {
+    width: 22px; height: 22px;
+  }
+
+  .tab-label { font-size: 10px; font-weight: 600; }
+  .tab-item.inactive { color: #C4C4D4; }
+  .tab-item.inactive .tab-label { color: #C4C4D4; }
+  .tab-item.active { color: #7B68EE; }
+  .tab-item.active .tab-label { color: #7B68EE; }
+
+  .scroll-pad { height: 100px; }
+</style>
+</head>
+<body>
+
+<!-- ============================================== -->
+<!-- D. ADD PROPERTY (UPDATED)                       -->
+<!-- ============================================== -->
+<div class="screen-wrap">
+  <div class="screen-title">D. Add Property (Updated)</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>9:41</span>
+      <span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="ftue-screen">
+      <div class="progress-bar">
+        <div class="progress-segment completed"></div>
+        <div class="progress-segment active"></div>
+        <div class="progress-segment"></div>
+        <div class="progress-segment"></div>
+        <div class="progress-segment"></div>
+        <div class="progress-segment"></div>
+      </div>
+
+      <div class="ftue-top">
+        <div class="ftue-heading">Add your first<br>property</div>
+        <div class="ftue-desc">We'll tailor your tracking based on property type and who manages it.</div>
+      </div>
+
+      <div class="form-area">
+        <!-- Property type -->
+        <div class="section-label">Property Type</div>
+        <div class="chip-row">
+          <div class="chip selected">Long-Term Rental</div>
+          <div class="chip">Short-Term Rental</div>
+        </div>
+
+        <!-- Who manages -->
+        <div class="section-label">Who manages this property?</div>
+        <div class="select-cards">
+          <div class="select-card selected">
+            <div class="sc-icon" style="background:#EDE8FF;">
+              <i data-lucide="user" style="color:#7B68EE;"></i>
+            </div>
+            <div class="sc-text">
+              <div class="sc-title">Just me</div>
+              <div class="sc-desc">I self-manage this property</div>
+            </div>
+            <div class="sc-radio"><div class="sc-radio-dot"></div></div>
+          </div>
+
+          <div class="select-card">
+            <div class="sc-icon" style="background:#FFE8E4;">
+              <i data-lucide="users" style="color:#FF8A7A;"></i>
+            </div>
+            <div class="sc-text">
+              <div class="sc-title">Me & my spouse</div>
+              <div class="sc-desc">We both manage and log hours</div>
+            </div>
+            <div class="sc-radio"><div class="sc-radio-dot"></div></div>
+          </div>
+
+          <div class="select-card">
+            <div class="sc-icon" style="background:#FFF4E0;">
+              <i data-lucide="building" style="color:#F5C563;"></i>
+            </div>
+            <div class="sc-text">
+              <div class="sc-title">Property manager</div>
+              <div class="sc-desc">A third party handles day-to-day</div>
+            </div>
+            <div class="sc-radio"><div class="sc-radio-dot"></div></div>
+          </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Address -->
+        <div class="form-group"><label class="form-label">Property Name</label><input type="text" class="form-input filled" value="Oak Street Duplex"></div>
+        <div class="form-group"><label class="form-label">Street Address</label><input type="text" class="form-input filled" value="123 Oak Street"></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">City</label><input type="text" class="form-input filled" value="Austin"></div>
+          <div class="form-group" style="max-width:80px;"><label class="form-label">State</label><input type="text" class="form-input filled" value="TX"></div>
+          <div class="form-group" style="max-width:100px;"><label class="form-label">Zip</label><input type="text" class="form-input filled" value="78701"></div>
+        </div>
+      </div>
+
+      <div style="flex:1;"></div>
+
+      <div class="ftue-cta">
+        <button class="cta-btn">Continue <i data-lucide="arrow-right"></i></button>
+        <button class="cta-skip">Skip for now</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================== -->
+<!-- SETTINGS: TAX PROFILE                           -->
+<!-- ============================================== -->
+<div class="screen-wrap">
+  <div class="screen-title">Settings: Tax Profile</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>9:41</span>
+      <span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="settings-screen">
+      <div class="settings-nav">
+        <div class="settings-back"><i data-lucide="arrow-left"></i></div>
+        <div class="settings-nav-title">Tax Profile</div>
+      </div>
+
+      <!-- Filing status -->
+      <div class="s-section">
+        <div class="s-section-title">Filing Status</div>
+        <div class="s-card">
+          <div class="s-row">
+            <div class="s-row-icon" style="background:#EDE8FF;">
+              <i data-lucide="file-text" style="color:#7B68EE;"></i>
+            </div>
+            <div class="s-row-content">
+              <div class="s-row-title">Filing Status</div>
+              <div class="s-row-value">How you file your tax return</div>
+            </div>
+            <div class="s-row-right">
+              <div class="s-row-right-text">Married, Joint</div>
+              <div class="s-chevron"><i data-lucide="chevron-right"></i></div>
+            </div>
+          </div>
+          <div class="s-row">
+            <div class="s-row-icon" style="background:#FFE8E4;">
+              <i data-lucide="users" style="color:#FF8A7A;"></i>
+            </div>
+            <div class="s-row-content">
+              <div class="s-row-title">Track Spouse Hours</div>
+              <div class="s-row-value">Combine for Material Participation</div>
+            </div>
+            <div class="s-row-right">
+              <div class="toggle on"><div class="toggle-knob"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="s-info">
+          <div class="s-info-icon"><i data-lucide="info"></i></div>
+          <div class="s-info-text"><strong>Spouse hours</strong> combine for Material Participation tests but NOT for REPS qualification. Only one spouse needs to meet the 750h + 50% rule.</div>
+        </div>
+      </div>
+
+      <!-- Qualification goal -->
+      <div class="s-section">
+        <div class="s-section-title">Qualification Goal</div>
+        <div class="s-card">
+          <div class="s-row">
+            <div class="s-row-icon" style="background:#EDE8FF;">
+              <i data-lucide="layers" style="color:#7B68EE;"></i>
+            </div>
+            <div class="s-row-content">
+              <div class="s-row-title">Primary Goal</div>
+              <div class="s-row-value">Determines your Reports dashboard</div>
+            </div>
+            <div class="s-row-right">
+              <div class="s-row-right-text">REPS (750h)</div>
+              <div class="s-chevron"><i data-lucide="chevron-right"></i></div>
+            </div>
+          </div>
+          <div class="s-row">
+            <div class="s-row-icon" style="background:#E0F5E8;">
+              <i data-lucide="calendar" style="color:#7EC8A0;"></i>
+            </div>
+            <div class="s-row-content">
+              <div class="s-row-title">Tax Year</div>
+              <div class="s-row-value">January 1 – December 31</div>
+            </div>
+            <div class="s-row-right">
+              <div class="s-row-right-text">2026</div>
+              <div class="s-chevron"><i data-lucide="chevron-right"></i></div>
+            </div>
+          </div>
+          <div class="s-row">
+            <div class="s-row-icon" style="background:#FFF4E0;">
+              <i data-lucide="clipboard-check" style="color:#F5C563;"></i>
+            </div>
+            <div class="s-row-content">
+              <div class="s-row-title">Grouping Election</div>
+              <div class="s-row-value">Treat all rentals as one activity</div>
+            </div>
+            <div class="s-row-right">
+              <div class="toggle off"><div class="toggle-knob"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="s-info">
+          <div class="s-info-icon"><i data-lucide="info"></i></div>
+          <div class="s-info-text"><strong>Grouping Election (1.469-9g):</strong> If you qualify as REP, you can test Material Participation across all properties combined instead of individually.</div>
+        </div>
+      </div>
+
+      <!-- Properties -->
+      <div class="s-section">
+        <div class="s-section-title">Properties</div>
+        <div class="s-card">
+          <div class="s-prop-row">
+            <div class="s-prop-icon" style="background:#EDE8FF; color:#7B68EE;">
+              <i data-lucide="house"></i>
+            </div>
+            <div class="s-prop-info">
+              <div class="s-prop-name">Oak Street Duplex</div>
+              <div class="s-prop-meta">123 Oak St, Austin TX</div>
+            </div>
+            <div class="s-prop-badges">
+              <div class="s-prop-badge badge-ltr">LTR</div>
+              <div class="s-prop-badge badge-self">Self</div>
+            </div>
+            <div class="s-chevron"><i data-lucide="chevron-right"></i></div>
+          </div>
+          <div class="s-prop-row">
+            <div class="s-prop-icon" style="background:#FFE8E4; color:#FF8A7A;">
+              <i data-lucide="house"></i>
+            </div>
+            <div class="s-prop-info">
+              <div class="s-prop-name">Riverside Condo</div>
+              <div class="s-prop-meta">456 River Rd, Austin TX</div>
+            </div>
+            <div class="s-prop-badges">
+              <div class="s-prop-badge badge-ltr">LTR</div>
+              <div class="s-prop-badge badge-spouse">Spouse</div>
+            </div>
+            <div class="s-chevron"><i data-lucide="chevron-right"></i></div>
+          </div>
+          <div class="s-prop-row">
+            <div class="s-prop-icon" style="background:#FFF4E0; color:#F5C563;">
+              <i data-lucide="house"></i>
+            </div>
+            <div class="s-prop-info">
+              <div class="s-prop-name">Beach House</div>
+              <div class="s-prop-meta">789 Coast Dr, Galveston TX</div>
+            </div>
+            <div class="s-prop-badges">
+              <div class="s-prop-badge badge-str">STR</div>
+              <div class="s-prop-badge badge-self">Self</div>
+            </div>
+            <div class="s-chevron"><i data-lucide="chevron-right"></i></div>
+          </div>
+
+          <!-- Add property -->
+          <div class="s-row" style="justify-content:center;">
+            <i data-lucide="plus" style="color:#7B68EE; width:18px; height:18px;"></i>
+            <span style="font-size:15px;font-weight:600;color:#7B68EE;margin-left:8px;">Add Property</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Non-RE work hours (for 50% rule) -->
+      <div class="s-section">
+        <div class="s-section-title">50% Rule Tracking</div>
+        <div class="s-card">
+          <div class="s-row">
+            <div class="s-row-icon" style="background:#F0EFF4;">
+              <i data-lucide="briefcase" style="color:#6E6E82;"></i>
+            </div>
+            <div class="s-row-content">
+              <div class="s-row-title">Non-RE Work Hours</div>
+              <div class="s-row-value">W-2 or other job hours this year</div>
+            </div>
+            <div class="s-row-right">
+              <div class="s-row-right-text">112h</div>
+              <div class="s-chevron"><i data-lucide="chevron-right"></i></div>
+            </div>
+          </div>
+        </div>
+        <div class="s-info">
+          <div class="s-info-icon"><i data-lucide="info"></i></div>
+          <div class="s-info-text">For REPS, your RE hours must be <strong>more than 50%</strong> of all personal services. Enter your non-RE work hours so we can track this.</div>
+        </div>
+      </div>
+
+      <div class="scroll-pad"></div>
+    </div>
+
+    <!-- Tab bar -->
+    <div class="tab-bar">
+      <div class="tab-item inactive"><div class="tab-icon"><i data-lucide="house"></i></div><div class="tab-label">Home</div></div>
+      <div class="tab-item inactive"><div class="tab-icon"><i data-lucide="building-2"></i></div><div class="tab-label">Properties</div></div>
+      <div class="tab-item inactive"><div class="tab-icon"><i data-lucide="clock"></i></div><div class="tab-label">Track</div></div>
+      <div class="tab-item inactive"><div class="tab-icon"><i data-lucide="bar-chart-3"></i></div><div class="tab-label">Reports</div></div>
+      <div class="tab-item active"><div class="tab-icon"><i data-lucide="settings"></i></div><div class="tab-label">Settings</div></div>
+    </div>
+  </div>
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

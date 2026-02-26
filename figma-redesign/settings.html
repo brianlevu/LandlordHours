@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings</title>
+<script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --cream: #FAF7F2;
+    --warm-white: #FFFFFF;
+    --violet: #7B68EE;
+    --violet-soft: #B8AFFE;
+    --violet-wash: #EDE8FF;
+    --violet-deep: #5B4BC9;
+    --coral: #FF8A7A;
+    --coral-wash: #FFE8E4;
+    --sage: #7EC8A0;
+    --sage-wash: #E4F5EC;
+    --honey: #F5C563;
+    --honey-wash: #FFF4DA;
+    --sky: #6CB4EE;
+    --sky-wash: #E0F0FF;
+    --rose: #E88CA5;
+    --rose-wash: #FFE4EC;
+    --charcoal: #1A1A2E;
+    --ink: #2D2D3F;
+    --slate: #6E6E82;
+    --mist: #A8A8BC;
+    --cloud: #D4D4E0;
+    --snow: #F0EFF4;
+  }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: #E5E0D8;
+    padding: 60px;
+    display: flex;
+    gap: 48px;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  .screen-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .screen-title { font-size: 13px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--slate); }
+
+  .phone {
+    width: 393px; height: 852px; background: var(--cream);
+    border-radius: 44px; overflow: hidden; position: relative;
+    box-shadow: 0 30px 80px rgba(26,26,46,0.15), 0 0 0 1px rgba(0,0,0,0.04);
+  }
+  .phone::before {
+    content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 126px; height: 34px; background: #000; border-radius: 0 0 22px 22px; z-index: 100;
+  }
+
+  .status-bar { height: 58px; padding: 14px 28px 0; display: flex; justify-content: space-between; align-items: center; font-size: 15px; font-weight: 600; color: var(--charcoal); }
+  .scroll-area { height: calc(100% - 58px - 80px); overflow-y: auto; scrollbar-width: none; }
+  .scroll-area::-webkit-scrollbar { display: none; }
+  .scroll-content { padding: 0 20px 40px; }
+
+  /* Tab Bar — Lucide icons inherit color via currentColor */
+  .tab-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 80px; background: var(--warm-white); border-top: 1px solid var(--snow); display: flex; justify-content: space-around; align-items: flex-start; padding-top: 10px; }
+  .tab { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; font-weight: 500; color: var(--mist); }
+  .tab.on { color: var(--violet); }
+  .tab-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--violet); margin-top: -2px; opacity: 0; }
+  .tab.on .tab-dot { opacity: 1; }
+  .tab svg { width: 22px; height: 22px; }
+
+  /* ===== Page Title ===== */
+  .page-title { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--charcoal); padding: 4px 0 24px; line-height: 1.2; }
+
+  /* ===== Section Labels ===== */
+  .section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--mist); padding: 28px 0 10px;
+  }
+  .section-label:first-of-type { padding-top: 0; }
+
+  /* ===== Setting Rows ===== */
+  .setting-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 15px 0; border-bottom: 1px solid var(--snow);
+  }
+  .setting-row:last-child { border-bottom: none; }
+
+  /* Icon container — color drives Lucide's currentColor stroke */
+  .s-icon {
+    width: 24px; height: 24px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--charcoal);
+  }
+  .s-icon svg { width: 22px; height: 22px; }
+
+  .setting-text { flex: 1; min-width: 0; }
+  .setting-name { font-size: 15px; font-weight: 500; color: var(--charcoal); line-height: 1.4; }
+  .setting-sub { font-size: 12px; color: var(--mist); margin-top: 1px; line-height: 1.4; }
+  .setting-value { font-size: 13px; color: var(--mist); font-weight: 500; flex-shrink: 0; }
+  .setting-accent { color: var(--violet); font-weight: 600; }
+
+  /* Chevron — Lucide chevron-right, color via currentColor */
+  .chev { width: 16px; height: 16px; flex-shrink: 0; color: var(--cloud); }
+  .chev svg { width: 16px; height: 16px; }
+
+  .setting-danger .setting-name { color: var(--coral); }
+  .setting-danger .s-icon { color: var(--coral); }
+
+  /* Toggle */
+  .toggle { width: 44px; height: 26px; border-radius: 13px; position: relative; flex-shrink: 0; }
+  .toggle-on { background: var(--violet); }
+  .toggle-off { background: var(--cloud); }
+  .toggle-thumb { width: 22px; height: 22px; border-radius: 50%; background: white; position: absolute; top: 2px; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+  .toggle-on .toggle-thumb { right: 2px; }
+  .toggle-off .toggle-thumb { left: 2px; }
+
+  /* Profile row */
+  .profile-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 18px 0; border-bottom: 1px solid var(--snow);
+  }
+  .profile-avatar {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--violet), var(--violet-soft));
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 20px; font-weight: 700; flex-shrink: 0;
+  }
+  .profile-name { font-size: 16px; font-weight: 600; color: var(--charcoal); }
+  .profile-email { font-size: 12px; color: var(--mist); margin-top: 1px; }
+
+  /* Subscription card */
+  .sub-card { border-radius: 16px; padding: 18px; margin-bottom: 4px; }
+  .sub-card-pro { background: linear-gradient(135deg, var(--violet-deep), var(--violet)); }
+  .sub-card-trial { background: linear-gradient(135deg, #1A1A2E, #2D2D3F); }
+  .sub-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+  .sub-title { font-size: 18px; font-weight: 700; color: white; margin-bottom: 4px; }
+  .sub-meta { font-size: 12px; color: rgba(255,255,255,0.6); margin-bottom: 12px; }
+  .sub-btn { display: inline-flex; padding: 8px 16px; border-radius: 999px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .sub-btn-manage { background: rgba(255,255,255,0.2); color: white; }
+  .sub-btn-upgrade { background: var(--violet); color: white; width: 100%; justify-content: center; padding: 12px; font-size: 14px; }
+
+  .trial-bar { height: 3px; border-radius: 2px; background: rgba(255,255,255,0.15); margin-bottom: 14px; overflow: hidden; }
+  .trial-bar-fill { height: 100%; border-radius: 2px; background: #FBBF24; }
+
+  /* Feature comparison */
+  .feature-list { padding: 8px 0 4px; }
+  .feature-item { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 13px; line-height: 1.4; }
+  .feature-item .f-icon { width: 18px; height: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .feature-item .f-icon svg { width: 18px; height: 18px; }
+  .feature-locked { color: var(--slate); }
+  .feature-locked .f-icon { color: var(--mist); }
+  .feature-free { color: var(--ink); }
+  .feature-free .f-icon { color: var(--sage); }
+  .feature-badge { font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 999px; margin-left: auto; flex-shrink: 0; }
+  .badge-pro { background: var(--violet-wash); color: var(--violet); }
+  .badge-free { background: var(--sage-wash); color: var(--sage); }
+  .feature-divider { height: 1px; background: var(--snow); margin: 6px 0; }
+
+  .version-text { text-align: center; font-size: 12px; color: var(--cloud); padding: 20px 0; }
+</style>
+</head>
+<body>
+
+<!-- ==================== SCREEN 1: Pro User ==================== -->
+<div class="screen-wrap">
+  <div class="screen-title">Pro User</div>
+  <div class="phone">
+    <div class="status-bar"><span>9:41</span><span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span></div>
+    <div class="scroll-area"><div class="scroll-content">
+      <div class="page-title">Settings</div>
+
+      <!-- ① Plan & Account -->
+      <div class="section-label">Plan &amp; Account</div>
+      <div class="sub-card sub-card-pro">
+        <div class="sub-label" style="color:rgba(255,255,255,0.6);">PRO PLAN</div>
+        <div class="sub-title">LandlordHours Pro</div>
+        <div class="sub-meta">Active · Renews Mar 15, 2026</div>
+        <button class="sub-btn sub-btn-manage">Manage Subscription</button>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="badge-check"></i></div>
+        <div class="setting-text"><div class="setting-name">Restore Purchase</div></div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+
+      <!-- ② Profile & Tax -->
+      <div class="section-label">Profile &amp; Tax</div>
+      <div class="profile-row">
+        <div class="profile-avatar">B</div>
+        <div class="setting-text">
+          <div class="profile-name">Brian Nguyen</div>
+          <div class="profile-email">brian@email.com</div>
+        </div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="target"></i></div>
+        <div class="setting-text"><div class="setting-name">Tax Goal</div></div>
+        <span class="setting-value setting-accent">REPS · 750h</span>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="calendar"></i></div>
+        <div class="setting-text"><div class="setting-name">Tax Profile</div><div class="setting-sub">Filing status, tax year</div></div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="users"></i></div>
+        <div class="setting-text"><div class="setting-name">Spouse Tracking</div><div class="setting-sub">Counts toward 50% rule</div></div>
+        <div class="toggle toggle-on"><div class="toggle-thumb"></div></div>
+      </div>
+
+      <!-- ③ Data & Export -->
+      <div class="section-label">Data &amp; Export</div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="download"></i></div>
+        <div class="setting-text"><div class="setting-name">Export Reports</div><div class="setting-sub">PDF for your accountant</div></div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="cloud-upload"></i></div>
+        <div class="setting-text"><div class="setting-name">Backup Data</div><div class="setting-sub">Last backup: Today</div></div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+
+      <!-- ④ App Preferences -->
+      <div class="section-label">Preferences</div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="bell"></i></div>
+        <div class="setting-text"><div class="setting-name">Notifications</div></div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="calendar-check"></i></div>
+        <div class="setting-text"><div class="setting-name">Calendar Sync</div></div>
+        <div class="toggle toggle-on"><div class="toggle-thumb"></div></div>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="sun"></i></div>
+        <div class="setting-text"><div class="setting-name">Appearance</div></div>
+        <span class="setting-value">System</span>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="layout-grid"></i></div>
+        <div class="setting-text"><div class="setting-name">App Icon</div></div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+
+      <!-- ⑤ Support & Legal -->
+      <div class="section-label">Support</div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="circle-help"></i></div>
+        <div class="setting-text"><div class="setting-name">Help Center</div></div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="mail"></i></div>
+        <div class="setting-text"><div class="setting-name">Contact Support</div></div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="scroll-text"></i></div>
+        <div class="setting-text"><div class="setting-name">Terms &amp; Privacy</div></div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+      <div class="setting-row setting-danger">
+        <div class="s-icon"><i data-lucide="log-out"></i></div>
+        <div class="setting-text"><div class="setting-name">Sign Out</div></div>
+      </div>
+
+      <div class="version-text">LandlordHours v1.0.0</div>
+    </div></div>
+    <div class="tab-bar">
+      <div class="tab"><i data-lucide="house"></i>Home<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="building-2"></i>Properties<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="clock"></i>Track<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="bar-chart-3"></i>Reports<div class="tab-dot"></div></div>
+      <div class="tab on"><i data-lucide="settings"></i>Settings<div class="tab-dot"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SCREEN 2: Free / Trial ==================== -->
+<div class="screen-wrap">
+  <div class="screen-title">Free / Trial</div>
+  <div class="phone">
+    <div class="status-bar"><span>9:41</span><span style="display:flex;gap:5px;font-size:13px;">&#9679; &#9679; &#9679;</span></div>
+    <div class="scroll-area"><div class="scroll-content">
+      <div class="page-title">Settings</div>
+
+      <!-- ① Plan & Account — TRIAL -->
+      <div class="section-label">Plan &amp; Account</div>
+      <div class="sub-card sub-card-trial">
+        <div class="sub-label" style="color:#FBBF24;">FREE TRIAL</div>
+        <div class="sub-title">5 days remaining</div>
+        <div class="trial-bar"><div class="trial-bar-fill" style="width:64%;"></div></div>
+        <button class="sub-btn sub-btn-upgrade">Upgrade to Pro — $4.99/mo</button>
+      </div>
+      <div class="feature-list">
+        <div class="feature-item feature-locked">
+          <div class="f-icon"><i data-lucide="lock"></i></div>
+          PDF Export Reports <span class="feature-badge badge-pro">PRO</span>
+        </div>
+        <div class="feature-item feature-locked">
+          <div class="f-icon"><i data-lucide="lock"></i></div>
+          Multi-Year Tracking <span class="feature-badge badge-pro">PRO</span>
+        </div>
+        <div class="feature-item feature-locked">
+          <div class="f-icon"><i data-lucide="lock"></i></div>
+          Unlimited Properties <span class="feature-badge badge-pro">PRO</span>
+        </div>
+        <div class="feature-divider"></div>
+        <div class="feature-item feature-free">
+          <div class="f-icon"><i data-lucide="check"></i></div>
+          Basic hour tracking <span class="feature-badge badge-free">FREE</span>
+        </div>
+        <div class="feature-item feature-free">
+          <div class="f-icon"><i data-lucide="check"></i></div>
+          1 property <span class="feature-badge badge-free">FREE</span>
+        </div>
+        <div class="feature-item feature-free">
+          <div class="f-icon"><i data-lucide="check"></i></div>
+          Learning center <span class="feature-badge badge-free">FREE</span>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="badge-check"></i></div>
+        <div class="setting-text"><div class="setting-name">Restore Purchase</div></div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+
+      <!-- ② Profile & Tax -->
+      <div class="section-label">Profile &amp; Tax</div>
+      <div class="profile-row">
+        <div class="profile-avatar">B</div>
+        <div class="setting-text">
+          <div class="profile-name">Brian Nguyen</div>
+          <div class="profile-email">brian@email.com</div>
+        </div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="target"></i></div>
+        <div class="setting-text"><div class="setting-name">Tax Goal</div></div>
+        <span class="setting-value setting-accent">REPS · 750h</span>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="calendar"></i></div>
+        <div class="setting-text"><div class="setting-name">Tax Profile</div><div class="setting-sub">Filing status, tax year</div></div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="users"></i></div>
+        <div class="setting-text"><div class="setting-name">Spouse Tracking</div><div class="setting-sub">Counts toward 50% rule</div></div>
+        <div class="toggle toggle-off"><div class="toggle-thumb"></div></div>
+      </div>
+
+      <!-- ③ Data — limited for free -->
+      <div class="section-label">Data &amp; Export</div>
+      <div class="setting-row" style="opacity:0.5;">
+        <div class="s-icon"><i data-lucide="download"></i></div>
+        <div class="setting-text"><div class="setting-name">Export Reports</div><div class="setting-sub">Upgrade to unlock</div></div>
+        <span class="feature-badge badge-pro" style="font-size:9px;">PRO</span>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="cloud-upload"></i></div>
+        <div class="setting-text"><div class="setting-name">Backup Data</div></div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+
+      <!-- ④ App Preferences -->
+      <div class="section-label">Preferences</div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="bell"></i></div>
+        <div class="setting-text"><div class="setting-name">Notifications</div></div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="calendar-check"></i></div>
+        <div class="setting-text"><div class="setting-name">Calendar Sync</div></div>
+        <div class="toggle toggle-on"><div class="toggle-thumb"></div></div>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="sun"></i></div>
+        <div class="setting-text"><div class="setting-name">Appearance</div></div>
+        <span class="setting-value">System</span>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+
+      <!-- ⑤ Support & Legal -->
+      <div class="section-label">Support</div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="circle-help"></i></div>
+        <div class="setting-text"><div class="setting-name">Help Center</div></div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="mail"></i></div>
+        <div class="setting-text"><div class="setting-name">Contact Support</div></div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+      <div class="setting-row">
+        <div class="s-icon"><i data-lucide="scroll-text"></i></div>
+        <div class="setting-text"><div class="setting-name">Terms &amp; Privacy</div></div>
+        <div class="chev"><i data-lucide="chevron-right"></i></div>
+      </div>
+      <div class="setting-row setting-danger">
+        <div class="s-icon"><i data-lucide="log-out"></i></div>
+        <div class="setting-text"><div class="setting-name">Sign Out</div></div>
+      </div>
+
+      <div class="version-text">LandlordHours v1.0.0</div>
+    </div></div>
+    <div class="tab-bar">
+      <div class="tab"><i data-lucide="house"></i>Home<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="building-2"></i>Properties<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="clock"></i>Track<div class="tab-dot"></div></div>
+      <div class="tab"><i data-lucide="bar-chart-3"></i>Reports<div class="tab-dot"></div></div>
+      <div class="tab on"><i data-lucide="settings"></i>Settings<div class="tab-dot"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

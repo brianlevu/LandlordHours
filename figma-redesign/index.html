@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LandlordHours — Design Gallery</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: #E5E0D8;
+    min-height: 100vh;
+  }
+
+  /* ============ STICKY NAV ============ */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: rgba(229, 224, 216, 0.75);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    padding: 0 48px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+  }
+
+  .nav-brand {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    color: #1A1A2E;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .nav-brand span {
+    color: #7B68EE;
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+  }
+
+  .nav-link {
+    padding: 8px 18px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #6E6E82;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+  }
+
+  .nav-link:hover {
+    background: rgba(123, 104, 238, 0.08);
+    color: #1A1A2E;
+  }
+
+  .nav-link:active {
+    transform: scale(0.97);
+  }
+
+  .nav-link--proto {
+    margin-left: auto;
+    background: #7B68EE;
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .nav-link--proto:hover {
+    background: #6A58DD;
+    color: #FFFFFF;
+  }
+
+  .nav-link--proto svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+
+  /* ============ PAGE HEADER ============ */
+  .page-header {
+    padding: 56px 48px 20px;
+    max-width: 1200px;
+  }
+
+  .page-header h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 42px;
+    color: #1A1A2E;
+    line-height: 1.15;
+    margin-bottom: 12px;
+  }
+
+  .page-header p {
+    font-size: 16px;
+    color: #6E6E82;
+    line-height: 1.6;
+    max-width: 600px;
+  }
+
+  /* ============ SECTIONS ============ */
+  .section {
+    padding: 48px 0 56px;
+  }
+
+  .section + .section {
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  .section-header {
+    padding: 0 48px 24px;
+  }
+
+  .section-number {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #7B68EE;
+    margin-bottom: 8px;
+  }
+
+  .section-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 32px;
+    color: #1A1A2E;
+    margin-bottom: 8px;
+    line-height: 1.2;
+  }
+
+  .section-desc {
+    font-size: 14px;
+    color: #6E6E82;
+    line-height: 1.6;
+  }
+
+  .section-desc code {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    background: rgba(123, 104, 238, 0.08);
+    color: #7B68EE;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+
+  /* ============ IFRAME CANVAS ============ */
+  .canvas-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 48px 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Custom scrollbar */
+  .canvas-scroll::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .canvas-scroll::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 0 48px;
+  }
+
+  .canvas-scroll::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.12);
+    border-radius: 4px;
+  }
+
+  .canvas-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  .canvas-frame {
+    background: #E5E0D8;
+    border-radius: 20px;
+    box-shadow:
+      0 2px 8px rgba(26, 26, 46, 0.06),
+      0 0 0 1px rgba(0, 0, 0, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    overflow: hidden;
+    display: inline-block;
+    /* Ensure the frame doesn't collapse */
+    vertical-align: top;
+  }
+
+  .canvas-frame--dark {
+    background: #1A1A2E;
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.2),
+      0 0 0 1px rgba(255, 255, 255, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .canvas-frame iframe {
+    display: block;
+    border: none;
+  }
+
+  /* ============ SCROLL HINT ============ */
+  .scroll-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 48px;
+    margin-top: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #A8A8BC;
+  }
+
+  .scroll-hint svg {
+    width: 16px;
+    height: 16px;
+    animation: scrollHint 2s ease-in-out infinite;
+  }
+
+  @keyframes scrollHint {
+    0%, 100% { transform: translateX(0); opacity: 0.5; }
+    50% { transform: translateX(6px); opacity: 1; }
+  }
+
+  /* ============ FOOTER ============ */
+  .footer {
+    padding: 40px 48px;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .footer-left {
+    font-size: 13px;
+    color: #A8A8BC;
+  }
+
+  .footer-left strong {
+    color: #6E6E82;
+    font-weight: 600;
+  }
+
+  .footer-files {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .footer-file {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    color: #7B68EE;
+    background: rgba(123, 104, 238, 0.08);
+    padding: 4px 10px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: background 0.15s ease;
+  }
+
+  .footer-file:hover {
+    background: rgba(123, 104, 238, 0.15);
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ STICKY NAV ============ -->
+<nav class="nav">
+  <div class="nav-brand">Landlord<span>Hours</span></div>
+  <div class="nav-links">
+    <a href="#onboarding" class="nav-link">Onboarding</a>
+    <a href="#track" class="nav-link">Track Time</a>
+    <a href="#reports" class="nav-link">Reports</a>
+    <a href="#property" class="nav-link">Property &amp; Tax</a>
+    <a href="#dashboard" class="nav-link">Dashboard</a>
+    <a href="#learn" class="nav-link">Learning</a>
+    <a href="#settings" class="nav-link">Settings</a>
+    <a href="#login" class="nav-link">Login</a>
+    <a href="#icons" class="nav-link">App Icons</a>
+    <a href="#dark" class="nav-link">Dark Theme</a>
+    <a href="reports-v3.html" target="_blank" class="nav-link nav-link--proto">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+        <polyline points="15 3 21 3 21 9"/>
+        <line x1="10" y1="14" x2="21" y2="3"/>
+      </svg>
+      Interactive Prototype
+    </a>
+  </div>
+</nav>
+
+<!-- ============ PAGE HEADER ============ -->
+<header class="page-header">
+  <h1>LandlordHours App Screens</h1>
+  <p>Complete design gallery for the LandlordHours iOS app. Each frame below embeds the actual HTML mockup file at full fidelity -- 393 x 852px per phone, pixel-perfect.</p>
+</header>
+
+<!-- ============ SECTION 1: ONBOARDING ============ -->
+<section id="onboarding" class="section">
+  <div class="section-header">
+    <div class="section-number">01</div>
+    <h2 class="section-title">Onboarding Flow</h2>
+    <p class="section-desc">
+      7 screens guiding first-time users from welcome through goal selection, property setup, permissions, AI demo, to completion.
+      <br>Source: <code>onboarding-full.html</code>
+    </p>
+  </div>
+  <div class="canvas-scroll">
+    <div class="canvas-frame">
+      <iframe
+        src="onboarding-full.html"
+        width="3120"
+        height="1020"
+        scrolling="no"
+      ></iframe>
+    </div>
+  </div>
+  <div class="scroll-hint">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="5" y1="12" x2="19" y2="12"/>
+      <polyline points="12 5 19 12 12 19"/>
+    </svg>
+    Scroll horizontally to see all 7 screens
+  </div>
+</section>
+
+<!-- ============ SECTION 2: TRACK TIME ============ -->
+<section id="track" class="section">
+  <div class="section-header">
+    <div class="section-number">02</div>
+    <h2 class="section-title">Track Time</h2>
+    <p class="section-desc">
+      3 states of the AI-assisted time entry screen: empty form, AI suggestion active, and auto-filled result.
+      <br>Source: <code>track-v3.html</code>
+    </p>
+  </div>
+  <div class="canvas-scroll">
+    <div class="canvas-frame">
+      <iframe
+        src="track-v3.html"
+        width="1440"
+        height="1020"
+        scrolling="no"
+      ></iframe>
+    </div>
+  </div>
+  <div class="scroll-hint">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="5" y1="12" x2="19" y2="12"/>
+      <polyline points="12 5 19 12 12 19"/>
+    </svg>
+    Scroll horizontally to see all 3 states
+  </div>
+</section>
+
+<!-- ============ SECTION 3: REPORTS ============ -->
+<section id="reports" class="section">
+  <div class="section-header">
+    <div class="section-number">03</div>
+    <h2 class="section-title">Reports</h2>
+    <p class="section-desc">
+      Interactive goal switcher with 3 modes: REPS 750h, Material Participation 500h, and 100h (goal met). Click the pills inside to switch.
+      <br>Source: <code>reports-v3.html</code>
+    </p>
+  </div>
+  <div class="canvas-scroll">
+    <div class="canvas-frame canvas-frame--dark">
+      <iframe
+        src="reports-v3.html"
+        width="520"
+        height="960"
+      ></iframe>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 4: PROPERTY + TAX ============ -->
+<section id="property" class="section">
+  <div class="section-header">
+    <div class="section-number">04</div>
+    <h2 class="section-title">Property &amp; Tax Profile</h2>
+    <p class="section-desc">
+      Property setup form with type toggle, management options, and address fields alongside the tax profile configuration screen.
+      <br>Source: <code>property-and-tax-profile.html</code>
+    </p>
+  </div>
+  <div class="canvas-scroll">
+    <div class="canvas-frame">
+      <iframe
+        src="property-and-tax-profile.html"
+        width="940"
+        height="1020"
+        scrolling="no"
+      ></iframe>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 5: DASHBOARD ============ -->
+<section id="dashboard" class="section">
+  <div class="section-header">
+    <div class="section-number">05</div>
+    <h2 class="section-title">Dashboard / Home</h2>
+    <p class="section-desc">
+      The home tab: progress snapshot, recent activity, learning carousel, and FOMO trial prompts for free users.
+      <br>Source: <code>dashboard.html</code>
+    </p>
+  </div>
+  <div class="canvas-scroll">
+    <div class="canvas-frame">
+      <iframe
+        src="dashboard.html"
+        width="1440"
+        height="1020"
+        scrolling="no"
+      ></iframe>
+    </div>
+  </div>
+  <div class="scroll-hint">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="5" y1="12" x2="19" y2="12"/>
+      <polyline points="12 5 19 12 12 19"/>
+    </svg>
+    3 states: Trial Active, Paid User, Trial Expired
+  </div>
+</section>
+
+<!-- ============ SECTION 6: LEARNING CENTER ============ -->
+<section id="learn" class="section">
+  <div class="section-header">
+    <div class="section-number">06</div>
+    <h2 class="section-title">Learning Center</h2>
+    <p class="section-desc">
+      Tax education hub with articles, guides, and courses. Content designed for SEO reuse on the marketing website.
+      <br>Source: <code>learning-center.html</code>
+    </p>
+  </div>
+  <div class="canvas-scroll">
+    <div class="canvas-frame">
+      <iframe
+        src="learning-center.html"
+        width="1440"
+        height="1020"
+        scrolling="no"
+      ></iframe>
+    </div>
+  </div>
+  <div class="scroll-hint">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="5" y1="12" x2="19" y2="12"/>
+      <polyline points="12 5 19 12 12 19"/>
+    </svg>
+    Hub, Article Detail, Guide Detail
+  </div>
+</section>
+
+<!-- ============ SECTION 7: SETTINGS ============ -->
+<section id="settings" class="section">
+  <div class="section-header">
+    <div class="section-number">07</div>
+    <h2 class="section-title">Settings</h2>
+    <p class="section-desc">
+      App preferences, user profile, tax configuration, and subscription management with trial/free FOMO.
+      <br>Source: <code>settings.html</code>
+    </p>
+  </div>
+  <div class="canvas-scroll">
+    <div class="canvas-frame">
+      <iframe
+        src="settings.html"
+        width="940"
+        height="1020"
+        scrolling="no"
+      ></iframe>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 8: LOGIN ============ -->
+<section id="login" class="section">
+  <div class="section-header">
+    <div class="section-number">08</div>
+    <h2 class="section-title">Login</h2>
+    <p class="section-desc">
+      Sign-in screen with Apple auth and email/password. Two states: empty form and filled form.
+      <br>Source: <code>login.html</code>
+    </p>
+  </div>
+  <div class="canvas-scroll">
+    <div class="canvas-frame">
+      <iframe
+        src="login.html"
+        width="940"
+        height="1020"
+        scrolling="no"
+      ></iframe>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 9: MILESTONE ============ -->
+<section id="milestone" class="section">
+  <div class="section-header">
+    <div class="section-number">09</div>
+    <h2 class="section-title">Milestone Celebration</h2>
+    <p class="section-desc">
+      Interactive confetti animation for goal milestones. Click to trigger celebration.
+      <br>Source: <code>milestone-celebration.html</code>
+    </p>
+  </div>
+  <div class="canvas-scroll">
+    <div class="canvas-frame">
+      <iframe
+        src="milestone-celebration.html"
+        width="520"
+        height="960"
+      ></iframe>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 10: DESIGN SYSTEM ============ -->
+<section id="design-system" class="section">
+  <div class="section-header">
+    <div class="section-number">10</div>
+    <h2 class="section-title">Design System</h2>
+    <p class="section-desc">
+      Complete design system reference: colors, typography, icons, spacing, components, and patterns.
+      <br>Source: <code>design-system.html</code> · <code>icon-dls.html</code>
+    </p>
+  </div>
+  <div class="canvas-scroll">
+    <div class="canvas-frame canvas-frame--dark">
+      <iframe
+        src="design-system.html"
+        width="1440"
+        height="900"
+      ></iframe>
+    </div>
+  </div>
+  <div class="scroll-hint">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="5" y1="12" x2="19" y2="12"/>
+      <polyline points="12 5 19 12 12 19"/>
+    </svg>
+    Scroll inside to explore all 10 sections
+  </div>
+</section>
+
+<!-- ============ SECTION 11: APP ICONS ============ -->
+<section id="icons" class="section">
+  <div class="section-header">
+    <div class="section-number">11</div>
+    <h2 class="section-title">App Icon Exploration</h2>
+    <p class="section-desc">
+      4 distinct icon variants at App Store (1024), iPhone (180), and badge (60) sizes. Each explores a different visual direction.
+      <br>Source: <code>app-icons.html</code>
+    </p>
+  </div>
+  <div class="canvas-scroll">
+    <div class="canvas-frame">
+      <iframe
+        src="app-icons.html"
+        width="1440"
+        height="1200"
+      ></iframe>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 12: DARK THEME ============ -->
+<section id="dark" class="section">
+  <div class="section-header">
+    <div class="section-number">12</div>
+    <h2 class="section-title">Dark Theme</h2>
+    <p class="section-desc">
+      Key screens adapted for dark mode: Dashboard, Track Time, Reports, and Settings with vibrant accents on dark surfaces.
+      <br>Source: <code>dark-theme.html</code>
+    </p>
+  </div>
+  <div class="canvas-scroll">
+    <div class="canvas-frame canvas-frame--dark">
+      <iframe
+        src="dark-theme.html"
+        width="1920"
+        height="1080"
+      ></iframe>
+    </div>
+  </div>
+  <div class="scroll-hint">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="5" y1="12" x2="19" y2="12"/>
+      <polyline points="12 5 19 12 12 19"/>
+    </svg>
+    Dashboard, Track, Reports, Settings in dark mode
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer">
+  <div class="footer-left">
+    <strong>LandlordHours</strong> -- Design Gallery -- February 2026
+  </div>
+  <div class="footer-files">
+    <a href="onboarding-full.html" target="_blank" class="footer-file">onboarding-full.html</a>
+    <a href="track-v3.html" target="_blank" class="footer-file">track-v3.html</a>
+    <a href="reports-v3.html" target="_blank" class="footer-file">reports-v3.html</a>
+    <a href="property-and-tax-profile.html" target="_blank" class="footer-file">property-and-tax-profile.html</a>
+    <a href="dashboard.html" target="_blank" class="footer-file">dashboard.html</a>
+    <a href="learning-center.html" target="_blank" class="footer-file">learning-center.html</a>
+    <a href="settings.html" target="_blank" class="footer-file">settings.html</a>
+    <a href="design-system.html" target="_blank" class="footer-file">design-system.html</a>
+    <a href="login.html" target="_blank" class="footer-file">login.html</a>
+    <a href="app-icons.html" target="_blank" class="footer-file">app-icons.html</a>
+    <a href="dark-theme.html" target="_blank" class="footer-file">dark-theme.html</a>
+  </div>
+</footer>
+
+</body>
+</html>

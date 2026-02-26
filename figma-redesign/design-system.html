@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LandlordHours — Complete Design System</title>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=DM+Serif+Display&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --cream: #FAF7F2;
+    --warm-white: #FFFFFF;
+    --violet: #7B68EE;
+    --violet-soft: #B8AFFE;
+    --violet-wash: #EDE8FF;
+    --violet-deep: #5B4BC9;
+    --coral: #FF8A7A;
+    --coral-wash: #FFE8E4;
+    --sage: #7EC8A0;
+    --sage-wash: #E4F5EC;
+    --honey: #F5C563;
+    --honey-wash: #FFF4DA;
+    --sky: #6CB4EE;
+    --sky-wash: #E0F0FF;
+    --rose: #E88CA5;
+    --rose-wash: #FFE4EC;
+    --charcoal: #1A1A2E;
+    --ink: #2D2D3F;
+    --slate: #6E6E82;
+    --mist: #A8A8BC;
+    --cloud: #D4D4E0;
+    --snow: #F0EFF4;
+    --success: #34D399;
+    --warning: #FBBF24;
+    --error: #F472B6;
+    --dark-bg: #0C0C18;
+    --dark-surface: #161626;
+  }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: var(--dark-bg);
+    color: #E0E0F0;
+    min-height: 100vh;
+  }
+
+  /* ===== Layout ===== */
+  .page-header { padding: 80px 60px 40px; max-width: 1400px; margin: 0 auto; }
+  .page-kicker { font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--violet-soft); margin-bottom: 12px; }
+  .page-title { font-family: 'DM Serif Display', serif; font-size: 48px; color: white; line-height: 1.15; margin-bottom: 12px; }
+  .page-sub { font-size: 16px; color: var(--mist); line-height: 1.6; max-width: 700px; }
+
+  .section { padding: 40px 60px; max-width: 1400px; margin: 0 auto; }
+  .section-label { font-size: 10px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: var(--violet-soft); margin-bottom: 8px; }
+  .section-title { font-family: 'DM Serif Display', serif; font-size: 28px; color: white; margin-bottom: 8px; }
+  .section-desc { font-size: 14px; color: var(--mist); line-height: 1.6; margin-bottom: 32px; max-width: 640px; }
+
+  .divider { height: 1px; background: rgba(255,255,255,0.06); margin: 20px 60px; max-width: 1280px; }
+
+  /* ===== Cards & Grids ===== */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+
+  .card {
+    background: var(--dark-surface);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 20px;
+    padding: 28px 24px;
+  }
+
+  .card-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--violet-soft); margin-bottom: 10px; }
+  .card-title { font-size: 16px; font-weight: 700; color: white; margin-bottom: 8px; }
+  .card-desc { font-size: 12px; color: var(--mist); line-height: 1.6; }
+
+  /* ===== Color Swatches ===== */
+  .swatch-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+  .swatch {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .swatch-circle {
+    width: 64px; height: 64px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.06);
+  }
+  .swatch-name { font-size: 11px; font-weight: 600; color: white; }
+  .swatch-hex { font-size: 10px; color: var(--mist); font-family: monospace; }
+
+  .swatch-pair {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .swatch-pair-row { display: flex; gap: 4px; }
+  .swatch-sm { width: 40px; height: 40px; border-radius: 10px; }
+
+  /* ===== Type Scale ===== */
+  .type-row {
+    display: flex; align-items: baseline; gap: 24px;
+    padding: 18px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .type-meta {
+    width: 200px; flex-shrink: 0;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .type-token { font-size: 11px; font-weight: 600; color: var(--violet-soft); font-family: monospace; }
+  .type-spec { font-size: 10px; color: var(--slate); }
+  .type-sample { flex: 1; color: white; }
+
+  /* ===== Spec cards ===== */
+  .spec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .spec-card { background: var(--dark-surface); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 20px; }
+  .spec-card-title { font-size: 14px; font-weight: 700; color: white; margin-bottom: 10px; }
+  .spec-card-body { font-family: monospace; font-size: 11px; line-height: 1.9; color: var(--violet-soft); }
+
+  /* ===== Component previews ===== */
+  .preview-row {
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    background: var(--dark-surface); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 20px; padding: 32px;
+    margin-bottom: 16px;
+  }
+  .preview-light {
+    background: var(--cream); border-radius: 20px; padding: 32px;
+    margin-bottom: 16px;
+  }
+  .preview-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--slate);
+    writing-mode: vertical-rl; transform: rotate(180deg);
+    flex-shrink: 0;
+  }
+
+  /* ===== Jelly icons (reused from icon-dls) ===== */
+  .jelly {
+    width: 64px; height: 64px; border-radius: 22%;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; color: white; overflow: hidden; flex-shrink: 0;
+  }
+  .jelly-body { position: absolute; inset: 0; border-radius: 22%; opacity: 0.8; }
+  .jelly::after {
+    content: ''; position: absolute; inset: 0; border-radius: 22%;
+    background: linear-gradient(170deg, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.06) 40%, rgba(0,0,0,0.04) 100%);
+    pointer-events: none;
+  }
+  .jelly svg { position: relative; z-index: 1; }
+  .jelly.sm { width: 44px; height: 44px; }
+  .jelly.sm svg { width: 22px !important; height: 22px !important; }
+
+  /* ===== Inline component demos ===== */
+  .demo-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 14px 28px; border-radius: 999px; font-size: 16px; font-weight: 600;
+    border: none; cursor: pointer; font-family: 'DM Sans', sans-serif;
+  }
+  .demo-chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 10px 16px; border-radius: 999px; font-size: 13px; font-weight: 500;
+    white-space: nowrap;
+  }
+  .demo-toggle { width: 48px; height: 28px; border-radius: 14px; position: relative; display: inline-block; }
+  .demo-toggle-knob { width: 22px; height: 22px; border-radius: 50%; background: white; position: absolute; top: 3px; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+
+  /* ===== Table ===== */
+  .ds-table {
+    width: 100%; border-collapse: collapse;
+    background: var(--dark-surface); border-radius: 16px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .ds-table th {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--violet-soft);
+    padding: 14px 16px; text-align: left;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .ds-table td {
+    font-size: 13px; padding: 10px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    vertical-align: middle;
+  }
+  .ds-table td:first-child { color: white; font-weight: 500; }
+  .ds-table td:nth-child(2) { color: var(--violet-soft); font-family: monospace; font-size: 12px; }
+  .ds-table td:nth-child(3) { color: var(--mist); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<!-- ===================== HEADER ===================== -->
+<header class="page-header">
+  <div class="page-kicker">LandlordHours v2.0</div>
+  <h1 class="page-title">Complete<br>Design System</h1>
+  <p class="page-sub">The definitive reference for every visual decision in LandlordHours. Colors, typography, icons, spacing, components, and patterns — all in one place. Tiimo-inspired, soft, rounded, friendly.</p>
+</header>
+
+<div class="divider"></div>
+
+<!-- ===================== 01. BRAND IDENTITY ===================== -->
+<section class="section">
+  <div class="section-label">01 · Brand</div>
+  <div class="section-title">Brand Identity</div>
+  <div class="section-desc">LandlordHours helps landlords track hours toward IRS Real Estate Professional Status (REPS). The brand is warm, approachable, and confidence-building — never intimidating or corporate.</div>
+
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-label">App Name</div>
+      <div class="card-title">LandlordHours</div>
+      <div class="card-desc">Tagline: "Track your path to tax qualification"</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Platform</div>
+      <div class="card-title">iOS 17+ · SwiftUI</div>
+      <div class="card-desc">Architecture: MVVM. One codebase, iPhone-only.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Design Language</div>
+      <div class="card-title">Organic-Soft</div>
+      <div class="card-desc">Tiimo-inspired. Soft rounded shapes, warm colors, jelly-glass depth, DM Serif headlines. Feels like a wellness app, not a tax tool.</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===================== 02. COLOR SYSTEM ===================== -->
+<section class="section">
+  <div class="section-label">02 · Color</div>
+  <div class="section-title">Color Palette</div>
+  <div class="section-desc">7 accent colors, each with a full-strength and wash variant. Neutrals run from charcoal to snow. Page backgrounds use cream (#FAF7F2).</div>
+
+  <!-- Accent Colors -->
+  <div style="margin-bottom:12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Accent Colors</div>
+  <div class="swatch-row">
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--violet);"></div>
+      <div class="swatch-name">Violet</div>
+      <div class="swatch-hex">#7B68EE</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--coral);"></div>
+      <div class="swatch-name">Coral</div>
+      <div class="swatch-hex">#FF8A7A</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--sage);"></div>
+      <div class="swatch-name">Sage</div>
+      <div class="swatch-hex">#7EC8A0</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--honey);"></div>
+      <div class="swatch-name">Honey</div>
+      <div class="swatch-hex">#F5C563</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--sky);"></div>
+      <div class="swatch-name">Sky</div>
+      <div class="swatch-hex">#6CB4EE</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--rose);"></div>
+      <div class="swatch-name">Rose</div>
+      <div class="swatch-hex">#E88CA5</div>
+    </div>
+  </div>
+
+  <!-- Wash Colors -->
+  <div style="margin-bottom:12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Wash Variants (Tinted Backgrounds)</div>
+  <div class="swatch-row">
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--violet-wash);"></div>
+      <div class="swatch-name">Violet Wash</div>
+      <div class="swatch-hex">#EDE8FF</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--coral-wash);"></div>
+      <div class="swatch-name">Coral Wash</div>
+      <div class="swatch-hex">#FFE8E4</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--sage-wash);"></div>
+      <div class="swatch-name">Sage Wash</div>
+      <div class="swatch-hex">#E4F5EC</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--honey-wash);"></div>
+      <div class="swatch-name">Honey Wash</div>
+      <div class="swatch-hex">#FFF4DA</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--sky-wash);"></div>
+      <div class="swatch-name">Sky Wash</div>
+      <div class="swatch-hex">#E0F0FF</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--rose-wash);"></div>
+      <div class="swatch-name">Rose Wash</div>
+      <div class="swatch-hex">#FFE4EC</div>
+    </div>
+  </div>
+
+  <!-- Extended Violet -->
+  <div style="margin-bottom:12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Violet Extended</div>
+  <div class="swatch-row" style="margin-bottom:32px;">
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--violet-deep);"></div>
+      <div class="swatch-name">Violet Deep</div>
+      <div class="swatch-hex">#5B4BC9</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--violet);"></div>
+      <div class="swatch-name">Violet</div>
+      <div class="swatch-hex">#7B68EE</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--violet-soft);"></div>
+      <div class="swatch-name">Violet Soft</div>
+      <div class="swatch-hex">#B8AFFE</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--violet-wash);"></div>
+      <div class="swatch-name">Violet Wash</div>
+      <div class="swatch-hex">#EDE8FF</div>
+    </div>
+  </div>
+
+  <!-- Neutrals -->
+  <div style="margin-bottom:12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Neutrals</div>
+  <div class="swatch-row" style="margin-bottom:32px;">
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--charcoal);"></div>
+      <div class="swatch-name">Charcoal</div>
+      <div class="swatch-hex">#1A1A2E</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--ink);"></div>
+      <div class="swatch-name">Ink</div>
+      <div class="swatch-hex">#2D2D3F</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--slate);"></div>
+      <div class="swatch-name">Slate</div>
+      <div class="swatch-hex">#6E6E82</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--mist);"></div>
+      <div class="swatch-name">Mist</div>
+      <div class="swatch-hex">#A8A8BC</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--cloud);"></div>
+      <div class="swatch-name">Cloud</div>
+      <div class="swatch-hex">#D4D4E0</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--snow);"></div>
+      <div class="swatch-name">Snow</div>
+      <div class="swatch-hex">#F0EFF4</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--cream);"></div>
+      <div class="swatch-name">Cream</div>
+      <div class="swatch-hex">#FAF7F2</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--warm-white);border-color:rgba(0,0,0,0.08);"></div>
+      <div class="swatch-name">White</div>
+      <div class="swatch-hex">#FFFFFF</div>
+    </div>
+  </div>
+
+  <!-- Semantic Colors -->
+  <div style="margin-bottom:12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Semantic</div>
+  <div class="swatch-row">
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--success);"></div>
+      <div class="swatch-name">Success</div>
+      <div class="swatch-hex">#34D399</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--warning);"></div>
+      <div class="swatch-name">Warning</div>
+      <div class="swatch-hex">#FBBF24</div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-circle" style="background:var(--error);"></div>
+      <div class="swatch-name">Error</div>
+      <div class="swatch-hex">#F472B6</div>
+    </div>
+  </div>
+
+  <!-- Usage rules -->
+  <div class="spec-grid" style="margin-top:24px;">
+    <div class="spec-card">
+      <div class="spec-card-title">Color Usage Rules</div>
+      <div class="spec-card-body">
+        Page background: --cream (#FAF7F2)<br>
+        Cards/surfaces: --warm-white (#FFF)<br>
+        Primary accent: --violet (#7B68EE)<br>
+        Primary text: --charcoal (#1A1A2E)<br>
+        Secondary text: --slate (#6E6E82)<br>
+        Tertiary/caption: --mist (#A8A8BC)<br>
+        Borders: --snow (#F0EFF4)<br>
+        Disabled: --cloud (#D4D4E0)
+      </div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-card-title">SwiftUI Mapping</div>
+      <div class="spec-card-body">
+        Use AppColors.* tokens always<br>
+        Use AdaptiveColors for light/dark<br>
+        Never hardcode hex inline<br><br>
+        --violet → AppColors.primary<br>
+        --cream → colors.background<br>
+        --warm-white → colors.backgroundSecondary<br>
+        --charcoal → colors.textPrimary<br>
+        --slate → colors.textSecondary
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===================== 03. TYPOGRAPHY ===================== -->
+<section class="section">
+  <div class="section-label">03 · Typography</div>
+  <div class="section-title">Type System</div>
+  <div class="section-desc">System-native fonts: SF Pro Rounded for UI, New York for editorial. In HTML mockups we use DM Sans (≈ Rounded) and DM Serif Display (≈ New York) as web equivalents.</div>
+
+  <div class="grid-2" style="margin-bottom:32px;">
+    <div class="card">
+      <div class="card-label">UI Font</div>
+      <div class="card-title" style="font-size:24px;">DM Sans → SF Pro Rounded</div>
+      <div class="card-desc">Used for all UI: body text, labels, buttons, captions. In SwiftUI: <code style="color:var(--violet-soft);font-family:monospace;font-size:11px;">.system(design: .rounded)</code></div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="font-family:'DM Serif Display',serif;font-size:24px;">DM Serif Display → New York</div>
+      <div class="card-label" style="margin-top:8px;">Editorial Font</div>
+      <div class="card-desc">Used for screen titles in Reports and Learning Center. In SwiftUI: <code style="color:var(--violet-soft);font-family:monospace;font-size:11px;">.system(design: .serif)</code></div>
+    </div>
+  </div>
+
+  <!-- Type Scale -->
+  <div style="margin-bottom:16px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Type Scale</div>
+  <div style="background:var(--dark-surface);border:1px solid rgba(255,255,255,0.06);border-radius:20px;padding:24px 32px;">
+
+    <div class="type-row">
+      <div class="type-meta">
+        <div class="type-token">Headline</div>
+        <div class="type-spec">Serif · 28px · Regular · 1.2 lh</div>
+      </div>
+      <div class="type-sample" style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1.2;">Track your hours</div>
+    </div>
+
+    <div class="type-row">
+      <div class="type-meta">
+        <div class="type-token">Title</div>
+        <div class="type-spec">Serif · 24px · Regular · 1.2 lh</div>
+      </div>
+      <div class="type-sample" style="font-family:'DM Serif Display',serif;font-size:24px;line-height:1.2;">Tax Profile</div>
+    </div>
+
+    <div class="type-row">
+      <div class="type-meta">
+        <div class="type-token">Subheadline</div>
+        <div class="type-spec">Sans · 17px · Semibold · 1.4 lh</div>
+      </div>
+      <div class="type-sample" style="font-size:17px;font-weight:600;line-height:1.4;">By Property</div>
+    </div>
+
+    <div class="type-row">
+      <div class="type-meta">
+        <div class="type-token">Body</div>
+        <div class="type-spec">Sans · 15px · Regular · 1.5 lh</div>
+      </div>
+      <div class="type-sample" style="font-size:15px;font-weight:400;line-height:1.5;">Fixed the leaky faucet at Oak Street duplex</div>
+    </div>
+
+    <div class="type-row">
+      <div class="type-meta">
+        <div class="type-token">Body Small</div>
+        <div class="type-spec">Sans · 13px · Regular · 1.5 lh</div>
+      </div>
+      <div class="type-sample" style="font-size:13px;font-weight:400;line-height:1.5;">Counts toward 50% rule</div>
+    </div>
+
+    <div class="type-row">
+      <div class="type-meta">
+        <div class="type-token">Caption</div>
+        <div class="type-spec">Sans · 12px · Medium · 1.4 lh</div>
+      </div>
+      <div class="type-sample" style="font-size:12px;font-weight:500;line-height:1.4;color:var(--mist);">Last backup: Today</div>
+    </div>
+
+    <div class="type-row">
+      <div class="type-meta">
+        <div class="type-token">Label</div>
+        <div class="type-spec">Sans · 11px · Bold · 1.2 lh · CAPS</div>
+      </div>
+      <div class="type-sample" style="font-size:11px;font-weight:700;line-height:1.2;letter-spacing:1.5px;text-transform:uppercase;color:var(--mist);">PREFERENCES</div>
+    </div>
+
+    <div class="type-row">
+      <div class="type-meta">
+        <div class="type-token">Tab Label</div>
+        <div class="type-spec">Sans · 10px · Medium · 1.2 lh</div>
+      </div>
+      <div class="type-sample" style="font-size:10px;font-weight:500;line-height:1.2;color:var(--mist);">Settings</div>
+    </div>
+
+    <div class="type-row">
+      <div class="type-meta">
+        <div class="type-token">Hero Number</div>
+        <div class="type-spec">Sans · 52px · ExtraBold · 1.0 lh</div>
+      </div>
+      <div class="type-sample" style="font-size:52px;font-weight:800;line-height:1;letter-spacing:-2px;">262</div>
+    </div>
+
+    <div class="type-row">
+      <div class="type-meta">
+        <div class="type-token">Stepper Number</div>
+        <div class="type-spec">Serif · 40px · Regular · 1.0 lh</div>
+      </div>
+      <div class="type-sample" style="font-family:'DM Serif Display',serif;font-size:40px;line-height:1;">2.0<span style="font-family:'DM Sans',sans-serif;font-size:16px;color:var(--mist);font-weight:400;">h</span></div>
+    </div>
+
+    <div class="type-row" style="border-bottom:none;">
+      <div class="type-meta">
+        <div class="type-token">Button</div>
+        <div class="type-spec">Sans · 16px · Semibold · 1.0 lh</div>
+      </div>
+      <div class="type-sample" style="font-size:16px;font-weight:600;">Log Time</div>
+    </div>
+  </div>
+
+  <!-- Typography rules -->
+  <div class="spec-grid" style="margin-top:24px;">
+    <div class="spec-card">
+      <div class="spec-card-title">Hierarchy Rule</div>
+      <div class="spec-card-body">
+        Headline → Bold Serif (screen titles)<br>
+        Subheadline → Semibold Rounded (sections)<br>
+        Body → Regular Rounded (content)<br>
+        Caption → Medium Rounded (metadata)<br>
+        Label → Bold Rounded CAPS (sections)<br><br>
+        Line-height: always generous<br>
+        Body ≥ 1.5, Headline ≥ 1.2
+      </div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-card-title">SwiftUI Font Mapping</div>
+      <div class="spec-card-body">
+        Headline:<br>
+        &nbsp;&nbsp;.system(size:28, design:.serif)<br>
+        Subheadline:<br>
+        &nbsp;&nbsp;.system(size:17, weight:.semibold,<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;design:.rounded)<br>
+        Body:<br>
+        &nbsp;&nbsp;.system(size:15, design:.rounded)<br>
+        Hero Number:<br>
+        &nbsp;&nbsp;.system(size:52, weight:.heavy,<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;design:.rounded)<br>
+        Button:<br>
+        &nbsp;&nbsp;.system(size:16, weight:.semibold)
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===================== 04. ICON SYSTEM ===================== -->
+<section class="section">
+  <div class="section-label">04 · Icons</div>
+  <div class="section-title">Icon System — Lucide + Jelly-Glass</div>
+  <div class="section-desc">All icons from the Lucide open-source library. Two modes: Naked Stroke (tab bar, navigation) and Jelly Container (categories, settings). Full reference: <a href="icon-dls.html" style="color:var(--violet-soft);">icon-dls.html</a></div>
+
+  <div class="grid-2" style="margin-bottom:24px;">
+    <div class="card">
+      <div class="card-label">Mode 1</div>
+      <div class="card-title">Naked Stroke</div>
+      <div class="card-desc">Tab bar, navigation, inline actions. Just the icon, no container. Color inherited from parent via currentColor.</div>
+      <div style="display:flex;gap:20px;margin-top:16px;color:var(--violet);">
+        <i data-lucide="house"></i>
+        <i data-lucide="building-2"></i>
+        <i data-lucide="clock"></i>
+        <i data-lucide="bar-chart-3"></i>
+        <i data-lucide="settings"></i>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Mode 2</div>
+      <div class="card-title">Jelly-Glass Container</div>
+      <div class="card-desc">Activity rows, categories, settings, cards. Icon in colored squircle (border-radius: 22%, opacity: 0.8, glass highlight, drop shadow).</div>
+      <div style="display:flex;gap:12px;margin-top:16px;">
+        <div class="jelly sm" style="box-shadow:0 4px 12px rgba(123,104,238,0.3);"><div class="jelly-body" style="background:var(--violet);"></div><i data-lucide="house" width="22" height="22"></i></div>
+        <div class="jelly sm" style="box-shadow:0 4px 12px rgba(255,138,122,0.3);"><div class="jelly-body" style="background:var(--coral);"></div><i data-lucide="wrench" width="22" height="22"></i></div>
+        <div class="jelly sm" style="box-shadow:0 4px 12px rgba(126,200,160,0.3);"><div class="jelly-body" style="background:var(--sage);"></div><i data-lucide="clipboard-check" width="22" height="22"></i></div>
+        <div class="jelly sm" style="box-shadow:0 4px 12px rgba(245,197,99,0.3);"><div class="jelly-body" style="background:var(--honey);"></div><i data-lucide="book-open" width="22" height="22"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="spec-grid">
+    <div class="spec-card">
+      <div class="spec-card-title">Lucide Source</div>
+      <div class="spec-card-body">
+        Library: Lucide (open-source)<br>
+        CDN: unpkg.com/lucide@latest<br>
+        viewBox: 0 0 24 24<br>
+        stroke: currentColor<br>
+        stroke-width: 2<br>
+        stroke-linecap: round<br>
+        stroke-linejoin: round<br>
+        fill: none
+      </div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-card-title">Jelly Container CSS</div>
+      <div class="spec-card-body">
+        border-radius: 22%<br>
+        overflow: hidden<br>
+        body opacity: 0.8<br>
+        glass: linear-gradient(170deg,<br>
+        &nbsp;&nbsp;rgba(255,255,255,0.30) 0%,<br>
+        &nbsp;&nbsp;rgba(255,255,255,0.06) 40%,<br>
+        &nbsp;&nbsp;rgba(0,0,0,0.04) 100%)<br>
+        shadow: 0 6px 16px [color@35%]
+      </div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-card-title">Size Scale</div>
+      <div class="spec-card-body">
+        22px — tab bar (naked stroke)<br>
+        36px — settings row (jelly)<br>
+        44px — activity row (jelly)<br>
+        64px — category picker (jelly)<br>
+        72px — empty state (jelly)<br>
+        96px — onboarding hero (jelly)
+      </div>
+    </div>
+    <div class="spec-card">
+      <div class="spec-card-title">SwiftUI Mapping</div>
+      <div class="spec-card-body">
+        Naked → use LHIcon enum shapes<br>
+        &nbsp;&nbsp;mapped to Lucide equivalents<br><br>
+        Jelly → LHCircleBadge component<br>
+        &nbsp;&nbsp;with .clipShape(RoundedRect(22%))<br>
+        &nbsp;&nbsp;and .shadow(color: X.opacity(0.35))<br><br>
+        DO NOT import Lucide Swift package<br>
+        Use LHIcon custom paths instead
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===================== 05. SPACING & LAYOUT ===================== -->
+<section class="section">
+  <div class="section-label">05 · Spacing</div>
+  <div class="section-title">Spacing, Layout & Corners</div>
+  <div class="section-desc">Consistent spacing creates rhythm. All screens use 393×852 phone frames. Content uses 20px horizontal padding.</div>
+
+  <div class="grid-3" style="margin-bottom:24px;">
+    <div class="card">
+      <div class="card-label">Phone Frame</div>
+      <div class="card-title">393 × 852 px</div>
+      <div class="card-desc">
+        Frame radius: 44px<br>
+        Dynamic Island: 126×34px<br>
+        Status bar: 58px height<br>
+        Tab bar: 80px height<br>
+        Content area: 714px (852 - 58 - 80)
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Spacing Scale</div>
+      <div class="card-title">4 · 8 · 12 · 16 · 20 · 24 · 32 · 48</div>
+      <div class="card-desc">
+        4pt — tight internal (icon-to-label)<br>
+        8pt — chip gaps, small padding<br>
+        12pt — compact card padding<br>
+        16pt — standard padding<br>
+        20pt — horizontal page padding<br>
+        24pt — section vertical spacing<br>
+        32pt — large section gaps<br>
+        48pt — major layout separation
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Corner Radius</div>
+      <div class="card-title">8 · 12 · 16 · 20 · 44 · 999</div>
+      <div class="card-desc">
+        8pt — small buttons, tags<br>
+        12pt — cards, input fields<br>
+        14pt — inner cards, textareas<br>
+        16pt — modal sheets, cards<br>
+        20pt — large containers<br>
+        44pt — phone frame<br>
+        999px — capsule/pill buttons
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===================== 06. COMPONENTS ===================== -->
+<section class="section">
+  <div class="section-label">06 · Components</div>
+  <div class="section-title">Component Catalog</div>
+  <div class="section-desc">Every reusable pattern in the app, shown on light and dark backgrounds.</div>
+
+  <!-- Buttons -->
+  <div style="margin-bottom:12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Buttons</div>
+  <div class="preview-light" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+    <button class="demo-btn" style="background:#7B68EE;color:white;">Log Time</button>
+    <button class="demo-btn" style="background:#1A1A2E;color:white;">Get Started <i data-lucide="arrow-right" width="18" height="18" style="color:white;"></i></button>
+    <button class="demo-btn" style="background:rgba(123,104,238,0.1);color:#7B68EE;">Upgrade</button>
+    <button class="demo-btn" style="background:#F0EFF4;color:#6E6E82;font-size:13px;padding:10px 16px;"><i data-lucide="paperclip" width="16" height="16" style="color:#6E6E82;"></i> Attach</button>
+  </div>
+
+  <!-- Chips -->
+  <div style="margin:24px 0 12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Category Chips</div>
+  <div class="preview-light" style="display:flex;gap:8px;flex-wrap:wrap;">
+    <div class="demo-chip" style="background:#7B68EE;color:white;border:1.5px solid #7B68EE;"><div style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.5);"></div>Repairs</div>
+    <div class="demo-chip" style="background:#F0EFF4;color:#6E6E82;border:1.5px solid transparent;"><div style="width:8px;height:8px;border-radius:50%;background:#7EC8A0;"></div>Management</div>
+    <div class="demo-chip" style="background:#F0EFF4;color:#6E6E82;border:1.5px solid transparent;"><div style="width:8px;height:8px;border-radius:50%;background:#6CB4EE;"></div>Leasing</div>
+    <div class="demo-chip" style="background:#F0EFF4;color:#6E6E82;border:1.5px solid transparent;"><div style="width:8px;height:8px;border-radius:50%;background:#F5C563;"></div>Bookkeeping</div>
+    <div class="demo-chip" style="background:#F0EFF4;color:#6E6E82;border:1.5px solid transparent;"><div style="width:8px;height:8px;border-radius:50%;background:#E88CA5;"></div>Legal</div>
+  </div>
+
+  <!-- Goal Pills -->
+  <div style="margin:24px 0 12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Goal Pills (Reports)</div>
+  <div class="preview-row" style="gap:8px;">
+    <div class="demo-chip" style="background:#8B5CF6;color:white;font-weight:600;box-shadow:0 4px 16px rgba(139,92,246,0.3);">REPS · 750h</div>
+    <div class="demo-chip" style="background:rgba(255,255,255,0.1);color:#E0E0F0;font-weight:600;border:1.5px solid rgba(255,255,255,0.1);">500h</div>
+    <div class="demo-chip" style="background:rgba(255,255,255,0.1);color:#E0E0F0;font-weight:600;border:1.5px solid rgba(255,255,255,0.1);">100h</div>
+  </div>
+
+  <!-- Toggles -->
+  <div style="margin:24px 0 12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Toggles</div>
+  <div class="preview-light" style="display:flex;gap:20px;align-items:center;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="demo-toggle" style="background:#7B68EE;"><div class="demo-toggle-knob" style="left:23px;"></div></div>
+      <span style="font-size:13px;color:#1A1A2E;">On</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="demo-toggle" style="background:#D4D4E0;"><div class="demo-toggle-knob" style="left:3px;"></div></div>
+      <span style="font-size:13px;color:#1A1A2E;">Off</span>
+    </div>
+  </div>
+
+  <!-- Setting Row -->
+  <div style="margin:24px 0 12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Setting Row</div>
+  <div class="preview-light">
+    <div style="display:flex;align-items:center;gap:14px;padding:15px 0;border-bottom:1px solid #F0EFF4;width:353px;">
+      <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:#1A1A2E;"><i data-lucide="bell"></i></div>
+      <div style="flex:1;"><div style="font-size:15px;font-weight:500;color:#1A1A2E;">Notifications</div></div>
+      <div style="color:#D4D4E0;"><i data-lucide="chevron-right" width="16" height="16"></i></div>
+    </div>
+  </div>
+
+  <!-- Cards -->
+  <div style="margin:24px 0 12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Card Styles</div>
+  <div class="grid-3">
+    <div class="card" style="background:var(--cream);border-color:rgba(0,0,0,0.04);">
+      <div style="font-size:13px;font-weight:600;color:#1A1A2E;margin-bottom:4px;">Standard Card</div>
+      <div style="font-size:12px;color:#6E6E82;">White bg on cream. 20px radius, 20px padding. Subtle border.</div>
+    </div>
+    <div class="card" style="background:rgba(255,255,255,0.65);backdrop-filter:blur(8px);border-color:rgba(0,0,0,0.04);">
+      <div style="font-size:13px;font-weight:600;color:#1A1A2E;margin-bottom:4px;">Glass Card</div>
+      <div style="font-size:12px;color:#6E6E82;">Used in Reports. bg rgba(255,255,255,0.65) + blur(8px).</div>
+    </div>
+    <div class="card" style="background:linear-gradient(135deg,#5B4BC9,#7B68EE);">
+      <div style="font-size:13px;font-weight:600;color:white;margin-bottom:4px;">Pro Card</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.7);">Subscription card. Gradient from violet-deep to violet.</div>
+    </div>
+  </div>
+
+  <!-- Tab Bar -->
+  <div style="margin:24px 0 12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Tab Bar</div>
+  <div class="preview-light" style="max-width:393px;">
+    <div style="display:flex;justify-content:space-around;align-items:flex-start;padding:10px 0;border-top:1px solid #F0EFF4;">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;color:#7B68EE;font-size:10px;font-weight:500;">
+        <i data-lucide="house" width="22" height="22"></i>Home
+        <div style="width:5px;height:5px;border-radius:50%;background:#7B68EE;"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;color:#A8A8BC;font-size:10px;font-weight:500;">
+        <i data-lucide="building-2" width="22" height="22"></i>Properties
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;color:#A8A8BC;font-size:10px;font-weight:500;">
+        <i data-lucide="clock" width="22" height="22"></i>Track
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;color:#A8A8BC;font-size:10px;font-weight:500;">
+        <i data-lucide="bar-chart-3" width="22" height="22"></i>Reports
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;color:#A8A8BC;font-size:10px;font-weight:500;">
+        <i data-lucide="settings" width="22" height="22"></i>Settings
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===================== 07. PATTERNS ===================== -->
+<section class="section">
+  <div class="section-label">07 · Patterns</div>
+  <div class="section-title">Visual Patterns</div>
+  <div class="section-desc">Recurring visual treatments that give the app its signature warm, atmospheric feel.</div>
+
+  <div class="grid-2" style="margin-bottom:24px;">
+    <div class="card">
+      <div class="card-label">Aurora Background</div>
+      <div class="card-title">Floating Blur Blobs</div>
+      <div class="card-desc">
+        2–3 large circles (200–300px) with radial-gradient fills, blurred 60–70px, positioned absolutely at corners.<br><br>
+        <strong style="color:white;">CSS:</strong> border-radius: 50%; filter: blur(70px); pointer-events: none; position: absolute;<br><br>
+        <strong style="color:white;">SwiftUI:</strong> Circle().fill(gradient).blur(radius: 70).offset()
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Progress Ring</div>
+      <div class="card-title">Dual-Ring Indicator</div>
+      <div class="card-desc">
+        <strong style="color:white;">Outer ring:</strong> 18pt stroke, r=108, 260×260 viewBox. Gradient fill with spring animation.<br><br>
+        <strong style="color:white;">Inner ring:</strong> 10pt stroke, r=82. Only for REPS (50% rule).<br><br>
+        <strong style="color:white;">Track:</strong> Dashed (stroke-dasharray: 3 5).<br><br>
+        <strong style="color:white;">Spring:</strong> response: 0.8, damping: 0.75
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Glass Tab Bar</div>
+      <div class="card-title">Frosted Glass</div>
+      <div class="card-desc">
+        background: rgba(255,255,255,0.85)<br>
+        backdrop-filter: blur(20px)<br>
+        border-top: 1px solid rgba(0,0,0,0.04)<br><br>
+        <strong style="color:white;">SwiftUI:</strong> .ultraThinMaterial
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">AI Suggestion</div>
+      <div class="card-title">Detection Bar</div>
+      <div class="card-desc">
+        background: var(--violet-wash)<br>
+        border: 1.5px solid var(--violet-soft)<br>
+        border-radius: 14px<br><br>
+        Sparkle badge: 28×28, rounded 8px, bg: violet, white sparkles icon.<br>
+        Auto-fill chips + button on right.
+      </div>
+    </div>
+  </div>
+
+  <!-- Animation presets -->
+  <div style="margin-bottom:12px;font-size:12px;font-weight:600;color:var(--slate);letter-spacing:1px;text-transform:uppercase;">Animation Presets</div>
+  <table class="ds-table">
+    <thead>
+      <tr><th>Name</th><th>Value</th><th>Usage</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Quick</td><td>easeInOut(0.15)</td><td>Micro-interactions, icon taps</td></tr>
+      <tr><td>Standard</td><td>easeInOut(0.3)</td><td>State transitions, cards</td></tr>
+      <tr><td>Smooth</td><td>spring(0.4, 0.8)</td><td>Smooth reveals, sheets</td></tr>
+      <tr><td>Bouncy</td><td>spring(0.5, 0.7)</td><td>Playful bounces, celebrations</td></tr>
+      <tr><td>Ring Progress</td><td>spring(0.8, 0.75)</td><td>Progress ring fill animation</td></tr>
+      <tr><td>Pill Pop</td><td>spring(0.45, 0.6)</td><td>Goal pill selection (1→1.08→0.97→1)</td></tr>
+      <tr><td>Background Morph</td><td>cubic-bezier(0.4,0,0.2,1) 0.9s</td><td>Gradient background crossfade</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===================== 08. SCREEN INVENTORY ===================== -->
+<section class="section">
+  <div class="section-label">08 · Screens</div>
+  <div class="section-title">Screen Inventory</div>
+  <div class="section-desc">Every screen in the app, with its file, state count, and key patterns.</div>
+
+  <table class="ds-table">
+    <thead>
+      <tr><th>Screen</th><th>File</th><th>States</th><th>Key Patterns</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Onboarding</td><td>onboarding-full.html</td><td>7 screens (A–G)</td><td>Progress bar, goal cards, property form, permission cards, AI demo, celebration</td></tr>
+      <tr><td>Dashboard / Home</td><td>dashboard.html</td><td>3 (Trial, Paid, Expired)</td><td>Hero progress ring, aurora bg, activity rows, learn carousel, trial nudge</td></tr>
+      <tr><td>Track Time</td><td>track-v3.html</td><td>3 (Empty, AI Suggest, Filled)</td><td>AI suggestion bar, category chips, hour stepper, date picker, participant toggle</td></tr>
+      <tr><td>Reports</td><td>reports-v3.html</td><td>3 goals (REPS, 500h, 100h)</td><td>Dual-ring progress, spring physics, goal pills, gradient morphing, glass stats</td></tr>
+      <tr><td>Learning Center</td><td>learning-center.html</td><td>3 (Hub, Article, Guide)</td><td>Aurora bg, course cards, article detail, reading progress, bookmarks</td></tr>
+      <tr><td>Settings</td><td>settings.html</td><td>2 (Pro, Free/Trial)</td><td>Setting rows with Lucide icons, subscription card, feature comparison</td></tr>
+      <tr><td>Property + Tax</td><td>property-and-tax-profile.html</td><td>2 (Add Property, Tax Profile)</td><td>Management select cards, property type toggle, grouped settings, info tips</td></tr>
+      <tr><td>Milestone</td><td>milestone-celebration.html</td><td>Interactive</td><td>Confetti animation, achievement card, share action</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===================== 09. DESIGN PHILOSOPHY ===================== -->
+<section class="section">
+  <div class="section-label">09 · Philosophy</div>
+  <div class="section-title">Design Principles</div>
+  <div class="section-desc">The "why" behind every visual decision.</div>
+
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-label">01</div>
+      <div class="card-title">Warm, Not Corporate</div>
+      <div class="card-desc">Users are landlords dealing with tax anxiety. The app should feel like a wellness tracker (Tiimo, Health app), not a spreadsheet. Cream backgrounds, rounded corners, friendly icons.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">02</div>
+      <div class="card-title">Clarity Over Density</div>
+      <div class="card-desc">Show one clear number per screen. Hero progress ring — not tables. Warm messages ("You're building momentum") instead of raw data dumps. Reduce cognitive load.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">03</div>
+      <div class="card-title">Respectful Monetization</div>
+      <div class="card-desc">Trial nudge = slim inline row, not giant FOMO banner. Expired state = gentle card saying "Your trial has ended" with a small Upgrade button. Never aggressive. Never scary.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">04</div>
+      <div class="card-title">Emotional Reward</div>
+      <div class="card-desc">Checking the dashboard should feel like checking a fitness ring you're proud of. Confetti on milestones. Encouraging messages. Color that shifts as you progress.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">05</div>
+      <div class="card-title">Progressive Disclosure</div>
+      <div class="card-desc">Don't show everything at once. Empty state → type description → AI suggests → auto-fill. Each step reveals the next. Complexity unfolds naturally.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">06</div>
+      <div class="card-title">System-Native Feel</div>
+      <div class="card-desc">SF Pro Rounded + New York. System materials for blur. Native springs for animation. The app should feel like it belongs on iOS, enhanced with our personality layer.</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ===================== 10. FILE MAP ===================== -->
+<section class="section" style="padding-bottom:80px;">
+  <div class="section-label">10 · Files</div>
+  <div class="section-title">Project File Map</div>
+  <div class="section-desc">HTML mockups are the source of truth for design. CLAUDE.md documents specs for SwiftUI implementation.</div>
+
+  <table class="ds-table">
+    <thead>
+      <tr><th>File</th><th>Purpose</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>index.html</td><td>Gallery hub — iframes all screens</td><td>Updated</td></tr>
+      <tr><td>design-system.html</td><td>This file — complete design system reference</td><td>Current</td></tr>
+      <tr><td>icon-dls.html</td><td>Full icon library reference (Lucide + Jelly)</td><td>Updated with Lucide</td></tr>
+      <tr><td>dashboard.html</td><td>Home tab — 3 states</td><td>Lucide migrated</td></tr>
+      <tr><td>track-v3.html</td><td>Track Time — 3 AI-assisted states</td><td>Lucide migrated</td></tr>
+      <tr><td>reports-v3.html</td><td>Reports — interactive goal switcher</td><td>Lucide migrated</td></tr>
+      <tr><td>learning-center.html</td><td>Learning Center — hub + detail views</td><td>Lucide migrated</td></tr>
+      <tr><td>settings.html</td><td>Settings — Pro and Free states</td><td>Lucide migrated</td></tr>
+      <tr><td>onboarding-full.html</td><td>7-screen onboarding flow</td><td>Lucide migrated</td></tr>
+      <tr><td>property-and-tax-profile.html</td><td>Add Property + Tax Profile settings</td><td>Lucide migrated</td></tr>
+      <tr><td>milestone-celebration.html</td><td>Interactive confetti celebration</td><td>Standalone</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>

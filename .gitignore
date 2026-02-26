@@ -4,3 +4,4 @@
 *.xcuserdatad
 DerivedData/
 .xcode.env.local
+.claude/worktrees/

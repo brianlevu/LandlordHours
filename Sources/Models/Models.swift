@@ -30,13 +30,25 @@ struct RentalProperty: Identifiable, Codable, Hashable {
     var address: String
     var propertyType: PropertyType
     var createdAt: Date
-    
+    var modifiedAt: Date
+
     init(id: UUID = UUID(), name: String, address: String, propertyType: PropertyType) {
         self.id = id
         self.name = name
         self.address = address
         self.propertyType = propertyType
         self.createdAt = Date()
+        self.modifiedAt = Date()
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        address = try c.decode(String.self, forKey: .address)
+        propertyType = try c.decode(PropertyType.self, forKey: .propertyType)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        modifiedAt = try c.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? createdAt
     }
     
     var shortAddress: String {
@@ -132,13 +144,25 @@ struct TimeAttachment: Identifiable, Codable {
     var data: Data
     var mimeType: String
     var createdAt: Date
-    
+    var modifiedAt: Date
+
     init(id: UUID = UUID(), filename: String, data: Data, mimeType: String) {
         self.id = id
         self.filename = filename
         self.data = data
         self.mimeType = mimeType
         self.createdAt = Date()
+        self.modifiedAt = Date()
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        filename = try c.decode(String.self, forKey: .filename)
+        data = try c.decode(Data.self, forKey: .data)
+        mimeType = try c.decode(String.self, forKey: .mimeType)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        modifiedAt = try c.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? createdAt
     }
 }
 
@@ -153,7 +177,8 @@ struct TimeEntry: Identifiable, Codable {
     var notes: String
     var attachments: [TimeAttachment]
     var createdAt: Date
-    
+    var modifiedAt: Date
+
     init(
         id: UUID = UUID(),
         propertyId: UUID,
@@ -173,6 +198,21 @@ struct TimeEntry: Identifiable, Codable {
         self.notes = notes
         self.attachments = attachments
         self.createdAt = Date()
+        self.modifiedAt = Date()
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        propertyId = try c.decode(UUID.self, forKey: .propertyId)
+        participant = try c.decode(Participant.self, forKey: .participant)
+        category = try c.decode(ActivityCategory.self, forKey: .category)
+        hours = try c.decode(Double.self, forKey: .hours)
+        date = try c.decode(Date.self, forKey: .date)
+        notes = try c.decode(String.self, forKey: .notes)
+        attachments = try c.decodeIfPresent([TimeAttachment].self, forKey: .attachments) ?? []
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        modifiedAt = try c.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? createdAt
     }
     
     // Helper to get property name - call this when needed
