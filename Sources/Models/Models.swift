@@ -178,6 +178,7 @@ struct TimeEntry: Identifiable, Codable {
     var attachments: [TimeAttachment]
     var createdAt: Date
     var modifiedAt: Date
+    var importSource: String? // nil = manual, "calendar" = calendar import
 
     init(
         id: UUID = UUID(),
@@ -187,7 +188,8 @@ struct TimeEntry: Identifiable, Codable {
         hours: Double,
         date: Date = Date(),
         notes: String = "",
-        attachments: [TimeAttachment] = []
+        attachments: [TimeAttachment] = [],
+        importSource: String? = nil
     ) {
         self.id = id
         self.propertyId = propertyId
@@ -197,6 +199,7 @@ struct TimeEntry: Identifiable, Codable {
         self.date = date
         self.notes = notes
         self.attachments = attachments
+        self.importSource = importSource
         self.createdAt = Date()
         self.modifiedAt = Date()
     }
@@ -213,6 +216,7 @@ struct TimeEntry: Identifiable, Codable {
         attachments = try c.decodeIfPresent([TimeAttachment].self, forKey: .attachments) ?? []
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         modifiedAt = try c.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? createdAt
+        importSource = try c.decodeIfPresent(String.self, forKey: .importSource)
     }
     
     // Helper to get property name - call this when needed

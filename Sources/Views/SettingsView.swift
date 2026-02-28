@@ -61,6 +61,9 @@ struct PropertyGoal: Identifiable, Codable {
 class GoalManager: ObservableObject {
     static let shared = GoalManager()
 
+    /// Called when goals change, so sync can be triggered
+    var onDidChange: (() -> Void)?
+
     @Published var propertyGoals: [PropertyGoal] = []
     @Published var globalGoalType: HourGoalType = .reps
 
@@ -92,6 +95,7 @@ class GoalManager: ObservableObject {
             UserDefaults.standard.set(data, forKey: goalsKey)
         }
         UserDefaults.standard.set(globalGoalType.rawValue, forKey: globalGoalKey)
+        onDidChange?()
     }
 
     func resetForSignOut() {
@@ -133,24 +137,32 @@ enum FilingStatus: String, CaseIterable, Codable {
 final class TaxProfileManager: ObservableObject {
     static let shared = TaxProfileManager()
 
+    /// Called when any field changes, so sync can be triggered
+    var onDidChange: (() -> Void)?
+
     private func scopedKey(_ field: String) -> String {
         UserScope.key("LandlordHours.taxProfile." + field)
     }
 
+    private func save(_ key: String, _ value: Any) {
+        UserDefaults.standard.set(value, forKey: key)
+        onDidChange?()
+    }
+
     @Published var filingStatus: FilingStatus {
-        didSet { UserDefaults.standard.set(filingStatus.rawValue, forKey: scopedKey("filingStatus")) }
+        didSet { save(scopedKey("filingStatus"), filingStatus.rawValue) }
     }
     @Published var spouseTracking: Bool {
-        didSet { UserDefaults.standard.set(spouseTracking, forKey: scopedKey("spouseTracking")) }
+        didSet { save(scopedKey("spouseTracking"), spouseTracking) }
     }
     @Published var taxYear: Int {
-        didSet { UserDefaults.standard.set(taxYear, forKey: scopedKey("taxYear")) }
+        didSet { save(scopedKey("taxYear"), taxYear) }
     }
     @Published var groupingElection: Bool {
-        didSet { UserDefaults.standard.set(groupingElection, forKey: scopedKey("groupingElection")) }
+        didSet { save(scopedKey("groupingElection"), groupingElection) }
     }
     @Published var nonREWorkHours: Double {
-        didSet { UserDefaults.standard.set(nonREWorkHours, forKey: scopedKey("nonREWorkHours")) }
+        didSet { save(scopedKey("nonREWorkHours"), nonREWorkHours) }
     }
 
     private init() {
@@ -366,7 +378,7 @@ private struct SubscriptionCard: View {
                                     .frame(height: 3)
                                 Capsule()
                                     .fill(AppColors.warning)
-                                    .frame(width: geo.size.width * CGFloat(max(0, 14 - trialDaysRemaining)) / 14.0, height: 3)
+                                    .frame(width: geo.size.width * CGFloat(max(0, 7 - trialDaysRemaining)) / 7.0, height: 3)
                             }
                         }
                         .frame(height: 3)
@@ -536,7 +548,10 @@ struct SettingsView: View {
     @State private var userEmail = ""
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var profileImage: Data?
-    @State private var calendarSyncEnabled = false
+    @State private var showingIconPicker = false
+    @State private var showingCalendarImport = false
+    @State private var calendarDetectedEntries: [DetectedCalendarEntry] = []
+    @State private var isScanning = false
 
     var body: some View {
         NavigationStack {
@@ -545,11 +560,12 @@ struct SettingsView: View {
                     // Page title
                     HStack {
                         Text("Settings")
-                            .font(AppTypography.headline)
+                            .font(.system(size: 28, weight: .regular, design: .serif))
                             .foregroundStyle(colors.textPrimary)
                         Spacer()
                     }
-                    .padding(.bottom, 24)
+                    .padding(.vertical, 4)
+                    .padding(.bottom, 20)
 
                     // ===== Plan & Account =====
                     SectionLabel(text: "Plan & Account")
@@ -570,7 +586,9 @@ struct SettingsView: View {
 
                     // Restore purchase row
                     Button {
-                        // Restore purchase action
+                        Task {
+                            await subscriptionManager.restorePurchases()
+                        }
                     } label: {
                         SettingRow(
                             icon: Lucide.badgeCheck,
@@ -579,6 +597,23 @@ struct SettingsView: View {
                         )
                     }
                     .buttonStyle(.plain)
+
+                    #if DEBUG
+                    // Debug-only: unlock Pro without StoreKit
+                    Button {
+                        print("[DEBUG] Unlock Pro tapped — calling unlockPro()")
+                        Task { await subscriptionManager.unlockPro() }
+                    } label: {
+                        Text(subscriptionManager.hasPurchased ? "DEBUG: Pro Unlocked ✓" : "DEBUG: Unlock Pro")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(subscriptionManager.hasPurchased ? AppColors.sage : AppColors.coral)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .padding(.top, 8)
+                    #endif
 
                     // ===== Profile & Tax =====
                     SectionLabel(text: "Profile & Tax")
@@ -597,7 +632,7 @@ struct SettingsView: View {
 
                     Divider().background(AppColors.snow)
 
-                    // Tax Profile
+                    // Tax Profile (includes goal, filing status, spouse tracking)
                     NavigationLink {
                         TaxProfileView()
                     } label: {
@@ -605,7 +640,22 @@ struct SettingsView: View {
                             icon: Lucide.fileText,
                             iconColor: AppColors.charcoal,
                             title: "Tax Profile",
-                            subtitle: "Filing, goals & properties"
+                            subtitle: "Filing, goals & spouse tracking"
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider().background(AppColors.snow)
+
+                    // Learning Center
+                    NavigationLink {
+                        LearningCenterView()
+                    } label: {
+                        SettingRow(
+                            icon: Lucide.bookOpen,
+                            iconColor: AppColors.charcoal,
+                            title: "Learning Center",
+                            subtitle: "Guides, tax strategy & tips"
                         )
                     }
                     .buttonStyle(.plain)
@@ -670,12 +720,43 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
 
+                    Divider().background(AppColors.snow)
+
+                    // Import from Calendar
+                    Button {
+                        Task {
+                            isScanning = true
+                            let granted = await CalendarImportService.shared.requestAccess()
+                            if granted {
+                                let calendars = CalendarImportService.shared.availableCalendars()
+                                let allIds = Set(calendars.map { $0.calendarIdentifier })
+                                calendarDetectedEntries = CalendarImportService.shared.scanCalendars(
+                                    allIds,
+                                    properties: viewModel.properties
+                                )
+                                showingCalendarImport = true
+                            }
+                            isScanning = false
+                        }
+                    } label: {
+                        SettingRow(
+                            icon: Lucide.calendar,
+                            iconColor: AppColors.charcoal,
+                            title: "Import from Calendar",
+                            subtitle: isScanning ? "Scanning..." : "Detect property events"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isScanning)
+
                     // ===== Preferences =====
                     SectionLabel(text: "Preferences")
 
                     // Notifications
                     Button {
-                        // Notifications settings
+                        if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
                     } label: {
                         SettingRow(
                             icon: Lucide.bell,
@@ -687,59 +768,21 @@ struct SettingsView: View {
 
                     Divider().background(AppColors.snow)
 
-                    // Calendar Sync
-                    SettingToggleRow(
-                        icon: Lucide.calendarCheck,
-                        iconColor: AppColors.charcoal,
-                        title: "Calendar Sync",
-                        isOn: $calendarSyncEnabled
-                    )
-
-                    Divider().background(AppColors.snow)
-
-                    // Appearance
-                    Button {
-                        // Appearance settings
-                    } label: {
-                        SettingRow(
-                            icon: Lucide.sun,
-                            iconColor: AppColors.charcoal,
-                            title: "Appearance",
-                            value: "System"
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    Divider().background(AppColors.snow)
-
                     // App Icon
                     Button {
-                        // App icon selection
+                        showingIconPicker = true
                     } label: {
                         SettingRow(
                             icon: Lucide.layoutGrid,
                             iconColor: AppColors.charcoal,
-                            title: "App Icon"
+                            title: "App Icon",
+                            value: AppIconOption.current.displayName
                         )
                     }
                     .buttonStyle(.plain)
 
                     // ===== Support =====
                     SectionLabel(text: "Support")
-
-                    // Help Center
-                    Button {
-                        // Help center
-                    } label: {
-                        SettingRow(
-                            icon: Lucide.circleQuestionMark,
-                            iconColor: AppColors.charcoal,
-                            title: "Help Center"
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    Divider().background(AppColors.snow)
 
                     // Contact Support
                     NavigationLink {
@@ -757,7 +800,9 @@ struct SettingsView: View {
 
                     // Terms & Privacy
                     Button {
-                        // Terms
+                        if let url = URL(string: "https://www.openclaw.com/landlord-hours/terms") {
+                            UIApplication.shared.open(url)
+                        }
                     } label: {
                         SettingRow(
                             icon: Lucide.scrollText,
@@ -811,11 +856,18 @@ struct SettingsView: View {
             .sheet(isPresented: $showingPaywall) {
                 PaywallView(showPaywall: $showingPaywall)
             }
+            .sheet(isPresented: $showingIconPicker) {
+                AppIconPickerView()
+            }
+            .sheet(isPresented: $showingCalendarImport) {
+                CalendarImportReviewView(detectedEntries: calendarDetectedEntries)
+            }
         }
     }
 
     private var syncSubtitle: String? {
         if viewModel.syncService.isSyncing { return "Syncing..." }
+        if let error = viewModel.syncService.syncError { return "Error: \(error)" }
         if let date = viewModel.syncService.lastSyncDate {
             let formatter = RelativeDateTimeFormatter()
             formatter.unitsStyle = .short
@@ -1499,6 +1551,169 @@ struct ProfileEditView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - App Icon Option
+
+enum AppIconOption: String, CaseIterable {
+    case `default` = "AppIcon"
+    case violet = "AppIcon-Violet"
+    case sunset = "AppIcon-Sunset"
+    case clock = "AppIcon-Clock"
+    case aurora = "AppIcon-Aurora"
+
+    var displayName: String {
+        switch self {
+        case .default: return "Default"
+        case .violet: return "Violet Waves"
+        case .sunset: return "Warm Sunset"
+        case .clock: return "House + Clock"
+        case .aurora: return "Full Spectrum"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .default: return "Original brand icon"
+        case .violet: return "Violet Soft to Violet Deep"
+        case .sunset: return "Coral through Rose to Violet"
+        case .clock: return "Sage-to-Violet with clock face"
+        case .aurora: return "Honey through Coral to Violet"
+        }
+    }
+
+    var previewImageName: String {
+        switch self {
+        case .default: return "AppIconPreview-Default"
+        case .violet: return "AppIconPreview-Violet"
+        case .sunset: return "AppIconPreview-Sunset"
+        case .clock: return "AppIconPreview-Clock"
+        case .aurora: return "AppIconPreview-Aurora"
+        }
+    }
+
+    var alternateIconName: String? {
+        self == .default ? nil : rawValue
+    }
+
+    static var current: AppIconOption {
+        guard let name = UIApplication.shared.alternateIconName else { return .default }
+        return AppIconOption(rawValue: name) ?? .default
+    }
+}
+
+// MARK: - App Icon Picker View
+
+struct AppIconPickerView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    @State private var selectedIcon: AppIconOption = AppIconOption.current
+
+    var body: some View {
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 16) {
+                    Text("Choose an icon that fits your style.")
+                        .font(AppTypography.body)
+                        .foregroundStyle(colors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.bottom, 4)
+
+                    ForEach(AppIconOption.allCases, id: \.rawValue) { option in
+                        AppIconRow(
+                            option: option,
+                            isSelected: selectedIcon == option,
+                            colors: colors
+                        ) {
+                            let actualCurrent = AppIconOption.current
+                            guard actualCurrent != option else {
+                                selectedIcon = option
+                                return
+                            }
+                            selectedIcon = option
+                            UIApplication.shared.setAlternateIconName(option.alternateIconName) { error in
+                                DispatchQueue.main.async {
+                                    if let error {
+                                        print("Failed to set app icon: \(error.localizedDescription)")
+                                        selectedIcon = AppIconOption.current
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 40)
+            }
+            .background(colors.background)
+            .navigationTitle("App Icon")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
+                        .foregroundStyle(AppColors.primary)
+                }
+            }
+            .onAppear {
+                selectedIcon = AppIconOption.current
+            }
+        }
+    }
+}
+
+private struct AppIconRow: View {
+    let option: AppIconOption
+    let isSelected: Bool
+    let colors: AdaptiveColors
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 16) {
+                // Icon preview
+                Image(option.previewImageName)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 60, height: 60)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(isSelected ? AppColors.primary : colors.border.opacity(0.5), lineWidth: isSelected ? 2.5 : 0.5)
+                    )
+
+                // Text
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(option.displayName)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(colors.textPrimary)
+                    Text(option.subtitle)
+                        .font(AppTypography.caption)
+                        .foregroundStyle(colors.textSecondary)
+                }
+
+                Spacer()
+
+                // Checkmark
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(AppColors.primary)
+                }
+            }
+            .padding(14)
+            .background(colors.backgroundSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
+            .overlay(
+                RoundedRectangle(cornerRadius: AppCornerRadius.medium)
+                    .stroke(isSelected ? AppColors.primary.opacity(0.3) : Color.clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

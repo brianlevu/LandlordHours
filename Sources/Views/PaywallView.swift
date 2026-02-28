@@ -223,7 +223,19 @@ struct PaywallView: View {
                 }
             } else {
                 Button {
-                    Task { await subscriptionManager.purchasePro() }
+                    if subscriptionManager.products.isEmpty {
+                        // Retry loading products, then attempt purchase
+                        Task {
+                            await subscriptionManager.loadProducts()
+                            if subscriptionManager.products.isEmpty {
+                                subscriptionManager.purchaseError = "Unable to connect to the App Store. Please check your connection and try again."
+                            } else {
+                                await subscriptionManager.purchasePro()
+                            }
+                        }
+                    } else {
+                        Task { await subscriptionManager.purchasePro() }
+                    }
                 } label: {
                     Group {
                         if let product = subscriptionManager.proProduct {
@@ -239,7 +251,6 @@ struct PaywallView: View {
                     .background(colorScheme == .dark ? Color.white : AppColors.charcoal)
                     .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
                 }
-                .disabled(subscriptionManager.products.isEmpty)
             }
 
             // Error message

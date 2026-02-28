@@ -1,6 +1,10 @@
 import SwiftUI
 import LucideIcons
 
+extension Notification.Name {
+    static let switchToTab = Notification.Name("switchToTab")
+}
+
 struct ContentView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @Environment(\.colorScheme) var colorScheme
@@ -47,22 +51,15 @@ struct ContentView: View {
         .environmentObject(goalManager)
         .onAppear {
             viewModel.checkSignInState()
-            if viewModel.isSignedIn {
-                if !UserDefaults.standard.bool(forKey: UserScope.key("hasCompletedOnboarding")) {
-                    showOnboarding = true
-                } else if subscriptionManager.showPaywall {
-                    showPaywall = true
-                }
-            }
+            checkPostSignInFlow()
         }
         .onChange(of: viewModel.isSignedIn) { _, newValue in
             if newValue {
-                // User just signed in — show onboarding if first time
-                if !UserDefaults.standard.bool(forKey: UserScope.key("hasCompletedOnboarding")) {
-                    showOnboarding = true
-                }
+                checkPostSignInFlow()
             } else {
                 // User signed out — show splash briefly, then login
+                showOnboarding = false
+                showPaywall = false
                 showSplashAfterSignOut = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                     withAnimation(AppAnimation.standard) {
@@ -76,15 +73,11 @@ struct ContentView: View {
     // MARK: - Splash / Loading Screen
     private var splashScreen: some View {
         ZStack {
-            // Soft lavender gradient (matches onboarding splash A)
+            // Soft lavender gradient — adapts to dark mode
             LinearGradient(
-                colors: [
-                    Color(hex: "C4B5FD"),
-                    Color(hex: "DDD6FE"),
-                    Color(hex: "EDE9FE"),
-                    Color(hex: "F5F3FF"),
-                    Color.white
-                ],
+                colors: colorScheme == .dark
+                    ? [Color(hex: "1A1535"), Color(hex: "1C1A2E"), Color(hex: "0D0D0D")]
+                    : [Color(hex: "C4B5FD"), Color(hex: "DDD6FE"), Color(hex: "EDE9FE"), Color(hex: "F5F3FF"), Color.white],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -124,7 +117,7 @@ struct ContentView: View {
                     VStack(spacing: 8) {
                         HStack(spacing: 0) {
                             Text("Landlord")
-                                .foregroundColor(AppColors.charcoal)
+                                .foregroundColor(colors.textPrimary)
                             Text("Hours")
                                 .foregroundColor(AppColors.primary)
                         }
@@ -132,7 +125,7 @@ struct ContentView: View {
 
                         Text("Track your path to tax qualification")
                             .font(.system(size: 15, design: .rounded))
-                            .foregroundColor(AppColors.slate)
+                            .foregroundColor(colors.textSecondary)
                     }
                 }
 
@@ -186,14 +179,20 @@ struct ContentView: View {
             .frame(width: 1, height: 20)
     }
 
-    // MARK: - Lucide Tab Icon Helper
-    private func lucideTabIcon(_ image: UIImage) -> Image {
-        Image(uiImage: image.withRenderingMode(.alwaysTemplate))
+    /// Single entry point for post-sign-in UI flow. Prevents duplicate triggers
+    /// from both onAppear and onChange(of: isSignedIn).
+    private func checkPostSignInFlow() {
+        guard viewModel.isSignedIn, !showOnboarding, !showPaywall else { return }
+        if !UserDefaults.standard.bool(forKey: UserScope.key("hasCompletedOnboarding")) {
+            showOnboarding = true
+        } else if subscriptionManager.showPaywall {
+            showPaywall = true
+        }
     }
 
     // MARK: - Main Content with Tab Bar
     var mainContent: some View {
-        VStack(spacing: 0) {
+        ZStack(alignment: .bottom) {
             TabView(selection: $selectedTab) {
                 DashboardView()
                     .tabItem {
@@ -231,6 +230,80 @@ struct ContentView: View {
                     .tag(4)
             }
             .tint(AppColors.primary)
+            .onReceive(NotificationCenter.default.publisher(for: .switchToTab)) { notification in
+                if let tab = notification.object as? Int {
+                    selectedTab = tab
+                }
+            }
+
+            // Floating timer banner (visible on all tabs except Track)
+            if viewModel.isTimerRunning && selectedTab != 2 {
+                FloatingTimerBanner(viewModel: viewModel) {
+                    selectedTab = 2
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .padding(.bottom, 52) // above tab bar
+            }
+        }
+    }
+
+    private func lucideTabIcon(_ image: UIImage) -> some View {
+        LucideIcon(image: image, size: 22)
+    }
+}
+
+// MARK: - Floating Timer Banner
+
+struct FloatingTimerBanner: View {
+    @ObservedObject var viewModel: AppViewModel
+    let onTap: () -> Void
+
+    @State private var elapsed: TimeInterval = 0
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    private var propertyName: String {
+        guard let id = viewModel.timerPropertyId else { return "" }
+        return viewModel.properties.first { $0.id == id }?.name ?? "Unknown"
+    }
+
+    private var formattedTime: String {
+        let h = Int(elapsed) / 3600
+        let m = (Int(elapsed) % 3600) / 60
+        let s = Int(elapsed) % 60
+        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
+        return String(format: "%d:%02d", m, s)
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(AppColors.coral)
+                    .frame(width: 8, height: 8)
+                Text(formattedTime)
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
+                Text(propertyName)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .lineLimit(1)
+                Spacer()
+                LucideIcon(image: Lucide.chevronRight, size: 14)
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(AppColors.primary)
+            .clipShape(Capsule())
+            .shadow(color: AppColors.primary.opacity(0.4), radius: 12, y: 4)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 20)
+        .onReceive(timer) { _ in
+            elapsed = viewModel.timerElapsedTime
+        }
+        .onAppear {
+            elapsed = viewModel.timerElapsedTime
         }
     }
 }

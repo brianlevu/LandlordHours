@@ -147,6 +147,8 @@ struct OnboardingView: View {
     @Binding var showOnboarding: Bool
     @EnvironmentObject var viewModel: AppViewModel
     @StateObject private var goalManager = GoalManager.shared
+    @Environment(\.colorScheme) var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var currentStep: OnboardingStep = .goalSelection
     @State private var appeared = false
@@ -165,7 +167,7 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            Color.white.ignoresSafeArea()
+            colors.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Navigation bar + progress
@@ -216,7 +218,7 @@ struct OnboardingView: View {
                     }
                 } label: {
                     LucideIcon(image: Lucide.chevronLeft, size: 18)
-                        .foregroundStyle(AppColors.charcoal)
+                        .foregroundStyle(colors.textPrimary)
                         .frame(width: 44, height: 44)
                 }
             } else {
@@ -309,7 +311,7 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("What's your\nmain goal?")
                     .font(.system(size: 28, weight: .regular, design: .serif))
-                    .foregroundStyle(AppColors.charcoal)
+                    .foregroundStyle(colors.textPrimary)
                     .lineSpacing(2)
 
                 Text("We'll customize your experience based on what you're tracking toward.")
@@ -360,7 +362,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(goal.title)
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .foregroundStyle(AppColors.charcoal)
+                        .foregroundStyle(colors.textPrimary)
 
                     Text(goal.subtitle)
                         .font(AppTypography.bodySmall)
@@ -377,7 +379,7 @@ struct OnboardingView: View {
             .padding(.vertical, 18)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(selectedGoal == goal ? Color(hex: "F8F6FF") : Color.white)
+                    .fill(selectedGoal == goal ? Color(hex: "F8F6FF").opacity(colorScheme == .dark ? 0.15 : 1) : colors.backgroundSecondary)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
@@ -399,7 +401,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Add your first\nproperty")
                         .font(.system(size: 28, weight: .regular, design: .serif))
-                        .foregroundStyle(AppColors.charcoal)
+                        .foregroundStyle(colors.textPrimary)
                         .lineSpacing(2)
 
                     Text("We'll tailor your tracking based on property type and who manages it.")
@@ -505,7 +507,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(option.title)
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundStyle(AppColors.charcoal)
+                        .foregroundStyle(colors.textPrimary)
 
                     Text(option.subtitle)
                         .font(.system(size: 11, weight: .regular, design: .rounded))
@@ -521,7 +523,7 @@ struct OnboardingView: View {
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(selectedManagement == option ? Color(hex: "F8F6FF") : Color.white)
+                    .fill(selectedManagement == option ? Color(hex: "F8F6FF").opacity(colorScheme == .dark ? 0.15 : 1) : colors.backgroundSecondary)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
@@ -543,7 +545,7 @@ struct OnboardingView: View {
 
             TextField(placeholder, text: text)
                 .font(.system(size: 16, design: .rounded))
-                .foregroundStyle(AppColors.charcoal)
+                .foregroundStyle(colors.textPrimary)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
                 .background(
@@ -580,7 +582,7 @@ struct OnboardingView: View {
                     TextField("123 Main Street", text: $streetAddress)
                         .focused($isAddressFocused)
                         .font(.system(size: 16, design: .rounded))
-                        .foregroundStyle(AppColors.charcoal)
+                        .foregroundStyle(colors.textPrimary)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 14)
                         .background(
@@ -612,7 +614,7 @@ struct OnboardingView: View {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(item.name ?? "Unknown")
                                             .font(.system(size: 14, weight: .medium, design: .rounded))
-                                            .foregroundStyle(AppColors.charcoal)
+                                            .foregroundStyle(colors.textPrimary)
                                         if let addr = item.placemark.title {
                                             Text(addr)
                                                 .font(.system(size: 11, design: .rounded))
@@ -692,11 +694,7 @@ struct OnboardingView: View {
 
     // MARK: - Screen E: Paywall
 
-    @State private var selectedPlan: PaywallPlan = .annual
-
-    private enum PaywallPlan {
-        case monthly, annual
-    }
+    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
 
     private var paywallScreen: some View {
         ZStack {
@@ -740,7 +738,7 @@ struct OnboardingView: View {
                 // Headline
                 Text("Track every hour\ntoward tax qualification")
                     .font(.system(size: 26, weight: .regular, design: .serif))
-                    .foregroundStyle(AppColors.charcoal)
+                    .foregroundStyle(colors.textPrimary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(2)
                     .padding(.bottom, 16)
@@ -753,32 +751,36 @@ struct OnboardingView: View {
                 }
                 .padding(.bottom, 24)
 
-                // Plan cards
-                HStack(spacing: 12) {
-                    // Monthly
-                    paywallPlanCard(
-                        label: "Monthly",
-                        price: "$9.99",
-                        period: "per month",
-                        trialText: "No trial",
-                        isPopular: false,
-                        isSelected: selectedPlan == .monthly
-                    ) {
-                        withAnimation(AppAnimation.quick) { selectedPlan = .monthly }
+                // One-time purchase card
+                VStack(spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        if let product = SubscriptionManager.shared.proProduct {
+                            Text(product.displayPrice)
+                                .font(.system(size: 42, weight: .heavy))
+                                .foregroundStyle(colors.textPrimary)
+                        } else {
+                            Text("$30")
+                                .font(.system(size: 42, weight: .heavy))
+                                .foregroundStyle(colors.textPrimary)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("one-time")
+                                .font(.system(size: 13))
+                                .foregroundStyle(AppColors.slate)
+                            Text("yours forever")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(AppColors.sage)
+                        }
                     }
-
-                    // Annual
-                    paywallPlanCard(
-                        label: "Annual",
-                        price: "$59.99",
-                        period: "per year",
-                        trialText: "7-day free trial",
-                        isPopular: true,
-                        isSelected: selectedPlan == .annual
-                    ) {
-                        withAnimation(AppAnimation.quick) { selectedPlan = .annual }
-                    }
+                    Text("Less than one hour of billable time")
+                        .font(.system(size: 13))
+                        .foregroundStyle(AppColors.mist)
                 }
+                .padding(.vertical, 20)
+                .padding(.horizontal, 28)
+                .frame(maxWidth: .infinity)
+                .background(Color.white.opacity(0.7))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
                 .padding(.horizontal, 28)
                 .padding(.bottom, 20)
 
@@ -802,30 +804,51 @@ struct OnboardingView: View {
                 // CTA
                 VStack(spacing: 8) {
                     Button {
-                        // TODO: Connect to SubscriptionManager purchase flow
-                        advance()
+                        Task {
+                            let manager = SubscriptionManager.shared
+                            if manager.products.isEmpty {
+                                await manager.loadProducts()
+                            }
+                            if !manager.products.isEmpty {
+                                await manager.purchasePro()
+                                if manager.hasPurchased {
+                                    advance()
+                                }
+                            } else {
+                                // Can't reach App Store, skip for now (trial will be active)
+                                advance()
+                            }
+                        }
                     } label: {
-                        Text(selectedPlan == .annual ? "Start 7-day free trial" : "Subscribe now")
-                            .font(AppTypography.buttonLarge)
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 56)
-                            .background(AppColors.charcoal)
-                            .clipShape(Capsule())
+                        Group {
+                            if SubscriptionManager.shared.isLoading {
+                                ProgressView()
+                                    .tint(.white)
+                            } else if let product = SubscriptionManager.shared.proProduct {
+                                Text("Unlock Pro \u{00B7} \(product.displayPrice)")
+                            } else {
+                                Text("Unlock Pro \u{00B7} $30")
+                            }
+                        }
+                        .font(AppTypography.buttonLarge)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 56)
+                        .background(AppColors.charcoal)
+                        .clipShape(Capsule())
                     }
 
-                    if selectedPlan == .annual {
-                        Text("7 days free, then **$59.99/year**.\nNo commitment. Cancel anytime.")
+                    if let error = SubscriptionManager.shared.purchaseError {
+                        Text(error)
                             .font(.system(size: 12))
-                            .foregroundStyle(AppColors.mist)
-                            .multilineTextAlignment(.center)
-                            .lineSpacing(2)
-                    } else {
-                        Text("No commitment. Cancel anytime.")
-                            .font(.system(size: 12))
-                            .foregroundStyle(AppColors.mist)
+                            .foregroundStyle(AppColors.coral)
                             .multilineTextAlignment(.center)
                     }
+
+                    Text("7-day free trial included with your account")
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppColors.mist)
+                        .multilineTextAlignment(.center)
 
                     Button {
                         withAnimation(AppAnimation.smooth) { skip() }
@@ -853,70 +876,10 @@ struct OnboardingView: View {
             }
             Text(text)
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(AppColors.charcoal)
+                .foregroundStyle(colors.textPrimary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 28)
-    }
-
-    private func paywallPlanCard(
-        label: String,
-        price: String,
-        period: String,
-        trialText: String,
-        isPopular: Bool,
-        isSelected: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            VStack(spacing: 0) {
-                Text(label.uppercased())
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(AppColors.slate)
-                    .tracking(0.8)
-                    .padding(.bottom, 6)
-
-                Text(price)
-                    .font(.system(size: 32, weight: .bold))
-                    .foregroundStyle(AppColors.charcoal)
-                    .padding(.bottom, 4)
-
-                Text(period)
-                    .font(.system(size: 12))
-                    .foregroundStyle(AppColors.mist)
-                    .padding(.bottom, 4)
-
-                Text(trialText)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(isPopular ? AppColors.primary : AppColors.mist)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 20)
-            .padding(.horizontal, 16)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(
-                        isSelected ? AppColors.primary : Color.white.opacity(0.6),
-                        lineWidth: isSelected ? 2 : 1
-                    )
-            )
-            .overlay(alignment: .top) {
-                if isPopular {
-                    Text("MOST POPULAR")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(0.8)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(AppColors.primary)
-                        .clipShape(Capsule())
-                        .offset(y: -12)
-                }
-            }
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Screen F: Notifications
@@ -927,7 +890,7 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Never miss a task!")
                     .font(.system(size: 28, weight: .regular, design: .serif))
-                    .foregroundStyle(AppColors.charcoal)
+                    .foregroundStyle(colors.textPrimary)
                     .lineSpacing(2)
 
                 Text("Smart reminders so you stay on track for qualification.")
@@ -978,7 +941,7 @@ struct OnboardingView: View {
 
                     Text("9:41")
                         .font(.system(size: 52, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppColors.charcoal)
+                        .foregroundStyle(colors.textPrimary)
                         .tracking(-2)
                 }
                 .padding(.top, 40)
@@ -995,7 +958,7 @@ struct OnboardingView: View {
 
                         Text("Don't forget to log today!")
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(AppColors.charcoal)
+                            .foregroundStyle(colors.textPrimary)
 
                         Text("You visited 123 Oak St earlier. Tap to log your hours.")
                             .font(.system(size: 11, weight: .regular, design: .rounded))
@@ -1043,7 +1006,7 @@ struct OnboardingView: View {
 
                         Text("Great week! 18.5h logged")
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(AppColors.charcoal)
+                            .foregroundStyle(colors.textPrimary)
 
                         Text("You're on track for REPS. Keep it up!")
                             .font(.system(size: 11, weight: .regular, design: .rounded))
@@ -1114,7 +1077,7 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Import your calendar\nfor a quick start")
                     .font(.system(size: 28, weight: .regular, design: .serif))
-                    .foregroundStyle(AppColors.charcoal)
+                    .foregroundStyle(colors.textPrimary)
                     .lineSpacing(2)
 
                 Text("We'll auto-detect property appointments and pre-fill your hours.")
@@ -1163,7 +1126,7 @@ struct OnboardingView: View {
                 VStack(spacing: 4) {
                     Text("February 2026")
                         .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppColors.charcoal)
+                        .foregroundStyle(colors.textPrimary)
 
                     // Day headers
                     calendarDayHeaders
@@ -1216,7 +1179,7 @@ struct OnboardingView: View {
                             .foregroundStyle(AppColors.primary)
                         Text(" detected today")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(AppColors.charcoal)
+                            .foregroundStyle(colors.textPrimary)
                     }
                 }
                 .padding(.horizontal, 14)
@@ -1303,7 +1266,7 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(AppColors.charcoal)
+                    .foregroundStyle(colors.textPrimary)
                 Text(time)
                     .font(.system(size: 9, weight: .regular, design: .rounded))
                     .foregroundStyle(AppColors.mist)
@@ -1359,7 +1322,7 @@ struct OnboardingView: View {
                 VStack(spacing: 6) {
                     Text("Select calendars to import")
                         .font(.system(size: 20, weight: .regular, design: .serif))
-                        .foregroundStyle(AppColors.charcoal)
+                        .foregroundStyle(colors.textPrimary)
                     Text("We'll scan the last 90 days for property-related events.")
                         .font(.system(size: 13))
                         .foregroundStyle(AppColors.slate)
@@ -1476,7 +1439,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(calendar.title)
                         .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundStyle(AppColors.charcoal)
+                        .foregroundStyle(colors.textPrimary)
                     Text(calendar.source.title)
                         .font(.system(size: 11, design: .rounded))
                         .foregroundStyle(AppColors.mist)
@@ -1503,7 +1466,7 @@ struct OnboardingView: View {
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(isSelected ? Color(hex: "F8F6FF") : Color.white)
+                    .fill(isSelected ? Color(hex: "F8F6FF").opacity(colorScheme == .dark ? 0.15 : 1) : colors.backgroundSecondary)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
@@ -1517,80 +1480,22 @@ struct OnboardingView: View {
         guard !selectedCalendarIds.isEmpty else { return }
         isImporting = true
 
-        let store = EKEventStore()
-        let calendars = availableCalendars.filter { selectedCalendarIds.contains($0.calendarIdentifier) }
+        let detected = CalendarImportService.shared.scanCalendars(
+            selectedCalendarIds,
+            properties: viewModel.properties
+        )
 
-        // Scan last 90 days
-        let endDate = Date()
-        let startDate = Calendar.current.date(byAdding: .day, value: -90, to: endDate)!
-
-        let predicate = store.predicateForEvents(withStart: startDate, end: endDate, calendars: calendars)
-        let events = store.events(matching: predicate)
-
-        // Filter for property-related keywords
-        let propertyKeywords = ["property", "tenant", "landlord", "repair", "maintenance",
-                                "plumber", "electrician", "inspection", "lease", "rent",
-                                "showing", "walkthrough", "contractor", "hvac", "cleaning",
-                                "move-in", "move-out", "appraisal", "realtor", "closing"]
-
-        var imported = 0
-        let firstProperty = viewModel.properties.first
-
-        for event in events {
-            let title = event.title?.lowercased() ?? ""
-            let location = event.location?.lowercased() ?? ""
-            let notes = event.notes?.lowercased() ?? ""
-            let combined = title + " " + location + " " + notes
-
-            let isPropertyRelated = propertyKeywords.contains { combined.contains($0) }
-
-            // Import events that have duration and look property-related
-            if isPropertyRelated, let start = event.startDate, let end = event.endDate {
-                let hours = end.timeIntervalSince(start) / 3600.0
-                guard hours > 0 && hours < 24 else { continue }
-
-                // Match to a property if possible, otherwise use first property
-                let propertyId = firstProperty?.id ?? UUID()
-
-                viewModel.addTimeEntry(
-                    propertyId: propertyId,
-                    participant: .selfParticipant,
-                    category: categorizeEvent(title: title),
-                    hours: hours,
-                    date: start,
-                    notes: event.title ?? ""
-                )
-                imported += 1
-            }
-        }
+        // During onboarding, import all detected entries directly (no review step)
+        let count = viewModel.importCalendarEntries(detected)
 
         DispatchQueue.main.async {
             isImporting = false
-            importedEventCount = imported
-            if imported == 0 {
-                // No events found — show message briefly, then complete
+            importedEventCount = count
+            if count == 0 {
                 showCalendarPicker = false
                 completeOnboarding()
             }
         }
-    }
-
-    private func categorizeEvent(title: String) -> ActivityCategory {
-        let t = title.lowercased()
-        if t.contains("repair") || t.contains("fix") || t.contains("plumber") || t.contains("electrician") || t.contains("hvac") || t.contains("clean") || t.contains("maintenance") || t.contains("lawn") {
-            return .repairs
-        } else if t.contains("tenant") || t.contains("lease") || t.contains("rent") || t.contains("showing") {
-            return .leasing
-        } else if t.contains("inspect") || t.contains("walkthrough") || t.contains("appraisal") || t.contains("travel") {
-            return .travel
-        } else if t.contains("closing") || t.contains("realtor") || t.contains("contractor") || t.contains("renovati") {
-            return .renovations
-        } else if t.contains("insurance") || t.contains("claim") {
-            return .insurance
-        } else if t.contains("legal") || t.contains("compliance") || t.contains("evict") {
-            return .legal
-        }
-        return .management
     }
 
     // MARK: - Shared Components

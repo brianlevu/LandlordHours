@@ -128,10 +128,11 @@ struct ExportPDFView: View {
 
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let rootVC = windowScene.windows.first?.rootViewController {
+            activityVC.completionWithItemsHandler = { _, _, _, _ in
+                dismiss()
+            }
             rootVC.present(activityVC, animated: true)
         }
-
-        dismiss()
     }
 
     func generatePDF() -> Data {
@@ -206,17 +207,25 @@ struct ExportPDFView: View {
             // Table header
             let entries = yearEntries.sorted { $0.date > $1.date }
 
+            let maxTextWidth = pageWidth - 2 * margin
+
             for entry in entries {
                 let property = viewModel.properties.first { $0.id == entry.propertyId }
                 let propertyName = property?.name ?? "Unknown"
 
-                let entryText = "\(entry.formattedDate) | \(propertyName) | \(entry.category.rawValue) | \(String(format: "%.1f", entry.hours))h | \(entry.participant.rawValue)"
-                entryText.draw(at: CGPoint(x: margin, y: yPosition), withAttributes: [.font: bodyFont])
-                yPosition += 16
+                let entryText = "\(entry.formattedDate) | \(propertyName) | \(entry.category.rawValue) | \(String(format: "%.1f", entry.hours))h | \(entry.participant.rawValue)" as NSString
+                let entryAttrs: [NSAttributedString.Key: Any] = [.font: bodyFont]
+                let entrySize = entryText.boundingRect(with: CGSize(width: maxTextWidth, height: .greatestFiniteMagnitude), options: .usesLineFragmentOrigin, attributes: entryAttrs, context: nil)
+                entryText.draw(in: CGRect(x: margin, y: yPosition, width: maxTextWidth, height: entrySize.height), withAttributes: entryAttrs)
+                yPosition += entrySize.height + 4
 
                 if !entry.notes.isEmpty {
-                    "  Notes: \(entry.notes)".draw(at: CGPoint(x: margin + 20, y: yPosition), withAttributes: [.font: bodyFont, .foregroundColor: UIColor.gray])
-                    yPosition += 16
+                    let notesText = "  Notes: \(entry.notes)" as NSString
+                    let notesAttrs: [NSAttributedString.Key: Any] = [.font: bodyFont, .foregroundColor: UIColor.gray]
+                    let notesWidth = maxTextWidth - 20
+                    let notesSize = notesText.boundingRect(with: CGSize(width: notesWidth, height: .greatestFiniteMagnitude), options: .usesLineFragmentOrigin, attributes: notesAttrs, context: nil)
+                    notesText.draw(in: CGRect(x: margin + 20, y: yPosition, width: notesWidth, height: notesSize.height), withAttributes: notesAttrs)
+                    yPosition += notesSize.height + 4
                 }
 
                 if yPosition > pageHeight - 50 {

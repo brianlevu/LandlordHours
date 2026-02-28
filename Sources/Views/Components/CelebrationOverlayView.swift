@@ -50,31 +50,6 @@ enum CelebrationType: Identifiable, Equatable {
         }
     }
 
-    var gradient: Color {
-        switch self {
-        case .propertyAdded: return Color(hex: "A78BFA")
-        case .goalMet: return Color(hex: "6EE7B7")
-        case .greatWork: return Color(hex: "FDE68A")
-        case .weeklyStreak: return Color(hex: "FFB4A9")
-        case .hoursLogged: return Color(hex: "93C5FD")
-        }
-    }
-
-    var confettiColors: [Color] {
-        switch self {
-        case .propertyAdded:
-            return [Color(hex: "7B68EE"), Color(hex: "A78BFA"), Color(hex: "EDE8FF"), Color(hex: "B8AFFE"), .white]
-        case .goalMet:
-            return [Color(hex: "34D399"), Color(hex: "6EE7B7"), Color(hex: "ECFDF5"), Color(hex: "059669"), .white]
-        case .greatWork:
-            return [Color(hex: "F5C563"), Color(hex: "FDE68A"), Color(hex: "FFF4DA"), Color(hex: "D97706"), .white]
-        case .weeklyStreak:
-            return [Color(hex: "FF8A7A"), Color(hex: "FFB4A9"), Color(hex: "FFE8E4"), Color(hex: "E55A4A"), .white]
-        case .hoursLogged:
-            return [Color(hex: "6CB4EE"), Color(hex: "93C5FD"), Color(hex: "E0F0FF"), Color(hex: "3B82F6"), .white]
-        }
-    }
-
     var iconImage: UIImage {
         switch self {
         case .propertyAdded: return Lucide.house
@@ -88,7 +63,6 @@ enum CelebrationType: Identifiable, Equatable {
 
 // MARK: - Milestone Tracker
 
-/// Tracks which hour milestones have already been celebrated to avoid duplicates.
 final class MilestoneTracker {
     static let shared = MilestoneTracker()
 
@@ -111,239 +85,252 @@ final class MilestoneTracker {
         celebrated = set
     }
 
-    /// Reload from UserDefaults (e.g. after user switch)
-    func reload() {
-        // No in-memory cache to reset — `celebrated` reads directly from UserDefaults
-    }
+    func reload() {}
 }
 
-// MARK: - Confetti Particle
+// MARK: - Confetti Shape Types
 
-private struct ConfettiParticle: Identifiable {
+private enum ConfettiShape {
+    case dot          // Small circle
+    case square       // Tiny square
+    case rectangle    // Thin rectangle
+    case crescent     // Half-moon / arc
+    case squiggle     // Short curved line
+}
+
+// MARK: - Confetti Piece
+
+private struct ConfettiPiece: Identifiable {
     let id = UUID()
-    var x: CGFloat
-    var y: CGFloat
-    var vx: CGFloat
-    var vy: CGFloat
-    var rotation: CGFloat
-    var rotSpeed: CGFloat
-    var opacity: CGFloat
-    var scale: CGFloat
-    var color: Color
-    var isCircle: Bool
-    var size: CGFloat
-    var age: CGFloat
+    let shape: ConfettiShape
+    let color: Color
+    let size: CGFloat          // Base size
+    let startX: CGFloat        // Starting X position (0...1 ratio)
+    let xDrift: CGFloat        // Horizontal drift during fall
+    let fallDistance: CGFloat   // How far it falls (screen heights)
+    let spinDegrees: Double    // 2D rotation
+    let flipAxis: (x: CGFloat, y: CGFloat, z: CGFloat)
+    let flipDegrees: Double    // 3D tumble
+    let delay: Double          // Stagger
+    let duration: Double       // Individual animation duration
+    let opacity: Double        // Base opacity
 }
 
-// MARK: - Confetti Canvas
+// MARK: - Single Piece View
 
-private struct ConfettiCanvasView: View {
-    let colors: [Color]
-    let particleCount: Int = 45
-    let startTime: Date
-
-    @State private var particles: [ConfettiParticle] = []
-
-    private let gravity: CGFloat = 400
-    private let lifespan: CGFloat = 2.5
-    private let fadeStart: CGFloat = 1.5
+private struct ConfettiPieceShape: View {
+    let shape: ConfettiShape
+    let size: CGFloat
 
     var body: some View {
-        TimelineView(.animation) { context in
-            let elapsed = CGFloat(context.date.timeIntervalSince(startTime))
-            Canvas { gfx, size in
-                drawParticles(context: gfx, size: size, elapsed: elapsed)
-            }
-        }
-        .onAppear {
-            spawnParticles()
+        switch shape {
+        case .dot:
+            Circle()
+                .frame(width: size, height: size)
+        case .square:
+            RoundedRectangle(cornerRadius: 1.5)
+                .frame(width: size, height: size)
+        case .rectangle:
+            RoundedRectangle(cornerRadius: 1)
+                .frame(width: size * 0.35, height: size)
+        case .crescent:
+            CrescentShape()
+                .frame(width: size, height: size)
+        case .squiggle:
+            SquiggleShape()
+                .stroke(style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .frame(width: size * 0.6, height: size)
         }
     }
+}
 
-    private func spawnParticles() {
-        particles = (0..<particleCount).map { _ in
-            let angle = CGFloat.random(in: 0...(2 * .pi))
-            let speed: CGFloat = 200 + CGFloat.random(in: 0...300)
-            let isCircle = Bool.random()
+// Crescent / half-moon shape
+private struct CrescentShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let r = min(rect.width, rect.height) / 2
+        // Outer arc
+        p.addArc(center: center, radius: r, startAngle: .degrees(-30), endAngle: .degrees(210), clockwise: false)
+        // Inner arc cutting back
+        p.addArc(center: CGPoint(x: center.x + r * 0.3, y: center.y), radius: r * 0.75,
+                 startAngle: .degrees(210), endAngle: .degrees(-30), clockwise: true)
+        p.closeSubpath()
+        return p
+    }
+}
 
-            return ConfettiParticle(
-                x: 0, y: 0,
-                vx: cos(angle) * speed,
-                vy: sin(angle) * speed,
-                rotation: CGFloat.random(in: 0...(2 * .pi)),
-                rotSpeed: CGFloat.random(in: -8...8),
-                opacity: 1,
-                scale: 0.8 + CGFloat.random(in: 0...0.4),
-                color: colors.randomElement() ?? .white,
-                isCircle: isCircle,
-                size: isCircle ? (3 + CGFloat.random(in: 0...2)) : (2 + CGFloat.random(in: 0...1)),
-                age: 0
+// Short squiggle / curve
+private struct SquiggleShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+        p.addCurve(
+            to: CGPoint(x: rect.maxX, y: rect.minY),
+            control1: CGPoint(x: rect.midX - rect.width * 0.2, y: rect.midY - rect.height * 0.3),
+            control2: CGPoint(x: rect.midX + rect.width * 0.2, y: rect.midY + rect.height * 0.3)
+        )
+        return p
+    }
+}
+
+// MARK: - Confetti Particle View
+
+private struct ConfettiParticleView: View {
+    let piece: ConfettiPiece
+    let animate: Bool
+    let screenHeight: CGFloat
+
+    var body: some View {
+        ConfettiPieceShape(shape: piece.shape, size: piece.size)
+            .foregroundStyle(piece.color)
+            .rotation3DEffect(
+                .degrees(animate ? piece.flipDegrees : 0),
+                axis: (x: piece.flipAxis.x, y: piece.flipAxis.y, z: piece.flipAxis.z)
             )
-        }
+            .rotationEffect(.degrees(animate ? piece.spinDegrees : 0))
+            .offset(
+                x: animate ? piece.xDrift : 0,
+                y: animate ? piece.fallDistance * screenHeight : -80
+            )
+            .opacity(animate ? 0 : piece.opacity)
+    }
+}
+
+// MARK: - Confetti Rain View (Tiimo-style — no overlay, just confetti)
+
+struct ConfettiRainView: View {
+    let particleCount: Int
+    @State private var animate = false
+    @State private var pieces: [ConfettiPiece] = []
+
+    // Dark purple palette matching Tiimo
+    private let confettiColors: [Color] = [
+        Color(hex: "4C3D8F"),  // Deep purple
+        Color(hex: "5B4BA8"),  // Medium purple
+        Color(hex: "7B68EE"),  // Primary purple
+        Color(hex: "6E5DC6"),  // Indigo-purple
+        Color(hex: "8B7EC8"),  // Lighter purple
+        Color(hex: "A78BFA"),  // Soft lavender
+        Color(hex: "3D3270"),  // Very dark purple
+    ]
+
+    init(particleCount: Int = 55) {
+        self.particleCount = particleCount
     }
 
-    private func drawParticles(context: GraphicsContext, size: CGSize, elapsed: CGFloat) {
-        let cx = size.width / 2
-        let cy = size.height / 2
-
-        for particle in particles {
-            let t = elapsed
-            guard t < lifespan else { continue }
-
-            let px = cx + particle.x + particle.vx * t
-            let py = cy + particle.y + particle.vy * t + 0.5 * gravity * t * t
-            let damping = pow(1 - 0.3 * min(t, 1), max(t, 1))
-            let dampedPx = cx + (particle.vx * t * damping) + particle.x
-            let _ = dampedPx // Use simpler physics
-
-            let rot = particle.rotation + particle.rotSpeed * t
-
-            var alpha: CGFloat = 1
-            if t > fadeStart {
-                let fadeProgress = (t - fadeStart) / (lifespan - fadeStart)
-                alpha = max(0, 1 - fadeProgress)
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                ForEach(pieces) { piece in
+                    ConfettiParticleView(
+                        piece: piece,
+                        animate: animate,
+                        screenHeight: geo.size.height
+                    )
+                    .position(
+                        x: piece.startX * geo.size.width,
+                        y: 0
+                    )
+                    .animation(
+                        // Gentle ease-in at start, very slow ease-out = floaty drift
+                        .timingCurve(0.1, 0.4, 0.2, 1.0, duration: piece.duration)
+                            .delay(piece.delay),
+                        value: animate
+                    )
+                }
             }
-            guard alpha > 0.01 else { continue }
-
-            var ctx = context
-            ctx.opacity = alpha * Double(particle.opacity)
-
-            let transform = CGAffineTransform.identity
-                .translatedBy(x: px, y: py)
-                .rotated(by: rot)
-                .scaledBy(x: particle.scale, y: particle.scale)
-
-            if particle.isCircle {
-                let circle = Path(ellipseIn: CGRect(
-                    x: -particle.size, y: -particle.size,
-                    width: particle.size * 2, height: particle.size * 2
-                ))
-                ctx.fill(circle.applying(transform), with: .color(particle.color))
-            } else {
-                let rect = Path(CGRect(x: -1, y: -4, width: 2, height: 8))
-                ctx.fill(rect.applying(transform), with: .color(particle.color))
+            .onAppear {
+                pieces = (0..<particleCount).map { _ in makePiece() }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+                    animate = true
+                }
             }
         }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+
+    private func makePiece() -> ConfettiPiece {
+        // Pick shape with distribution matching Tiimo:
+        // crescents + squiggles are most common, then dots, then squares/rectangles
+        let shapeRoll = Double.random(in: 0...1)
+        let shape: ConfettiShape
+        if shapeRoll < 0.25 {
+            shape = .crescent
+        } else if shapeRoll < 0.45 {
+            shape = .squiggle
+        } else if shapeRoll < 0.65 {
+            shape = .dot
+        } else if shapeRoll < 0.82 {
+            shape = .rectangle
+        } else {
+            shape = .square
+        }
+
+        let size: CGFloat
+        switch shape {
+        case .dot: size = CGFloat.random(in: 6...14)
+        case .square: size = CGFloat.random(in: 6...10)
+        case .rectangle: size = CGFloat.random(in: 16...28)
+        case .crescent: size = CGFloat.random(in: 12...22)
+        case .squiggle: size = CGFloat.random(in: 14...22)
+        }
+
+        return ConfettiPiece(
+            shape: shape,
+            color: confettiColors.randomElement()!,
+            size: size,
+            startX: CGFloat.random(in: 0.02...0.98),
+            xDrift: CGFloat.random(in: -40...40),           // Gentle horizontal sway
+            fallDistance: CGFloat.random(in: 0.8...1.4),     // Full screen drift
+            spinDegrees: Double.random(in: -200...200),      // Gentle spin, not frantic
+            flipAxis: (
+                x: CGFloat.random(in: 0...1),
+                y: CGFloat.random(in: 0...1),
+                z: CGFloat.random(in: 0...0.3)
+            ),
+            flipDegrees: Double.random(in: 180...720),       // Gentle 3D tumble
+            delay: Double.random(in: 0...0.8),               // Wide stagger = cascading waves
+            duration: Double.random(in: 3.0...4.5),          // Slow, floaty drift
+            opacity: Double.random(in: 0.55...0.9)
+        )
     }
 }
 
 // MARK: - Celebration Overlay View
+// Now just shows confetti rain — no dark overlay, no icon/text.
+// The confetti plays on top of the existing screen content.
 
 struct CelebrationOverlayView: View {
     let type: CelebrationType
     let onDismiss: () -> Void
 
-    @State private var showBackground = false
-    @State private var showIcon = false
-    @State private var showTitle = false
-    @State private var showSubtitle = false
     @State private var showConfetti = false
     @State private var dismissing = false
-    @State private var confettiStartTime = Date()
 
     var body: some View {
         ZStack {
-            // Radial gradient background
-            RadialGradient(
-                colors: [
-                    type.gradient.opacity(0.6),
-                    type.accent.opacity(0.3),
-                    Color.black.opacity(0.75)
-                ],
-                center: .center,
-                startRadius: 0,
-                endRadius: 500
-            )
-            .ignoresSafeArea()
-            .opacity(showBackground ? 1 : 0)
-
-            // Confetti
             if showConfetti {
-                ConfettiCanvasView(colors: type.confettiColors, startTime: confettiStartTime)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-            }
-
-            // Hero content
-            VStack(spacing: 20) {
-                // Icon badge
-                ZStack {
-                    Circle()
-                        .fill(type.accent)
-                        .frame(width: 100, height: 100)
-                        .shadow(color: type.accent.opacity(0.4), radius: 30, y: 8)
-
-                    Image(uiImage: type.iconImage.withRenderingMode(.alwaysTemplate))
-                        .renderingMode(.template)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 44, height: 44)
-                        .foregroundStyle(.white)
-                }
-                .scaleEffect(showIcon ? 1 : 0)
-                .opacity(showIcon ? 1 : 0)
-
-                // Title
-                Text(type.title)
-                    .font(.system(size: 28, weight: .regular, design: .serif))
-                    .foregroundStyle(.white)
-                    .offset(y: showTitle ? 0 : 20)
-                    .opacity(showTitle ? 1 : 0)
-
-                // Subtitle
-                Text(type.subtitle)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
-                    .offset(y: showSubtitle ? 0 : 15)
-                    .opacity(showSubtitle ? 1 : 0)
+                ConfettiRainView(particleCount: 55)
             }
         }
-        .scaleEffect(dismissing ? 0.85 : 1)
         .opacity(dismissing ? 0 : 1)
         .onTapGesture {
             dismiss()
         }
         .onAppear {
-            startAnimation()
-        }
-    }
-
-    private func startAnimation() {
-        // Background fades in
-        withAnimation(.easeOut(duration: 0.3)) {
-            showBackground = true
-        }
-
-        // Icon springs in at 100ms
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.65).delay(0.1)) {
-            showIcon = true
-        }
-
-        // Confetti at 200ms
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            confettiStartTime = Date()
             showConfetti = true
-        }
-
-        // Title at 350ms
-        withAnimation(.spring(response: 0.6, dampingFraction: 0.75).delay(0.35)) {
-            showTitle = true
-        }
-
-        // Subtitle at 500ms
-        withAnimation(.spring(response: 0.6, dampingFraction: 0.75).delay(0.5)) {
-            showSubtitle = true
-        }
-
-        // Auto-dismiss after 3s
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            dismiss()
+            // Auto-dismiss after confetti drifts off screen
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5.5) {
+                dismiss()
+            }
         }
     }
 
     private func dismiss() {
         guard !dismissing else { return }
-        withAnimation(.easeIn(duration: 0.3)) {
+        withAnimation(.easeOut(duration: 0.3)) {
             dismissing = true
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -352,11 +339,14 @@ struct CelebrationOverlayView: View {
     }
 }
 
-// MARK: - Preview
-
 #Preview {
     ZStack {
         Color(hex: "FAF7F2").ignoresSafeArea()
-        CelebrationOverlayView(type: .goalMet) {}
+        VStack {
+            Text("Some content underneath")
+                .font(.title)
+            Text("Confetti plays on top")
+        }
+        CelebrationOverlayView(type: .propertyAdded) {}
     }
 }

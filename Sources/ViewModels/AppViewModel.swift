@@ -50,10 +50,21 @@ class AppViewModel: ObservableObject {
     private var timerKey: String { UserScope.key("LandlordHours.timer") }
 
     init() {
-        loadData()
-        loadTimerState()
         checkSignInState()
+        if UserScope.userId != nil {
+            migrateUnscopedLegacyData()
+            loadData()
+            loadTimerState()
+        }
         syncService.delegate = self
+
+        // Trigger cloud sync when tax profile or goals change
+        TaxProfileManager.shared.onDidChange = { [weak self] in
+            self?.syncService.schedulePush()
+        }
+        GoalManager.shared.onDidChange = { [weak self] in
+            self?.syncService.schedulePush()
+        }
         // Show branded splash screen for 1.5s, then animate into the app
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             withAnimation(.easeOut(duration: 0.4)) {
@@ -80,6 +91,12 @@ class AppViewModel: ObservableObject {
 
     func signIn() {
         isSignedIn = true
+        // Clear in-memory state from any previous user before loading new user's data.
+        // This prevents stale data from leaking if a CloudKit sync fires during the transition.
+        properties = []
+        timeEntries = []
+        // Migrate legacy unscoped data to this user's scoped keys (one-time)
+        migrateUnscopedLegacyData()
         // Load user-scoped data (UserScope.userId is now set via auth keys)
         loadData()
         loadTimerState()
@@ -101,9 +118,11 @@ class AppViewModel: ObservableObject {
         // Start CloudKit sync
         Task { await syncService.start() }
     }
-    
+
     /// Call when a new account is created (not for returning sign-in).
     func signUp() {
+        // New user — delete any stale unscoped data so it doesn't leak
+        Self.clearUnscopedLegacyData()
         // Clear onboarding flag so new user sees onboarding flow
         UserDefaults.standard.removeObject(forKey: UserScope.key("hasCompletedOnboarding"))
         signIn()
@@ -121,14 +140,19 @@ class AppViewModel: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "emailUserName")
         UserDefaults.standard.removeObject(forKey: "emailUserEmail")
         UserDefaults.standard.removeObject(forKey: "loginType")
+        // Clear any stale unscoped legacy data to prevent leaking to next user
+        Self.clearUnscopedLegacyData()
         // Note: per-user data stays in UserDefaults under scoped keys (u.<userId>.*)
+
+        // Cancel any running timer and clear persisted timer state
+        isTimerRunning = false
+        timerStartTime = nil
+        timerPropertyId = nil
+        saveTimerState()
 
         // Reset in-memory state
         properties = []
         timeEntries = []
-        isTimerRunning = false
-        timerStartTime = nil
-        timerPropertyId = nil
         activeCelebration = nil
         isSignedIn = false
         userName = ""
@@ -139,6 +163,56 @@ class AppViewModel: ObservableObject {
         CategoryManager.shared.resetForSignOut()
         TaxProfileManager.shared.resetForSignOut()
         MilestoneTracker.shared.reload()
+    }
+
+    // MARK: - Legacy Data Migration
+
+    /// Unscoped keys from before the UserScope system was added.
+    /// These must be migrated once, then deleted.
+    private static let unscopedLegacyKeys = [
+        "LandlordHours.properties",
+        "LandlordHours.entries",
+        "LandlordHours.timer",
+        "LandlordHours.celebratedMilestones",
+        "hasCompletedOnboarding",
+        "isProUser",
+        "hasPurchasedPro",
+        "trialStartDate",
+        "globalGoalType",
+        "propertyGoals",
+        "iCloudBackupEnabled",
+        "profileImageData",
+    ]
+
+    /// One-time migration: copies unscoped data into the current user's scoped keys,
+    /// then deletes the unscoped keys so they can't leak to other users.
+    private func migrateUnscopedLegacyData() {
+        let migrationKey = UserScope.key("legacyDataMigrated")
+        guard !UserDefaults.standard.bool(forKey: migrationKey) else { return }
+        guard UserScope.userId != nil else { return }
+
+        let defaults = UserDefaults.standard
+        for baseKey in Self.unscopedLegacyKeys {
+            let scopedKey = UserScope.key(baseKey)
+            // Only migrate if unscoped data exists AND scoped version doesn't
+            if defaults.object(forKey: baseKey) != nil && defaults.object(forKey: scopedKey) == nil {
+                defaults.set(defaults.object(forKey: baseKey), forKey: scopedKey)
+            }
+        }
+
+        // Mark migration as done for this user
+        defaults.set(true, forKey: migrationKey)
+
+        // Delete all unscoped legacy keys
+        Self.clearUnscopedLegacyData()
+    }
+
+    /// Delete all unscoped legacy data keys. Safe to call multiple times.
+    static func clearUnscopedLegacyData() {
+        let defaults = UserDefaults.standard
+        for key in unscopedLegacyKeys {
+            defaults.removeObject(forKey: key)
+        }
     }
     
     // MARK: - Sync Now (manual trigger for Settings)
@@ -195,6 +269,10 @@ class AppViewModel: ObservableObject {
     }
 
     func deleteProperty(_ property: RentalProperty) {
+        // Stop timer if it's running for this property
+        if isTimerRunning && timerPropertyId == property.id {
+            cancelTimer()
+        }
         properties.removeAll { $0.id == property.id }
         timeEntries.removeAll { $0.propertyId == property.id }
         saveData()
@@ -225,14 +303,45 @@ class AppViewModel: ObservableObject {
         checkHourMilestones()
     }
     
+    func updateTimeEntry(_ entry: TimeEntry) {
+        if let index = timeEntries.firstIndex(where: { $0.id == entry.id }) {
+            timeEntries[index] = entry
+            saveData()
+        }
+    }
+
     func deleteTimeEntry(_ entry: TimeEntry) {
         timeEntries.removeAll { $0.id == entry.id }
         saveData()
         Task { await syncService.deleteEntryFromCloud(entry) }
     }
-    
+
+    // MARK: - Calendar Import
+    func importCalendarEntries(_ detectedEntries: [DetectedCalendarEntry]) -> Int {
+        let selected = detectedEntries.filter { $0.isSelected }
+        for detected in selected {
+            let entry = TimeEntry(
+                propertyId: detected.propertyId ?? properties.first?.id ?? UUID(),
+                participant: .selfParticipant,
+                category: detected.category,
+                hours: detected.hours,
+                date: detected.eventDate,
+                notes: detected.eventTitle,
+                importSource: "calendar"
+            )
+            timeEntries.append(entry)
+        }
+        if !selected.isEmpty {
+            saveData()
+            checkHourMilestones()
+        }
+        return selected.count
+    }
+
     // MARK: - Timer Functions
     func startTimer(propertyId: UUID, category: ActivityCategory) {
+        guard !isTimerRunning else { return }
+        guard properties.contains(where: { $0.id == propertyId }) else { return }
         isTimerRunning = true
         timerStartTime = Date()
         timerPropertyId = propertyId
@@ -240,13 +349,19 @@ class AppViewModel: ObservableObject {
         saveTimerState()
     }
     
+    /// Set to true when `stopTimer` caps the entry at 24 hours, so the UI can warn the user.
+    @Published var timerWasCapped = false
+
     func stopTimer(participant: Participant, notes: String = "") {
         guard isTimerRunning,
               let startTime = timerStartTime,
               let propertyId = timerPropertyId else { return }
-        
-        let hours = Date().timeIntervalSince(startTime) / 3600.0
-        
+
+        let rawHours = Date().timeIntervalSince(startTime) / 3600.0
+        let maxHours: Double = 24
+        let wasCapped = rawHours > maxHours
+        let hours = min(rawHours, maxHours)
+
         addTimeEntry(
             propertyId: propertyId,
             participant: participant,
@@ -255,10 +370,11 @@ class AppViewModel: ObservableObject {
             date: startTime,
             notes: notes
         )
-        
+
         isTimerRunning = false
         timerStartTime = nil
         timerPropertyId = nil
+        timerWasCapped = wasCapped
         saveTimerState()
     }
     
@@ -271,13 +387,22 @@ class AppViewModel: ObservableObject {
     
     var timerElapsedTime: TimeInterval {
         guard let startTime = timerStartTime else { return 0 }
-        return Date().timeIntervalSince(startTime)
+        let elapsed = Date().timeIntervalSince(startTime)
+        // Cap at 24 hours to prevent inflated entries from stale timers
+        return min(elapsed, 24 * 3600)
     }
     
     // MARK: - Milestone Celebrations
 
     func triggerCelebration(_ type: CelebrationType) {
         guard !suppressCelebrations else { return }
+
+        // Property added always celebrates (every new property is an achievement)
+        if case .propertyAdded = type {
+            activeCelebration = type
+            return
+        }
+
         let year = Calendar.current.component(.year, from: Date())
         let tracker = MilestoneTracker.shared
         guard tracker.shouldCelebrate(type, year: year) else { return }
@@ -343,17 +468,15 @@ class AppViewModel: ObservableObject {
     }
     
     func meets50PercentRule(year: Int) -> Bool {
-        let selfHours = totalHoursForParticipant(.selfParticipant, year: year)
-        let spouseHours = totalHoursForParticipant(.spouse, year: year)
-        let totalHours = selfHours + spouseHours
-        
-        guard totalHours > 0 else { return false }
-        
-        let selfPercentage = selfHours / totalHours
-        let spousePercentage = spouseHours / totalHours
-        
-        return selfPercentage <= REPSRequirements.workingTimePercentage || 
-               spousePercentage <= REPSRequirements.workingTimePercentage
+        let reHours = totalHoursForParticipant(.selfParticipant, year: year)
+        let nonREHours = TaxProfileManager.shared.nonREWorkHours
+        let totalWorkingHours = reHours + nonREHours
+
+        guard totalWorkingHours > 0 else { return false }
+
+        // IRS 50% rule: RE hours must exceed 50% of total personal service hours
+        let rePercentage = reHours / totalWorkingHours
+        return rePercentage > REPSRequirements.workingTimePercentage
     }
     
     // MARK: - Persistence
@@ -369,6 +492,10 @@ class AppViewModel: ObservableObject {
     }
     
     private func loadData() {
+        // Always reset before loading — prevents stale data from leaking across user scopes
+        properties = []
+        timeEntries = []
+
         if let propertiesData = UserDefaults.standard.data(forKey: propertiesKey),
            let decoded = try? JSONDecoder().decode([RentalProperty].self, from: propertiesData) {
             properties = decoded
@@ -380,12 +507,22 @@ class AppViewModel: ObservableObject {
     }
     
     private func saveTimerState() {
+        let defaults = UserDefaults.standard
+        let startTimeKey = UserScope.key("timerStartTime")
+        let propertyIdKey = UserScope.key("timerPropertyId")
+
+        defaults.set(isTimerRunning, forKey: timerKey)
+
         if let startTime = timerStartTime {
-            UserDefaults.standard.set(startTime, forKey: UserScope.key("timerStartTime"))
+            defaults.set(startTime, forKey: startTimeKey)
+        } else {
+            defaults.removeObject(forKey: startTimeKey)
         }
-        UserDefaults.standard.set(isTimerRunning, forKey: timerKey)
+
         if let propertyId = timerPropertyId {
-            UserDefaults.standard.set(propertyId.uuidString, forKey: UserScope.key("timerPropertyId"))
+            defaults.set(propertyId.uuidString, forKey: propertyIdKey)
+        } else {
+            defaults.removeObject(forKey: propertyIdKey)
         }
     }
 
@@ -397,6 +534,14 @@ class AppViewModel: ObservableObject {
         if let propertyIdStr = UserDefaults.standard.string(forKey: UserScope.key("timerPropertyId")),
            let propertyId = UUID(uuidString: propertyIdStr) {
             timerPropertyId = propertyId
+        }
+        // Auto-cancel stale timers (running for >24 hours = forgotten)
+        if isTimerRunning, let start = timerStartTime,
+           Date().timeIntervalSince(start) > 24 * 3600 {
+            isTimerRunning = false
+            timerStartTime = nil
+            timerPropertyId = nil
+            saveTimerState()
         }
     }
 }

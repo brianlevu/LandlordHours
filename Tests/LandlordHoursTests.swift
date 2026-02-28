@@ -1,0 +1,473 @@
+import XCTest
+@testable import LandlordHours
+
+// MARK: - Model Codable Tests
+
+final class ModelCodableTests: XCTestCase {
+
+    func testRentalPropertyRoundtrip() throws {
+        let property = RentalProperty(name: "Oak House", address: "123 Oak St, Portland, OR", propertyType: .ltr)
+        let data = try JSONEncoder().encode(property)
+        let decoded = try JSONDecoder().decode(RentalProperty.self, from: data)
+
+        XCTAssertEqual(decoded.id, property.id)
+        XCTAssertEqual(decoded.name, "Oak House")
+        XCTAssertEqual(decoded.address, "123 Oak St, Portland, OR")
+        XCTAssertEqual(decoded.propertyType, .ltr)
+    }
+
+    func testRentalPropertyDecodesWithoutModifiedAt() throws {
+        // Older records may not have modifiedAt — should fall back to createdAt
+        let json = """
+        {"id":"550e8400-e29b-41d4-a716-446655440000","name":"Test","address":"Addr","propertyType":"LTR","createdAt":0}
+        """
+        let decoded = try JSONDecoder().decode(RentalProperty.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.modifiedAt, decoded.createdAt)
+    }
+
+    func testTimeEntryRoundtrip() throws {
+        let propertyId = UUID()
+        let entry = TimeEntry(
+            propertyId: propertyId,
+            participant: .selfParticipant,
+            category: .repairs,
+            hours: 2.5,
+            date: Date(),
+            notes: "Fixed leaking faucet"
+        )
+        let data = try JSONEncoder().encode(entry)
+        let decoded = try JSONDecoder().decode(TimeEntry.self, from: data)
+
+        XCTAssertEqual(decoded.id, entry.id)
+        XCTAssertEqual(decoded.propertyId, propertyId)
+        XCTAssertEqual(decoded.participant, .selfParticipant)
+        XCTAssertEqual(decoded.category, .repairs)
+        XCTAssertEqual(decoded.hours, 2.5)
+        XCTAssertEqual(decoded.notes, "Fixed leaking faucet")
+    }
+
+    func testTimeEntryDecodesWithoutAttachments() throws {
+        // Entries from CloudKit or older versions may lack attachments
+        let propertyId = UUID()
+        let json = """
+        {"id":"550e8400-e29b-41d4-a716-446655440001","propertyId":"\(propertyId.uuidString)","participant":"Self","category":"Repairs & Maintenance","hours":1.0,"date":0,"notes":"test","createdAt":0}
+        """
+        let decoded = try JSONDecoder().decode(TimeEntry.self, from: Data(json.utf8))
+        XCTAssertTrue(decoded.attachments.isEmpty)
+    }
+
+    func testPropertyTypeRawValues() {
+        XCTAssertEqual(PropertyType.ltr.rawValue, "LTR")
+        XCTAssertEqual(PropertyType.str.rawValue, "STR")
+        XCTAssertEqual(PropertyType(rawValue: "LTR"), .ltr)
+        XCTAssertEqual(PropertyType(rawValue: "STR"), .str)
+        XCTAssertNil(PropertyType(rawValue: "invalid"))
+    }
+
+    func testParticipantRawValues() {
+        XCTAssertEqual(Participant.selfParticipant.rawValue, "Self")
+        XCTAssertEqual(Participant.spouse.rawValue, "Spouse")
+    }
+}
+
+// MARK: - Category REPS Qualification Tests
+
+final class CategoryREPSTests: XCTestCase {
+
+    func testREPSQualifiedCategories() {
+        let qualified: [ActivityCategory] = [
+            .repairs, .management, .leasing, .bookkeeping,
+            .legal, .insurance, .travel, .renovations
+        ]
+        for cat in qualified {
+            XCTAssertTrue(cat.countsForREPS, "\(cat.rawValue) should count for REPS")
+        }
+    }
+
+    func testNonREPSCategories() {
+        let nonQualified: [ActivityCategory] = [
+            .investing, .financing, .contractNegotiation
+        ]
+        for cat in nonQualified {
+            XCTAssertFalse(cat.countsForREPS, "\(cat.rawValue) should NOT count for REPS")
+        }
+    }
+
+    func testREPSFilteredLists() {
+        XCTAssertEqual(ActivityCategory.repsQualified.count, 8)
+        XCTAssertEqual(ActivityCategory.nonREPS.count, 3)
+        XCTAssertEqual(
+            ActivityCategory.repsQualified.count + ActivityCategory.nonREPS.count,
+            ActivityCategory.allCases.count
+        )
+    }
+
+    func testTimeEntryCountsForREPSMatchesCategory() {
+        let propertyId = UUID()
+        let repsEntry = TimeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs, hours: 1)
+        let nonRepsEntry = TimeEntry(propertyId: propertyId, participant: .selfParticipant, category: .investing, hours: 1)
+
+        XCTAssertTrue(repsEntry.countsForREPS)
+        XCTAssertFalse(nonRepsEntry.countsForREPS)
+    }
+}
+
+// MARK: - REPS Requirements Tests
+
+final class REPSRequirementsTests: XCTestCase {
+
+    func testAnnualThreshold() {
+        XCTAssertEqual(REPSRequirements.annualHourThreshold, 750.0)
+    }
+
+    func testWorkingTimePercentage() {
+        XCTAssertEqual(REPSRequirements.workingTimePercentage, 0.50)
+    }
+
+    func testWeeklyGoal() {
+        let expected = 750.0 / 52.0
+        XCTAssertEqual(REPSRequirements.weeklyGoal, expected, accuracy: 0.01)
+    }
+
+    func testMonthlyGoal() {
+        let expected = 750.0 / 12.0
+        XCTAssertEqual(REPSRequirements.monthlyGoal, expected, accuracy: 0.01)
+    }
+}
+
+// MARK: - AI Local Parser Tests
+
+final class AILocalParserTests: XCTestCase {
+
+    private let service = AITimeEntryService.shared
+
+    // We can't test private methods directly, so we test through parseTimeEntry
+    // with no API key set (guarantees local parsing path)
+
+    func testParseRepairEntry() async {
+        let properties = [RentalProperty(name: "Oak House", address: "123 Oak St", propertyType: .ltr)]
+        let result = await service.parseTimeEntry(from: "Fixed the leaking faucet at Oak House for 2 hours", properties: properties)
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.category, .repairs)
+        XCTAssertEqual(result?.hours, 2.0)
+        XCTAssertEqual(result?.property?.name, "Oak House")
+        XCTAssertEqual(result?.participant, .selfParticipant)
+    }
+
+    func testParseTravelEntry() async {
+        let properties = [RentalProperty(name: "Maple", address: "456 Maple Ave", propertyType: .str)]
+        let result = await service.parseTimeEntry(from: "Drove to Maple for 1.5 hours", properties: properties)
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.category, .travel)
+        XCTAssertEqual(result?.hours, 1.5)
+        XCTAssertEqual(result?.property?.name, "Maple")
+    }
+
+    func testParseSpouseParticipant() async {
+        let result = await service.parseTimeEntry(from: "My spouse managed the property for 3 hours", properties: [])
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.participant, .spouse)
+        XCTAssertEqual(result?.hours, 3.0)
+    }
+
+    func testParseDefaultsToManagement() async {
+        let result = await service.parseTimeEntry(from: "did some stuff today 1h", properties: [])
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.category, .management) // Default when no keyword matches
+    }
+
+    func testParseDefaultsTo1HourWhenNoHoursMentioned() async {
+        let result = await service.parseTimeEntry(from: "fixed the sink", properties: [])
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.hours, 1.0) // Default when no hours extracted
+    }
+
+    func testParseMatchesPropertyByAddress() async {
+        let properties = [RentalProperty(name: "Unit A", address: "1234 Washington Boulevard, Seattle", propertyType: .ltr)]
+        let result = await service.parseTimeEntry(from: "Repaired plumbing at Washington 2h", properties: properties)
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.property?.name, "Unit A")
+    }
+
+    func testParseHoursCappedAt24() async {
+        let result = await service.parseTimeEntry(from: "worked 48 hours on repairs", properties: [])
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.hours, 24.0) // Capped
+    }
+
+    func testParseHoursMinimum() async {
+        let result = await service.parseTimeEntry(from: "quick repair 0.1h", properties: [])
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.hours, 0.25) // Minimum
+    }
+
+    func testParseSinglePropertyAutoSelect() async {
+        let properties = [RentalProperty(name: "My House", address: "555 Any St", propertyType: .ltr)]
+        // Text doesn't mention the property name or address
+        let result = await service.parseTimeEntry(from: "bookkeeping work 2h", properties: properties)
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.property?.name, "My House") // Auto-selected when only 1 property
+    }
+
+    func testParseNoPropertyWhenMultipleAndNoMatch() async {
+        let properties = [
+            RentalProperty(name: "House A", address: "111 First St", propertyType: .ltr),
+            RentalProperty(name: "House B", address: "222 Second St", propertyType: .str)
+        ]
+        let result = await service.parseTimeEntry(from: "did some legal work 1h", properties: properties)
+
+        XCTAssertNotNil(result)
+        XCTAssertNil(result?.property) // Can't determine which property
+    }
+}
+
+// MARK: - UserScope Tests
+
+final class UserScopeTests: XCTestCase {
+
+    /// Saved auth state to restore after tests, since this is a hosted test.
+    private var savedAppleUserId: String?
+    private var savedEmailUserId: String?
+
+    override func setUp() {
+        super.setUp()
+        // Save any existing auth state from the host app
+        savedAppleUserId = UserDefaults.standard.string(forKey: "appleUserId")
+        savedEmailUserId = UserDefaults.standard.string(forKey: "emailUserId")
+        // Clear for test isolation
+        UserDefaults.standard.removeObject(forKey: "appleUserId")
+        UserDefaults.standard.removeObject(forKey: "emailUserId")
+        UserDefaults.standard.synchronize()
+    }
+
+    override func tearDown() {
+        // Restore original auth state so we don't break the host app
+        if let saved = savedAppleUserId {
+            UserDefaults.standard.set(saved, forKey: "appleUserId")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "appleUserId")
+        }
+        if let saved = savedEmailUserId {
+            UserDefaults.standard.set(saved, forKey: "emailUserId")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "emailUserId")
+        }
+        UserDefaults.standard.synchronize()
+        super.tearDown()
+    }
+
+    func testUserIdReflectsCurrentAuthState() {
+        // In a hosted test, we can't guarantee nil state (app may restore keys).
+        // Instead, verify that setting a key updates userId correctly.
+        UserDefaults.standard.set("test-user-abc", forKey: "appleUserId")
+        UserDefaults.standard.synchronize()
+        XCTAssertEqual(UserScope.userId, "test-user-abc")
+    }
+
+    func testUserIdReturnsAppleId() {
+        UserDefaults.standard.set("apple-123", forKey: "appleUserId")
+        XCTAssertEqual(UserScope.userId, "apple-123")
+    }
+
+    func testUserIdReturnsEmailIdWhenNoApple() {
+        UserDefaults.standard.set("email-test@example.com", forKey: "emailUserId")
+        XCTAssertEqual(UserScope.userId, "email-test@example.com")
+    }
+
+    func testAppleIdTakesPrecedenceOverEmail() {
+        UserDefaults.standard.set("apple-123", forKey: "appleUserId")
+        UserDefaults.standard.set("email-test@example.com", forKey: "emailUserId")
+        XCTAssertEqual(UserScope.userId, "apple-123")
+    }
+
+    func testKeyScopingWithUser() {
+        UserDefaults.standard.set("user-42", forKey: "appleUserId")
+        XCTAssertEqual(UserScope.key("someKey"), "u.user-42.someKey")
+    }
+
+    func testKeyScopingProducesUserPrefixedKey() {
+        // Verify that setting a user produces correctly prefixed keys
+        UserDefaults.standard.set("scope-test-user", forKey: "appleUserId")
+        UserDefaults.standard.synchronize()
+        let key = UserScope.key("someKey")
+        XCTAssertTrue(key.hasPrefix("u.scope-test-user."), "Key should have user prefix, got: \(key)")
+        XCTAssertTrue(key.hasSuffix(".someKey"), "Key should end with base key, got: \(key)")
+    }
+
+    func testDifferentUsersGetDifferentKeys() {
+        UserDefaults.standard.set("user-A", forKey: "appleUserId")
+        let keyA = UserScope.key("data")
+
+        UserDefaults.standard.set("user-B", forKey: "appleUserId")
+        let keyB = UserScope.key("data")
+
+        XCTAssertNotEqual(keyA, keyB)
+        XCTAssertEqual(keyA, "u.user-A.data")
+        XCTAssertEqual(keyB, "u.user-B.data")
+    }
+}
+
+// MARK: - Date Extension Tests
+
+final class DateExtensionTests: XCTestCase {
+
+    func testStartOfDay() {
+        let now = Date()
+        let start = now.startOfDay
+        let components = Calendar.current.dateComponents([.hour, .minute, .second], from: start)
+        XCTAssertEqual(components.hour, 0)
+        XCTAssertEqual(components.minute, 0)
+        XCTAssertEqual(components.second, 0)
+    }
+
+    func testIsToday() {
+        XCTAssertTrue(Date().isToday)
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
+        XCTAssertFalse(yesterday.isToday)
+    }
+
+    func testShortAddress() {
+        let property = RentalProperty(name: "Test", address: "123 Main St, Portland, OR 97201", propertyType: .ltr)
+        XCTAssertEqual(property.shortAddress, "123 Main St")
+    }
+
+    func testShortAddressNoComma() {
+        let property = RentalProperty(name: "Test", address: "123 Main St", propertyType: .ltr)
+        XCTAssertEqual(property.shortAddress, "123 Main St")
+    }
+}
+
+// MARK: - TimeEntry Formatting Tests
+
+final class TimeEntryFormattingTests: XCTestCase {
+
+    func testFormattedDuration() {
+        let entry = TimeEntry(propertyId: UUID(), participant: .selfParticipant, category: .repairs, hours: 2.5)
+        XCTAssertEqual(entry.formattedDuration, "2.5h")
+    }
+
+    func testFormattedDurationWholeNumber() {
+        let entry = TimeEntry(propertyId: UUID(), participant: .selfParticipant, category: .repairs, hours: 3.0)
+        XCTAssertEqual(entry.formattedDuration, "3.0h")
+    }
+
+    func testGetPropertyName() {
+        let propertyId = UUID()
+        let properties = [
+            RentalProperty(id: propertyId, name: "Oak House", address: "123 Oak St", propertyType: .ltr)
+        ]
+        let entry = TimeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs, hours: 1)
+        XCTAssertEqual(entry.getPropertyName(from: properties), "Oak House")
+    }
+
+    func testGetPropertyNameUnknownWhenMissing() {
+        let entry = TimeEntry(propertyId: UUID(), participant: .selfParticipant, category: .repairs, hours: 1)
+        XCTAssertEqual(entry.getPropertyName(from: []), "Unknown")
+    }
+}
+
+// MARK: - TimeEntry importSource Backward Compatibility Tests
+
+final class TimeEntryImportSourceTests: XCTestCase {
+
+    func testTimeEntryDecodesWithoutImportSource() throws {
+        // Old entries that lack importSource should decode with nil
+        let propertyId = UUID()
+        let json = """
+        {"id":"550e8400-e29b-41d4-a716-446655440002","propertyId":"\(propertyId.uuidString)","participant":"Self","category":"Repairs & Maintenance","hours":1.0,"date":0,"notes":"test","createdAt":0}
+        """
+        let decoded = try JSONDecoder().decode(TimeEntry.self, from: Data(json.utf8))
+        XCTAssertNil(decoded.importSource)
+    }
+
+    func testTimeEntryRoundtripWithImportSource() throws {
+        let entry = TimeEntry(
+            propertyId: UUID(),
+            participant: .selfParticipant,
+            category: .management,
+            hours: 2.0,
+            importSource: "calendar"
+        )
+        let data = try JSONEncoder().encode(entry)
+        let decoded = try JSONDecoder().decode(TimeEntry.self, from: data)
+        XCTAssertEqual(decoded.importSource, "calendar")
+    }
+
+    func testTimeEntryRoundtripWithNilImportSource() throws {
+        let entry = TimeEntry(
+            propertyId: UUID(),
+            participant: .selfParticipant,
+            category: .repairs,
+            hours: 1.0
+        )
+        let data = try JSONEncoder().encode(entry)
+        let decoded = try JSONDecoder().decode(TimeEntry.self, from: data)
+        XCTAssertNil(decoded.importSource)
+    }
+
+    func testExistingInitDefaultsToNilImportSource() {
+        let entry = TimeEntry(
+            propertyId: UUID(),
+            participant: .selfParticipant,
+            category: .repairs,
+            hours: 1.0
+        )
+        XCTAssertNil(entry.importSource)
+    }
+}
+
+// MARK: - CalendarImportService Categorization Tests
+
+final class CalendarImportServiceTests: XCTestCase {
+
+    func testCategorizeRepairEvent() {
+        let service = CalendarImportService.shared
+        XCTAssertEqual(service.categorizeEvent(title: "Plumber at Oak House"), .repairs)
+        XCTAssertEqual(service.categorizeEvent(title: "HVAC maintenance"), .repairs)
+        XCTAssertEqual(service.categorizeEvent(title: "Fix leaking pipe"), .repairs)
+    }
+
+    func testCategorizeLeasingEvent() {
+        let service = CalendarImportService.shared
+        XCTAssertEqual(service.categorizeEvent(title: "Tenant screening call"), .leasing)
+        XCTAssertEqual(service.categorizeEvent(title: "Lease signing meeting"), .leasing)
+        XCTAssertEqual(service.categorizeEvent(title: "Property showing"), .leasing)
+    }
+
+    func testCategorizeTravelEvent() {
+        let service = CalendarImportService.shared
+        XCTAssertEqual(service.categorizeEvent(title: "Inspection walkthrough"), .travel)
+    }
+
+    func testCategorizeRenovationEvent() {
+        let service = CalendarImportService.shared
+        XCTAssertEqual(service.categorizeEvent(title: "Contractor meeting"), .renovations)
+        XCTAssertEqual(service.categorizeEvent(title: "Closing on property"), .renovations)
+    }
+
+    func testCategorizeInsuranceEvent() {
+        let service = CalendarImportService.shared
+        XCTAssertEqual(service.categorizeEvent(title: "Insurance claim follow-up"), .insurance)
+    }
+
+    func testCategorizeLegalEvent() {
+        let service = CalendarImportService.shared
+        XCTAssertEqual(service.categorizeEvent(title: "Legal consultation"), .legal)
+        XCTAssertEqual(service.categorizeEvent(title: "Eviction hearing"), .legal)
+    }
+
+    func testCategorizeDefaultsToManagement() {
+        let service = CalendarImportService.shared
+        XCTAssertEqual(service.categorizeEvent(title: "Property check"), .management)
+        XCTAssertEqual(service.categorizeEvent(title: "Random meeting"), .management)
+    }
+}

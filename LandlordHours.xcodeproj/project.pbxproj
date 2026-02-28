@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CI00000000000000000AF002 /* CalendarImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CI00000000000000000AF001 /* CalendarImportService.swift */; };
+		CI00000000000000000AF004 /* CalendarImportReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CI00000000000000000AF003 /* CalendarImportReviewView.swift */; };
 		12BA2B1FF6DA34B9708EABF4 /* ExportPDFView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37718C6C352F5146B1B19AAA /* ExportPDFView.swift */; };
 		19BD84C3A545BA2935D9A7CF /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFF3C2F4E4EAC2D09DCB3F5B /* ContentView.swift */; };
 		1A2A80F489BB65C766EBA321 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5490464EB91A5699EED6EFCE /* ReportsView.swift */; };
@@ -16,6 +18,7 @@
 		248FE0A34E510171590D2CA0 /* CloudKitSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D5650586AC0BFB4A2B259B /* CloudKitSyncService.swift */; };
 		691B932AEB4ECA321D667151 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7002A4C1E561833705DE3B43 /* PaywallView.swift */; };
 		93C20D864969D6F6EC85B191 /* TimeLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11377EC6BD95D70E1AF5A9A6 /* TimeLogView.swift */; };
+		CA86542BAD924288A378FD01 /* TimeEntryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26C660CB5D63400ABAF4136A /* TimeEntryDetailView.swift */; };
 		98B8F1C68BDAB98363098499 /* TrialBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6479CEE1FE815563D8292734 /* TrialBannerView.swift */; };
 		A47503D607E3D15AB9B78D16 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 754B9E894A2C95D4E5C635B0 /* HistoryView.swift */; };
 		A72762E0F4CE4DEFA07D9C28 /* AITimeEntryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63814CFFD3A0284AC85988D /* AITimeEntryService.swift */; };
@@ -38,10 +41,14 @@
 		D0FB50644A3E4250418CF25F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8F16B919639EBDE7C821FEC2 /* Assets.xcassets */; };
 		EA9388030050C4067B4212BE /* AppleSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = C85EE25AEEEC23C7341BEA7B /* AppleSignIn.swift */; };
 		F20713D35465CC3396393B14 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2CA9BA1AD53F0ABA92A9F2F /* OnboardingView.swift */; };
+		TT00000000000000000BF002 /* LandlordHoursTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TT00000000000000000BF001 /* LandlordHoursTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		CI00000000000000000AF001 /* CalendarImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarImportService.swift; sourceTree = "<group>"; };
+		CI00000000000000000AF003 /* CalendarImportReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarImportReviewView.swift; sourceTree = "<group>"; };
 		11377EC6BD95D70E1AF5A9A6 /* TimeLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeLogView.swift; sourceTree = "<group>"; };
+		26C660CB5D63400ABAF4136A /* TimeEntryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeEntryDetailView.swift; sourceTree = "<group>"; };
 		1552DA58D14D98D9473D352A /* SubscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
 		F4D5650586AC0BFB4A2B259B /* CloudKitSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitSyncService.swift; sourceTree = "<group>"; };
 		368AC8C360A71EB0FAFB1D52 /* TasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksView.swift; sourceTree = "<group>"; };
@@ -72,6 +79,9 @@
 		D91BDD921FD02E42B58FE334 /* PropertiesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertiesView.swift; sourceTree = "<group>"; };
 		DE13F908989158FDAB28BF57 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		F63814CFFD3A0284AC85988D /* AITimeEntryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITimeEntryService.swift; sourceTree = "<group>"; };
+		CC7777770000000000000001 /* LandlordHours.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = LandlordHours.storekit; sourceTree = "<group>"; };
+		TT00000000000000000BF001 /* LandlordHoursTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordHoursTests.swift; sourceTree = "<group>"; };
+		TT00000000000000000BF007 /* LandlordHoursTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LandlordHoursTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -80,6 +90,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				BB5555550000000000000001 /* LucideIcons in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		TT00000000000000000BF006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -118,9 +135,19 @@
 			isa = PBXGroup;
 			children = (
 				8F16B919639EBDE7C821FEC2 /* Assets.xcassets */,
+				CC7777770000000000000001 /* LandlordHours.storekit */,
 				396398AA798125B67EFC1B2A /* Sources */,
+				TT00000000000000000BF003 /* Tests */,
 				F152E78B546CB481CAD1B0FA /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		TT00000000000000000BF003 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				TT00000000000000000BF001 /* LandlordHoursTests.swift */,
+			);
+			path = Tests;
 			sourceTree = "<group>";
 		};
 		BB5791F5978AAAD88BED36D1 /* App */ = {
@@ -138,6 +165,7 @@
 			children = (
 				F63814CFFD3A0284AC85988D /* AITimeEntryService.swift */,
 				C85EE25AEEEC23C7341BEA7B /* AppleSignIn.swift */,
+				CI00000000000000000AF001 /* CalendarImportService.swift */,
 				1552DA58D14D98D9473D352A /* SubscriptionManager.swift */,
 				F4D5650586AC0BFB4A2B259B /* CloudKitSyncService.swift */,
 				AA2222220000000000000007 /* WeeklySummaryService.swift */,
@@ -158,6 +186,7 @@
 			isa = PBXGroup;
 			children = (
 				AA3333330000000000000001 /* Components */,
+				CI00000000000000000AF003 /* CalendarImportReviewView.swift */,
 				AA2222220000000000000003 /* CategoryManagementView.swift */,
 				AA2222220000000000000004 /* CategoryPickerSheet.swift */,
 				AA2222220000000000000005 /* ContactSupportView.swift */,
@@ -174,6 +203,7 @@
 				368AC8C360A71EB0FAFB1D52 /* TasksView.swift */,
 				AA2222220000000000000006 /* TaxYearView.swift */,
 				11377EC6BD95D70E1AF5A9A6 /* TimeLogView.swift */,
+				26C660CB5D63400ABAF4136A /* TimeEntryDetailView.swift */,
 				6479CEE1FE815563D8292734 /* TrialBannerView.swift */,
 			);
 			path = Views;
@@ -183,6 +213,7 @@
 			isa = PBXGroup;
 			children = (
 				74E7F35CA9ADFE290A5D0420 /* LandlordHours.app */,
+				TT00000000000000000BF007 /* LandlordHoursTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -210,7 +241,42 @@
 			productReference = 74E7F35CA9ADFE290A5D0420 /* LandlordHours.app */;
 			productType = "com.apple.product-type.application";
 		};
+		TT00000000000000000BF004 /* LandlordHoursTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = TT00000000000000000BF00C /* Build configuration list for PBXNativeTarget "LandlordHoursTests" */;
+			buildPhases = (
+				TT00000000000000000BF005 /* Sources */,
+				TT00000000000000000BF006 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				TT00000000000000000BF009 /* PBXTargetDependency */,
+			);
+			name = LandlordHoursTests;
+			productName = LandlordHoursTests;
+			productReference = TT00000000000000000BF007 /* LandlordHoursTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXContainerItemProxy section */
+		TT00000000000000000BF008 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D0C874CA0683032090187EC6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7A7EED730EC6B964D229DF99;
+			remoteInfo = LandlordHours;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		TT00000000000000000BF009 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7A7EED730EC6B964D229DF99 /* LandlordHours */;
+			targetProxy = TT00000000000000000BF008 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		D0C874CA0683032090187EC6 /* Project object */ = {
@@ -236,6 +302,7 @@
 			projectRoot = "";
 			targets = (
 				7A7EED730EC6B964D229DF99 /* LandlordHours */,
+				TT00000000000000000BF004 /* LandlordHoursTests */,
 			);
 		};
 /* End PBXProject section */
@@ -259,6 +326,8 @@
 				A72762E0F4CE4DEFA07D9C28 /* AITimeEntryService.swift in Sources */,
 				C6B50842EA064CEACA38BA96 /* AppViewModel.swift in Sources */,
 				EA9388030050C4067B4212BE /* AppleSignIn.swift in Sources */,
+				CI00000000000000000AF004 /* CalendarImportReviewView.swift in Sources */,
+				CI00000000000000000AF002 /* CalendarImportService.swift in Sources */,
 				AA1111110000000000000003 /* CategoryManagementView.swift in Sources */,
 				AA1111110000000000000004 /* CategoryPickerSheet.swift in Sources */,
 				AA1111110000000000000005 /* ContactSupportView.swift in Sources */,
@@ -285,6 +354,15 @@
 				AA1111110000000000000008 /* LearningCenterView.swift in Sources */,
 				AA1111110000000000000009 /* CelebrationOverlayView.swift in Sources */,
 				AA111111000000000000000A /* AppDesignSystem.swift in Sources */,
+			
+				CA86542BAD924288A378FD01 /* TimeEntryDetailView.swift in Sources */,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		TT00000000000000000BF005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				TT00000000000000000BF002 /* LandlordHoursTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -494,6 +572,44 @@
 			};
 			name = Release;
 		};
+		TT00000000000000000BF00A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = G68NLC3DA3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.landlordhours.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LandlordHours.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/LandlordHours";
+			};
+			name = Debug;
+		};
+		TT00000000000000000BF00B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = G68NLC3DA3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.openclaw.landlordhours.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LandlordHours.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/LandlordHours";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -511,6 +627,15 @@
 			buildConfigurations = (
 				8B762220F1C1D3351F7E78B1 /* Debug */,
 				B89BC0F4E0C7011D8FFFA57F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		TT00000000000000000BF00C /* Build configuration list for PBXNativeTarget "LandlordHoursTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				TT00000000000000000BF00A /* Debug */,
+				TT00000000000000000BF00B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

@@ -66,7 +66,16 @@ struct ContactSupportView: View {
 
                     // Send button
                     Button {
-                        showingMailComposer = true
+                        if MFMailComposeViewController.canSendMail() {
+                            showingMailComposer = true
+                        } else {
+                            // Fallback: open mailto URL
+                            let mailtoSubject = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+                            let mailtoBody = message.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+                            if let url = URL(string: "mailto:\(supportEmail)?subject=\(mailtoSubject)&body=\(mailtoBody)") {
+                                UIApplication.shared.open(url)
+                            }
+                        }
                     } label: {
                         HStack(spacing: 8) {
                             LucideIcon(image: Lucide.mail, size: 16)
@@ -129,19 +138,37 @@ struct ContactSupportView: View {
 }
 
 struct MailComposeView: UIViewControllerRepresentable {
+    @Environment(\.dismiss) private var dismiss
     let subject: String
     let body: String
     let to: String
 
-    func makeUIViewController(context: Context) -> UIViewController {
+    func makeCoordinator() -> Coordinator {
+        Coordinator(dismiss: dismiss)
+    }
+
+    func makeUIViewController(context: Context) -> MFMailComposeViewController {
         let picker = MFMailComposeViewController()
+        picker.mailComposeDelegate = context.coordinator
         picker.setSubject(subject)
         picker.setMessageBody(body, isHTML: false)
         picker.setToRecipients([to])
         return picker
     }
 
-    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: MFMailComposeViewController, context: Context) {}
+
+    class Coordinator: NSObject, MFMailComposeViewControllerDelegate {
+        let dismiss: DismissAction
+
+        init(dismiss: DismissAction) {
+            self.dismiss = dismiss
+        }
+
+        func mailComposeController(_ controller: MFMailComposeViewController, didFinishWith result: MFMailComposeResult, error: Error?) {
+            dismiss()
+        }
+    }
 }
 
 #Preview {

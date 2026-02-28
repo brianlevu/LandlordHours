@@ -1,6 +1,9 @@
 import SwiftUI
 import AuthenticationServices
 import LucideIcons
+import os.log
+
+private let logger = Logger(subsystem: "com.openclaw.landlordhours", category: "Auth")
 
 @available(iOS 16.0, *)
 struct AppleSignInButton: View {
@@ -49,7 +52,7 @@ struct AppleSignInButton: View {
                     errorMessage = "Apple Sign In isn't available right now. Please use email sign-up or make sure you're signed into your Apple ID in Settings."
                     showError = true
                 }
-                print("Apple Sign-In failed: \(error.localizedDescription)")
+                logger.error("Apple Sign-In failed: \(error.localizedDescription)")
             }
         }
         .signInWithAppleButtonStyle(.black)
@@ -88,7 +91,7 @@ class AppleSignInManager: ObservableObject {
             self.isSignedIn = true
             self.fullName = UserDefaults.standard.string(forKey: "appleUserName")
             self.email = UserDefaults.standard.string(forKey: "appleUserEmail")
-            self.profileImageData = UserDefaults.standard.data(forKey: "profileImageData")
+            self.profileImageData = UserDefaults.standard.data(forKey: UserScope.key("profileImageData"))
             if let typeRaw = UserDefaults.standard.string(forKey: "loginType"),
                let type = LoginType(rawValue: typeRaw) {
                 self.loginType = type
@@ -98,21 +101,28 @@ class AppleSignInManager: ObservableObject {
             self.isSignedIn = true
             self.fullName = UserDefaults.standard.string(forKey: "emailUserName")
             self.email = UserDefaults.standard.string(forKey: "emailUserEmail")
-            self.profileImageData = UserDefaults.standard.data(forKey: "profileImageData")
+            self.profileImageData = UserDefaults.standard.data(forKey: UserScope.key("profileImageData"))
             self.loginType = .email
         }
     }
     
     func signInWithEmail(email: String, password: String, name: String) {
-        let userId = UUID().uuidString
+        // Use a deterministic userId based on email so the same account always
+        // maps to the same data scope (no random UUID that changes every login)
+        let normalizedEmail = email.lowercased().trimmingCharacters(in: .whitespaces)
+        let userId = "email-" + normalizedEmail
         UserDefaults.standard.set(userId, forKey: "emailUserId")
         UserDefaults.standard.set(email, forKey: "emailUserEmail")
-        UserDefaults.standard.set(name, forKey: "emailUserName")
+        if !name.isEmpty {
+            UserDefaults.standard.set(name, forKey: "emailUserName")
+        }
         UserDefaults.standard.set(LoginType.email.rawValue, forKey: "loginType")
-        
+
         self.userId = userId
         self.email = email
-        self.fullName = name
+        if !name.isEmpty {
+            self.fullName = name
+        }
         self.isSignedIn = true
         self.loginType = .email
     }
@@ -138,7 +148,7 @@ class AppleSignInManager: ObservableObject {
         
         if let imageData = imageData {
             profileImageData = imageData
-            UserDefaults.standard.set(imageData, forKey: "profileImageData")
+            UserDefaults.standard.set(imageData, forKey: UserScope.key("profileImageData"))
         }
     }
     
@@ -163,6 +173,8 @@ class AppleSignInManager: ObservableObject {
 
 struct LoginView: View {
     @EnvironmentObject var viewModel: AppViewModel
+    @Environment(\.colorScheme) var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     @State private var appeared = false
     @State private var showCreateAccount = false
     @State private var showEmailLogin = false
@@ -171,21 +183,17 @@ struct LoginView: View {
         NavigationStack {
             GeometryReader { geo in
                 ZStack {
-                    // White base
-                    Color.white.ignoresSafeArea()
+                    // Base background
+                    colors.background.ignoresSafeArea()
 
                     // Top half: lavender gradient + floating glass cards
                     VStack(spacing: 0) {
                         ZStack {
-                            // Lavender gradient background
+                            // Lavender gradient background — adapts to dark mode
                             LinearGradient(
-                                colors: [
-                                    Color(hex: "C4B5FD").opacity(0.4),
-                                    Color(hex: "DDD6FE").opacity(0.5),
-                                    Color(hex: "EDE9FE").opacity(0.6),
-                                    Color.white.opacity(0.85),
-                                    Color.white
-                                ],
+                                colors: colorScheme == .dark
+                                    ? [Color(hex: "1A1535").opacity(0.6), Color(hex: "1C1A2E").opacity(0.5), colors.background]
+                                    : [Color(hex: "C4B5FD").opacity(0.4), Color(hex: "DDD6FE").opacity(0.5), Color(hex: "EDE9FE").opacity(0.6), Color.white.opacity(0.85), Color.white],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
@@ -361,7 +369,7 @@ struct LoginView: View {
             // Headline
             Text("Track your hours.\nQualify with confidence.")
                 .font(.system(size: 26, weight: .regular, design: .serif))
-                .foregroundStyle(AppColors.charcoal)
+                .foregroundStyle(colors.textPrimary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(2)
                 .padding(.bottom, 6)
@@ -369,7 +377,7 @@ struct LoginView: View {
             // Subline
             Text("750 hours to Real Estate Professional Status \u{2014} we make every hour count.")
                 .font(.system(size: 15))
-                .foregroundStyle(AppColors.slate)
+                .foregroundStyle(colors.textSecondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
                 .padding(.bottom, 32)
@@ -424,7 +432,7 @@ struct LoginView: View {
             // Already have an account link
             HStack(spacing: 0) {
                 Text("Already have an account? ")
-                    .foregroundStyle(AppColors.slate)
+                    .foregroundStyle(colors.textSecondary)
                 Button {
                     showEmailLogin = true
                 } label: {
@@ -481,6 +489,10 @@ struct EmailLoginSheetView: View {
                     Button {
                         guard !email.isEmpty, !password.isEmpty else {
                             errorMessage = "Please fill in all fields"
+                            return
+                        }
+                        guard email.contains("@") && email.contains(".") else {
+                            errorMessage = "Please enter a valid email address"
                             return
                         }
                         guard password.count >= 6 else {
@@ -605,6 +617,10 @@ struct EmailSignUpView: View {
                     }
                     if name.isEmpty || email.isEmpty {
                         errorMessage = "Please fill in all fields"
+                        return
+                    }
+                    guard email.contains("@") && email.contains(".") else {
+                        errorMessage = "Please enter a valid email address"
                         return
                     }
 

@@ -9,6 +9,9 @@ struct HistoryView: View {
     @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
     @State private var selectedParticipant: Participant?
     @State private var selectedProperty: RentalProperty?
+    @State private var entryToDelete: TimeEntry?
+    @State private var showingDeleteConfirmation = false
+    @State private var filterImportedOnly = false
 
     var filteredEntries: [TimeEntry] {
         var entries = viewModel.entriesForYear(selectedYear)
@@ -17,6 +20,9 @@ struct HistoryView: View {
         }
         if let property = selectedProperty {
             entries = entries.filter { $0.propertyId == property.id }
+        }
+        if filterImportedOnly {
+            entries = entries.filter { $0.importSource != nil }
         }
         return entries.sorted { $0.date > $1.date }
     }
@@ -68,6 +74,16 @@ struct HistoryView: View {
                                 isActive: selectedProperty != nil
                             )
                         }
+
+                        Button {
+                            filterImportedOnly.toggle()
+                        } label: {
+                            filterChip(
+                                text: "Imported",
+                                icon: Lucide.calendar,
+                                isActive: filterImportedOnly
+                            )
+                        }
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
@@ -103,15 +119,29 @@ struct HistoryView: View {
                     .background(colors.background)
                 } else {
                     ScrollView(showsIndicators: false) {
-                        VStack(spacing: 0) {
+                        LazyVStack(spacing: 0) {
                             ForEach(Array(filteredEntries.enumerated()), id: \.element.id) { index, entry in
-                                EntryListRow(
-                                    entry: entry,
-                                    propertyName: viewModel.properties.first { $0.id == entry.propertyId }?.name ?? "Unknown"
-                                )
+                                NavigationLink {
+                                    TimeEntryDetailView(entry: entry)
+                                } label: {
+                                    EntryListRow(
+                                        entry: entry,
+                                        propertyName: viewModel.properties.first { $0.id == entry.propertyId }?.name ?? "Unknown"
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    Button(role: .destructive) {
+                                        entryToDelete = entry
+                                        showingDeleteConfirmation = true
+                                    } label: {
+                                        Label("Delete", image: "trash")
+                                    }
+                                }
                                 .contextMenu {
                                     Button(role: .destructive) {
-                                        viewModel.deleteTimeEntry(entry)
+                                        entryToDelete = entry
+                                        showingDeleteConfirmation = true
                                     } label: {
                                         Label { Text("Delete") } icon: { lucideImage(Lucide.trash2) }
                                     }
@@ -134,6 +164,17 @@ struct HistoryView: View {
             }
             .background(colors.background)
             .navigationTitle("History")
+            .alert("Delete Entry?", isPresented: $showingDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { entryToDelete = nil }
+                Button("Delete", role: .destructive) {
+                    if let entry = entryToDelete {
+                        viewModel.deleteTimeEntry(entry)
+                    }
+                    entryToDelete = nil
+                }
+            } message: {
+                Text("This time entry will be permanently deleted.")
+            }
         }
     }
 

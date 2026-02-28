@@ -16,13 +16,13 @@ struct DashboardView: View {
 
     private var isREPS: Bool { goalManager.globalGoalType == .reps || goalManager.globalGoalType == .both }
 
-    // 50% rule compliance: ratio of RE hours to total working hours
+    // 50% rule compliance: ratio of RE hours to total working hours (incl. non-RE employment)
     private var fiftyPercentCompliance: Double {
-        let selfHours = viewModel.totalHoursForParticipant(.selfParticipant, year: currentYear)
-        let spouseHours = viewModel.totalHoursForParticipant(.spouse, year: currentYear)
-        let total = selfHours + spouseHours
-        guard total > 0 else { return 0 }
-        return min(selfHours / total, 1.0)
+        let reHours = viewModel.totalHoursForParticipant(.selfParticipant, year: currentYear)
+        let nonREHours = TaxProfileManager.shared.nonREWorkHours
+        let totalWorkingHours = reHours + nonREHours
+        guard totalWorkingHours > 0 else { return 0 }
+        return min(reHours / totalWorkingHours, 1.0)
     }
 
     // Pace calculations
@@ -81,28 +81,48 @@ struct DashboardView: View {
     }
 
     @State private var showPaywall = false
+    @State private var isReady = false
 
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 24) {
-                    headerSection
-                    trialStatusNudge
-                    progressRingCard
-                    thisWeekCard
-                    recentEntriesSection
-                    learnCarouselSection
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 40)
-            }
-            .background {
+            ZStack {
                 AuroraBackground()
+
+                if isReady {
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 24) {
+                            headerSection
+                            trialStatusNudge
+                            progressRingCard
+                            thisWeekCard
+                            recentEntriesSection
+                            learnCarouselSection
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
+                        .padding(.bottom, 40)
+                    }
+                    .transition(.opacity)
+                } else {
+                    ScrollView(showsIndicators: false) {
+                        DashboardSkeleton()
+                    }
+                    .transition(.opacity)
+                }
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showPaywall) {
                 PaywallView(showPaywall: $showPaywall)
+            }
+            .onAppear {
+                // Brief skeleton then reveal — lets SwiftUI layout settle
+                if !isReady {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                        withAnimation(.easeOut(duration: 0.35)) {
+                            isReady = true
+                        }
+                    }
+                }
             }
         }
     }
@@ -112,15 +132,16 @@ struct DashboardView: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(greetingLine)
-                    .font(AppTypography.caption)
-                    .foregroundStyle(colors.textSecondary)
-                HStack(spacing: 6) {
-                    Text("Track your hours")
-                        .font(AppTypography.headline)
+                    .font(.system(size: 14))
+                    .foregroundStyle(AppColors.slate)
+                HStack(spacing: 10) {
+                    Text(displayName)
+                        .font(.system(size: 28, weight: .regular, design: .serif))
                         .foregroundStyle(colors.textPrimary)
                     if subscriptionManager.isPro && !subscriptionManager.isTrialActive {
                         Text("PRO")
                             .font(.system(size: 10, weight: .bold))
+                            .tracking(0.5)
                             .foregroundStyle(.white)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
@@ -130,22 +151,15 @@ struct DashboardView: View {
                 }
             }
             Spacer()
-            Button(action: {}) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color.white)
-                        .frame(width: 40, height: 40)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(colors.border, lineWidth: 1)
-                        )
-                        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-                    LucideIcon(image: Lucide.bell, size: 18)
-                        .foregroundStyle(AppColors.charcoal)
-                }
-            }
         }
         .padding(.top, 4)
+    }
+
+    private var displayName: String {
+        let name = viewModel.userName
+        if name.isEmpty || name == "User" { return "Dashboard" }
+        // Use first name only
+        return name.components(separatedBy: " ").first ?? name
     }
 
     // MARK: - Trial Status Nudge
@@ -318,6 +332,10 @@ struct DashboardView: View {
                     }
                 }
                 .frame(width: 260, height: 260)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(totalHours >= targetHours
+                    ? "Goal met! \(AppFormat.hours(totalHours)) logged"
+                    : "\(AppFormat.hours(totalHours)) of \(Int(targetHours)) hours, \(Int(progress * 100)) percent complete")
             }
 
             // Hero message
@@ -486,10 +504,15 @@ struct DashboardView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(recentEntries.enumerated()), id: \.element.id) { index, entry in
-                        EntryListRow(
-                            entry: entry,
-                            propertyName: viewModel.properties.first { $0.id == entry.propertyId }?.name ?? "Unknown"
-                        )
+                        NavigationLink {
+                            TimeEntryDetailView(entry: entry)
+                        } label: {
+                            EntryListRow(
+                                entry: entry,
+                                propertyName: viewModel.properties.first { $0.id == entry.propertyId }?.name ?? "Unknown"
+                            )
+                        }
+                        .buttonStyle(.plain)
                         if index < recentEntries.count - 1 {
                             Divider()
                                 .padding(.leading, 72)
@@ -522,66 +545,80 @@ struct DashboardView: View {
     // MARK: - Learn Carousel
     private var learnCarouselSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Kicker + headline
-            VStack(alignment: .leading, spacing: 4) {
-                Text("LEARN")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.5)
-                    .foregroundStyle(AppColors.mist)
-                Text("Tax Essentials")
-                    .font(.system(size: 20, weight: .regular, design: .serif))
-                    .foregroundStyle(colors.textPrimary)
+            // Kicker + headline + "See all" link
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("LEARN")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.5)
+                        .foregroundStyle(AppColors.mist)
+                    Text("Tax Essentials")
+                        .font(.system(size: 20, weight: .regular, design: .serif))
+                        .foregroundStyle(colors.textPrimary)
+                }
+                Spacer()
+                NavigationLink {
+                    LearningCenterView()
+                } label: {
+                    HStack(spacing: 2) {
+                        Text("See all")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(AppColors.primary)
+                        LucideIcon(image: Lucide.chevronRight, size: 14)
+                            .foregroundStyle(AppColors.primary)
+                    }
+                }
+                .buttonStyle(.plain)
             }
 
             // Horizontal card scroll
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    NavigationLink {
-                        LearningCenterView()
-                    } label: {
-                        learnCard(
-                            category: "IRS BASICS",
-                            title: "What Counts as REPS Hours?",
-                            readTime: "3 min",
-                            categoryColor: AppColors.primary,
-                            washColor: AppColors.primarySurface,
-                            iconImage: Lucide.bookOpen
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    NavigationLink {
-                        LearningCenterView()
-                    } label: {
-                        learnCard(
-                            category: "TAX STRATEGY",
-                            title: "The 50% Rule Explained",
-                            readTime: "5 min",
-                            categoryColor: AppColors.sage,
-                            washColor: AppColors.sageWash,
-                            iconImage: Lucide.lightbulb
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    NavigationLink {
-                        LearningCenterView()
-                    } label: {
-                        learnCard(
-                            category: "RECORD KEEPING",
-                            title: "Audit-Proof Your Logs",
-                            readTime: "4 min",
-                            categoryColor: AppColors.coral,
-                            washColor: AppColors.coralWash,
-                            iconImage: Lucide.shieldCheck
-                        )
-                    }
-                    .buttonStyle(.plain)
+                    learnCardLink(
+                        category: "IRS BASICS",
+                        title: "What Counts as REPS Hours?",
+                        readTime: "5 min",
+                        categoryColor: AppColors.primary,
+                        washColor: AppColors.primarySurface,
+                        iconImage: Lucide.house
+                    )
+                    learnCardLink(
+                        category: "TAX STRATEGY",
+                        title: "The 50% Rule Explained",
+                        readTime: "4 min",
+                        categoryColor: Color(hex: "059669"),
+                        washColor: AppColors.sageWash,
+                        iconImage: Lucide.circleCheck
+                    )
+                    learnCardLink(
+                        category: "RECORD KEEPING",
+                        title: "Hours That Count for IRS",
+                        readTime: "5 min",
+                        categoryColor: AppColors.coral,
+                        washColor: AppColors.coralWash,
+                        iconImage: Lucide.fileText
+                    )
                 }
                 .padding(.horizontal, 2)
             }
             .padding(.horizontal, -2)
         }
+    }
+
+    private func learnCardLink(category: String, title: String, readTime: String, categoryColor: Color, washColor: Color, iconImage: UIImage) -> some View {
+        NavigationLink {
+            LearningCenterView()
+        } label: {
+            learnCard(
+                category: category,
+                title: title,
+                readTime: readTime,
+                categoryColor: categoryColor,
+                washColor: washColor,
+                iconImage: iconImage
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private func learnCard(category: String, title: String, readTime: String, categoryColor: Color, washColor: Color, iconImage: UIImage) -> some View {
@@ -657,36 +694,12 @@ struct EntryListRow: View {
     let entry: TimeEntry
     let propertyName: String
 
-    private var categorySystemIcon: String {
-        switch entry.category {
-        case .repairs: return "wrench"
-        case .management: return "clipboard"
-        case .leasing: return "key"
-        case .bookkeeping: return "calculator"
-        case .legal: return "landmark"
-        case .insurance: return "shield"
-        case .travel: return "car"
-        case .renovations: return "hammer"
-        case .investing: return "trending-up"
-        case .financing: return "banknote"
-        case .contractNegotiation: return "file-cog"
-        }
+    private var categoryIconName: String {
+        entry.category.lucideIconName
     }
 
     private var categoryColor: Color {
-        switch entry.category {
-        case .repairs: return AppColors.coral
-        case .management: return AppColors.sage
-        case .leasing: return AppColors.sky
-        case .bookkeeping: return AppColors.honey
-        case .legal: return AppColors.rose
-        case .insurance: return AppColors.primaryLight
-        case .travel: return AppColors.sky
-        case .renovations: return AppColors.coral
-        case .investing: return AppColors.sage
-        case .financing: return AppColors.honey
-        case .contractNegotiation: return AppColors.primary
-        }
+        entry.category.color
     }
 
     private var categoryWash: Color {
@@ -704,7 +717,7 @@ struct EntryListRow: View {
     var body: some View {
         HStack(spacing: 14) {
             JellyBadge(
-                systemName: categorySystemIcon,
+                systemName: categoryIconName,
                 color: categoryColor,
                 wash: categoryWash,
                 size: 44
@@ -720,6 +733,18 @@ struct EntryListRow: View {
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 HStack(spacing: 4) {
+                    if entry.importSource != nil {
+                        HStack(spacing: 2) {
+                            LucideIcon(image: Lucide.calendar, size: 9)
+                            Text("Cal")
+                                .font(.system(size: 9, weight: .medium, design: .rounded))
+                        }
+                        .foregroundStyle(AppColors.sky)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(colors.skyWash)
+                        .clipShape(Capsule())
+                    }
                     if !entry.countsForREPS {
                         Text("Non-REPS")
                             .font(.system(size: 10, weight: .medium, design: .rounded))

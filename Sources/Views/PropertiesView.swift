@@ -10,46 +10,57 @@ struct PropertiesView: View {
     @State private var showingAddProperty = false
     @State private var selectedProperty: RentalProperty?
     @State private var showingPaywall = false
+    @State private var propertyToDelete: RentalProperty?
+    @State private var showingDeleteConfirmation = false
 
     var body: some View {
         NavigationStack {
             Group {
                 if viewModel.properties.isEmpty {
                     // MARK: - Empty State
-                    VStack(spacing: 20) {
-                        JellyBadge(
-                            systemName: "building-2",
-                            color: AppColors.primary,
-                            wash: colors.primarySurface,
-                            size: 72
-                        )
+                    VStack(spacing: 0) {
+                        headerSection
+                            .padding(.horizontal, 20)
 
-                        Text("No Properties Yet")
-                            .font(AppTypography.headline)
-                            .foregroundStyle(colors.textPrimary)
+                        Spacer()
 
-                        Text("Add your first rental property\nto start tracking time")
-                            .font(AppTypography.body)
-                            .foregroundStyle(colors.textSecondary)
-                            .multilineTextAlignment(.center)
+                        VStack(spacing: 20) {
+                            JellyBadge(
+                                systemName: "building-2",
+                                color: AppColors.primary,
+                                wash: colors.primarySurface,
+                                size: 72
+                            )
 
-                        Button {
-                            if viewModel.canAddProperty() {
-                                showingAddProperty = true
-                            } else {
-                                showingPaywall = true
+                            Text("No Properties Yet")
+                                .font(AppTypography.headline)
+                                .foregroundStyle(colors.textPrimary)
+
+                            Text("Add your first rental property\nto start tracking time")
+                                .font(AppTypography.body)
+                                .foregroundStyle(colors.textSecondary)
+                                .multilineTextAlignment(.center)
+
+                            Button {
+                                if viewModel.canAddProperty() {
+                                    showingAddProperty = true
+                                } else {
+                                    showingPaywall = true
+                                }
+                            } label: {
+                                Label { Text("Add Property") } icon: { lucideImage(Lucide.plus) }
+                                    .font(AppTypography.button)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .background(AppColors.primary)
+                                    .foregroundStyle(Color.white)
+                                    .clipShape(Capsule())
                             }
-                        } label: {
-                            Label { Text("Add Property") } icon: { lucideImage(Lucide.plus) }
-                                .font(AppTypography.button)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                                .background(AppColors.primary)
-                                .foregroundStyle(Color.white)
-                                .clipShape(Capsule())
+                            .padding(.horizontal, 40)
+                            .padding(.top, 4)
                         }
-                        .padding(.horizontal, 40)
-                        .padding(.top, 4)
+
+                        Spacer()
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(colors.background)
@@ -57,9 +68,12 @@ struct PropertiesView: View {
                     // MARK: - Property List
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 12) {
+                            headerSection
+
                             ForEach(viewModel.properties) { property in
                                 PropertyListCard(property: property, hours: viewModel.totalHoursForProperty(property.id)) {
-                                    viewModel.deleteProperty(property)
+                                    propertyToDelete = property
+                                    showingDeleteConfirmation = true
                                 }
                                 .onTapGesture {
                                     selectedProperty = property
@@ -85,24 +99,13 @@ struct PropertiesView: View {
                             .padding(.top, 4)
                         }
                         .padding(.horizontal, 20)
-                        .padding(.vertical, 16)
+                        .padding(.top, 8)
+                        .padding(.bottom, 40)
                     }
                     .background(colors.background)
                 }
             }
-            .navigationTitle("Properties")
-            .toolbar {
-                Button {
-                    if viewModel.canAddProperty() {
-                        showingAddProperty = true
-                    } else {
-                        showingPaywall = true
-                    }
-                } label: {
-                    LucideIcon(image: Lucide.circlePlus, size: 22)
-                        .foregroundStyle(AppColors.primary)
-                }
-            }
+            .navigationBarHidden(true)
             .sheet(isPresented: $showingAddProperty) {
                 AddPropertyView()
             }
@@ -112,7 +115,39 @@ struct PropertiesView: View {
             .sheet(item: $selectedProperty) { property in
                 PropertyDetailView(property: property)
             }
+            .alert("Delete Property?", isPresented: $showingDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { propertyToDelete = nil }
+                Button("Delete", role: .destructive) {
+                    if let property = propertyToDelete {
+                        viewModel.deleteProperty(property)
+                    }
+                    propertyToDelete = nil
+                }
+            } message: {
+                Text("This will permanently delete \"\(propertyToDelete?.name ?? "")\" and all its time entries. This cannot be undone.")
+            }
         }
+    }
+
+    // MARK: - Header
+    private var headerSection: some View {
+        HStack {
+            Text("Properties")
+                .font(.system(size: 28, weight: .regular, design: .serif))
+                .foregroundStyle(colors.textPrimary)
+            Spacer()
+            Button {
+                if viewModel.canAddProperty() {
+                    showingAddProperty = true
+                } else {
+                    showingPaywall = true
+                }
+            } label: {
+                LucideIcon(image: Lucide.circlePlus, size: 22)
+                    .foregroundStyle(AppColors.primary)
+            }
+        }
+        .padding(.top, 4)
     }
 }
 
@@ -197,6 +232,7 @@ struct AddPropertyView: View {
     @State private var propertyType: PropertyType = .ltr
     @State private var addressResults: [MKMapItem] = []
     @State private var isSearching = false
+    @State private var showDuplicateWarning = false
     @FocusState private var isAddressFocused: Bool
 
     init(property: RentalProperty? = nil) {
@@ -292,15 +328,19 @@ struct AddPropertyView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
+                        // Check for duplicate name (only when adding new)
+                        if editingProperty == nil,
+                           viewModel.properties.contains(where: { $0.name.lowercased() == name.lowercased() }) {
+                            showDuplicateWarning = true
+                            return
+                        }
                         if let existingProperty = editingProperty {
-                            // Update existing property
                             var updatedProperty = existingProperty
                             updatedProperty.name = name
                             updatedProperty.address = address
                             updatedProperty.propertyType = propertyType
                             viewModel.updateProperty(updatedProperty)
                         } else {
-                            // Add new property
                             viewModel.addProperty(name: name, address: address, type: propertyType)
                         }
                         dismiss()
@@ -308,6 +348,11 @@ struct AddPropertyView: View {
                     .disabled(name.isEmpty || address.isEmpty)
                     .foregroundStyle(name.isEmpty || address.isEmpty ? colors.textTertiary : AppColors.primary)
                 }
+            }
+            .alert("Duplicate Name", isPresented: $showDuplicateWarning) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("A property named \"\(name)\" already exists. Please use a different name.")
             }
         }
     }
@@ -323,6 +368,8 @@ struct AddPropertyView: View {
             isSearching = false
             if let response = response {
                 addressResults = response.mapItems
+            } else {
+                addressResults = []
             }
         }
     }

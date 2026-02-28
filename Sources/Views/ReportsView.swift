@@ -4,7 +4,7 @@ import LucideIcons
 
 // MARK: - Goal Mode Enum
 enum GoalMode: String, CaseIterable, Identifiable {
-    case reps750 = "REPS 750h"
+    case reps750 = "REPS · 750h"
     case mp500 = "500h"
     case mp100 = "100h"
 
@@ -83,6 +83,59 @@ enum GoalMode: String, CaseIterable, Identifiable {
         case .mp100: return "Properties"
         }
     }
+
+    // MARK: - Background Gradients
+    var backgroundGradientColors: [Color] {
+        switch self {
+        case .reps750:
+            return [
+                Color(hex: "DDD8EE"), Color(hex: "E4DDFA"), Color(hex: "ECE6FF"),
+                Color(hex: "F2EEFF"), Color(hex: "F7F3FF"), Color(hex: "FAF7F2")
+            ]
+        case .mp500:
+            return [
+                Color(hex: "DDE0EE"), Color(hex: "E4DCF5"), Color(hex: "EEDDEE"),
+                Color(hex: "F5E6EF"), Color(hex: "FAEFF0"), Color(hex: "FFF8F5")
+            ]
+        case .mp100:
+            return [
+                Color(hex: "D5E8DD"), Color(hex: "DAEFDF"), Color(hex: "DFFAE5"),
+                Color(hex: "E5FAEB"), Color(hex: "EDFFF0"), Color(hex: "F5FFF8")
+            ]
+        }
+    }
+
+    var blob1Color: Color {
+        switch self {
+        case .reps750: return Color(hex: "8B5CF6").opacity(0.15)
+        case .mp500: return Color(hex: "A855F7").opacity(0.14)
+        case .mp100: return Color(hex: "34D399").opacity(0.15)
+        }
+    }
+
+    var blob2Color: Color {
+        switch self {
+        case .reps750: return Color(hex: "A78BFA").opacity(0.10)
+        case .mp500: return Color(hex: "F472B6").opacity(0.08)
+        case .mp100: return Color(hex: "6EE7B7").opacity(0.10)
+        }
+    }
+
+    var blob1Offset: CGSize {
+        switch self {
+        case .reps750: return CGSize(width: 60, height: -40)
+        case .mp500: return CGSize(width: 80, height: -50)
+        case .mp100: return CGSize(width: 40, height: -25)
+        }
+    }
+
+    var blob2Offset: CGSize {
+        switch self {
+        case .reps750: return CGSize(width: -50, height: 120)
+        case .mp500: return CGSize(width: -60, height: 140)
+        case .mp100: return CGSize(width: -35, height: 105)
+        }
+    }
 }
 
 // MARK: - Reports View
@@ -90,6 +143,7 @@ struct ReportsView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @Environment(\.colorScheme) var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+    @StateObject private var goalManager = GoalManager.shared
     @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
     @State private var showingExportSheet = false
     @State private var selectedGoal: GoalMode = .reps750
@@ -117,8 +171,12 @@ struct ReportsView: View {
 
     private var innerProgress: Double {
         guard selectedGoal.showInnerRing else { return 0 }
-        let selfRatio = selfHours > 0 ? min(selfHours / max(selfHours + spouseHours, 1), 1.0) : 0
-        return selfRatio
+        // 50% rule: RE hours as percentage of total working hours (RE + non-RE employment)
+        let reHours = viewModel.totalHoursForParticipant(.selfParticipant, year: selectedYear)
+        let nonREHours = TaxProfileManager.shared.nonREWorkHours
+        let totalWorking = reHours + nonREHours
+        guard totalWorking > 0 else { return 0 }
+        return min(reHours / totalWorking, 1.0)
     }
 
     private var meets50Percent: Bool {
@@ -146,16 +204,39 @@ struct ReportsView: View {
     private var stat3Value: String {
         switch selectedGoal {
         case .reps750:
-            let total = selfHours + spouseHours
-            guard total > 0 else { return "0%" }
-            let selfPercent = (selfHours / total) * 100
-            return String(format: "%.0f%%", selfPercent)
+            // 50% rule: RE hours as % of total working hours
+            let reHours = viewModel.totalHoursForParticipant(.selfParticipant, year: selectedYear)
+            let nonREHours = TaxProfileManager.shared.nonREWorkHours
+            let totalWorking = reHours + nonREHours
+            guard totalWorking > 0 else { return "0%" }
+            let rePercent = (reHours / totalWorking) * 100
+            return String(format: "%.0f%%", rePercent)
         case .mp500:
             let pct = (totalHours / 500.0) * 100
             return String(format: "%.0f%%", min(pct, 100))
         case .mp100:
             let count = viewModel.properties.count
             return "\(count)"
+        }
+    }
+
+    private var weeklyPaceNeeded: Double {
+        guard daysLeftInYear > 0 else { return 0 }
+        let weeksLeft = Double(daysLeftInYear) / 7.0
+        guard weeksLeft > 0 else { return 0 }
+        return remainingHours / weeksLeft
+    }
+
+    private var paceStatus: (label: String, detail: String, isOnTrack: Bool) {
+        if isGoalMet {
+            let over = totalHours - selectedGoal.targetHours
+            return ("Qualified", "\(String(format: "%.0f", over))h over target", true)
+        }
+        let pace = weeklyPaceNeeded
+        if pace <= 20 {
+            return ("On track", "~\(String(format: "%.1f", pace))h/week needed", true)
+        } else {
+            return ("Behind pace", "~\(String(format: "%.1f", pace))h/week needed", false)
         }
     }
 
@@ -174,30 +255,27 @@ struct ReportsView: View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    // Header row
                     headerRow
                         .padding(.horizontal, AppSpacing.xl)
                         .padding(.top, AppSpacing.xs)
 
-                    // Goal mode pills
                     goalPillRow
                         .padding(.horizontal, AppSpacing.xl)
                         .padding(.top, AppSpacing.md)
 
-                    // Ring hero
                     ringHeroSection
                         .padding(.top, 28)
 
-                    // Legend
                     legendRow
                         .padding(.top, 14)
 
-                    // Stat chips
+                    paceIndicator
+                        .padding(.top, 14)
+
                     statChipRow
                         .padding(.horizontal, AppSpacing.xl)
                         .padding(.top, AppSpacing.md)
 
-                    // Property breakdown
                     PropertyBreakdownSection(
                         properties: viewModel.properties,
                         viewModel: viewModel,
@@ -207,7 +285,6 @@ struct ReportsView: View {
                     )
                     .padding(.top, AppSpacing.xl)
 
-                    // Category breakdown
                     CategoryBreakdownSection(
                         viewModel: viewModel,
                         selectedYear: selectedYear,
@@ -218,7 +295,7 @@ struct ReportsView: View {
                 .padding(.bottom, 40)
             }
             .background {
-                AuroraBackground()
+                goalBackground
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -235,6 +312,13 @@ struct ReportsView: View {
                 ExportPDFView(year: selectedYear)
             }
             .onAppear {
+                // Sync selected goal from GoalManager settings
+                switch goalManager.globalGoalType {
+                case .reps, .both:
+                    selectedGoal = .reps750
+                case .str:
+                    selectedGoal = .mp100
+                }
                 withAnimation(AppAnimation.ringProgress.delay(0.3)) {
                     ringAppeared = true
                 }
@@ -242,12 +326,43 @@ struct ReportsView: View {
         }
     }
 
-    // MARK: - Header Row
+    // MARK: - Goal-Specific Background
+    private var goalBackground: some View {
+        ZStack {
+            // Gradient background
+            LinearGradient(
+                colors: colorScheme == .dark
+                    ? [colors.background, colors.background]
+                    : selectedGoal.backgroundGradientColors,
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+            .animation(.easeInOut(duration: 0.9), value: selectedGoal)
 
+            // Floating blob 1
+            Circle()
+                .fill(selectedGoal.blob1Color)
+                .frame(width: 280, height: 280)
+                .blur(radius: 70)
+                .offset(selectedGoal.blob1Offset)
+                .animation(.easeInOut(duration: 1.2), value: selectedGoal)
+
+            // Floating blob 2
+            Circle()
+                .fill(selectedGoal.blob2Color)
+                .frame(width: 220, height: 220)
+                .blur(radius: 60)
+                .offset(selectedGoal.blob2Offset)
+                .animation(.easeInOut(duration: 1.2), value: selectedGoal)
+        }
+    }
+
+    // MARK: - Header Row
     private var headerRow: some View {
         HStack {
             Text("Reports")
-                .font(AppTypography.headline)
+                .font(.system(size: 28, weight: .regular, design: .serif))
                 .foregroundStyle(colors.textPrimary)
 
             Spacer()
@@ -261,7 +376,6 @@ struct ReportsView: View {
     }
 
     // MARK: - Goal Pill Row
-
     private var goalPillRow: some View {
         HStack(spacing: 8) {
             ForEach(GoalMode.allCases) { goal in
@@ -269,6 +383,7 @@ struct ReportsView: View {
                     goal: goal,
                     isSelected: selectedGoal == goal,
                     action: {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         withAnimation(AppAnimation.pillPop) {
                             selectedGoal = goal
                         }
@@ -280,7 +395,6 @@ struct ReportsView: View {
     }
 
     // MARK: - Ring Hero Section
-
     private var ringHeroSection: some View {
         ZStack {
             // Ambient glow
@@ -296,7 +410,6 @@ struct ReportsView: View {
                 .frame(width: 240, height: 240)
                 .animation(AppAnimation.standard, value: selectedGoal)
 
-            // Ring container
             ZStack {
                 // Outer track (segmented dashes)
                 Circle()
@@ -333,7 +446,6 @@ struct ReportsView: View {
                         .frame(width: 164, height: 164)
                         .transition(.opacity)
 
-                    // Inner progress (50% rule)
                     Circle()
                         .trim(from: 0, to: ringAppeared ? innerProgress : 0)
                         .stroke(
@@ -350,7 +462,6 @@ struct ReportsView: View {
                         .transition(.opacity)
                 }
 
-                // Center content
                 ringCenterContent
             }
             .frame(width: 260, height: 260)
@@ -360,7 +471,6 @@ struct ReportsView: View {
     @ViewBuilder
     private var ringCenterContent: some View {
         if isGoalMet && selectedGoal == .mp100 {
-            // Goal met state
             VStack(spacing: 4) {
                 LucideIcon(image: Lucide.circleCheck, size: 32)
                     .foregroundStyle(Color(hex: "059669"))
@@ -387,7 +497,6 @@ struct ReportsView: View {
     }
 
     // MARK: - Legend Row
-
     private var legendRow: some View {
         HStack(spacing: 20) {
             legendDot(
@@ -417,12 +526,37 @@ struct ReportsView: View {
         }
     }
 
-    // MARK: - Stat Chip Row
+    // MARK: - Pace Indicator
+    private var paceIndicator: some View {
+        let pace = paceStatus
+        return HStack(spacing: 8) {
+            // Pace badge
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(pace.isOnTrack ? Color(hex: "34D399") : AppColors.warning)
+                    .frame(width: 6, height: 6)
+                Text(pace.label)
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .foregroundStyle(pace.isOnTrack ? Color(hex: "059669") : Color(hex: "D97706"))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(pace.isOnTrack ? Color(hex: "ECFDF5") : Color(hex: "FEF3C7"))
+            .clipShape(Capsule())
 
+            // Detail text
+            Text(pace.detail)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(AppColors.mist)
+        }
+        .animation(AppAnimation.standard, value: selectedGoal)
+    }
+
+    // MARK: - Stat Chip Row
     private var statChipRow: some View {
         HStack(spacing: 8) {
             StatChip(
-                value: isGoalMet ? String(format: "%.0fh", totalHours) : String(format: "%.0fh", remainingHours),
+                value: isGoalMet ? AppFormat.hours(totalHours) : AppFormat.hours(remainingHours),
                 label: isGoalMet ? "Total logged" : "Remaining",
                 valueColor: isGoalMet ? Color(hex: "059669") : colors.textPrimary,
                 colorScheme: colorScheme
@@ -567,29 +701,35 @@ struct PropertyBreakdownSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Section header
             HStack {
                 Text("By Property")
-                    .font(AppTypography.subheadline)
+                    .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(colors.textPrimary)
 
                 Spacer()
+
+                Text("See all")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(selectedGoal.accentColor)
             }
             .padding(.horizontal, AppSpacing.xl)
 
             if properties.isEmpty {
                 EmptySectionCard(
                     systemIcon: "building-2",
-                    message: "No properties added"
+                    message: "No properties added",
+                    actionLabel: "Add Property",
+                    action: {
+                        // Switch to Properties tab (index 1)
+                        NotificationCenter.default.post(name: .switchToTab, object: 1)
+                    }
                 )
             } else {
                 VStack(spacing: 8) {
                     ForEach(Array(properties.enumerated()), id: \.element.id) { index, property in
                         let hours = viewModel.hoursForProperty(property, year: selectedYear)
                         let totalHrs = viewModel.totalHoursAllParticipants(year: selectedYear)
-                        let barColor = accentColors.indices.contains(index)
-                            ? accentColors[index]
-                            : accentColors[index % max(accentColors.count, 1)]
+                        let barColor = accentColors[index % max(accentColors.count, 1)]
                         PropertyBreakdownRow(
                             property: property,
                             hours: hours,
@@ -629,13 +769,70 @@ struct PropertyBreakdownRow: View {
         )
     }
 
+    private var metaText: String {
+        switch selectedGoal {
+        case .reps750:
+            return "\(property.propertyType.rawValue) \u{00B7} \(property.address)"
+        case .mp500:
+            return "\(property.propertyType.rawValue) \u{00B7} \(AppFormat.hours(hours)) of \(Int(selectedGoal.targetHours))h"
+        case .mp100:
+            if hours >= 100 {
+                return "\(property.propertyType.rawValue) \u{00B7} \(AppFormat.hours(hours)) — Met \u{2713}"
+            } else {
+                let left = 100 - hours
+                return "\(property.propertyType.rawValue) \u{00B7} \(AppFormat.hours(hours)) — \(AppFormat.hours(left)) left"
+            }
+        }
+    }
+
+    private var hoursDisplayText: String {
+        switch selectedGoal {
+        case .reps750:
+            return AppFormat.hours(hours)
+        case .mp500:
+            let pct = totalHours > 0 ? (hours / totalHours) * 100 : 0
+            return String(format: "%.0f%%", pct)
+        case .mp100:
+            return AppFormat.hours(hours)
+        }
+    }
+
+    private var hoursColor: Color {
+        switch selectedGoal {
+        case .reps750:
+            return colors.textPrimary
+        case .mp500:
+            return barColor
+        case .mp100:
+            return hours >= 100 ? Color(hex: "059669") : colors.textPrimary
+        }
+    }
+
+    private var subText: String {
+        switch selectedGoal {
+        case .reps750:
+            return String(format: "%.0f%%", progress * 100)
+        case .mp500:
+            return "complete"
+        case .mp100:
+            return "logged"
+        }
+    }
+
+    private var effectiveBarColor: Color {
+        if selectedGoal == .mp100 && hours >= 100 {
+            return Color(hex: "34D399")
+        }
+        return barColor
+    }
+
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
             // Color bar accent
             RoundedRectangle(cornerRadius: 2)
                 .fill(
                     LinearGradient(
-                        colors: [barColor, barColor.opacity(0.7)],
+                        colors: [effectiveBarColor, effectiveBarColor.opacity(0.7)],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -649,7 +846,7 @@ struct PropertyBreakdownRow: View {
                     .foregroundStyle(colors.textPrimary)
                     .lineLimit(1)
 
-                Text("\(property.propertyType.rawValue) \u{00B7} \(property.address)")
+                Text(metaText)
                     .font(AppTypography.caption)
                     .foregroundStyle(AppColors.mist)
                     .lineLimit(1)
@@ -662,7 +859,13 @@ struct PropertyBreakdownRow: View {
                             .frame(height: 4)
 
                         RoundedRectangle(cornerRadius: 2)
-                            .fill(barGradient)
+                            .fill(
+                                LinearGradient(
+                                    colors: [effectiveBarColor, effectiveBarColor.opacity(0.6)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
                             .frame(width: max(geometry.size.width * progress, 0), height: 4)
                             .animation(AppAnimation.ringProgress, value: progress)
                     }
@@ -675,13 +878,11 @@ struct PropertyBreakdownRow: View {
 
             // Hours
             VStack(alignment: .trailing, spacing: 2) {
-                Text(String(format: "%.0fh", hours))
+                Text(hoursDisplayText)
                     .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(
-                        selectedGoal == .mp100 && hours >= 100 ? Color(hex: "059669") : colors.textPrimary
-                    )
+                    .foregroundStyle(hoursColor)
 
-                Text(String(format: "%.0f%%", progress * 100))
+                Text(subText)
                     .font(AppTypography.label)
                     .foregroundStyle(AppColors.mist)
             }
@@ -742,10 +943,14 @@ struct CategoryBreakdownSection: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("By Category")
-                    .font(AppTypography.subheadline)
+                    .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(colors.textPrimary)
 
                 Spacer()
+
+                Text("See all")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(selectedGoal.accentColor)
             }
             .padding(.horizontal, AppSpacing.xl)
 
@@ -758,9 +963,7 @@ struct CategoryBreakdownSection: View {
                 VStack(spacing: 8) {
                     ForEach(Array(categoryBreakdown.enumerated()), id: \.element.0) { index, item in
                         let (category, hours) = item
-                        let catColor = categoryColors.indices.contains(index)
-                            ? categoryColors[index]
-                            : categoryColors[index % max(categoryColors.count, 1)]
+                        let catColor = categoryColors[index % max(categoryColors.count, 1)]
                         CategoryBreakdownRow(
                             category: category,
                             hours: hours,
@@ -792,7 +995,6 @@ struct CategoryBreakdownRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
-            // Color bar accent
             RoundedRectangle(cornerRadius: 2)
                 .fill(
                     LinearGradient(
@@ -803,7 +1005,6 @@ struct CategoryBreakdownRow: View {
                 )
                 .frame(width: 4, height: 40)
 
-            // Category info
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     LucideIcon(image: category.lucideIcon, size: 12)
@@ -815,7 +1016,6 @@ struct CategoryBreakdownRow: View {
                         .lineLimit(1)
                 }
 
-                // Progress bar
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 2)
@@ -840,9 +1040,8 @@ struct CategoryBreakdownRow: View {
 
             Spacer(minLength: 4)
 
-            // Hours
             VStack(alignment: .trailing, spacing: 2) {
-                Text(String(format: "%.1fh", hours))
+                Text(AppFormat.hours(hours))
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
 
@@ -873,6 +1072,8 @@ struct CategoryBreakdownRow: View {
 struct EmptySectionCard: View {
     let systemIcon: String
     let message: String
+    var actionLabel: String? = nil
+    var action: (() -> Void)? = nil
 
     @Environment(\.colorScheme) var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
@@ -891,6 +1092,14 @@ struct EmptySectionCard: View {
                 Text(message)
                     .font(AppTypography.body)
                     .foregroundStyle(colors.textSecondary)
+
+                if let actionLabel, let action {
+                    Button(action: action) {
+                        Text(actionLabel)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(AppColors.primary)
+                    }
+                }
             }
             .padding(.vertical, AppSpacing.xl)
             Spacer()
@@ -922,6 +1131,54 @@ extension ActivityCategory {
         case .investing: return Lucide.trendingUp
         case .financing: return Lucide.dollarSign
         case .contractNegotiation: return Lucide.fileCog
+        }
+    }
+
+    var lucideIconName: String {
+        switch self {
+        case .repairs: return "wrench"
+        case .management: return "folder"
+        case .leasing: return "key"
+        case .bookkeeping: return "file-text"
+        case .legal: return "landmark"
+        case .insurance: return "shield"
+        case .travel: return "car"
+        case .renovations: return "hammer"
+        case .investing: return "trending-up"
+        case .financing: return "dollar-sign"
+        case .contractNegotiation: return "file-cog"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .repairs: return AppColors.coral
+        case .management: return AppColors.sage
+        case .leasing: return AppColors.sky
+        case .bookkeeping: return AppColors.honey
+        case .legal: return AppColors.rose
+        case .insurance: return AppColors.primaryLight
+        case .travel: return AppColors.sky
+        case .renovations: return AppColors.coral
+        case .investing: return AppColors.sage
+        case .financing: return AppColors.honey
+        case .contractNegotiation: return AppColors.primary
+        }
+    }
+
+    var chipLabel: String {
+        switch self {
+        case .repairs: return "Repairs"
+        case .management: return "Management"
+        case .leasing: return "Leasing"
+        case .bookkeeping: return "Bookkeeping"
+        case .legal: return "Legal"
+        case .insurance: return "Insurance"
+        case .travel: return "Travel"
+        case .renovations: return "Renovations"
+        case .investing: return "Investing"
+        case .financing: return "Financing"
+        case .contractNegotiation: return "Contracts"
         }
     }
 }

@@ -176,6 +176,19 @@ enum AppAnimation {
     static let logoEntrance = SwiftUI.Animation.spring(response: 0.6, dampingFraction: 0.7)
 }
 
+// MARK: - Hours Formatting
+enum AppFormat {
+    /// Consistent hours display across the app: "1.5h", "10.0h"
+    static func hours(_ value: Double) -> String {
+        String(format: "%.1f", value) + "h"
+    }
+
+    /// Whole hours for large ring displays: "142"
+    static func hoursWhole(_ value: Double) -> String {
+        String(format: "%.0f", value)
+    }
+}
+
 // MARK: - Color Extension
 extension Color {
     init(hex: String) {

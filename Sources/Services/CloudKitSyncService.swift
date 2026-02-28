@@ -1,5 +1,8 @@
 import Foundation
 import CloudKit
+import os.log
+
+private let logger = Logger(subsystem: "com.openclaw.landlordhours", category: "CloudKit")
 
 // MARK: - Sync Delegate
 
@@ -41,6 +44,8 @@ final class CloudKitSyncService: ObservableObject {
     private let container = CKContainer(identifier: "iCloud.com.openclaw.landlordhours")
     private var database: CKDatabase { container.privateCloudDatabase }
     private let zoneID = CKRecordZone.ID(zoneName: "LandlordHoursZone", ownerName: CKCurrentUserDefaultName)
+    /// The current app-level userId, used to tag CloudKit records so they don't leak across app users sharing the same iCloud account.
+    private var appUserId: String? { UserScope.userId }
 
     private var changeTokenKey: String { UserScope.key("cloudkit.changeToken") }
     private var zoneTokenKey: String { UserScope.key("cloudkit.zoneChangeToken") }
@@ -49,7 +54,13 @@ final class CloudKitSyncService: ObservableObject {
     private var migrationDoneKey: String { UserScope.key("cloudkit.migrationDone") }
 
     private var pushDebounceTask: Task<Void, Never>?
-    private var isFromRemote = false // prevents push loop when merging remote changes
+    /// Counter-based guard to prevent push loops when merging remote changes.
+    /// Incremented before delegate callbacks, decremented after. Using a counter
+    /// instead of a boolean is safer if delegate callbacks trigger nested paths.
+    private var remoteUpdateDepth = 0
+
+    /// Maximum retry attempts for transient CloudKit errors.
+    private let maxRetries = 3
 
     // MARK: - Lifecycle
 
@@ -79,7 +90,7 @@ final class CloudKitSyncService: ObservableObject {
             accountAvailable = (status == .available)
         } catch {
             accountAvailable = false
-            print("[CloudKit] Account status error: \(error)")
+            logger.error("Account status error: \(error.localizedDescription)")
         }
     }
 
@@ -96,7 +107,7 @@ final class CloudKitSyncService: ObservableObject {
             if let ckError = error as? CKError, ckError.code == .serverRejectedRequest {
                 UserDefaults.standard.set(true, forKey: zoneCreatedKey)
             } else {
-                print("[CloudKit] Zone creation error: \(error)")
+                logger.error("Zone creation error: \(error.localizedDescription)")
             }
         }
     }
@@ -118,7 +129,7 @@ final class CloudKitSyncService: ObservableObject {
             if let ckError = error as? CKError, ckError.code == .serverRejectedRequest {
                 UserDefaults.standard.set(true, forKey: subscriptionCreatedKey)
             } else {
-                print("[CloudKit] Subscription error: \(error)")
+                logger.error("Subscription error: \(error.localizedDescription)")
             }
         }
     }
@@ -127,7 +138,7 @@ final class CloudKitSyncService: ObservableObject {
 
     /// Debounced push — waits 2 seconds after last call before actually pushing.
     func schedulePush() {
-        guard !isFromRemote else { return }
+        guard remoteUpdateDepth == 0 else { return }
         pushDebounceTask?.cancel()
         pushDebounceTask = Task {
             try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -168,12 +179,14 @@ final class CloudKitSyncService: ObservableObject {
             // Tax profile (single record)
             records.append(taxProfileToRecord())
 
-            // Batch save (up to 400 per operation)
-            try await batchSave(records)
+            // Batch save with retry for transient errors
+            try await withRetry { [records] in
+                try await self.batchSave(records)
+            }
             lastSyncDate = Date()
         } catch {
             syncError = error.localizedDescription
-            print("[CloudKit] Push error: \(error)")
+            logger.error("Push error: \(error.localizedDescription)")
         }
 
         isSyncing = false
@@ -209,11 +222,13 @@ final class CloudKitSyncService: ObservableObject {
         syncError = nil
 
         do {
-            try await fetchZoneChanges()
+            try await withRetry {
+                try await self.fetchZoneChanges()
+            }
             lastSyncDate = Date()
         } catch {
             syncError = error.localizedDescription
-            print("[CloudKit] Pull error: \(error)")
+            logger.error("Pull error: \(error.localizedDescription)")
         }
 
         isSyncing = false
@@ -243,6 +258,19 @@ final class CloudKitSyncService: ObservableObject {
             op.recordWasChangedBlock = { recordID, result in
                 switch result {
                 case .success(let record):
+                    // Filter by appUserId — skip records that belong to a different app user
+                    let recordOwner = record["appUserId"] as? String
+                    let currentUser = self.appUserId
+                    if let owner = recordOwner, let current = currentUser, owner != current {
+                        // Record belongs to a different app user — skip it
+                        return
+                    }
+                    if recordOwner == nil && currentUser != nil {
+                        // Legacy record with no appUserId — skip for safety
+                        // (original user's data is already migrated to their local scoped keys)
+                        return
+                    }
+
                     switch record.recordType {
                     case "Property":
                         if let property = self.recordToProperty(record) {
@@ -264,11 +292,14 @@ final class CloudKitSyncService: ObservableObject {
                         break
                     }
                 case .failure(let error):
-                    print("[CloudKit] Record change error: \(error)")
+                    logger.error("Record change error: \(error.localizedDescription)")
                 }
             }
 
             op.recordWithIDWasDeletedBlock = { recordID, recordType in
+                // Note: CK delete callbacks don't include record fields, so we can't filter
+                // by appUserId here. Only process deletes for records that exist locally
+                // (which are already scoped to the current user).
                 if let uuid = UUID(uuidString: recordID.recordName) {
                     switch recordType {
                     case "Property":
@@ -290,7 +321,7 @@ final class CloudKitSyncService: ObservableObject {
                 case .success(let (serverToken, _, _)):
                     newToken = serverToken
                 case .failure(let error):
-                    print("[CloudKit] Zone fetch error: \(error)")
+                    logger.error("Zone fetch error: \(error.localizedDescription)")
                 }
             }
 
@@ -312,8 +343,10 @@ final class CloudKitSyncService: ObservableObject {
             saveZoneToken(token)
         }
 
-        // Notify delegate with changes on MainActor
-        isFromRemote = true
+        // Notify delegate with changes on MainActor.
+        // Increment depth guard so delegate-triggered saves don't push back to CloudKit.
+        remoteUpdateDepth += 1
+        defer { remoteUpdateDepth -= 1 }
 
         if !updatedProperties.isEmpty {
             delegate?.syncDidReceiveProperties(updatedProperties)
@@ -331,12 +364,22 @@ final class CloudKitSyncService: ObservableObject {
             delegate?.syncDidReceiveCategories(updatedCategories)
         }
         if let record = goalRecord {
-            let goalType = HourGoalType(rawValue: record["globalGoalType"] as? String ?? "") ?? .reps
+            let rawGoalType = record["globalGoalType"] as? String
+            let goalType = rawGoalType.flatMap(HourGoalType.init(rawValue:)) ?? .reps
+            if rawGoalType == nil {
+                logger.warning("GoalSettings record missing globalGoalType, defaulting to .reps")
+            }
             let goalsJSON = record["propertyGoalsJSON"] as? String ?? "[]"
             let goals = (try? JSONDecoder().decode([PropertyGoal].self, from: Data(goalsJSON.utf8))) ?? []
+            if goals.isEmpty && record["propertyGoalsJSON"] != nil {
+                logger.warning("GoalSettings record has malformed propertyGoalsJSON, defaulting to empty")
+            }
             delegate?.syncDidReceiveGoalSettings(globalGoalType: goalType, propertyGoals: goals)
         }
         if let record = taxProfileRecord {
+            if record["filingStatus"] == nil {
+                logger.warning("TaxProfile record missing filingStatus, defaulting to marriedJoint")
+            }
             let fields = TaxProfileFields(
                 filingStatus: record["filingStatus"] as? String ?? "marriedJoint",
                 spouseTracking: (record["spouseTracking"] as? Int64 ?? 1) != 0,
@@ -347,8 +390,6 @@ final class CloudKitSyncService: ObservableObject {
             )
             delegate?.syncDidReceiveTaxProfile(fields)
         }
-
-        isFromRemote = false
     }
 
     // MARK: - Delete from Cloud
@@ -359,7 +400,7 @@ final class CloudKitSyncService: ObservableObject {
         do {
             try await database.deleteRecord(withID: recordID)
         } catch {
-            print("[CloudKit] Delete property error: \(error)")
+            logger.error("Delete property error: \(error.localizedDescription)")
         }
     }
 
@@ -369,7 +410,7 @@ final class CloudKitSyncService: ObservableObject {
         do {
             try await database.deleteRecord(withID: recordID)
         } catch {
-            print("[CloudKit] Delete entry error: \(error)")
+            logger.error("Delete entry error: \(error.localizedDescription)")
         }
     }
 
@@ -383,6 +424,7 @@ final class CloudKitSyncService: ObservableObject {
         record["propertyType"] = property.propertyType.rawValue
         record["createdAt"] = property.createdAt
         record["modifiedAt"] = property.modifiedAt
+        record["appUserId"] = appUserId
         return record
     }
 
@@ -412,6 +454,8 @@ final class CloudKitSyncService: ObservableObject {
         record["notes"] = entry.notes
         record["createdAt"] = entry.createdAt
         record["modifiedAt"] = entry.modifiedAt
+        record["importSource"] = entry.importSource
+        record["appUserId"] = appUserId
         return record
     }
 
@@ -427,7 +471,8 @@ final class CloudKitSyncService: ObservableObject {
               let id = UUID(uuidString: record.recordID.recordName) else { return nil }
 
         let notes = record["notes"] as? String ?? ""
-        var entry = TimeEntry(id: id, propertyId: propertyId, participant: participant, category: category, hours: hours, date: date, notes: notes)
+        let importSource = record["importSource"] as? String
+        var entry = TimeEntry(id: id, propertyId: propertyId, participant: participant, category: category, hours: hours, date: date, notes: notes, importSource: importSource)
         entry.createdAt = record["createdAt"] as? Date ?? Date()
         entry.modifiedAt = record["modifiedAt"] as? Date ?? entry.createdAt
         return entry
@@ -443,6 +488,7 @@ final class CloudKitSyncService: ObservableObject {
         record["colorHex"] = cat.colorHex
         record["countsForREPS"] = cat.countsForREPS ? 1 : 0
         record["modifiedAt"] = cat.modifiedAt
+        record["appUserId"] = appUserId
         return record
     }
 
@@ -461,7 +507,8 @@ final class CloudKitSyncService: ObservableObject {
     // MARK: - Record Mapping: GoalSettings (single record)
 
     private func goalSettingsToRecord() -> CKRecord {
-        let recordName = "GoalSettings"
+        // Scope record name by app user so multiple users don't overwrite each other
+        let recordName = "GoalSettings-\(appUserId ?? "default")"
         let recordID = CKRecord.ID(recordName: recordName, zoneID: zoneID)
         let record = CKRecord(recordType: "GoalSettings", recordID: recordID)
         let gm = GoalManager.shared
@@ -471,13 +518,14 @@ final class CloudKitSyncService: ObservableObject {
             record["propertyGoalsJSON"] = str
         }
         record["modifiedAt"] = Date() as CKRecordValue
+        record["appUserId"] = appUserId
         return record
     }
 
     // MARK: - Record Mapping: TaxProfile (single record)
 
     private func taxProfileToRecord() -> CKRecord {
-        let recordName = "TaxProfile"
+        let recordName = "TaxProfile-\(appUserId ?? "default")"
         let recordID = CKRecord.ID(recordName: recordName, zoneID: zoneID)
         let record = CKRecord(recordType: "TaxProfile", recordID: recordID)
         let tp = TaxProfileManager.shared
@@ -487,6 +535,7 @@ final class CloudKitSyncService: ObservableObject {
         record["groupingElection"] = tp.groupingElection ? 1 : 0
         record["nonREWorkHours"] = tp.nonREWorkHours
         record["modifiedAt"] = Date() as CKRecordValue
+        record["appUserId"] = appUserId
         return record
     }
 
@@ -526,5 +575,48 @@ final class CloudKitSyncService: ObservableObject {
     private func getViewModel() -> AppViewModel? {
         // Access via delegate — AppViewModel is the delegate
         return delegate as? AppViewModel
+    }
+
+    // MARK: - Retry Helper
+
+    /// Returns true if the CKError is transient and worth retrying.
+    private func isTransientError(_ error: Error) -> Bool {
+        guard let ckError = error as? CKError else { return false }
+        switch ckError.code {
+        case .networkUnavailable, .networkFailure, .serviceUnavailable,
+             .requestRateLimited, .zoneBusy, .serverResponseLost:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Returns the retry delay from a CKError's retryAfterSeconds, or a default exponential backoff.
+    private func retryDelay(for error: Error, attempt: Int) -> TimeInterval {
+        if let ckError = error as? CKError,
+           let retryAfter = ckError.userInfo[CKErrorRetryAfterKey] as? TimeInterval {
+            return retryAfter
+        }
+        // Exponential backoff: 1s, 2s, 4s
+        return pow(2.0, Double(attempt - 1))
+    }
+
+    /// Executes `operation` with retry logic for transient CloudKit errors.
+    private func withRetry(_ operation: @escaping () async throws -> Void) async throws {
+        var lastError: Error?
+        for attempt in 0..<maxRetries {
+            do {
+                try await operation()
+                return
+            } catch {
+                lastError = error
+                guard isTransientError(error), attempt < maxRetries - 1 else {
+                    throw error
+                }
+                let delay = retryDelay(for: error, attempt: attempt + 1)
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            }
+        }
+        if let lastError { throw lastError }
     }
 }
