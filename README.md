@@ -96,7 +96,7 @@ LandlordHours/
 
 ## License
 
-Private - All rights reserved
+MIT License. See [LICENSE](LICENSE).
 
 ---
 
