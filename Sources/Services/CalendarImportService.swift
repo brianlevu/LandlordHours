@@ -4,6 +4,8 @@ import EventKit
 /// A detected calendar event ready for user review before import.
 struct DetectedCalendarEntry: Identifiable {
     let id: UUID = UUID()
+    let sourceExternalId: String?
+    let sourceCalendarId: String?
     let eventTitle: String
     let eventDate: Date
     var propertyId: UUID?
@@ -17,6 +19,9 @@ struct DetectedCalendarEntry: Identifiable {
 class CalendarImportService {
     static let shared = CalendarImportService()
 
+    /// Single retained store — authorization is tied to the instance.
+    private let store = EKEventStore()
+
     private let propertyKeywords = [
         "property", "tenant", "landlord", "repair", "maintenance",
         "plumber", "electrician", "inspection", "lease", "rent",
@@ -28,7 +33,6 @@ class CalendarImportService {
 
     /// Request calendar access. Returns true if granted.
     func requestAccess() async -> Bool {
-        let store = EKEventStore()
         if #available(iOS 17.0, *) {
             return (try? await store.requestFullAccessToEvents()) ?? false
         } else {
@@ -42,7 +46,7 @@ class CalendarImportService {
 
     /// Returns all available calendars sorted by title.
     func availableCalendars() -> [EKCalendar] {
-        EKEventStore().calendars(for: .event).sorted { $0.title < $1.title }
+        store.calendars(for: .event).sorted { $0.title < $1.title }
     }
 
     /// Scans the given calendars for the last `days` days and returns
@@ -52,7 +56,6 @@ class CalendarImportService {
         properties: [RentalProperty],
         days: Int = 90
     ) -> [DetectedCalendarEntry] {
-        let store = EKEventStore()
         let allCalendars = store.calendars(for: .event)
         let selected = allCalendars.filter { calendarIds.contains($0.calendarIdentifier) }
         guard !selected.isEmpty else { return [] }
@@ -62,8 +65,6 @@ class CalendarImportService {
 
         let predicate = store.predicateForEvents(withStart: startDate, end: endDate, calendars: selected)
         let events = store.events(matching: predicate)
-        let defaultPropertyId = properties.first?.id
-
         var results: [DetectedCalendarEntry] = []
         for event in events {
             let title = event.title?.lowercased() ?? ""
@@ -82,9 +83,11 @@ class CalendarImportService {
             let matchedProperty = matchProperty(from: combined, properties: properties)
 
             results.append(DetectedCalendarEntry(
+                sourceExternalId: event.eventIdentifier,
+                sourceCalendarId: event.calendar.calendarIdentifier,
                 eventTitle: event.title ?? "Calendar Event",
                 eventDate: start,
-                propertyId: matchedProperty?.id ?? defaultPropertyId,
+                propertyId: matchedProperty?.id,
                 category: categorizeEvent(title: title),
                 hours: min(hours, 24)
             ))

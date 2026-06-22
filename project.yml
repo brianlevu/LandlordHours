@@ -8,9 +8,14 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    GENERATE_INFOPLIST_FILE: YES
+    GENERATE_INFOPLIST_FILE: NO
     MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
+
+packages:
+  LucideIcons:
+    url: https://github.com/JakubMazur/lucide-icons-swift.git
+    from: 0.575.0
 
 targets:
   LandlordHours:
@@ -19,6 +24,8 @@ targets:
     sources:
       - path: Sources
       - path: Assets.xcassets
+    dependencies:
+      - package: LucideIcons
     entitlements:
       path: LandlordHours.entitlements
       properties:
@@ -32,17 +39,48 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.openclaw.landlordhours
-        DEVELOPMENT_TEAM: M43MX2N2YG
-        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
-        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait"
-        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
-        INFOPLIST_KEY_CFBundleDisplayName: "LandlordHours"
-        INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.business"
-        INFOPLIST_KEY_CFBundleIcons_AppIcon: "AppIcon"
+        DEVELOPMENT_TEAM: G68NLC3DA3
+        INFOPLIST_FILE: Sources/App/Info.plist
         SWIFT_EMIT_LOC_STRINGS: YES
-        CODE_SIGN_STYLE: Manual
-        CODE_SIGN_IDENTITY: "Apple Development: Vu Le (M43MX2N2YG)"
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "Apple Development"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+  LandlordHoursTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+      - path: LandlordHours.storekit
+        buildPhase: resources
+    dependencies:
+      - target: LandlordHours
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.openclaw.landlordhours.tests
+        DEVELOPMENT_TEAM: G68NLC3DA3
+        GENERATE_INFOPLIST_FILE: YES
+  LandlordHoursUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: LandlordHours
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.openclaw.landlordhours.uitests
+        DEVELOPMENT_TEAM: G68NLC3DA3
+        TEST_TARGET_NAME: LandlordHours
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  LandlordHours:
+    shared: true
+    build:
+      targets:
+        LandlordHours: all
+    test:
+      targets:
+        - LandlordHoursTests
+        - LandlordHoursUITests

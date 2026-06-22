@@ -4,6 +4,7 @@ import LucideIcons
 struct TimeEntryDetailView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dismiss) var dismiss
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
@@ -74,7 +75,7 @@ struct TimeEntryDetailView: View {
                         .disabled(!hasChanges)
                 } else {
                     Button {
-                        withAnimation(AppAnimation.standard) { isEditing = true }
+                        animate(AppAnimation.standard) { isEditing = true }
                     } label: {
                         HStack(spacing: 4) {
                             LucideIcon(image: Lucide.pencil, size: 14)
@@ -155,9 +156,8 @@ struct TimeEntryDetailView: View {
 
             // REPS badge
             if !entry.countsForREPS {
-                Text("NON-REPS")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(0.6)
+                Text("Not REPS")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(AppColors.coral)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
@@ -169,7 +169,10 @@ struct TimeEntryDetailView: View {
         .padding(.vertical, 24)
         .background(colors.backgroundSecondary)
         .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.05), radius: 12, x: 0, y: 2)
+        .overlay {
+            RoundedRectangle(cornerRadius: AppCornerRadius.xl)
+                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
+        }
     }
 
     // MARK: - Read-Only Details
@@ -202,7 +205,10 @@ struct TimeEntryDetailView: View {
         }
         .background(colors.backgroundSecondary)
         .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.05), radius: 12, x: 0, y: 2)
+        .overlay {
+            RoundedRectangle(cornerRadius: AppCornerRadius.xl)
+                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
+        }
 
         // Delete button
         Button {
@@ -363,7 +369,7 @@ struct TimeEntryDetailView: View {
             Button { saveChanges() } label: {
                 Text("Save Changes")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AppColors.onAction)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
                     .background(hasChanges ? AppColors.primary : AppColors.mist)
@@ -376,15 +382,16 @@ struct TimeEntryDetailView: View {
         .padding(16)
         .background(colors.backgroundSecondary)
         .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.05), radius: 12, x: 0, y: 2)
+        .overlay {
+            RoundedRectangle(cornerRadius: AppCornerRadius.xl)
+                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
+        }
     }
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: 13, weight: .semibold, design: .rounded))
             .foregroundStyle(colors.textSecondary)
-            .textCase(.uppercase)
-            .tracking(0.5)
     }
 
     // MARK: - Edit Form Components
@@ -394,7 +401,7 @@ struct TimeEntryDetailView: View {
             HStack(spacing: 8) {
                 ForEach(ActivityCategory.allCases, id: \.self) { cat in
                     Button {
-                        withAnimation(AppAnimation.quick) { category = cat }
+                        animate(AppAnimation.quick) { category = cat }
                     } label: {
                         HStack(spacing: 7) {
                             Circle()
@@ -465,7 +472,7 @@ struct TimeEntryDetailView: View {
 
             Button {
                 if hours > 0.25 {
-                    withAnimation(AppAnimation.quick) { hours -= 0.25 }
+                    animate(AppAnimation.quick) { hours -= 0.25 }
                 }
             } label: {
                 LucideIcon(image: Lucide.minus, size: 16)
@@ -490,7 +497,7 @@ struct TimeEntryDetailView: View {
 
             Button {
                 if hours < 24 {
-                    withAnimation(AppAnimation.quick) { hours += 0.25 }
+                    animate(AppAnimation.quick) { hours += 0.25 }
                 }
             } label: {
                 LucideIcon(image: Lucide.plus, size: 16)
@@ -533,10 +540,10 @@ struct TimeEntryDetailView: View {
     private var participantSegment: some View {
         HStack(spacing: 0) {
             segmentButton("Self", isSelected: participant == .selfParticipant) {
-                withAnimation(AppAnimation.quick) { participant = .selfParticipant }
+                animate(AppAnimation.quick) { participant = .selfParticipant }
             }
             segmentButton("Spouse", isSelected: participant == .spouse) {
-                withAnimation(AppAnimation.quick) { participant = .spouse }
+                animate(AppAnimation.quick) { participant = .spouse }
             }
         }
         .padding(3)
@@ -553,7 +560,10 @@ struct TimeEntryDetailView: View {
                 .padding(.vertical, 10)
                 .background(isSelected ? colors.backgroundSecondary : Color.clear)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
-                .shadow(color: isSelected ? .black.opacity(0.06) : .clear, radius: 4, y: 1)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(isSelected ? colors.border.opacity(0.35) : Color.clear, lineWidth: 1)
+                }
         }
         .buttonStyle(.plain)
     }
@@ -570,14 +580,14 @@ struct TimeEntryDetailView: View {
         updated.participant = participant
         updated.modifiedAt = Date()
         viewModel.updateTimeEntry(updated)
-        withAnimation(AppAnimation.standard) { isEditing = false }
+        animate(AppAnimation.standard) { isEditing = false }
     }
 
     private func cancelEditing() {
         if hasChanges {
             showingDiscardAlert = true
         } else {
-            withAnimation(AppAnimation.standard) { isEditing = false }
+            animate(AppAnimation.standard) { isEditing = false }
         }
     }
 
@@ -588,7 +598,15 @@ struct TimeEntryDetailView: View {
         hours = entry.hours
         date = entry.date
         participant = entry.participant
-        withAnimation(AppAnimation.standard) { isEditing = false }
+        animate(AppAnimation.standard) { isEditing = false }
+    }
+
+    private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
+        if reduceMotion {
+            updates()
+        } else {
+            withAnimation(animation, updates)
+        }
     }
 
     // MARK: - Helpers

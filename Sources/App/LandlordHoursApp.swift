@@ -12,28 +12,90 @@ enum AppColors {
     static let backgroundSecondary = Color.white         // pure white for cards
     static let backgroundTertiary = Color(hex: "F0EFF4") // snow — inputs, tags, subtle surfaces
 
-    // Primary accent — Violet family
-    static let primary = Color(hex: "7B68EE")            // violet — buttons, accents, brand
-    static let primaryLight = Color(hex: "B8AFFE")       // violet-soft — gradients, secondary
-    static let primarySurface = Color(hex: "EDE8FF")     // violet-wash — tinted backgrounds
-    static let primaryDark = Color(hex: "5B4BC9")        // violet-deep — pressed states, logo gradient end
+    // Primary accent — Violet family.
+    // Role: brand identity, primary CTAs, selected navigation, focus, links.
+    static let primary = Color(hex: "7B68EE")
+    static let primaryLight = Color(hex: "B8AFFE")
+    static let primarySurface = Color(hex: "EDE8FF")
+    static let primaryDark = Color(hex: "5B4BC9")
 
     // Accent palette
-    static let coral = Color(hex: "FF8A7A")              // activity icons, maintenance
+    static let coral = Color(hex: "FF8A7A")              // destructive, repair/maintenance emphasis
     static let coralWash = Color(hex: "FFE8E4")
-    static let sage = Color(hex: "7EC8A0")               // success, progress indicators
+    static let sage = Color(hex: "7EC8A0")               // success, qualified, complete, healthy progress
     static let sageWash = Color(hex: "E4F5EC")
-    static let honey = Color(hex: "F5C563")              // warnings, alerts
+    static let honey = Color(hex: "F5C563")              // warning, behind pace, needs attention
     static let honeyWash = Color(hex: "FFF4DA")
-    static let sky = Color(hex: "6CB4EE")                // info states
+    static let sky = Color(hex: "6CB4EE")                // info, imports, calendar/sync
     static let skyWash = Color(hex: "E0F0FF")
-    static let rose = Color(hex: "E88CA5")               // soft emphasis
+    static let rose = Color(hex: "E88CA5")               // soft human/spouse emphasis
     static let roseWash = Color(hex: "FFE4EC")
+    static let lavenderPanel = Color(hex: "F8F6FF")
+    static let lavenderMist = Color(hex: "E8E0FF")
+    static let lavenderField = Color(hex: "F0ECFF")
+    static let skyMist = Color(hex: "E0F2FE")
+    static let aquaMist = Color(hex: "F0FDFA")
+    static let blueSoft = Color(hex: "93C5FD")
+    static let successDeep = Color(hex: "5BA87E")
+    static let indigoMist = Color(hex: "E0E7FF")
+    static let lavenderSoft = Color(hex: "C4B5FD")
+    static let lavenderPale = Color(hex: "F5F3FF")
+    static let darkPlum = Color(hex: "1A1535")
+    static let darkInk = Color(hex: "1C1A2E")
 
     // Semantic
     static let success = Color(hex: "34D399")
     static let warning = Color(hex: "FBBF24")
     static let error = Color(hex: "F472B6")
+
+    // Intent aliases. New UI should prefer these over raw accent names.
+    static let action = primary
+    static let actionSurface = primarySurface
+    static let actionPressed = primaryDark
+    static let onAction = Color.white
+    static let positive = sage
+    static let positiveSurface = sageWash
+    static let caution = honey
+    static let cautionSurface = honeyWash
+    static let destructive = coral
+    static let destructiveSurface = coralWash
+    static let informational = sky
+    static let informationalSurface = skyWash
+
+    // Reports goal palettes
+    static let reportsAccent = Color(hex: "8B5CF6")
+    static let reportsAccentSoft = Color(hex: "A78BFA")
+    static let reportsAccentWash = Color(hex: "EDE9FE")
+    static let mpAccent = Color(hex: "A855F7")
+    static let mpAccentSoft = Color(hex: "C084FC")
+    static let mpAccentWash = Color(hex: "F3E8FF")
+    static let successGreen = Color(hex: "059669")
+    static let successGreenLight = Color(hex: "34D399")
+    static let successGreenSoft = Color(hex: "6EE7B7")
+    static let successGreenWash = Color(hex: "ECFDF5")
+    static let cautionText = Color(hex: "D97706")
+    static let repairOrange = Color(hex: "F97316")
+    static let dataBlue = Color(hex: "60A5FA")
+    static let dataBlueDeep = Color(hex: "3B82F6")
+    static let dataRed = Color(hex: "EF4444")
+    static let dataEmerald = Color(hex: "10B981")
+    static let dataPink = Color(hex: "EC4899")
+
+    // Celebration palette
+    static let celebrationDeepPurple = Color(hex: "4C3D8F")
+    static let celebrationPurple = Color(hex: "5B4BA8")
+    static let celebrationIndigo = Color(hex: "6E5DC6")
+    static let celebrationLavender = Color(hex: "8B7EC8")
+    static let celebrationNightPurple = Color(hex: "3D3270")
+
+    // Logo artwork palette
+    static let logoCanvas = Color(hex: "F4F1FF")
+    static let logoWaveLightStart = Color(hex: "D8D0FF")
+    static let logoWaveMidStart = Color(hex: "A899F7")
+    static let logoWaveMidEnd = Color(hex: "9485F0")
+    static let logoWaveStrongStart = Color(hex: "8B78F0")
+    static let logoWaveDeepStart = Color(hex: "6B58DE")
+    static let logoWaveDeepEnd = Color(hex: "4A38B0")
 
     // Neutrals
     static let charcoal = Color(hex: "1A1A2E")           // headlines, primary text
@@ -90,6 +152,17 @@ struct AdaptiveColors {
     var warning: Color { colorScheme == .dark ? AppColors.darkWarning : AppColors.warning }
     var error: Color { colorScheme == .dark ? AppColors.darkError : AppColors.error }
 
+    var action: Color { primary }
+    var actionSurface: Color { primarySurface }
+    var positive: Color { sage }
+    var positiveSurface: Color { sageWash }
+    var caution: Color { honey }
+    var cautionSurface: Color { honeyWash }
+    var destructive: Color { coral }
+    var destructiveSurface: Color { coralWash }
+    var informational: Color { sky }
+    var informationalSurface: Color { skyWash }
+
     var coral: Color { AppColors.coral }
     var sage: Color { AppColors.sage }
     var honey: Color { AppColors.honey }
@@ -109,7 +182,7 @@ struct AdaptiveColors {
     var border: Color { colorScheme == .dark ? AppColors.darkBorder : AppColors.cloud }
 
     /// Glass effect background for tab bar, overlays
-    var glass: Color { colorScheme == .dark ? Color(hex: "0C0C18").opacity(0.85) : Color.white.opacity(0.85) }
+    var glass: Color { colorScheme == .dark ? AppColors.darkBackground.opacity(0.85) : Color.white.opacity(0.85) }
 }
 
 // MARK: - Typography
@@ -152,6 +225,8 @@ enum AppSpacing {
     static let xl: CGFloat = 24
     static let xxl: CGFloat = 32
     static let xxxl: CGFloat = 48
+    static let tabContentBottomInset: CGFloat = 176
+    static let floatingTabBarReservedHeight: CGFloat = 132
 }
 
 // MARK: - Corner Radius
@@ -166,14 +241,17 @@ enum AppCornerRadius {
 // MARK: - Animation
 enum AppAnimation {
     static let quick = SwiftUI.Animation.easeInOut(duration: 0.15)
-    static let standard = SwiftUI.Animation.easeInOut(duration: 0.3)
-    static let smooth = SwiftUI.Animation.spring(response: 0.4, dampingFraction: 0.8)
-    static let bouncy = SwiftUI.Animation.spring(response: 0.5, dampingFraction: 0.7)
+    static let standard = SwiftUI.Animation.easeInOut(duration: 0.24)
+    static let smooth = SwiftUI.Animation.spring(response: 0.28, dampingFraction: 0.9)
+    static let feedback = SwiftUI.Animation.easeOut(duration: 0.12)
+    static let reveal = SwiftUI.Animation.easeOut(duration: 0.22)
+    static let flow = SwiftUI.Animation.spring(response: 0.34, dampingFraction: 0.88)
+    static let bouncy = SwiftUI.Animation.spring(response: 0.32, dampingFraction: 0.86)
 
     // Specific presets from design system
-    static let ringProgress = SwiftUI.Animation.spring(response: 0.8, dampingFraction: 0.75)
-    static let pillPop = SwiftUI.Animation.spring(response: 0.45, dampingFraction: 0.6)
-    static let logoEntrance = SwiftUI.Animation.spring(response: 0.6, dampingFraction: 0.7)
+    static let ringProgress = SwiftUI.Animation.spring(response: 0.7, dampingFraction: 0.82)
+    static let pillPop = SwiftUI.Animation.spring(response: 0.26, dampingFraction: 0.82)
+    static let logoEntrance = SwiftUI.Animation.spring(response: 0.45, dampingFraction: 0.86)
 }
 
 // MARK: - Hours Formatting
@@ -300,6 +378,11 @@ class CategoryManager: ObservableObject {
     func resetForSignOut() {
         customCategories = []
     }
+
+    func resetForDataReset() {
+        customCategories = []
+        UserDefaults.standard.removeObject(forKey: userDefaultsKey)
+    }
 }
 
 // MARK: - Available Icons and Colors
@@ -336,13 +419,20 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         return true
     }
 
-    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
         // CloudKit subscription notification — pull changes
-        guard let viewModel = await MainActor.run(body: { AppDelegate.sharedViewModel }) else {
-            return .noData
+        Task { @MainActor in
+            guard let viewModel = AppDelegate.sharedViewModel else {
+                completionHandler(.noData)
+                return
+            }
+            await viewModel.syncService.pullChanges()
+            completionHandler(.newData)
         }
-        await viewModel.syncService.pullChanges()
-        return .newData
     }
 
     @MainActor static var sharedViewModel: AppViewModel?
@@ -355,13 +445,13 @@ struct LandlordHoursApp: App {
     @StateObject private var categoryManager = CategoryManager.shared
 
     init() {
-        // Tab bar — glass effect
+        // Tab bar: soft but legible. Keep content from visually bleeding through the controls.
         let tabBar = UITabBarAppearance()
-        tabBar.configureWithDefaultBackground()
-        tabBar.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
-        tabBar.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.85)
+        tabBar.configureWithOpaqueBackground()
+        tabBar.backgroundEffect = nil
+        tabBar.backgroundColor = UIColor.systemBackground
         tabBar.shadowImage = UIImage()
-        tabBar.shadowColor = .clear
+        tabBar.shadowColor = UIColor.separator.withAlphaComponent(0.18)
         UITabBar.appearance().standardAppearance = tabBar
         UITabBar.appearance().scrollEdgeAppearance = tabBar
         UITabBar.appearance().tintColor = UIColor(AppColors.primary)
@@ -527,11 +617,11 @@ struct JellyBadge: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: size * 0.45, height: size * 0.45)
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(AppColors.onAction)
             } else {
                 Image(systemName: systemName)
                     .font(.system(size: size * 0.42, weight: .medium))
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(AppColors.onAction)
             }
         }
         .shadow(color: color.opacity(0.35), radius: size * 0.25, y: size * 0.1)

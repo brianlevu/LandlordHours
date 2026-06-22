@@ -77,7 +77,7 @@ private let allArticles: [LearningArticle] = [
             ArticleSection(
                 heading: "The Basics",
                 body: "Real Estate Professional Status (REPS) is an IRS designation that allows qualifying taxpayers to treat all rental real estate losses as non-passive. This means losses can offset your active income \u{2014} W-2 wages, business income, etc.",
-                callout: "Key Requirements:\n1. 750+ hours in real estate activities per year\n2. More than 50% of total working hours in real estate\n3. Material participation in each rental property"
+                callout: "Key Requirements:\n1. More than 750 hours in real estate activities per year\n2. More than 50% of total working hours in real estate\n3. Material participation in each rental property"
             ),
             ArticleSection(
                 heading: "What Counts as RE Hours?",
@@ -96,7 +96,7 @@ private let allArticles: [LearningArticle] = [
         id: "50-percent-rule",
         category: "TAX STRATEGY",
         section: "Understanding REPS",
-        categoryColor: Color(hex: "059669"),
+        categoryColor: AppColors.successGreen,
         categoryWash: AppColors.sageWash,
         title: "The 50% Rule Explained",
         description: "How the 50% rule determines your REPS eligibility.",
@@ -279,12 +279,12 @@ private let allGuides: [LearningGuide] = [
         category: "IRS BASICS",
         description: "A step-by-step guide to achieving Real Estate Professional Status. Learn the requirements, build your tracking habits, and prepare for tax season.",
         totalTime: "25 min",
-        gradient: [Color(hex: "5B4BC9"), AppColors.primary],
-        blobColor: Color(hex: "B8AFFE"),
+        gradient: [AppColors.primaryDark, AppColors.primary],
+        blobColor: AppColors.primaryLight,
         lessons: [
             GuideLesson(id: 1, title: "Understanding REPS Requirements", duration: "5 min", content: [
                 ArticleSection(heading: "What is REPS?", body: "Real Estate Professional Status is a special IRS designation under IRC \u{00A7}469(c)(7). It allows you to deduct rental real estate losses against active income \u{2014} something passive investors cannot do. This is one of the most powerful tax benefits available to landlords.", callout: nil),
-                ArticleSection(heading: "The Two Tests", body: "You must pass BOTH tests in the same tax year:\n\n1. The 750-Hour Test: Spend at least 750 hours in real estate trades or businesses\n2. The 50% Rule: More than half your total working hours must be in real estate\n\nFailing either test means you don\u{2019}t qualify for that year.", callout: "Remember: These are calendar-year tests. Hours don\u{2019}t carry over from one year to the next.")
+                ArticleSection(heading: "The Two Tests", body: "You must pass BOTH tests in the same tax year:\n\n1. The 750-Hour Test: Spend more than 750 hours in real estate trades or businesses\n2. The 50% Rule: More than half your total working hours must be in real estate\n\nFailing either test means you don\u{2019}t qualify for that year.", callout: "Remember: These are calendar-year tests. Hours don\u{2019}t carry over from one year to the next.")
             ]),
             GuideLesson(id: 2, title: "The 750-Hour Threshold", duration: "6 min", content: [
                 ArticleSection(heading: "Breaking Down 750 Hours", body: "750 hours equals roughly 14.5 hours per week, or just over 2 hours per day. While this sounds manageable, it requires consistent tracking and legitimate activities. The IRS has denied REPS status to taxpayers who couldn\u{2019}t prove their hours.", callout: nil),
@@ -311,8 +311,8 @@ private let allGuides: [LearningGuide] = [
         category: "TAX STRATEGY",
         description: "Everything new landlords need to know about rental property taxes, from deductions to depreciation.",
         totalTime: "20 min",
-        gradient: [Color(hex: "059669"), AppColors.success],
-        blobColor: Color(hex: "6EE7B7"),
+        gradient: [AppColors.successGreen, AppColors.success],
+        blobColor: AppColors.successGreenSoft,
         lessons: [
             GuideLesson(id: 1, title: "Rental Income Basics", duration: "5 min", content: [
                 ArticleSection(heading: "What\u{2019}s Taxable", body: "All rental income must be reported on Schedule E. This includes rent payments, late fees, pet fees, and any other income from the property. Security deposits are generally not income unless you keep them.", callout: nil)
@@ -335,7 +335,7 @@ private let allGuides: [LearningGuide] = [
         category: "RECORD KEEPING",
         description: "How to build a documentation system that stands up to IRS scrutiny.",
         totalTime: "15 min",
-        gradient: [Color(hex: "E06A5C"), AppColors.coral],
+        gradient: [AppColors.destructive, AppColors.coral],
         blobColor: Color.white.opacity(0.3),
         lessons: [
             GuideLesson(id: 1, title: "The IRS Standard", duration: "5 min", content: [
@@ -345,7 +345,7 @@ private let allGuides: [LearningGuide] = [
                 ArticleSection(heading: "Daily Logging", body: "The best approach is to log activities the same day they occur. Set a daily reminder to open LandlordHours and record your work. Even a 2-minute entry is better than trying to remember details weeks later.", callout: "Tip: Use the AI assistant \u{2014} just describe what you did in plain English and it auto-fills the fields.")
             ]),
             GuideLesson(id: 3, title: "Export & Archive", duration: "5 min", content: [
-                ArticleSection(heading: "Regular Backups", body: "Export quarterly PDF reports and save them with your tax documents. Keep digital and physical copies. Store records for at least 7 years after filing. LandlordHours Pro automatically syncs to iCloud for cloud backup.", callout: nil)
+                ArticleSection(heading: "Regular Backups", body: "Export quarterly PDF reports and save them with your tax documents. Keep digital and physical copies. Store records for at least 7 years after filing.", callout: nil)
             ])
         ],
         source: "Sources: IRS Publication 925, Tax Court case law"
@@ -432,6 +432,18 @@ private func articleById(_ id: String) -> LearningArticle? {
     allArticlesWithExtra.first { $0.id == id }
 }
 
+private func articleVisualAssetName(_ article: LearningArticle) -> String {
+    if article.section == "Grow Your Portfolio" || article.id == "grouping-election" {
+        return "LearningArticlePortfolio"
+    }
+
+    if article.category == "RECORD KEEPING" || article.id == "audit-red-flags" || article.id == "receipt-practices" {
+        return "LearningArticleRecords"
+    }
+
+    return "LearningArticleQualification"
+}
+
 // MARK: - Section Grouping
 
 private struct ArticleGroup: Identifiable {
@@ -455,6 +467,7 @@ private let articleSections: [ArticleGroup] = {
 
 struct LearningCenterView: View {
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dismiss) var dismiss
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
@@ -476,6 +489,8 @@ struct LearningCenterView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
                 headerSection
+                learningHeroCard
+                startHereSection
                 filterChips
 
                 // Sectioned articles
@@ -493,48 +508,159 @@ struct LearningCenterView: View {
             .padding(.top, 8)
             .padding(.bottom, 40)
         }
-        .background {
-            ZStack {
-                colors.background.ignoresSafeArea()
-                Circle()
-                    .fill(AppColors.coralWash.opacity(0.5))
-                    .frame(width: 320, height: 320)
-                    .blur(radius: 60)
-                    .offset(x: 100, y: -60)
-                Circle()
-                    .fill(AppColors.primarySurface.opacity(0.6))
-                    .frame(width: 280, height: 280)
-                    .blur(radius: 65)
-                    .offset(x: -70, y: 100)
-                Circle()
-                    .fill(AppColors.skyWash.opacity(0.4))
-                    .frame(width: 160, height: 160)
-                    .blur(radius: 55)
-                    .offset(x: 40, y: 300)
-            }
-        }
+        .background { LHMobileCanvas() }
         .navigationTitle("Learn")
         .navigationBarTitleDisplayMode(.inline)
+        .hidesAppTabBar()
     }
 
     // MARK: - Header
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("GUIDES, STRATEGY & GROWTH")
-                .font(.system(size: 10, weight: .bold))
-                .tracking(2)
-                .foregroundStyle(AppColors.mist)
-
-            Text("Master Property\nManagement")
-                .font(.system(size: 28, weight: .regular, design: .serif))
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Learn")
+                .font(.system(size: 42, weight: .black, design: .rounded))
                 .foregroundStyle(colors.textPrimary)
-                .lineSpacing(2)
+                .lineSpacing(-2)
+                .minimumScaleFactor(0.82)
 
-            Text("Everything you need to save on taxes and grow your portfolio.")
-                .font(.system(size: 13))
-                .foregroundStyle(AppColors.slate)
-                .lineSpacing(2)
-                .padding(.top, 2)
+            Text("Plain-English tax guidance, recordkeeping tips, and property management playbooks.")
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
+                .lineLimit(3)
+        }
+    }
+
+    private var learningHeroCard: some View {
+        ZStack(alignment: .bottomLeading) {
+            Image("LearningHero")
+                .resizable()
+                .scaledToFill()
+                .frame(height: 184)
+                .frame(maxWidth: .infinity)
+                .clipped()
+                .accessibilityHidden(true)
+
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.58)],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    LucideIcon(image: Lucide.fileText, size: 14)
+                    Text("IRS-ready records")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                }
+                .foregroundStyle(AppColors.onAction)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(AppColors.onAction.opacity(0.18))
+                .clipShape(Capsule())
+
+                Text("Learn what to track before tax time")
+                    .font(.system(size: 21, weight: .black, design: .rounded))
+                    .foregroundStyle(AppColors.onAction)
+                    .lineSpacing(1)
+                    .lineLimit(2)
+                    .shadow(color: .black.opacity(0.28), radius: 5, x: 0, y: 2)
+            }
+            .padding(18)
+        }
+        .frame(height: 184)
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xxl, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppCornerRadius.xxl, style: .continuous)
+                .strokeBorder(colors.border.opacity(colorScheme == .dark ? 0.2 : 0.35), lineWidth: 1)
+        }
+    }
+
+    // MARK: - Start Here
+    private var startHereSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Start here")
+                    .font(.system(size: 19, weight: .bold, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                Spacer()
+            }
+
+            VStack(spacing: 10) {
+                startHereRow(
+                    articleId: "reps-basics",
+                    title: "Know the REPS tests",
+                    subtitle: "750 hours, 50% rule, and what the IRS expects.",
+                    icon: Lucide.target,
+                    color: AppColors.primary,
+                    wash: colors.primarySurface
+                )
+                startHereRow(
+                    articleId: "hours-that-count",
+                    title: "Log defensible hours",
+                    subtitle: "What details make your entries easier to review.",
+                    icon: Lucide.clipboardCheck,
+                    color: AppColors.sky,
+                    wash: colors.skyWash
+                )
+                startHereRow(
+                    articleId: "str-vs-ltr",
+                    title: "Understand STR vs LTR",
+                    subtitle: "Different property types can change the tax strategy.",
+                    icon: Lucide.house,
+                    color: AppColors.coral,
+                    wash: colors.coralWash
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func startHereRow(
+        articleId: String,
+        title: String,
+        subtitle: String,
+        icon: UIImage,
+        color: Color,
+        wash: Color
+    ) -> some View {
+        if let article = articleById(articleId) {
+            NavigationLink {
+                ArticleDetailView(article: article)
+            } label: {
+                HStack(spacing: 14) {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(wash.opacity(colorScheme == .dark ? 0.22 : 1))
+                        .frame(width: 46, height: 46)
+                        .overlay {
+                            LucideIcon(image: icon, size: 20)
+                                .foregroundStyle(color)
+                        }
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(title)
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(colors.textPrimary)
+                        Text(subtitle)
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(colors.textSecondary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    LucideIcon(image: Lucide.chevronRight, size: 16)
+                        .foregroundStyle(colors.textTertiary)
+                }
+                .padding(14)
+                .background(colors.backgroundSecondary)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(colors.border.opacity(0.28), lineWidth: 1)
+                }
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -544,19 +670,34 @@ struct LearningCenterView: View {
             HStack(spacing: 8) {
                 ForEach(filters, id: \.self) { filter in
                     Button {
-                        withAnimation(AppAnimation.quick) { selectedFilter = filter }
+                        animate(AppAnimation.quick) { selectedFilter = filter }
                     } label: {
                         Text(filter)
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(selectedFilter == filter ? .white : AppColors.slate)
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundStyle(selectedFilter == filter ? AppColors.charcoal : colors.textSecondary)
                             .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(selectedFilter == filter ? AppColors.primary : colors.backgroundSecondary)
+                            .padding(.vertical, 9)
+                            .background(selectedFilter == filter ? colors.sageWash : colors.backgroundSecondary)
                             .clipShape(Capsule())
-                            .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.04), radius: 4, y: 1)
+                            .overlay {
+                                Capsule()
+                                    .strokeBorder(
+                                        selectedFilter == filter ? AppColors.sage.opacity(0.65) : colors.border.opacity(0.35),
+                                        lineWidth: 1
+                                    )
+                            }
                     }
+                    .buttonStyle(.plain)
                 }
             }
+        }
+    }
+
+    private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
+        if reduceMotion {
+            updates()
+        } else {
+            withAnimation(animation, updates)
         }
     }
 
@@ -566,12 +707,8 @@ struct LearningCenterView: View {
             // Section header
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(section.kicker)
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1.5)
-                        .foregroundStyle(AppColors.mist)
                     Text(section.name)
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .font(.system(size: 19, weight: .bold, design: .rounded))
                         .foregroundStyle(colors.textPrimary)
                 }
                 Spacer()
@@ -604,19 +741,13 @@ struct LearningCenterView: View {
             ArticleDetailView(article: article)
         } label: {
             HStack(spacing: 0) {
-                // Clean pastel icon area
-                ZStack {
-                    article.categoryWash
-                    LucideIcon(image: article.iconImage, size: 44)
-                        .foregroundStyle(article.categoryColor.opacity(0.5))
-                }
+                learningArticleImage(article, height: 160)
                 .frame(width: 140, height: 160)
                 .clipped()
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(article.category)
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1.2)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(article.categoryColor)
 
                     Text(article.title)
@@ -627,7 +758,7 @@ struct LearningCenterView: View {
 
                     Text(article.description)
                         .font(.system(size: 12))
-                        .foregroundStyle(AppColors.slate)
+                        .foregroundStyle(colors.textSecondary)
                         .lineSpacing(2)
                         .lineLimit(2)
 
@@ -644,12 +775,11 @@ struct LearningCenterView: View {
                 .padding(.vertical, 20)
             }
             .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xxl))
             .overlay(
-                RoundedRectangle(cornerRadius: 24)
-                    .stroke(colors.border.opacity(0.15), lineWidth: 1)
+                RoundedRectangle(cornerRadius: AppCornerRadius.xxl)
+                    .stroke(colors.border.opacity(0.35), lineWidth: 1)
             )
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.04), radius: 8, x: 0, y: 2)
         }
         .buttonStyle(.plain)
     }
@@ -657,18 +787,12 @@ struct LearningCenterView: View {
     // MARK: - Article Grid Card
     private func articleGridCard(_ article: LearningArticle) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Clean pastel icon area
-            ZStack {
-                article.categoryWash
-                LucideIcon(image: article.iconImage, size: 32)
-                    .foregroundStyle(article.categoryColor.opacity(0.5))
-            }
+            learningArticleImage(article, height: 104)
             .frame(height: 100)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(article.category)
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(1)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(article.categoryColor)
 
                 Text(article.title)
@@ -691,23 +815,47 @@ struct LearningCenterView: View {
             .padding(.bottom, 14)
         }
         .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(colors.border.opacity(0.15), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppCornerRadius.xl)
+                .stroke(colors.border.opacity(0.35), lineWidth: 1)
         )
+    }
+
+    private func learningArticleImage(_ article: LearningArticle, height: CGFloat) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            Image(articleVisualAssetName(article))
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity)
+                .frame(height: height)
+                .clipped()
+                .accessibilityHidden(true)
+
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.22)],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(.white.opacity(0.82))
+                .frame(width: 34, height: 34)
+                .overlay {
+                    LucideIcon(image: article.iconImage, size: 17)
+                        .foregroundStyle(article.categoryColor)
+                }
+                .padding(12)
+        }
+        .background(article.categoryWash)
     }
 
     // MARK: - Guides Carousel
     private var guidesSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("GUIDES & COURSES")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.5)
-                    .foregroundStyle(AppColors.mist)
                 Text("Expert Guides")
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(.system(size: 19, weight: .bold, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
             }
 
@@ -744,16 +892,15 @@ struct LearningCenterView: View {
             LinearGradient(colors: [.clear, .black.opacity(0.15)], startPoint: .center, endPoint: .bottom)
 
             VStack(alignment: .leading) {
-                Text("GUIDE \u{00B7} \(guide.lessons.count) LESSONS")
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(0.5)
-                    .foregroundStyle(.white.opacity(0.7))
+                Text("\(guide.lessons.count) lessons")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(AppColors.onAction.opacity(0.82))
 
                 Spacer()
 
                 Text(guide.title)
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AppColors.onAction)
                     .lineSpacing(2)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
@@ -785,12 +932,8 @@ struct LearningCenterView: View {
     private var quickReadsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("QUICK READS")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.5)
-                    .foregroundStyle(AppColors.mist)
                 Text("Bite-Sized Tips")
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(.system(size: 19, weight: .bold, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
             }
 
@@ -832,12 +975,11 @@ struct LearningCenterView: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 16)
         .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(colors.border.opacity(0.15), lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppCornerRadius.xl)
+                .stroke(colors.border.opacity(0.35), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.03), radius: 6, y: 1)
     }
 }
 
@@ -867,8 +1009,7 @@ struct ArticleDetailView: View {
                 // Header
                 VStack(alignment: .leading, spacing: 10) {
                     Text(article.category)
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(0.5)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(article.categoryColor)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
@@ -898,35 +1039,51 @@ struct ArticleDetailView: View {
                     )
                 )
 
+                Image(articleVisualAssetName(article))
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 214)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                    .overlay(alignment: .bottomLeading) {
+                        HStack(spacing: 7) {
+                            LucideIcon(image: article.iconImage, size: 15)
+                            Text(article.section)
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                        }
+                        .foregroundStyle(AppColors.onAction)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(.black.opacity(0.28))
+                        .clipShape(Capsule())
+                        .padding(16)
+                    }
+                    .accessibilityHidden(true)
+
                 // Content sections
                 VStack(alignment: .leading, spacing: 24) {
                     ForEach(article.content) { section in
                         VStack(alignment: .leading, spacing: 10) {
-                            HStack(spacing: 10) {
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(AppColors.primary)
-                                    .frame(width: 3, height: 20)
-                                Text(section.heading)
-                                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                                    .foregroundStyle(colors.textPrimary)
-                            }
+                            Text(section.heading)
+                                .font(.system(size: 17, weight: .bold, design: .rounded))
+                                .foregroundStyle(colors.textPrimary)
 
                             Text(section.body)
-                                .font(.system(size: 13))
-                                .foregroundStyle(AppColors.ink)
+                                .font(.system(size: 14, weight: .regular, design: .rounded))
+                                .foregroundStyle(colors.textSecondary)
                                 .lineSpacing(6)
 
                             if let callout = section.callout {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(callout)
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(AppColors.ink)
+                                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                                        .foregroundStyle(colors.textPrimary)
                                         .lineSpacing(4)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(16)
                                 .background(colors.primarySurface)
-                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
                             }
                         }
                     }
@@ -942,6 +1099,7 @@ struct ArticleDetailView: View {
         }
         .background(colors.background)
         .navigationBarTitleDisplayMode(.inline)
+        .hidesAppTabBar()
     }
 
     private var relatedArticlesSection: some View {
@@ -967,8 +1125,11 @@ struct ArticleDetailView: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 14)
                         .background(colors.backgroundSecondary)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .shadow(color: .black.opacity(0.03), radius: 4, y: 1)
+                        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: AppCornerRadius.large)
+                                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
+                        }
                     }
                     .buttonStyle(.plain)
                 }
@@ -996,31 +1157,15 @@ struct GuideDetailView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                // Hero gradient
                 ZStack(alignment: .bottomLeading) {
-                    LinearGradient(colors: guide.gradient, startPoint: .topLeading, endPoint: .bottomTrailing)
+                    guide.gradient.first?.opacity(0.16) ?? colors.primarySurface
 
-                    // Blobs
-                    Circle()
-                        .fill(guide.blobColor)
-                        .frame(width: 80, height: 80)
-                        .blur(radius: 10)
-                        .offset(x: 280, y: -60)
-                        .opacity(0.15)
-                    Circle()
-                        .fill(guide.blobColor)
-                        .frame(width: 50, height: 50)
-                        .blur(radius: 8)
-                        .offset(x: -10, y: -20)
-                        .opacity(0.1)
-
-                    Text("GUIDE \u{00B7} \(guide.lessons.count) LESSONS \u{00B7} \(guide.totalTime.uppercased())")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1)
-                        .foregroundStyle(.white.opacity(0.85))
+                    Text("\(guide.lessons.count) lessons · \(guide.totalTime)")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
                         .padding(20)
                 }
-                .frame(height: 140)
+                .frame(height: 104)
 
                 // Body
                 VStack(alignment: .leading, spacing: 0) {
@@ -1030,8 +1175,7 @@ struct GuideDetailView: View {
                         .lineSpacing(2)
 
                     Text(guide.category)
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(0.5)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(guide.gradient.first ?? AppColors.primary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
@@ -1041,7 +1185,7 @@ struct GuideDetailView: View {
 
                     Text(guide.description)
                         .font(.system(size: 13))
-                        .foregroundStyle(AppColors.slate)
+                        .foregroundStyle(colors.textSecondary)
                         .lineSpacing(4)
                         .padding(.top, 12)
 
@@ -1053,14 +1197,15 @@ struct GuideDetailView: View {
                     } label: {
                         Text("Start Guide")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(AppColors.charcoal)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(
-                                LinearGradient(colors: guide.gradient, startPoint: .leading, endPoint: .trailing)
-                            )
+                            .background(colors.sageWash)
                             .clipShape(Capsule())
-                            .shadow(color: (guide.gradient.first ?? AppColors.primary).opacity(0.25), radius: 16, y: 4)
+                            .overlay {
+                                Capsule()
+                                    .strokeBorder(AppColors.sage.opacity(0.7), lineWidth: 1)
+                            }
                     }
                     .buttonStyle(.plain)
                     .padding(.top, 20)
@@ -1092,8 +1237,11 @@ struct GuideDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
                     .background(colors.backgroundSecondary)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .shadow(color: .black.opacity(0.03), radius: 4, y: 1)
+                    .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: AppCornerRadius.large)
+                            .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
+                    }
                     .padding(.top, 24)
                 }
                 .padding(20)
@@ -1102,6 +1250,7 @@ struct GuideDetailView: View {
         }
         .background(colors.background)
         .navigationBarTitleDisplayMode(.inline)
+        .hidesAppTabBar()
         .navigationDestination(item: $selectedLesson) { lesson in
             LessonDetailView(
                 guide: guide,
@@ -1133,7 +1282,7 @@ struct GuideDetailView: View {
                         .overlay(
                             Text("\(lesson.id)")
                                 .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(AppColors.onAction)
                         )
                 } else {
                     RoundedRectangle(cornerRadius: 10)
@@ -1189,9 +1338,8 @@ struct LessonDetailView: View {
             VStack(alignment: .leading, spacing: 0) {
                 // Header
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("LESSON \(lesson.id) OF \(guide.lessons.count)")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1)
+                    Text("Lesson \(lesson.id) of \(guide.lessons.count)")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle((guide.gradient.first ?? AppColors.primary))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
@@ -1265,7 +1413,7 @@ struct LessonDetailView: View {
                                 Text("Mark as Complete")
                             }
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(AppColors.onAction)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .background(

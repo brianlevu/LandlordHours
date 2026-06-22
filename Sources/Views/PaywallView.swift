@@ -3,6 +3,7 @@ import LucideIcons
 
 struct PaywallView: View {
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     @ObservedObject var subscriptionManager = SubscriptionManager.shared
     @Binding var showPaywall: Bool
@@ -13,41 +14,34 @@ struct PaywallView: View {
     @State private var heroOpacity: Double = 0
     @State private var pulseScale: CGFloat = 1.0
     // Features stagger
-    @State private var featureOffsets: [CGFloat] = Array(repeating: 32, count: 5)
-    @State private var featureOpacities: [Double] = Array(repeating: 0, count: 5)
+    @State private var featureOffsets: [CGFloat] = Array(repeating: 32, count: 3)
+    @State private var featureOpacities: [Double] = Array(repeating: 0, count: 3)
     // Bottom section
     @State private var bottomOffset: CGFloat = 40
     @State private var bottomOpacity: Double = 0
 
-    private let proFeatures: [(icon: String, title: String, desc: String, color: Color, wash: Color)] = [
-        ("sparkles",       "AI Smart Entry",       "Describe your work, AI does the rest",   AppColors.primary,  AppColors.primarySurface),
-        ("camera",         "Photo Evidence",        "Attach photos to every time entry",       AppColors.coral,    AppColors.coralWash),
-        ("cloud",          "iCloud Backup",         "Your records, safe and synced forever",   AppColors.sky,      AppColors.skyWash),
-        ("file-text",      "Audit-Ready Reports",   "Clean PDF exports for tax filing",        AppColors.sage,     AppColors.sageWash),
-        ("building-2",     "Unlimited Properties",  "Track every rental you own",              AppColors.honey,    AppColors.honeyWash),
+    private let proFeatures: [(icon: UIImage, title: String, desc: String, color: Color, wash: Color)] = [
+        (Lucide.fileText,   "Accountant-ready exports", "Clean PDF reports by tax year, property, and category.", AppColors.action, AppColors.primarySurface),
+        (Lucide.building2,  "Portfolio tracking",       "Add every rental you manage without hitting a property cap.", AppColors.informational, AppColors.informationalSurface),
+        (Lucide.badgeCheck, "Lifetime recovery",        "Restore Pro from the App Store whenever you move devices.", AppColors.positive, AppColors.positiveSurface),
     ]
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            colors.background.ignoresSafeArea()
+            LHMobileCanvas()
+                .ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
+                VStack(spacing: 20) {
                     heroSection
-                        .padding(.top, 56)
-                        .padding(.bottom, 32)
+                        .padding(.top, 70)
 
                     featuresSection
                         .padding(.horizontal, 24)
-                        .padding(.bottom, 28)
-
-                    freeNotice
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 32)
 
                     pricingAndCTA
                         .padding(.horizontal, 24)
-                        .padding(.bottom, 48)
+                        .padding(.bottom, 34)
                 }
             }
 
@@ -59,11 +53,12 @@ struct PaywallView: View {
                 ZStack {
                     Circle()
                         .fill(colors.backgroundTertiary)
-                        .frame(width: 32, height: 32)
-                    LucideIcon(image: Lucide.x, size: 12)
-                        .foregroundStyle(colors.textSecondary)
+                        .frame(width: 44, height: 44)
+                    LucideIcon(image: Lucide.x, size: 18)
+                        .foregroundStyle(AppColors.charcoal)
                 }
             }
+            .accessibilityLabel("Close")
             .padding(.top, 16)
             .padding(.trailing, 20)
         }
@@ -72,217 +67,311 @@ struct PaywallView: View {
 
     // MARK: - Hero
     private var heroSection: some View {
-        VStack(spacing: 20) {
-            ZStack {
-                // Outer pulse ring
-                Circle()
-                    .fill(AppColors.primary.opacity(0.07))
-                    .frame(width: 148, height: 148)
-                    .scaleEffect(pulseScale)
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(subscriptionManager.hasPurchased ? AppColors.positiveSurface : AppColors.actionSurface)
+                        .frame(width: 58, height: 58)
+                        .scaleEffect(pulseScale)
 
-                // Inner lavender circle
-                Circle()
-                    .fill(colors.primarySurface)
-                    .frame(width: 112, height: 112)
+                    LucideIcon(image: subscriptionManager.hasPurchased ? Lucide.badgeCheck : Lucide.sparkles, size: 26)
+                        .foregroundStyle(subscriptionManager.hasPurchased ? AppColors.successGreen : AppColors.action)
+                }
+                .scaleEffect(heroScale)
+                .opacity(heroOpacity)
 
-                LucideIcon(image: Lucide.crown, size: 48)
-                    .foregroundStyle(AppColors.primary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(subscriptionManager.hasPurchased ? "Pro is active" : "LandlordHours Pro")
+                        .font(.system(size: 31, weight: .black, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
+
+                    Text(subscriptionManager.hasPurchased ? "Lifetime access is unlocked on this account." : "Export clean records and track every rental with one lifetime purchase.")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            .scaleEffect(heroScale)
             .opacity(heroOpacity)
 
-            VStack(spacing: 8) {
-                Text("Go Pro")
-                    .font(AppTypography.headline)
-                    .foregroundStyle(colors.textPrimary)
-
-                Text("Track every hour.\nKeep every deduction.")
-                    .font(AppTypography.body)
-                    .foregroundStyle(colors.textSecondary)
-                    .multilineTextAlignment(.center)
+            HStack(spacing: 8) {
+                trustChip("One-time purchase", icon: Lucide.receiptText)
+                trustChip("No renewal", icon: Lucide.refreshCwOff)
             }
             .opacity(heroOpacity)
         }
+        .padding(.horizontal, 24)
     }
 
     // MARK: - Features
     private var featuresSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionPill(icon: Lucide.sparkles, label: "WHAT'S INCLUDED")
-                .padding(.bottom, 4)
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Built for tax review")
+                .font(.system(size: 19, weight: .black, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
 
-            ForEach(Array(proFeatures.enumerated()), id: \.offset) { index, feature in
-                featureRow(feature, index: index)
+            VStack(spacing: 0) {
+                ForEach(Array(proFeatures.enumerated()), id: \.offset) { index, feature in
+                    featureRow(feature, index: index)
+
+                    if index < proFeatures.count - 1 {
+                        Divider()
+                            .background(colors.border.opacity(0.35))
+                            .padding(.leading, 62)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(colors.backgroundSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(colors.border.opacity(0.28), lineWidth: 1)
             }
         }
     }
 
-    private func featureRow(_ feature: (icon: String, title: String, desc: String, color: Color, wash: Color), index: Int) -> some View {
+    private func featureRow(_ feature: (icon: UIImage, title: String, desc: String, color: Color, wash: Color), index: Int) -> some View {
         HStack(spacing: 14) {
-            JellyBadge(systemName: feature.icon, color: feature.color, wash: feature.wash, size: 48)
+            LHIconTile(icon: feature.icon, color: feature.color, wash: feature.wash, size: 44, isActive: true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(feature.title)
-                    .font(AppTypography.body)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
                 Text(feature.desc)
-                    .font(AppTypography.bodySmall)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(colors.textSecondary)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             LucideIcon(image: Lucide.check, size: 16)
-                .foregroundStyle(AppColors.sage)
+                .foregroundStyle(AppColors.successGreen)
         }
-        .padding(14)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.04), radius: 8, x: 0, y: 2)
+        .padding(.vertical, 12)
         .offset(y: featureOffsets[index])
         .opacity(featureOpacities[index])
     }
 
-    // MARK: - Free Notice
-    private var freeNotice: some View {
-        HStack(spacing: 10) {
-            LucideIcon(image: Lucide.info, size: 14)
-                .foregroundStyle(colors.textTertiary)
-            Text("Free plan: 1 property \u{00B7} 20 entries/month \u{00B7} basic reports")
-                .font(AppTypography.bodySmall)
-                .foregroundStyle(colors.textSecondary)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
-        .offset(y: bottomOffset)
-        .opacity(bottomOpacity)
-    }
-
     // MARK: - Pricing + CTA
     private var pricingAndCTA: some View {
-        VStack(spacing: 16) {
-            // Price display
-            VStack(spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("$30")
-                        .font(AppTypography.heroNumber)
-                        .foregroundStyle(colors.textPrimary)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("one-time")
-                            .font(AppTypography.caption)
+        VStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 14) {
+                if let product = subscriptionManager.proProduct {
+                    HStack(alignment: .center) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(product.displayPrice)
+                                .font(.system(size: 48, weight: .black, design: .rounded))
+                                .foregroundStyle(colors.textPrimary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
+                            Text("Lifetime access. Paid once through the App Store.")
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .foregroundStyle(colors.textSecondary)
+                        }
+
+                        Spacer()
+
+                        VStack(spacing: 5) {
+                            Text("PRO")
+                                .font(.system(size: 11, weight: .black, design: .rounded))
+                                .foregroundStyle(AppColors.action)
+                            Text("no renewal")
+                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .foregroundStyle(colors.textSecondary)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(colors.actionSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        LucideIcon(image: Lucide.store, size: 22)
+                            .foregroundStyle(AppColors.primary)
+                        Text("Pro availability check")
+                            .font(AppTypography.title3)
+                            .foregroundStyle(colors.textPrimary)
+                        Text("We will check the App Store before showing a price or starting purchase.")
+                            .font(AppTypography.bodySmall)
                             .foregroundStyle(colors.textSecondary)
-                        Text("yours forever \u{2713}")
-                            .font(AppTypography.label)
-                            .foregroundStyle(AppColors.sage)
+                            .lineSpacing(3)
                     }
                 }
-                Text("Less than one hour of billable time")
-                    .font(AppTypography.bodySmall)
+
+                primaryAction
+
+                Text(subscriptionManager.proProduct == nil ? "You can keep using free tracking while Pro is unavailable." : "Free plan still includes basic time tracking and the learning center.")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(colors.textSecondary)
-            }
-            .padding(.bottom, 4)
-
-            // Trial note
-            if subscriptionManager.isTrialActive {
-                HStack(spacing: 6) {
-                    LucideIcon(image: Lucide.clock, size: 12)
-                        .foregroundStyle(AppColors.honey)
-                    Text("\(subscriptionManager.trialDaysRemaining) day\(subscriptionManager.trialDaysRemaining == 1 ? "" : "s") left in free trial")
-                        .font(AppTypography.caption)
-                        .fontWeight(.medium)
-                        .foregroundStyle(colors.textSecondary)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(AppColors.honeyWash)
-                .clipShape(Capsule())
-            }
-
-            // CTA Button
-            if subscriptionManager.isLoading {
-                ProgressView("Processing...")
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-            } else if subscriptionManager.hasPurchased {
-                Button {
-                    showPaywall = false
-                    onDismiss?()
-                } label: {
-                    HStack(spacing: 8) {
-                        LucideIcon(image: Lucide.check, size: 20)
-                            .foregroundStyle(.white)
-                        Text("You're Pro! Tap to continue")
-                    }
-                    .font(AppTypography.buttonLarge)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(AppColors.sage)
-                    .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
-                }
-            } else {
-                Button {
-                    if subscriptionManager.products.isEmpty {
-                        // Retry loading products, then attempt purchase
-                        Task {
-                            await subscriptionManager.loadProducts()
-                            if subscriptionManager.products.isEmpty {
-                                subscriptionManager.purchaseError = "Unable to connect to the App Store. Please check your connection and try again."
-                            } else {
-                                await subscriptionManager.purchasePro()
-                            }
-                        }
-                    } else {
-                        Task { await subscriptionManager.purchasePro() }
-                    }
-                } label: {
-                    Group {
-                        if let product = subscriptionManager.proProduct {
-                            Text("Unlock Pro \u{00B7} \(product.displayPrice)")
-                        } else {
-                            Text("Unlock Pro \u{00B7} $30")
-                        }
-                    }
-                    .font(AppTypography.buttonLarge)
-                    .foregroundStyle(colorScheme == .dark ? Color.black : Color.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(colorScheme == .dark ? Color.white : AppColors.charcoal)
-                    .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
-                }
-            }
-
-            // Error message
-            if let error = subscriptionManager.purchaseError {
-                Text(error)
-                    .font(AppTypography.caption)
-                    .foregroundStyle(AppColors.error)
                     .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+            }
+            .padding(18)
+            .background(
+                LinearGradient(
+                    colors: colorScheme == .dark
+                        ? [colors.backgroundSecondary, AppColors.darkPlum.opacity(0.72)]
+                        : [Color.white, AppColors.lavenderPale, AppColors.reportsAccentWash.opacity(0.72)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .strokeBorder(AppColors.action.opacity(0.18), lineWidth: 1)
             }
 
-            // Dismiss link
+            if !subscriptionManager.hasPurchased {
+                Button {
+                    Task {
+                        await subscriptionManager.restorePurchases()
+                        if subscriptionManager.isPro {
+                            showPaywall = false
+                            onDismiss?()
+                        }
+                    }
+                } label: {
+                    Text("Restore purchase")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(colors.action)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.lhPressable)
+            }
+
+            if let error = subscriptionManager.purchaseError {
+                errorMessage(error)
+            }
+
             Button {
                 showPaywall = false
                 onDismiss?()
             } label: {
-                Text(subscriptionManager.hasPurchased ? "Close" : "Maybe Later")
+                Text(subscriptionManager.hasPurchased ? "Close" : "Continue free")
                     .font(AppTypography.bodySmall)
-                    .foregroundStyle(colors.textTertiary)
+                    .foregroundStyle(colors.textSecondary)
             }
         }
         .offset(y: bottomOffset)
         .opacity(bottomOpacity)
     }
 
+    @ViewBuilder
+    private var primaryAction: some View {
+        if subscriptionManager.isLoading {
+            ProgressView("Checking App Store...")
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+        } else if subscriptionManager.hasPurchased {
+            Button {
+                showPaywall = false
+                onDismiss?()
+            } label: {
+                HStack(spacing: 8) {
+                    LucideIcon(image: Lucide.check, size: 20)
+                        .foregroundStyle(AppColors.onAction)
+                    Text("Continue with Pro")
+                }
+                .font(AppTypography.buttonLarge)
+                .foregroundStyle(AppColors.onAction)
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+                .background(colors.action)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.lhPressable)
+        } else {
+            Button {
+                Task { await subscriptionManager.purchasePro() }
+            } label: {
+                Group {
+                    if let product = subscriptionManager.proProduct {
+                        Text("Buy lifetime Pro - \(product.displayPrice)")
+                    } else {
+                        Text(subscriptionManager.purchaseError == nil ? "Check Pro availability" : "Try Pro purchase again")
+                    }
+                }
+                .font(AppTypography.buttonLarge)
+                .foregroundStyle(AppColors.onAction)
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+                .background(colors.action)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.lhPressable)
+        }
+    }
+
+    private func errorMessage(_ error: String) -> some View {
+        VStack(spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
+                LucideIcon(image: Lucide.circleAlert, size: 14)
+                    .foregroundStyle(AppColors.error)
+                    .padding(.top, 1)
+                Text(error)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(colors.textPrimary)
+                    .multilineTextAlignment(.leading)
+            }
+
+            #if DEBUG
+            if AdminAccess.isCurrentUserAdmin {
+                Button {
+                    subscriptionManager.unlockPro()
+                    showPaywall = false
+                    onDismiss?()
+                } label: {
+                    Text("Use local Pro for testing")
+                        .font(AppTypography.buttonSmall)
+                        .foregroundStyle(AppColors.primary)
+                }
+            }
+            #endif
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity)
+        .background(AppColors.error.opacity(0.08))
+        .overlay(
+            RoundedRectangle(cornerRadius: AppCornerRadius.medium)
+                .stroke(AppColors.error.opacity(0.18), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
+    }
+
     // MARK: - Helpers
+    private func trustChip(_ text: String, icon: UIImage) -> some View {
+        HStack(spacing: 6) {
+            LucideIcon(image: icon, size: 13)
+                .foregroundStyle(AppColors.action)
+            Text(text)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.84)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.62 : 0.78))
+        .clipShape(Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(colors.border.opacity(0.22), lineWidth: 1)
+        }
+    }
+
     private func sectionPill(icon: UIImage, label: String) -> some View {
         HStack(spacing: 5) {
             LucideIcon(image: icon, size: 11)
                 .foregroundStyle(colors.textSecondary)
             Text(label)
-                .font(AppTypography.label)
-                .tracking(1.5)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
         }
         .foregroundStyle(colors.textSecondary)
         .padding(.horizontal, 10)
@@ -290,29 +379,41 @@ struct PaywallView: View {
         .background(colors.backgroundTertiary)
         .clipShape(Capsule())
     }
-
     // MARK: - Animations
     private func animateIn() {
-        // Hero bounces in
-        withAnimation(.spring(response: 0.7, dampingFraction: 0.72).delay(0.05)) {
+        guard !reduceMotion else {
+            heroScale = 1.0
+            heroOpacity = 1.0
+            featureOffsets = Array(repeating: 0, count: proFeatures.count)
+            featureOpacities = Array(repeating: 1, count: proFeatures.count)
+            bottomOffset = 0
+            bottomOpacity = 1.0
+            return
+        }
+
+        animate(.easeOut(duration: 0.22).delay(0.05)) {
             heroScale = 1.0
             heroOpacity = 1.0
         }
-        // Continuous pulse on outer ring
-        withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true).delay(0.8)) {
-            pulseScale = 1.1
-        }
-        // Features stagger in
+
         for i in 0..<proFeatures.count {
-            withAnimation(.spring(response: 0.55, dampingFraction: 0.78).delay(0.35 + Double(i) * 0.08)) {
+            animate(.easeOut(duration: 0.22).delay(0.18 + Double(i) * 0.04)) {
                 featureOffsets[i] = 0
                 featureOpacities[i] = 1.0
             }
         }
-        // Bottom section slides up
-        withAnimation(.easeOut(duration: 0.45).delay(0.75)) {
+
+        animate(.easeOut(duration: 0.24).delay(0.36)) {
             bottomOffset = 0
             bottomOpacity = 1.0
+        }
+    }
+
+    private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
+        if reduceMotion {
+            updates()
+        } else {
+            withAnimation(animation, updates)
         }
     }
 }

@@ -71,11 +71,24 @@ class AITimeEntryService {
         // If we have an API key, try the remote API for better accuracy
         if !apiKey.isEmpty {
             if let remoteResult = await parseRemotely(text: text, properties: properties) {
-                return remoteResult
+                return mergeRemoteResult(remoteResult, with: localResult, sourceText: text)
             }
         }
 
         return localResult
+    }
+
+    private func mergeRemoteResult(_ remote: ParsedTimeEntry, with local: ParsedTimeEntry?, sourceText: String) -> ParsedTimeEntry {
+        guard let local else { return remote }
+        let hasExplicitHours = extractExplicitHours(from: sourceText.lowercased()) != nil
+
+        return ParsedTimeEntry(
+            property: remote.property ?? local.property,
+            category: remote.category,
+            hours: (!hasExplicitHours && abs(remote.hours - 1.0) < 0.001) ? local.hours : remote.hours,
+            participant: remote.participant,
+            notes: remote.notes.isEmpty ? local.notes : remote.notes
+        )
     }
 
     // MARK: - Local Parser (keyword-based, no API needed)
@@ -83,11 +96,12 @@ class AITimeEntryService {
     private func parseLocally(text: String, properties: [RentalProperty]) -> ParsedTimeEntry? {
         let lower = text.lowercased()
 
-        // Extract hours
-        let hours = extractHours(from: lower)
-
         // Match category by keywords
         let category = matchCategory(from: lower)
+
+        // Extract or estimate hours after category detection, so short natural notes
+        // still produce a useful draft instead of a generic 1.0h default.
+        let hours = extractExplicitHours(from: lower) ?? estimateHours(for: category, text: lower)
 
         // Match property by name
         let property = matchProperty(from: lower, properties: properties)
@@ -105,7 +119,30 @@ class AITimeEntryService {
         )
     }
 
-    private func extractHours(from text: String) -> Double {
+    private func extractExplicitHours(from text: String) -> Double? {
+        let naturalLanguageHours: [(String, Double)] = [
+            (#"\b(?:an|one|1)\s+hour\b"#, 1.0),
+            (#"\b(?:a|one|1)\s+half\s+hour\b"#, 0.5),
+            (#"\bhalf\s+(?:an\s+)?hour\b"#, 0.5),
+            (#"\b(?:quarter|15\s+minutes?)\b"#, 0.25),
+            (#"\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+hours?\b"#, 0)
+        ]
+
+        for (pattern, value) in naturalLanguageHours {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+                  let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else {
+                continue
+            }
+
+            if value > 0 {
+                return value
+            }
+
+            if let swiftRange = Range(match.range, in: text) {
+                return wordHourValue(in: String(text[swiftRange]))
+            }
+        }
+
         // Match patterns like "3 hours", "2.5h", "1.5 hrs", "for 3h", "took 2 hours"
         let patterns = [
             #"(\d+\.?\d*)\s*(?:hours?|hrs?|h)\b"#,
@@ -123,7 +160,56 @@ class AITimeEntryService {
             }
         }
 
-        return 1.0
+        return nil
+    }
+
+    private func wordHourValue(in text: String) -> Double? {
+        let hourWords: [String: Double] = [
+            "two": 2,
+            "three": 3,
+            "four": 4,
+            "five": 5,
+            "six": 6,
+            "seven": 7,
+            "eight": 8,
+            "nine": 9,
+            "ten": 10,
+            "eleven": 11,
+            "twelve": 12
+        ]
+
+        for (word, value) in hourWords where text.contains(word) {
+            return value
+        }
+        return nil
+    }
+
+    private func estimateHours(for category: ActivityCategory, text: String) -> Double {
+        if text.contains("quick") || text.contains("brief") || text.contains("call") || text.contains("texted") {
+            return 0.5
+        }
+
+        if text.contains("paint") {
+            if text.contains("house") || text.contains("exterior") || text.contains("room") {
+                return 3.0
+            }
+            return 2.0
+        }
+
+        switch category {
+        case .repairs:
+            return 1.5
+        case .renovations:
+            return 3.0
+        case .leasing, .legal, .insurance:
+            return 1.0
+        case .bookkeeping, .management:
+            return 0.75
+        case .travel:
+            return 1.0
+        case .investing, .financing, .contractNegotiation:
+            return 0.5
+        }
     }
 
     private func matchCategory(from text: String) -> ActivityCategory {
@@ -143,6 +229,28 @@ class AITimeEntryService {
             if text.contains(name) { return property }
         }
 
+        // Match meaningful property-name words. This handles natural phrases like
+        // "Oak Street leak" for a saved property named "Oak Street Duplex".
+        let textWords = significantWords(in: text)
+        let nameMatches = properties.compactMap { property -> (property: RentalProperty, score: Int)? in
+            let nameWords = significantWords(in: property.name.lowercased())
+            let score = nameWords.intersection(textWords).count
+            return score > 0 ? (property, score) : nil
+        }
+        .sorted { lhs, rhs in
+            if lhs.score == rhs.score {
+                return lhs.property.name.count > rhs.property.name.count
+            }
+            return lhs.score > rhs.score
+        }
+
+        if let best = nameMatches.first {
+            let isAmbiguous = nameMatches.dropFirst().first?.score == best.score
+            if !isAmbiguous || best.score >= 2 {
+                return best.property
+            }
+        }
+
         // Try address parts
         for property in properties {
             let addressWords = property.address.lowercased()
@@ -157,6 +265,20 @@ class AITimeEntryService {
         if properties.count == 1 { return properties[0] }
 
         return nil
+    }
+
+    private func significantWords(in text: String) -> Set<String> {
+        let stopWords: Set<String> = [
+            "the", "and", "for", "with", "unit", "house", "home", "property", "rental",
+            "duplex", "triplex", "apartment", "condo", "street", "st", "avenue", "ave",
+            "road", "rd", "drive", "dr", "lane", "ln", "court", "ct", "place", "pl"
+        ]
+
+        return Set(
+            text.components(separatedBy: CharacterSet.alphanumerics.inverted)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { $0.count > 2 && !stopWords.contains($0) }
+        )
     }
 
     // MARK: - Remote API Parser (MiniMax — optional enhancement)

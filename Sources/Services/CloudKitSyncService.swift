@@ -41,8 +41,8 @@ final class CloudKitSyncService: ObservableObject {
     weak var delegate: CloudKitSyncDelegate?
 
     // MARK: Private
-    private let container = CKContainer(identifier: "iCloud.com.openclaw.landlordhours")
-    private var database: CKDatabase { container.privateCloudDatabase }
+    private let container: CKContainer?
+    private var database: CKDatabase? { container?.privateCloudDatabase }
     private let zoneID = CKRecordZone.ID(zoneName: "LandlordHoursZone", ownerName: CKCurrentUserDefaultName)
     /// The current app-level userId, used to tag CloudKit records so they don't leak across app users sharing the same iCloud account.
     private var appUserId: String? { UserScope.userId }
@@ -64,7 +64,18 @@ final class CloudKitSyncService: ObservableObject {
 
     // MARK: - Lifecycle
 
+    init() {
+        if Self.hasCloudKitEntitlement {
+            container = CKContainer(identifier: "iCloud.com.openclaw.landlordhours")
+        } else {
+            container = nil
+            syncError = "iCloud sync is unavailable in this build."
+            logger.warning("CloudKit disabled: missing iCloud CloudKit entitlement")
+        }
+    }
+
     func start() async {
+        guard container != nil else { return }
         await checkAccountStatus()
         guard accountAvailable else { return }
         await ensureZoneExists()
@@ -85,6 +96,11 @@ final class CloudKitSyncService: ObservableObject {
     // MARK: - Account Status
 
     func checkAccountStatus() async {
+        guard let container else {
+            accountAvailable = false
+            syncError = "iCloud sync is unavailable in this build."
+            return
+        }
         do {
             let status = try await container.accountStatus()
             accountAvailable = (status == .available)
@@ -97,6 +113,7 @@ final class CloudKitSyncService: ObservableObject {
     // MARK: - Zone Setup
 
     private func ensureZoneExists() async {
+        guard let database else { return }
         guard !UserDefaults.standard.bool(forKey: zoneCreatedKey) else { return }
         let zone = CKRecordZone(zoneID: zoneID)
         do {
@@ -115,6 +132,7 @@ final class CloudKitSyncService: ObservableObject {
     // MARK: - Subscription
 
     private func ensureSubscriptionExists() async {
+        guard let database else { return }
         guard !UserDefaults.standard.bool(forKey: subscriptionCreatedKey) else { return }
         let subscriptionID = "private-db-changes"
         let subscription = CKDatabaseSubscription(subscriptionID: subscriptionID)
@@ -138,6 +156,7 @@ final class CloudKitSyncService: ObservableObject {
 
     /// Debounced push — waits 2 seconds after last call before actually pushing.
     func schedulePush() {
+        guard container != nil else { return }
         guard remoteUpdateDepth == 0 else { return }
         pushDebounceTask?.cancel()
         pushDebounceTask = Task {
@@ -158,7 +177,7 @@ final class CloudKitSyncService: ObservableObject {
             var records: [CKRecord] = []
 
             // Properties
-            let viewModel = await getViewModel()
+            let viewModel = getViewModel()
             for property in viewModel?.properties ?? [] {
                 records.append(propertyToRecord(property))
             }
@@ -193,6 +212,7 @@ final class CloudKitSyncService: ObservableObject {
     }
 
     private func batchSave(_ records: [CKRecord]) async throws {
+        guard let database else { throw CloudKitSyncUnavailableError() }
         let batchSize = 400
         for offset in stride(from: 0, to: records.count, by: batchSize) {
             let batch = Array(records[offset..<min(offset + batchSize, records.count)])
@@ -206,10 +226,14 @@ final class CloudKitSyncService: ObservableObject {
                     case .success:
                         continuation.resume()
                     case .failure(let error):
+                        if Self.isDeleteMissingRecordsOnly(error) {
+                            continuation.resume()
+                            return
+                        }
                         continuation.resume(throwing: error)
                     }
                 }
-                self.database.add(op)
+                database.add(op)
             }
         }
     }
@@ -235,6 +259,7 @@ final class CloudKitSyncService: ObservableObject {
     }
 
     private func fetchZoneChanges() async throws {
+        guard let database else { throw CloudKitSyncUnavailableError() }
         let token = loadZoneToken()
 
         var updatedProperties: [RentalProperty] = []
@@ -335,7 +360,7 @@ final class CloudKitSyncService: ObservableObject {
             }
 
             op.qualityOfService = .userInitiated
-            self.database.add(op)
+            database.add(op)
         }
 
         // Save the new zone change token
@@ -396,6 +421,7 @@ final class CloudKitSyncService: ObservableObject {
 
     func deletePropertyFromCloud(_ property: RentalProperty) async {
         guard accountAvailable else { return }
+        guard let database else { return }
         let recordID = CKRecord.ID(recordName: property.id.uuidString, zoneID: zoneID)
         do {
             try await database.deleteRecord(withID: recordID)
@@ -406,12 +432,102 @@ final class CloudKitSyncService: ObservableObject {
 
     func deleteEntryFromCloud(_ entry: TimeEntry) async {
         guard accountAvailable else { return }
+        guard let database else { return }
         let recordID = CKRecord.ID(recordName: entry.id.uuidString, zoneID: zoneID)
         do {
             try await database.deleteRecord(withID: recordID)
         } catch {
             logger.error("Delete entry error: \(error.localizedDescription)")
         }
+    }
+
+    func deleteCurrentUserRecords(
+        properties: [RentalProperty],
+        entries: [TimeEntry],
+        categories: [CustomCategory],
+        userId: String
+    ) async throws {
+        guard let database else { throw CloudKitSyncUnavailableError() }
+
+        await checkAccountStatus()
+        guard accountAvailable else { return }
+        await ensureZoneExists()
+
+        var recordIDs = properties.map { CKRecord.ID(recordName: $0.id.uuidString, zoneID: zoneID) }
+        recordIDs.append(contentsOf: entries.map { CKRecord.ID(recordName: $0.id.uuidString, zoneID: zoneID) })
+        recordIDs.append(contentsOf: categories.map { CKRecord.ID(recordName: $0.id.uuidString, zoneID: zoneID) })
+        for recordType in ["Property", "TimeEntry", "CustomCategory"] {
+            recordIDs.append(contentsOf: try await fetchRecordIDs(recordType: recordType, userId: userId))
+        }
+        recordIDs.append(CKRecord.ID(recordName: "GoalSettings-\(userId)", zoneID: zoneID))
+        recordIDs.append(CKRecord.ID(recordName: "TaxProfile-\(userId)", zoneID: zoneID))
+
+        let uniqueRecordIDs = Array(Dictionary(uniqueKeysWithValues: recordIDs.map { ($0.recordName, $0) }).values)
+        let batchSize = 400
+        for offset in stride(from: 0, to: uniqueRecordIDs.count, by: batchSize) {
+            let batch = Array(uniqueRecordIDs[offset..<min(offset + batchSize, uniqueRecordIDs.count)])
+            let op = CKModifyRecordsOperation(recordsToSave: nil, recordIDsToDelete: batch)
+            op.qualityOfService = .userInitiated
+
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                op.modifyRecordsResultBlock = { result in
+                    switch result {
+                    case .success:
+                        continuation.resume()
+                    case .failure(let error):
+                        if Self.isDeleteMissingRecordsOnly(error) {
+                            continuation.resume()
+                            return
+                        }
+                        continuation.resume(throwing: error)
+                    }
+                }
+                database.add(op)
+            }
+        }
+
+        UserDefaults.standard.removeObject(forKey: changeTokenKey)
+        UserDefaults.standard.removeObject(forKey: zoneTokenKey)
+        lastSyncDate = Date()
+    }
+
+    private func fetchRecordIDs(recordType: String, userId: String) async throws -> [CKRecord.ID] {
+        guard let database else { return [] }
+        let predicate = NSPredicate(format: "appUserId == %@", userId)
+        let query = CKQuery(recordType: recordType, predicate: predicate)
+        var recordIDs: [CKRecord.ID] = []
+        var cursor: CKQueryOperation.Cursor?
+
+        repeat {
+            let operation: CKQueryOperation
+            if let cursor {
+                operation = CKQueryOperation(cursor: cursor)
+            } else {
+                operation = CKQueryOperation(query: query)
+                operation.zoneID = zoneID
+            }
+            operation.desiredKeys = []
+            operation.resultsLimit = 400
+
+            cursor = try await withCheckedThrowingContinuation { continuation in
+                operation.recordMatchedBlock = { recordID, result in
+                    if case .success = result {
+                        recordIDs.append(recordID)
+                    }
+                }
+                operation.queryResultBlock = { result in
+                    switch result {
+                    case .success(let nextCursor):
+                        continuation.resume(returning: nextCursor)
+                    case .failure(let error):
+                        continuation.resume(throwing: error)
+                    }
+                }
+                database.add(operation)
+            }
+        } while cursor != nil
+
+        return recordIDs
     }
 
     // MARK: - Record Mapping: Property
@@ -455,6 +571,8 @@ final class CloudKitSyncService: ObservableObject {
         record["createdAt"] = entry.createdAt
         record["modifiedAt"] = entry.modifiedAt
         record["importSource"] = entry.importSource
+        record["importExternalId"] = entry.importExternalId
+        record["importCalendarId"] = entry.importCalendarId
         record["appUserId"] = appUserId
         return record
     }
@@ -472,7 +590,20 @@ final class CloudKitSyncService: ObservableObject {
 
         let notes = record["notes"] as? String ?? ""
         let importSource = record["importSource"] as? String
-        var entry = TimeEntry(id: id, propertyId: propertyId, participant: participant, category: category, hours: hours, date: date, notes: notes, importSource: importSource)
+        let importExternalId = record["importExternalId"] as? String
+        let importCalendarId = record["importCalendarId"] as? String
+        var entry = TimeEntry(
+            id: id,
+            propertyId: propertyId,
+            participant: participant,
+            category: category,
+            hours: hours,
+            date: date,
+            notes: notes,
+            importSource: importSource,
+            importExternalId: importExternalId,
+            importCalendarId: importCalendarId
+        )
         entry.createdAt = record["createdAt"] as? Date ?? Date()
         entry.modifiedAt = record["modifiedAt"] as? Date ?? entry.createdAt
         return entry
@@ -618,5 +749,27 @@ final class CloudKitSyncService: ObservableObject {
             }
         }
         if let lastError { throw lastError }
+    }
+
+    private static var hasCloudKitEntitlement: Bool {
+        #if targetEnvironment(simulator)
+        return false
+        #else
+        return true
+        #endif
+    }
+
+    private static func isDeleteMissingRecordsOnly(_ error: Error) -> Bool {
+        guard let ckError = error as? CKError, ckError.code == .partialFailure else {
+            return false
+        }
+        let errors = ckError.partialErrorsByItemID?.values.compactMap { $0 as? CKError } ?? []
+        return !errors.isEmpty && errors.allSatisfy { $0.code == .unknownItem }
+    }
+}
+
+private struct CloudKitSyncUnavailableError: LocalizedError {
+    var errorDescription: String? {
+        "iCloud sync is unavailable in this build."
     }
 }

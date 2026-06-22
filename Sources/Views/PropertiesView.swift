@@ -12,101 +12,79 @@ struct PropertiesView: View {
     @State private var showingPaywall = false
     @State private var propertyToDelete: RentalProperty?
     @State private var showingDeleteConfirmation = false
+#if DEBUG
+    @State private var didHandleDebugLaunchSurface = false
+#endif
+
+    private var totalPortfolioHours: Double {
+        viewModel.properties.reduce(0) { partial, property in
+            partial + viewModel.totalHoursForProperty(property.id)
+        }
+    }
+
+    private var ltrCount: Int {
+        viewModel.properties.filter { $0.propertyType == .ltr }.count
+    }
+
+    private var strCount: Int {
+        viewModel.properties.filter { $0.propertyType == .str }.count
+    }
 
     var body: some View {
         NavigationStack {
-            Group {
+            ZStack {
+                LHMobileCanvas()
+
                 if viewModel.properties.isEmpty {
                     // MARK: - Empty State
-                    VStack(spacing: 0) {
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 22) {
                         headerSection
-                            .padding(.horizontal, 20)
-
-                        Spacer()
-
-                        VStack(spacing: 20) {
-                            JellyBadge(
-                                systemName: "building-2",
-                                color: AppColors.primary,
-                                wash: colors.primarySurface,
-                                size: 72
-                            )
-
-                            Text("No Properties Yet")
-                                .font(AppTypography.headline)
-                                .foregroundStyle(colors.textPrimary)
-
-                            Text("Add your first rental property\nto start tracking time")
-                                .font(AppTypography.body)
-                                .foregroundStyle(colors.textSecondary)
-                                .multilineTextAlignment(.center)
-
-                            Button {
-                                if viewModel.canAddProperty() {
-                                    showingAddProperty = true
-                                } else {
-                                    showingPaywall = true
-                                }
-                            } label: {
-                                Label { Text("Add Property") } icon: { lucideImage(Lucide.plus) }
-                                    .font(AppTypography.button)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
-                                    .background(AppColors.primary)
-                                    .foregroundStyle(Color.white)
-                                    .clipShape(Capsule())
-                            }
-                            .padding(.horizontal, 40)
-                            .padding(.top, 4)
+                            emptyPortfolioCard
+                            setupPreviewCard
                         }
-
-                        Spacer()
+                        .padding(.horizontal, 24)
+                        .padding(.top, 18)
+                        .padding(.bottom, AppSpacing.tabContentBottomInset)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(colors.background)
                 } else {
                     // MARK: - Property List
                     ScrollView(showsIndicators: false) {
-                        VStack(spacing: 12) {
+                        VStack(spacing: 18) {
                             headerSection
+                            portfolioSummaryCard
 
                             ForEach(viewModel.properties) { property in
-                                PropertyListCard(property: property, hours: viewModel.totalHoursForProperty(property.id)) {
+                                PropertyListCard(
+                                    property: property,
+                                    hours: viewModel.totalHoursForProperty(property.id),
+                                    yearHours: viewModel.hoursForProperty(property, year: Calendar.current.component(.year, from: Date())),
+                                    entryCount: viewModel.timeEntries.filter { $0.propertyId == property.id }.count,
+                                    onOpen: {
+                                        selectedProperty = property
+                                    },
+                                    onDelete: {
                                     propertyToDelete = property
                                     showingDeleteConfirmation = true
-                                }
-                                .onTapGesture {
-                                    selectedProperty = property
-                                }
+                                    }
+                                )
                             }
 
                             // Add Property button at bottom of list
-                            Button {
-                                if viewModel.canAddProperty() {
-                                    showingAddProperty = true
-                                } else {
-                                    showingPaywall = true
-                                }
-                            } label: {
-                                Label { Text("Add Property") } icon: { lucideImage(Lucide.plus) }
-                                    .font(AppTypography.button)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
-                                    .background(AppColors.primary)
-                                    .foregroundStyle(Color.white)
-                                    .clipShape(Capsule())
-                            }
-                            .padding(.top, 4)
+                            addPropertyRow
+                                .padding(.top, 2)
+                            .guidedSpotlightTarget(.addProperty)
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
-                        .padding(.bottom, 40)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 18)
+                        .padding(.bottom, AppSpacing.tabContentBottomInset)
                     }
-                    .background(colors.background)
                 }
             }
             .navigationBarHidden(true)
-            .sheet(isPresented: $showingAddProperty) {
+            .sheet(isPresented: $showingAddProperty, onDismiss: {
+                NotificationCenter.default.post(name: .resumeGuidedOnboardingOverlay, object: nil)
+            }) {
                 AddPropertyView()
             }
             .sheet(isPresented: $showingPaywall) {
@@ -126,28 +104,235 @@ struct PropertiesView: View {
             } message: {
                 Text("This will permanently delete \"\(propertyToDelete?.name ?? "")\" and all its time entries. This cannot be undone.")
             }
-        }
-    }
-
-    // MARK: - Header
-    private var headerSection: some View {
-        HStack {
-            Text("Properties")
-                .font(.system(size: 28, weight: .regular, design: .serif))
-                .foregroundStyle(colors.textPrimary)
-            Spacer()
-            Button {
+            .onReceive(NotificationCenter.default.publisher(for: .openAddProperty)) { _ in
                 if viewModel.canAddProperty() {
+                    NotificationCenter.default.post(name: .suspendGuidedOnboardingOverlay, object: nil)
                     showingAddProperty = true
                 } else {
                     showingPaywall = true
                 }
+            }
+#if DEBUG
+            .onAppear {
+                handleDebugLaunchSurfaceIfNeeded()
+            }
+#endif
+        }
+    }
+
+    private var emptyPortfolioCard: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            HStack(alignment: .top, spacing: 14) {
+                JellyBadge(systemName: "building-2", color: AppColors.primary, wash: colors.primarySurface, size: 58)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Start with the property, then every hour has a home.")
+                        .font(.system(size: 25, weight: .black, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Add one rental place now. You can track repairs, management, leasing, and spouse hours against it next.")
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Button {
+                openAddProperty()
             } label: {
-                LucideIcon(image: Lucide.circlePlus, size: 22)
-                    .foregroundStyle(AppColors.primary)
+                Label { Text("Add first property") } icon: { lucideImage(Lucide.plus) }
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 15)
+                    .background(colors.action)
+                    .foregroundStyle(AppColors.onAction)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.lhPressable)
+            .guidedSpotlightTarget(.addProperty)
+        }
+        .padding(20)
+        .background(colors.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(colors.border.opacity(0.25), lineWidth: 1)
+        }
+    }
+
+    private var setupPreviewCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("What this unlocks")
+                .font(.system(size: 18, weight: .black, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
+
+            setupPreviewRow(icon: Lucide.clock3, title: "Cleaner time logs", detail: "Each entry links to a property for review.")
+            setupPreviewRow(icon: Lucide.badgeCheck, title: "Tax-ready grouping", detail: "LTR and STR activity stays separated.")
+            setupPreviewRow(icon: Lucide.fileText, title: "Better exports", detail: "Reports can show hours by property.")
+        }
+        .padding(18)
+        .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.72 : 0.78))
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(colors.border.opacity(0.22), lineWidth: 1)
+        }
+    }
+
+    private func setupPreviewRow(icon: UIImage, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            LucideIcon(image: icon, size: 18)
+                .foregroundStyle(colors.action)
+                .frame(width: 34, height: 34)
+                .background(colors.actionSurface)
+                .clipShape(Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                Text(detail)
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var portfolioSummaryCard: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Portfolio evidence")
+                        .font(.system(size: 19, weight: .black, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                    Text("Hours organized by rental type")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                }
+                Spacer()
+                Text(String(format: "%.0fh", totalPortfolioHours))
+                    .font(.system(size: 34, weight: .black, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+            }
+
+            HStack(spacing: 10) {
+                portfolioMetric(title: "Properties", value: "\(viewModel.properties.count)", icon: Lucide.building2, color: AppColors.primary, wash: colors.primarySurface)
+                portfolioMetric(title: "LTR", value: "\(ltrCount)", icon: Lucide.house, color: AppColors.sage, wash: colors.sageWash)
+                portfolioMetric(title: "STR", value: "\(strCount)", icon: Lucide.bedDouble, color: AppColors.honey, wash: colors.honeyWash)
             }
         }
-        .padding(.top, 4)
+        .padding(18)
+        .premiumGlassCard(cornerRadius: 24, colors: colors, colorScheme: colorScheme)
+    }
+
+    private func portfolioMetric(title: String, value: String, icon: UIImage, color: Color, wash: Color) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            LucideIcon(image: icon, size: 16)
+                .foregroundStyle(color)
+                .frame(width: 30, height: 30)
+                .background(wash)
+                .clipShape(Circle())
+            Text(value)
+                .font(.system(size: 18, weight: .black, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
+            Text(title)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.64 : 0.74))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var addPropertyRow: some View {
+        Button {
+            openAddProperty()
+        } label: {
+            HStack(spacing: 12) {
+                LucideIcon(image: Lucide.plus, size: 18)
+                    .foregroundStyle(colors.action)
+                    .frame(width: 38, height: 38)
+                    .background(colors.actionSurface)
+                    .clipShape(Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Add another property")
+                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                    Text(viewModel.canAddProperty() ? "Keep each rental's evidence separate." : "Upgrade to track more properties.")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                }
+                Spacer()
+                LucideIcon(image: Lucide.chevronRight, size: 18)
+                    .foregroundStyle(colors.textTertiary)
+            }
+            .padding(16)
+            .background(colors.backgroundSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(colors.border.opacity(0.24), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.lhPressable)
+    }
+
+    private func openAddProperty() {
+        if viewModel.canAddProperty() {
+            showingAddProperty = true
+        } else {
+            showingPaywall = true
+        }
+    }
+
+#if DEBUG
+    private func handleDebugLaunchSurfaceIfNeeded() {
+        guard !didHandleDebugLaunchSurface else { return }
+        let args = ProcessInfo.processInfo.arguments
+        guard args.contains("-LHOpenAddProperty") || args.contains("-LHOpenFirstPropertyDetail") else { return }
+        didHandleDebugLaunchSurface = true
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            if args.contains("-LHOpenAddProperty") {
+                openAddProperty()
+            } else if args.contains("-LHOpenFirstPropertyDetail"),
+                      let firstProperty = viewModel.properties.first {
+                selectedProperty = firstProperty
+            }
+        }
+    }
+#endif
+
+    // MARK: - Header
+    private var headerSection: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Properties")
+                    .font(.system(size: 42, weight: .black, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                    .minimumScaleFactor(0.82)
+                Text("\(viewModel.properties.count) rental \(viewModel.properties.count == 1 ? "place" : "places")")
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+            }
+            Spacer()
+            Button {
+                openAddProperty()
+            } label: {
+                    LucideIcon(image: Lucide.circlePlus, size: 22)
+                    .foregroundStyle(colors.textPrimary)
+                    .frame(width: 48, height: 48)
+                    .background(colors.backgroundTertiary)
+                    .clipShape(Circle())
+            }
+            .guidedSpotlightTarget(.addProperty)
+            .accessibilityLabel("Add property")
+        }
     }
 }
 
@@ -158,63 +343,159 @@ struct PropertyListCard: View {
 
     let property: RentalProperty
     let hours: Double
+    let yearHours: Double
+    let entryCount: Int
+    let onOpen: () -> Void
     let onDelete: () -> Void
 
     private var typeColor: Color {
-        property.propertyType == .str ? AppColors.honey : AppColors.primary
+        property.propertyType == .str ? AppColors.honey : AppColors.sage
+    }
+
+    private var typeWash: Color {
+        property.propertyType == .str ? colors.honeyWash : colors.sageWash
+    }
+
+    private var goalHours: Double {
+        property.propertyType == .str ? 100 : 750
+    }
+
+    private var progress: Double {
+        min(max(yearHours / max(goalHours, 1), 0), 1)
+    }
+
+    private var evidenceLabel: String {
+        property.propertyType == .str ? "STR material participation" : "REPS evidence"
     }
 
     var body: some View {
-        HStack(spacing: 14) {
-            // Jelly icon badge
-            JellyBadge(
-                systemName: property.propertyType == .str ? "bed-double" : "house",
-                color: typeColor,
-                wash: property.propertyType == .str ? colors.honeyWash : colors.primarySurface,
-                size: 52
-            )
+        Button(action: onOpen) {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .top, spacing: 14) {
+                    JellyBadge(
+                        systemName: property.propertyType == .str ? "bed-double" : "house",
+                        color: typeColor,
+                        wash: typeWash,
+                        size: 52
+                    )
 
-            VStack(alignment: .leading, spacing: 5) {
-                Text(property.name)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(property.name)
+                            .font(.system(size: 18, weight: .black, design: .rounded))
+                            .foregroundStyle(colors.textPrimary)
+                            .lineLimit(1)
 
-                Text(property.address)
-                    .font(AppTypography.bodySmall)
-                    .foregroundStyle(colors.textSecondary)
-                    .lineLimit(1)
+                        Text(property.address)
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundStyle(colors.textSecondary)
+                            .lineLimit(2)
+                    }
 
-                HStack(spacing: 8) {
-                    // Type badge capsule
-                    Text(property.propertyType.rawValue)
-                        .font(AppTypography.label)
-                        .foregroundStyle(typeColor)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(
-                            property.propertyType == .str
-                                ? colors.honeyWash
-                                : colors.primarySurface
-                        )
-                        .clipShape(Capsule())
+                    Spacer()
 
-                    Text(String(format: "%.1fh total", hours))
-                        .font(AppTypography.caption)
-                        .foregroundStyle(colors.textSecondary)
+                    LucideIcon(image: Lucide.chevronRight, size: 18)
+                        .foregroundStyle(colors.textTertiary)
+                        .padding(.top, 6)
+                }
+
+                VStack(alignment: .leading, spacing: 9) {
+                    HStack {
+                        Text(evidenceLabel)
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundStyle(colors.textSecondary)
+                        Spacer()
+                        Text(String(format: "%.0fh / %.0fh", yearHours, goalHours))
+                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .foregroundStyle(colors.textPrimary)
+                            .monospacedDigit()
+                    }
+
+                    GeometryReader { proxy in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(colors.backgroundTertiary)
+                            Capsule()
+                                .fill(LinearGradient(colors: [typeColor, typeColor.opacity(0.62)], startPoint: .leading, endPoint: .trailing))
+                                .frame(width: proxy.size.width * progress)
+                        }
+                    }
+                    .frame(height: 8)
+                }
+
+                HStack(spacing: 10) {
+                    propertyMetric(title: property.propertyType.rawValue, value: "Type")
+                    propertyMetric(title: String(format: "%.1fh", hours), value: "Total")
+                    propertyMetric(title: "\(entryCount)", value: "Logs")
                 }
             }
-
-            Spacer()
-
-            Button(action: onDelete) {
-                LucideIcon(image: Lucide.trash2, size: 14)
-                    .foregroundStyle(AppColors.coral.opacity(0.8))
-            }
         }
-        .padding(16)
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(property.name), \(property.address), \(property.propertyType.rawValue), \(String(format: "%.1f hours logged", hours))")
+        .accessibilityHint("Opens property details")
+        .accessibilityElement(children: .ignore)
+        .padding(18)
         .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.05), radius: 10, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(colors.border.opacity(0.28), lineWidth: 1)
+        }
+        .overlay(alignment: .topTrailing) {
+            Menu {
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Label("Delete property", systemImage: "trash")
+                }
+            } label: {
+                LucideIcon(image: Lucide.ellipsis, size: 18)
+                    .foregroundStyle(colors.textSecondary)
+                    .frame(width: 36, height: 36)
+                    .background(colors.backgroundTertiary)
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("More actions for \(property.name)")
+            .padding(.top, 54)
+            .padding(.trailing, 14)
+        }
+    }
+
+    private func propertyMetric(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
+            Text(title)
+                .font(.system(size: 15, weight: .black, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(colors.backgroundTertiary)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func premiumGlassCard(cornerRadius: CGFloat, colors: AdaptiveColors, colorScheme: ColorScheme) -> some View {
+        if #available(iOS 26.0, *) {
+            self
+                .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.42 : 0.34))
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                .glassEffect(.regular.tint(colors.actionSurface.opacity(colorScheme == .dark ? 0.16 : 0.32)), in: .rect(cornerRadius: cornerRadius))
+        } else {
+            self
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(colors.border.opacity(0.24), lineWidth: 1)
+                }
+        }
     }
 }
 
@@ -223,6 +504,7 @@ struct AddPropertyView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     let editingProperty: RentalProperty?
@@ -246,108 +528,25 @@ struct AddPropertyView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("Property Name", text: $name)
+            ZStack {
+                LHMobileCanvas()
 
-                    // Address with autocomplete
-                    ZStack(alignment: .topLeading) {
-                        TextField("Address", text: $address)
-                            .focused($isAddressFocused)
-                            .onChange(of: address) { _, newValue in
-                                if newValue.count > 2 {
-                                    searchAddress(query: newValue)
-                                } else {
-                                    addressResults = []
-                                }
-                            }
-
-                        if !addressResults.isEmpty && isAddressFocused {
-                            VStack(spacing: 0) {
-                                ForEach(addressResults.prefix(5), id: \.self) { item in
-                                    Button {
-                                        selectAddress(item)
-                                    } label: {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(item.name ?? "Unknown")
-                                                .font(AppTypography.body)
-                                                .foregroundStyle(colors.textPrimary)
-                                            if let addr = item.placemark.title {
-                                                Text(addr)
-                                                    .font(AppTypography.caption)
-                                                    .foregroundStyle(colors.textSecondary)
-                                            }
-                                        }
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.vertical, 10)
-                                        .padding(.horizontal, 12)
-                                        .background(colors.backgroundSecondary)
-                                    }
-                                    .buttonStyle(.plain)
-
-                                    Divider()
-                                }
-                            }
-                            .background(colors.backgroundSecondary)
-                            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.small))
-                            .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
-                        }
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 24) {
+                        addPropertyHeader
+                        propertySetupSummary
+                        propertyIdentitySection
+                        propertyTypeSection
+                        firstPropertyNudge
                     }
-                }
-
-                Section("Property Type") {
-                    Picker("Type", selection: $propertyType) {
-                        HStack {
-                            LucideIcon(image: Lucide.house, size: 16)
-                                .foregroundStyle(AppColors.primary)
-                            Text("Long-Term Rental")
-                        }
-                        .tag(PropertyType.ltr)
-
-                        HStack {
-                            LucideIcon(image: Lucide.bedDouble, size: 16)
-                                .foregroundStyle(AppColors.honey)
-                            Text("Short-Term (Airbnb/VRBO)")
-                        }
-                        .tag(PropertyType.str)
-                    }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
+                    .padding(.horizontal, 24)
+                    .padding(.top, 18)
+                    .padding(.bottom, 120)
                 }
             }
-            .scrollContentBackground(.hidden)
-            .background(colors.background)
-            .navigationTitle(editingProperty != nil ? "Edit Property" : "Add Property")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundStyle(colors.textSecondary)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        // Check for duplicate name (only when adding new)
-                        if editingProperty == nil,
-                           viewModel.properties.contains(where: { $0.name.lowercased() == name.lowercased() }) {
-                            showDuplicateWarning = true
-                            return
-                        }
-                        if let existingProperty = editingProperty {
-                            var updatedProperty = existingProperty
-                            updatedProperty.name = name
-                            updatedProperty.address = address
-                            updatedProperty.propertyType = propertyType
-                            viewModel.updateProperty(updatedProperty)
-                        } else {
-                            viewModel.addProperty(name: name, address: address, type: propertyType)
-                        }
-                        dismiss()
-                    }
-                    .disabled(name.isEmpty || address.isEmpty)
-                    .foregroundStyle(name.isEmpty || address.isEmpty ? colors.textTertiary : AppColors.primary)
-                }
+            .navigationBarHidden(true)
+            .safeAreaInset(edge: .bottom) {
+                savePropertyFooter
             }
             .alert("Duplicate Name", isPresented: $showDuplicateWarning) {
                 Button("OK", role: .cancel) {}
@@ -355,6 +554,309 @@ struct AddPropertyView: View {
                 Text("A property named \"\(name)\" already exists. Please use a different name.")
             }
         }
+    }
+
+    private var addPropertyHeader: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack {
+                Button {
+                    dismiss()
+                } label: {
+                    LucideIcon(image: Lucide.x, size: 20)
+                        .foregroundStyle(colors.textPrimary)
+                        .frame(width: 44, height: 44)
+                        .background(colors.backgroundTertiary)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close")
+
+                Spacer()
+            }
+
+            Text(editingProperty != nil ? "Edit property" : "Add property")
+                .font(.system(size: 42, weight: .black, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
+                .lineSpacing(-2)
+                .minimumScaleFactor(0.82)
+
+            Text("Name the place, choose the rental type, and keep future hours organized.")
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
+                .lineSpacing(3)
+        }
+    }
+
+    private var propertySetupSummary: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 13) {
+                JellyBadge(systemName: "clipboard-check", color: AppColors.primary, wash: colors.primarySurface, size: 50)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(editingProperty == nil ? "Create the evidence container" : "Keep the evidence container current")
+                        .font(.system(size: 19, weight: .black, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                    Text("Every log, report, and export becomes easier to review once the property identity is clean.")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            HStack(spacing: 10) {
+                setupSummaryPill(icon: Lucide.house, title: "Name", value: name.isEmpty ? "Needed" : "Ready")
+                setupSummaryPill(icon: Lucide.mapPin, title: "Address", value: address.isEmpty ? "Needed" : "Ready")
+                setupSummaryPill(icon: propertyType == .str ? Lucide.bedDouble : Lucide.house, title: "Type", value: propertyType.rawValue)
+            }
+        }
+        .padding(18)
+        .premiumGlassCard(cornerRadius: 24, colors: colors, colorScheme: colorScheme)
+    }
+
+    private func setupSummaryPill(icon: UIImage, title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            LucideIcon(image: icon, size: 15)
+                .foregroundStyle(colors.action)
+                .frame(width: 28, height: 28)
+                .background(colors.actionSurface)
+                .clipShape(Circle())
+            Text(title)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
+            Text(value)
+                .font(.system(size: 13, weight: .black, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(11)
+        .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.64 : 0.76))
+        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+    }
+
+    private var propertyIdentitySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            propertyTextField(title: "Property name", placeholder: "Oak Street Duplex", text: $name, icon: Lucide.house)
+
+            VStack(alignment: .leading, spacing: 8) {
+                propertyTextField(title: "Address", placeholder: "123 Oak Street", text: $address, icon: Lucide.mapPin)
+                    .focused($isAddressFocused)
+                    .onChange(of: address) { _, newValue in
+                        if newValue.count > 2 {
+                            searchAddress(query: newValue)
+                        } else {
+                            addressResults = []
+                        }
+                    }
+
+                if !addressResults.isEmpty && isAddressFocused {
+                    VStack(spacing: 0) {
+                        ForEach(addressResults.prefix(5), id: \.self) { item in
+                            Button {
+                                selectAddress(item)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.name ?? "Unknown")
+                                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                                        .foregroundStyle(colors.textPrimary)
+                                    if let addr = item.placemark.title {
+                                        Text(addr)
+                                            .font(AppTypography.caption)
+                                            .foregroundStyle(colors.textSecondary)
+                                            .lineLimit(2)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 12)
+                                .padding(.horizontal, 14)
+                                .background(colors.backgroundSecondary)
+                            }
+                            .buttonStyle(.plain)
+
+                            if item != addressResults.prefix(5).last {
+                                Divider()
+                            }
+                        }
+                    }
+                    .background(colors.backgroundSecondary)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(colors.border.opacity(0.28), lineWidth: 1)
+                    }
+                }
+            }
+        }
+        .padding(18)
+        .background(colors.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .stroke(colors.border.opacity(0.28), lineWidth: 1)
+        }
+    }
+
+    private func propertyTextField(title: String, placeholder: String, text: Binding<String>, icon: UIImage) -> some View {
+        HStack(spacing: 12) {
+            LucideIcon(image: icon, size: 18)
+                .foregroundStyle(colors.textPrimary)
+                .frame(width: 38, height: 38)
+                .background(colors.backgroundTertiary)
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                TextField("", text: text, prompt: Text(placeholder).foregroundStyle(colors.textSecondary))
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                    .textInputAutocapitalization(.words)
+            }
+        }
+        .padding(14)
+        .background(colors.backgroundTertiary.opacity(colorScheme == .dark ? 0.72 : 0.9))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var propertyTypeSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Evidence profile")
+                    .font(.system(size: 19, weight: .black, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                Text("LTR and STR hours support different tax questions, so choose the profile before logging.")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 10) {
+                propertyTypeOption(.ltr, title: "Long-term", subtitle: "LTR", icon: Lucide.house, color: AppColors.sage)
+                propertyTypeOption(.str, title: "Short-term", subtitle: "STR", icon: Lucide.bedDouble, color: AppColors.honey)
+            }
+        }
+        .padding(18)
+        .background(colors.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(colors.border.opacity(0.25), lineWidth: 1)
+        }
+    }
+
+    private func propertyTypeOption(_ type: PropertyType, title: String, subtitle: String, icon: UIImage, color: Color) -> some View {
+        Button {
+            animate(AppAnimation.quick) {
+                propertyType = type
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                LucideIcon(image: icon, size: 22)
+                    .foregroundStyle(propertyType == type ? AppColors.charcoal : colors.textPrimary)
+                    .frame(width: 44, height: 44)
+                    .background(propertyType == type ? color : colors.backgroundTertiary)
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                    Text(subtitle)
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .background(propertyType == type ? color.opacity(colorScheme == .dark ? 0.22 : 0.28) : colors.backgroundSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(propertyType == type ? color.opacity(0.62) : colors.border.opacity(0.28), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var firstPropertyNudge: some View {
+        if editingProperty == nil && viewModel.properties.isEmpty && !GuidedOnboardingStore.isCompleted && !GuidedOnboardingStore.isSkipped {
+            HStack(spacing: 10) {
+                LHIconTile(icon: Lucide.mapPinHouse, color: AppColors.sage, wash: colors.sageWash, size: 34, isActive: true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("A nickname is enough")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                    Text("Use the name you naturally say when logging work.")
+                        .font(.system(size: 12, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                }
+                Spacer()
+            }
+            .padding(14)
+            .background(AppColors.sageWash.opacity(colorScheme == .dark ? 0.18 : 1))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+    }
+
+    private var savePropertyFooter: some View {
+        VStack(spacing: 0) {
+            Button {
+                saveProperty()
+            } label: {
+                Text(editingProperty != nil ? "Save Changes" : "Save Property")
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .foregroundStyle(canSaveProperty ? AppColors.onAction : colors.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(canSaveProperty ? colors.action : colors.backgroundTertiary)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(!canSaveProperty)
+            .padding(.horizontal, 24)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
+            .background(.ultraThinMaterial)
+        }
+    }
+
+    private var canSaveProperty: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func saveProperty() {
+        guard canSaveProperty else { return }
+        let normalizedName = normalizedPropertyName(name)
+        if viewModel.properties.contains(where: { property in
+            property.id != editingProperty?.id && normalizedPropertyName(property.name) == normalizedName
+        }) {
+            showDuplicateWarning = true
+            return
+        }
+        if let existingProperty = editingProperty {
+            var updatedProperty = existingProperty
+            updatedProperty.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            updatedProperty.address = address.trimmingCharacters(in: .whitespacesAndNewlines)
+            updatedProperty.propertyType = propertyType
+            viewModel.updateProperty(updatedProperty)
+        } else {
+            viewModel.addProperty(
+                name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+                address: address.trimmingCharacters(in: .whitespacesAndNewlines),
+                type: propertyType
+            )
+        }
+        dismiss()
+    }
+
+    private func normalizedPropertyName(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
     }
 
     func searchAddress(query: String) {
@@ -398,6 +900,14 @@ struct AddPropertyView: View {
         addressResults = []
         isAddressFocused = false
     }
+
+    private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
+        if reduceMotion {
+            updates()
+        } else {
+            withAnimation(animation, updates)
+        }
+    }
 }
 
 // MARK: - Property Detail View
@@ -413,7 +923,6 @@ struct PropertyDetailView: View {
     @State private var propertyType: PropertyType
     @State private var hasChanges = false
     @State private var coordinate: CLLocationCoordinate2D?
-    @State private var showingEditSheet = false
     @State private var addressResults: [MKMapItem] = []
     @FocusState private var isAddressFocusedDetail: Bool
 
@@ -425,166 +934,43 @@ struct PropertyDetailView: View {
     }
 
     private var typeColor: Color {
-        propertyType == .str ? AppColors.honey : AppColors.primary
+        propertyType == .str ? AppColors.honey : AppColors.sage
+    }
+
+    private var typeWash: Color {
+        propertyType == .str ? colors.honeyWash : colors.sageWash
+    }
+
+    private var evidenceGoalHours: Double {
+        propertyType == .str ? 100 : 750
+    }
+
+    private var evidenceProgress: Double {
+        min(max(yearHours / max(evidenceGoalHours, 1), 0), 1)
+    }
+
+    private var evidenceTitle: String {
+        propertyType == .str ? "STR material participation" : "REPS evidence"
     }
 
     var body: some View {
         NavigationStack {
-            List {
-                // Property header with JellyBadge
-                Section {
-                    HStack(spacing: 14) {
-                        JellyBadge(
-                            systemName: propertyType == .str ? "bed-double" : "house",
-                            color: typeColor,
-                            wash: propertyType == .str ? colors.honeyWash : colors.primarySurface,
-                            size: 48
-                        )
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(name)
-                                .font(.system(size: 18, weight: .semibold, design: .rounded))
-                                .foregroundStyle(colors.textPrimary)
-                            Text(address)
-                                .font(AppTypography.bodySmall)
-                                .foregroundStyle(colors.textSecondary)
-                                .lineLimit(2)
-                        }
-                    }
-                    .listRowBackground(colors.backgroundSecondary)
-                }
-
-                Section("Property Details") {
-                    TextField("Name", text: $name)
-                        .onChange(of: name) { _, _ in hasChanges = true }
-
-                    // Address with autocomplete
-                    ZStack(alignment: .topLeading) {
-                        TextField("Address", text: $address)
-                            .focused($isAddressFocusedDetail)
-                            .onChange(of: address) { _, newValue in
-                                hasChanges = true
-                                if newValue.count > 2 {
-                                    searchAddress(query: newValue)
-                                } else {
-                                    addressResults = []
-                                }
-                            }
-
-                        if !addressResults.isEmpty && isAddressFocusedDetail {
-                            VStack(spacing: 0) {
-                                ForEach(addressResults.prefix(5), id: \.self) { item in
-                                    Button {
-                                        selectAddress(item)
-                                    } label: {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(item.name ?? "Unknown")
-                                                .font(AppTypography.body)
-                                                .foregroundStyle(colors.textPrimary)
-                                            if let addr = item.placemark.title {
-                                                Text(addr)
-                                                    .font(AppTypography.caption)
-                                                    .foregroundStyle(colors.textSecondary)
-                                            }
-                                        }
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.vertical, 10)
-                                        .padding(.horizontal, 12)
-                                        .background(colors.backgroundSecondary)
-                                    }
-                                    .buttonStyle(.plain)
-
-                                    Divider()
-                                }
-                            }
-                            .background(colors.backgroundSecondary)
-                            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.small))
-                            .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
-                        }
-                    }
-
-                    Picker("Type", selection: $propertyType) {
-                        Text("Long-Term Rental").tag(PropertyType.ltr)
-                        Text("Short-Term Rental").tag(PropertyType.str)
-                    }
-                    .onChange(of: propertyType) { _, _ in hasChanges = true }
-                }
-                .listRowBackground(colors.backgroundSecondary)
-
-                Section("Statistics") {
-                    HStack {
-                        Text("Total Hours Logged")
-                            .font(AppTypography.body)
-                            .foregroundStyle(colors.textPrimary)
-                        Spacer()
-                        Text(String(format: "%.1f hours", totalHours))
-                            .font(AppTypography.body)
-                            .foregroundStyle(colors.textSecondary)
-                    }
-
-                    HStack {
-                        Text("This Year")
-                            .font(AppTypography.body)
-                            .foregroundStyle(colors.textPrimary)
-                        Spacer()
-                        Text(String(format: "%.1f hours", yearHours))
-                            .font(AppTypography.body)
-                            .foregroundStyle(colors.textSecondary)
-                    }
-
-                    HStack {
-                        Text("Time Entries")
-                            .font(AppTypography.body)
-                            .foregroundStyle(colors.textPrimary)
-                        Spacer()
-                        Text("\(entryCount)")
-                            .font(AppTypography.body)
-                            .foregroundStyle(colors.textSecondary)
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    detailHeader
+                    evidenceOverviewCard
+                    propertyDetailsCard
+                    locationCard
+                    if hasChanges {
+                        saveButton
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
-                .listRowBackground(colors.backgroundSecondary)
-
-                Section("Location") {
-                    if let coordinate = coordinate {
-                        Map(initialPosition: .region(MKCoordinateRegion(
-                            center: coordinate,
-                            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-                        ))) {
-                            Annotation("", coordinate: coordinate) {
-                                LucideIcon(image: Lucide.house, size: 16)
-                                    .foregroundStyle(AppColors.primary)
-                            }
-                        }
-                        .frame(height: 200)
-                        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
-                    } else {
-                        HStack {
-                            Spacer()
-                            ProgressView("Loading location...")
-                                .foregroundStyle(colors.textSecondary)
-                            Spacer()
-                        }
-                    }
-                }
-                .listRowBackground(colors.backgroundSecondary)
-
-                if hasChanges {
-                    Section {
-                        Button {
-                            saveChanges()
-                        } label: {
-                            Text("Save Changes")
-                                .font(AppTypography.button)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .foregroundStyle(Color.white)
-                        }
-                        .listRowBackground(AppColors.primary)
-                    }
-                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 40)
             }
-            .scrollContentBackground(.hidden)
-            .background(colors.background)
+            .background { LHMobileCanvas() }
             .navigationTitle("Property Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -594,19 +980,247 @@ struct PropertyDetailView: View {
                     }
                     .foregroundStyle(colors.textSecondary)
                 }
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Edit") {
-                        showingEditSheet = true
-                    }
-                    .foregroundStyle(AppColors.primary)
-                }
-            }
-            .sheet(isPresented: $showingEditSheet) {
-                AddPropertyView(property: property)
             }
             .onAppear {
                 loadCoordinate()
             }
+        }
+    }
+
+    private var detailHeader: some View {
+        HStack(spacing: 14) {
+            JellyBadge(
+                systemName: propertyType == .str ? "bed-double" : "house",
+                color: typeColor,
+                wash: typeWash,
+                size: 54
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(name.isEmpty ? "Unnamed property" : name)
+                    .font(.system(size: 24, weight: .black, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                    .lineLimit(2)
+                Text(address.isEmpty ? "No address added" : address)
+                    .font(AppTypography.bodySmall)
+                    .foregroundStyle(colors.textSecondary)
+                    .lineLimit(2)
+            }
+            Spacer()
+        }
+        .padding(18)
+        .background(colors.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xxl))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppCornerRadius.xxl)
+                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
+        }
+    }
+
+    private var propertyDetailsCard: some View {
+        propertyDetailCard(title: "Property identity") {
+            VStack(spacing: 12) {
+                propertyTextField("Name", text: $name)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    propertyTextField("Address", text: $address)
+                        .focused($isAddressFocusedDetail)
+                        .onChange(of: address) { _, newValue in
+                            hasChanges = true
+                            if newValue.count > 2 {
+                                searchAddress(query: newValue)
+                            } else {
+                                addressResults = []
+                            }
+                        }
+
+                    if !addressResults.isEmpty && isAddressFocusedDetail {
+                        addressResultsMenu
+                    }
+                }
+
+                Picker("Type", selection: $propertyType) {
+                    Text("Long-Term Rental").tag(PropertyType.ltr)
+                    Text("Short-Term Rental").tag(PropertyType.str)
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: propertyType) { _, _ in hasChanges = true }
+            }
+        }
+    }
+
+    private var evidenceOverviewCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(evidenceTitle)
+                        .font(.system(size: 19, weight: .black, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                    Text(propertyType == .str ? "Track toward the 100-hour material participation test." : "Track annual hours toward the 750-hour REPS threshold.")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Text(String(format: "%.0fh", yearHours))
+                    .font(.system(size: 34, weight: .black, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                    .monospacedDigit()
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("This tax year")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                    Spacer()
+                    Text(String(format: "%.0fh / %.0fh", yearHours, evidenceGoalHours))
+                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                        .monospacedDigit()
+                }
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(colors.backgroundTertiary)
+                        Capsule()
+                            .fill(LinearGradient(colors: [typeColor, typeColor.opacity(0.62)], startPoint: .leading, endPoint: .trailing))
+                            .frame(width: proxy.size.width * evidenceProgress)
+                    }
+                }
+                .frame(height: 8)
+            }
+
+            HStack(spacing: 10) {
+                evidenceMetric(title: "Total", value: String(format: "%.1fh", totalHours))
+                evidenceMetric(title: "Logs", value: "\(entryCount)")
+                evidenceMetric(title: "Type", value: propertyType.rawValue)
+            }
+        }
+        .padding(18)
+        .premiumGlassCard(cornerRadius: 24, colors: colors, colorScheme: colorScheme)
+    }
+
+    private func evidenceMetric(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
+            Text(value)
+                .font(.system(size: 15, weight: .black, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.64 : 0.76))
+        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+    }
+
+    private func propertyTextField(_ title: String, text: Binding<String>) -> some View {
+        TextField(title, text: text)
+            .font(AppTypography.body)
+            .foregroundStyle(colors.textPrimary)
+            .padding(14)
+            .background(colors.backgroundTertiary)
+            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppCornerRadius.large)
+                    .strokeBorder(colors.border.opacity(0.25), lineWidth: 1)
+            }
+            .onChange(of: text.wrappedValue) { _, _ in hasChanges = true }
+    }
+
+    private var addressResultsMenu: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(addressResults.prefix(5).enumerated()), id: \.element) { index, item in
+                Button {
+                    selectAddress(item)
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.name ?? "Unknown")
+                            .font(AppTypography.body)
+                            .foregroundStyle(colors.textPrimary)
+                        if let addr = item.placemark.title {
+                            Text(addr)
+                                .font(AppTypography.caption)
+                                .foregroundStyle(colors.textSecondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                }
+                .buttonStyle(.plain)
+
+                if index < min(addressResults.count, 5) - 1 {
+                    Divider()
+                }
+            }
+        }
+        .background(colors.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppCornerRadius.large)
+                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
+        }
+    }
+
+    private var locationCard: some View {
+        propertyDetailCard(title: "Location") {
+            if let coordinate = coordinate {
+                Map(initialPosition: .region(MKCoordinateRegion(
+                    center: coordinate,
+                    span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                ))) {
+                    Annotation("", coordinate: coordinate) {
+                        LucideIcon(image: Lucide.house, size: 16)
+                            .foregroundStyle(AppColors.primary)
+                    }
+                }
+                .frame(height: 200)
+                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
+            } else {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("Loading location...")
+                        .font(AppTypography.body)
+                        .foregroundStyle(colors.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 30)
+            }
+        }
+    }
+
+    private var saveButton: some View {
+        Button { saveChanges() } label: {
+            Text("Save changes")
+                .font(AppTypography.button)
+                .foregroundStyle(AppColors.onAction)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(colors.action)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func propertyDetailCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(title)
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
+            content()
+        }
+        .padding(18)
+        .background(colors.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xxl))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppCornerRadius.xxl)
+                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
         }
     }
 

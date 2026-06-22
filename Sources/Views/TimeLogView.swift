@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import PhotosUI
 import LucideIcons
 
@@ -6,6 +7,7 @@ struct TimeLogView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @EnvironmentObject var categoryManager: CategoryManager
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     // Main inline entry form state
@@ -19,6 +21,7 @@ struct TimeLogView: View {
     @State private var entryAttachments: [TimeAttachment] = []
     @State private var showingSaved: Bool = false
     @State private var isSaving: Bool = false
+    @State private var isLogDetailsExpanded: Bool = false
 
     // Timer mode
     enum TrackMode: String, CaseIterable {
@@ -40,14 +43,18 @@ struct TimeLogView: View {
     @State private var stoppedCategory: ActivityCategory = .management
     @State private var stoppedStartDate: Date = Date()
     @State private var showTimerCappedAlert = false
+    @State private var showDiscardTimerAlert = false
     @FocusState private var isTimerNotesFocused: Bool
     private let timerTick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    private var stoppedTimerDraftKey: String { UserScope.key("LandlordHours.stoppedTimerDraft") }
+    private let minimumSavableTimerElapsed: TimeInterval = 60
 
     // Inline AI state
     @State private var isProcessingAI: Bool = false
     @State private var aiParsedEntry: ParsedTimeEntry?
     @State private var aiAutoFilled: Bool = false
     @State private var aiDebounceTask: Task<Void, Never>?
+    @State private var userAdjustedLogDetails: Bool = false
 
     // Property picker sheet
     @State private var showingPropertyPicker = false
@@ -71,6 +78,11 @@ struct TimeLogView: View {
                 entryPropertyId = viewModel.properties.first?.id
                 timerSelectedPropertyId = viewModel.properties.first?.id
             }
+            if loadStoppedTimerDraft() {
+                trackMode = .timer
+                timerPhase = .finishing
+                return
+            }
             // Auto-switch to timer mode if a timer is running and we're not already in a timer flow
             if viewModel.isTimerRunning && timerPhase == .idle {
                 trackMode = .timer
@@ -84,128 +96,251 @@ struct TimeLogView: View {
                 timerElapsed = 0
             }
         }
+        .onChange(of: timerNotes) { _, _ in
+            if timerPhase == .finishing { saveStoppedTimerDraft() }
+        }
+        .onChange(of: timerParticipant) { _, _ in
+            if timerPhase == .finishing { saveStoppedTimerDraft() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .prefillFirstActivity)) { _ in
+            guard viewModel.timeEntries.isEmpty, !viewModel.properties.isEmpty else { return }
+            trackMode = .log
+            entryPropertyId = viewModel.properties.first?.id
+            entryCategory = .management
+            entryHours = 1.0
+            entryDate = Date()
+            entryParticipant = .selfParticipant
+            entryNotes = "Reviewed tenant message and coordinated maintenance for the property."
+            aiParsedEntry = nil
+            aiAutoFilled = false
+            isLogDetailsExpanded = false
+            isNotesFocused = false
+            userAdjustedLogDetails = false
+        }
         .alert("Timer Capped", isPresented: $showTimerCappedAlert) {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Your timer was running for over 24 hours. The entry has been capped at 24 hours.")
         }
+        .alert("Discard this timer?", isPresented: $showDiscardTimerAlert) {
+            Button("Keep Timer", role: .cancel) {}
+            Button("Discard timer", role: .destructive) {
+                viewModel.cancelTimer()
+                timerPhase = .idle
+                timerElapsed = 0
+            }
+        } message: {
+            Text("The running timer will stop without saving a time entry.")
+        }
     }
 
     // MARK: - Main Scroll Content
     private var mainScrollContent: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 24) {
-                headerSection
-                if trackMode == .log {
-                    mainEntryCard
-                } else {
-                    timerCard
+        ScrollViewReader { proxy in
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 24) {
+                    headerSection
+                        .id("trackHeader")
+                    if let recovery = viewModel.staleTimerRecovery {
+                        staleTimerRecoveryCard(recovery)
+                    }
+                    if trackMode == .log {
+                        mainEntryCard
+                    } else {
+                        timerCard
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 18)
+                .padding(.bottom, AppSpacing.tabContentBottomInset)
+            }
+            .background {
+                LHMobileCanvas()
+            }
+            .onTapGesture {
+                isNotesFocused = false
+                isTimerNotesFocused = false
+            }
+            .onChange(of: isLogDetailsExpanded) { _, expanded in
+                guard expanded else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    animate(AppAnimation.smooth) {
+                        proxy.scrollTo("trackHeader", anchor: .top)
+                    }
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 40)
-        }
-        .background(colors.background)
-        .onTapGesture {
-            isNotesFocused = false
-            isTimerNotesFocused = false
-        }
-        .overlay(alignment: .bottom) {
-            if showingSaved {
-                savedBanner
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .animation(AppAnimation.smooth, value: showingSaved)
-                    .padding(.bottom, 16)
+            .overlay(alignment: .bottom) {
+                VStack(spacing: 10) {
+                    if showingSaved {
+                        savedBanner
+                            .transition(toastTransition)
+                            .lhMotion(AppAnimation.reveal, value: showingSaved)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 94)
             }
+        }
+    }
+
+    private var contentTransition: AnyTransition {
+        reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top))
+    }
+
+    private var toastTransition: AnyTransition {
+        reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity)
+    }
+
+    private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
+        if reduceMotion {
+            updates()
+        } else {
+            withAnimation(animation, updates)
         }
     }
 
     // MARK: - Header
     private var headerSection: some View {
-        VStack(spacing: 14) {
+        VStack(alignment: .leading, spacing: 18) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Track Time")
-                        .font(.system(size: 28, weight: .regular, design: .serif))
+                    Text("Log your time")
+                        .font(.system(size: 42, weight: .black, design: .rounded))
                         .foregroundStyle(colors.textPrimary)
-                    Text(Date(), style: .date)
-                        .font(AppTypography.caption)
+                        .lineSpacing(-2)
+                        .minimumScaleFactor(0.82)
+                    Text(trackMode == .log ? "Describe the work. We’ll fill the details." : "Start a timer for work in progress.")
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
                         .foregroundStyle(colors.textSecondary)
+                        .lineLimit(2)
                 }
                 Spacer()
+
+                LucideIcon(image: trackMode == .log ? Lucide.penLine : Lucide.timer, size: 22)
+                    .foregroundStyle(colors.textPrimary)
+                    .frame(width: 48, height: 48)
+                    .background(colors.backgroundTertiary)
+                    .clipShape(Circle())
             }
             modeToggle
         }
-        .padding(.top, 4)
+    }
+
+    // MARK: - Stale Timer Recovery
+    private func staleTimerRecoveryCard(_ recovery: StaleTimerRecovery) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                LHIconTile(icon: Lucide.timerReset, color: AppColors.honey, wash: colors.honeyWash, size: 42, isActive: true)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Finish your saved timer")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                    Text(staleTimerRecoveryMessage(recovery))
+                        .font(AppTypography.bodySmall)
+                        .foregroundStyle(colors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            HStack(spacing: 10) {
+                Button {
+                    viewModel.saveRecoveredStaleTimer()
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                } label: {
+                    Text("Save \(AppFormat.hours(recovery.suggestedHours))")
+                        .font(AppTypography.buttonSmall)
+                        .foregroundStyle(AppColors.onAction)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(AppColors.action)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.lhPressable)
+
+                Button {
+                    viewModel.discardRecoveredStaleTimer()
+                } label: {
+                    Text("Discard")
+                        .font(AppTypography.buttonSmall)
+                        .foregroundStyle(colors.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(colors.backgroundTertiary)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.lhPressable)
+            }
+        }
+        .padding(16)
+        .background(colors.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous)
+                .strokeBorder(colors.border.opacity(0.45), lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Forgotten timer recovery. \(staleTimerRecoveryMessage(recovery))")
+    }
+
+    private func staleTimerRecoveryMessage(_ recovery: StaleTimerRecovery) -> String {
+        let propertyName = viewModel.properties.first { $0.id == recovery.propertyId }?.name ?? "this property"
+        let start = recovery.startTime.formatted(date: .abbreviated, time: .shortened)
+        return "Started \(start) for \(propertyName). We capped the suggested entry at 24 hours so you can review it instead of losing the record."
     }
 
     // MARK: - Main Entry Card
     private var mainEntryCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Notes textarea
+            entryComposerHeader
+
             notesSection
 
-            // AI state: hint, suggestion bar, or auto-filled confirmation
             aiStateSection
 
-            // Category
-            fieldLabel("Category")
-                .padding(.horizontal, 20)
-            categoryChipsSection
-                .padding(.bottom, 20)
-
-            // Property
-            if viewModel.properties.count > 1 {
-                fieldLabel("Property")
-                    .padding(.horizontal, 20)
-                propertyPickerRow
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
+            if isLogDetailsExpanded {
+                logDetailsSection
+                    .transition(contentTransition)
+            } else {
+                composerNextStep
+                .transition(.opacity)
             }
-
-            // Hours
-            fieldLabel("Hours")
-                .padding(.horizontal, 20)
-            hoursStepperRow
-                .padding(.bottom, 20)
-
-            // Date
-            fieldLabel("Date")
-                .padding(.horizontal, 20)
-            datePickerRow
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
-
-            // Participant
-            fieldLabel("Participant")
-                .padding(.horizontal, 20)
-            participantSegment
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
-
-            // Attach
-            attachButton
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
-
-            // Log Time
-            logTimeButton
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
         }
         .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.06), radius: 16, x: 0, y: 4)
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .stroke(colors.border.opacity(0.28), lineWidth: 1)
+        }
+        .lhMotion(AppAnimation.flow, value: isLogDetailsExpanded)
+    }
+
+    private var entryComposerHeader: some View {
+        HStack(alignment: .center, spacing: 12) {
+            LHIconTile(icon: Lucide.sparkles, color: colors.action, wash: colors.actionSurface, size: 40, isActive: true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Today’s entry")
+                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                Text("Write it naturally. Review the evidence before saving.")
+                    .font(AppTypography.bodySmall)
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 8)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+        .padding(.bottom, 14)
     }
 
     // MARK: - Field Label
     private func fieldLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(colors.textSecondary)
-            .textCase(.uppercase)
-            .tracking(0.5)
+            .font(.system(size: 14, weight: .black, design: .rounded))
+            .foregroundStyle(colors.textPrimary)
             .padding(.bottom, 10)
     }
 
@@ -213,17 +348,17 @@ struct TimeLogView: View {
     private var notesSection: some View {
         ZStack(alignment: .topLeading) {
             if entryNotes.isEmpty {
-                Text("What did you work on?")
-                    .foregroundStyle(colors.textTertiary)
-                    .font(.system(size: 15))
-                    .padding(.top, 34)
-                    .padding(.leading, 32)
+                Text("Called plumber about the Oak Street leak for 1 hour")
+                    .foregroundStyle(colors.textSecondary.opacity(0.72))
+                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .padding(.top, 20)
+                    .padding(.leading, 20)
                     .allowsHitTesting(false)
             }
             TextEditor(text: $entryNotes)
                 .focused($isNotesFocused)
-                .frame(minHeight: 60, maxHeight: 100)
-                .font(.system(size: 15))
+                .frame(minHeight: isLogDetailsExpanded ? 74 : 122, maxHeight: isLogDetailsExpanded ? 116 : 156)
+                .font(.system(size: 16, weight: .regular, design: .rounded))
                 .foregroundStyle(colors.textPrimary)
                 .scrollContentBackground(.hidden)
                 .padding(.horizontal, 12)
@@ -240,20 +375,226 @@ struct TimeLogView: View {
                 }
         }
         .padding(4)
-        .background(colors.background.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .background(colors.backgroundTertiary.opacity(colorScheme == .dark ? 0.72 : 0.9))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(
                     notesBorderColor,
-                    lineWidth: 1.5
+                    lineWidth: aiParsedEntry != nil || isProcessingAI ? 1.5 : 1
                 )
         )
         .padding(.horizontal, 20)
-        .padding(.top, 20)
+        .guidedSpotlightTarget(.firstActivity)
         .onChange(of: entryNotes) { _, newValue in
             handleNotesChange(newValue)
         }
+    }
+
+    private var composerNextStep: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if entryNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                entryEvidencePreview
+
+                Button {
+                    revealLogDetails()
+                } label: {
+                    HStack(spacing: 12) {
+                        LHIconTile(icon: Lucide.slidersHorizontal, color: colors.textPrimary, wash: colors.backgroundTertiary, size: 34, isActive: true)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Set details manually")
+                                .font(AppTypography.button)
+                                .foregroundStyle(colors.textPrimary)
+                            Text("Property, category, hours")
+                                .font(AppTypography.caption)
+                                .foregroundStyle(colors.textSecondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.82)
+                        }
+                        Spacer(minLength: 8)
+                        LucideIcon(image: Lucide.chevronDown, size: 18)
+                            .foregroundStyle(colors.textPrimary)
+                    }
+                    .padding(15)
+                    .background(colors.backgroundTertiary)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .buttonStyle(.lhPressable)
+            } else {
+                entryEvidencePreview
+
+                Button {
+                    revealLogDetails()
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("Review evidence")
+                        LucideIcon(image: Lucide.arrowRight, size: 16)
+                    }
+                    .font(AppTypography.button)
+                    .foregroundStyle(AppColors.onAction)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(colors.action)
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.lhPressable)
+
+                Text("Property, category, hours, date, person, and attachments stay editable before saving.")
+                    .font(AppTypography.caption)
+                    .foregroundStyle(colors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
+    }
+
+    private var entryEvidencePreview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                LucideIcon(image: Lucide.clipboardCheck, size: 15)
+                    .foregroundStyle(colors.action)
+                Text("Evidence draft")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                Spacer()
+                Text(evidenceDraftStatus)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(evidenceDraftStatusColor)
+            }
+
+            VStack(spacing: 8) {
+                evidencePreviewChip(icon: Lucide.house, text: selectedPropertyName, isResolved: effectivePropertyId != nil)
+
+                HStack(spacing: 8) {
+                    evidencePreviewChip(icon: Lucide.tag, text: categoryChipLabel(for: entryCategory), isResolved: true)
+                    evidencePreviewChip(icon: Lucide.clock, text: AppFormat.hours(entryHours), isResolved: true)
+                }
+            }
+        }
+        .padding(14)
+        .background(colors.background.opacity(colorScheme == .dark ? 0.45 : 0.72))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(colors.border.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    private var evidenceDraftStatus: String {
+        if aiAutoFilled { return "AI filled" }
+        if aiParsedEntry != nil { return "Detected" }
+        if entryNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Ready" }
+        return "Review"
+    }
+
+    private var evidenceDraftStatusColor: Color {
+        if aiAutoFilled { return colors.positive }
+        if aiParsedEntry != nil { return colors.action }
+        return colors.textSecondary
+    }
+
+    private func evidencePreviewChip(icon: UIImage, text: String, isResolved: Bool) -> some View {
+        HStack(spacing: 6) {
+            LucideIcon(image: icon, size: 13)
+            Text(text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+        }
+        .font(AppTypography.caption)
+        .foregroundStyle(isResolved ? colors.textPrimary : colors.textSecondary)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 9)
+        .background(isResolved ? colors.backgroundSecondary : colors.backgroundTertiary.opacity(0.75))
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(colors.border.opacity(isResolved ? 0.24 : 0.12), lineWidth: 1)
+        )
+    }
+
+    private var logDetailsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .center, spacing: 10) {
+                LHIconTile(icon: Lucide.listChecks, color: colors.action, wash: colors.actionSurface, size: 32, isActive: true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(entryNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Set details" : "Review details")
+                        .font(.system(size: 19, weight: .black, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                    Text(entryNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Fill the fields now, then add a note before saving." : "Adjust only what needs changing.")
+                        .font(AppTypography.caption)
+                        .foregroundStyle(colors.textSecondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+
+            quickDetailSummary
+
+            logTimeButton
+                .padding(.horizontal, 20)
+
+            fieldLabel("Category")
+                .padding(.horizontal, 20)
+            categoryChipsSection
+
+            if viewModel.properties.count > 1 {
+                fieldLabel("Property")
+                    .padding(.horizontal, 20)
+                propertyPickerRow
+                    .padding(.horizontal, 20)
+            }
+
+            fieldLabel("Hours")
+                .padding(.horizontal, 20)
+            hoursStepperRow
+
+            VStack(alignment: .leading, spacing: 10) {
+                fieldLabel("Date")
+                datePickerRow
+            }
+            .padding(.horizontal, 20)
+
+            VStack(alignment: .leading, spacing: 10) {
+                fieldLabel("Person")
+                participantSegment
+            }
+            .padding(.horizontal, 20)
+
+            attachButton
+                .padding(.horizontal, 20)
+        }
+        .padding(.top, 4)
+        .padding(.bottom, 20)
+    }
+
+    private var quickDetailSummary: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                compactDetailChip(icon: Lucide.clock, text: AppFormat.hours(entryHours))
+                compactDetailChip(icon: Lucide.tag, text: categoryChipLabel(for: entryCategory))
+                compactDetailChip(icon: Lucide.house, text: selectedPropertyName)
+            }
+        }
+        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func compactDetailChip(icon: UIImage, text: String) -> some View {
+        HStack(spacing: 6) {
+            LucideIcon(image: icon, size: 13)
+            Text(text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+        }
+        .font(AppTypography.caption)
+        .foregroundStyle(colors.textSecondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(colors.background.opacity(0.56))
+        .clipShape(Capsule())
     }
 
     // MARK: - AI State Section
@@ -271,7 +612,7 @@ struct TimeLogView: View {
             } else {
                 // State 1: AI hint — show until notes are long enough to trigger AI
                 let trimmed = entryNotes.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmed.count < 10 {
+                if !trimmed.isEmpty && trimmed.count < 10 {
                     aiHint(hasStartedTyping: !entryNotes.isEmpty)
                 }
             }
@@ -282,48 +623,36 @@ struct TimeLogView: View {
     private func aiHint(hasStartedTyping: Bool) -> some View {
         HStack(spacing: 8) {
             // AI sparkle badge
-            RoundedRectangle(cornerRadius: 6)
-                .fill(AppColors.primary.opacity(0.12))
-                .frame(width: 24, height: 24)
-                .overlay(
-                    LucideIcon(image: Lucide.sparkles, size: 12)
-                        .foregroundStyle(AppColors.primary)
-                )
+            LHIconTile(icon: Lucide.sparkles, color: colors.action, wash: colors.actionSurface, size: 26, isActive: true)
             Text(hasStartedTyping
-                 ? "Keep typing — AI will auto-detect category, property & hours"
+                 ? "Keep typing. AI will detect category, property, and hours."
                  : "Describe your work and AI will fill in the details")
                 .font(.system(size: 12))
-                .foregroundStyle(AppColors.mist)
+                .foregroundStyle(colors.textSecondary)
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
         .padding(.bottom, 20)
-        .animation(.easeInOut(duration: 0.2), value: hasStartedTyping)
+        .lhMotion(AppAnimation.standard, value: hasStartedTyping)
     }
 
     // AI Processing
     private var aiProcessingIndicator: some View {
         HStack(spacing: 10) {
             // AI sparkle badge
-            RoundedRectangle(cornerRadius: 6)
-                .fill(AppColors.primary)
-                .frame(width: 24, height: 24)
-                .overlay(
-                    LucideIcon(image: Lucide.sparkles, size: 12)
-                        .foregroundStyle(.white)
-                )
+            LHIconTile(icon: Lucide.sparkles, color: colors.action, wash: colors.actionSurface, size: 28, isActive: true)
             Text("Analyzing your description...")
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(AppColors.primary)
+                .foregroundStyle(colors.textPrimary)
             Spacer()
             ProgressView()
                 .scaleEffect(0.7)
-                .tint(AppColors.primary)
+                .tint(colors.action)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(colors.primarySurface)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .background(colors.actionSurface.opacity(colorScheme == .dark ? 0.45 : 1))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .padding(.horizontal, 20)
         .padding(.top, 8)
         .padding(.bottom, 20)
@@ -331,70 +660,58 @@ struct TimeLogView: View {
 
     // State 2: AI Suggestion Bar
     private func aiSuggestionBar(parsed: ParsedTimeEntry) -> some View {
-        HStack(spacing: 10) {
-            // Sparkle badge
-            RoundedRectangle(cornerRadius: 8)
-                .fill(AppColors.primary)
-                .frame(width: 28, height: 28)
-                .overlay(
-                    LucideIcon(image: Lucide.sparkles, size: 14)
-                        .foregroundStyle(.white)
-                )
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                LHIconTile(icon: Lucide.sparkles, color: colors.action, wash: colors.actionSurface, size: 32, isActive: true)
+                Text("Detected details")
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
 
-            // Body: "We detected:" + chips
-            VStack(alignment: .leading, spacing: 6) {
-                Text("We detected:")
-                    .font(.system(size: 13))
-                    .foregroundStyle(colors.textSecondary)
+                Spacer(minLength: 8)
 
-                // Detected chips
+                Button {
+                    applyAutoFill(parsed)
+                } label: {
+                    Text("Auto-fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(AppColors.onAction)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(colors.action)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.lhPressable)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-                    // Category chip
                     aiDetectedChip(
                         dotColor: categoryDotColor(for: parsed.category),
                         text: categoryChipLabel(for: parsed.category)
                     )
 
-                    // Property chip
                     if let property = parsed.property {
                         aiDetectedChip(dotColor: nil, text: property.name, icon: "🏠")
                     }
 
-                    // Hours chip
                     aiDetectedChip(
                         dotColor: nil,
                         text: "\(parsed.hours.formatted(.number.precision(.fractionLength(0...1))))h"
                     )
                 }
             }
-
-            Spacer(minLength: 0)
-
-            // Auto-fill button
-            Button {
-                applyAutoFill(parsed)
-            } label: {
-                Text("Auto-fill")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(AppColors.primary)
-                    .clipShape(Capsule())
-            }
-            .buttonStyle(.plain)
         }
         .padding(14)
-        .background(colors.primarySurface)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .background(colors.actionSurface.opacity(colorScheme == .dark ? 0.45 : 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(AppColors.primaryLight, lineWidth: 1.5)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(colors.action.opacity(0.32), lineWidth: 1)
         )
         .padding(.horizontal, 20)
         .padding(.top, 10)
         .padding(.bottom, 20)
-        .transition(.opacity.combined(with: .move(edge: .top)))
+        .transition(contentTransition)
     }
 
     private func aiDetectedChip(dotColor: Color?, text: String, icon: String? = nil) -> some View {
@@ -411,6 +728,7 @@ struct TimeLogView: View {
             Text(text)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(AppColors.primary)
+                .lineLimit(1)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
@@ -423,9 +741,9 @@ struct TimeLogView: View {
         HStack(spacing: 6) {
             LucideIcon(image: Lucide.check, size: 14)
                 .foregroundStyle(AppColors.sage)
-            Text("Auto-filled from your description")
-                .font(.system(size: 12))
-                .foregroundStyle(AppColors.sage)
+            Text("Draft ready from your description")
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
@@ -439,9 +757,7 @@ struct TimeLogView: View {
             HStack(spacing: 8) {
                 ForEach(ActivityCategory.allCases, id: \.self) { cat in
                     Button {
-                        withAnimation(AppAnimation.quick) {
-                            entryCategory = cat
-                        }
+                        updateEntryCategory(cat)
                     } label: {
                         HStack(spacing: 7) {
                             Circle()
@@ -453,26 +769,21 @@ struct TimeLogView: View {
                                 .font(.system(size: 13, weight: .medium))
                                 .lineLimit(1)
                         }
-                        .foregroundStyle(entryCategory == cat ? .white : AppColors.slate)
+                        .foregroundStyle(entryCategory == cat ? AppColors.onAction : colors.textSecondary)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
-                        .background(entryCategory == cat ? AppColors.primary : AppColors.snow)
+                        .background(entryCategory == cat ? colors.action : colors.backgroundTertiary)
                         .clipShape(Capsule())
                         .overlay(
                             Capsule()
                                 .strokeBorder(
-                                    entryCategory == cat ? AppColors.primary : Color.clear,
-                                    lineWidth: 1.5
+                                    entryCategory == cat ? colors.action.opacity(0.55) : colors.border.opacity(0.2),
+                                    lineWidth: 1
                                 )
                         )
-                        .shadow(
-                            color: entryCategory == cat ? AppColors.primary.opacity(0.3) : .clear,
-                            radius: 6,
-                            y: 3
-                        )
                     }
-                    .buttonStyle(.plain)
-                    .animation(AppAnimation.pillPop, value: entryCategory == cat)
+                    .buttonStyle(.lhPressable)
+                    .lhMotion(AppAnimation.pillPop, value: entryCategory == cat)
                 }
             }
             .padding(.horizontal, 20)
@@ -484,7 +795,7 @@ struct TimeLogView: View {
         Menu {
             ForEach(viewModel.properties) { property in
                 Button {
-                    entryPropertyId = property.id
+                    updateEntryPropertyId(property.id)
                 } label: {
                     HStack {
                         Text(property.name)
@@ -497,13 +808,13 @@ struct TimeLogView: View {
         } label: {
             HStack(spacing: 10) {
                 // House icon badge
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(entryPropertyId != nil ? colors.primarySurface : AppColors.snow)
-                    .frame(width: 28, height: 28)
-                    .overlay(
-                        LucideIcon(image: Lucide.house, size: 14)
-                            .foregroundStyle(entryPropertyId != nil ? AppColors.primary : AppColors.mist)
-                    )
+                LHIconTile(
+                    icon: Lucide.house,
+                    color: entryPropertyId != nil ? AppColors.primary : AppColors.mist,
+                    wash: entryPropertyId != nil ? colors.primarySurface : AppColors.snow,
+                    size: 30,
+                    isActive: entryPropertyId != nil
+                )
 
                 Text(selectedPropertyName)
                     .font(.system(size: 15))
@@ -534,63 +845,79 @@ struct TimeLogView: View {
 
     // MARK: - Hours Stepper
     private var hoursStepperRow: some View {
-        HStack(spacing: 24) {
-            Spacer()
+        VStack(spacing: 12) {
+            HStack(spacing: 24) {
+                Spacer()
 
-            Button {
-                if entryHours > 0.25 {
-                    withAnimation(AppAnimation.quick) { entryHours -= 0.25 }
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                Button {
+                    if entryHours > 0.25 {
+                        updateEntryHours(entryHours - 0.25)
+                    }
+                } label: {
+                    LucideIcon(image: Lucide.minus, size: 16)
+                        .foregroundStyle(colors.textPrimary)
+                        .frame(width: 44, height: 44)
+                        .background(colors.backgroundTertiary)
+                        .clipShape(Circle())
                 }
-            } label: {
-                LucideIcon(image: Lucide.minus, size: 16)
-                    .foregroundStyle(colors.textPrimary)
-                    .frame(width: 44, height: 44)
-                    .background(colors.backgroundSecondary)
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle()
-                            .strokeBorder(AppColors.snow, lineWidth: 1.5)
-                    )
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Decrease hours")
-            .accessibilityHint("Decreases by 15 minutes")
+                .buttonStyle(.lhPressable)
+                .accessibilityLabel("Decrease hours")
+                .accessibilityHint("Decreases by 15 minutes")
 
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(entryHours.formatted(.number.precision(.fractionLength(0...2))))
-                    .font(.system(size: 40, weight: .regular, design: .serif))
-                    .foregroundStyle(colors.textPrimary)
-                    .contentTransition(.numericText())
-                Text("h")
-                    .font(.system(size: 16))
-                    .foregroundStyle(AppColors.mist)
-            }
-            .frame(minWidth: 80, alignment: .center)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(entryHours.formatted(.number.precision(.fractionLength(0...2)))) hours")
-
-            Button {
-                if entryHours < 24 {
-                    withAnimation(AppAnimation.quick) { entryHours += 0.25 }
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text(entryHours.formatted(.number.precision(.fractionLength(0...2))))
+                        .font(.system(size: 40, weight: .regular, design: .serif))
+                        .foregroundStyle(colors.textPrimary)
+                        .contentTransition(.numericText())
+                    Text("h")
+                        .font(.system(size: 16))
+                        .foregroundStyle(AppColors.mist)
                 }
-            } label: {
-                LucideIcon(image: Lucide.plus, size: 16)
-                    .foregroundStyle(colors.textPrimary)
-                    .frame(width: 44, height: 44)
-                    .background(colors.backgroundSecondary)
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle()
-                            .strokeBorder(AppColors.snow, lineWidth: 1.5)
-                    )
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Increase hours")
-            .accessibilityHint("Increases by 15 minutes")
+                .frame(minWidth: 80, alignment: .center)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(entryHours.formatted(.number.precision(.fractionLength(0...2)))) hours")
 
-            Spacer()
+                Button {
+                    if entryHours < 24 {
+                        updateEntryHours(entryHours + 0.25)
+                    }
+                } label: {
+                    LucideIcon(image: Lucide.plus, size: 16)
+                        .foregroundStyle(colors.textPrimary)
+                        .frame(width: 44, height: 44)
+                        .background(colors.backgroundTertiary)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.lhPressable)
+                .accessibilityLabel("Increase hours")
+                .accessibilityHint("Increases by 15 minutes")
+
+                Spacer()
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach([0.5, 1.0, 1.5, 2.0, 3.0, 4.0], id: \.self) { preset in
+                        Button {
+                            updateEntryHours(preset)
+                        } label: {
+                            Text(AppFormat.hours(preset))
+                                .font(AppTypography.buttonSmall)
+                                .foregroundStyle(abs(entryHours - preset) < 0.001 ? AppColors.onAction : colors.textSecondary)
+                                .padding(.horizontal, 13)
+                                .padding(.vertical, 8)
+                                .background(abs(entryHours - preset) < 0.001 ? colors.action : colors.backgroundTertiary)
+                                .clipShape(Capsule())
+                                .overlay(
+                                    Capsule()
+                                        .strokeBorder(abs(entryHours - preset) < 0.001 ? colors.action.opacity(0.55) : colors.border.opacity(0.24), lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.lhPressable)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
         }
     }
 
@@ -598,13 +925,7 @@ struct TimeLogView: View {
     private var datePickerRow: some View {
         HStack(spacing: 10) {
             // Calendar icon badge
-            RoundedRectangle(cornerRadius: 8)
-                .fill(colors.primarySurface)
-                .frame(width: 28, height: 28)
-                .overlay(
-                    LucideIcon(image: Lucide.calendar, size: 14)
-                        .foregroundStyle(AppColors.primary)
-                )
+            LHIconTile(icon: Lucide.calendar, color: AppColors.primary, wash: colors.primarySurface, size: 30, isActive: true)
 
             // Overlay DatePicker for native date picking
             DatePicker("", selection: $entryDate, displayedComponents: .date)
@@ -619,37 +940,48 @@ struct TimeLogView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(AppColors.snow, lineWidth: 1.5)
+                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1.5)
         )
     }
 
     // MARK: - Participant Segment
     private var participantSegment: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 6) {
             segmentButton("Self", isSelected: entryParticipant == .selfParticipant) {
-                withAnimation(AppAnimation.quick) { entryParticipant = .selfParticipant }
+                updateEntryParticipant(.selfParticipant)
             }
             segmentButton("Spouse", isSelected: entryParticipant == .spouse) {
-                withAnimation(AppAnimation.quick) { entryParticipant = .spouse }
+                updateEntryParticipant(.spouse)
             }
         }
-        .padding(3)
-        .background(AppColors.snow)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(5)
+        .frame(maxWidth: .infinity)
+        .background(colors.backgroundTertiary)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func segmentButton(_ title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title)
-                .font(.system(size: 14, weight: isSelected ? .semibold : .medium))
-                .foregroundStyle(isSelected ? colors.textPrimary : AppColors.slate)
+            HStack(spacing: 8) {
+                LucideIcon(image: title == "Self" ? Lucide.user : Lucide.users, size: 15)
+                Text(title)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+            }
+                .font(.system(size: 15, weight: isSelected ? .bold : .semibold, design: .rounded))
+                .foregroundStyle(isSelected ? colors.textPrimary : colors.textSecondary)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
+                .padding(.vertical, 13)
                 .background(isSelected ? colors.backgroundSecondary : Color.clear)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .shadow(color: isSelected ? .black.opacity(0.06) : .clear, radius: 4, y: 1)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(isSelected ? colors.border.opacity(0.35) : Color.clear, lineWidth: 1)
+                }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.lhPressable)
+        .accessibilityLabel(title == "Self" ? "Self participant" : "Spouse participant")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: - Attach Button
@@ -667,7 +999,7 @@ struct TimeLogView: View {
             .foregroundStyle(entryAttachments.isEmpty ? AppColors.slate : AppColors.primary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(AppColors.snow)
+            .background(colors.backgroundTertiary)
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .onChange(of: entryPhotoItems) { _, newItems in
@@ -682,41 +1014,30 @@ struct TimeLogView: View {
     // MARK: - Log Time Button
     private var logTimeButton: some View {
         VStack(spacing: 6) {
-            if effectivePropertyId != nil && entryNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text("Add a description for IRS records")
+            if let helperText = logTimeHelperText {
+                Text(helperText)
                     .font(.system(size: 12))
-                    .foregroundStyle(AppColors.mist)
+                    .foregroundStyle(colors.textSecondary)
             }
             Button {
                 saveMainEntry()
             } label: {
                 Text("Log Time")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .foregroundStyle(canSave ? AppColors.onAction : .white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(canSave ? AppColors.primary : AppColors.mist)
+                    .background(canSave ? colors.action : AppColors.mist)
                     .clipShape(Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.lhPressable)
             .disabled(!canSave)
         }
     }
 
     // MARK: - Saved Banner
     private var savedBanner: some View {
-        HStack(spacing: 10) {
-            LucideIcon(image: Lucide.circleCheck, size: 18)
-                .foregroundStyle(.white)
-            Text("Time logged!")
-                .font(AppTypography.button)
-                .foregroundStyle(.white)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .background(AppColors.sage)
-        .clipShape(Capsule())
-        .shadow(color: AppColors.sage.opacity(0.3), radius: 12, y: 4)
+        LHSuccessToast(title: "Time logged", detail: "Evidence saved for \(Calendar.current.component(.year, from: entryDate))")
     }
 
     // MARK: - Category Helpers
@@ -731,20 +1052,30 @@ struct TimeLogView: View {
     // MARK: - Helpers
     private var notesBorderColor: Color {
         if aiParsedEntry != nil && !aiAutoFilled {
-            return AppColors.primaryLight // AI has suggestion ready
+            return colors.action // AI has suggestion ready
         }
         if isProcessingAI {
-            return AppColors.primaryLight.opacity(0.6) // AI analyzing
+            return colors.action.opacity(0.7) // AI analyzing
         }
         if isNotesFocused && !entryNotes.isEmpty {
-            return AppColors.primary.opacity(0.3) // Typing, AI will activate
+            return colors.action.opacity(0.5) // Typing, AI will activate
         }
-        return AppColors.snow // Default
+        return colors.border.opacity(0.18) // Default
     }
 
     private var effectivePropertyId: UUID? {
         if viewModel.properties.count == 1 { return viewModel.properties[0].id }
         return entryPropertyId
+    }
+
+    private var logTimeHelperText: String? {
+        if effectivePropertyId == nil {
+            return "Select a property to log this entry."
+        }
+        if entryNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Add a short description for your records."
+        }
+        return nil
     }
 
     private func saveMainEntry() {
@@ -766,14 +1097,16 @@ struct TimeLogView: View {
         entryDate = Date()
         entryParticipant = .selfParticipant
         entryCategory = .management
+        isLogDetailsExpanded = false
+        userAdjustedLogDetails = false
         entryAttachments = []
         entryPhotoItems = []
         aiParsedEntry = nil
         aiAutoFilled = false
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        withAnimation(.spring(response: 0.4)) { showingSaved = true }
+        animate(AppAnimation.reveal) { showingSaved = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation { showingSaved = false }
+            animate(AppAnimation.reveal) { showingSaved = false }
             isSaving = false
         }
     }
@@ -797,10 +1130,17 @@ struct TimeLogView: View {
     private func handleNotesChange(_ text: String) {
         // Cancel previous debounce
         aiDebounceTask?.cancel()
+        isProcessingAI = false
         aiAutoFilled = false
         aiParsedEntry = nil
 
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            animate(AppAnimation.quick) {
+                isLogDetailsExpanded = false
+            }
+            userAdjustedLogDetails = false
+        }
         guard trimmed.count >= 10 else { return }
 
         // Debounce 1 second before calling AI
@@ -820,8 +1160,12 @@ struct TimeLogView: View {
             await MainActor.run {
                 isProcessingAI = false
                 if let result {
-                    withAnimation(AppAnimation.smooth) {
-                        aiParsedEntry = result
+                    animate(AppAnimation.smooth) {
+                        if userAdjustedLogDetails {
+                            aiParsedEntry = result
+                        } else {
+                            applyAutoFill(result)
+                        }
                     }
                 }
             }
@@ -829,7 +1173,9 @@ struct TimeLogView: View {
     }
 
     private func applyAutoFill(_ parsed: ParsedTimeEntry) {
-        withAnimation(AppAnimation.smooth) {
+        isNotesFocused = false
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        animate(AppAnimation.smooth) {
             entryCategory = parsed.category
             entryHours = parsed.hours
             entryParticipant = parsed.participant
@@ -838,29 +1184,84 @@ struct TimeLogView: View {
             }
             aiAutoFilled = true
             aiParsedEntry = nil
+            isLogDetailsExpanded = true
+        }
+    }
+
+    private func updateEntryCategory(_ category: ActivityCategory) {
+        userAdjustedLogDetails = true
+        animate(AppAnimation.quick) {
+            entryCategory = category
+        }
+    }
+
+    private func updateEntryPropertyId(_ propertyId: UUID?) {
+        userAdjustedLogDetails = true
+        entryPropertyId = propertyId
+    }
+
+    private func updateEntryHours(_ hours: Double) {
+        userAdjustedLogDetails = true
+        animate(AppAnimation.quick) {
+            entryHours = min(max(hours, 0.25), 24)
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    private func updateEntryParticipant(_ participant: Participant) {
+        userAdjustedLogDetails = true
+        animate(AppAnimation.quick) {
+            entryParticipant = participant
+        }
+    }
+
+    private func revealLogDetails() {
+        isNotesFocused = false
+        animate(AppAnimation.smooth) {
+            isLogDetailsExpanded = true
         }
     }
 
     // MARK: - Empty State
     private var emptyState: some View {
         VStack(spacing: 20) {
-            JellyBadge(
-                systemName: "house",
-                color: AppColors.primary,
-                wash: colors.primarySurface,
-                size: 72
-            )
-            Text("Add a Property First")
-                .font(AppTypography.subheadline)
+            Circle()
+                .fill(colors.backgroundTertiary)
+                .frame(width: 76, height: 76)
+                .overlay {
+                    LucideIcon(image: Lucide.housePlus, size: 32)
+                        .foregroundStyle(AppColors.charcoal)
+                }
+            Text("Add a property first")
+                .font(.system(size: 34, weight: .black, design: .rounded))
                 .foregroundStyle(colors.textPrimary)
-            Text("You need at least one property\nbefore logging time")
-                .font(AppTypography.body)
+                .multilineTextAlignment(.center)
+            Text("Create one rental property, then log time against it for cleaner records.")
+                .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(colors.textSecondary)
                 .multilineTextAlignment(.center)
+                .lineSpacing(3)
+                .padding(.horizontal, 32)
+
+            Button {
+                NotificationCenter.default.post(name: .switchToTab, object: 1)
+            } label: {
+                HStack(spacing: 8) {
+                    LucideIcon(image: Lucide.plus, size: 16)
+                    Text("Add property")
+                }
+                .font(AppTypography.button)
+                .foregroundStyle(AppColors.onAction)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 14)
+                .background(colors.action)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.lhPressable)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
-            AuroraBackground()
+            LHMobileCanvas()
         }
     }
 
@@ -872,9 +1273,9 @@ struct TimeLogView: View {
             modeButton(.timer)
         }
         .padding(3)
-        .background(AppColors.snow)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .animation(AppAnimation.quick, value: trackMode) // animate the pill highlight only
+        .background(colors.backgroundTertiary)
+        .clipShape(Capsule())
+        .lhMotion(AppAnimation.quick, value: trackMode)
     }
 
     private func modeButton(_ mode: TrackMode) -> some View {
@@ -897,12 +1298,11 @@ struct TimeLogView: View {
             }
             .foregroundStyle(trackMode == mode ? colors.textPrimary : AppColors.slate)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
+            .padding(.vertical, 12)
             .background(trackMode == mode ? colors.backgroundSecondary : Color.clear)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .shadow(color: trackMode == mode ? .black.opacity(0.06) : .clear, radius: 4, y: 1)
+            .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.lhPressable)
     }
 
     // MARK: - Timer Card
@@ -919,8 +1319,11 @@ struct TimeLogView: View {
             }
         }
         .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.06), radius: 16, x: 0, y: 4)
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .stroke(colors.border.opacity(0.28), lineWidth: 1)
+        }
         .onReceive(timerTick) { _ in
             if viewModel.isTimerRunning && timerPhase == .running {
                 timerElapsed = viewModel.timerElapsedTime
@@ -958,16 +1361,16 @@ struct TimeLogView: View {
             } label: {
                 HStack(spacing: 10) {
                     Text("Start")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: 17, weight: .black, design: .rounded))
                     LucideIcon(image: Lucide.play, size: 16)
                 }
-                .foregroundStyle(.white)
+                .foregroundStyle(timerCanStart ? AppColors.onAction : .white)
                 .padding(.horizontal, 36)
                 .padding(.vertical, 14)
-                .background(timerCanStart ? AppColors.charcoal : AppColors.mist)
+                .background(timerCanStart ? colors.action : AppColors.mist)
                 .clipShape(Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.lhPressable)
             .disabled(!timerCanStart)
             .padding(.bottom, 28)
         }
@@ -1013,31 +1416,29 @@ struct TimeLogView: View {
             // Controls — Tiimo style
             HStack(spacing: 20) {
                 Button {
-                    viewModel.cancelTimer()
-                    timerPhase = .idle
-                    timerElapsed = 0
+                    showDiscardTimerAlert = true
                 } label: {
-                    Text("Cancel")
+                    Text("Discard timer")
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(AppColors.slate)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.lhPressable)
 
                 Button {
                     stopTimerAction()
                 } label: {
                     HStack(spacing: 10) {
                         Text("Stop")
-                            .font(.system(size: 17, weight: .semibold))
+                            .font(.system(size: 17, weight: .black, design: .rounded))
                         LucideIcon(image: Lucide.square, size: 14)
                     }
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AppColors.onAction)
                     .padding(.horizontal, 36)
                     .padding(.vertical, 14)
                     .background(AppColors.coral)
                     .clipShape(Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.lhPressable)
             }
             .padding(.bottom, 28)
         }
@@ -1105,7 +1506,7 @@ struct TimeLogView: View {
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(AppColors.snow, lineWidth: 1.5)
+                    .strokeBorder(colors.border.opacity(0.35), lineWidth: 1.5)
             )
             .padding(.horizontal, 20)
 
@@ -1114,21 +1515,25 @@ struct TimeLogView: View {
                 .padding(.horizontal, 20)
             HStack(spacing: 0) {
                 segmentButton("Self", isSelected: timerParticipant == .selfParticipant) {
-                    withAnimation(AppAnimation.quick) { timerParticipant = .selfParticipant }
+                    animate(AppAnimation.quick) { timerParticipant = .selfParticipant }
                 }
                 segmentButton("Spouse", isSelected: timerParticipant == .spouse) {
-                    withAnimation(AppAnimation.quick) { timerParticipant = .spouse }
+                    animate(AppAnimation.quick) { timerParticipant = .spouse }
                 }
             }
             .padding(3)
-            .background(AppColors.snow)
+            .background(colors.backgroundTertiary)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .padding(.horizontal, 20)
 
             // Save / Discard
             VStack(spacing: 10) {
-                if timerNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text("Add a description for IRS records")
+                if stoppedElapsed < minimumSavableTimerElapsed {
+                    Text("Timer entries need at least 1 minute before saving.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppColors.mist)
+                } else if timerNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("Add a short description for your records.")
                         .font(.system(size: 12))
                         .foregroundStyle(AppColors.mist)
                 }
@@ -1136,14 +1541,14 @@ struct TimeLogView: View {
                     saveTimerEntry()
                 } label: {
                     Text("Save Entry")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        .foregroundStyle(canSaveTimer ? AppColors.onAction : .white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(canSaveTimer ? AppColors.primary : AppColors.mist)
+                        .background(canSaveTimer ? colors.action : AppColors.mist)
                         .clipShape(Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.lhPressable)
                 .disabled(!canSaveTimer)
 
                 Button {
@@ -1153,7 +1558,7 @@ struct TimeLogView: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(AppColors.slate)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.lhPressable)
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 20)
@@ -1217,7 +1622,7 @@ struct TimeLogView: View {
                     .rotationEffect(.degrees(-90))
                     .frame(width: ringDiameter, height: ringDiameter)
                     .shadow(color: AppColors.primary.opacity(0.25), radius: 8)
-                    .animation(.spring(response: 0.8, dampingFraction: 0.75), value: progress)
+                    .lhMotion(AppAnimation.ringProgress, value: progress)
             }
 
             // Clock face labels
@@ -1249,9 +1654,8 @@ struct TimeLogView: View {
                     .font(.system(size: 56, weight: .bold, design: .rounded))
                     .foregroundStyle(isActive ? colors.textPrimary : colors.textTertiary)
                     .contentTransition(.numericText())
-                Text("MINS")
-                    .font(.system(size: 14, weight: .semibold))
-                    .tracking(2)
+                Text("mins")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
                     .foregroundStyle(isActive ? colors.textSecondary : colors.textTertiary)
             }
         }
@@ -1265,40 +1669,33 @@ struct TimeLogView: View {
             HStack(spacing: 8) {
                 ForEach(ActivityCategory.allCases, id: \.self) { cat in
                     Button {
-                        withAnimation(AppAnimation.quick) {
+                        animate(AppAnimation.quick) {
                             timerSelectedCategory = cat
                         }
                     } label: {
                         HStack(spacing: 7) {
                             Circle()
-                                .fill(timerSelectedCategory == cat
-                                      ? Color.white.opacity(0.5)
-                                      : cat.color)
+                                .fill(timerSelectedCategory == cat ? AppColors.onAction.opacity(0.62) : cat.color)
                                 .frame(width: 8, height: 8)
                             Text(cat.chipLabel)
                                 .font(.system(size: 13, weight: .medium))
                                 .lineLimit(1)
                         }
-                        .foregroundStyle(timerSelectedCategory == cat ? .white : AppColors.slate)
+                        .foregroundStyle(timerSelectedCategory == cat ? AppColors.onAction : colors.textSecondary)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
-                        .background(timerSelectedCategory == cat ? AppColors.primary : AppColors.snow)
+                        .background(timerSelectedCategory == cat ? colors.action : colors.backgroundTertiary)
                         .clipShape(Capsule())
                         .overlay(
                             Capsule()
                                 .strokeBorder(
-                                    timerSelectedCategory == cat ? AppColors.primary : Color.clear,
+                                    timerSelectedCategory == cat ? colors.action.opacity(0.55) : colors.border.opacity(0.35),
                                     lineWidth: 1.5
                                 )
                         )
-                        .shadow(
-                            color: timerSelectedCategory == cat ? AppColors.primary.opacity(0.3) : .clear,
-                            radius: 6,
-                            y: 3
-                        )
                     }
-                    .buttonStyle(.plain)
-                    .animation(AppAnimation.pillPop, value: timerSelectedCategory == cat)
+                    .buttonStyle(.lhPressable)
+                    .lhMotion(AppAnimation.pillPop, value: timerSelectedCategory == cat)
                 }
             }
             .padding(.horizontal, 20)
@@ -1359,6 +1756,7 @@ struct TimeLogView: View {
     }
 
     private var canSaveTimer: Bool {
+        stoppedElapsed >= minimumSavableTimerElapsed &&
         !timerNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
@@ -1420,6 +1818,7 @@ struct TimeLogView: View {
         stoppedPropertyId = viewModel.timerPropertyId
         stoppedCategory = viewModel.timerCategory
         stoppedStartDate = viewModel.timerStartTime ?? Date()
+        saveStoppedTimerDraft()
 
         if rawElapsed > 24 * 3600 {
             showTimerCappedAlert = true
@@ -1447,9 +1846,9 @@ struct TimeLogView: View {
 
         resetTimerState()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        withAnimation(.spring(response: 0.4)) { showingSaved = true }
+        animate(AppAnimation.reveal) { showingSaved = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation { showingSaved = false }
+            animate(AppAnimation.reveal) { showingSaved = false }
         }
     }
 
@@ -1458,6 +1857,7 @@ struct TimeLogView: View {
     }
 
     private func resetTimerState() {
+        clearStoppedTimerDraft()
         timerNotes = ""
         timerParticipant = .selfParticipant
         timerPhase = .idle
@@ -1467,6 +1867,52 @@ struct TimeLogView: View {
         stoppedCategory = .management
         stoppedStartDate = Date()
     }
+
+    private func saveStoppedTimerDraft() {
+        guard let propertyId = stoppedPropertyId else { return }
+        let draft = StoppedTimerDraft(
+            elapsed: stoppedElapsed,
+            propertyId: propertyId,
+            category: stoppedCategory,
+            startDate: stoppedStartDate,
+            participant: timerParticipant,
+            notes: timerNotes
+        )
+        if let data = try? JSONEncoder().encode(draft) {
+            UserDefaults.standard.set(data, forKey: stoppedTimerDraftKey)
+        }
+    }
+
+    @discardableResult
+    private func loadStoppedTimerDraft() -> Bool {
+        guard let data = UserDefaults.standard.data(forKey: stoppedTimerDraftKey),
+              let draft = try? JSONDecoder().decode(StoppedTimerDraft.self, from: data),
+              viewModel.properties.contains(where: { $0.id == draft.propertyId }) else {
+            clearStoppedTimerDraft()
+            return false
+        }
+
+        stoppedElapsed = draft.elapsed
+        stoppedPropertyId = draft.propertyId
+        stoppedCategory = draft.category
+        stoppedStartDate = draft.startDate
+        timerParticipant = draft.participant
+        timerNotes = draft.notes
+        return true
+    }
+
+    private func clearStoppedTimerDraft() {
+        UserDefaults.standard.removeObject(forKey: stoppedTimerDraftKey)
+    }
+}
+
+private struct StoppedTimerDraft: Codable {
+    let elapsed: TimeInterval
+    let propertyId: UUID
+    let category: ActivityCategory
+    let startDate: Date
+    let participant: Participant
+    let notes: String
 }
 
 // MARK: - Quick Stat Badge (used by ReportsView)
@@ -1523,67 +1969,16 @@ struct QuickLogEntryView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Category") {
-                    Picker("Category", selection: $selectedCategory) {
-                        ForEach(ActivityCategory.allCases, id: \.self) { cat in
-                            HStack {
-                                Text(cat.rawValue)
-                                if !cat.countsForREPS {
-                                    Spacer()
-                                    Text("Non-REPS")
-                                        .font(.caption2)
-                                        .foregroundStyle(.orange)
-                                }
-                            }
-                            .tag(cat)
-                        }
-                    }
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
+                    inputCard
                 }
-
-                Section("Property") {
-                    if viewModel.properties.isEmpty {
-                        Text("No properties added")
-                            .foregroundStyle(.secondary)
-                    } else if viewModel.properties.count == 1 {
-                        HStack {
-                            LucideIcon(image: Lucide.house, size: 16)
-                                .foregroundStyle(AppColors.primary)
-                            Text(viewModel.properties[0].name)
-                        }
-                    } else {
-                        Picker("Select Property", selection: $selectedPropertyId) {
-                            Text("Select a property").tag(nil as UUID?)
-                            ForEach(viewModel.properties) { property in
-                                Text(property.name).tag(property.id as UUID?)
-                            }
-                        }
-                    }
-                }
-
-                Section("Participant") {
-                    Picker("Participant", selection: $selectedParticipant) {
-                        Text("Self").tag(Participant.selfParticipant)
-                        Text("Spouse").tag(Participant.spouse)
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                Section("Hours") {
-                    Stepper(value: $hours, in: 0.25...24, step: 0.25) {
-                        Text(String(format: "%.1f hours", hours))
-                    }
-                }
-
-                Section("Date") {
-                    DatePicker("Date", selection: $date, displayedComponents: .date)
-                }
-
-                Section("Notes (Optional)") {
-                    TextEditor(text: $notes)
-                        .frame(minHeight: 60)
-                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 32)
             }
+            .background { LHMobileCanvas() }
             .navigationTitle(customCategory?.name ?? "Quick Log")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1600,6 +1995,95 @@ struct QuickLogEntryView: View {
                     selectedPropertyId = viewModel.properties[0].id
                 }
             }
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(customCategory?.name ?? "Quick log")
+                .font(.system(size: 34, weight: .black, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
+            Text("Add a focused entry without leaving the category flow.")
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
+        }
+    }
+
+    private var inputCard: some View {
+        VStack(spacing: 14) {
+            Picker("Category", selection: $selectedCategory) {
+                ForEach(ActivityCategory.allCases, id: \.self) { cat in
+                    Text(cat.rawValue).tag(cat)
+                }
+            }
+            .pickerStyle(.menu)
+
+            propertyPickerRow
+
+            Picker("Participant", selection: $selectedParticipant) {
+                Text("Self").tag(Participant.selfParticipant)
+                Text("Spouse").tag(Participant.spouse)
+            }
+            .pickerStyle(.segmented)
+
+            Stepper(value: $hours, in: 0.25...24, step: 0.25) {
+                HStack {
+                    Text("Hours")
+                        .foregroundStyle(colors.textSecondary)
+                    Spacer()
+                    Text(String(format: "%.1f hours", hours))
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                }
+            }
+
+            DatePicker("Date", selection: $date, displayedComponents: .date)
+                .foregroundStyle(colors.textSecondary)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Notes")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                TextEditor(text: $notes)
+                    .frame(minHeight: 90)
+                    .scrollContentBackground(.hidden)
+                    .padding(10)
+                    .background(colors.backgroundTertiary)
+                    .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
+            }
+        }
+        .padding(18)
+        .background(colors.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xxl))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppCornerRadius.xxl)
+                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
+        }
+    }
+
+    @ViewBuilder
+    private var propertyPickerRow: some View {
+        if viewModel.properties.isEmpty {
+            Text("No properties added")
+                .font(AppTypography.body)
+                .foregroundStyle(colors.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else if viewModel.properties.count == 1 {
+            HStack(spacing: 10) {
+                LHIconTile(icon: Lucide.house, color: AppColors.sage, wash: colors.sageWash, size: 34, isActive: true)
+                Text(viewModel.properties[0].name)
+                    .font(AppTypography.body)
+                    .foregroundStyle(colors.textPrimary)
+                Spacer()
+            }
+        } else {
+            Picker("Property", selection: $selectedPropertyId) {
+                Text("Select a property").tag(nil as UUID?)
+                ForEach(viewModel.properties) { property in
+                    Text(property.name).tag(property.id as UUID?)
+                }
+            }
+            .pickerStyle(.menu)
         }
     }
 

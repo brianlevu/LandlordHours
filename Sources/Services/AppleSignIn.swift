@@ -1,5 +1,6 @@
 import SwiftUI
 import AuthenticationServices
+import Combine
 import LucideIcons
 import os.log
 
@@ -69,6 +70,23 @@ struct AppleSignInButton: View {
 enum LoginType: String, Codable {
     case apple
     case email
+}
+
+enum AdminAccess {
+    static let adminEmails: Set<String> = ["brianlevu@gmail.com"]
+
+    static var currentEmail: String? {
+        UserDefaults.standard.string(forKey: "appleUserEmail")
+        ?? UserDefaults.standard.string(forKey: "emailUserEmail")
+        ?? AppleSignInManager.shared.email
+    }
+
+    static var isCurrentUserAdmin: Bool {
+        guard let email = currentEmail?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() else {
+            return false
+        }
+        return adminEmails.contains(email)
+    }
 }
 
 class AppleSignInManager: ObservableObject {
@@ -174,64 +192,38 @@ class AppleSignInManager: ObservableObject {
 struct LoginView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     @State private var appeared = false
     @State private var showCreateAccount = false
     @State private var showEmailLogin = false
+    @State private var selectedSlide = 0
+
+    private let carouselTimer = Timer.publish(every: 5.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         NavigationStack {
-            GeometryReader { geo in
-                ZStack {
-                    // Base background
-                    colors.background.ignoresSafeArea()
+            ZStack {
+                wiseBackground
 
-                    // Top half: lavender gradient + floating glass cards
-                    VStack(spacing: 0) {
-                        ZStack {
-                            // Lavender gradient background — adapts to dark mode
-                            LinearGradient(
-                                colors: colorScheme == .dark
-                                    ? [Color(hex: "1A1535").opacity(0.6), Color(hex: "1C1A2E").opacity(0.5), colors.background]
-                                    : [Color(hex: "C4B5FD").opacity(0.4), Color(hex: "DDD6FE").opacity(0.5), Color(hex: "EDE9FE").opacity(0.6), Color.white.opacity(0.85), Color.white],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
+                VStack(spacing: 0) {
+                    progressBar
+                        .padding(.top, 56)
 
-                            // Decorative blobs
-                            Circle()
-                                .fill(Color(hex: "7B68EE").opacity(0.12))
-                                .frame(width: 200, height: 200)
-                                .blur(radius: 50)
-                                .offset(x: 60, y: -20)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-
-                            Circle()
-                                .fill(Color(hex: "B8AFFE").opacity(0.15))
-                                .frame(width: 180, height: 180)
-                                .blur(radius: 40)
-                                .offset(x: -60, y: 40)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-                            // Floating glass cards
-                            floatingCards
-                                .opacity(appeared ? 1 : 0)
-                                .offset(y: appeared ? 0 : 20)
+                    TabView(selection: $selectedSlide) {
+                        ForEach(Array(LandlordWelcomeSlide.allCases.enumerated()), id: \.offset) { index, slide in
+                            welcomeSlide(slide)
+                                .tag(index)
                         }
-                        .frame(height: geo.size.height * 0.48)
-
-                        Spacer()
                     }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .animation(AppAnimation.standard, value: selectedSlide)
 
-                    // Bottom content: logo, headline, auth buttons
-                    VStack(spacing: 0) {
-                        Spacer()
-
-                        loginContent
-                            .opacity(appeared ? 1 : 0)
-                            .offset(y: appeared ? 0 : 30)
-                    }
+                    authActions
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 34)
                 }
+                .opacity(appeared ? 1 : 0)
             }
             .navigationDestination(isPresented: $showCreateAccount) {
                 EmailSignUpView()
@@ -239,213 +231,170 @@ struct LoginView: View {
             .sheet(isPresented: $showEmailLogin) {
                 EmailLoginSheetView()
             }
+            .preferredColorScheme(.light)
             .onAppear {
-                withAnimation(.easeOut(duration: 0.7).delay(0.2)) {
+                withAnimation(reduceMotion ? .linear(duration: 0.01) : .easeOut(duration: 0.35).delay(0.08)) {
                     appeared = true
                 }
             }
+            .onReceive(carouselTimer) { _ in
+                guard !reduceMotion else { return }
+                withAnimation(AppAnimation.standard) {
+                    selectedSlide = (selectedSlide + 1) % LandlordWelcomeSlide.allCases.count
+                }
+            }
         }
     }
 
-    // MARK: - Floating Glass Cards
-
-    private var floatingCards: some View {
-        ZStack {
-            // Card 1: REPS Progress — top-left, rotated -6deg
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 10) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color(hex: "EDE8FF"))
-                            .frame(width: 36, height: 36)
-                        LucideIcon(image: Lucide.clock, size: 18)
-                            .foregroundStyle(AppColors.primary)
-                    }
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("REPS Progress")
-                            .font(.system(size: 14, weight: .semibold, design: .rounded))
-                            .foregroundStyle(AppColors.charcoal)
-                        Text("262.5 of 750 hours")
-                            .font(.system(size: 11, design: .rounded))
-                            .foregroundStyle(AppColors.slate)
-                    }
-                }
-                .padding(.bottom, 14)
-
-                // Progress bar
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(AppColors.snow)
-                        .frame(height: 6)
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(
-                            LinearGradient(
-                                colors: [AppColors.primary, Color(hex: "B8AFFE")],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: 88, height: 6) // ~35%
-                }
-                .padding(.bottom, 8)
-
-                // Category rows
-                HStack(spacing: 8) {
-                    Circle().fill(AppColors.coral).frame(width: 8, height: 8)
-                    Text("Repairs").font(.system(size: 11, design: .rounded)).foregroundStyle(AppColors.slate)
-                    Spacer()
-                    Text("105.0h").font(.system(size: 11, weight: .semibold, design: .rounded)).foregroundStyle(AppColors.charcoal)
-                }
-                .padding(.bottom, 6)
-                HStack(spacing: 8) {
-                    Circle().fill(AppColors.sage).frame(width: 8, height: 8)
-                    Text("Management").font(.system(size: 11, design: .rounded)).foregroundStyle(AppColors.slate)
-                    Spacer()
-                    Text("65.5h").font(.system(size: 11, weight: .semibold, design: .rounded)).foregroundStyle(AppColors.charcoal)
-                }
-            }
-            .padding(24)
-            .frame(width: 280)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 24))
-            .overlay(
-                RoundedRectangle(cornerRadius: 24)
-                    .stroke(Color.white.opacity(0.5), lineWidth: 1)
-            )
-            .shadow(color: AppColors.primary.opacity(0.08), radius: 32, y: 8)
-            .rotationEffect(.degrees(-6))
-            .offset(x: -40, y: -30)
-
-            // Card 2: Time Entry — top-right, rotated 4deg
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 10) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color(hex: "FFE8E4"))
-                            .frame(width: 36, height: 36)
-                        LucideIcon(image: Lucide.wrench, size: 18)
-                            .foregroundStyle(AppColors.coral)
-                    }
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("2.5h logged")
-                            .font(.system(size: 14, weight: .semibold, design: .rounded))
-                            .foregroundStyle(AppColors.charcoal)
-                        Text("123 Oak St \u{2022} Today")
-                            .font(.system(size: 11, design: .rounded))
-                            .foregroundStyle(AppColors.slate)
-                    }
-                }
-                .padding(.bottom, 10)
-
-                Text("Fixed leaky faucet and replaced bathroom fixtures")
-                    .font(.system(size: 11, design: .rounded))
-                    .foregroundStyle(AppColors.slate)
-                    .lineSpacing(2)
-            }
-            .padding(20)
-            .frame(width: 240)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 24))
-            .overlay(
-                RoundedRectangle(cornerRadius: 24)
-                    .stroke(Color.white.opacity(0.5), lineWidth: 1)
-            )
-            .shadow(color: AppColors.primary.opacity(0.08), radius: 32, y: 8)
-            .rotationEffect(.degrees(4))
-            .offset(x: 50, y: 60)
-        }
-        .padding(.top, 40)
+    private var wiseBackground: some View {
+        Color.white
+            .ignoresSafeArea()
     }
 
-    // MARK: - Login Content (bottom half)
+    private var progressBar: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(AppColors.cloud.opacity(0.35))
+                    .frame(height: 5)
 
-    private var loginContent: some View {
+                Capsule()
+                    .fill(AppColors.charcoal)
+                    .frame(width: proxy.size.width * progressFraction, height: 5)
+                    .animation(AppAnimation.standard, value: selectedSlide)
+            }
+        }
+        .frame(height: 5)
+        .padding(.horizontal, 32)
+        .accessibilityLabel("Onboarding progress")
+        .accessibilityValue("\(selectedSlide + 1) of \(LandlordWelcomeSlide.allCases.count)")
+    }
+
+    private var progressFraction: CGFloat {
+        CGFloat(selectedSlide + 1) / CGFloat(LandlordWelcomeSlide.allCases.count)
+    }
+
+    private func welcomeSlide(_ slide: LandlordWelcomeSlide) -> some View {
         VStack(spacing: 0) {
-            // Logo
-            WaveHouseIcon(size: 56)
-                .shadow(color: AppColors.primary.opacity(0.2), radius: 24, y: 8)
-                .padding(.bottom, 20)
+            Spacer(minLength: 22)
 
-            // Headline
-            Text("Track your hours.\nQualify with confidence.")
-                .font(.system(size: 26, weight: .regular, design: .serif))
-                .foregroundStyle(colors.textPrimary)
-                .multilineTextAlignment(.center)
-                .lineSpacing(2)
-                .padding(.bottom, 6)
+            Image(slide.imageName)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: 278)
+                .frame(height: 342)
+                .accessibilityHidden(true)
 
-            // Subline
-            Text("750 hours to Real Estate Professional Status \u{2014} we make every hour count.")
-                .font(.system(size: 15))
-                .foregroundStyle(colors.textSecondary)
-                .multilineTextAlignment(.center)
-                .lineSpacing(4)
-                .padding(.bottom, 32)
+            Spacer(minLength: 20)
 
-            // Auth buttons
-            VStack(spacing: 12) {
-                // Sign in with Apple
-                if #available(iOS 16.0, *) {
-                    AppleSignInButton { isNewUser in
-                        if isNewUser {
-                            viewModel.signUp()
-                        } else {
-                            viewModel.signIn()
-                        }
-                    }
-                    .clipShape(Capsule())
-                } else {
-                    Button {
-                        viewModel.signIn()
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "apple.logo")
-                                .font(.system(size: 18))
-                            Text("Sign in with Apple")
-                                .font(.system(size: 16, weight: .semibold))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(AppColors.charcoal)
-                        .foregroundColor(.white)
-                        .clipShape(Capsule())
-                    }
-                }
+            VStack(spacing: 14) {
+                Text(slide.title)
+                    .font(.system(size: 43, weight: .black, design: .rounded))
+                    .foregroundStyle(AppColors.charcoal)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(-4)
+                    .minimumScaleFactor(0.72)
+                    .padding(.horizontal, 18)
 
-                // Continue with email
-                Button {
-                    showCreateAccount = true
-                } label: {
-                    Text("Continue with email")
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .foregroundStyle(AppColors.primary)
-                        .overlay(
-                            Capsule()
-                                .stroke(AppColors.primary, lineWidth: 2)
-                        )
-                }
+                Text(slide.subtitle)
+                    .font(.system(size: 16, weight: .medium, design: .rounded))
+                    .foregroundStyle(AppColors.slate)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+                    .padding(.horizontal, 36)
             }
-            .padding(.bottom, 12)
 
-            // Already have an account link
-            HStack(spacing: 0) {
-                Text("Already have an account? ")
-                    .foregroundStyle(colors.textSecondary)
+            Spacer(minLength: 24)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(slide.title). \(slide.subtitle)")
+    }
+
+    private var authActions: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 14) {
                 Button {
                     showEmailLogin = true
                 } label: {
-                    Text("Log in here")
-                        .foregroundStyle(AppColors.primary)
-                        .fontWeight(.semibold)
-                        .underline(true, color: AppColors.primary)
+                    Text("Log in")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 58)
+                        .background(colors.primary)
+                        .foregroundStyle(AppColors.charcoal)
+                        .clipShape(Capsule())
+                }
+
+                Button {
+                    showCreateAccount = true
+                } label: {
+                    Text("Register")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 58)
+                        .background(colors.primary)
+                        .foregroundStyle(AppColors.charcoal)
+                        .clipShape(Capsule())
                 }
             }
-            .font(.system(size: 14))
-            .padding(.bottom, 60)
+
+            if #available(iOS 16.0, *) {
+                AppleSignInButton { isNewUser in
+                    if isNewUser {
+                        viewModel.signUp()
+                    } else {
+                        viewModel.signIn()
+                    }
+                }
+                .clipShape(Capsule())
+            } else {
+                Button {
+                    viewModel.signIn()
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "apple.logo")
+                            .font(.system(size: 19))
+                        Text("Sign in with Apple")
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 58)
+                    .background(Color.black)
+                    .foregroundColor(.white)
+                    .clipShape(Capsule())
+                }
+            }
         }
-        .padding(.horizontal, 28)
+    }
+}
+
+private enum LandlordWelcomeSlide: CaseIterable {
+    case qualification
+    case logging
+    case records
+
+    var title: String {
+        switch self {
+        case .qualification: return "KNOW WHAT HOURS COUNT"
+        case .logging: return "TRACK RENTAL WORK FAST"
+        case .records: return "KEEP TAX RECORDS READY"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .qualification: return "Track REPS, material participation, and the 50% rule without decoding the tax tests every time."
+        case .logging: return "Save the property, category, participant, date, and notes while the work is still fresh."
+        case .records: return "Build a clean year-end history your CPA can review."
+        }
+    }
+
+    var imageName: String {
+        switch self {
+        case .qualification: return "OnboardingHeroQualification"
+        case .logging: return "OnboardingHeroLogging"
+        case .records: return "OnboardingHeroRecords"
+        }
     }
 }
 
@@ -488,7 +437,7 @@ struct EmailLoginSheetView: View {
 
                     Button {
                         guard !email.isEmpty, !password.isEmpty else {
-                            errorMessage = "Please fill in all fields"
+                            errorMessage = "Enter both email and password."
                             return
                         }
                         guard email.contains("@") && email.contains(".") else {
@@ -616,7 +565,7 @@ struct EmailSignUpView: View {
                         return
                     }
                     if name.isEmpty || email.isEmpty {
-                        errorMessage = "Please fill in all fields"
+                        errorMessage = "Enter your name and email."
                         return
                     }
                     guard email.contains("@") && email.contains(".") else {

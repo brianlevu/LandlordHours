@@ -8,76 +8,136 @@ struct ExportPDFView: View {
     @Environment(\.colorScheme) var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     let year: Int
+    @State private var shareItem: PDFShareItem?
+    @State private var exportError: String?
 
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Export report")
+                            .font(.system(size: 42, weight: .black, design: .rounded))
+                            .foregroundStyle(colors.textPrimary)
+                            .minimumScaleFactor(0.82)
+                        Text("Create a \(String(year)) PDF for your records or accountant.")
+                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .foregroundStyle(colors.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
                     // Export action card
                     VStack(spacing: 16) {
-                        JellyBadge(systemName: "file-text", color: AppColors.primary, wash: colors.primarySurface, size: 56)
+                        Circle()
+                            .fill(colors.backgroundTertiary)
+                            .frame(width: 64, height: 64)
+                            .overlay {
+                                LucideIcon(image: Lucide.fileText, size: 28)
+                                    .foregroundStyle(AppColors.charcoal)
+                            }
 
-                        Text("Export \(String(year)) Report")
-                            .font(AppTypography.title3)
+                        Text("Export \(String(year)) report")
+                            .font(.system(size: 22, weight: .black, design: .rounded))
                             .foregroundStyle(colors.textPrimary)
 
-                        Text("Generates a detailed PDF report of all time entries for tax auditing purposes.")
+                        Text(exportSummaryText)
                             .font(AppTypography.bodySmall)
                             .foregroundStyle(colors.textSecondary)
                             .multilineTextAlignment(.center)
+                            .lineSpacing(3)
 
-                        Button {
-                            generateAndSharePDF()
-                        } label: {
-                            HStack(spacing: 8) {
-                                LucideIcon(image: Lucide.share2, size: 16)
-                                Text("Export as PDF")
+                        if let shareItem {
+                            VStack(spacing: 10) {
+                                HStack(spacing: 8) {
+                                    LucideIcon(image: Lucide.check, size: 16)
+                                        .foregroundStyle(AppColors.sage)
+                                    Text("PDF ready")
+                                        .font(AppTypography.button)
+                                        .foregroundStyle(colors.textPrimary)
+                                }
+
+                                ShareLink(item: shareItem.url) {
+                                    HStack(spacing: 8) {
+                                        LucideIcon(image: Lucide.share2, size: 16)
+                                        Text("Share PDF")
+                                    }
+                                    .font(AppTypography.button)
+                                    .foregroundStyle(AppColors.onAction)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .background(colors.action)
+                                    .clipShape(Capsule())
+                                }
+                                .buttonStyle(.lhPressable)
+                                .accessibilityIdentifier("export.sharePDF")
                             }
-                            .font(AppTypography.button)
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(AppColors.primary)
-                            .clipShape(Capsule())
+                        } else {
+                            Button {
+                                generateAndSharePDF()
+                            } label: {
+                                HStack(spacing: 8) {
+                                    LucideIcon(image: Lucide.fileDown, size: 16)
+                                    Text(canExport ? "Generate PDF" : "No entries to export")
+                                }
+                                .font(AppTypography.button)
+                                .foregroundStyle(canExport ? AppColors.charcoal : .white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(canExport ? AppColors.sage : AppColors.mist)
+                                .clipShape(Capsule())
+                            }
+                            .disabled(!canExport)
+                            .accessibilityIdentifier("export.generatePDF")
+                        }
+
+                        if let exportError {
+                            Text(exportError)
+                                .font(AppTypography.caption)
+                                .foregroundStyle(AppColors.error)
+                                .multilineTextAlignment(.center)
                         }
                     }
                     .padding(20)
                     .background(colors.backgroundSecondary)
-                    .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
-                    .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.05), radius: 12, x: 0, y: 2)
+                    .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 26, style: .continuous)
+                            .stroke(colors.border.opacity(0.28), lineWidth: 1)
+                    }
 
                     // Report summary card
                     VStack(alignment: .leading, spacing: 14) {
                         HStack(spacing: 8) {
                             LucideIcon(image: Lucide.list, size: 14)
-                                .foregroundStyle(AppColors.primary)
-                            Text("REPORT INCLUDES")
-                                .font(AppTypography.label)
-                                .tracking(1.5)
-                                .foregroundStyle(colors.textSecondary)
+                                .foregroundStyle(AppColors.charcoal)
+                            Text("Report includes")
+                                .font(.system(size: 19, weight: .black, design: .rounded))
+                                .foregroundStyle(colors.textPrimary)
                         }
 
                         VStack(spacing: 0) {
-                            reportRow(label: "Property Details", value: "\(viewModel.properties.count) properties", icon: "building-2", color: AppColors.sky)
+                            reportRow(label: "Properties", value: "\(viewModel.properties.count) properties", icon: "building-2", color: AppColors.sky)
                             Divider().padding(.leading, 48)
                             reportRow(label: "Time Entries", value: "\(yearEntries.count) entries", icon: "clock", color: AppColors.primary)
                             Divider().padding(.leading, 48)
                             reportRow(label: "Total Hours", value: String(format: "%.1f hours", totalHours), icon: "hourglass", color: AppColors.honey)
                             Divider().padding(.leading, 48)
-                            reportRow(label: "REPS Qualified", value: String(format: "%.1f hours", repsQualifiedHours), icon: "badge-check", color: AppColors.sage)
+                            reportRow(label: "REPS hours", value: String(format: "%.1f hours", repsQualifiedHours), icon: "badge-check", color: AppColors.sage)
                         }
                     }
                     .padding(20)
                     .background(colors.backgroundSecondary)
-                    .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
-                    .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.05), radius: 12, x: 0, y: 2)
+                    .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 26, style: .continuous)
+                            .stroke(colors.border.opacity(0.28), lineWidth: 1)
+                    }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
+                .padding(.horizontal, 24)
+                .padding(.top, 18)
                 .padding(.bottom, 40)
             }
-            .background(colors.background)
-            .navigationTitle("Export Report")
+            .background { LHMobileCanvas() }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -87,13 +147,14 @@ struct ExportPDFView: View {
                 }
             }
         }
+        .hidesAppTabBar()
     }
 
     private func reportRow(label: String, value: String, icon: String, color: Color) -> some View {
         HStack(spacing: 12) {
-            JellyBadge(systemName: icon, color: color, size: 36)
+            JellyBadge(systemName: icon, color: color, wash: colors.backgroundTertiary, size: 36)
             Text(label)
-                .font(AppTypography.body)
+                .font(.system(size: 15, weight: .bold, design: .rounded))
                 .foregroundStyle(colors.textPrimary)
             Spacer()
             Text(value)
@@ -112,26 +173,32 @@ struct ExportPDFView: View {
         yearEntries.reduce(0) { $0 + $1.hours }
     }
 
+    var canExport: Bool {
+        !yearEntries.isEmpty
+    }
+
+    var exportSummaryText: String {
+        if canExport {
+            return "Create a PDF with properties, entries, notes, participants, and total hours."
+        }
+        return "Log time entries for \(year), then export a PDF for your CPA or records."
+    }
+
     var repsQualifiedHours: Double {
         yearEntries.filter { $0.countsForREPS }.reduce(0) { $0 + $1.hours }
     }
 
-    func generateAndSharePDF() {
+    private func generateAndSharePDF() {
         let pdfData = generatePDF()
 
         // Save to temp file
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("LandlordHours_\(year).pdf")
-        try? pdfData.write(to: tempURL)
-
-        // Present share sheet
-        let activityVC = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
-
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootVC = windowScene.windows.first?.rootViewController {
-            activityVC.completionWithItemsHandler = { _, _, _, _ in
-                dismiss()
-            }
-            rootVC.present(activityVC, animated: true)
+        do {
+            try pdfData.write(to: tempURL, options: .atomic)
+            shareItem = PDFShareItem(url: tempURL)
+            exportError = nil
+        } catch {
+            exportError = "Could not generate the PDF. Please try again."
         }
     }
 
@@ -176,7 +243,7 @@ struct ExportPDFView: View {
             "Total Hours Logged: \(String(format: "%.1f", totalHours)) hours".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: [.font: bodyFont])
             yPosition += 20
 
-            "REPS Qualified Hours: \(String(format: "%.1f", repsQualifiedHours)) hours".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: [.font: bodyFont])
+            "REPS-counted Hours: \(String(format: "%.1f", repsQualifiedHours)) hours".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: [.font: bodyFont])
             yPosition += 20
 
             "Total Entries: \(yearEntries.count)".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: [.font: bodyFont])
@@ -243,4 +310,9 @@ struct ExportPDFView: View {
 
         return data
     }
+}
+
+private struct PDFShareItem: Identifiable {
+    let id = UUID()
+    let url: URL
 }
