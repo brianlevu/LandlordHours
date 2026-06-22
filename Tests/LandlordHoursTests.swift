@@ -135,6 +135,184 @@ final class REPSRequirementsTests: XCTestCase {
     }
 }
 
+// MARK: - Tax Qualification Engine Tests
+
+final class TaxQualificationEngineTests: XCTestCase {
+
+    func testREPSDoesNotCombineSpouseHoursFor750HourTest() {
+        let propertyId = UUID()
+        let entries = [
+            makeEntry(propertyId: propertyId, participant: .selfParticipant, category: .management, hours: 400),
+            makeEntry(propertyId: propertyId, participant: .spouse, category: .management, hours: 400)
+        ]
+
+        let result = TaxQualificationEngine.repsStatus(
+            entries: entries,
+            participant: .selfParticipant,
+            year: currentYear,
+            nonRealEstateHours: 100
+        )
+
+        XCTAssertEqual(result.realEstateHours, 400)
+        XCTAssertFalse(result.meets750HourTest)
+        XCTAssertFalse(result.isQualified)
+    }
+
+    func testREPSTestsRequireMoreThan750AndMoreThanHalf() {
+        let propertyId = UUID()
+        let entries = [
+            makeEntry(propertyId: propertyId, participant: .selfParticipant, category: .management, hours: 751)
+        ]
+
+        let qualified = TaxQualificationEngine.repsStatus(
+            entries: entries,
+            participant: .selfParticipant,
+            year: currentYear,
+            nonRealEstateHours: 700
+        )
+        XCTAssertTrue(qualified.meets750HourTest)
+        XCTAssertTrue(qualified.meetsMoreThanHalfPersonalServicesTest)
+        XCTAssertTrue(qualified.isQualified)
+
+        let failsMoreThanHalf = TaxQualificationEngine.repsStatus(
+            entries: entries,
+            participant: .selfParticipant,
+            year: currentYear,
+            nonRealEstateHours: 800
+        )
+        XCTAssertTrue(failsMoreThanHalf.meets750HourTest)
+        XCTAssertFalse(failsMoreThanHalf.meetsMoreThanHalfPersonalServicesTest)
+        XCTAssertFalse(failsMoreThanHalf.isQualified)
+    }
+
+    func testMaterialParticipationCanCombineSpouseHours() {
+        let propertyId = UUID()
+        let entries = [
+            makeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs, hours: 60),
+            makeEntry(propertyId: propertyId, participant: .spouse, category: .leasing, hours: 50)
+        ]
+
+        let result = TaxQualificationEngine.materialParticipationStatus(
+            entries: entries,
+            year: currentYear,
+            propertyId: propertyId,
+            groupingElection: false
+        )
+
+        XCTAssertEqual(result.ownerAndSpouseHours, 110)
+        XCTAssertTrue(result.meets100HourTest)
+        XCTAssertTrue(result.isMateriallyParticipating)
+    }
+
+    func testMaterialParticipationGroupingCombinesProperties() {
+        let propertyA = UUID()
+        let propertyB = UUID()
+        let entries = [
+            makeEntry(propertyId: propertyA, participant: .selfParticipant, category: .repairs, hours: 300),
+            makeEntry(propertyId: propertyB, participant: .spouse, category: .management, hours: 225)
+        ]
+
+        let ungrouped = TaxQualificationEngine.materialParticipationStatus(
+            entries: entries,
+            year: currentYear,
+            propertyId: propertyA,
+            groupingElection: false
+        )
+        XCTAssertEqual(ungrouped.ownerAndSpouseHours, 300)
+        XCTAssertFalse(ungrouped.meets500HourTest)
+
+        let grouped = TaxQualificationEngine.materialParticipationStatus(
+            entries: entries,
+            year: currentYear,
+            propertyId: propertyA,
+            groupingElection: true
+        )
+        XCTAssertEqual(grouped.ownerAndSpouseHours, 525)
+        XCTAssertTrue(grouped.meets500HourTest)
+    }
+
+    func testUngroupedMaterialParticipationDoesNotAggregateWithoutProperty() {
+        let propertyA = UUID()
+        let propertyB = UUID()
+        let entries = [
+            makeEntry(propertyId: propertyA, participant: .selfParticipant, category: .repairs, hours: 60),
+            makeEntry(propertyId: propertyB, participant: .spouse, category: .management, hours: 50)
+        ]
+
+        let result = TaxQualificationEngine.materialParticipationStatus(
+            entries: entries,
+            year: currentYear,
+            propertyId: nil,
+            groupingElection: false
+        )
+
+        XCTAssertEqual(result.ownerAndSpouseHours, 0)
+        XCTAssertFalse(result.meets100HourTest)
+        XCTAssertFalse(result.isMateriallyParticipating)
+    }
+
+    func testMaterialParticipationHundredHourTestIsStrictlyMoreThan100() {
+        let propertyId = UUID()
+        let entries = [
+            makeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs, hours: 100)
+        ]
+
+        let result = TaxQualificationEngine.materialParticipationStatus(
+            entries: entries,
+            year: currentYear,
+            propertyId: propertyId,
+            groupingElection: false
+        )
+
+        XCTAssertEqual(result.ownerAndSpouseHours, 100)
+        XCTAssertFalse(result.meets100HourTest)
+        XCTAssertFalse(result.isMateriallyParticipating)
+    }
+
+    func testInvestorLevelHoursAreExcludedFromQualificationCalculations() {
+        let propertyId = UUID()
+        let entries = [
+            makeEntry(propertyId: propertyId, participant: .selfParticipant, category: .investing, hours: 900)
+        ]
+
+        let reps = TaxQualificationEngine.repsStatus(
+            entries: entries,
+            participant: .selfParticipant,
+            year: currentYear,
+            nonRealEstateHours: 0
+        )
+        let material = TaxQualificationEngine.materialParticipationStatus(
+            entries: entries,
+            year: currentYear,
+            propertyId: propertyId,
+            groupingElection: false
+        )
+
+        XCTAssertEqual(reps.realEstateHours, 0)
+        XCTAssertEqual(material.ownerAndSpouseHours, 0)
+    }
+
+    private var currentYear: Int {
+        Calendar.current.component(.year, from: Date())
+    }
+
+    private func makeEntry(
+        propertyId: UUID,
+        participant: Participant,
+        category: ActivityCategory,
+        hours: Double
+    ) -> TimeEntry {
+        TimeEntry(
+            propertyId: propertyId,
+            participant: participant,
+            category: category,
+            hours: hours,
+            date: Date(),
+            notes: "Test entry"
+        )
+    }
+}
+
 // MARK: - AI Local Parser Tests
 
 final class AILocalParserTests: XCTestCase {
@@ -180,11 +358,38 @@ final class AILocalParserTests: XCTestCase {
         XCTAssertEqual(result?.category, .management) // Default when no keyword matches
     }
 
-    func testParseDefaultsTo1HourWhenNoHoursMentioned() async {
+    func testParseEstimatesRepairHoursWhenNoHoursMentioned() async {
         let result = await service.parseTimeEntry(from: "fixed the sink", properties: [])
 
         XCTAssertNotNil(result)
-        XCTAssertEqual(result?.hours, 1.0) // Default when no hours extracted
+        XCTAssertEqual(result?.hours, 1.5) // Repairs get a useful estimate when no hours are extracted
+    }
+
+    func testParsePaintedHouseAsRepairWithSinglePropertyAndEstimatedHours() async {
+        let properties = [RentalProperty(name: "Oak House", address: "123 Oak St", propertyType: .ltr)]
+        let result = await service.parseTimeEntry(from: "I painted the house", properties: properties)
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.category, .repairs)
+        XCTAssertEqual(result?.hours, 3.0)
+        XCTAssertEqual(result?.property?.name, "Oak House")
+    }
+
+    func testParseNaturalLanguageHourOverridesPaintEstimate() async {
+        let properties = [RentalProperty(name: "Oak Street Duplex", address: "123 Oak St", propertyType: .ltr)]
+        let result = await service.parseTimeEntry(from: "Painting the porch for an hour", properties: properties)
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.category, .repairs)
+        XCTAssertEqual(result?.hours, 1.0)
+        XCTAssertEqual(result?.property?.name, "Oak Street Duplex")
+    }
+
+    func testParseWordBasedHours() async {
+        let result = await service.parseTimeEntry(from: "painted trim for two hours", properties: [])
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.hours, 2.0)
     }
 
     func testParseMatchesPropertyByAddress() async {
@@ -193,6 +398,19 @@ final class AILocalParserTests: XCTestCase {
 
         XCTAssertNotNil(result)
         XCTAssertEqual(result?.property?.name, "Unit A")
+    }
+
+    func testParseMatchesPropertyByPartialNamePhrase() async {
+        let properties = [
+            RentalProperty(name: "Maple Avenue House", address: "555 Maple Avenue", propertyType: .ltr),
+            RentalProperty(name: "Oak Street Duplex", address: "214 Oak Street", propertyType: .ltr)
+        ]
+        let result = await service.parseTimeEntry(from: "Called plumber about the Oak Street leak for 1 hour", properties: properties)
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.category, .repairs)
+        XCTAssertEqual(result?.hours, 1.0)
+        XCTAssertEqual(result?.property?.name, "Oak Street Duplex")
     }
 
     func testParseHoursCappedAt24() async {
@@ -316,6 +534,175 @@ final class UserScopeTests: XCTestCase {
     }
 }
 
+// MARK: - Local Data Reset Tests
+
+@MainActor
+final class AppViewModelLocalResetTests: XCTestCase {
+
+    private var savedAppleUserId: String?
+    private var savedEmailUserId: String?
+
+    override func setUp() {
+        super.setUp()
+        savedAppleUserId = UserDefaults.standard.string(forKey: "appleUserId")
+        savedEmailUserId = UserDefaults.standard.string(forKey: "emailUserId")
+        UserDefaults.standard.removeObject(forKey: "appleUserId")
+        UserDefaults.standard.set("reset-test-user", forKey: "emailUserId")
+        UserDefaults.standard.set("reset@example.com", forKey: "emailUserEmail")
+        UserDefaults.standard.synchronize()
+    }
+
+    override func tearDown() {
+        AppViewModel.clearScopedAccountData(for: "reset-test-user")
+        if let savedAppleUserId {
+            UserDefaults.standard.set(savedAppleUserId, forKey: "appleUserId")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "appleUserId")
+        }
+        if let savedEmailUserId {
+            UserDefaults.standard.set(savedEmailUserId, forKey: "emailUserId")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "emailUserId")
+        }
+        UserDefaults.standard.synchronize()
+        super.tearDown()
+    }
+
+    func testResetCurrentUserLocalDataClearsMemoryAndScopedPreferences() {
+        let viewModel = AppViewModel()
+        viewModel.properties = [RentalProperty(name: "Oak", address: "123 Oak St", propertyType: .ltr)]
+        viewModel.timeEntries = [
+            TimeEntry(propertyId: viewModel.properties[0].id, participant: .selfParticipant, category: .management, hours: 2, notes: "Test")
+        ]
+        viewModel.isTimerRunning = true
+        viewModel.timerStartTime = Date()
+        viewModel.timerPropertyId = viewModel.properties[0].id
+        GoalManager.shared.setGlobalGoal(.str)
+        CategoryManager.shared.addCategory(
+            CustomCategory(name: "Custom", iconName: "house", colorHex: "7B68EE", countsForREPS: true)
+        )
+        TaxProfileManager.shared.nonREWorkHours = 123
+        UserDefaults.standard.set(true, forKey: UserScope.key("hasCompletedOnboarding"))
+
+        viewModel.resetCurrentUserLocalData()
+
+        XCTAssertTrue(viewModel.properties.isEmpty)
+        XCTAssertTrue(viewModel.timeEntries.isEmpty)
+        XCTAssertFalse(viewModel.isTimerRunning)
+        XCTAssertNil(viewModel.timerStartTime)
+        XCTAssertNil(viewModel.timerPropertyId)
+        XCTAssertEqual(GoalManager.shared.globalGoalType, .reps)
+        XCTAssertTrue(CategoryManager.shared.customCategories.isEmpty)
+        XCTAssertEqual(TaxProfileManager.shared.nonREWorkHours, 0)
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: UserScope.key("hasCompletedOnboarding")))
+    }
+}
+
+@MainActor
+final class AppViewModelFlowTests: XCTestCase {
+
+    private let testUserId = "flow-test-user"
+    private var savedAppleUserId: String?
+    private var savedEmailUserId: String?
+
+    override func setUp() {
+        super.setUp()
+        savedAppleUserId = UserDefaults.standard.string(forKey: "appleUserId")
+        savedEmailUserId = UserDefaults.standard.string(forKey: "emailUserId")
+        UserDefaults.standard.removeObject(forKey: "appleUserId")
+        UserDefaults.standard.set(testUserId, forKey: "emailUserId")
+        AppViewModel.clearScopedAccountData(for: testUserId)
+        UserDefaults.standard.synchronize()
+    }
+
+    override func tearDown() {
+        AppViewModel.clearScopedAccountData(for: testUserId)
+        if let savedAppleUserId {
+            UserDefaults.standard.set(savedAppleUserId, forKey: "appleUserId")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "appleUserId")
+        }
+        if let savedEmailUserId {
+            UserDefaults.standard.set(savedEmailUserId, forKey: "emailUserId")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "emailUserId")
+        }
+        UserDefaults.standard.synchronize()
+        super.tearDown()
+    }
+
+    func testDeletingPropertyRemovesEntriesAndCancelsRunningTimer() {
+        let viewModel = AppViewModel()
+        viewModel.suppressCelebrations = true
+        viewModel.addProperty(name: "Oak", address: "123 Oak St", type: .ltr)
+        let property = viewModel.properties[0]
+        viewModel.addTimeEntry(
+            propertyId: property.id,
+            participant: .selfParticipant,
+            category: .management,
+            hours: 1,
+            date: Date(),
+            notes: "Test"
+        )
+        viewModel.startTimer(propertyId: property.id, category: .repairs)
+
+        viewModel.deleteProperty(property)
+
+        XCTAssertTrue(viewModel.properties.isEmpty)
+        XCTAssertTrue(viewModel.timeEntries.isEmpty)
+        XCTAssertFalse(viewModel.isTimerRunning)
+        XCTAssertNil(viewModel.timerPropertyId)
+        XCTAssertNil(viewModel.timerStartTime)
+    }
+
+    func testCalendarImportSkipsDuplicateExternalIdAndContentDuplicate() {
+        let viewModel = AppViewModel()
+        viewModel.suppressCelebrations = true
+        viewModel.addProperty(name: "Oak", address: "123 Oak St", type: .ltr)
+        let propertyId = viewModel.properties[0].id
+        let eventDate = Date()
+
+        let first = makeDetectedEntry(propertyId: propertyId, eventDate: eventDate, externalId: "event-1")
+        XCTAssertEqual(viewModel.importCalendarEntries([first]), 1)
+        XCTAssertEqual(viewModel.timeEntries.count, 1)
+
+        XCTAssertEqual(viewModel.importCalendarEntries([first]), 0)
+        XCTAssertEqual(viewModel.timeEntries.count, 1)
+
+        let contentDuplicate = makeDetectedEntry(propertyId: propertyId, eventDate: eventDate, externalId: "event-1-copy")
+        XCTAssertEqual(viewModel.importCalendarEntries([contentDuplicate]), 0)
+        XCTAssertEqual(viewModel.timeEntries.count, 1)
+    }
+
+    func testStopTimerCapsStaleTimerAt24Hours() {
+        let viewModel = AppViewModel()
+        viewModel.suppressCelebrations = true
+        viewModel.addProperty(name: "Oak", address: "123 Oak St", type: .ltr)
+        let propertyId = viewModel.properties[0].id
+        viewModel.startTimer(propertyId: propertyId, category: .management)
+        viewModel.timerStartTime = Calendar.current.date(byAdding: .hour, value: -30, to: Date())
+
+        viewModel.stopTimer(participant: .selfParticipant, notes: "Long timer")
+
+        XCTAssertFalse(viewModel.isTimerRunning)
+        XCTAssertTrue(viewModel.timerWasCapped)
+        XCTAssertEqual(viewModel.timeEntries.count, 1)
+        XCTAssertEqual(viewModel.timeEntries[0].hours, 24, accuracy: 0.01)
+    }
+
+    private func makeDetectedEntry(propertyId: UUID, eventDate: Date, externalId: String) -> DetectedCalendarEntry {
+        DetectedCalendarEntry(
+            sourceExternalId: externalId,
+            sourceCalendarId: "calendar-1",
+            eventTitle: "Plumbing repair",
+            eventDate: eventDate,
+            propertyId: propertyId,
+            category: .repairs,
+            hours: 1.5
+        )
+    }
+}
+
 // MARK: - Date Extension Tests
 
 final class DateExtensionTests: XCTestCase {
@@ -395,11 +782,15 @@ final class TimeEntryImportSourceTests: XCTestCase {
             participant: .selfParticipant,
             category: .management,
             hours: 2.0,
-            importSource: "calendar"
+            importSource: "calendar",
+            importExternalId: "event-123",
+            importCalendarId: "calendar-abc"
         )
         let data = try JSONEncoder().encode(entry)
         let decoded = try JSONDecoder().decode(TimeEntry.self, from: data)
         XCTAssertEqual(decoded.importSource, "calendar")
+        XCTAssertEqual(decoded.importExternalId, "event-123")
+        XCTAssertEqual(decoded.importCalendarId, "calendar-abc")
     }
 
     func testTimeEntryRoundtripWithNilImportSource() throws {

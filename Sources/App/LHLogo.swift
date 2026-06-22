@@ -9,6 +9,7 @@ struct LHLogo: View {
     var showText: Bool = true
     var animated: Bool = false
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appeared = false
 
     var body: some View {
@@ -19,7 +20,7 @@ struct LHLogo: View {
             }
         }
         .onAppear {
-            if animated {
+            if animated && !reduceMotion {
                 withAnimation(AppAnimation.logoEntrance.delay(0.1)) {
                     appeared = true
                 }
@@ -71,7 +72,7 @@ struct WaveHouseIcon: View {
 
             // 1. Background fill
             let bgRect = CGRect(origin: .zero, size: canvasSize)
-            context.fill(Path(bgRect), with: .color(Color(hex: "F4F1FF")))
+            context.fill(Path(bgRect), with: .color(AppColors.logoCanvas))
 
             // 2. House clip path
             var housePath = Path()
@@ -96,7 +97,7 @@ struct WaveHouseIcon: View {
             }
 
             // 3. Base gradient (lightest violet)
-            let bgGradient = Gradient(colors: [Color(hex: "D8D0FF"), Color(hex: "B8AFFE")])
+            let bgGradient = Gradient(colors: [AppColors.logoWaveLightStart, AppColors.primaryLight])
             context.fill(Path(bgRect), with: .linearGradient(bgGradient, startPoint: .zero, endPoint: CGPoint(x: 0, y: s)))
 
             // 4. Wave 1 — light violet
@@ -108,7 +109,7 @@ struct WaveHouseIcon: View {
             wave1.addLine(to: p(1024, 1024))
             wave1.addLine(to: p(0, 1024))
             wave1.closeSubpath()
-            let w1Gradient = Gradient(colors: [Color(hex: "A899F7"), Color(hex: "9485F0")])
+            let w1Gradient = Gradient(colors: [AppColors.logoWaveMidStart, AppColors.logoWaveMidEnd])
             context.fill(wave1, with: .linearGradient(w1Gradient, startPoint: .zero, endPoint: CGPoint(x: s, y: s)))
 
             // 5. Wave 2 — mid violet
@@ -120,7 +121,7 @@ struct WaveHouseIcon: View {
             wave2.addLine(to: p(1024, 1024))
             wave2.addLine(to: p(0, 1024))
             wave2.closeSubpath()
-            let w2Gradient = Gradient(colors: [Color(hex: "8B78F0"), Color(hex: "7B68EE")])
+            let w2Gradient = Gradient(colors: [AppColors.logoWaveStrongStart, AppColors.primary])
             context.fill(wave2, with: .linearGradient(w2Gradient, startPoint: .zero, endPoint: CGPoint(x: s, y: s)))
 
             // 6. Wave 3 — deep violet
@@ -132,7 +133,7 @@ struct WaveHouseIcon: View {
             wave3.addLine(to: p(1024, 1024))
             wave3.addLine(to: p(0, 1024))
             wave3.closeSubpath()
-            let w3Gradient = Gradient(colors: [Color(hex: "6B58DE"), Color(hex: "4A38B0")])
+            let w3Gradient = Gradient(colors: [AppColors.logoWaveDeepStart, AppColors.logoWaveDeepEnd])
             context.fill(wave3, with: .linearGradient(w3Gradient, startPoint: .zero, endPoint: CGPoint(x: s * 0.5, y: s)))
         }
         .frame(width: size, height: size)
@@ -180,5 +181,5 @@ struct LHWordmark: View {
         LHWordmark(fontSize: 28)
     }
     .padding()
-    .background(Color(hex: "FAF7F2"))
+    .background(AppColors.background)
 }

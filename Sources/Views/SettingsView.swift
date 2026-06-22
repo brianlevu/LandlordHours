@@ -103,6 +103,15 @@ class GoalManager: ObservableObject {
         globalGoalType = .reps
     }
 
+    func resetForDataReset() {
+        propertyGoals = []
+        globalGoalType = .reps
+        let ud = UserDefaults.standard
+        ud.removeObject(forKey: goalsKey)
+        ud.removeObject(forKey: globalGoalKey)
+        onDidChange?()
+    }
+
     func setGoal(for propertyId: UUID, type: HourGoalType) {
         if let index = propertyGoals.firstIndex(where: { $0.propertyId == propertyId }) {
             propertyGoals[index].goalType = type
@@ -197,6 +206,20 @@ final class TaxProfileManager: ObservableObject {
         groupingElection = false
         nonREWorkHours = 0
     }
+
+    func resetForDataReset() {
+        filingStatus = .marriedJoint
+        spouseTracking = true
+        taxYear = Calendar.current.component(.year, from: Date())
+        groupingElection = false
+        nonREWorkHours = 0
+
+        let ud = UserDefaults.standard
+        for field in ["filingStatus", "spouseTracking", "taxYear", "groupingElection", "nonREWorkHours"] {
+            ud.removeObject(forKey: scopedKey(field))
+        }
+        onDidChange?()
+    }
 }
 
 // MARK: - Setting Row Component
@@ -217,16 +240,16 @@ private struct SettingRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            // Bare icon — no background container
             LucideIcon(image: icon, size: 20)
                 .foregroundStyle(isDanger ? AppColors.coral : iconColor)
-                .frame(width: 24, height: 24)
+                .frame(width: 38, height: 38)
+                .background(iconWash ?? colors.backgroundTertiary)
+                .clipShape(Circle())
 
             // Text content
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(AppTypography.body)
-                    .fontWeight(.medium)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(isDanger ? AppColors.coral : colors.textPrimary)
                 if let subtitle {
                     Text(subtitle)
@@ -251,7 +274,7 @@ private struct SettingRow: View {
                     .foregroundStyle(AppColors.cloud)
             }
         }
-        .padding(.vertical, 13)
+        .padding(.vertical, 12)
     }
 }
 
@@ -269,15 +292,15 @@ private struct SettingToggleRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            // Bare icon — no background container
             LucideIcon(image: icon, size: 20)
                 .foregroundStyle(iconColor)
-                .frame(width: 24, height: 24)
+                .frame(width: 38, height: 38)
+                .background(colors.backgroundTertiary)
+                .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(AppTypography.body)
-                    .fontWeight(.medium)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
                 if let subtitle {
                     Text(subtitle)
@@ -290,9 +313,92 @@ private struct SettingToggleRow: View {
 
             Toggle("", isOn: $isOn)
                 .labelsHidden()
-                .tint(AppColors.primary)
+                .tint(AppColors.sage)
         }
         .padding(.vertical, 13)
+    }
+}
+
+// MARK: - Appearance Preference Row
+
+private struct AppearancePreferenceRow: View {
+    @ObservedObject var appearanceManager: AppearanceManager
+
+    @Environment(\.colorScheme) var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 14) {
+                LucideIcon(image: Lucide.contrast, size: 20)
+                    .foregroundStyle(AppColors.action)
+                    .frame(width: 38, height: 38)
+                    .background(colors.actionSurface)
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Appearance")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                    Text("Follow the device or choose a theme")
+                        .font(AppTypography.caption)
+                        .foregroundStyle(colors.textTertiary)
+                }
+
+                Spacer()
+            }
+
+            HStack(spacing: 8) {
+                ForEach(AppAppearancePreference.allCases) { preference in
+                    appearanceButton(preference)
+                }
+            }
+        }
+        .padding(.vertical, 12)
+    }
+
+    private func appearanceButton(_ preference: AppAppearancePreference) -> some View {
+        let isSelected = appearanceManager.preference == preference
+
+        return Button {
+            if reduceMotion {
+                appearanceManager.preference = preference
+            } else {
+                withAnimation(AppAnimation.quick) {
+                    appearanceManager.preference = preference
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                LucideIcon(image: icon(for: preference), size: 14)
+                Text(preference.displayName)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+            }
+            .font(.system(size: 13, weight: .bold, design: .rounded))
+            .foregroundStyle(isSelected ? AppColors.onAction : colors.textSecondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(isSelected ? colors.action : colors.backgroundTertiary)
+            .clipShape(Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(isSelected ? Color.clear : colors.border.opacity(0.35), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.lhPressable)
+        .accessibilityLabel("\(preference.displayName) appearance")
+        .accessibilityHint(preference.subtitle)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func icon(for preference: AppAppearancePreference) -> UIImage {
+        switch preference {
+        case .system: return Lucide.monitor
+        case .light: return Lucide.sun
+        case .dark: return Lucide.moon
+        }
     }
 }
 
@@ -300,14 +406,15 @@ private struct SettingToggleRow: View {
 
 private struct SectionLabel: View {
     let text: String
+    @Environment(\.colorScheme) var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
-        Text(text.uppercased())
-            .font(AppTypography.label)
-            .tracking(1.5)
-            .foregroundStyle(AppColors.mist)
+        Text(text)
+            .font(.system(size: 19, weight: .black, design: .rounded))
+            .foregroundStyle(colors.textPrimary)
             .padding(.top, 28)
-            .padding(.bottom, 10)
+            .padding(.bottom, 8)
     }
 }
 
@@ -315,101 +422,139 @@ private struct SectionLabel: View {
 
 private struct SubscriptionCard: View {
     let isPro: Bool
-    let isTrialActive: Bool
-    let trialDaysRemaining: Int
     let onTap: () -> Void
+
+    @Environment(\.colorScheme) var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
         Button(action: onTap) {
-            if isPro && !isTrialActive {
-                // Pro member card
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("PRO PLAN")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1)
-                        .foregroundStyle(Color.white.opacity(0.6))
-
-                    Text("LandlordHours Pro")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.white)
-
-                    Text("Active subscription")
-                        .font(AppTypography.caption)
-                        .foregroundStyle(Color.white.opacity(0.6))
-                        .padding(.bottom, 6)
-
-                    Text("Manage Subscription")
-                        .font(AppTypography.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Color.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.white.opacity(0.2))
-                        .clipShape(Capsule())
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(18)
-                .background(
-                    LinearGradient(
-                        colors: [AppColors.primaryDark, AppColors.primary],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
-            } else {
-                // Trial / free card
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("FREE TRIAL")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1)
-                        .foregroundStyle(AppColors.warning)
-
-                    Text(isTrialActive ? "\(trialDaysRemaining) days remaining" : "Trial Expired")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.white)
-
-                    // Trial progress bar
-                    if isTrialActive {
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Capsule()
-                                    .fill(Color.white.opacity(0.15))
-                                    .frame(height: 3)
-                                Capsule()
-                                    .fill(AppColors.warning)
-                                    .frame(width: geo.size.width * CGFloat(max(0, 7 - trialDaysRemaining)) / 7.0, height: 3)
-                            }
-                        }
-                        .frame(height: 3)
-                        .padding(.bottom, 8)
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top, spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(isPro ? AppColors.positiveSurface : AppColors.actionSurface)
+                            .frame(width: 54, height: 54)
+                        LucideIcon(image: isPro ? Lucide.badgeCheck : Lucide.sparkles, size: 24)
+                            .foregroundStyle(isPro ? AppColors.successGreen : AppColors.action)
                     }
 
-                    Text("Upgrade to Pro")
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(AppColors.primary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(isPro ? "Pro is active" : "Upgrade to Pro")
+                            .font(.system(size: 23, weight: .black, design: .rounded))
+                            .foregroundStyle(colors.textPrimary)
+                        Text(isPro ? "Lifetime access is unlocked for this account." : "Unlock the audit-ready tools that make this app worth trusting at tax time.")
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundStyle(colors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    LucideIcon(image: Lucide.chevronRight, size: 14)
+                        .foregroundStyle(colors.textTertiary)
+                        .padding(.top, 6)
+                }
+
+                HStack(spacing: 8) {
+                    planBenefit("PDF exports", icon: Lucide.fileText)
+                    planBenefit("Unlimited properties", icon: Lucide.building2)
+                }
+
+                HStack {
+                    Text(isPro ? "Manage Pro" : "One-time lifetime purchase")
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(isPro ? AppColors.successGreen : AppColors.onAction)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(isPro ? AppColors.positiveSurface : AppColors.action)
+                        .clipShape(Capsule())
+
+                    Spacer()
+
+                    Text(isPro ? "ACTIVE" : "PRO")
+                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .foregroundStyle(isPro ? AppColors.successGreen : AppColors.action)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(isPro ? AppColors.positiveSurface : AppColors.actionSurface)
                         .clipShape(Capsule())
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(18)
-                .background(
-                    LinearGradient(
-                        colors: [AppColors.charcoal, AppColors.ink],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                LinearGradient(
+                    colors: colorScheme == .dark
+                        ? [colors.backgroundSecondary, AppColors.darkPlum.opacity(0.72)]
+                        : [Color.white, AppColors.lavenderPale, isPro ? AppColors.successGreenWash : AppColors.reportsAccentWash],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
-                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(isPro ? AppColors.positive.opacity(0.28) : AppColors.action.opacity(0.22), lineWidth: 1)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.lhPressable)
+        .accessibilityLabel(isPro ? "Manage Pro. Lifetime access is active." : "Upgrade to Pro. One-time lifetime purchase.")
+    }
+
+    private func planBenefit(_ text: String, icon: UIImage) -> some View {
+        HStack(spacing: 6) {
+            LucideIcon(image: icon, size: 13)
+                .foregroundStyle(isPro ? AppColors.successGreen : AppColors.action)
+            Text(text)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 9)
+        .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.5 : 0.72))
+        .clipShape(Capsule())
     }
 }
 
-// MARK: - Feature List (Trial)
+private struct SettingsGroup<Content: View>: View {
+    let title: String
+    var subtitle: String? = nil
+    @ViewBuilder let content: Content
+
+    @Environment(\.colorScheme) var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                }
+            }
+
+            VStack(spacing: 0) {
+                content
+            }
+            .padding(.horizontal, 14)
+            .background(colors.backgroundSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(colors.border.opacity(colorScheme == .dark ? 0.42 : 0.28), lineWidth: 1)
+            }
+        }
+    }
+}
+
+// MARK: - Feature List
 
 private struct FeatureListView: View {
     @Environment(\.colorScheme) var colorScheme
@@ -487,23 +632,17 @@ private struct ProfileRow: View {
                 } else {
                     ZStack {
                         Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [AppColors.primary, AppColors.primaryLight],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
+                            .fill(AppColors.sage)
                             .frame(width: 48, height: 48)
 
                         // Show initial or person icon
                         if !name.isEmpty && name != "Your Name" {
                             Text(String(name.prefix(1)).uppercased())
                                 .font(.system(size: 20, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color.white)
+                                .foregroundStyle(AppColors.charcoal)
                         } else {
                             LucideIcon(image: Lucide.user, size: 20)
-                                .foregroundStyle(Color.white)
+                                .foregroundStyle(AppColors.charcoal)
                         }
                     }
                 }
@@ -511,7 +650,7 @@ private struct ProfileRow: View {
                 // Name and email
                 VStack(alignment: .leading, spacing: 1) {
                     Text(name)
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .font(.system(size: 16, weight: .black, design: .rounded))
                         .foregroundStyle(colors.textPrimary)
                     if let email, !email.isEmpty {
                         Text(email)
@@ -525,7 +664,7 @@ private struct ProfileRow: View {
                 LucideIcon(image: Lucide.chevronRight, size: 12)
                     .foregroundStyle(AppColors.cloud)
             }
-            .padding(.vertical, 16)
+            .padding(.vertical, 14)
         }
         .buttonStyle(.plain)
     }
@@ -538,7 +677,9 @@ struct SettingsView: View {
     @EnvironmentObject var categoryManager: CategoryManager
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @StateObject private var appleSignIn = AppleSignInManager.shared
+    @StateObject private var appearanceManager = AppearanceManager.shared
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var showingResetAlert = false
@@ -549,306 +690,364 @@ struct SettingsView: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var profileImage: Data?
     @State private var showingIconPicker = false
-    @State private var showingCalendarImport = false
-    @State private var calendarDetectedEntries: [DetectedCalendarEntry] = []
-    @State private var isScanning = false
+    @State private var restoreStatusMessage: String?
+    @State private var showingDeleteAccountAlert = false
+    @State private var isDeletingAccount = false
+    @State private var deleteAccountError: String?
+    @State private var showDeveloperTools = false
 
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    // Page title
-                    HStack {
+                VStack(spacing: 22) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text("Settings")
-                            .font(.system(size: 28, weight: .regular, design: .serif))
+                            .font(.system(size: 42, weight: .black, design: .rounded))
                             .foregroundStyle(colors.textPrimary)
-                        Spacer()
+                            .minimumScaleFactor(0.82)
+                        Text("Account, tax profile, exports, and support.")
+                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .foregroundStyle(colors.textSecondary)
                     }
-                    .padding(.vertical, 4)
-                    .padding(.bottom, 20)
-
-                    // ===== Plan & Account =====
-                    SectionLabel(text: "Plan & Account")
-                        .padding(.top, 0)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     SubscriptionCard(
                         isPro: subscriptionManager.isPro,
-                        isTrialActive: subscriptionManager.isTrialActive,
-                        trialDaysRemaining: subscriptionManager.trialDaysRemaining,
                         onTap: { showingPaywall = true }
                     )
-                    .padding(.bottom, 4)
 
-                    // Feature list for trial/free users
-                    if !subscriptionManager.isPro || subscriptionManager.isTrialActive {
-                        FeatureListView()
-                    }
-
-                    // Restore purchase row
-                    Button {
-                        Task {
-                            await subscriptionManager.restorePurchases()
+                    if !subscriptionManager.isPro {
+                        SettingsGroup(title: "What Pro unlocks", subtitle: "The features that matter when records need to leave the app.") {
+                            FeatureListView()
                         }
-                    } label: {
-                        SettingRow(
-                            icon: Lucide.badgeCheck,
-                            iconColor: AppColors.charcoal,
-                            title: "Restore Purchase"
+                    }
+
+                    SettingsGroup(title: "Account", subtitle: "Profile, purchase status, and identity.") {
+                        ProfileRow(
+                            name: appleSignIn.fullName ?? (viewModel.userName.isEmpty ? "Your Name" : viewModel.userName),
+                            email: appleSignIn.email,
+                            imageData: profileImage ?? appleSignIn.profileImageData,
+                            onTap: {
+                                userName = appleSignIn.fullName ?? viewModel.userName
+                                userEmail = appleSignIn.email ?? ""
+                                profileImage = appleSignIn.profileImageData
+                                showingProfileEdit = true
+                            }
                         )
-                    }
-                    .buttonStyle(.plain)
 
-                    #if DEBUG
-                    // Debug-only: unlock Pro without StoreKit
-                    Button {
-                        print("[DEBUG] Unlock Pro tapped — calling unlockPro()")
-                        Task { await subscriptionManager.unlockPro() }
-                    } label: {
-                        Text(subscriptionManager.hasPurchased ? "DEBUG: Pro Unlocked ✓" : "DEBUG: Unlock Pro")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(subscriptionManager.hasPurchased ? AppColors.sage : AppColors.coral)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    .padding(.top, 8)
-                    #endif
+                        Divider().background(colors.border.opacity(0.35))
 
-                    // ===== Profile & Tax =====
-                    SectionLabel(text: "Profile & Tax")
-
-                    ProfileRow(
-                        name: appleSignIn.fullName ?? (viewModel.userName.isEmpty ? "Your Name" : viewModel.userName),
-                        email: appleSignIn.email,
-                        imageData: profileImage ?? appleSignIn.profileImageData,
-                        onTap: {
-                            userName = appleSignIn.fullName ?? viewModel.userName
-                            userEmail = appleSignIn.email ?? ""
-                            profileImage = appleSignIn.profileImageData
-                            showingProfileEdit = true
-                        }
-                    )
-
-                    Divider().background(AppColors.snow)
-
-                    // Tax Profile (includes goal, filing status, spouse tracking)
-                    NavigationLink {
-                        TaxProfileView()
-                    } label: {
-                        SettingRow(
-                            icon: Lucide.fileText,
-                            iconColor: AppColors.charcoal,
-                            title: "Tax Profile",
-                            subtitle: "Filing, goals & spouse tracking"
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    Divider().background(AppColors.snow)
-
-                    // Learning Center
-                    NavigationLink {
-                        LearningCenterView()
-                    } label: {
-                        SettingRow(
-                            icon: Lucide.bookOpen,
-                            iconColor: AppColors.charcoal,
-                            title: "Learning Center",
-                            subtitle: "Guides, tax strategy & tips"
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    // ===== Data & Export =====
-                    SectionLabel(text: "Data & Export")
-
-                    if subscriptionManager.isPro && !subscriptionManager.isTrialActive {
-                        NavigationLink {
-                            ExportPDFView(year: Calendar.current.component(.year, from: Date()))
+                        Button {
+                            Task {
+                                await subscriptionManager.restorePurchases()
+                                restoreStatusMessage = subscriptionManager.hasPurchased
+                                    ? "Your Pro purchase has been restored."
+                                    : (subscriptionManager.purchaseError ?? "No previous purchase was found.")
+                            }
                         } label: {
                             SettingRow(
-                                icon: Lucide.download,
-                                iconColor: AppColors.charcoal,
-                                title: "Export Reports",
-                                subtitle: "PDF for your accountant"
+                                icon: Lucide.badgeCheck,
+                                iconColor: AppColors.action,
+                                iconWash: colors.actionSurface,
+                                title: subscriptionManager.isLoading ? "Restoring Purchase..." : "Restore Purchase",
+                                subtitle: "Recover a previous Pro purchase"
                             )
                         }
                         .buttonStyle(.plain)
-                    } else {
-                        HStack(spacing: 14) {
-                            LucideIcon(image: Lucide.download, size: 20)
-                                .foregroundStyle(AppColors.charcoal)
-                                .frame(width: 24, height: 24)
+                        .disabled(subscriptionManager.isLoading)
+                    }
 
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text("Export Reports")
-                                    .font(AppTypography.body)
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(colors.textPrimary)
-                                Text("Upgrade to unlock")
-                                    .font(AppTypography.caption)
-                                    .foregroundStyle(colors.textTertiary)
-                            }
-
-                            Spacer()
-
-                            Text("PRO")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(AppColors.primary)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 2)
-                                .background(AppColors.primarySurface)
-                                .clipShape(Capsule())
+                    SettingsGroup(title: "Tax Setup", subtitle: "The assumptions that drive qualification math.") {
+                        NavigationLink {
+                            TaxProfileView()
+                        } label: {
+                            SettingRow(
+                                icon: Lucide.fileText,
+                                iconColor: AppColors.action,
+                                iconWash: colors.actionSurface,
+                                title: "Tax Profile",
+                                subtitle: "Filing, goals, spouse tracking, and 50% rule inputs"
+                            )
                         }
-                        .padding(.vertical, 13)
-                        .opacity(0.5)
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("settings.taxProfile")
+
+                        Divider().background(colors.border.opacity(0.35))
+
+                        NavigationLink {
+                            LearningCenterView()
+                        } label: {
+                            SettingRow(
+                                icon: Lucide.bookOpen,
+                                iconColor: AppColors.informational,
+                                iconWash: colors.informationalSurface,
+                                title: "Learning Center",
+                                subtitle: "REPS, STR rules, and audit-ready logs"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("settings.learningCenter")
                     }
 
-                    Divider().background(AppColors.snow)
-
-                    // Backup / Sync
-                    Button {
-                        viewModel.syncNow()
-                    } label: {
-                        SettingRow(
-                            icon: Lucide.cloudUpload,
-                            iconColor: AppColors.charcoal,
-                            title: "Sync Now",
-                            subtitle: syncSubtitle
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    Divider().background(AppColors.snow)
-
-                    // Import from Calendar
-                    Button {
-                        Task {
-                            isScanning = true
-                            let granted = await CalendarImportService.shared.requestAccess()
-                            if granted {
-                                let calendars = CalendarImportService.shared.availableCalendars()
-                                let allIds = Set(calendars.map { $0.calendarIdentifier })
-                                calendarDetectedEntries = CalendarImportService.shared.scanCalendars(
-                                    allIds,
-                                    properties: viewModel.properties
+                    SettingsGroup(title: "Records", subtitle: "Import, sync, and export your tracking evidence.") {
+                        if subscriptionManager.isPro && !subscriptionManager.isTrialActive {
+                            NavigationLink {
+                                ExportPDFView(year: Calendar.current.component(.year, from: Date()))
+                            } label: {
+                                SettingRow(
+                                    icon: Lucide.download,
+                                    iconColor: AppColors.action,
+                                    iconWash: colors.actionSurface,
+                                    title: "Export Reports",
+                                    subtitle: "PDF package for your accountant"
                                 )
-                                showingCalendarImport = true
                             }
-                            isScanning = false
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("settings.exportReports")
+                        } else {
+                            Button {
+                                showingPaywall = true
+                            } label: {
+                                SettingRow(
+                                    icon: Lucide.download,
+                                    iconColor: AppColors.action,
+                                    iconWash: colors.actionSurface,
+                                    title: "Export Reports",
+                                    subtitle: "Unlock accountant-ready PDF exports with Pro",
+                                    value: "PRO",
+                                    valueColor: AppColors.action
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
-                    } label: {
-                        SettingRow(
-                            icon: Lucide.calendar,
-                            iconColor: AppColors.charcoal,
-                            title: "Import from Calendar",
-                            subtitle: isScanning ? "Scanning..." : "Detect property events"
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isScanning)
 
-                    // ===== Preferences =====
-                    SectionLabel(text: "Preferences")
+                        Divider().background(colors.border.opacity(0.35))
 
-                    // Notifications
-                    Button {
-                        if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
-                            UIApplication.shared.open(url)
+                        Button {
+                            viewModel.syncNow()
+                        } label: {
+                            SettingRow(
+                                icon: Lucide.cloudUpload,
+                                iconColor: AppColors.informational,
+                                iconWash: colors.informationalSurface,
+                                title: "Sync Now",
+                                subtitle: syncSubtitle ?? "Back up latest records to iCloud"
+                            )
                         }
-                    } label: {
-                        SettingRow(
-                            icon: Lucide.bell,
-                            iconColor: AppColors.charcoal,
-                            title: "Notifications"
-                        )
-                    }
-                    .buttonStyle(.plain)
+                        .buttonStyle(.plain)
 
-                    Divider().background(AppColors.snow)
+                        Divider().background(colors.border.opacity(0.35))
 
-                    // App Icon
-                    Button {
-                        showingIconPicker = true
-                    } label: {
-                        SettingRow(
-                            icon: Lucide.layoutGrid,
-                            iconColor: AppColors.charcoal,
-                            title: "App Icon",
-                            value: AppIconOption.current.displayName
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    // ===== Support =====
-                    SectionLabel(text: "Support")
-
-                    // Contact Support
-                    NavigationLink {
-                        ContactSupportView()
-                    } label: {
-                        SettingRow(
-                            icon: Lucide.mail,
-                            iconColor: AppColors.charcoal,
-                            title: "Contact Support"
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    Divider().background(AppColors.snow)
-
-                    // Terms & Privacy
-                    Button {
-                        if let url = URL(string: "https://www.openclaw.com/landlord-hours/terms") {
-                            UIApplication.shared.open(url)
+                        NavigationLink {
+                            CalendarImportView()
+                                .environmentObject(viewModel)
+                        } label: {
+                            SettingRow(
+                                icon: Lucide.calendar,
+                                iconColor: AppColors.informational,
+                                iconWash: colors.informationalSurface,
+                                title: "Import from Calendar",
+                                subtitle: "Detect property events and draft time entries"
+                            )
                         }
-                    } label: {
-                        SettingRow(
-                            icon: Lucide.scrollText,
-                            iconColor: AppColors.charcoal,
-                            title: "Terms & Privacy"
-                        )
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("settings.importCalendar")
                     }
-                    .buttonStyle(.plain)
 
-                    Divider().background(AppColors.snow)
+                    SettingsGroup(title: "App Preferences", subtitle: "Personalize reminders, icon, and setup guidance.") {
+                        AppearancePreferenceRow(appearanceManager: appearanceManager)
+                            .accessibilityIdentifier("settings.appearance")
 
-                    // Sign Out (danger)
-                    Button {
-                        viewModel.signOut()
-                        AppleSignInManager.shared.signOut()
-                    } label: {
-                        SettingRow(
-                            icon: Lucide.logOut,
-                            iconColor: AppColors.coral,
-                            title: "Sign Out",
-                            showChevron: false,
-                            isDanger: true
-                        )
+                        Divider().background(colors.border.opacity(0.35))
+
+                        Button {
+                            if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        } label: {
+                            SettingRow(
+                                icon: Lucide.bell,
+                                iconColor: AppColors.caution,
+                                iconWash: colors.cautionSurface,
+                                title: "Notifications",
+                                subtitle: "Manage reminder permissions in iOS Settings"
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        Divider().background(colors.border.opacity(0.35))
+
+                        Button {
+                            showingIconPicker = true
+                        } label: {
+                            SettingRow(
+                                icon: Lucide.layoutGrid,
+                                iconColor: AppColors.action,
+                                iconWash: colors.actionSurface,
+                                title: "App Icon",
+                                value: AppIconOption.current.displayName
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("settings.appIcon")
+
+                        Divider().background(colors.border.opacity(0.35))
+
+                        Button {
+                            NotificationCenter.default.post(name: .restartGuidedOnboarding, object: nil)
+                        } label: {
+                            SettingRow(
+                                icon: Lucide.route,
+                                iconColor: AppColors.action,
+                                iconWash: colors.actionSurface,
+                                title: "Restart Guided Setup",
+                                subtitle: "Show the first property and first activity walkthrough again"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("settings.restartGuidedSetup")
+
+                        Divider().background(colors.border.opacity(0.35))
+
+                        Button {
+                            NotificationCenter.default.post(name: .skipGuidedOnboarding, object: nil)
+                        } label: {
+                            SettingRow(
+                                icon: Lucide.circleSlash,
+                                iconColor: AppColors.textSecondary,
+                                title: "Skip Guided Setup",
+                                subtitle: "Hide first-run prompts on this account"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("settings.skipGuidedSetup")
                     }
-                    .buttonStyle(.plain)
+
+                    SettingsGroup(title: "Support & Legal", subtitle: "Help, policies, and account exits.") {
+                        NavigationLink {
+                            ContactSupportView()
+                        } label: {
+                            SettingRow(
+                                icon: Lucide.mail,
+                                iconColor: AppColors.informational,
+                                iconWash: colors.informationalSurface,
+                                title: "Contact Support",
+                                subtitle: "Questions about tracking, exports, or setup"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("settings.contactSupport")
+
+                        Divider().background(colors.border.opacity(0.35))
+
+                        Button {
+                            if let url = URL(string: "https://www.openclaw.com/landlord-hours/terms") {
+                                UIApplication.shared.open(url)
+                            }
+                        } label: {
+                            SettingRow(
+                                icon: Lucide.scrollText,
+                                iconColor: AppColors.textSecondary,
+                                title: "Terms & Privacy"
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        Divider().background(colors.border.opacity(0.35))
+
+                        Button {
+                            viewModel.signOut()
+                            AppleSignInManager.shared.signOut()
+                        } label: {
+                            SettingRow(
+                                icon: Lucide.logOut,
+                                iconColor: AppColors.coral,
+                                iconWash: colors.destructiveSurface,
+                                title: "Sign Out",
+                                showChevron: false,
+                                isDanger: true
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        Divider().background(colors.border.opacity(0.35))
+
+                        Button {
+                            showingDeleteAccountAlert = true
+                        } label: {
+                            SettingRow(
+                                icon: Lucide.trash2,
+                                iconColor: AppColors.coral,
+                                iconWash: colors.destructiveSurface,
+                                title: isDeletingAccount ? "Deleting Account..." : "Delete Account and Data",
+                                subtitle: "Permanently remove this account and records",
+                                showChevron: false,
+                                isDanger: true
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isDeletingAccount)
+                    }
+
+                    #if DEBUG
+                    if AdminAccess.isCurrentUserAdmin {
+                        developerToolsSection
+                    }
+                    #endif
 
                     // Version
                     Text("LandlordHours v1.0.0")
                         .font(AppTypography.caption)
                         .foregroundStyle(AppColors.cloud)
-                        .padding(.top, 20)
-                        .padding(.bottom, 40)
+                        .padding(.bottom, AppSpacing.tabContentBottomInset)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
+                .padding(.horizontal, 24)
+                .padding(.top, 18)
             }
-            .background(colors.background)
+            .background {
+                LHMobileCanvas()
+            }
             .navigationBarHidden(true)
             .alert("Reset All Data?", isPresented: $showingResetAlert) {
                 Button("Cancel", role: .cancel) { }
                 Button("Reset", role: .destructive) {
-                    UserDefaults.standard.removeObject(forKey: UserScope.key("LandlordHours.properties"))
-                    UserDefaults.standard.removeObject(forKey: UserScope.key("LandlordHours.entries"))
+                    viewModel.resetCurrentUserLocalData()
                 }
             } message: {
-                Text("This will delete all your properties, time entries, and settings.")
+                Text("This will delete your local properties, time entries, goals, tax profile, categories, and setup state for this account. Your sign-in and Pro purchase status stay intact.")
+            }
+            .alert("Delete Account and Data?", isPresented: $showingDeleteAccountAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete Account", role: .destructive) {
+                    Task {
+                        isDeletingAccount = true
+                        do {
+                            try await viewModel.deleteAccountAndData()
+                            AppleSignInManager.shared.signOut()
+                        } catch {
+                            deleteAccountError = error.localizedDescription
+                        }
+                        isDeletingAccount = false
+                    }
+                }
+            } message: {
+                Text("This permanently deletes your LandlordHours account data on this device and any LandlordHours iCloud backup records for this app account, including properties, time entries, categories, goals, and tax profile. This cannot be undone.")
+            }
+            .alert("Account Deletion Failed", isPresented: Binding(
+                get: { deleteAccountError != nil },
+                set: { if !$0 { deleteAccountError = nil } }
+            )) {
+                Button("OK", role: .cancel) { deleteAccountError = nil }
+            } message: {
+                Text(deleteAccountError ?? "")
+            }
+            .alert("Restore Purchase", isPresented: Binding(
+                get: { restoreStatusMessage != nil },
+                set: { if !$0 { restoreStatusMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) { restoreStatusMessage = nil }
+            } message: {
+                Text(restoreStatusMessage ?? "")
             }
             .sheet(isPresented: $showingProfileEdit) {
                 ProfileEditView(userName: $userName, userEmail: $userEmail, profileImage: $profileImage)
@@ -858,9 +1057,6 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingIconPicker) {
                 AppIconPickerView()
-            }
-            .sheet(isPresented: $showingCalendarImport) {
-                CalendarImportReviewView(detectedEntries: calendarDetectedEntries)
             }
         }
     }
@@ -876,6 +1072,134 @@ struct SettingsView: View {
         if !viewModel.syncService.accountAvailable { return "iCloud unavailable" }
         return nil
     }
+
+    private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
+        if reduceMotion {
+            updates()
+        } else {
+            withAnimation(animation, updates)
+        }
+    }
+
+    #if DEBUG
+    private var developerToolsSection: some View {
+        DisclosureGroup(isExpanded: $showDeveloperTools) {
+            VStack(spacing: 12) {
+                Button {
+                    subscriptionManager.unlockPro()
+                } label: {
+                    HStack {
+                        LucideIcon(image: Lucide.badgeCheck, size: 18)
+                        Text(subscriptionManager.hasPurchased ? "Pro unlocked for this build" : "Unlock Pro for testing")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                        Spacer()
+                    }
+                    .foregroundStyle(subscriptionManager.hasPurchased ? AppColors.successGreen : AppColors.onAction)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(subscriptionManager.hasPurchased ? AppColors.successGreenWash : AppColors.coral)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(.plain)
+
+                ForEach(AppViewModel.MockDataScenario.allCases) { scenario in
+                    Button {
+                        animate(AppAnimation.smooth) {
+                            viewModel.applyMockScenario(scenario)
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            LHIconTile(
+                                icon: debugScenarioIcon(for: scenario),
+                                color: debugScenarioColor(for: scenario),
+                                wash: debugScenarioWash(for: scenario),
+                                size: 38,
+                                isActive: true
+                            )
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(scenario.title)
+                                    .font(AppTypography.body)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(colors.textPrimary)
+                                Text(scenario.subtitle)
+                                    .font(AppTypography.caption)
+                                    .foregroundStyle(colors.textSecondary)
+                            }
+
+                            Spacer()
+
+                            Text("Seed")
+                                .font(AppTypography.buttonSmall)
+                                .foregroundStyle(debugScenarioColor(for: scenario))
+                        }
+                        .padding(12)
+                        .background(colors.backgroundSecondary)
+                        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: AppCornerRadius.large)
+                                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.top, 12)
+        } label: {
+            HStack(spacing: 12) {
+                LHIconTile(
+                    icon: Lucide.code,
+                    color: AppColors.textSecondary,
+                    wash: colors.backgroundTertiary,
+                    size: 38,
+                    isActive: true
+                )
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Developer Tools")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                    Text("Mock data and debug-only Pro controls")
+                        .font(AppTypography.caption)
+                        .foregroundStyle(colors.textSecondary)
+                }
+            }
+        }
+        .padding(14)
+        .background(colors.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(colors.border.opacity(0.28), lineWidth: 1)
+        }
+    }
+
+    private func debugScenarioIcon(for scenario: AppViewModel.MockDataScenario) -> UIImage {
+        switch scenario {
+        case .firstTime: return Lucide.userPlus
+        case .emptyMainTabs: return Lucide.panelTop
+        case .occasional: return Lucide.calendarClock
+        case .frequent: return Lucide.chartNoAxesCombined
+        }
+    }
+
+    private func debugScenarioColor(for scenario: AppViewModel.MockDataScenario) -> Color {
+        switch scenario {
+        case .firstTime: return AppColors.sky
+        case .emptyMainTabs: return AppColors.primary
+        case .occasional: return AppColors.honey
+        case .frequent: return AppColors.primary
+        }
+    }
+
+    private func debugScenarioWash(for scenario: AppViewModel.MockDataScenario) -> Color {
+        switch scenario {
+        case .firstTime: return colors.skyWash
+        case .emptyMainTabs: return colors.primarySurface
+        case .occasional: return colors.honeyWash
+        case .frequent: return colors.primarySurface
+        }
+    }
+    #endif
 }
 
 // MARK: - Tax Profile View
@@ -898,16 +1222,29 @@ struct TaxProfileView: View {
     @State private var newPropertyType: PropertyType = .ltr
 
     private let propertyIconStyles: [(bg: Color, fg: Color)] = [
-        (Color(hex: "EDE8FF"), Color(hex: "7B68EE")),
-        (Color(hex: "FFE8E4"), Color(hex: "FF8A7A")),
-        (Color(hex: "FFF4E0"), Color(hex: "F5C563")),
-        (Color(hex: "E0F5E8"), Color(hex: "7EC8A0")),
-        (Color(hex: "E0F0FF"), Color(hex: "6CB4EE")),
+        (AppColors.sageWash, AppColors.charcoal),
+        (AppColors.coralWash, AppColors.charcoal),
+        (AppColors.honeyWash, AppColors.charcoal),
+        (AppColors.skyWash, AppColors.charcoal),
+        (AppColors.primarySurface, AppColors.charcoal),
     ]
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Tax profile")
+                        .font(.system(size: 42, weight: .black, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                        .minimumScaleFactor(0.82)
+                    Text("Set the filing assumptions that drive your reports.")
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+                .padding(.top, 18)
+
                 filingStatusSection
                 qualificationGoalSection
                 propertiesSection
@@ -915,12 +1252,15 @@ struct TaxProfileView: View {
                 Spacer().frame(height: 100)
             }
         }
-        .background(colors.background)
+        .background {
+            LHMobileCanvas()
+        }
         .navigationBarTitleDisplayMode(.inline)
+        .hidesAppTabBar()
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Text("Tax Profile")
-                    .font(.system(size: 22, weight: .regular, design: .serif))
+                Text("")
+                    .font(.system(size: 1))
                     .foregroundStyle(colors.textPrimary)
             }
         }
@@ -959,8 +1299,8 @@ struct TaxProfileView: View {
                 Button { showFilingStatusPicker = true } label: {
                     tpRow(
                         icon: Lucide.fileText,
-                        iconBg: Color(hex: "EDE8FF"),
-                        iconFg: Color(hex: "7B68EE"),
+                        iconBg: colors.backgroundTertiary,
+                        iconFg: AppColors.charcoal,
                         title: "Filing Status",
                         subtitle: "How you file your tax return",
                         rightText: taxProfile.filingStatus.rawValue
@@ -972,16 +1312,19 @@ struct TaxProfileView: View {
 
                 tpToggleRow(
                     icon: Lucide.users,
-                    iconBg: Color(hex: "FFE8E4"),
-                    iconFg: Color(hex: "FF8A7A"),
+                    iconBg: AppColors.coralWash,
+                    iconFg: AppColors.charcoal,
                     title: "Track Spouse Hours",
                     subtitle: "Combine for Material Participation",
                     isOn: $taxProfile.spouseTracking
                 )
             }
             .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: Color.black.opacity(0.03), radius: 2, y: 1)
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .stroke(colors.border.opacity(0.28), lineWidth: 1)
+            }
 
             tpInfoTip {
                 (Text("Spouse hours ").fontWeight(.semibold).foregroundStyle(colors.textPrimary) +
@@ -1004,8 +1347,8 @@ struct TaxProfileView: View {
                 Button { showGoalPicker = true } label: {
                     tpRow(
                         icon: Lucide.layers,
-                        iconBg: Color(hex: "EDE8FF"),
-                        iconFg: Color(hex: "7B68EE"),
+                        iconBg: colors.backgroundTertiary,
+                        iconFg: AppColors.charcoal,
                         title: "Primary Goal",
                         subtitle: "Determines your Reports dashboard",
                         rightText: "\(goalManager.globalGoalType.rawValue) (\(Int(goalManager.globalGoalType.hoursRequired))h)"
@@ -1018,8 +1361,8 @@ struct TaxProfileView: View {
                 Button { showYearPicker = true } label: {
                     tpRow(
                         icon: Lucide.calendar,
-                        iconBg: Color(hex: "E0F5E8"),
-                        iconFg: Color(hex: "7EC8A0"),
+                        iconBg: AppColors.sageWash,
+                        iconFg: AppColors.charcoal,
                         title: "Tax Year",
                         subtitle: "January 1 \u{2013} December 31",
                         rightText: "\(taxProfile.taxYear)"
@@ -1031,16 +1374,19 @@ struct TaxProfileView: View {
 
                 tpToggleRow(
                     icon: Lucide.clipboardCheck,
-                    iconBg: Color(hex: "FFF4E0"),
-                    iconFg: Color(hex: "F5C563"),
+                    iconBg: AppColors.honeyWash,
+                    iconFg: AppColors.charcoal,
                     title: "Grouping Election",
                     subtitle: "Treat all rentals as one activity",
                     isOn: $taxProfile.groupingElection
                 )
             }
             .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: Color.black.opacity(0.03), radius: 2, y: 1)
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .stroke(colors.border.opacity(0.28), lineWidth: 1)
+            }
 
             tpInfoTip {
                 (Text("Grouping Election (1.469-9g): ").fontWeight(.semibold).foregroundStyle(colors.textPrimary) +
@@ -1093,8 +1439,11 @@ struct TaxProfileView: View {
                 .buttonStyle(.plain)
             }
             .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: Color.black.opacity(0.03), radius: 2, y: 1)
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .stroke(colors.border.opacity(0.28), lineWidth: 1)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, 20)
@@ -1113,8 +1462,8 @@ struct TaxProfileView: View {
                 } label: {
                     tpRow(
                         icon: Lucide.briefcase,
-                        iconBg: Color(hex: "F0EFF4"),
-                        iconFg: Color(hex: "6E6E82"),
+                        iconBg: colors.backgroundTertiary,
+                        iconFg: AppColors.charcoal,
                         title: "Non-RE Work Hours",
                         subtitle: "W-2 or other job hours this year",
                         rightText: "\(Int(taxProfile.nonREWorkHours))h"
@@ -1123,8 +1472,11 @@ struct TaxProfileView: View {
                 .buttonStyle(.plain)
             }
             .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: Color.black.opacity(0.03), radius: 2, y: 1)
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .stroke(colors.border.opacity(0.28), lineWidth: 1)
+            }
 
             tpInfoTip {
                 (Text("For REPS, your RE hours must be ").foregroundStyle(AppColors.slate) +
@@ -1173,12 +1525,11 @@ struct TaxProfileView: View {
 
     private func propertyBadge(_ type: PropertyType) -> some View {
         let (bg, fg): (Color, Color) = type == .ltr
-            ? (Color(hex: "EDE8FF"), Color(hex: "7B68EE"))
-            : (Color(hex: "FFF4E0"), Color(hex: "D4870E"))
+            ? (colors.sageWash, colors.textPrimary)
+            : (colors.honeyWash, colors.textPrimary)
 
         return Text(type.rawValue)
-            .font(.system(size: 10, weight: .bold))
-            .tracking(0.5)
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
             .foregroundStyle(fg)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
@@ -1189,10 +1540,9 @@ struct TaxProfileView: View {
     // MARK: - Reusable Row Helpers
 
     private func tpSectionTitle(_ text: String) -> some View {
-        Text(text.uppercased())
-            .font(.system(size: 11, weight: .bold))
-            .tracking(1.2)
-            .foregroundStyle(AppColors.mist)
+        Text(text)
+            .font(.system(size: 19, weight: .black, design: .rounded))
+            .foregroundStyle(colors.textPrimary)
             .padding(.leading, 4)
     }
 
@@ -1262,22 +1612,22 @@ struct TaxProfileView: View {
     private func tpInfoTip<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         HStack(alignment: .top, spacing: 10) {
             RoundedRectangle(cornerRadius: 6)
-                .fill(Color(hex: "EDE8FF"))
+                .fill(AppColors.sageWash)
                 .frame(width: 20, height: 20)
                 .overlay(
                     LucideIcon(image: Lucide.info, size: 10)
-                        .foregroundStyle(AppColors.primary)
+                        .foregroundStyle(AppColors.charcoal)
                 )
 
             content()
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color(hex: "F8F6FF"))
+        .background(AppColors.sageWash.opacity(colorScheme == .dark ? 0.18 : 1))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(hex: "EDE8FF"), lineWidth: 1)
+                .stroke(AppColors.sage.opacity(0.28), lineWidth: 1)
         )
     }
 
@@ -1333,8 +1683,8 @@ struct TaxProfileView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(AppColors.primary)
-                        .foregroundStyle(Color.white)
+                        .background(AppColors.action)
+                        .foregroundStyle(AppColors.onAction)
                         .clipShape(Capsule())
                 }
             }
@@ -1363,11 +1713,11 @@ struct TaxProfileView: View {
                                 .font(.system(size: 14, weight: .semibold))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
-                                .background(newPropertyType == type ? Color(hex: "F8F6FF") : Color.clear)
-                                .foregroundStyle(newPropertyType == type ? AppColors.primary : AppColors.slate)
+                                .background(newPropertyType == type ? AppColors.sageWash : Color.clear)
+                                .foregroundStyle(newPropertyType == type ? AppColors.charcoal : AppColors.slate)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .stroke(newPropertyType == type ? AppColors.primary : AppColors.snow, lineWidth: 2)
+                                        .stroke(newPropertyType == type ? AppColors.sage : AppColors.snow, lineWidth: 1)
                                 )
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
@@ -1379,21 +1729,21 @@ struct TaxProfileView: View {
                     TextField("Property Name", text: $newPropertyName)
                         .font(.system(size: 16))
                         .padding(14)
-                        .background(Color(hex: "FAFAFA"))
+                        .background(colors.backgroundTertiary)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         .overlay(
                             RoundedRectangle(cornerRadius: 14)
-                                .stroke(newPropertyName.isEmpty ? AppColors.snow : AppColors.primary, lineWidth: 2)
+                                .stroke(newPropertyName.isEmpty ? colors.border.opacity(0.2) : AppColors.sage, lineWidth: 1)
                         )
 
                     TextField("Address", text: $newPropertyAddress)
                         .font(.system(size: 16))
                         .padding(14)
-                        .background(Color(hex: "FAFAFA"))
+                        .background(colors.backgroundTertiary)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         .overlay(
                             RoundedRectangle(cornerRadius: 14)
-                                .stroke(newPropertyAddress.isEmpty ? AppColors.snow : AppColors.primary, lineWidth: 2)
+                                .stroke(newPropertyAddress.isEmpty ? colors.border.opacity(0.2) : AppColors.sage, lineWidth: 1)
                         )
                 }
 
@@ -1413,8 +1763,8 @@ struct TaxProfileView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(newPropertyName.isEmpty ? AppColors.cloud : AppColors.primary)
-                        .foregroundStyle(Color.white)
+                        .background(newPropertyName.isEmpty ? AppColors.cloud : AppColors.sage)
+                        .foregroundStyle(newPropertyName.isEmpty ? Color.white : AppColors.charcoal)
                         .clipShape(Capsule())
                 }
                 .disabled(newPropertyName.isEmpty)
@@ -1463,24 +1813,18 @@ struct ProfileEditView: View {
                         } else {
                             ZStack {
                                 Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [AppColors.primary, AppColors.primaryLight],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
+                                    .fill(AppColors.sage)
                                     .frame(width: 100, height: 100)
 
                                 LucideIcon(image: Lucide.user, size: 40)
-                                    .foregroundStyle(Color.white)
+                                    .foregroundStyle(AppColors.charcoal)
                             }
                         }
 
                         PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
                             Text("Change Photo")
                                 .font(AppTypography.buttonSmall)
-                                .foregroundStyle(AppColors.primary)
+                                .foregroundStyle(AppColors.charcoal)
                         }
                         .onChange(of: selectedPhotoItem) { _, newValue in
                             Task {
@@ -1494,10 +1838,9 @@ struct ProfileEditView: View {
 
                     // Name Field
                     VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                        Text("NAME")
-                            .font(AppTypography.label)
-                            .tracking(1.5)
-                            .foregroundStyle(colors.textTertiary)
+                        Text("Name")
+                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .foregroundStyle(colors.textPrimary)
 
                         TextField("Your name", text: $userName)
                             .font(AppTypography.body)
@@ -1509,10 +1852,9 @@ struct ProfileEditView: View {
 
                     // Email Field
                     VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                        Text("EMAIL")
-                            .font(AppTypography.label)
-                            .tracking(1.5)
-                            .foregroundStyle(colors.textTertiary)
+                        Text("Email")
+                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .foregroundStyle(colors.textPrimary)
 
                         TextField("your@email.com", text: $userEmail)
                             .font(AppTypography.body)
@@ -1529,7 +1871,9 @@ struct ProfileEditView: View {
                 }
                 .padding(.horizontal, 20)
             }
-            .background(colors.background)
+            .background {
+                LHMobileCanvas()
+            }
             .navigationTitle("Edit Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1611,6 +1955,7 @@ struct AppIconPickerView: View {
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var selectedIcon: AppIconOption = AppIconOption.current
+    @State private var iconError: String?
 
     var body: some View {
         NavigationStack {
@@ -1637,7 +1982,7 @@ struct AppIconPickerView: View {
                             UIApplication.shared.setAlternateIconName(option.alternateIconName) { error in
                                 DispatchQueue.main.async {
                                     if let error {
-                                        print("Failed to set app icon: \(error.localizedDescription)")
+                                        iconError = error.localizedDescription
                                         selectedIcon = AppIconOption.current
                                     }
                                 }
@@ -1652,6 +1997,7 @@ struct AppIconPickerView: View {
             .background(colors.background)
             .navigationTitle("App Icon")
             .navigationBarTitleDisplayMode(.inline)
+            .hidesAppTabBar()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
@@ -1661,6 +2007,14 @@ struct AppIconPickerView: View {
             }
             .onAppear {
                 selectedIcon = AppIconOption.current
+            }
+            .alert("Could not change icon", isPresented: Binding(
+                get: { iconError != nil },
+                set: { if !$0 { iconError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(iconError ?? "Try again later.")
             }
         }
     }

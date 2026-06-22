@@ -1,0 +1,10 @@
+schemaVersion: 1
+sessionDefaults:
+  projectPath: /Users/brian/Projects/LandlordHours/LandlordHours.xcodeproj
+  scheme: LandlordHours
+  simulatorName: LandlordHours iPhone iOS 27
+  simulatorId: C8B22181-D398-477F-91D3-ED67F1B8851C
+  derivedDataPath: /Volumes/Home/XcodeStorage/DerivedData/landlordhours-xcode27
+  preferXcodebuild: true
+  bundleId: com.openclaw.landlordhours
+  simulatorPlatform: iOS Simulator

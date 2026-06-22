@@ -201,18 +201,19 @@ private struct ConfettiParticleView: View {
 
 struct ConfettiRainView: View {
     let particleCount: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var animate = false
     @State private var pieces: [ConfettiPiece] = []
 
     // Dark purple palette matching Tiimo
     private let confettiColors: [Color] = [
-        Color(hex: "4C3D8F"),  // Deep purple
-        Color(hex: "5B4BA8"),  // Medium purple
-        Color(hex: "7B68EE"),  // Primary purple
-        Color(hex: "6E5DC6"),  // Indigo-purple
-        Color(hex: "8B7EC8"),  // Lighter purple
-        Color(hex: "A78BFA"),  // Soft lavender
-        Color(hex: "3D3270"),  // Very dark purple
+        AppColors.celebrationDeepPurple,
+        AppColors.celebrationPurple,
+        AppColors.primary,
+        AppColors.celebrationIndigo,
+        AppColors.celebrationLavender,
+        AppColors.reportsAccentSoft,
+        AppColors.celebrationNightPurple,
     ]
 
     init(particleCount: Int = 55) {
@@ -234,13 +235,13 @@ struct ConfettiRainView: View {
                     )
                     .animation(
                         // Gentle ease-in at start, very slow ease-out = floaty drift
-                        .timingCurve(0.1, 0.4, 0.2, 1.0, duration: piece.duration)
-                            .delay(piece.delay),
+                        reduceMotion ? nil : Animation.timingCurve(0.1, 0.4, 0.2, 1.0, duration: piece.duration).delay(piece.delay),
                         value: animate
                     )
                 }
             }
             .onAppear {
+                guard !reduceMotion else { return }
                 pieces = (0..<particleCount).map { _ in makePiece() }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
                     animate = true
@@ -306,6 +307,7 @@ struct CelebrationOverlayView: View {
     let type: CelebrationType
     let onDismiss: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showConfetti = false
     @State private var dismissing = false
 
@@ -330,18 +332,26 @@ struct CelebrationOverlayView: View {
 
     private func dismiss() {
         guard !dismissing else { return }
-        withAnimation(.easeOut(duration: 0.3)) {
+        animate(.easeOut(duration: 0.3)) {
             dismissing = true
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             onDismiss()
         }
     }
+
+    private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
+        if reduceMotion {
+            updates()
+        } else {
+            withAnimation(animation, updates)
+        }
+    }
 }
 
 #Preview {
     ZStack {
-        Color(hex: "FAF7F2").ignoresSafeArea()
+        AppColors.background.ignoresSafeArea()
         VStack {
             Text("Some content underneath")
                 .font(.title)

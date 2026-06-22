@@ -154,7 +154,10 @@ struct HistoryView: View {
                         }
                         .background(colors.backgroundSecondary)
                         .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
-                        .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.05), radius: 12, x: 0, y: 2)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: AppCornerRadius.xl)
+                                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
+                        }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 16)
                         .padding(.bottom, 20)
@@ -193,7 +196,10 @@ struct HistoryView: View {
         .padding(.vertical, 8)
         .background(isActive ? colors.primarySurface : colors.backgroundSecondary)
         .clipShape(Capsule())
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.04), radius: 4, x: 0, y: 2)
+        .overlay {
+            Capsule()
+                .strokeBorder(isActive ? colors.primary.opacity(0.35) : colors.border.opacity(0.35), lineWidth: 1)
+        }
     }
 
     private func summaryChip(label: String, value: String, color: Color) -> some View {

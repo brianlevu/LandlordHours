@@ -179,6 +179,8 @@ struct TimeEntry: Identifiable, Codable {
     var createdAt: Date
     var modifiedAt: Date
     var importSource: String? // nil = manual, "calendar" = calendar import
+    var importExternalId: String?
+    var importCalendarId: String?
 
     init(
         id: UUID = UUID(),
@@ -189,7 +191,9 @@ struct TimeEntry: Identifiable, Codable {
         date: Date = Date(),
         notes: String = "",
         attachments: [TimeAttachment] = [],
-        importSource: String? = nil
+        importSource: String? = nil,
+        importExternalId: String? = nil,
+        importCalendarId: String? = nil
     ) {
         self.id = id
         self.propertyId = propertyId
@@ -200,6 +204,8 @@ struct TimeEntry: Identifiable, Codable {
         self.notes = notes
         self.attachments = attachments
         self.importSource = importSource
+        self.importExternalId = importExternalId
+        self.importCalendarId = importCalendarId
         self.createdAt = Date()
         self.modifiedAt = Date()
     }
@@ -217,6 +223,8 @@ struct TimeEntry: Identifiable, Codable {
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         modifiedAt = try c.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? createdAt
         importSource = try c.decodeIfPresent(String.self, forKey: .importSource)
+        importExternalId = try c.decodeIfPresent(String.self, forKey: .importExternalId)
+        importCalendarId = try c.decodeIfPresent(String.self, forKey: .importCalendarId)
     }
     
     // Helper to get property name - call this when needed
@@ -251,6 +259,97 @@ struct REPSRequirements {
     
     static var monthlyGoal: Double {
         annualHourThreshold / 12.0
+    }
+}
+
+// MARK: - Tax Qualification Engine
+//
+// Law baseline checked against IRS Publication 925 (2025):
+// - Real estate professional status is measured for one spouse at a time.
+// - Spouse hours can count for material participation in an activity.
+// - Investor-level tasks do not count as participation for these thresholds.
+struct TaxQualificationEngine {
+    struct REPSResult: Equatable {
+        let participant: Participant
+        let realEstateHours: Double
+        let nonRealEstateHours: Double
+        let meets750HourTest: Bool
+        let meetsMoreThanHalfPersonalServicesTest: Bool
+
+        var isQualified: Bool {
+            meets750HourTest && meetsMoreThanHalfPersonalServicesTest
+        }
+
+        var realEstateWorkPercentage: Double {
+            let total = realEstateHours + nonRealEstateHours
+            guard total > 0 else { return 0 }
+            return realEstateHours / total
+        }
+    }
+
+    struct MaterialParticipationResult: Equatable {
+        let propertyId: UUID?
+        let ownerAndSpouseHours: Double
+        let meets500HourTest: Bool
+        let meets100HourTest: Bool
+
+        var isMateriallyParticipating: Bool {
+            meets500HourTest || meets100HourTest
+        }
+    }
+
+    static func qualifyingRealEstateHours(
+        entries: [TimeEntry],
+        participant: Participant,
+        year: Int
+    ) -> Double {
+        entriesForYear(entries, year: year)
+            .filter { $0.participant == participant && $0.countsForREPS }
+            .reduce(0) { $0 + $1.hours }
+    }
+
+    static func repsStatus(
+        entries: [TimeEntry],
+        participant: Participant,
+        year: Int,
+        nonRealEstateHours: Double
+    ) -> REPSResult {
+        let hours = qualifyingRealEstateHours(entries: entries, participant: participant, year: year)
+        return REPSResult(
+            participant: participant,
+            realEstateHours: hours,
+            nonRealEstateHours: nonRealEstateHours,
+            meets750HourTest: hours > REPSRequirements.annualHourThreshold,
+            meetsMoreThanHalfPersonalServicesTest: hours > nonRealEstateHours
+        )
+    }
+
+    static func materialParticipationStatus(
+        entries: [TimeEntry],
+        year: Int,
+        propertyId: UUID?,
+        groupingElection: Bool
+    ) -> MaterialParticipationResult {
+        let scoped = entriesForYear(entries, year: year)
+            .filter { $0.countsForREPS }
+            .filter { entry in
+                if groupingElection { return true }
+                guard let propertyId else { return false }
+                return entry.propertyId == propertyId
+            }
+        let hours = scoped.reduce(0) { $0 + $1.hours }
+
+        return MaterialParticipationResult(
+            propertyId: groupingElection ? nil : propertyId,
+            ownerAndSpouseHours: hours,
+            meets500HourTest: hours > 500,
+            meets100HourTest: hours > 100
+        )
+    }
+
+    private static func entriesForYear(_ entries: [TimeEntry], year: Int) -> [TimeEntry] {
+        let calendar = Calendar.current
+        return entries.filter { calendar.component(.year, from: $0.date) == year }
     }
 }
 

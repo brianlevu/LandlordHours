@@ -38,7 +38,7 @@ enum OnboardingGoal: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .reps: return "Real Estate Professional Status"
-        case .materialParticipation: return "Material Participation"
+        case .materialParticipation: return "Short-term rental participation"
         case .generalTracking: return "General Hour Tracking"
         case .notSure: return "Not sure yet"
         }
@@ -46,10 +46,10 @@ enum OnboardingGoal: String, CaseIterable, Identifiable {
 
     var subtitle: String {
         switch self {
-        case .reps: return "Track 750+ hours for REPS tax benefits"
-        case .materialParticipation: return "Meet IRS tests for active involvement"
+        case .reps: return "Track more than 750 hours for REPS tax benefits"
+        case .materialParticipation: return "Track the 100-hour material participation test"
         case .generalTracking: return "Keep organized property work records"
-        case .notSure: return "Help me understand my options"
+        case .notSure: return "Start with guided tracking. You can choose a goal later."
         }
     }
 
@@ -86,7 +86,7 @@ enum OnboardingGoal: String, CaseIterable, Identifiable {
         case .reps: return .reps
         case .materialParticipation: return .str
         case .generalTracking: return .both
-        case .notSure: return .reps
+        case .notSure: return .both
         }
     }
 }
@@ -148,6 +148,7 @@ struct OnboardingView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @StateObject private var goalManager = GoalManager.shared
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var currentStep: OnboardingStep = .goalSelection
@@ -198,7 +199,7 @@ struct OnboardingView: View {
         }
         .onAppear {
             viewModel.suppressCelebrations = true
-            withAnimation(.easeOut(duration: 0.5).delay(0.15)) {
+            animate(.easeOut(duration: 0.5).delay(0.15)) {
                 appeared = true
             }
         }
@@ -213,7 +214,7 @@ struct OnboardingView: View {
         HStack {
             if currentStep != .goalSelection {
                 Button {
-                    withAnimation(AppAnimation.smooth) {
+                    animate(AppAnimation.smooth) {
                         goBack()
                     }
                 } label: {
@@ -240,7 +241,7 @@ struct OnboardingView: View {
                     .fill(i <= currentStep.progressIndex ? AppColors.primary : AppColors.snow)
                     .frame(maxWidth: .infinity)
                     .frame(height: 4)
-                    .animation(AppAnimation.standard, value: currentStep)
+                    .lhMotion(AppAnimation.standard, value: currentStep)
             }
         }
         .padding(.horizontal, 28)
@@ -249,7 +250,7 @@ struct OnboardingView: View {
     // MARK: - Navigation Helpers
 
     private func advance() {
-        withAnimation(AppAnimation.smooth) {
+        animate(AppAnimation.smooth) {
             switch currentStep {
             case .goalSelection:
                 // Save goal selection
@@ -289,13 +290,22 @@ struct OnboardingView: View {
     }
 
     private func completeOnboarding() {
+        UserDefaults.standard.set(true, forKey: UserScope.key("hasCompletedOnboarding"))
         showOnboarding = false
+    }
+
+    private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
+        if reduceMotion {
+            updates()
+        } else {
+            withAnimation(animation, updates)
+        }
     }
 
     private func savePropertyIfNeeded() {
         let trimmedName = propertyName.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedAddress = streetAddress.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty else { return }
+        guard !trimmedName.isEmpty, !trimmedAddress.isEmpty else { return }
         viewModel.addProperty(
             name: trimmedName,
             address: trimmedAddress,
@@ -334,18 +344,22 @@ struct OnboardingView: View {
             Spacer()
 
             // CTA
-            ctaSection(primaryLabel: "Continue", showSkip: false) {
+            ctaSection(
+                primaryLabel: "Continue",
+                primaryIdentifier: "onboarding.goalPrimaryCTA",
+                showSkip: false
+            ) {
                 advance()
             }
         }
         .opacity(appeared ? 1 : 0)
         .offset(y: appeared ? 0 : 18)
-        .animation(.easeOut(duration: 0.45).delay(0.1), value: appeared)
+        .lhMotion(.easeOut(duration: 0.45).delay(0.1), value: appeared)
     }
 
     private func goalCard(_ goal: OnboardingGoal) -> some View {
         Button {
-            withAnimation(AppAnimation.quick) {
+            animate(AppAnimation.quick) {
                 selectedGoal = goal
             }
         } label: {
@@ -379,7 +393,7 @@ struct OnboardingView: View {
             .padding(.vertical, 18)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(selectedGoal == goal ? Color(hex: "F8F6FF").opacity(colorScheme == .dark ? 0.15 : 1) : colors.backgroundSecondary)
+                    .fill(selectedGoal == goal ? AppColors.lavenderPanel.opacity(colorScheme == .dark ? 0.15 : 1) : colors.backgroundSecondary)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
@@ -404,10 +418,10 @@ struct OnboardingView: View {
                         .foregroundStyle(colors.textPrimary)
                         .lineSpacing(2)
 
-                    Text("We'll tailor your tracking based on property type and who manages it.")
-                        .font(AppTypography.body)
-                        .foregroundStyle(AppColors.slate)
-                        .lineSpacing(4)
+                Text("We'll tailor your tracking based on property type and who manages it. You can add this later from Properties.")
+                    .font(AppTypography.body)
+                    .foregroundStyle(AppColors.slate)
+                    .lineSpacing(4)
                 }
                 .padding(.horizontal, 28)
                 .padding(.top, 20)
@@ -443,7 +457,12 @@ struct OnboardingView: View {
                         .padding(.vertical, 14)
 
                     // Property Name
-                    formField(label: "Property Name", placeholder: "e.g. Oak Street Duplex", text: $propertyName)
+                    formField(
+                        label: "Property Name",
+                        placeholder: "e.g. Oak Street Duplex",
+                        text: $propertyName,
+                        accessibilityIdentifier: "onboarding.propertyName"
+                    )
 
                     // Street Address with autocomplete
                     addressAutocompleteField
@@ -452,7 +471,11 @@ struct OnboardingView: View {
                 .padding(.horizontal, 28)
 
                 // CTA
-                ctaSection(primaryLabel: "Continue", showSkip: true) {
+                ctaSection(
+                    primaryLabel: propertySetupPrimaryLabel,
+                    primaryIdentifier: "onboarding.propertyPrimaryCTA",
+                    showSkip: hasPartialPropertySetup
+                ) {
                     advance()
                 }
                 .padding(.top, 24)
@@ -460,9 +483,23 @@ struct OnboardingView: View {
         }
     }
 
+    private var hasCompletePropertySetup: Bool {
+        !propertyName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !streetAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var hasPartialPropertySetup: Bool {
+        !propertyName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !streetAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var propertySetupPrimaryLabel: String {
+        hasCompletePropertySetup ? "Save property" : "Continue without property"
+    }
+
     private func propertyTypeChip(_ label: String, type: PropertyType) -> some View {
         Button {
-            withAnimation(AppAnimation.quick) {
+            animate(AppAnimation.quick) {
                 selectedPropertyType = type
             }
         } label: {
@@ -473,7 +510,7 @@ struct OnboardingView: View {
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(selectedPropertyType == type ? Color(hex: "F8F6FF") : Color.clear)
+                        .fill(selectedPropertyType == type ? AppColors.lavenderPanel : Color.clear)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
@@ -488,7 +525,7 @@ struct OnboardingView: View {
 
     private func managementCard(_ option: ManagementOption) -> some View {
         Button {
-            withAnimation(AppAnimation.quick) {
+            animate(AppAnimation.quick) {
                 selectedManagement = option
             }
         } label: {
@@ -523,7 +560,7 @@ struct OnboardingView: View {
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(selectedManagement == option ? Color(hex: "F8F6FF").opacity(colorScheme == .dark ? 0.15 : 1) : colors.backgroundSecondary)
+                    .fill(selectedManagement == option ? AppColors.lavenderPanel.opacity(colorScheme == .dark ? 0.15 : 1) : colors.backgroundSecondary)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
@@ -536,26 +573,31 @@ struct OnboardingView: View {
         .buttonStyle(.plain)
     }
 
-    private func formField(label: String, placeholder: String, text: Binding<String>) -> some View {
+    private func formField(
+        label: String,
+        placeholder: String,
+        text: Binding<String>,
+        accessibilityIdentifier: String? = nil
+    ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label.uppercased())
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(AppColors.mist)
-                .tracking(0.8)
+            Text(label)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
 
             TextField(placeholder, text: text)
                 .font(.system(size: 16, design: .rounded))
                 .foregroundStyle(colors.textPrimary)
+                .accessibilityIdentifier(accessibilityIdentifier ?? placeholder)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
                 .background(
                     RoundedRectangle(cornerRadius: 14)
-                        .fill(text.wrappedValue.isEmpty ? Color(hex: "FAFAFA") : Color(hex: "FDFCFF"))
+                        .fill(text.wrappedValue.isEmpty ? colors.backgroundTertiary : colors.backgroundSecondary)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(
-                            text.wrappedValue.isEmpty ? AppColors.snow : AppColors.primary,
+                            text.wrappedValue.isEmpty ? colors.border.opacity(0.35) : AppColors.sage,
                             lineWidth: 2
                         )
                 )
@@ -572,10 +614,9 @@ struct OnboardingView: View {
 
     private var addressAutocompleteField: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("STREET ADDRESS")
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(AppColors.mist)
-                .tracking(0.8)
+            Text("Street address")
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
 
             ZStack(alignment: .top) {
                 VStack(spacing: 0) {
@@ -583,16 +624,17 @@ struct OnboardingView: View {
                         .focused($isAddressFocused)
                         .font(.system(size: 16, design: .rounded))
                         .foregroundStyle(colors.textPrimary)
+                        .accessibilityIdentifier("onboarding.streetAddress")
                         .padding(.horizontal, 16)
                         .padding(.vertical, 14)
                         .background(
                             RoundedRectangle(cornerRadius: 14)
-                                .fill(streetAddress.isEmpty ? Color(hex: "FAFAFA") : Color(hex: "FDFCFF"))
+                                .fill(streetAddress.isEmpty ? colors.backgroundTertiary : colors.backgroundSecondary)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 14)
                                 .stroke(
-                                    streetAddress.isEmpty ? AppColors.snow : AppColors.primary,
+                                    streetAddress.isEmpty ? colors.border.opacity(0.35) : AppColors.sage,
                                     lineWidth: 2
                                 )
                         )
@@ -637,13 +679,12 @@ struct OnboardingView: View {
                         }
                         .background(
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.white)
+                                .fill(colors.backgroundSecondary)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(AppColors.snow, lineWidth: 1)
+                                .stroke(colors.border.opacity(0.35), lineWidth: 1)
                         )
-                        .shadow(color: AppColors.primary.opacity(0.08), radius: 12, y: 4)
                         .padding(.top, 4)
                     }
                 }
@@ -701,11 +742,11 @@ struct OnboardingView: View {
             // Pastel gradient background
             LinearGradient(
                 colors: [
-                    Color(hex: "E0E7FF"),
-                    Color(hex: "EDE9FE"),
-                    Color(hex: "F5F3FF"),
-                    Color(hex: "E0F2FE"),
-                    Color(hex: "F0FDFA")
+                    AppColors.indigoMist,
+                    AppColors.reportsAccentWash,
+                    AppColors.lavenderPale,
+                    AppColors.skyMist,
+                    AppColors.aquaMist
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -714,19 +755,19 @@ struct OnboardingView: View {
 
             // Organic blur blobs
             Circle()
-                .fill(Color(hex: "C4B5FD").opacity(0.35))
+                .fill(AppColors.lavenderSoft.opacity(0.35))
                 .frame(width: 320, height: 320)
                 .blur(radius: 80)
                 .offset(x: -60, y: -280)
 
             Circle()
-                .fill(Color(hex: "93C5FD").opacity(0.3))
+                .fill(AppColors.blueSoft.opacity(0.3))
                 .frame(width: 280, height: 280)
                 .blur(radius: 70)
                 .offset(x: 100, y: -80)
 
             Circle()
-                .fill(Color(hex: "C4B5FD").opacity(0.2))
+                .fill(AppColors.lavenderSoft.opacity(0.2))
                 .frame(width: 240, height: 240)
                 .blur(radius: 60)
                 .offset(x: -40, y: 200)
@@ -736,7 +777,7 @@ struct OnboardingView: View {
                 Spacer().frame(height: 20)
 
                 // Headline
-                Text("Track every hour\ntoward tax qualification")
+                Text("Choose your path,\nthen start tracking")
                     .font(.system(size: 26, weight: .regular, design: .serif))
                     .foregroundStyle(colors.textPrimary)
                     .multilineTextAlignment(.center)
@@ -745,36 +786,45 @@ struct OnboardingView: View {
 
                 // Value props
                 VStack(spacing: 10) {
-                    paywallProp("AI-powered time logging & categorization")
-                    paywallProp("IRS-ready PDF reports for your CPA")
-                    paywallProp("Unlimited properties & iCloud sync")
+                    paywallProp("AI-assisted logging with review before save")
+                    paywallProp("CPA-ready PDF exports")
+                    paywallProp("Unlimited properties and PDF exports")
                 }
                 .padding(.bottom, 24)
 
                 // One-time purchase card
                 VStack(spacing: 8) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        if let product = SubscriptionManager.shared.proProduct {
+                    if let product = SubscriptionManager.shared.proProduct {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
                             Text(product.displayPrice)
                                 .font(.system(size: 42, weight: .heavy))
                                 .foregroundStyle(colors.textPrimary)
-                        } else {
-                            Text("$30")
-                                .font(.system(size: 42, weight: .heavy))
-                                .foregroundStyle(colors.textPrimary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("one-time")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(colors.textSecondary)
+                                Text("lifetime access")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(AppColors.sage)
+                            }
                         }
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("one-time")
+                        Text("Use the App Store price shown here")
+                            .font(.system(size: 13))
+                            .foregroundStyle(colors.textSecondary)
+                    } else {
+                        VStack(spacing: 8) {
+                            LucideIcon(image: Lucide.store, size: 22)
+                                .foregroundStyle(AppColors.primary)
+                            Text("Pro availability check")
+                                .font(AppTypography.title3)
+                                .foregroundStyle(colors.textPrimary)
+                            Text("Start free now. We will check the App Store before showing a Pro price.")
                                 .font(.system(size: 13))
-                                .foregroundStyle(AppColors.slate)
-                            Text("yours forever")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(AppColors.sage)
+                                .foregroundStyle(colors.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .lineSpacing(3)
                         }
                     }
-                    Text("Less than one hour of billable time")
-                        .font(.system(size: 13))
-                        .foregroundStyle(AppColors.mist)
                 }
                 .padding(.vertical, 20)
                 .padding(.horizontal, 28)
@@ -790,10 +840,10 @@ struct OnboardingView: View {
                         ForEach(0..<5, id: \.self) { _ in
                             Image(systemName: "star.fill")
                                 .font(.system(size: 14))
-                                .foregroundStyle(Color(hex: "F5C563"))
+                                .foregroundStyle(AppColors.caution)
                         }
                     }
-                    Text("Trusted by 2,000+ landlords")
+                    Text("Built for rental owners tracking tax-year hours")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(AppColors.slate)
                 }
@@ -805,55 +855,67 @@ struct OnboardingView: View {
                 VStack(spacing: 8) {
                     Button {
                         Task {
-                            let manager = SubscriptionManager.shared
-                            if manager.products.isEmpty {
-                                await manager.loadProducts()
-                            }
-                            if !manager.products.isEmpty {
-                                await manager.purchasePro()
-                                if manager.hasPurchased {
-                                    advance()
-                                }
-                            } else {
-                                // Can't reach App Store, skip for now (trial will be active)
-                                advance()
-                            }
+                            await subscriptionManager.purchasePro()
+                            if subscriptionManager.hasPurchased { advance() }
                         }
                     } label: {
                         Group {
-                            if SubscriptionManager.shared.isLoading {
+                            if subscriptionManager.isLoading {
                                 ProgressView()
-                                    .tint(.white)
-                            } else if let product = SubscriptionManager.shared.proProduct {
-                                Text("Unlock Pro \u{00B7} \(product.displayPrice)")
+                                    .tint(AppColors.onAction)
+                            } else if let product = subscriptionManager.proProduct {
+                                Text("Buy lifetime Pro \u{00B7} \(product.displayPrice)")
                             } else {
-                                Text("Unlock Pro \u{00B7} $30")
+                                Text(subscriptionManager.purchaseError == nil ? "Check Pro availability" : "Try Pro purchase again")
                             }
                         }
                         .font(AppTypography.buttonLarge)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(AppColors.onAction)
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
                         .background(AppColors.charcoal)
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.clear, lineWidth: 1)
+                        )
                         .clipShape(Capsule())
                     }
 
-                    if let error = SubscriptionManager.shared.purchaseError {
-                        Text(error)
-                            .font(.system(size: 12))
-                            .foregroundStyle(AppColors.coral)
-                            .multilineTextAlignment(.center)
+                    if let error = subscriptionManager.purchaseError {
+                        VStack(spacing: 10) {
+                            Text(error)
+                                .font(.system(size: 12))
+                                .foregroundStyle(AppColors.coral)
+                                .multilineTextAlignment(.center)
+
+                            #if DEBUG
+                            if AdminAccess.isCurrentUserAdmin {
+                                Button {
+                                    subscriptionManager.unlockPro()
+                                    advance()
+                                } label: {
+                                    Text("Use local Pro for testing")
+                                        .font(AppTypography.buttonSmall)
+                                        .foregroundStyle(AppColors.primary)
+                                }
+                            }
+                            #endif
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.white.opacity(0.65))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
 
-                    Text("7-day free trial included with your account")
+                    Text(subscriptionManager.proProduct == nil ? "You can keep using the free plan while Pro is unavailable." : "One-time purchase. No subscription. No automatic renewal.")
                         .font(.system(size: 12))
-                        .foregroundStyle(AppColors.mist)
+                        .foregroundStyle(colors.textSecondary)
                         .multilineTextAlignment(.center)
 
                     Button {
-                        withAnimation(AppAnimation.smooth) { skip() }
+                        animate(AppAnimation.smooth) { skip() }
                     } label: {
-                        Text("Skip for now")
+                        Text("Continue free")
                             .font(.system(size: 14, weight: .medium, design: .rounded))
                             .foregroundStyle(AppColors.mist)
                             .padding(.vertical, 6)
@@ -942,7 +1004,6 @@ struct OnboardingView: View {
                     Text("9:41")
                         .font(.system(size: 52, weight: .bold, design: .rounded))
                         .foregroundStyle(colors.textPrimary)
-                        .tracking(-2)
                 }
                 .padding(.top, 40)
 
@@ -951,10 +1012,9 @@ struct OnboardingView: View {
                     WaveHouseIcon(size: 36)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("LANDLORD HOURS")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        Text("LandlordHours")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
                             .foregroundStyle(AppColors.primary)
-                            .tracking(0.5)
 
                         Text("Don't forget to log today!")
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
@@ -977,7 +1037,10 @@ struct OnboardingView: View {
                     RoundedRectangle(cornerRadius: 16)
                         .fill(Color.white.opacity(0.85))
                 )
-                .shadow(color: Color.black.opacity(0.05), radius: 10, y: 4)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(Color.white.opacity(0.55), lineWidth: 1)
+                }
                 .padding(.horizontal, 14)
                 .padding(.top, 24)
 
@@ -987,7 +1050,7 @@ struct OnboardingView: View {
                         RoundedRectangle(cornerRadius: 9)
                             .fill(
                                 LinearGradient(
-                                    colors: [AppColors.sage, Color(hex: "5BA87E")],
+                                    colors: [AppColors.sage, AppColors.successDeep],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
@@ -995,14 +1058,13 @@ struct OnboardingView: View {
                             .frame(width: 36, height: 36)
 
                         LucideIcon(image: Lucide.circleCheck, size: 18)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(AppColors.onAction)
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("WEEKLY SUMMARY")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        Text("Weekly summary")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
                             .foregroundStyle(AppColors.sage)
-                            .tracking(0.5)
 
                         Text("Great week! 18.5h logged")
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
@@ -1025,7 +1087,10 @@ struct OnboardingView: View {
                     RoundedRectangle(cornerRadius: 16)
                         .fill(Color.white.opacity(0.6))
                 )
-                .shadow(color: Color.black.opacity(0.03), radius: 6, y: 2)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(Color.white.opacity(0.45), lineWidth: 1)
+                }
                 .padding(.horizontal, 14)
                 .padding(.top, 8)
 
@@ -1036,20 +1101,23 @@ struct OnboardingView: View {
             .background(
                 LinearGradient(
                     colors: [
-                        Color(hex: "E8E0FF"),
-                        Color(hex: "F5F3FF"),
+                        AppColors.lavenderMist,
+                        AppColors.lavenderPale,
                         AppColors.background
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             )
-            .clipShape(RoundedRectangle(cornerRadius: 32))
+            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xxl))
             .overlay(
-                RoundedRectangle(cornerRadius: 32)
+                RoundedRectangle(cornerRadius: AppCornerRadius.xxl)
                     .stroke(Color.white.opacity(0.6), lineWidth: 3)
             )
-            .shadow(color: AppColors.primary.opacity(0.14), radius: 30, y: 12)
+            .overlay {
+                RoundedRectangle(cornerRadius: AppCornerRadius.xxl)
+                    .strokeBorder(colors.border.opacity(0.2), lineWidth: 1)
+            }
         }
         .frame(maxWidth: .infinity)
     }
@@ -1097,7 +1165,7 @@ struct OnboardingView: View {
             Spacer()
 
             // CTA
-            ctaSection(primaryLabel: "Import Calendar", showSkip: true) {
+            ctaSection(primaryLabel: "Import Calendar", showSkip: false) {
                 requestCalendarAccess()
             }
         }
@@ -1139,7 +1207,7 @@ struct OnboardingView: View {
                 .padding(.bottom, 12)
                 .background(
                     LinearGradient(
-                        colors: [Color(hex: "E8E0FF"), Color(hex: "F0ECFF")],
+                        colors: [AppColors.lavenderMist, AppColors.lavenderField],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -1189,7 +1257,7 @@ struct OnboardingView: View {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(
                             LinearGradient(
-                                colors: [Color(hex: "F8F6FF"), AppColors.primarySurface],
+                                colors: [AppColors.lavenderPanel, AppColors.primarySurface],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -1201,12 +1269,15 @@ struct OnboardingView: View {
             }
             .frame(width: 240)
             .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 32))
+            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xxl))
             .overlay(
-                RoundedRectangle(cornerRadius: 32)
+                RoundedRectangle(cornerRadius: AppCornerRadius.xxl)
                     .stroke(Color.white.opacity(0.6), lineWidth: 3)
             )
-            .shadow(color: AppColors.primary.opacity(0.14), radius: 30, y: 12)
+            .overlay {
+                RoundedRectangle(cornerRadius: AppCornerRadius.xxl)
+                    .strokeBorder(colors.border.opacity(0.2), lineWidth: 1)
+            }
         }
         .frame(maxWidth: .infinity)
     }
@@ -1376,7 +1447,7 @@ struct OnboardingView: View {
                             } label: {
                                 Text("Continue")
                                     .font(AppTypography.buttonLarge)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(AppColors.onAction)
                                     .frame(maxWidth: .infinity)
                                     .frame(height: 56)
                                     .background(AppColors.charcoal)
@@ -1392,7 +1463,7 @@ struct OnboardingView: View {
                                 Text("Import \(selectedCalendarIds.count) calendar\(selectedCalendarIds.count == 1 ? "" : "s")")
                             }
                             .font(AppTypography.buttonLarge)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(AppColors.onAction)
                             .frame(maxWidth: .infinity)
                             .frame(height: 56)
                             .background(selectedCalendarIds.isEmpty ? AppColors.mist : AppColors.charcoal)
@@ -1421,7 +1492,7 @@ struct OnboardingView: View {
     private func calendarRow(_ calendar: EKCalendar) -> some View {
         let isSelected = selectedCalendarIds.contains(calendar.calendarIdentifier)
         return Button {
-            withAnimation(AppAnimation.quick) {
+            animate(AppAnimation.quick) {
                 if isSelected {
                     selectedCalendarIds.remove(calendar.calendarIdentifier)
                 } else {
@@ -1458,7 +1529,7 @@ struct OnboardingView: View {
                             .fill(AppColors.primary)
                             .frame(width: 22, height: 22)
                         LucideIcon(image: Lucide.check, size: 12)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(AppColors.onAction)
                     }
                 }
             }
@@ -1466,7 +1537,7 @@ struct OnboardingView: View {
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(isSelected ? Color(hex: "F8F6FF").opacity(colorScheme == .dark ? 0.15 : 1) : colors.backgroundSecondary)
+                    .fill(isSelected ? AppColors.lavenderPanel.opacity(colorScheme == .dark ? 0.15 : 1) : colors.backgroundSecondary)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
@@ -1500,7 +1571,12 @@ struct OnboardingView: View {
 
     // MARK: - Shared Components
 
-    private func ctaSection(primaryLabel: String, showSkip: Bool, action: @escaping () -> Void) -> some View {
+    private func ctaSection(
+        primaryLabel: String,
+        primaryIdentifier: String? = nil,
+        showSkip: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
         VStack(spacing: 8) {
             // Primary CTA
             Button(action: action) {
@@ -1509,17 +1585,18 @@ struct OnboardingView: View {
                         .font(AppTypography.buttonLarge)
                     LucideIcon(image: Lucide.arrowRight, size: 14)
                 }
-                .foregroundStyle(.white)
+                .foregroundStyle(AppColors.onAction)
                 .frame(maxWidth: .infinity)
                 .frame(height: 56)
                 .background(AppColors.charcoal)
                 .clipShape(Capsule())
             }
+            .accessibilityIdentifier(primaryIdentifier ?? "")
 
             // Skip button
             if showSkip {
                 Button {
-                    withAnimation(AppAnimation.smooth) {
+                    animate(AppAnimation.smooth) {
                         skip()
                     }
                 } label: {

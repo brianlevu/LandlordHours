@@ -8,14 +8,13 @@ class SubscriptionManager: ObservableObject {
     static let shared = SubscriptionManager()
     
     @Published var isPro = false
-    @Published var trialDaysRemaining = 7
+    @Published var trialDaysRemaining = 0
     @Published var hasPurchased = false
     @Published var isLoading = false
     @Published var products: [Product] = []
     @Published var purchaseError: String?
     
     private let proProductID = "com.openclaw.landlordhours.pro"
-    private var trialStartKey: String { UserScope.key("trialStartDate") }
     private var isProKey: String { UserScope.key("isProUser") }
     private var hasPurchasedKey: String { UserScope.key("hasPurchasedPro") }
     private var transactionListener: Task<Void, Never>?
@@ -30,6 +29,7 @@ class SubscriptionManager: ObservableObject {
 
         // Load products from App Store
         Task {
+            await refreshEntitlements()
             await loadProducts()
         }
     }
@@ -39,8 +39,10 @@ class SubscriptionManager: ObservableObject {
             for await result in Transaction.updates {
                 guard let self else { return }
                 if case .verified(let transaction) = result {
-                    if transaction.productID == self.proProductID {
+                    if self.isActiveProTransaction(transaction) {
                         await self.unlockPro()
+                    } else if transaction.productID == self.proProductID {
+                        await self.refreshEntitlements()
                     }
                     await transaction.finish()
                 }
@@ -62,33 +64,25 @@ class SubscriptionManager: ObservableObject {
     }
     
     func checkSubscriptionStatus() {
-        // Check if user purchased pro
-        if UserDefaults.standard.bool(forKey: isProKey) {
-            isPro = true
-            return
+        trialDaysRemaining = 0
+        isPro = UserDefaults.standard.bool(forKey: isProKey)
+    }
+
+    @MainActor
+    func refreshEntitlements() async {
+        for await result in Transaction.currentEntitlements {
+            guard case .verified(let transaction) = result else { continue }
+            if isActiveProTransaction(transaction) {
+                unlockPro()
+                return
+            }
         }
-        
-        // Check trial
-        if let trialStart = UserDefaults.standard.object(forKey: trialStartKey) as? Date {
-            let daysPassed = Calendar.current.dateComponents([.day], from: trialStart, to: Date()).day ?? 0
-            trialDaysRemaining = max(0, 7 - daysPassed)
-            
-            if trialDaysRemaining == 0 {
-                isPro = false
-            } else {
-                isPro = true
-            }
-        } else {
-            // Only start a trial if a user is signed in, so we don't
-            // create an orphaned trial under the unscoped key.
-            if UserScope.userId != nil {
-                UserDefaults.standard.set(Date(), forKey: trialStartKey)
-                trialDaysRemaining = 7
-                isPro = true
-            } else {
-                trialDaysRemaining = 0
-                isPro = false
-            }
+
+        if let latest = await Transaction.latest(for: proProductID),
+           case .verified(let transaction) = latest,
+           transaction.productID == proProductID,
+           !isActiveProTransaction(transaction) {
+            lockPro()
         }
     }
     
@@ -98,9 +92,13 @@ class SubscriptionManager: ObservableObject {
         purchaseError = nil
         
         do {
+            if products.isEmpty {
+                await loadProducts()
+            }
+
             // Find the pro product
             guard let product = products.first(where: { $0.id == proProductID }) else {
-                purchaseError = "Product not found. Please try again."
+                purchaseError = "LandlordHours Pro is temporarily unavailable in the App Store. Please try again later."
                 isLoading = false
                 return
             }
@@ -112,7 +110,7 @@ class SubscriptionManager: ObservableObject {
             case .success(let verification):
                 // Verify and finish transaction
                 if case .verified(let transaction) = verification {
-                    await unlockPro()
+                    unlockPro()
                     await transaction.finish()
                 }
                 
@@ -120,10 +118,10 @@ class SubscriptionManager: ObservableObject {
                 purchaseError = nil // User cancelled, no error
                 
             case .pending:
-                purchaseError = "Purchase is pending approval."
+                purchaseError = "Purchase is pending approval. We'll unlock Pro after it is approved."
                 
             @unknown default:
-                purchaseError = "Unknown error occurred."
+                purchaseError = "Purchase could not be completed. Please try again."
             }
         } catch {
             purchaseError = "Purchase failed: \(error.localizedDescription)"
@@ -141,14 +139,10 @@ class SubscriptionManager: ObservableObject {
             // Sync with App Store
             try await AppStore.sync()
 
-            // Check for verified transactions
-            let productID = proProductID
-            if let result = await Transaction.latest(for: productID) {
-                if case .verified(_) = result {
-                    unlockPro()
-                    isLoading = false
-                    return
-                }
+            await refreshEntitlements()
+            if isPro {
+                isLoading = false
+                return
             }
 
             purchaseError = "No previous purchase found."
@@ -166,15 +160,23 @@ class SubscriptionManager: ObservableObject {
         hasPurchased = true
         isPro = true
     }
+
+    @MainActor
+    private func lockPro() {
+        UserDefaults.standard.set(false, forKey: isProKey)
+        hasPurchased = false
+        isPro = false
+    }
     
     var isTrialActive: Bool {
-        return trialDaysRemaining > 0 && !hasPurchased
+        false
     }
     
     /// Reload subscription state for the current user (call after sign-in)
     func reload() {
         hasPurchased = UserDefaults.standard.bool(forKey: hasPurchasedKey)
         checkSubscriptionStatus()
+        Task { await refreshEntitlements() }
     }
 
     /// Reset subscription state on sign-out without starting a new trial
@@ -185,10 +187,16 @@ class SubscriptionManager: ObservableObject {
     }
 
     var showPaywall: Bool {
-        return !isPro
+        false
     }
     
     var proProduct: Product? {
         products.first(where: { $0.id == proProductID })
+    }
+
+    private func isActiveProTransaction(_ transaction: Transaction) -> Bool {
+        transaction.productID == proProductID &&
+        transaction.revocationDate == nil &&
+        transaction.isUpgraded == false
     }
 }

@@ -5,3 +5,7 @@
 DerivedData/
 .xcode.env.local
 .claude/worktrees/
+/tmp/
+/*.ipa
+/*.app.dSYM.zip
+appstore-screenshots/node_modules/

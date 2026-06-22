@@ -18,6 +18,13 @@ enum UserScope {
         guard let id = userId else { return base }
         return "u.\(id).\(base)"
     }
+
+    /// Returns the scoped key for a known userId. Used during account deletion
+    /// after capturing the account id but before clearing auth keys.
+    static func key(_ base: String, userId: String?) -> String {
+        guard let userId else { return base }
+        return "u.\(userId).\(base)"
+    }
 }
 
 @MainActor
@@ -43,14 +50,19 @@ class AppViewModel: ObservableObject {
     @Published var timerStartTime: Date?
     @Published var timerPropertyId: UUID?
     @Published var timerCategory: ActivityCategory = .repairs
+    @Published var staleTimerRecovery: StaleTimerRecovery?
 
     // Data persistence (user-scoped)
     private var propertiesKey: String { UserScope.key("LandlordHours.properties") }
     private var entriesKey: String { UserScope.key("LandlordHours.entries") }
     private var timerKey: String { UserScope.key("LandlordHours.timer") }
+    private var staleTimerRecoveryKey: String { UserScope.key("LandlordHours.staleTimerRecovery") }
 
     init() {
         checkSignInState()
+#if DEBUG
+        applyLaunchMockScenarioIfNeeded()
+#endif
         if UserScope.userId != nil {
             migrateUnscopedLegacyData()
             loadData()
@@ -165,6 +177,106 @@ class AppViewModel: ObservableObject {
         MilestoneTracker.shared.reload()
     }
 
+    func deleteAccountAndData() async throws {
+        guard let userId = UserScope.userId else {
+            signOut()
+            return
+        }
+
+        syncService.stop()
+        if syncService.accountAvailable {
+            try await syncService.deleteCurrentUserRecords(
+                properties: properties,
+                entries: timeEntries,
+                categories: CategoryManager.shared.customCategories,
+                userId: userId
+            )
+        } else {
+            await syncService.checkAccountStatus()
+            if syncService.accountAvailable {
+                try await syncService.deleteCurrentUserRecords(
+                    properties: properties,
+                    entries: timeEntries,
+                    categories: CategoryManager.shared.customCategories,
+                    userId: userId
+                )
+            }
+        }
+
+        Self.clearScopedAccountData(for: userId)
+
+        properties = []
+        timeEntries = []
+        activeCelebration = nil
+        isTimerRunning = false
+        timerStartTime = nil
+        timerPropertyId = nil
+
+        signOut()
+    }
+
+    func resetCurrentUserLocalData() {
+        syncService.stop()
+
+        properties = []
+        timeEntries = []
+        activeCelebration = nil
+        isTimerRunning = false
+        timerStartTime = nil
+        timerPropertyId = nil
+        timerCategory = .repairs
+        staleTimerRecovery = nil
+
+        saveTimerState()
+        clearStaleTimerRecovery()
+
+        let defaults = UserDefaults.standard
+        let localDataKeys = [
+            "LandlordHours.properties",
+            "LandlordHours.entries",
+            "LandlordHours.timer",
+            "timerStartTime",
+            "timerPropertyId",
+            "timerCategory",
+            "LandlordHours.staleTimerRecovery",
+            "LandlordHours.stoppedTimerDraft",
+            "LandlordHours.celebratedMilestones",
+            "hasCompletedOnboarding",
+            GuidedOnboardingStore.completedKey,
+            GuidedOnboardingStore.skippedKey,
+            "globalGoalType",
+            "propertyGoals",
+            "customCategories",
+            "selectedTaxYear",
+            "lastLogDate",
+            "smartRemindersEnabled",
+            "iCloudBackupEnabled",
+            "cloudkit.changeToken",
+            "cloudkit.zoneChangeToken",
+            "cloudkit.zoneCreated",
+            "cloudkit.subscriptionCreated",
+            "cloudkit.migrationDone",
+            "LandlordHours.taxProfile.filingStatus",
+            "LandlordHours.taxProfile.spouseTracking",
+            "LandlordHours.taxProfile.taxYear",
+            "LandlordHours.taxProfile.groupingElection",
+            "LandlordHours.taxProfile.nonREWorkHours"
+        ]
+
+        for key in Set(localDataKeys) {
+            defaults.removeObject(forKey: UserScope.key(key))
+        }
+
+        GoalManager.shared.resetForDataReset()
+        CategoryManager.shared.resetForDataReset()
+        TaxProfileManager.shared.resetForDataReset()
+        MilestoneTracker.shared.reload()
+        SubscriptionManager.shared.reload()
+        defaults.synchronize()
+
+        Task { await syncService.start() }
+    }
+
     // MARK: - Legacy Data Migration
 
     /// Unscoped keys from before the UserScope system was added.
@@ -182,6 +294,13 @@ class AppViewModel: ObservableObject {
         "propertyGoals",
         "iCloudBackupEnabled",
         "profileImageData",
+        GuidedOnboardingStore.completedKey,
+        GuidedOnboardingStore.skippedKey,
+        "LandlordHours.taxProfile.filingStatus",
+        "LandlordHours.taxProfile.spouseTracking",
+        "LandlordHours.taxProfile.taxYear",
+        "LandlordHours.taxProfile.groupingElection",
+        "LandlordHours.taxProfile.nonREWorkHours",
     ]
 
     /// One-time migration: copies unscoped data into the current user's scoped keys,
@@ -212,6 +331,40 @@ class AppViewModel: ObservableObject {
         let defaults = UserDefaults.standard
         for key in unscopedLegacyKeys {
             defaults.removeObject(forKey: key)
+        }
+    }
+
+    static func clearScopedAccountData(for userId: String) {
+        let defaults = UserDefaults.standard
+        let taxProfileFields = [
+            "filingStatus",
+            "spouseTracking",
+            "taxYear",
+            "groupingElection",
+            "nonREWorkHours"
+        ]
+        let baseKeys = unscopedLegacyKeys + [
+            "legacyDataMigrated",
+            "timerStartTime",
+            "timerPropertyId",
+            "timerCategory",
+            "LandlordHours.staleTimerRecovery",
+            "LandlordHours.stoppedTimerDraft",
+            "customCategories",
+            "selectedTaxYear",
+            "lastLogDate",
+            "smartRemindersEnabled",
+            "cloudkit.changeToken",
+            "cloudkit.zoneChangeToken",
+            "cloudkit.zoneCreated",
+            "cloudkit.subscriptionCreated",
+            "cloudkit.migrationDone",
+            GuidedOnboardingStore.completedKey,
+            GuidedOnboardingStore.skippedKey
+        ] + taxProfileFields.map { "LandlordHours.taxProfile.\($0)" }
+
+        for key in Set(baseKeys) {
+            defaults.removeObject(forKey: UserScope.key(key, userId: userId))
         }
     }
     
@@ -318,24 +471,65 @@ class AppViewModel: ObservableObject {
 
     // MARK: - Calendar Import
     func importCalendarEntries(_ detectedEntries: [DetectedCalendarEntry]) -> Int {
+        guard !properties.isEmpty else { return 0 }
+        let validPropertyIds = Set(properties.map(\.id))
         let selected = detectedEntries.filter { $0.isSelected }
+        var importedCount = 0
         for detected in selected {
+            guard let propertyId = detected.propertyId,
+                  validPropertyIds.contains(propertyId) else {
+                continue
+            }
+            if let externalId = detected.sourceExternalId,
+               timeEntries.contains(where: { $0.importSource == "calendar" && $0.importExternalId == externalId }) {
+                continue
+            }
+            if timeEntries.contains(where: { isDuplicateCalendarEntry($0, detected: detected, propertyId: propertyId) }) {
+                continue
+            }
             let entry = TimeEntry(
-                propertyId: detected.propertyId ?? properties.first?.id ?? UUID(),
+                propertyId: propertyId,
                 participant: .selfParticipant,
                 category: detected.category,
                 hours: detected.hours,
                 date: detected.eventDate,
                 notes: detected.eventTitle,
-                importSource: "calendar"
+                importSource: "calendar",
+                importExternalId: detected.sourceExternalId,
+                importCalendarId: detected.sourceCalendarId
             )
             timeEntries.append(entry)
+            importedCount += 1
         }
-        if !selected.isEmpty {
+        if importedCount > 0 {
             saveData()
             checkHourMilestones()
         }
-        return selected.count
+        return importedCount
+    }
+
+    private func isDuplicateCalendarEntry(
+        _ entry: TimeEntry,
+        detected: DetectedCalendarEntry,
+        propertyId: UUID
+    ) -> Bool {
+        guard entry.importSource == "calendar",
+              entry.propertyId == propertyId,
+              entry.category == detected.category,
+              abs(entry.hours - detected.hours) < 0.01,
+              abs(entry.date.timeIntervalSince(detected.eventDate)) < 60 else {
+            return false
+        }
+
+        if let calendarId = detected.sourceCalendarId,
+           let entryCalendarId = entry.importCalendarId,
+           calendarId != entryCalendarId {
+            return false
+        }
+
+        return entry.notes
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .caseInsensitiveCompare(detected.eventTitle.trimmingCharacters(in: .whitespacesAndNewlines)) == .orderedSame
     }
 
     // MARK: - Timer Functions
@@ -384,6 +578,26 @@ class AppViewModel: ObservableObject {
         timerPropertyId = nil
         saveTimerState()
     }
+
+    func saveRecoveredStaleTimer(hours: Double? = nil, notes: String = "Recovered from a timer that was left running.") {
+        guard let recovery = staleTimerRecovery else { return }
+        let cappedHours = min(max(hours ?? recovery.suggestedHours, 0.25), 24)
+        addTimeEntry(
+            propertyId: recovery.propertyId,
+            participant: .selfParticipant,
+            category: recovery.category,
+            hours: cappedHours,
+            date: recovery.startTime,
+            notes: notes
+        )
+        staleTimerRecovery = nil
+        clearStaleTimerRecovery()
+    }
+
+    func discardRecoveredStaleTimer() {
+        staleTimerRecovery = nil
+        clearStaleTimerRecovery()
+    }
     
     var timerElapsedTime: TimeInterval {
         guard let startTime = timerStartTime else { return 0 }
@@ -412,12 +626,20 @@ class AppViewModel: ObservableObject {
 
     private func checkHourMilestones() {
         let year = Calendar.current.component(.year, from: Date())
-        let total = totalHoursAllParticipants(year: year)
         let goalType = GoalManager.shared.globalGoalType
-        let target = goalType.hoursRequired
+        let status: (hours: Double, isMet: Bool)
+
+        switch goalType {
+        case .reps, .both:
+            let reps = repsStatus(participant: .selfParticipant, year: year)
+            status = (reps.realEstateHours, reps.isQualified)
+        case .str:
+            let material = materialParticipationOverview(year: year)
+            status = (material.ownerAndSpouseHours, material.isMateriallyParticipating)
+        }
 
         // Check goal met first (highest priority)
-        if total >= target {
+        if status.isMet {
             triggerCelebration(.goalMet)
             return
         }
@@ -425,7 +647,7 @@ class AppViewModel: ObservableObject {
         // Check hour milestones: 10, 50, 100, 250, 500
         let milestones: [Int] = [500, 250, 100, 50, 10]
         for milestone in milestones {
-            if total >= Double(milestone) {
+            if status.hours >= Double(milestone) {
                 triggerCelebration(.hoursLogged(milestone: milestone))
                 return
             }
@@ -463,20 +685,48 @@ class AppViewModel: ObservableObject {
     }
     
     func progressTo750Hours(participant: Participant, year: Int) -> Double {
-        let hours = totalHoursForParticipant(participant, year: year)
+        let hours = TaxQualificationEngine.qualifyingRealEstateHours(
+            entries: timeEntries,
+            participant: participant,
+            year: year
+        )
         return min(hours / REPSRequirements.annualHourThreshold, 1.0)
     }
     
     func meets50PercentRule(year: Int) -> Bool {
-        let reHours = totalHoursForParticipant(.selfParticipant, year: year)
-        let nonREHours = TaxProfileManager.shared.nonREWorkHours
-        let totalWorkingHours = reHours + nonREHours
+        repsStatus(participant: .selfParticipant, year: year).meetsMoreThanHalfPersonalServicesTest
+    }
 
-        guard totalWorkingHours > 0 else { return false }
+    func repsStatus(participant: Participant, year: Int) -> TaxQualificationEngine.REPSResult {
+        TaxQualificationEngine.repsStatus(
+            entries: timeEntries,
+            participant: participant,
+            year: year,
+            nonRealEstateHours: TaxProfileManager.shared.nonREWorkHours
+        )
+    }
 
-        // IRS 50% rule: RE hours must exceed 50% of total personal service hours
-        let rePercentage = reHours / totalWorkingHours
-        return rePercentage > REPSRequirements.workingTimePercentage
+    func materialParticipationStatus(
+        year: Int,
+        propertyId: UUID? = nil
+    ) -> TaxQualificationEngine.MaterialParticipationResult {
+        TaxQualificationEngine.materialParticipationStatus(
+            entries: timeEntries,
+            year: year,
+            propertyId: propertyId,
+            groupingElection: TaxProfileManager.shared.groupingElection
+        )
+    }
+
+    func materialParticipationOverview(year: Int) -> TaxQualificationEngine.MaterialParticipationResult {
+        if TaxProfileManager.shared.groupingElection {
+            return materialParticipationStatus(year: year)
+        }
+
+        return properties
+            .map { materialParticipationStatus(year: year, propertyId: $0.id) }
+            .max { $0.ownerAndSpouseHours < $1.ownerAndSpouseHours }
+            ?? materialParticipationStatus(year: year, propertyId: nil)
     }
     
     // MARK: - Persistence
@@ -510,6 +760,7 @@ class AppViewModel: ObservableObject {
         let defaults = UserDefaults.standard
         let startTimeKey = UserScope.key("timerStartTime")
         let propertyIdKey = UserScope.key("timerPropertyId")
+        let categoryKey = UserScope.key("timerCategory")
 
         defaults.set(isTimerRunning, forKey: timerKey)
 
@@ -524,9 +775,36 @@ class AppViewModel: ObservableObject {
         } else {
             defaults.removeObject(forKey: propertyIdKey)
         }
+
+        if isTimerRunning {
+            defaults.set(timerCategory.rawValue, forKey: categoryKey)
+        } else {
+            defaults.removeObject(forKey: categoryKey)
+        }
+    }
+
+    private func saveStaleTimerRecovery(_ recovery: StaleTimerRecovery) {
+        if let data = try? JSONEncoder().encode(recovery) {
+            UserDefaults.standard.set(data, forKey: staleTimerRecoveryKey)
+        }
+    }
+
+    private func loadStaleTimerRecovery() {
+        guard let data = UserDefaults.standard.data(forKey: staleTimerRecoveryKey),
+              let recovery = try? JSONDecoder().decode(StaleTimerRecovery.self, from: data),
+              properties.contains(where: { $0.id == recovery.propertyId }) else {
+            clearStaleTimerRecovery()
+            return
+        }
+        staleTimerRecovery = recovery
+    }
+
+    private func clearStaleTimerRecovery() {
+        UserDefaults.standard.removeObject(forKey: staleTimerRecoveryKey)
     }
 
     private func loadTimerState() {
+        loadStaleTimerRecovery()
         isTimerRunning = UserDefaults.standard.bool(forKey: timerKey)
         if let startTime = UserDefaults.standard.object(forKey: UserScope.key("timerStartTime")) as? Date {
             timerStartTime = startTime
@@ -535,14 +813,41 @@ class AppViewModel: ObservableObject {
            let propertyId = UUID(uuidString: propertyIdStr) {
             timerPropertyId = propertyId
         }
+        if let categoryRaw = UserDefaults.standard.string(forKey: UserScope.key("timerCategory")),
+           let category = ActivityCategory(rawValue: categoryRaw) {
+            timerCategory = category
+        }
         // Auto-cancel stale timers (running for >24 hours = forgotten)
         if isTimerRunning, let start = timerStartTime,
            Date().timeIntervalSince(start) > 24 * 3600 {
+            if let propertyId = timerPropertyId,
+               properties.contains(where: { $0.id == propertyId }) {
+                staleTimerRecovery = StaleTimerRecovery(
+                    startTime: start,
+                    propertyId: propertyId,
+                    category: timerCategory,
+                    elapsedHours: Date().timeIntervalSince(start) / 3600.0
+                )
+                if let staleTimerRecovery {
+                    saveStaleTimerRecovery(staleTimerRecovery)
+                }
+            }
             isTimerRunning = false
             timerStartTime = nil
             timerPropertyId = nil
             saveTimerState()
         }
+    }
+}
+
+struct StaleTimerRecovery: Codable, Equatable {
+    let startTime: Date
+    let propertyId: UUID
+    let category: ActivityCategory
+    let elapsedHours: Double
+
+    var suggestedHours: Double {
+        min(max(elapsedHours, 0.25), 24)
     }
 }
 
@@ -629,4 +934,255 @@ extension AppViewModel: CloudKitSyncDelegate {
             UserDefaults.standard.set(entriesData, forKey: entriesKey)
         }
     }
+
+#if DEBUG
+    enum MockDataScenario: String, CaseIterable, Identifiable {
+        case firstTime
+        case emptyMainTabs
+        case occasional
+        case frequent
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .firstTime: return "First-time user"
+            case .emptyMainTabs: return "Empty main tabs"
+            case .occasional: return "Occasional user"
+            case .frequent: return "Frequent user"
+            }
+        }
+
+        var subtitle: String {
+            switch self {
+            case .firstTime: return "Signed in, no onboarding or records"
+            case .emptyMainTabs: return "Signed in, onboarding complete, no records"
+            case .occasional: return "One LTR, light monthly logging"
+            case .frequent: return "Three properties, spouse, calendar imports"
+            }
+        }
+
+        var userName: String {
+            switch self {
+            case .firstTime: return "New Owner"
+            case .emptyMainTabs: return "New Owner"
+            case .occasional: return "Maya Chen"
+            case .frequent: return "Jordan Rivera"
+            }
+        }
+    }
+
+    private func applyLaunchMockScenarioIfNeeded() {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "-LHMockScenario"),
+              args.indices.contains(index + 1),
+              let scenario = MockDataScenario(rawValue: args[index + 1]) else {
+            return
+        }
+        applyMockScenario(scenario)
+    }
+
+    func applyMockScenario(_ scenario: MockDataScenario) {
+        syncService.stop()
+        suppressCelebrations = true
+
+        let userId = "debug-\(scenario.rawValue)"
+        Self.clearScopedAccountData(for: userId)
+
+        let defaults = UserDefaults.standard
+        defaults.set(userId, forKey: "emailUserId")
+        defaults.set(Self.launchMockEmail(defaultValue: "brianlevu@gmail.com"), forKey: "emailUserEmail")
+        defaults.set(Self.launchMockName(defaultValue: scenario.userName), forKey: "emailUserName")
+        defaults.set(LoginType.email.rawValue, forKey: "loginType")
+
+        isSignedIn = true
+        userName = Self.launchMockName(defaultValue: scenario.userName)
+        properties = []
+        timeEntries = []
+        activeCelebration = nil
+        isTimerRunning = false
+        timerStartTime = nil
+        timerPropertyId = nil
+        staleTimerRecovery = nil
+
+        defaults.removeObject(forKey: UserScope.key("hasCompletedOnboarding"))
+        defaults.removeObject(forKey: UserScope.key("isProUser"))
+        defaults.removeObject(forKey: UserScope.key("hasPurchasedPro"))
+        clearStaleTimerRecovery()
+
+        let taxProfile = TaxProfileManager.shared
+        taxProfile.filingStatus = .marriedJoint
+        taxProfile.spouseTracking = scenario == .frequent
+        taxProfile.taxYear = Calendar.current.component(.year, from: Date())
+        taxProfile.groupingElection = scenario == .frequent
+        taxProfile.nonREWorkHours = scenario == .frequent ? 620 : 0
+
+        let goalManager = GoalManager.shared
+        goalManager.propertyGoals = []
+        goalManager.globalGoalType = scenario == .occasional ? .str : .reps
+
+        switch scenario {
+        case .firstTime:
+            break
+        case .emptyMainTabs:
+            defaults.set(true, forKey: UserScope.key("hasCompletedOnboarding"))
+            GuidedOnboardingStore.skip()
+        case .occasional:
+            defaults.set(true, forKey: UserScope.key("hasCompletedOnboarding"))
+            properties = Self.mockPropertiesOccasional()
+            timeEntries = Self.mockEntriesOccasional(properties: properties)
+        case .frequent:
+            defaults.set(true, forKey: UserScope.key("hasCompletedOnboarding"))
+            defaults.set(true, forKey: UserScope.key("isProUser"))
+            defaults.set(true, forKey: UserScope.key("hasPurchasedPro"))
+            properties = Self.mockPropertiesFrequent()
+            timeEntries = Self.mockEntriesFrequent(properties: properties)
+            goalManager.propertyGoals = properties.map { property in
+                PropertyGoal(propertyId: property.id, goalType: property.propertyType == .str ? .str : .reps)
+            }
+        }
+
+        saveDataLocal()
+        goalManager.saveGoals()
+        SubscriptionManager.shared.reload()
+        CategoryManager.shared.loadCategories()
+        MilestoneTracker.shared.reload()
+        defaults.synchronize()
+
+        suppressCelebrations = false
+    }
+
+    private static func launchMockEmail(defaultValue: String) -> String {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "-LHMockEmail"),
+              args.indices.contains(index + 1),
+              !args[index + 1].isEmpty else {
+            return defaultValue
+        }
+        return args[index + 1]
+    }
+
+    private static func launchMockName(defaultValue: String) -> String {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "-LHMockName"),
+              args.indices.contains(index + 1),
+              !args[index + 1].isEmpty else {
+            return defaultValue
+        }
+        return args[index + 1]
+    }
+
+    private static func mockPropertiesOccasional() -> [RentalProperty] {
+        [
+            mockProperty(
+                id: "0D776174-6B40-4550-97D3-A45D4E0D54F8",
+                name: "Oak Street Duplex",
+                address: "214 Oak Street, Sacramento, CA",
+                type: .ltr,
+                createdDaysAgo: 220
+            )
+        ]
+    }
+
+    private static func mockPropertiesFrequent() -> [RentalProperty] {
+        [
+            mockProperty(id: "4C529168-E861-40EF-A093-8605A0C545B6", name: "Oak Street Duplex", address: "214 Oak Street, Sacramento, CA", type: .ltr, createdDaysAgo: 640),
+            mockProperty(id: "3858434C-2475-4F34-BE31-89DE9154E663", name: "Lakeview Cottage", address: "78 Pine Shore Road, South Lake Tahoe, CA", type: .str, createdDaysAgo: 410),
+            mockProperty(id: "E4A83DC6-3EB1-4AE0-A695-36B80492450C", name: "Mission Studio", address: "901 Valencia Street, San Francisco, CA", type: .ltr, createdDaysAgo: 130)
+        ]
+    }
+
+    private static func mockProperty(id: String, name: String, address: String, type: PropertyType, createdDaysAgo: Int) -> RentalProperty {
+        let createdAt = date(daysAgo: createdDaysAgo, hour: 9)
+        var property = RentalProperty(
+            id: UUID(uuidString: id) ?? UUID(),
+            name: name,
+            address: address,
+            propertyType: type
+        )
+        property.createdAt = createdAt
+        property.modifiedAt = date(daysAgo: min(createdDaysAgo, 4), hour: 11)
+        return property
+    }
+
+    private static func mockEntriesOccasional(properties: [RentalProperty]) -> [TimeEntry] {
+        guard let property = properties.first else { return [] }
+        let raw: [(Int, Double, ActivityCategory, String)] = [
+            (3, 1.0, .management, "Called tenant about dishwasher issue and coordinated repair window."),
+            (9, 1.5, .bookkeeping, "Reviewed rent ledger, receipts, and mileage notes."),
+            (16, 2.0, .repairs, "Met handyman at the duplex and inspected the garbage disposal repair."),
+            (24, 0.75, .leasing, "Answered prospective tenant questions about lease renewal options."),
+            (32, 1.25, .insurance, "Reviewed policy renewal and uploaded documents for CPA records."),
+            (47, 2.5, .repairs, "Replaced smoke detector batteries and checked hallway lighting."),
+            (61, 1.0, .management, "Followed up on rent payment timing and vendor invoice."),
+            (74, 1.5, .travel, "Drove to Oak Street for exterior inspection after storm."),
+            (92, 2.0, .bookkeeping, "Prepared quarterly expense summary."),
+            (118, 1.0, .legal, "Reviewed local rental ordinance update.")
+        ]
+        return raw.map { day, hours, category, notes in
+            TimeEntry(
+                propertyId: property.id,
+                participant: .selfParticipant,
+                category: category,
+                hours: hours,
+                date: date(daysAgo: day, hour: 10 + (day % 7)),
+                notes: notes,
+                importSource: day % 3 == 0 ? "calendar" : nil
+            )
+        }
+    }
+
+    private static func mockEntriesFrequent(properties: [RentalProperty]) -> [TimeEntry] {
+        guard properties.count >= 3 else { return [] }
+        let templates: [(ActivityCategory, Double, String)] = [
+            (.management, 1.0, "Tenant messages, vendor scheduling, and owner follow-up."),
+            (.repairs, 2.25, "On-site repair coordination and completion photos."),
+            (.bookkeeping, 1.5, "Categorized expenses and reconciled receipts."),
+            (.leasing, 1.75, "Screened applicant questions and updated listing details."),
+            (.travel, 1.25, "Travel to property for inspection and lockbox check."),
+            (.renovations, 3.0, "Reviewed contractor scope, materials, and punch list."),
+            (.insurance, 1.0, "Prepared claim documentation and policy notes."),
+            (.legal, 0.75, "Reviewed lease language and compliance notes.")
+        ]
+
+        var entries: [TimeEntry] = []
+        for i in 0..<96 {
+            let property = properties[i % properties.count]
+            let template = templates[i % templates.count]
+            let isSpouse = i % 9 == 0
+            let hours = template.1 + Double((i % 4)) * 0.25
+            entries.append(
+                TimeEntry(
+                    propertyId: property.id,
+                    participant: isSpouse ? .spouse : .selfParticipant,
+                    category: template.0,
+                    hours: hours,
+                    date: date(daysAgo: 1 + (i * 3) % 178, hour: 8 + (i % 9)),
+                    notes: "\(property.name): \(template.2)",
+                    importSource: i % 5 == 0 ? "calendar" : nil
+                )
+            )
+        }
+
+        entries.append(
+            TimeEntry(
+                propertyId: properties[1].id,
+                participant: .selfParticipant,
+                category: .investing,
+                hours: 2.0,
+                date: date(daysAgo: 12, hour: 14),
+                notes: "Compared possible acquisition returns. Marked non-REPS so reports can verify excluded hours."
+            )
+        )
+        return entries.sorted { $0.date > $1.date }
+    }
+
+    private static func date(daysAgo: Int, hour: Int) -> Date {
+        var components = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        components.hour = hour
+        components.minute = 15
+        let base = Calendar.current.date(from: components) ?? Date()
+        return Calendar.current.date(byAdding: .day, value: -daysAgo, to: base) ?? Date()
+    }
+#endif
 }

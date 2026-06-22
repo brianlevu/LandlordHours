@@ -6,23 +6,41 @@ struct DashboardView: View {
     @EnvironmentObject var goalManager: GoalManager
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     private var currentYear: Int { Calendar.current.component(.year, from: Date()) }
-    private var totalHours: Double { viewModel.totalHoursAllParticipants(year: currentYear) }
+    private var repsStatus: TaxQualificationEngine.REPSResult {
+        viewModel.repsStatus(participant: .selfParticipant, year: currentYear)
+    }
+    private var materialParticipationStatus: TaxQualificationEngine.MaterialParticipationResult {
+        viewModel.materialParticipationOverview(year: currentYear)
+    }
+    private var totalHours: Double {
+        switch goalManager.globalGoalType {
+        case .reps, .both:
+            return repsStatus.realEstateHours
+        case .str:
+            return materialParticipationStatus.ownerAndSpouseHours
+        }
+    }
     private var targetHours: Double { goalManager.globalGoalType.hoursRequired }
     private var progress: Double { min(totalHours / targetHours, 1.0) }
     private var remainingHours: Double { max(targetHours - totalHours, 0) }
+    private var isGoalMet: Bool {
+        switch goalManager.globalGoalType {
+        case .reps, .both:
+            return repsStatus.isQualified
+        case .str:
+            return materialParticipationStatus.isMateriallyParticipating
+        }
+    }
 
     private var isREPS: Bool { goalManager.globalGoalType == .reps || goalManager.globalGoalType == .both }
 
     // 50% rule compliance: ratio of RE hours to total working hours (incl. non-RE employment)
     private var fiftyPercentCompliance: Double {
-        let reHours = viewModel.totalHoursForParticipant(.selfParticipant, year: currentYear)
-        let nonREHours = TaxProfileManager.shared.nonREWorkHours
-        let totalWorkingHours = reHours + nonREHours
-        guard totalWorkingHours > 0 else { return 0 }
-        return min(reHours / totalWorkingHours, 1.0)
+        min(repsStatus.realEstateWorkPercentage, 1.0)
     }
 
     // Pace calculations
@@ -82,25 +100,37 @@ struct DashboardView: View {
 
     @State private var showPaywall = false
     @State private var isReady = false
+    @State private var showLearningCenter = false
+    @State private var showHistory = false
+
+    private var shouldShowActivationCard: Bool {
+        viewModel.properties.isEmpty || viewModel.timeEntries.isEmpty
+    }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                AuroraBackground()
+                LHMobileCanvas()
 
                 if isReady {
                     ScrollView(showsIndicators: false) {
-                        VStack(spacing: 24) {
+                        VStack(spacing: 26) {
                             headerSection
-                            trialStatusNudge
-                            progressRingCard
-                            thisWeekCard
+                            quickActionsRow
+                            if shouldShowActivationCard {
+                                homeActivationCard
+                                progressRingCard
+                            } else {
+                                progressRingCard
+                                learningShortcutCard
+                            }
                             recentEntriesSection
-                            learnCarouselSection
+                            thisWeekCard
+                            trialStatusNudge
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
-                        .padding(.bottom, 40)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 18)
+                        .padding(.bottom, AppSpacing.tabContentBottomInset)
                     }
                     .transition(.opacity)
                 } else {
@@ -114,11 +144,17 @@ struct DashboardView: View {
             .sheet(isPresented: $showPaywall) {
                 PaywallView(showPaywall: $showPaywall)
             }
+            .navigationDestination(isPresented: $showLearningCenter) {
+                LearningCenterView()
+            }
+            .navigationDestination(isPresented: $showHistory) {
+                HistoryView()
+            }
             .onAppear {
                 // Brief skeleton then reveal — lets SwiftUI layout settle
                 if !isReady {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                        withAnimation(.easeOut(duration: 0.35)) {
+                        animate(.easeOut(duration: 0.35)) {
                             isReady = true
                         }
                     }
@@ -127,32 +163,69 @@ struct DashboardView: View {
         }
     }
 
+    private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
+        if reduceMotion {
+            updates()
+        } else {
+            withAnimation(animation, updates)
+        }
+    }
+
     // MARK: - Header
     private var headerSection: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(greetingLine)
-                    .font(.system(size: 14))
-                    .foregroundStyle(AppColors.slate)
-                HStack(spacing: 10) {
-                    Text(displayName)
-                        .font(.system(size: 28, weight: .regular, design: .serif))
-                        .foregroundStyle(colors.textPrimary)
-                    if subscriptionManager.isPro && !subscriptionManager.isTrialActive {
-                        Text("PRO")
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(0.5)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(AppColors.primary)
-                            .clipShape(Capsule())
-                    }
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .center) {
+                Button {
+                    NotificationCenter.default.post(name: .switchToTab, object: 4)
+                } label: {
+                    Circle()
+                        .fill(colors.backgroundTertiary)
+                        .frame(width: 54, height: 54)
+                        .overlay {
+                            Text(userInitials)
+                                .font(.system(size: 20, weight: .black, design: .rounded))
+                                .foregroundStyle(colors.textPrimary)
+                        }
+                        .overlay(alignment: .bottomTrailing) {
+                            Circle()
+                                .fill(colors.backgroundSecondary)
+                                .frame(width: 22, height: 22)
+                                .overlay {
+                                    LucideIcon(image: Lucide.settings, size: 12)
+                                        .foregroundStyle(colors.textSecondary)
+                                }
+                                .overlay {
+                                    Circle()
+                                        .strokeBorder(colors.border.opacity(0.38), lineWidth: 1)
+                                }
+                        }
+                        .contentShape(Circle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open profile and settings")
+
+                Spacer()
+
+                Button {
+                    NotificationCenter.default.post(name: .switchToTab, object: 3)
+                } label: {
+                    LucideIcon(image: Lucide.chartColumnIncreasing, size: 22)
+                        .foregroundStyle(colors.textPrimary)
+                        .frame(width: 48, height: 48)
+                        .background(colors.backgroundTertiary)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open reports")
             }
-            Spacer()
+
+            Text(dashboardTitle)
+                .font(.system(size: 42, weight: .black, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
+                .lineSpacing(-2)
+                .minimumScaleFactor(0.78)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.top, 4)
     }
 
     private var displayName: String {
@@ -162,208 +235,316 @@ struct DashboardView: View {
         return name.components(separatedBy: " ").first ?? name
     }
 
-    // MARK: - Trial Status Nudge
+    private var dashboardTitle: String {
+        if viewModel.properties.isEmpty {
+            return "Welcome to LandlordHours"
+        }
+        return "Welcome back, \(displayName)"
+    }
+
+    private var userInitials: String {
+        let source = displayName == "Dashboard" ? "LH" : displayName
+        let pieces = source.split(separator: " ")
+        if pieces.count >= 2 {
+            return pieces.prefix(2).compactMap { $0.first }.map(String.init).joined().uppercased()
+        }
+        return String(source.prefix(2)).uppercased()
+    }
+
+    // MARK: - Quick Actions
+    private var quickActionsRow: some View {
+        HStack(spacing: 8) {
+            dashboardPill("Log time", isPrimary: true) {
+                NotificationCenter.default.post(name: .switchToTab, object: 2)
+            }
+            dashboardPill("Property") {
+                NotificationCenter.default.post(name: .switchToTab, object: 1)
+                NotificationCenter.default.post(name: .openAddProperty, object: nil)
+            }
+            dashboardPill("Entries") {
+                showHistory = true
+            }
+        }
+    }
+
+    private func dashboardPill(_ title: String, isPrimary: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 15, weight: .black, design: .rounded))
+                .foregroundStyle(isPrimary ? AppColors.onAction : colors.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(isPrimary ? colors.action : colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.72 : 1))
+                .clipShape(Capsule())
+                .overlay {
+                    Capsule()
+                        .strokeBorder(isPrimary ? Color.clear : colors.border.opacity(0.35), lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Pro Status Nudge
     @ViewBuilder
     private var trialStatusNudge: some View {
-        if subscriptionManager.isTrialActive {
-            // Trial active
-            Button { showPaywall = true } label: {
-                HStack(spacing: 10) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(AppColors.primarySurface)
-                            .frame(width: 32, height: 32)
-                        LucideIcon(image: Lucide.sparkles, size: 16)
-                            .foregroundStyle(AppColors.primary)
-                    }
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Pro Trial \u{00B7} \(subscriptionManager.trialDaysRemaining) days left")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(colors.textPrimary)
-                        Text("All features unlocked")
-                            .font(.system(size: 11, design: .rounded))
-                            .foregroundStyle(colors.textSecondary)
-                    }
-                    Spacer()
-                    Text("Upgrade")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppColors.primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(AppColors.primarySurface)
-                        .clipShape(Capsule())
-                }
-                .padding(10)
-                .background(colors.backgroundSecondary)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(colors.border.opacity(0.3), lineWidth: 1)
-                )
-            }
-            .buttonStyle(.plain)
-        } else if !subscriptionManager.isPro {
-            // Trial expired
+        if !subscriptionManager.isPro && shouldShowProNudge {
             Button { showPaywall = true } label: {
                 HStack(spacing: 12) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color(hex: "5B4BC9"), AppColors.primary],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 44, height: 44)
-                        LucideIcon(image: Lucide.sparkles, size: 20)
-                            .foregroundStyle(.white)
-                    }
+                    LHIconTile(icon: Lucide.sparkles, color: AppColors.primary, wash: colors.primarySurface, size: 44, isActive: true)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Your trial has ended")
+                        Text("Unlock Pro")
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(colors.textPrimary)
-                        Text("Upgrade to keep all your data and unlock exports.")
+                        Text("Buy lifetime access for exports and unlimited properties.")
                             .font(.system(size: 11, design: .rounded))
                             .foregroundStyle(colors.textSecondary)
                     }
                     Spacer()
                     Text("Upgrade")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(AppColors.onAction)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(AppColors.primary)
+                        .background(AppColors.action)
                         .clipShape(Capsule())
                 }
                 .padding(14)
-                .background(colors.backgroundSecondary)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(colors.border.opacity(0.3), lineWidth: 1)
-                )
+                .lhSurfaceCard(cornerRadius: 20)
             }
             .buttonStyle(.plain)
         }
     }
 
+    private var shouldShowProNudge: Bool {
+        !viewModel.properties.isEmpty &&
+        (!viewModel.timeEntries.isEmpty || GuidedOnboardingStore.isCompleted || GuidedOnboardingStore.isSkipped)
+    }
+
     // MARK: - Progress Ring Card
     private var progressRingCard: some View {
-        VStack(spacing: 16) {
-            // Dual-ring progress
-            ZStack {
-                // Ambient glow
-                RadialGradient(
-                    colors: [AppColors.primary.opacity(0.08), AppColors.primary.opacity(0.02), Color.clear],
-                    center: .center,
-                    startRadius: 0,
-                    endRadius: 120
-                )
-                .frame(width: 240, height: 240)
+        VStack(alignment: .leading, spacing: 22) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(goalCardTitle)
+                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                    Text(goalCardSubtitle)
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                        .lineSpacing(2)
+                }
+                Spacer(minLength: 16)
+                Text("\(Int(progress * 100))%")
+                    .font(.system(size: 36, weight: .black, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+            }
 
-                // Ring container
-                ZStack {
-                    // Outer track (segmented dashes)
-                    Circle()
-                        .stroke(
-                            AppColors.primarySurface,
-                            style: StrokeStyle(lineWidth: 18, dash: [3, 5])
-                        )
-                        .frame(width: 216, height: 216)
-
-                    // Outer progress fill
-                    Circle()
-                        .trim(from: 0, to: progress)
-                        .stroke(
-                            LinearGradient(
-                                colors: [Color(hex: "8B5CF6"), Color(hex: "A78BFA")],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
-                            style: StrokeStyle(lineWidth: 18, lineCap: .round, dash: [3, 5])
-                        )
-                        .rotationEffect(.degrees(-90))
-                        .frame(width: 216, height: 216)
-                        .animation(AppAnimation.ringProgress, value: progress)
-
-                    // Inner ring (50% rule) — only for REPS
-                    if isREPS {
-                        // Inner track
-                        Circle()
-                            .stroke(
-                                AppColors.sageWash,
-                                style: StrokeStyle(lineWidth: 10, dash: [3, 5])
-                            )
-                            .frame(width: 164, height: 164)
-
-                        // Inner progress fill
-                        Circle()
-                            .trim(from: 0, to: fiftyPercentCompliance)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [Color(hex: "34D399"), Color(hex: "6EE7B7")],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ),
-                                style: StrokeStyle(lineWidth: 10, lineCap: .round, dash: [3, 5])
-                            )
-                            .rotationEffect(.degrees(-90))
-                            .frame(width: 164, height: 164)
-                            .animation(AppAnimation.ringProgress, value: fiftyPercentCompliance)
+            VStack(alignment: .leading, spacing: 9) {
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(colors.textPrimary.opacity(colorScheme == .dark ? 0.16 : 0.08))
+                            .frame(height: 10)
+                        Capsule()
+                            .fill(colors.textPrimary)
+                            .frame(width: proxy.size.width * progress, height: 10)
                     }
+                }
+                .frame(height: 10)
 
-                    // Center content
-                    VStack(spacing: 4) {
-                        if totalHours >= targetHours {
-                            LucideIcon(image: Lucide.check, size: 32)
-                                .foregroundStyle(AppColors.success)
-                            Text("Goal met!")
-                                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                                .foregroundStyle(AppColors.success)
-                        } else {
-                            Text(String(format: "%.0f", totalHours))
-                                .font(.system(size: 44, weight: .heavy, design: .rounded))
-                                .foregroundStyle(colors.textPrimary)
-                            Text("of \(Int(targetHours)) hours")
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(colors.textTertiary)
+                HStack {
+                    Text("\(AppFormat.hours(totalHours)) logged")
+                    Spacer()
+                    Text("\(Int(remainingHours))h left")
+                }
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
+            }
+
+            HStack(spacing: 12) {
+                dashboardMiniMetric(title: "Pace", value: isOnTrack ? "On track" : "Behind")
+                if isREPS {
+                    dashboardMiniMetric(title: "50% rule", value: "\(Int(fiftyPercentCompliance * 100))%")
+                } else {
+                    dashboardMiniMetric(title: "Days left", value: "\(daysLeftInYear)")
+                }
+            }
+        }
+        .padding(24)
+        .background(isGoalMet ? AppColors.sage : colors.sageWash)
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .stroke(colors.border.opacity(0.35), lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(isGoalMet
+            ? "Goal met. \(AppFormat.hours(totalHours)) logged"
+            : "\(AppFormat.hours(totalHours)) of \(Int(targetHours)) hours, \(Int(progress * 100)) percent complete")
+    }
+
+    private var goalCardTitle: String {
+        isGoalMet ? "Goal met" : "\(Int(targetHours)) hour target"
+    }
+
+    private var goalCardSubtitle: String {
+        if isGoalMet { return "Your tracked work has reached the current goal." }
+        return "\(Int(hoursPerWeekNeeded))h per week keeps you on pace for \(currentYear)."
+    }
+
+    private func dashboardMiniMetric(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
+            Text(value)
+                .font(.system(size: 16, weight: .black, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.62 : 0.72))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    // MARK: - Activation
+    private var homeActivationCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                LHIconTile(
+                    icon: Lucide.listChecks,
+                    color: colors.action,
+                    wash: colors.actionSurface,
+                    size: 42,
+                    isActive: true
+                )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Finish your tax-ready setup")
+                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                    Text("A few quick steps make every hour easier to review later.")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                        .lineSpacing(2)
+                }
+
+                Spacer(minLength: 8)
+
+                Text("\(completedActivationSteps)/2")
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(colors.backgroundTertiary)
+                    .clipShape(Capsule())
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                activationActionTile(
+                    title: "Property",
+                    subtitle: viewModel.properties.isEmpty ? "Add first" : "\(viewModel.properties.count) ready",
+                    icon: Lucide.building2,
+                    isComplete: !viewModel.properties.isEmpty,
+                    action: {
+                        NotificationCenter.default.post(name: .switchToTab, object: 1)
+                        if viewModel.properties.isEmpty {
+                            NotificationCenter.default.post(name: .openAddProperty, object: nil)
                         }
                     }
-                }
-                .frame(width: 260, height: 260)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(totalHours >= targetHours
-                    ? "Goal met! \(AppFormat.hours(totalHours)) logged"
-                    : "\(AppFormat.hours(totalHours)) of \(Int(targetHours)) hours, \(Int(progress * 100)) percent complete")
-            }
+                )
 
-            // Hero message
-            if totalHours < targetHours {
-                VStack(spacing: 4) {
-                    Text("You\u{2019}re building momentum")
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                    Text("\(Int(remainingHours)) hours to go \u{2014} about \(Int(hoursPerWeekNeeded))h per week. You\u{2019}ve got this.")
-                        .font(.system(size: 12, weight: .regular, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                        .multilineTextAlignment(.center)
-                }
-            }
+                activationActionTile(
+                    title: "First hour",
+                    subtitle: viewModel.timeEntries.isEmpty ? "Log now" : AppFormat.hours(totalHours),
+                    icon: Lucide.clock,
+                    isComplete: !viewModel.timeEntries.isEmpty,
+                    action: {
+                        NotificationCenter.default.post(name: .switchToTab, object: 2)
+                    }
+                )
 
-            // Pace chips
-            paceChipsRow
+                activationActionTile(
+                    title: "Learn",
+                    subtitle: "What counts",
+                    icon: Lucide.bookOpenText,
+                    isComplete: false,
+                    action: {
+                        showLearningCenter = true
+                    }
+                )
+
+                activationActionTile(
+                    title: "Report",
+                    subtitle: "Check pace",
+                    icon: Lucide.chartColumnIncreasing,
+                    isComplete: false,
+                    action: {
+                        NotificationCenter.default.post(name: .switchToTab, object: 3)
+                    }
+                )
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
-        .padding(.horizontal, 24)
+        .padding(18)
         .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 28))
-        .overlay(
-            RoundedRectangle(cornerRadius: 28)
-                .stroke(colors.border.opacity(0.3), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.045), radius: 16, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(colors.border.opacity(0.28), lineWidth: 1)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var completedActivationSteps: Int {
+        (viewModel.properties.isEmpty ? 0 : 1) + (viewModel.timeEntries.isEmpty ? 0 : 1)
+    }
+
+    private func activationActionTile(
+        title: String,
+        subtitle: String,
+        icon: UIImage,
+        isComplete: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(isComplete ? colors.positiveSurface : colors.backgroundTertiary)
+                        .frame(width: 40, height: 40)
+
+                    LucideIcon(image: isComplete ? Lucide.circleCheck : icon, size: 19)
+                        .foregroundStyle(isComplete ? colors.positive : colors.textPrimary)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+
+                    Text(subtitle)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 92)
+            .padding(12)
+            .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.72 : 0.9))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(colors.border.opacity(0.22), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(title). \(subtitle)")
     }
 
     // MARK: - Pace Chips
@@ -384,11 +565,11 @@ struct DashboardView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(AppColors.background)
+            .background(colors.backgroundTertiary.opacity(colorScheme == .dark ? 0.82 : 1))
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color(hex: "F0F0F0").opacity(0.6), lineWidth: 1)
+                    .stroke(colors.border.opacity(colorScheme == .dark ? 0.8 : 0.55), lineWidth: 1)
             )
 
             // 50% Rule chip
@@ -406,11 +587,11 @@ struct DashboardView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(AppColors.background)
+            .background(colors.backgroundTertiary.opacity(colorScheme == .dark ? 0.82 : 1))
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color(hex: "F0F0F0").opacity(0.6), lineWidth: 1)
+                    .stroke(colors.border.opacity(colorScheme == .dark ? 0.8 : 0.55), lineWidth: 1)
             )
         }
     }
@@ -421,13 +602,12 @@ struct DashboardView: View {
             // Header
             HStack {
                 Text("This Week")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(.system(size: 19, weight: .black, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
                 Spacer()
                 Text(String(format: "%.1fh", thisWeekTotal))
                     .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(AppColors.primary)
-                    .tracking(-0.5)
+                    .foregroundStyle(colors.textPrimary)
             }
 
             // Day grid
@@ -440,39 +620,37 @@ struct DashboardView: View {
                         ZStack {
                             RoundedRectangle(cornerRadius: 10)
                                 .fill(
-                                    isToday ? AppColors.primary :
-                                    hours > 0 ? AppColors.primarySurface :
-                                    AppColors.snow
+                                    isToday ? AppColors.sage :
+                                    hours > 0 ? AppColors.sageWash :
+                                    colors.backgroundTertiary
                                 )
-                                .frame(width: 32, height: 32)
-                                .shadow(color: isToday ? AppColors.primary.opacity(0.3) : .clear, radius: 4, y: 2)
+                                .frame(width: 30, height: 30)
 
                             if hours > 0 {
                                 Text(String(format: "%.0f", hours))
                                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .foregroundStyle(isToday ? .white : AppColors.primary)
+                                    .foregroundStyle(isToday ? AppColors.charcoal : colors.textPrimary)
                             } else {
                                 Text("\u{2013}")
                                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .foregroundStyle(isToday ? .white : AppColors.cloud)
+                                    .foregroundStyle(isToday ? AppColors.charcoal : colors.textTertiary)
                             }
                         }
                         Text(dayLabels[i])
                             .font(.system(size: 10, design: .rounded))
-                            .foregroundStyle(AppColors.mist)
+                            .foregroundStyle(colors.textTertiary)
                     }
                     .frame(maxWidth: .infinity)
                 }
             }
         }
-        .padding(22)
+        .padding(20)
         .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(Color(hex: "F0F0F0").opacity(0.6), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.04), radius: 12, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .stroke(colors.border.opacity(0.28), lineWidth: 1)
+        }
     }
 
     // MARK: - Recent Entries
@@ -520,8 +698,11 @@ struct DashboardView: View {
                     }
                 }
                 .background(colors.backgroundSecondary)
-                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.05), radius: 12, x: 0, y: 2)
+                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 26, style: .continuous)
+                        .stroke(colors.border.opacity(0.28), lineWidth: 1)
+                }
             }
         }
     }
@@ -542,145 +723,53 @@ struct DashboardView: View {
         .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
     }
 
-    // MARK: - Learn Carousel
-    private var learnCarouselSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Kicker + headline + "See all" link
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("LEARN")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1.5)
-                        .foregroundStyle(AppColors.mist)
-                    Text("Tax Essentials")
-                        .font(.system(size: 20, weight: .regular, design: .serif))
-                        .foregroundStyle(colors.textPrimary)
-                }
-                Spacer()
-                NavigationLink {
-                    LearningCenterView()
-                } label: {
-                    HStack(spacing: 2) {
-                        Text("See all")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(AppColors.primary)
-                        LucideIcon(image: Lucide.chevronRight, size: 14)
-                            .foregroundStyle(AppColors.primary)
-                    }
-                }
-                .buttonStyle(.plain)
-            }
-
-            // Horizontal card scroll
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    learnCardLink(
-                        category: "IRS BASICS",
-                        title: "What Counts as REPS Hours?",
-                        readTime: "5 min",
-                        categoryColor: AppColors.primary,
-                        washColor: AppColors.primarySurface,
-                        iconImage: Lucide.house
-                    )
-                    learnCardLink(
-                        category: "TAX STRATEGY",
-                        title: "The 50% Rule Explained",
-                        readTime: "4 min",
-                        categoryColor: Color(hex: "059669"),
-                        washColor: AppColors.sageWash,
-                        iconImage: Lucide.circleCheck
-                    )
-                    learnCardLink(
-                        category: "RECORD KEEPING",
-                        title: "Hours That Count for IRS",
-                        readTime: "5 min",
-                        categoryColor: AppColors.coral,
-                        washColor: AppColors.coralWash,
-                        iconImage: Lucide.fileText
-                    )
-                }
-                .padding(.horizontal, 2)
-            }
-            .padding(.horizontal, -2)
-        }
-    }
-
-    private func learnCardLink(category: String, title: String, readTime: String, categoryColor: Color, washColor: Color, iconImage: UIImage) -> some View {
+    // MARK: - Learning Shortcut
+    private var learningShortcutCard: some View {
         NavigationLink {
             LearningCenterView()
         } label: {
-            learnCard(
-                category: category,
-                title: title,
-                readTime: readTime,
-                categoryColor: categoryColor,
-                washColor: washColor,
-                iconImage: iconImage
-            )
+            HStack(alignment: .center, spacing: 14) {
+                LHIconTile(
+                    icon: Lucide.bookOpenText,
+                    color: AppColors.primary,
+                    wash: colors.primarySurface,
+                    size: 46,
+                    isActive: true
+                )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Learn what counts")
+                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+
+                    Text("REPS, STR rules, and audit-ready logs.")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                        .lineSpacing(2)
+                        .multilineTextAlignment(.leading)
+                }
+
+                Spacer(minLength: 8)
+
+                LucideIcon(image: Lucide.chevronRight, size: 18)
+                    .foregroundStyle(colors.textTertiary)
+                    .frame(width: 32, height: 32)
+                    .background(colors.backgroundTertiary)
+                    .clipShape(Circle())
+            }
+            .padding(18)
+            .background(colors.backgroundSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(colors.border.opacity(0.28), lineWidth: 1)
+            }
         }
         .buttonStyle(.plain)
-    }
-
-    private func learnCard(category: String, title: String, readTime: String, categoryColor: Color, washColor: Color, iconImage: UIImage) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Illustration area
-            ZStack {
-                washColor
-                ZStack {
-                    Circle()
-                        .fill(AppColors.charcoal)
-                        .frame(width: 24, height: 24)
-                    LucideIcon(image: Lucide.bookOpen, size: 12)
-                        .foregroundStyle(.white)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(10)
-
-                LucideIcon(image: iconImage, size: 32)
-                    .foregroundStyle(categoryColor.opacity(0.5))
-            }
-            .frame(height: 100)
-
-            // Body
-            VStack(alignment: .leading, spacing: 6) {
-                Text(category)
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(0.5)
-                    .foregroundStyle(categoryColor)
-                Text(title)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                    .lineSpacing(2)
-                    .lineLimit(2)
-                HStack(spacing: 4) {
-                    LucideIcon(image: Lucide.clock, size: 10)
-                        .foregroundStyle(AppColors.mist)
-                    Text(readTime)
-                        .font(.system(size: 10, design: .rounded))
-                        .foregroundStyle(AppColors.mist)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 4)
-            .padding(.bottom, 16)
-        }
-        .frame(width: 165)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(colors.border.opacity(0.2), lineWidth: 1)
-        )
+        .accessibilityLabel("Open learning center. Learn what counts for rental tax tracking.")
     }
 
     // MARK: - Computed
-    private var greetingLine: String {
-        let h = Calendar.current.component(.hour, from: Date())
-        if h < 12 { return "Good morning," }
-        if h < 17 { return "Good afternoon," }
-        return "Good evening,"
-    }
-
     private var recentEntries: [TimeEntry] {
         Array(viewModel.timeEntries.sorted { $0.date > $1.date }.prefix(5))
     }
