@@ -66,6 +66,7 @@ struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @StateObject private var goalManager = GoalManager.shared
+    @StateObject private var appearanceManager = AppearanceManager.shared
     @State private var selectedTab = Self.initialTabFromLaunchArguments()
     @State private var showOnboarding = false
     @State private var showPaywall = Self.shouldShowPaywallFromLaunchArguments
@@ -145,7 +146,7 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(colors.background)
-        .preferredColorScheme(Self.forcedColorSchemeFromLaunchArguments)
+        .preferredColorScheme(Self.forcedColorSchemeFromLaunchArguments ?? appearanceManager.preferredColorScheme)
         .overlay {
             if let celebration = viewModel.activeCelebration {
                 CelebrationOverlayView(type: celebration) {
@@ -157,6 +158,7 @@ struct ContentView: View {
         }
         .environmentObject(CategoryManager.shared)
         .environmentObject(goalManager)
+        .environmentObject(appearanceManager)
         .onAppear {
             viewModel.checkSignInState()
             checkPostSignInFlow()

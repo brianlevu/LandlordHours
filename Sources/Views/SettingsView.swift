@@ -319,6 +319,89 @@ private struct SettingToggleRow: View {
     }
 }
 
+// MARK: - Appearance Preference Row
+
+private struct AppearancePreferenceRow: View {
+    @ObservedObject var appearanceManager: AppearanceManager
+
+    @Environment(\.colorScheme) var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 14) {
+                LucideIcon(image: Lucide.contrast, size: 20)
+                    .foregroundStyle(AppColors.action)
+                    .frame(width: 38, height: 38)
+                    .background(colors.actionSurface)
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Appearance")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                    Text("Follow the device or choose a theme")
+                        .font(AppTypography.caption)
+                        .foregroundStyle(colors.textTertiary)
+                }
+
+                Spacer()
+            }
+
+            HStack(spacing: 8) {
+                ForEach(AppAppearancePreference.allCases) { preference in
+                    appearanceButton(preference)
+                }
+            }
+        }
+        .padding(.vertical, 12)
+    }
+
+    private func appearanceButton(_ preference: AppAppearancePreference) -> some View {
+        let isSelected = appearanceManager.preference == preference
+
+        return Button {
+            if reduceMotion {
+                appearanceManager.preference = preference
+            } else {
+                withAnimation(AppAnimation.quick) {
+                    appearanceManager.preference = preference
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                LucideIcon(image: icon(for: preference), size: 14)
+                Text(preference.displayName)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+            }
+            .font(.system(size: 13, weight: .bold, design: .rounded))
+            .foregroundStyle(isSelected ? AppColors.onAction : colors.textSecondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(isSelected ? colors.action : colors.backgroundTertiary)
+            .clipShape(Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(isSelected ? Color.clear : colors.border.opacity(0.35), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.lhPressable)
+        .accessibilityLabel("\(preference.displayName) appearance")
+        .accessibilityHint(preference.subtitle)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func icon(for preference: AppAppearancePreference) -> UIImage {
+        switch preference {
+        case .system: return Lucide.monitor
+        case .light: return Lucide.sun
+        case .dark: return Lucide.moon
+        }
+    }
+}
+
 // MARK: - Section Label
 
 private struct SectionLabel: View {
@@ -594,6 +677,7 @@ struct SettingsView: View {
     @EnvironmentObject var categoryManager: CategoryManager
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @StateObject private var appleSignIn = AppleSignInManager.shared
+    @StateObject private var appearanceManager = AppearanceManager.shared
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
@@ -771,6 +855,11 @@ struct SettingsView: View {
                     }
 
                     SettingsGroup(title: "App Preferences", subtitle: "Personalize reminders, icon, and setup guidance.") {
+                        AppearancePreferenceRow(appearanceManager: appearanceManager)
+                            .accessibilityIdentifier("settings.appearance")
+
+                        Divider().background(colors.border.opacity(0.35))
+
                         Button {
                             if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
                                 UIApplication.shared.open(url)

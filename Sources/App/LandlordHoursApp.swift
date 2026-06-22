@@ -185,6 +185,60 @@ struct AdaptiveColors {
     var glass: Color { colorScheme == .dark ? AppColors.darkBackground.opacity(0.85) : Color.white.opacity(0.85) }
 }
 
+// MARK: - Appearance Preference
+enum AppAppearancePreference: String, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system: return "Auto"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .system: return "Match device"
+        case .light: return "Always light"
+        case .dark: return "Always dark"
+        }
+    }
+
+    var preferredColorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+}
+
+final class AppearanceManager: ObservableObject {
+    static let shared = AppearanceManager()
+
+    private let storageKey = "LandlordHours.appearancePreference"
+
+    @Published var preference: AppAppearancePreference {
+        didSet {
+            UserDefaults.standard.set(preference.rawValue, forKey: storageKey)
+        }
+    }
+
+    var preferredColorScheme: ColorScheme? {
+        preference.preferredColorScheme
+    }
+
+    private init() {
+        let raw = UserDefaults.standard.string(forKey: storageKey)
+        preference = raw.flatMap(AppAppearancePreference.init(rawValue:)) ?? .system
+    }
+}
+
 // MARK: - Typography
 // SF Pro Rounded for UI, Serif (New York) for editorial headlines
 enum AppTypography {
