@@ -209,6 +209,14 @@ enum AppAppearancePreference: String, CaseIterable, Identifiable {
         }
     }
 
+    var confirmationText: String {
+        switch self {
+        case .system: return "Saved - following device"
+        case .light: return "Saved - light mode"
+        case .dark: return "Saved - dark mode"
+        }
+    }
+
     var preferredColorScheme: ColorScheme? {
         switch self {
         case .system: return nil
@@ -233,7 +241,26 @@ final class AppearanceManager: ObservableObject {
         preference.preferredColorScheme
     }
 
+    static var forcedColorSchemeFromLaunchArguments: ColorScheme? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "-LHColorScheme"),
+              args.indices.contains(index + 1) else {
+            return nil
+        }
+
+        switch args[index + 1].lowercased() {
+        case "dark": return .dark
+        case "light": return .light
+        default: return nil
+        }
+    }
+
     private init() {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-LHResetAppearancePreference") {
+            UserDefaults.standard.removeObject(forKey: storageKey)
+        }
+        #endif
         let raw = UserDefaults.standard.string(forKey: storageKey)
         preference = raw.flatMap(AppAppearancePreference.init(rawValue:)) ?? .system
     }
@@ -497,6 +524,7 @@ struct LandlordHoursApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var viewModel = AppViewModel()
     @StateObject private var categoryManager = CategoryManager.shared
+    @StateObject private var appearanceManager = AppearanceManager.shared
 
     init() {
         // Tab bar: soft but legible. Keep content from visually bleeding through the controls.
@@ -525,6 +553,8 @@ struct LandlordHoursApp: App {
             ContentView()
                 .environmentObject(viewModel)
                 .environmentObject(categoryManager)
+                .environmentObject(appearanceManager)
+                .preferredColorScheme(AppearanceManager.forcedColorSchemeFromLaunchArguments ?? appearanceManager.preferredColorScheme)
                 .onAppear {
                     AppDelegate.sharedViewModel = viewModel
                 }

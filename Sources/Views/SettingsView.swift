@@ -326,6 +326,7 @@ private struct AppearancePreferenceRow: View {
 
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var savedPulse = false
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
@@ -347,6 +348,19 @@ private struct AppearancePreferenceRow: View {
                 }
 
                 Spacer()
+
+                HStack(spacing: 5) {
+                    LucideIcon(image: Lucide.check, size: 12)
+                    Text("Saved")
+                }
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(colors.positive)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(colors.positiveSurface)
+                .clipShape(Capsule())
+                .opacity(savedPulse ? 1 : 0)
+                .scaleEffect(savedPulse ? 1 : 0.92)
             }
 
             HStack(spacing: 8) {
@@ -354,19 +368,42 @@ private struct AppearancePreferenceRow: View {
                     appearanceButton(preference)
                 }
             }
+
+            HStack(spacing: 6) {
+                LucideIcon(image: confirmationIcon, size: 13)
+                Text(appearanceManager.preference.confirmationText)
+            }
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .foregroundStyle(colors.textSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 12)
+        .lhMotion(AppAnimation.quick, value: appearanceManager.preference)
+        .lhMotion(AppAnimation.reveal, value: savedPulse)
     }
 
     private func appearanceButton(_ preference: AppAppearancePreference) -> some View {
         let isSelected = appearanceManager.preference == preference
 
         return Button {
+            guard appearanceManager.preference != preference else { return }
             if reduceMotion {
                 appearanceManager.preference = preference
+                savedPulse = true
             } else {
                 withAnimation(AppAnimation.quick) {
                     appearanceManager.preference = preference
+                    savedPulse = true
+                }
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                if reduceMotion {
+                    savedPulse = false
+                } else {
+                    withAnimation(AppAnimation.reveal) {
+                        savedPulse = false
+                    }
                 }
             }
         } label: {
@@ -391,6 +428,14 @@ private struct AppearancePreferenceRow: View {
         .accessibilityLabel("\(preference.displayName) appearance")
         .accessibilityHint(preference.subtitle)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var confirmationIcon: UIImage {
+        switch appearanceManager.preference {
+        case .system: return Lucide.monitor
+        case .light: return Lucide.sun
+        case .dark: return Lucide.moon
+        }
     }
 
     private func icon(for preference: AppAppearancePreference) -> UIImage {

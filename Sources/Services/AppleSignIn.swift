@@ -231,7 +231,6 @@ struct LoginView: View {
             .sheet(isPresented: $showEmailLogin) {
                 EmailLoginSheetView()
             }
-            .preferredColorScheme(.light)
             .onAppear {
                 withAnimation(reduceMotion ? .linear(duration: 0.01) : .easeOut(duration: 0.35).delay(0.08)) {
                     appeared = true

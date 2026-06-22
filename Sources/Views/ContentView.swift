@@ -66,7 +66,6 @@ struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @StateObject private var goalManager = GoalManager.shared
-    @StateObject private var appearanceManager = AppearanceManager.shared
     @State private var selectedTab = Self.initialTabFromLaunchArguments()
     @State private var showOnboarding = false
     @State private var showPaywall = Self.shouldShowPaywallFromLaunchArguments
@@ -110,20 +109,6 @@ struct ContentView: View {
         ProcessInfo.processInfo.arguments.contains("-LHShowPaywall")
     }
 
-    private static var forcedColorSchemeFromLaunchArguments: ColorScheme? {
-        let args = ProcessInfo.processInfo.arguments
-        guard let index = args.firstIndex(of: "-LHColorScheme"),
-              args.indices.contains(index + 1) else {
-            return nil
-        }
-
-        switch args[index + 1].lowercased() {
-        case "dark": return .dark
-        case "light": return .light
-        default: return nil
-        }
-    }
-
     var body: some View {
         Group {
             if viewModel.isInitializing || showSplashAfterSignOut {
@@ -146,7 +131,6 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(colors.background)
-        .preferredColorScheme(Self.forcedColorSchemeFromLaunchArguments ?? appearanceManager.preferredColorScheme)
         .overlay {
             if let celebration = viewModel.activeCelebration {
                 CelebrationOverlayView(type: celebration) {
@@ -158,7 +142,6 @@ struct ContentView: View {
         }
         .environmentObject(CategoryManager.shared)
         .environmentObject(goalManager)
-        .environmentObject(appearanceManager)
         .onAppear {
             viewModel.checkSignInState()
             checkPostSignInFlow()

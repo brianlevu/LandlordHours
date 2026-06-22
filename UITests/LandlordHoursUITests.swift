@@ -95,14 +95,40 @@ final class LandlordHoursUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Track"].isHittable)
     }
 
-    private func launch(scenario: String, tab: Int) {
+    func testAppearancePreferenceShowsSavedStateAndPersists() {
+        launch(scenario: "frequent", tab: 4, extraArguments: ["-LHResetAppearancePreference"])
+
+        XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 8))
+        scrollToElement(app.buttons["Dark appearance"])
+        app.buttons["Dark appearance"].tap()
+
+        XCTAssertTrue(app.staticTexts["Saved - dark mode"].waitForExistence(timeout: 5))
+
+        app.terminate()
+        launch(scenario: "frequent", tab: 4)
+
+        XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 8))
+        scrollToElement(app.staticTexts["Saved - dark mode"])
+        XCTAssertTrue(app.staticTexts["Saved - dark mode"].exists)
+    }
+
+    private func launch(scenario: String, tab: Int, extraArguments: [String] = []) {
         app.launchArguments = [
             "-LHMockScenario", scenario,
             "-LHInitialTab", "\(tab)",
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US"
-        ]
+        ] + extraArguments
         app.launch()
+    }
+
+    private func scrollToElement(_ element: XCUIElement, maxSwipes: Int = 6) {
+        var swipes = 0
+        while !element.exists && swipes < maxSwipes {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(element.waitForExistence(timeout: 2))
     }
 
     private func waitAndTap(_ element: XCUIElement, timeout: TimeInterval = 5) {
