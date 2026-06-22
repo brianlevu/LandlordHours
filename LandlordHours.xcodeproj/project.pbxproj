@@ -29,6 +29,7 @@
 		A47503D607E3D15AB9B78D16 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 754B9E894A2C95D4E5C635B0 /* HistoryView.swift */; };
 		A692C559186CE846A2E224CB /* LHLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499428642ACE937E7B98B111 /* LHLogo.swift */; };
 		A72762E0F4CE4DEFA07D9C28 /* AITimeEntryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63814CFFD3A0284AC85988D /* AITimeEntryService.swift */; };
+		AAE481F1480E4F77B1787CA2 /* VoiceEntryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAE481F0480E4F77B1787CA2 /* VoiceEntryService.swift */; };
 		B49ADDBA7AB7A7FE8A9DB496 /* TaxYearView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97C0F683B6B3BF53609A1D59 /* TaxYearView.swift */; };
 		B4CE9038708F34E70E784BF9 /* LHIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E4FDA46A18FD2D2EB716A39 /* LHIcons.swift */; };
 		B6FC290317CCEE66FC6E7333 /* AppDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7ECB76E7A5D6C4DDACBA2AD /* AppDesignSystem.swift */; };
@@ -106,6 +107,7 @@
 		DE13F908989158FDAB28BF57 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		E942608EE77393A2E7F17F89 /* CloudKitSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitSyncService.swift; sourceTree = "<group>"; };
 		F63814CFFD3A0284AC85988D /* AITimeEntryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITimeEntryService.swift; sourceTree = "<group>"; };
+		AAE481F0480E4F77B1787CA2 /* VoiceEntryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceEntryService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -205,6 +207,7 @@
 				3BDA44BD54B97B0B3D60A429 /* CalendarImportService.swift */,
 				E942608EE77393A2E7F17F89 /* CloudKitSyncService.swift */,
 				1552DA58D14D98D9473D352A /* SubscriptionManager.swift */,
+				AAE481F0480E4F77B1787CA2 /* VoiceEntryService.swift */,
 				2CDD5A26F0EDE1AF0DB43F2D /* WeeklySummaryService.swift */,
 			);
 			path = Services;
@@ -408,6 +411,7 @@
 				183917104B86E5DC6FAFB97A /* TimeEntryDetailView.swift in Sources */,
 				93C20D864969D6F6EC85B191 /* TimeLogView.swift in Sources */,
 				98B8F1C68BDAB98363098499 /* TrialBannerView.swift in Sources */,
+				AAE481F1480E4F77B1787CA2 /* VoiceEntryService.swift in Sources */,
 				A0635C304AF19BD05633788E /* WeeklySummaryService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

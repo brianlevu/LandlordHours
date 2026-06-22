@@ -9,6 +9,7 @@ struct TimeLogView: View {
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+    @StateObject private var voiceEntryService = VoiceEntryService.shared
 
     // Main inline entry form state
     @State private var entryNotes: String = ""
@@ -96,6 +97,9 @@ struct TimeLogView: View {
                 timerElapsed = 0
             }
         }
+        .onChange(of: voiceEntryService.transcript) { _, transcript in
+            applyVoiceTranscript(transcript)
+        }
         .onChange(of: timerNotes) { _, _ in
             if timerPhase == .finishing { saveStoppedTimerDraft() }
         }
@@ -131,6 +135,9 @@ struct TimeLogView: View {
             }
         } message: {
             Text("The running timer will stop without saving a time entry.")
+        }
+        .onDisappear {
+            voiceEntryService.finishRecording()
         }
     }
 
@@ -373,6 +380,16 @@ struct TimeLogView: View {
                         .foregroundStyle(AppColors.primary)
                     }
                 }
+
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    voiceEntryButton
+                        .padding(.trailing, 10)
+                        .padding(.bottom, 10)
+                }
+            }
         }
         .padding(4)
         .background(colors.backgroundTertiary.opacity(colorScheme == .dark ? 0.72 : 0.9))
@@ -389,6 +406,31 @@ struct TimeLogView: View {
         .onChange(of: entryNotes) { _, newValue in
             handleNotesChange(newValue)
         }
+    }
+
+    private var voiceEntryButton: some View {
+        Button {
+            toggleVoiceEntry()
+        } label: {
+            HStack(spacing: 7) {
+                LucideIcon(image: voiceEntryService.isRecording ? Lucide.audioWaveform : Lucide.mic, size: 15)
+                Text(voiceEntryService.isRecording ? "Listening" : "Speak")
+                    .lineLimit(1)
+            }
+            .font(.system(size: 12, weight: .bold, design: .rounded))
+            .foregroundStyle(voiceEntryService.isRecording ? AppColors.onAction : colors.action)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(voiceEntryService.isRecording ? colors.action : colors.actionSurface)
+            .clipShape(Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(colors.action.opacity(voiceEntryService.isRecording ? 0 : 0.18), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.lhPressable)
+        .accessibilityLabel(voiceEntryService.isRecording ? "Stop voice entry" : "Start voice entry")
+        .accessibilityHint("Dictates the time entry description using Apple speech recognition.")
     }
 
     private var composerNextStep: some View {
@@ -609,6 +651,10 @@ struct TimeLogView: View {
             } else if isProcessingAI {
                 // Loading state
                 aiProcessingIndicator
+            } else if let voiceError = voiceEntryService.errorMessage {
+                voiceEntryError(voiceError)
+            } else if voiceEntryService.isRecording {
+                voiceEntryListeningIndicator
             } else {
                 // State 1: AI hint — show until notes are long enough to trigger AI
                 let trimmed = entryNotes.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -634,6 +680,46 @@ struct TimeLogView: View {
         .padding(.top, 8)
         .padding(.bottom, 20)
         .lhMotion(AppAnimation.standard, value: hasStartedTyping)
+    }
+
+    private var voiceEntryListeningIndicator: some View {
+        HStack(spacing: 10) {
+            LHIconTile(icon: Lucide.audioWaveform, color: colors.action, wash: colors.actionSurface, size: 28, isActive: true)
+            Text("Listening. Speak naturally, then review the draft.")
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
+            Spacer()
+            Button("Done") {
+                voiceEntryService.finishRecording()
+            }
+            .font(.system(size: 12, weight: .bold, design: .rounded))
+            .foregroundStyle(colors.action)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(colors.actionSurface.opacity(colorScheme == .dark ? 0.45 : 1))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 20)
+    }
+
+    private func voiceEntryError(_ message: String) -> some View {
+        HStack(spacing: 10) {
+            LHIconTile(icon: Lucide.micOff, color: AppColors.caution, wash: colors.cautionSurface, size: 28, isActive: true)
+            Text(message)
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(colors.cautionSurface.opacity(colorScheme == .dark ? 0.48 : 1))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 20)
     }
 
     // AI Processing
@@ -1170,6 +1256,37 @@ struct TimeLogView: View {
                 }
             }
         }
+    }
+
+    private func toggleVoiceEntry() {
+        isNotesFocused = false
+
+        if voiceEntryService.isRecording {
+            voiceEntryService.finishRecording()
+            return
+        }
+
+        Task {
+            await voiceEntryService.startRecording(contextualStrings: voiceContextualStrings)
+        }
+    }
+
+    private func applyVoiceTranscript(_ transcript: String) {
+        let cleaned = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return }
+        entryNotes = cleaned
+    }
+
+    private var voiceContextualStrings: [String] {
+        var phrases = viewModel.properties.flatMap { property in
+            [property.name, property.address]
+        }
+        phrases += ActivityCategory.allCases.flatMap { category in
+            [category.rawValue, category.chipLabel]
+        }
+        phrases += ["REPS", "real estate professional", "material participation", "spouse", "tenant", "receipt"]
+        let uniquePhrases = Array(Set(phrases.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }))
+        return Array(uniquePhrases.prefix(80))
     }
 
     private func applyAutoFill(_ parsed: ParsedTimeEntry) {

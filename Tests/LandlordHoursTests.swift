@@ -392,6 +392,29 @@ final class AILocalParserTests: XCTestCase {
         XCTAssertEqual(result?.hours, 2.0)
     }
 
+    func testParseDictatedHalfHourPhrase() async {
+        let result = await service.parseTimeEntry(from: "called the tenant for one and a half hours", properties: [])
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.hours, 1.5)
+    }
+
+    func testParseDictatedMinutePhrase() async {
+        let result = await service.parseTimeEntry(from: "reviewed receipts for thirty minutes", properties: [])
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.category, .bookkeeping)
+        XCTAssertEqual(result?.hours, 0.5)
+    }
+
+    func testParseDictatedMixedHoursAndMinutes() async {
+        let result = await service.parseTimeEntry(from: "painted the porch for 1 hour and 30 minutes", properties: [])
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.category, .repairs)
+        XCTAssertEqual(result?.hours, 1.5)
+    }
+
     func testParseMatchesPropertyByAddress() async {
         let properties = [RentalProperty(name: "Unit A", address: "1234 Washington Boulevard, Seattle", propertyType: .ltr)]
         let result = await service.parseTimeEntry(from: "Repaired plumbing at Washington 2h", properties: properties)

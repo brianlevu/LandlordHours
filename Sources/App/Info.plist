@@ -73,6 +73,10 @@
 	<false/>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>LandlordHours scans your calendar to detect property-related events and pre-fill your time log.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>LandlordHours uses the microphone to let you dictate time-entry descriptions before saving.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>LandlordHours uses Apple speech recognition to turn dictated work notes into editable time-entry drafts.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -25,11 +25,13 @@ For each milestone:
 
 ### P0 - Track Time
 
-Status: Milestone 1 complete; timer/detail refinements remain open
-Files: `Sources/Views/TimeLogView.swift`
+Status: Milestone 2 complete; timer/detail refinements remain open
+Files: `Sources/Views/TimeLogView.swift`, `Sources/Services/VoiceEntryService.swift`, `Sources/Services/AITimeEntryService.swift`
 Evidence:
 - `08-occasional-track.png`
 - `13-frequent-track-pro.png`
+- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-light.png`
+- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-dark.png`
 
 Problems:
 - Core daily flow still reads like the older app compared with Home, Reports, Settings, and Paywall.
@@ -51,16 +53,27 @@ Completed in milestone 1:
 - Tightened the note field height so the first viewport has a clearer path forward.
 - Preserved the existing AI auto-fill, manual details, attachment, timer, and save behavior.
 
+Completed in milestone 2:
+- Added Apple-native voice entry to the Log composer through `VoiceEntryService`.
+- Kept voice local-first: Apple speech creates a transcript, then the existing local parser fills property, category, participant, and hours.
+- Added microphone and speech-recognition privacy strings.
+- Added contextual speech phrases for property names, addresses, categories, and tax terms.
+- Improved local parsing for dictated durations such as "one and a half hours", "thirty minutes", and "1 hour and 30 minutes".
+
 Verification:
 - Build/run: passed with no warnings via XcodeBuildMCP.
 - Visual evidence:
   - `/Users/brian/Projects/LandlordHours/docs/e2e-visual-runs/2026-06-21_23-01-07-track-impeccable-milestone/08-occasional-track.png`
   - `/Users/brian/Projects/LandlordHours/docs/e2e-visual-runs/2026-06-21_23-01-07-track-impeccable-milestone/13-frequent-track-pro.png`
+- Voice visual evidence:
+  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-light.png`
+  - `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-dark.png`
 - Static design scans: no new Track-specific critical hits.
-- Tests: 67 passed, 0 failed, 0 skipped.
+- Tests: 69 passed, 0 failed, 0 skipped.
 
 Remaining Track follow-up:
 - Inspect expanded manual details at large Dynamic Type.
+- Real-device voice QA is still needed because Simulator microphone/speech permission behavior is not a full production signal.
 - Give Timer mode the same level of composition after Properties is started or if timer usage becomes the next priority.
 
 ### P1 - Properties
@@ -406,3 +419,25 @@ Next:
 - Add deterministic capture for deeper onboarding steps.
 - Add UI automation for Home activation-card actions.
 - Continue reducing remaining static-scan cleanup items after the current branch is reviewed.
+
+### 2026-06-22 - Apple-Native Voice Logging
+
+Outcome:
+- Added a `Speak` control directly inside the Track Log composer.
+- Built `VoiceEntryService` with Apple Speech + AVFAudio so dictated text flows into the same note field and parser used by typed entries.
+- Kept MiniMax optional; voice-to-fields does not require a remote API key.
+- Added speech and microphone usage descriptions to `Info.plist`.
+- Improved parser coverage for dictation-like duration phrases.
+
+Evidence:
+- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-light.png`
+- `/Users/brian/Projects/LandlordHours/tmp/xcode27/screenshots/voice-logging-202606220657/track-voice-dark.png`
+
+Verification:
+- `LANE_TIMEOUT_SECONDS=240 ./ci_scripts/test_xcode27_lane.sh build`: passed.
+- `LANE_TIMEOUT_SECONDS=300 ./ci_scripts/test_xcode27_lane.sh unit`: passed, 69 / 69.
+- Visual screenshot inspection: voice control is visible and does not crowd the first Track viewport in light or dark mode.
+
+Next:
+- Run real-device voice QA before treating speech recognition as release-complete.
+- Continue with deterministic onboarding substep capture or Timer mode composition.

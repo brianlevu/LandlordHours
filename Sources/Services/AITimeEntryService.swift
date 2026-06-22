@@ -120,11 +120,41 @@ class AITimeEntryService {
     }
 
     private func extractExplicitHours(from text: String) -> Double? {
+        // Match dictated mixed-duration phrases before simpler hour-only patterns.
+        let mixedDurationPatterns = [
+            #"(\d+\.?\d*)\s*(?:hours?|hrs?|h)\s+(?:and\s+)?(\d+)\s*(?:minutes?|mins?|m)\b"#,
+            #"(\d+\.?\d*)\s*(?:hours?|hrs?|h)\s+(?:and\s+)?(?:a\s+)?half\b"#
+        ]
+
+        for pattern in mixedDurationPatterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+               let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) {
+                let hourRange = match.range(at: 1)
+                guard let swiftHourRange = Range(hourRange, in: text),
+                      let hours = Double(text[swiftHourRange]) else { continue }
+
+                var minutes = 30.0
+                if match.numberOfRanges > 2 {
+                    let minuteRange = match.range(at: 2)
+                    if let swiftMinuteRange = Range(minuteRange, in: text),
+                       let parsedMinutes = Double(text[swiftMinuteRange]) {
+                        minutes = parsedMinutes
+                    }
+                }
+
+                return min(max(hours + (minutes / 60), 0.25), 24)
+            }
+        }
+
         let naturalLanguageHours: [(String, Double)] = [
+            (#"\b(?:one|an|a|1)\s+and\s+(?:a\s+)?half\s+hours?\b"#, 1.5),
+            (#"\b(?:an|a|one|1)\s+hour\s+and\s+(?:a\s+)?half\b"#, 1.5),
             (#"\b(?:an|one|1)\s+hour\b"#, 1.0),
             (#"\b(?:a|one|1)\s+half\s+hour\b"#, 0.5),
             (#"\bhalf\s+(?:an\s+)?hour\b"#, 0.5),
             (#"\b(?:quarter|15\s+minutes?)\b"#, 0.25),
+            (#"\b(?:thirty|30)\s+minutes?\b"#, 0.5),
+            (#"\b(?:forty\s*five|45)\s+minutes?\b"#, 0.75),
             (#"\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+hours?\b"#, 0)
         ]
 
@@ -158,6 +188,13 @@ class AITimeEntryService {
                     return min(max(value, 0.25), 24)
                 }
             }
+        }
+
+        if let regex = try? NSRegularExpression(pattern: #"(\d+)\s*(?:minutes?|mins?|m)\b"#, options: .caseInsensitive),
+           let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+           let range = Range(match.range(at: 1), in: text),
+           let minutes = Double(text[range]) {
+            return min(max(minutes / 60, 0.25), 24)
         }
 
         return nil
