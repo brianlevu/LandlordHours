@@ -60,6 +60,33 @@ App Store Connect build-upload status immediately after upload:
 - Build `202606230805`: `PROCESSING`
 - Validation errors: none reported at first status check
 
+Later verification:
+
+- Build `202606230805`: `VALID`
+- Build audience: `APP_STORE_ELIGIBLE`
+- App Store version `1.0.3` selected build: `52954130-1d21-44d1-aa57-a84f91ebe5d9`
+- App Store Connect UI shows build `202606230805` attached on the version page.
+
+## Remaining Submission Blocker
+
+The binary is accepted and attached, but final App Review submission is still blocked by App Store Connect server errors:
+
+- API `GET /apps/<app>/reviewSubmissions`: `500 UNEXPECTED_ERROR`
+- API `POST /reviewSubmissions`: `500 UNEXPECTED_ERROR`
+- Web UI `Add for Review`: changes to `Processing`, then returns to `Add for Review` with `An error has occurred. Try again later.`
+- App Review page remains empty: `Items you submit to App Review will appear here.`
+
+Likely contributing issue:
+
+- Legacy unused IAP product ID `premium`
+- Type: consumable
+- State: `WAITING_FOR_SCREENSHOT`
+- Current binary and StoreKit config use only `com.openclaw.landlordhours.pro`
+- Real Pro IAP `com.openclaw.landlordhours.pro` is `APPROVED`
+- App Store Connect's newer `inAppPurchasesV2` endpoint and the web IAP page return server errors while the legacy IAP endpoint still lists both products.
+
+Do not delete the legacy `premium` IAP without Brian's explicit confirmation. If approved, remove/delete that unused draft product from App Store Connect, then retry `Add for Review`.
+
 ## Stable Xcode 26 Readiness
 
 Stable toolchain:
@@ -151,8 +178,7 @@ Use stable Xcode 26.5 for App Store release:
 
 1. Confirm branch is `main` and includes the latest LandlordHours polish work.
 2. Confirm `tmp` is still the SSD symlink.
-3. Build/archive with `/Volumes/Home/Applications/Xcode.app/Contents/Developer`.
-4. Upload the Xcode 26.5 / iOS 26.5 SDK build to App Store Connect for version `1.0.3`.
-5. Verify build `202606230805` or any newer corrected build appears as `APP_STORE_ELIGIBLE`.
-6. Attach it to version `1.0.3`.
-7. Submit version `1.0.3` for App Review.
+3. Confirm build `202606230805` is still selected for version `1.0.3`.
+4. Ask Brian whether to delete the unused legacy App Store Connect IAP product `premium` if App Store Connect still shows the same generic review/IAP server errors.
+5. After confirmation and cleanup, retry `Add for Review` from App Store Connect or retry the `reviewSubmissions` API.
+6. Verify App Review status moves from `PREPARE_FOR_SUBMISSION` to `WAITING_FOR_REVIEW`.
