@@ -9,8 +9,8 @@ BUNDLE_ID="${BUNDLE_ID:-com.openclaw.landlordhours}"
 
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Volumes/Home/Applications/Xcode-27-beta.app/Contents/Developer}"
 
-SIMULATOR_NAME="${SIMULATOR_NAME:-LandlordHours iPhone iOS 27}"
-SIMULATOR_ID="${SIMULATOR_ID:-C8B22181-D398-477F-91D3-ED67F1B8851C}"
+SIMULATOR_NAME="${SIMULATOR_NAME:-LandlordHours iPhone 17 Pro Max iOS 27}"
+SIMULATOR_ID="${SIMULATOR_ID:-B119FCEA-3C7B-4022-A57E-28357879F07D}"
 DERIVED_DATA="${DERIVED_DATA:-/Volumes/Home/XcodeStorage/DerivedData/landlordhours-xcode27}"
 WORKSPACE_DIR="${WORKSPACE_DIR:-/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours}"
 RESULTS_DIR="${RESULTS_DIR:-$WORKSPACE_DIR/results}"

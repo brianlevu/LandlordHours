@@ -252,7 +252,7 @@ struct ReportsView: View {
                     )
                 }
                 .padding(.horizontal, 24)
-                .padding(.top, 18)
+                .padding(.top, 8)
                 .padding(.bottom, reportsBottomContentInset)
             }
             .background {
@@ -315,7 +315,7 @@ struct ReportsView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top) {
                 Text("Reports")
-                    .font(.system(size: 42, weight: .black, design: .rounded))
+                    .font(.system(size: 34, weight: .black, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
                     .minimumScaleFactor(0.82)
 
@@ -334,7 +334,7 @@ struct ReportsView: View {
                 .accessibilityLabel(subscriptionManager.isPro && !subscriptionManager.isTrialActive ? "Export report" : "Unlock export")
             }
 
-            Text("Know what counts, what is left, and what to export.")
+            Text("Check pace, gaps, and export-ready evidence.")
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(colors.textSecondary)
                 .lineLimit(2)

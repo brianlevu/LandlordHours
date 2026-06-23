@@ -6,6 +6,8 @@ DerivedData/
 .xcode.env.local
 .claude/worktrees/
 /tmp/
+tmp
 /*.ipa
 /*.app.dSYM.zip
-appstore-screenshots/node_modules/
+/appstore-screenshots/node_modules/
+/fastlane/report.xml

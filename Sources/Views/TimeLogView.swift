@@ -23,6 +23,7 @@ struct TimeLogView: View {
     @State private var showingSaved: Bool = false
     @State private var isSaving: Bool = false
     @State private var isLogDetailsExpanded: Bool = false
+    @State private var didApplyTrackScrollLaunchArgument = false
 
     // Timer mode
     enum TrackMode: String, CaseIterable {
@@ -45,6 +46,7 @@ struct TimeLogView: View {
     @State private var stoppedStartDate: Date = Date()
     @State private var showTimerCappedAlert = false
     @State private var showDiscardTimerAlert = false
+    @State private var didApplyTimerLaunchArguments = false
     @FocusState private var isTimerNotesFocused: Bool
     private let timerTick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private var stoppedTimerDraftKey: String { UserScope.key("LandlordHours.stoppedTimerDraft") }
@@ -78,6 +80,10 @@ struct TimeLogView: View {
             if viewModel.properties.count == 1 {
                 entryPropertyId = viewModel.properties.first?.id
                 timerSelectedPropertyId = viewModel.properties.first?.id
+            }
+            applyLogLaunchArgumentsIfNeeded()
+            if applyTimerLaunchArgumentsIfNeeded() {
+                return
             }
             if loadStoppedTimerDraft() {
                 trackMode = .timer
@@ -158,8 +164,8 @@ struct TimeLogView: View {
                     }
                 }
                 .padding(.horizontal, 24)
-                .padding(.top, 18)
-                .padding(.bottom, AppSpacing.tabContentBottomInset)
+                .padding(.top, 8)
+                .padding(.bottom, trackContentBottomInset)
             }
             .background {
                 LHMobileCanvas()
@@ -168,11 +174,18 @@ struct TimeLogView: View {
                 isNotesFocused = false
                 isTimerNotesFocused = false
             }
+            .onAppear {
+                scrollToTrackLaunchTargetIfNeeded(proxy)
+            }
             .onChange(of: isLogDetailsExpanded) { _, expanded in
                 guard expanded else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     animate(AppAnimation.smooth) {
-                        proxy.scrollTo("trackHeader", anchor: .top)
+                        if ProcessInfo.processInfo.arguments.contains("-LHScrollLogDetailsLower") {
+                            proxy.scrollTo("trackDetailsLower", anchor: .center)
+                        } else {
+                            proxy.scrollTo("trackHeader", anchor: .top)
+                        }
                     }
                 }
             }
@@ -194,6 +207,11 @@ struct TimeLogView: View {
         reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top))
     }
 
+    private var trackContentBottomInset: CGFloat {
+        let expandedDetailsRunway: CGFloat = trackMode == .log && isLogDetailsExpanded ? 220 : 0
+        return AppSpacing.tabContentBottomInset + expandedDetailsRunway
+    }
+
     private var toastTransition: AnyTransition {
         reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity)
     }
@@ -212,11 +230,11 @@ struct TimeLogView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Log your time")
-                        .font(.system(size: 42, weight: .black, design: .rounded))
+                        .font(.system(size: 34, weight: .black, design: .rounded))
                         .foregroundStyle(colors.textPrimary)
-                        .lineSpacing(-2)
+                        .lineSpacing(-1)
                         .minimumScaleFactor(0.82)
-                    Text(trackMode == .log ? "Describe the work. We’ll fill the details." : "Start a timer for work in progress.")
+                    Text(trackMode == .log ? "Describe the work and review the filled details." : "Start a timer for work in progress.")
                         .font(.system(size: 15, weight: .medium, design: .rounded))
                         .foregroundStyle(colors.textSecondary)
                         .lineLimit(2)
@@ -370,6 +388,7 @@ struct TimeLogView: View {
                 .scrollContentBackground(.hidden)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
+                .accessibilityIdentifier("track.entryNotes")
                 .toolbar {
                     ToolbarItemGroup(placement: .keyboard) {
                         Spacer()
@@ -480,6 +499,7 @@ struct TimeLogView: View {
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.lhPressable)
+                .accessibilityIdentifier("track.reviewEvidence")
 
                 Text("Property, category, hours, date, person, and attachments stay editable before saving.")
                     .font(AppTypography.caption)
@@ -603,6 +623,7 @@ struct TimeLogView: View {
                 fieldLabel("Person")
                 participantSegment
             }
+            .id("trackDetailsLower")
             .padding(.horizontal, 20)
 
             attachButton
@@ -896,20 +917,20 @@ struct TimeLogView: View {
                 // House icon badge
                 LHIconTile(
                     icon: Lucide.house,
-                    color: entryPropertyId != nil ? AppColors.primary : AppColors.mist,
-                    wash: entryPropertyId != nil ? colors.primarySurface : AppColors.snow,
+                    color: entryPropertyId != nil ? colors.action : colors.textTertiary,
+                    wash: entryPropertyId != nil ? colors.actionSurface : colors.backgroundTertiary,
                     size: 30,
                     isActive: entryPropertyId != nil
                 )
 
                 Text(selectedPropertyName)
                     .font(.system(size: 15))
-                    .foregroundStyle(entryPropertyId != nil ? colors.textPrimary : AppColors.mist)
+                    .foregroundStyle(entryPropertyId != nil ? colors.textPrimary : colors.textTertiary)
 
                 Spacer()
 
                 LucideIcon(image: Lucide.chevronRight, size: 18)
-                    .foregroundStyle(AppColors.cloud)
+                    .foregroundStyle(colors.textTertiary)
             }
             .padding(14)
             .padding(.horizontal, 2)
@@ -917,7 +938,7 @@ struct TimeLogView: View {
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(AppColors.snow, lineWidth: 1.5)
+                    .strokeBorder(colors.border.opacity(0.35), lineWidth: 1.5)
             )
         }
     }
@@ -957,7 +978,7 @@ struct TimeLogView: View {
                         .contentTransition(.numericText())
                     Text("h")
                         .font(.system(size: 16))
-                        .foregroundStyle(AppColors.mist)
+                        .foregroundStyle(colors.textSecondary)
                 }
                 .frame(minWidth: 80, alignment: .center)
                 .accessibilityElement(children: .combine)
@@ -1082,7 +1103,7 @@ struct TimeLogView: View {
                 Text(entryAttachments.isEmpty ? "Attach receipt or document" : "Attached (\(entryAttachments.count))")
                     .font(.system(size: 13, weight: .medium))
             }
-            .foregroundStyle(entryAttachments.isEmpty ? AppColors.slate : AppColors.primary)
+            .foregroundStyle(entryAttachments.isEmpty ? colors.textSecondary : colors.action)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .background(colors.backgroundTertiary)
@@ -1110,14 +1131,15 @@ struct TimeLogView: View {
             } label: {
                 Text("Log Time")
                     .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(canSave ? AppColors.onAction : .white)
+                    .foregroundStyle(canSave ? AppColors.onAction : colors.textSecondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(canSave ? colors.action : AppColors.mist)
+                    .background(canSave ? colors.action : colors.backgroundTertiary)
                     .clipShape(Capsule())
             }
             .buttonStyle(.lhPressable)
             .disabled(!canSave)
+            .accessibilityIdentifier("track.logTime")
         }
     }
 
@@ -1196,6 +1218,44 @@ struct TimeLogView: View {
             isSaving = false
         }
     }
+
+#if DEBUG
+    private func applyLogLaunchArgumentsIfNeeded() {
+        let args = ProcessInfo.processInfo.arguments
+        guard args.contains("-LHExpandLogDetails") else { return }
+        trackMode = .log
+        entryPropertyId = viewModel.properties.first?.id
+        timerSelectedPropertyId = viewModel.properties.first?.id
+        entryCategory = .repairs
+        entryHours = 1.0
+        entryParticipant = .selfParticipant
+        entryNotes = "Painting the porch for one hour"
+        aiParsedEntry = nil
+        aiAutoFilled = false
+        userAdjustedLogDetails = true
+        isLogDetailsExpanded = true
+        isNotesFocused = false
+    }
+#else
+    private func applyLogLaunchArgumentsIfNeeded() {}
+#endif
+
+#if DEBUG
+    private func scrollToTrackLaunchTargetIfNeeded(_ proxy: ScrollViewProxy) {
+        guard !didApplyTrackScrollLaunchArgument,
+              ProcessInfo.processInfo.arguments.contains("-LHScrollLogDetailsLower") else {
+            return
+        }
+        didApplyTrackScrollLaunchArgument = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
+            animate(AppAnimation.smooth) {
+                proxy.scrollTo("trackDetailsLower", anchor: .center)
+            }
+        }
+    }
+#else
+    private func scrollToTrackLaunchTargetIfNeeded(_ proxy: ScrollViewProxy) {}
+#endif
 
     private func loadPhotos(from items: [PhotosPickerItem]) async {
         var attachments: [TimeAttachment] = []
@@ -1341,44 +1401,95 @@ struct TimeLogView: View {
 
     // MARK: - Empty State
     private var emptyState: some View {
-        VStack(spacing: 20) {
-            Circle()
-                .fill(colors.backgroundTertiary)
-                .frame(width: 76, height: 76)
-                .overlay {
-                    LucideIcon(image: Lucide.housePlus, size: 32)
-                        .foregroundStyle(AppColors.charcoal)
-                }
-            Text("Add a property first")
-                .font(.system(size: 34, weight: .black, design: .rounded))
-                .foregroundStyle(colors.textPrimary)
-                .multilineTextAlignment(.center)
-            Text("Create one rental property, then log time against it for cleaner records.")
-                .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(colors.textSecondary)
-                .multilineTextAlignment(.center)
-                .lineSpacing(3)
-                .padding(.horizontal, 32)
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 18) {
+                headerSection
 
-            Button {
-                NotificationCenter.default.post(name: .switchToTab, object: 1)
-            } label: {
-                HStack(spacing: 8) {
-                    LucideIcon(image: Lucide.plus, size: 16)
-                    Text("Add property")
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(alignment: .top, spacing: 12) {
+                        JellyBadge(systemName: "house-plus", color: AppColors.primary, wash: colors.primarySurface, size: 52)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Add a property first")
+                                .font(.system(size: 22, weight: .black, design: .rounded))
+                                .foregroundStyle(colors.textPrimary)
+                            Text("Time entries need a rental address so reports can group the evidence cleanly.")
+                                .font(.system(size: 15, weight: .medium, design: .rounded))
+                                .foregroundStyle(colors.textSecondary)
+                                .lineSpacing(3)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    Button {
+                        NotificationCenter.default.post(name: .switchToPropertiesAndOpenAddProperty, object: nil)
+                    } label: {
+                        HStack(spacing: 8) {
+                            LucideIcon(image: Lucide.plus, size: 16)
+                            Text("Add first property")
+                        }
+                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        .foregroundStyle(AppColors.onAction)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 15)
+                        .background(colors.action)
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.lhPressable)
                 }
-                .font(AppTypography.button)
-                .foregroundStyle(AppColors.onAction)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 14)
-                .background(colors.action)
-                .clipShape(Capsule())
+                .padding(18)
+                .background(colors.backgroundSecondary)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(colors.border.opacity(0.25), lineWidth: 1)
+                }
+
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Why this comes first")
+                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+
+                    emptyStateReason(icon: Lucide.clock3, title: "Cleaner logs", detail: "Every hour is tied to one rental.")
+                    emptyStateReason(icon: Lucide.chartColumnIncreasing, title: "Better reports", detail: "Progress and exports can separate properties.")
+                    emptyStateReason(icon: Lucide.users, title: "Spouse tracking", detail: "Shared work still belongs to the right property.")
+                }
+                .padding(18)
+                .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.72 : 0.78))
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(colors.border.opacity(0.22), lineWidth: 1)
+                }
             }
-            .buttonStyle(.lhPressable)
+            .padding(.horizontal, 24)
+            .padding(.top, 8)
+            .padding(.bottom, AppSpacing.tabContentBottomInset)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
             LHMobileCanvas()
+        }
+    }
+
+    private func emptyStateReason(icon: UIImage, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            LucideIcon(image: icon, size: 18)
+                .foregroundStyle(colors.action)
+                .frame(width: 34, height: 34)
+                .background(colors.actionSurface)
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                Text(detail)
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
         }
     }
 
@@ -1413,7 +1524,7 @@ struct TimeLogView: View {
                         .frame(width: 6, height: 6)
                 }
             }
-            .foregroundStyle(trackMode == mode ? colors.textPrimary : AppColors.slate)
+            .foregroundStyle(trackMode == mode ? colors.textPrimary : colors.textSecondary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .background(trackMode == mode ? colors.backgroundSecondary : Color.clear)
@@ -1425,7 +1536,9 @@ struct TimeLogView: View {
     // MARK: - Timer Card
 
     private var timerCard: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
+            timerComposerHeader
+
             switch timerPhase {
             case .idle:
                 timerIdleContent
@@ -1446,151 +1559,193 @@ struct TimeLogView: View {
                 timerElapsed = viewModel.timerElapsedTime
             }
         }
+        .lhMotion(AppAnimation.flow, value: timerPhase)
+    }
+
+    private var timerComposerHeader: some View {
+        HStack(alignment: .center, spacing: 12) {
+            LHIconTile(
+                icon: timerPhase == .finishing ? Lucide.clipboardCheck : Lucide.timer,
+                color: timerPhase == .running ? colors.positive : colors.action,
+                wash: timerPhase == .running ? colors.positiveSurface : colors.actionSurface,
+                size: 40,
+                isActive: true
+            )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(timerHeaderTitle)
+                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                Text(timerHeaderSubtitle)
+                    .font(AppTypography.bodySmall)
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 8)
+
+            timerStatusPill
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+        .padding(.bottom, 14)
+    }
+
+    private var timerHeaderTitle: String {
+        switch timerPhase {
+        case .idle: return "Live timer"
+        case .running: return "Recording work"
+        case .finishing: return "Review entry"
+        }
+    }
+
+    private var timerHeaderSubtitle: String {
+        switch timerPhase {
+        case .idle: return "Pick the evidence first. Save the note after stopping."
+        case .running: return "Keep working. Stop when the record is ready to review."
+        case .finishing: return "Add a short note so the log is audit-ready."
+        }
+    }
+
+    private var timerStatusPill: some View {
+        let text: String = {
+            switch timerPhase {
+            case .idle: return "Ready"
+            case .running: return "Live"
+            case .finishing: return "Review"
+            }
+        }()
+
+        let tint = timerPhase == .running ? colors.positive : colors.action
+        let wash = timerPhase == .running ? colors.positiveSurface : colors.actionSurface
+
+        return HStack(spacing: 6) {
+            if timerPhase == .running {
+                Circle()
+                    .fill(tint)
+                    .frame(width: 7, height: 7)
+            }
+            Text(text)
+        }
+        .font(.system(size: 11, weight: .bold, design: .rounded))
+        .foregroundStyle(tint)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(wash)
+        .clipShape(Capsule())
     }
 
     // MARK: - Timer Idle
 
     private var timerIdleContent: some View {
-        VStack(spacing: 0) {
-            // Category
+        VStack(alignment: .leading, spacing: 18) {
             fieldLabel("Category")
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
             timerCategoryChips
-                .padding(.bottom, 20)
 
-            // Property
             if viewModel.properties.count > 1 {
                 fieldLabel("Property")
-                    .padding(.horizontal, 20)
                 timerPropertyPicker
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
             }
 
-            // Clock ring (idle)
-            clockRingView(progress: 0, isActive: false)
-                .padding(.vertical, 12)
+            timerEvidenceSummary(
+                title: "Timer will track",
+                rows: [
+                    (Lucide.house, "Property", selectedTimerPropertyName),
+                    (Lucide.tag, "Category", timerSelectedCategory.chipLabel)
+                ]
+            )
 
-            // Start button — Tiimo style
             Button {
                 startTimerAction()
             } label: {
                 HStack(spacing: 10) {
-                    Text("Start")
-                        .font(.system(size: 17, weight: .black, design: .rounded))
                     LucideIcon(image: Lucide.play, size: 16)
+                    Text("Start Timer")
+                        .font(.system(size: 17, weight: .black, design: .rounded))
                 }
-                .foregroundStyle(timerCanStart ? AppColors.onAction : .white)
-                .padding(.horizontal, 36)
-                .padding(.vertical, 14)
-                .background(timerCanStart ? colors.action : AppColors.mist)
+                .foregroundStyle(timerCanStart ? AppColors.onAction : colors.textSecondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(timerCanStart ? colors.action : colors.backgroundTertiary)
                 .clipShape(Capsule())
             }
             .buttonStyle(.lhPressable)
             .disabled(!timerCanStart)
-            .padding(.bottom, 28)
+            .accessibilityIdentifier("track.timer.start")
+
+            clockRingView(progress: 0, isActive: false)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 2)
         }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
     }
 
     // MARK: - Timer Running
 
     private var timerRunningContent: some View {
-        VStack(spacing: 16) {
-            // Context chips
-            HStack(spacing: 8) {
-                HStack(spacing: 6) {
-                    LucideIcon(image: Lucide.house, size: 12)
-                        .foregroundStyle(AppColors.primary)
-                    Text(timerPropertyName)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(colors.textPrimary)
-                        .lineLimit(1)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(colors.primarySurface)
-                .clipShape(Capsule())
+        VStack(spacing: 18) {
+            timerEvidenceSummary(
+                title: "Evidence in progress",
+                rows: [
+                    (Lucide.house, "Property", timerPropertyName),
+                    (Lucide.tag, "Category", viewModel.timerCategory.chipLabel)
+                ]
+            )
 
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(viewModel.timerCategory.color)
-                        .frame(width: 6, height: 6)
-                    Text(viewModel.timerCategory.chipLabel)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(colors.textPrimary)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(colors.primarySurface)
-                .clipShape(Capsule())
-            }
-            .padding(.top, 20)
-
-            // Clock ring
-            clockRingView(progress: ringProgress, isActive: true)
-
-            // Controls — Tiimo style
-            HStack(spacing: 20) {
+            HStack(spacing: 10) {
                 Button {
                     showDiscardTimerAlert = true
                 } label: {
-                    Text("Discard timer")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(AppColors.slate)
+                    HStack(spacing: 8) {
+                        LucideIcon(image: Lucide.x, size: 15)
+                        Text("Discard")
+                    }
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(colors.backgroundTertiary)
+                    .clipShape(Capsule())
                 }
                 .buttonStyle(.lhPressable)
+                .accessibilityIdentifier("track.timer.discardRunning")
 
                 Button {
                     stopTimerAction()
                 } label: {
                     HStack(spacing: 10) {
-                        Text("Stop")
-                            .font(.system(size: 17, weight: .black, design: .rounded))
                         LucideIcon(image: Lucide.square, size: 14)
+                        Text("Stop & Review")
+                            .font(.system(size: 17, weight: .black, design: .rounded))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.82)
                     }
                     .foregroundStyle(AppColors.onAction)
-                    .padding(.horizontal, 36)
+                    .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(AppColors.coral)
+                    .background(colors.action)
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.lhPressable)
+                .accessibilityIdentifier("track.timer.stop")
             }
-            .padding(.bottom, 28)
+
+            clockRingView(progress: ringProgress, isActive: true)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 2)
         }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
     }
 
     // MARK: - Timer Finishing
 
     private var timerFinishingContent: some View {
-        VStack(spacing: 20) {
-            // Summary
-            VStack(spacing: 8) {
-                JellyBadge(systemName: "circle-check", color: AppColors.sage, wash: AppColors.sageWash, size: 48)
+        VStack(alignment: .leading, spacing: 18) {
+            timerReviewSummary
 
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(String(format: "%.2f", stoppedElapsed / 3600.0))
-                        .font(.system(size: 36, weight: .bold, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                    Text("hours")
-                        .font(.system(size: 14))
-                        .foregroundStyle(colors.textSecondary)
-                }
-
-                HStack(spacing: 6) {
-                    Text(stoppedPropertyDisplayName)
-                    Text("·")
-                    Text(stoppedCategory.chipLabel)
-                }
-                .font(AppTypography.bodySmall)
-                .foregroundStyle(colors.textSecondary)
-            }
-            .padding(.top, 24)
-
-            // Notes
             fieldLabel("Notes")
-                .padding(.horizontal, 20)
             ZStack(alignment: .topLeading) {
                 if timerNotes.isEmpty {
                     Text("What did you work on?")
@@ -1625,11 +1780,47 @@ struct TimeLogView: View {
                 RoundedRectangle(cornerRadius: 14)
                     .strokeBorder(colors.border.opacity(0.35), lineWidth: 1.5)
             )
-            .padding(.horizontal, 20)
 
-            // Participant
+            VStack(spacing: 10) {
+                if stoppedElapsed < minimumSavableTimerElapsed {
+                    Text("Timer entries need at least 1 minute before saving.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(colors.textSecondary)
+                } else if timerNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("Add a short description for your records.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(colors.textSecondary)
+                }
+                Button {
+                    saveTimerEntry()
+                } label: {
+                    HStack(spacing: 9) {
+                        LucideIcon(image: Lucide.check, size: 16)
+                        Text("Save Timer Entry")
+                    }
+                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        .foregroundStyle(canSaveTimer ? AppColors.onAction : colors.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(canSaveTimer ? colors.action : colors.backgroundTertiary)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.lhPressable)
+                .disabled(!canSaveTimer)
+                .accessibilityIdentifier("track.timer.save")
+
+                Button {
+                    discardTimerEntry()
+                } label: {
+                    Text("Discard")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(colors.textSecondary)
+                }
+                .buttonStyle(.lhPressable)
+                .accessibilityIdentifier("track.timer.discardDraft")
+            }
+
             fieldLabel("Participant")
-                .padding(.horizontal, 20)
             HStack(spacing: 0) {
                 segmentButton("Self", isSelected: timerParticipant == .selfParticipant) {
                     animate(AppAnimation.quick) { timerParticipant = .selfParticipant }
@@ -1641,56 +1832,105 @@ struct TimeLogView: View {
             .padding(3)
             .background(colors.backgroundTertiary)
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            .padding(.horizontal, 20)
-
-            // Save / Discard
-            VStack(spacing: 10) {
-                if stoppedElapsed < minimumSavableTimerElapsed {
-                    Text("Timer entries need at least 1 minute before saving.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(AppColors.mist)
-                } else if timerNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text("Add a short description for your records.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(AppColors.mist)
-                }
-                Button {
-                    saveTimerEntry()
-                } label: {
-                    Text("Save Entry")
-                        .font(.system(size: 16, weight: .black, design: .rounded))
-                        .foregroundStyle(canSaveTimer ? AppColors.onAction : .white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(canSaveTimer ? colors.action : AppColors.mist)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.lhPressable)
-                .disabled(!canSaveTimer)
-
-                Button {
-                    discardTimerEntry()
-                } label: {
-                    Text("Discard")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(AppColors.slate)
-                }
-                .buttonStyle(.lhPressable)
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 20)
         }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
+    }
+
+    private var timerReviewSummary: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(AppFormat.hours(stoppedElapsed / 3600.0))
+                    .font(.system(size: 34, weight: .black, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                    .minimumScaleFactor(0.82)
+                Text("captured")
+                    .font(AppTypography.bodySmall)
+                    .foregroundStyle(colors.textSecondary)
+            }
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    timerSummaryChip(icon: Lucide.house, text: stoppedPropertyDisplayName)
+                    timerSummaryChip(icon: Lucide.tag, text: stoppedCategory.chipLabel)
+                    timerSummaryChip(icon: Lucide.calendar, text: stoppedStartDate.formatted(date: .omitted, time: .shortened))
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    timerSummaryChip(icon: Lucide.house, text: stoppedPropertyDisplayName)
+                    timerSummaryChip(icon: Lucide.tag, text: stoppedCategory.chipLabel)
+                    timerSummaryChip(icon: Lucide.calendar, text: stoppedStartDate.formatted(date: .omitted, time: .shortened))
+                }
+            }
+        }
+        .padding(16)
+        .background(colors.backgroundTertiary.opacity(colorScheme == .dark ? 0.72 : 0.82))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func timerEvidenceSummary(title: String, rows: [(UIImage, String, String)]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
+
+            VStack(spacing: 8) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    timerEvidenceRow(icon: row.0, label: row.1, value: row.2)
+                }
+            }
+        }
+        .padding(14)
+        .background(colors.backgroundTertiary.opacity(colorScheme == .dark ? 0.72 : 0.82))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func timerEvidenceRow(icon: UIImage, label: String, value: String) -> some View {
+        HStack(spacing: 10) {
+            LucideIcon(image: icon, size: 15)
+                .foregroundStyle(colors.action)
+                .frame(width: 28, height: 28)
+                .background(colors.actionSurface)
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+            Text(label)
+                .font(AppTypography.caption)
+                .foregroundStyle(colors.textSecondary)
+
+            Spacer(minLength: 8)
+
+            Text(value)
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+        }
+    }
+
+    private func timerSummaryChip(icon: UIImage, text: String) -> some View {
+        HStack(spacing: 6) {
+            LucideIcon(image: icon, size: 13)
+            Text(text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+        }
+        .font(.system(size: 12, weight: .bold, design: .rounded))
+        .foregroundStyle(colors.textSecondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.7 : 0.86))
+        .clipShape(Capsule())
     }
 
     // MARK: - Tiimo-Style Clock Ring
 
     private func clockRingView(progress: Double, isActive: Bool) -> some View {
-        let ringDiameter: CGFloat = 220
-        let strokeWidth: CGFloat = 22
+        let ringDiameter: CGFloat = 176
+        let strokeWidth: CGFloat = 18
         let ringRadius: CGFloat = ringDiameter / 2
         let innerEdge: CGFloat = ringRadius - strokeWidth / 2
         let tickOuter: CGFloat = innerEdge - 2
-        let labelOffset: CGFloat = ringRadius + 16
+        let labelOffset: CGFloat = ringRadius + 13
 
         return ZStack {
             // Track ring (lavender)
@@ -1718,10 +1958,10 @@ struct TimeLogView: View {
                     var path = Path()
                     path.move(to: outerPt)
                     path.addLine(to: innerPt)
-                    context.stroke(path, with: .color(AppColors.slate.opacity(opacity)), lineWidth: w)
+                    context.stroke(path, with: .color(colors.textTertiary.opacity(opacity)), lineWidth: w)
                 }
             }
-            .frame(width: ringDiameter + 64, height: ringDiameter + 64)
+            .frame(width: ringDiameter + 52, height: ringDiameter + 52)
             .allowsHitTesting(false)
 
             // Progress ring
@@ -1768,7 +2008,7 @@ struct TimeLogView: View {
                         .foregroundStyle(AppColors.primary)
                 }
                 Text("\(isActive ? timerMinutesInHour : 0)")
-                    .font(.system(size: 56, weight: .bold, design: .rounded))
+                    .font(.system(size: 48, weight: .bold, design: .rounded))
                     .foregroundStyle(isActive ? colors.textPrimary : colors.textTertiary)
                     .contentTransition(.numericText())
                 Text("mins")
@@ -1776,7 +2016,7 @@ struct TimeLogView: View {
                     .foregroundStyle(isActive ? colors.textSecondary : colors.textTertiary)
             }
         }
-        .frame(width: ringDiameter + 64, height: ringDiameter + 64)
+        .frame(width: ringDiameter + 52, height: ringDiameter + 52)
     }
 
     // MARK: - Timer Category Chips
@@ -1815,7 +2055,7 @@ struct TimeLogView: View {
                     .lhMotion(AppAnimation.pillPop, value: timerSelectedCategory == cat)
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 0)
         }
     }
 
@@ -1838,21 +2078,21 @@ struct TimeLogView: View {
         } label: {
             HStack(spacing: 10) {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(timerSelectedPropertyId != nil ? colors.primarySurface : AppColors.snow)
+                    .fill(timerSelectedPropertyId != nil ? colors.actionSurface : colors.backgroundTertiary)
                     .frame(width: 28, height: 28)
                     .overlay(
                         LucideIcon(image: Lucide.house, size: 14)
-                            .foregroundStyle(timerSelectedPropertyId != nil ? AppColors.primary : AppColors.mist)
+                            .foregroundStyle(timerSelectedPropertyId != nil ? colors.action : colors.textTertiary)
                     )
 
                 Text(selectedTimerPropertyName)
                     .font(.system(size: 15))
-                    .foregroundStyle(timerSelectedPropertyId != nil ? colors.textPrimary : AppColors.mist)
+                    .foregroundStyle(timerSelectedPropertyId != nil ? colors.textPrimary : colors.textTertiary)
 
                 Spacer()
 
                 LucideIcon(image: Lucide.chevronRight, size: 18)
-                    .foregroundStyle(AppColors.cloud)
+                    .foregroundStyle(colors.textTertiary)
             }
             .padding(14)
             .padding(.horizontal, 2)
@@ -1860,7 +2100,7 @@ struct TimeLogView: View {
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(AppColors.snow, lineWidth: 1.5)
+                    .strokeBorder(colors.border.opacity(0.35), lineWidth: 1.5)
             )
         }
     }
@@ -2020,6 +2260,50 @@ struct TimeLogView: View {
 
     private func clearStoppedTimerDraft() {
         UserDefaults.standard.removeObject(forKey: stoppedTimerDraftKey)
+    }
+
+    @discardableResult
+    private func applyTimerLaunchArgumentsIfNeeded() -> Bool {
+        #if DEBUG
+        guard !didApplyTimerLaunchArguments else { return false }
+        let args = ProcessInfo.processInfo.arguments
+        guard let modeIndex = args.firstIndex(of: "-LHInitialTrackMode"),
+              args.indices.contains(modeIndex + 1),
+              args[modeIndex + 1].lowercased() == "timer" else {
+            return false
+        }
+
+        didApplyTimerLaunchArguments = true
+        trackMode = .timer
+
+        let propertyId = timerSelectedPropertyId ?? viewModel.properties.first?.id
+        timerSelectedPropertyId = propertyId
+
+        if args.contains("-LHShowTimerReview") {
+            stoppedElapsed = 5400
+            stoppedPropertyId = propertyId
+            stoppedCategory = .repairs
+            stoppedStartDate = Calendar.current.date(byAdding: .minute, value: -90, to: Date()) ?? Date()
+            timerParticipant = .selfParticipant
+            timerNotes = ""
+            timerPhase = .finishing
+            return true
+        }
+
+        if args.contains("-LHStartTimer"), let propertyId {
+            viewModel.startTimer(propertyId: propertyId, category: timerSelectedCategory)
+            timerPhase = .running
+            timerElapsed = viewModel.timerElapsedTime
+            return true
+        }
+
+        viewModel.cancelTimer()
+        timerPhase = .idle
+        timerElapsed = 0
+        return true
+        #else
+        return false
+        #endif
     }
 }
 

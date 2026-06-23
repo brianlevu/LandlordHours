@@ -1,0 +1,1 @@
+Adds a more polished first-run experience, improved voice-assisted time logging, Home Screen widgets, active-timer Live Activity support, Siri and Shortcuts actions, quieter engagement reminders, and broader visual polish across tracking, reports, learning, settings, and onboarding.

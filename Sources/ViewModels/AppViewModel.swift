@@ -1,6 +1,8 @@
 import Foundation
 import SwiftUI
 import AuthenticationServices
+import WidgetKit
+import ActivityKit
 
 // MARK: - Per-User Key Scoping
 
@@ -67,6 +69,7 @@ class AppViewModel: ObservableObject {
             migrateUnscopedLegacyData()
             loadData()
             loadTimerState()
+            refreshWidgetSnapshot()
         }
         syncService.delegate = self
 
@@ -75,6 +78,7 @@ class AppViewModel: ObservableObject {
             self?.syncService.schedulePush()
         }
         GoalManager.shared.onDidChange = { [weak self] in
+            self?.refreshWidgetSnapshot()
             self?.syncService.schedulePush()
         }
         // Show branded splash screen for 1.5s, then animate into the app
@@ -157,6 +161,7 @@ class AppViewModel: ObservableObject {
         // Note: per-user data stays in UserDefaults under scoped keys (u.<userId>.*)
 
         // Cancel any running timer and clear persisted timer state
+        endTimerLiveActivity(propertyId: timerPropertyId, category: timerCategory, startDate: timerStartTime, needsReview: false)
         isTimerRunning = false
         timerStartTime = nil
         timerPropertyId = nil
@@ -168,6 +173,8 @@ class AppViewModel: ObservableObject {
         activeCelebration = nil
         isSignedIn = false
         userName = ""
+        EngagementWidgetSnapshotStore.save(.empty)
+        WidgetCenter.shared.reloadTimelines(ofKind: EngagementWidgetSnapshotStore.widgetKind)
 
         // Reset singleton managers in memory
         SubscriptionManager.shared.resetForSignOut()
@@ -208,6 +215,7 @@ class AppViewModel: ObservableObject {
         properties = []
         timeEntries = []
         activeCelebration = nil
+        endTimerLiveActivity(propertyId: timerPropertyId, category: timerCategory, startDate: timerStartTime, needsReview: false)
         isTimerRunning = false
         timerStartTime = nil
         timerPropertyId = nil
@@ -221,11 +229,14 @@ class AppViewModel: ObservableObject {
         properties = []
         timeEntries = []
         activeCelebration = nil
+        endTimerLiveActivity(propertyId: timerPropertyId, category: timerCategory, startDate: timerStartTime, needsReview: false)
         isTimerRunning = false
         timerStartTime = nil
         timerPropertyId = nil
         timerCategory = .repairs
         staleTimerRecovery = nil
+        EngagementWidgetSnapshotStore.save(.empty)
+        WidgetCenter.shared.reloadTimelines(ofKind: EngagementWidgetSnapshotStore.widgetKind)
 
         saveTimerState()
         clearStaleTimerRecovery()
@@ -541,6 +552,7 @@ class AppViewModel: ObservableObject {
         timerPropertyId = propertyId
         timerCategory = category
         saveTimerState()
+        startOrUpdateTimerLiveActivity()
     }
     
     /// Set to true when `stopTimer` caps the entry at 24 hours, so the UI can warn the user.
@@ -569,13 +581,18 @@ class AppViewModel: ObservableObject {
         timerStartTime = nil
         timerPropertyId = nil
         timerWasCapped = wasCapped
+        endTimerLiveActivity(propertyId: propertyId, category: timerCategory, startDate: startTime, needsReview: true)
         saveTimerState()
     }
     
     func cancelTimer() {
+        let endingPropertyId = timerPropertyId
+        let endingCategory = timerCategory
+        let endingStartDate = timerStartTime
         isTimerRunning = false
         timerStartTime = nil
         timerPropertyId = nil
+        endTimerLiveActivity(propertyId: endingPropertyId, category: endingCategory, startDate: endingStartDate, needsReview: false)
         saveTimerState()
     }
 
@@ -737,6 +754,7 @@ class AppViewModel: ObservableObject {
         if let entriesData = try? JSONEncoder().encode(timeEntries) {
             UserDefaults.standard.set(entriesData, forKey: entriesKey)
         }
+        refreshWidgetSnapshot()
         // Trigger debounced cloud push
         syncService.schedulePush()
     }
@@ -753,6 +771,61 @@ class AppViewModel: ObservableObject {
         if let entriesData = UserDefaults.standard.data(forKey: entriesKey),
            let decoded = try? JSONDecoder().decode([TimeEntry].self, from: entriesData) {
             timeEntries = decoded
+        }
+        refreshWidgetSnapshot()
+    }
+
+    private func refreshWidgetSnapshot() {
+        let now = Date()
+        let taxYear = Calendar.current.component(.year, from: now)
+        let widgetGoal = widgetGoalContext()
+        let context = EngagementContext(
+            now: now,
+            taxYear: taxYear,
+            properties: properties,
+            timeEntries: timeEntries,
+            calendarDraftCount: 0,
+            isTimerRunning: isTimerRunning,
+            timerStartTime: timerStartTime,
+            notificationPermission: .notDetermined,
+            recentDismissals: [],
+            isProUser: SubscriptionManager.shared.isPro,
+            targetHours: widgetGoal.targetHours
+        )
+        let snapshot = EngagementIntelligenceService.shared.snapshot(for: context)
+        let recommendation = EngagementIntelligenceService.shared.recommendation(for: context)
+        EngagementWidgetSnapshotStore.save(
+            EngagementWidgetSnapshot(
+                updatedAt: now,
+                taxYear: taxYear,
+                propertyCount: properties.count,
+                yearHours: snapshot.yearHours,
+                targetHours: widgetGoal.targetHours,
+                targetLabel: widgetGoal.label,
+                targetShortLabel: widgetGoal.shortLabel,
+                requiredHoursToDate: snapshot.requiredHoursToDate,
+                daysRemainingInYear: snapshot.daysRemainingInYear,
+                lastLogDate: snapshot.lastLogDate,
+                isTimerRunning: isTimerRunning,
+                timerStartTime: timerStartTime,
+                recommendationSurface: recommendation.surface,
+                recommendationReason: recommendation.reason,
+                recommendationDestination: recommendation.destination,
+                recommendationTitle: recommendation.title,
+                recommendationMessage: recommendation.message
+            )
+        )
+        WidgetCenter.shared.reloadTimelines(ofKind: EngagementWidgetSnapshotStore.widgetKind)
+    }
+
+    private func widgetGoalContext() -> (targetHours: Double, label: String, shortLabel: String) {
+        switch GoalManager.shared.globalGoalType {
+        case .reps:
+            return (750, "750h REPS", "750h")
+        case .str:
+            return (100, "100h STR", "100h")
+        case .both:
+            return (750, "750h REPS + STR", "750h")
         }
     }
     
@@ -781,6 +854,8 @@ class AppViewModel: ObservableObject {
         } else {
             defaults.removeObject(forKey: categoryKey)
         }
+
+        refreshWidgetSnapshot()
     }
 
     private func saveStaleTimerRecovery(_ recovery: StaleTimerRecovery) {
@@ -820,6 +895,7 @@ class AppViewModel: ObservableObject {
         // Auto-cancel stale timers (running for >24 hours = forgotten)
         if isTimerRunning, let start = timerStartTime,
            Date().timeIntervalSince(start) > 24 * 3600 {
+            let stalePropertyId = timerPropertyId
             if let propertyId = timerPropertyId,
                properties.contains(where: { $0.id == propertyId }) {
                 staleTimerRecovery = StaleTimerRecovery(
@@ -835,8 +911,81 @@ class AppViewModel: ObservableObject {
             isTimerRunning = false
             timerStartTime = nil
             timerPropertyId = nil
+            endTimerLiveActivity(propertyId: stalePropertyId, category: timerCategory, startDate: start, needsReview: true)
             saveTimerState()
+        } else if isTimerRunning {
+            startOrUpdateTimerLiveActivity()
         }
+    }
+
+    private func startOrUpdateTimerLiveActivity() {
+        guard isTimerRunning,
+              let timerStartTime,
+              let timerPropertyId,
+              ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+
+        let state = timerLiveActivityState(
+            propertyId: timerPropertyId,
+            category: timerCategory,
+            startDate: timerStartTime,
+            needsReview: false
+        )
+
+        Task {
+            if let existing = Activity<LandlordHoursTimerAttributes>.activities.first {
+                await existing.update(ActivityContent(state: state, staleDate: nil))
+                return
+            }
+
+            do {
+                _ = try Activity.request(
+                    attributes: LandlordHoursTimerAttributes(timerId: timerPropertyId.uuidString),
+                    content: ActivityContent(state: state, staleDate: nil),
+                    pushType: nil
+                )
+            } catch {
+                #if DEBUG
+                print("[LiveActivity] Could not start timer activity: \(error.localizedDescription)")
+                #endif
+            }
+        }
+    }
+
+    private func endTimerLiveActivity(
+        propertyId: UUID?,
+        category: ActivityCategory,
+        startDate: Date?,
+        needsReview: Bool
+    ) {
+        guard !Activity<LandlordHoursTimerAttributes>.activities.isEmpty else { return }
+
+        let fallbackPropertyId = propertyId ?? properties.first?.id ?? UUID()
+        let state = timerLiveActivityState(
+            propertyId: fallbackPropertyId,
+            category: category,
+            startDate: startDate ?? Date(),
+            needsReview: needsReview
+        )
+
+        Task {
+            for activity in Activity<LandlordHoursTimerAttributes>.activities {
+                await activity.end(ActivityContent(state: state, staleDate: nil), dismissalPolicy: .immediate)
+            }
+        }
+    }
+
+    private func timerLiveActivityState(
+        propertyId: UUID,
+        category: ActivityCategory,
+        startDate: Date,
+        needsReview: Bool
+    ) -> LandlordHoursTimerAttributes.ContentState {
+        LandlordHoursTimerAttributes.ContentState(
+            propertyName: properties.first(where: { $0.id == propertyId })?.name ?? "Rental property",
+            categoryName: category.chipLabel,
+            startDate: startDate,
+            isReviewNeeded: needsReview
+        )
     }
 }
 

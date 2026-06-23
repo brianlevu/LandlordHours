@@ -38,13 +38,13 @@ struct PropertiesView: View {
                 if viewModel.properties.isEmpty {
                     // MARK: - Empty State
                     ScrollView(showsIndicators: false) {
-                        VStack(spacing: 22) {
-                        headerSection
+                        VStack(spacing: 18) {
+                            headerSection
                             emptyPortfolioCard
                             setupPreviewCard
                         }
                         .padding(.horizontal, 24)
-                        .padding(.top, 18)
+                        .padding(.top, 8)
                         .padding(.bottom, AppSpacing.tabContentBottomInset)
                     }
                 } else {
@@ -76,7 +76,7 @@ struct PropertiesView: View {
                             .guidedSpotlightTarget(.addProperty)
                         }
                         .padding(.horizontal, 24)
-                        .padding(.top, 18)
+                        .padding(.top, 8)
                         .padding(.bottom, AppSpacing.tabContentBottomInset)
                     }
                 }
@@ -121,16 +121,16 @@ struct PropertiesView: View {
     }
 
     private var emptyPortfolioCard: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            HStack(alignment: .top, spacing: 14) {
-                JellyBadge(systemName: "building-2", color: AppColors.primary, wash: colors.primarySurface, size: 58)
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top, spacing: 12) {
+                JellyBadge(systemName: "building-2", color: AppColors.primary, wash: colors.primarySurface, size: 52)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Start with the property, then every hour has a home.")
-                        .font(.system(size: 25, weight: .black, design: .rounded))
+                    Text("Create the property record")
+                        .font(.system(size: 22, weight: .black, design: .rounded))
                         .foregroundStyle(colors.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text("Add one rental place now. You can track repairs, management, leasing, and spouse hours against it next.")
+                    Text("Then log repairs, management, leasing, and spouse work against the right rental.")
                         .font(.system(size: 15, weight: .medium, design: .rounded))
                         .foregroundStyle(colors.textSecondary)
                         .lineSpacing(3)
@@ -152,7 +152,7 @@ struct PropertiesView: View {
             .buttonStyle(.lhPressable)
             .guidedSpotlightTarget(.addProperty)
         }
-        .padding(20)
+        .padding(18)
         .background(colors.backgroundSecondary)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay {
@@ -313,10 +313,10 @@ struct PropertiesView: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Properties")
-                    .font(.system(size: 42, weight: .black, design: .rounded))
+                    .font(.system(size: 34, weight: .black, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
                     .minimumScaleFactor(0.82)
-                Text("\(viewModel.properties.count) rental \(viewModel.properties.count == 1 ? "place" : "places")")
+                Text(propertyHeaderSubtitle)
                     .font(.system(size: 15, weight: .medium, design: .rounded))
                     .foregroundStyle(colors.textSecondary)
             }
@@ -333,6 +333,13 @@ struct PropertiesView: View {
             .guidedSpotlightTarget(.addProperty)
             .accessibilityLabel("Add property")
         }
+    }
+
+    private var propertyHeaderSubtitle: String {
+        if viewModel.properties.isEmpty {
+            return "Add the rental each hour should belong to."
+        }
+        return "\(viewModel.properties.count) rental \(viewModel.properties.count == 1 ? "place" : "places")"
     }
 }
 
@@ -501,6 +508,11 @@ private extension View {
 
 // MARK: - Add Property View
 struct AddPropertyView: View {
+    private enum FocusedField {
+        case name
+        case address
+    }
+
     @EnvironmentObject var viewModel: AppViewModel
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
@@ -515,7 +527,7 @@ struct AddPropertyView: View {
     @State private var addressResults: [MKMapItem] = []
     @State private var isSearching = false
     @State private var showDuplicateWarning = false
-    @FocusState private var isAddressFocused: Bool
+    @FocusState private var focusedField: FocusedField?
 
     init(property: RentalProperty? = nil) {
         self.editingProperty = property
@@ -637,11 +649,32 @@ struct AddPropertyView: View {
 
     private var propertyIdentitySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            propertyTextField(title: "Property name", placeholder: "Oak Street Duplex", text: $name, icon: Lucide.house)
+            propertyTextField(
+                title: "Property name",
+                placeholder: "Oak Street Duplex",
+                text: $name,
+                icon: Lucide.house,
+                accessibilityIdentifier: "property.name",
+                focusedField: .name,
+                submitLabel: .next
+            )
+            .onSubmit {
+                focusedField = .address
+            }
 
             VStack(alignment: .leading, spacing: 8) {
-                propertyTextField(title: "Address", placeholder: "123 Oak Street", text: $address, icon: Lucide.mapPin)
-                    .focused($isAddressFocused)
+                propertyTextField(
+                    title: "Address",
+                    placeholder: "123 Oak Street",
+                    text: $address,
+                    icon: Lucide.mapPin,
+                    accessibilityIdentifier: "property.address",
+                    focusedField: .address,
+                    submitLabel: .done
+                )
+                    .onSubmit {
+                        focusedField = nil
+                    }
                     .onChange(of: address) { _, newValue in
                         if newValue.count > 2 {
                             searchAddress(query: newValue)
@@ -650,7 +683,7 @@ struct AddPropertyView: View {
                         }
                     }
 
-                if !addressResults.isEmpty && isAddressFocused {
+                if !addressResults.isEmpty && focusedField == .address {
                     VStack(spacing: 0) {
                         ForEach(addressResults.prefix(5), id: \.self) { item in
                             Button {
@@ -697,7 +730,15 @@ struct AddPropertyView: View {
         }
     }
 
-    private func propertyTextField(title: String, placeholder: String, text: Binding<String>, icon: UIImage) -> some View {
+    private func propertyTextField(
+        title: String,
+        placeholder: String,
+        text: Binding<String>,
+        icon: UIImage,
+        accessibilityIdentifier: String,
+        focusedField field: FocusedField,
+        submitLabel: SubmitLabel
+    ) -> some View {
         HStack(spacing: 12) {
             LucideIcon(image: icon, size: 18)
                 .foregroundStyle(colors.textPrimary)
@@ -713,11 +754,19 @@ struct AddPropertyView: View {
                     .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
                     .textInputAutocapitalization(.words)
+                    .focused($focusedField, equals: field)
+                    .submitLabel(submitLabel)
+                    .accessibilityLabel(title)
+                    .accessibilityIdentifier(accessibilityIdentifier)
             }
         }
         .padding(14)
         .background(colors.backgroundTertiary.opacity(colorScheme == .dark ? 0.72 : 0.9))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .onTapGesture {
+            focusedField = field
+        }
     }
 
     private var propertyTypeSection: some View {
@@ -817,6 +866,7 @@ struct AddPropertyView: View {
             }
             .buttonStyle(.plain)
             .disabled(!canSaveProperty)
+            .accessibilityIdentifier("property.save")
             .padding(.horizontal, 24)
             .padding(.top, 12)
             .padding(.bottom, 10)
@@ -898,7 +948,7 @@ struct AddPropertyView: View {
 
         address = addressString.trimmingCharacters(in: CharacterSet(charactersIn: ", "))
         addressResults = []
-        isAddressFocused = false
+        focusedField = nil
     }
 
     private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {

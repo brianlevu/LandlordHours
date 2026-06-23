@@ -432,16 +432,61 @@ private func articleById(_ id: String) -> LearningArticle? {
     allArticlesWithExtra.first { $0.id == id }
 }
 
+private func guideById(_ id: String) -> LearningGuide? {
+    allGuides.first { $0.id == id }
+}
+
+private func quickReadById(_ id: String) -> QuickRead? {
+    allQuickReads.first { $0.id == id }
+}
+
 private func articleVisualAssetName(_ article: LearningArticle) -> String {
-    if article.section == "Grow Your Portfolio" || article.id == "grouping-election" {
-        return "LearningArticlePortfolio"
+    switch article.id {
+    case "str-vs-ltr":
+        return "LearningArticleSTRLTR"
+    case "spouse-hours":
+        return "LearningArticleSpousePhoto"
+    case "hours-that-count", "audit-red-flags":
+        return "LearningArticleRecordsPhoto"
+    case "add-property-2", "grouping-election":
+        return "LearningArticlePortfolioPhoto"
+    default:
+        return "LearningArticleREPSPhoto"
     }
+}
 
-    if article.category == "RECORD KEEPING" || article.id == "audit-red-flags" || article.id == "receipt-practices" {
-        return "LearningArticleRecords"
+private func articleSectionSubtitle(_ name: String) -> String {
+    switch name {
+    case "Understanding REPS":
+        return "The rules behind 750 hours, 50% tracking, and defensible logs."
+    case "Smart Tax Moves":
+        return "Property-type and household decisions that change the tracking strategy."
+    case "Grow Your Portfolio":
+        return "How multiple properties change participation, grouping, and planning."
+    default:
+        return "Short reads to make the tax rules easier to apply."
     }
+}
 
-    return "LearningArticleQualification"
+private func articleQuickMap(_ article: LearningArticle) -> [(UIImage, String, String)] {
+    switch article.id {
+    case "reps-basics":
+        return [(Lucide.clock, "750h", "Annual real-estate work"), (Lucide.percent, "50%", "More than half your work time"), (Lucide.clipboardCheck, "Proof", "Material participation records")]
+    case "50-percent-rule":
+        return [(Lucide.briefcaseBusiness, "All work", "Count every working hour"), (Lucide.house, "Real estate", "Must be the majority"), (Lucide.trendingUp, "Pace", "Monitor through the year")]
+    case "hours-that-count":
+        return [(Lucide.calendar, "Date", "Log near the activity"), (Lucide.house, "Property", "Tie work to a rental"), (Lucide.fileText, "Detail", "Describe what happened")]
+    case "str-vs-ltr":
+        return [(Lucide.bedDouble, "STR", "Average stay matters"), (Lucide.fileText, "LTR", "Usually passive by default"), (Lucide.tag, "Track", "Keep property types separate")]
+    case "spouse-hours":
+        return [(Lucide.user, "Self", "REPS is individual"), (Lucide.users, "Spouse", "May help participation tests"), (Lucide.scale, "Separate", "Do not blend the 750h test")]
+    case "add-property-2":
+        return [(Lucide.house, "Property 1", "Current base"), (Lucide.housePlus, "Property 2", "More legitimate work"), (Lucide.folderCheck, "Plan", "Review grouping with CPA")]
+    case "grouping-election":
+        return [(Lucide.layers, "Group", "Combine rental activities"), (Lucide.clipboardCheck, "Elect", "Attach to tax return"), (Lucide.lock, "Durable", "Usually applies going forward")]
+    default:
+        return [(Lucide.bookOpen, "Learn", "Read the rule"), (Lucide.clock, "Track", "Log the work"), (Lucide.fileText, "Export", "Keep records ready")]
+    }
 }
 
 // MARK: - Section Grouping
@@ -472,6 +517,12 @@ struct LearningCenterView: View {
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var selectedFilter = "All"
+#if DEBUG
+    @State private var openedArticleId = Self.articleIdFromLaunchArguments()
+    @State private var openedGuideId = Self.guideIdFromLaunchArguments()
+    @State private var openedQuickReadId = Self.quickReadIdFromLaunchArguments()
+    @State private var didApplyLearningScrollLaunchArgument = false
+#endif
     private let filters = ["All", "Tax Strategy", "IRS Basics", "Record Keeping", "Growth"]
 
     private var filteredSections: [ArticleGroup] {
@@ -486,33 +537,110 @@ struct LearningCenterView: View {
     }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 24) {
-                headerSection
-                learningHeroCard
-                startHereSection
-                filterChips
+        ScrollViewReader { proxy in
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 24) {
+                    headerSection
+                    startHereSection
+                    filterChips
 
-                // Sectioned articles
-                ForEach(filteredSections) { section in
-                    articleSectionView(section)
+                    // Sectioned articles
+                    ForEach(filteredSections) { section in
+                        articleSectionView(section)
+                    }
+
+                    // Guides carousel
+                    guidesSection
+                        .id("learningGuidesSection")
+
+                    // Quick reads
+                    quickReadsSection
+                        .id("learningQuickReadsSection")
                 }
-
-                // Guides carousel
-                guidesSection
-
-                // Quick reads
-                quickReadsSection
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 64)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 40)
+            .onAppear {
+#if DEBUG
+                scrollToLearningLaunchTargetIfNeeded(proxy)
+#endif
+            }
         }
         .background { LHMobileCanvas() }
         .navigationTitle("Learn")
         .navigationBarTitleDisplayMode(.inline)
         .hidesAppTabBar()
+#if DEBUG
+        .navigationDestination(item: $openedArticleId) { articleId in
+            if let article = articleById(articleId) {
+                ArticleDetailView(article: article)
+            }
+        }
+        .navigationDestination(item: $openedGuideId) { guideId in
+            if let guide = guideById(guideId) {
+                GuideDetailView(guide: guide)
+            }
+        }
+        .navigationDestination(item: $openedQuickReadId) { quickReadId in
+            if let quickRead = quickReadById(quickReadId) {
+                QuickReadDetailView(quickRead: quickRead)
+            }
+        }
+#endif
     }
+
+#if DEBUG
+    private static func articleIdFromLaunchArguments() -> String? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let flagIndex = args.firstIndex(of: "-LHOpenLearningArticle"),
+              args.indices.contains(flagIndex + 1) else {
+            return nil
+        }
+        let articleId = args[flagIndex + 1]
+        return articleById(articleId) == nil ? nil : articleId
+    }
+
+    private static func guideIdFromLaunchArguments() -> String? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let flagIndex = args.firstIndex(of: "-LHOpenLearningGuide"),
+              args.indices.contains(flagIndex + 1) else {
+            return nil
+        }
+        let guideId = args[flagIndex + 1]
+        return guideById(guideId) == nil ? nil : guideId
+    }
+
+    private static func quickReadIdFromLaunchArguments() -> String? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let flagIndex = args.firstIndex(of: "-LHOpenQuickRead"),
+              args.indices.contains(flagIndex + 1) else {
+            return nil
+        }
+        let quickReadId = args[flagIndex + 1]
+        return quickReadById(quickReadId) == nil ? nil : quickReadId
+    }
+
+    private func scrollToLearningLaunchTargetIfNeeded(_ proxy: ScrollViewProxy) {
+        guard !didApplyLearningScrollLaunchArgument else { return }
+        let args = ProcessInfo.processInfo.arguments
+        let target: String?
+        if args.contains("-LHScrollLearningQuickReads") {
+            target = "learningQuickReadsSection"
+        } else if args.contains("-LHScrollLearningGuides") {
+            target = "learningGuidesSection"
+        } else {
+            target = nil
+        }
+        guard let target else { return }
+        didApplyLearningScrollLaunchArgument = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
+            animate(AppAnimation.smooth) {
+                proxy.scrollTo(target, anchor: .top)
+            }
+        }
+    }
+#endif
 
     // MARK: - Header
     private var headerSection: some View {
@@ -530,86 +658,87 @@ struct LearningCenterView: View {
         }
     }
 
-    private var learningHeroCard: some View {
-        ZStack(alignment: .bottomLeading) {
-            Image("LearningHero")
-                .resizable()
-                .scaledToFill()
-                .frame(height: 184)
-                .frame(maxWidth: .infinity)
-                .clipped()
-                .accessibilityHidden(true)
-
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.58)],
-                startPoint: .center,
-                endPoint: .bottom
-            )
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    LucideIcon(image: Lucide.fileText, size: 14)
-                    Text("IRS-ready records")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                }
-                .foregroundStyle(AppColors.onAction)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(AppColors.onAction.opacity(0.18))
-                .clipShape(Capsule())
-
-                Text("Learn what to track before tax time")
-                    .font(.system(size: 21, weight: .black, design: .rounded))
-                    .foregroundStyle(AppColors.onAction)
-                    .lineSpacing(1)
-                    .lineLimit(2)
-                    .shadow(color: .black.opacity(0.28), radius: 5, x: 0, y: 2)
-            }
-            .padding(18)
-        }
-        .frame(height: 184)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xxl, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppCornerRadius.xxl, style: .continuous)
-                .strokeBorder(colors.border.opacity(colorScheme == .dark ? 0.2 : 0.35), lineWidth: 1)
-        }
-    }
-
     // MARK: - Start Here
     private var startHereSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Start here")
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Start with the core path")
                     .font(.system(size: 19, weight: .bold, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
-                Spacer()
+                Text("Three reads that explain what to track, why it matters, and where STR/LTR rules differ.")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                    .lineLimit(2)
             }
 
-            VStack(spacing: 10) {
-                startHereRow(
-                    articleId: "reps-basics",
-                    title: "Know the REPS tests",
-                    subtitle: "750 hours, 50% rule, and what the IRS expects.",
-                    icon: Lucide.target,
-                    color: AppColors.primary,
-                    wash: colors.primarySurface
-                )
-                startHereRow(
-                    articleId: "hours-that-count",
-                    title: "Log defensible hours",
-                    subtitle: "What details make your entries easier to review.",
-                    icon: Lucide.clipboardCheck,
-                    color: AppColors.sky,
-                    wash: colors.skyWash
-                )
-                startHereRow(
-                    articleId: "str-vs-ltr",
-                    title: "Understand STR vs LTR",
-                    subtitle: "Different property types can change the tax strategy.",
-                    icon: Lucide.house,
-                    color: AppColors.coral,
-                    wash: colors.coralWash
-                )
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .bottomLeading) {
+                    Image("LearningHero")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(height: 132)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                        .accessibilityHidden(true)
+
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.55)],
+                        startPoint: .center,
+                        endPoint: .bottom
+                    )
+
+                    HStack(spacing: 7) {
+                        LucideIcon(image: Lucide.fileText, size: 14)
+                        Text("Build audit-ready records")
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                    }
+                    .foregroundStyle(AppColors.onAction)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(.black.opacity(0.24))
+                    .clipShape(Capsule())
+                    .padding(14)
+                }
+                .frame(height: 132)
+
+                VStack(spacing: 0) {
+                    startHereRow(
+                        articleId: "reps-basics",
+                        number: 1,
+                        title: "Know the REPS tests",
+                        subtitle: "750 hours, 50% rule, and what the IRS expects.",
+                        icon: Lucide.target,
+                        color: AppColors.primary,
+                        wash: colors.primarySurface
+                    )
+                    Divider().padding(.leading, 74)
+                    startHereRow(
+                        articleId: "hours-that-count",
+                        number: 2,
+                        title: "Log defensible hours",
+                        subtitle: "What details make entries easier to review.",
+                        icon: Lucide.clipboardCheck,
+                        color: AppColors.sky,
+                        wash: colors.skyWash
+                    )
+                    Divider().padding(.leading, 74)
+                    startHereRow(
+                        articleId: "str-vs-ltr",
+                        number: 3,
+                        title: "Understand STR vs LTR",
+                        subtitle: "Property type changes the tax strategy.",
+                        icon: Lucide.house,
+                        color: AppColors.coral,
+                        wash: colors.coralWash
+                    )
+                }
+                .padding(.vertical, 4)
+            }
+            .background(colors.backgroundSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous)
+                    .stroke(colors.border.opacity(0.3), lineWidth: 1)
             }
         }
     }
@@ -617,6 +746,7 @@ struct LearningCenterView: View {
     @ViewBuilder
     private func startHereRow(
         articleId: String,
+        number: Int,
         title: String,
         subtitle: String,
         icon: UIImage,
@@ -625,19 +755,29 @@ struct LearningCenterView: View {
     ) -> some View {
         if let article = articleById(articleId) {
             NavigationLink {
-                ArticleDetailView(article: article)
-            } label: {
-                HStack(spacing: 14) {
+            ArticleDetailView(article: article)
+        } label: {
+            HStack(spacing: 14) {
+                ZStack(alignment: .topTrailing) {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .fill(wash.opacity(colorScheme == .dark ? 0.22 : 1))
                         .frame(width: 46, height: 46)
                         .overlay {
-                            LucideIcon(image: icon, size: 20)
+                            LucideIcon(image: icon, size: 19)
                                 .foregroundStyle(color)
                         }
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(title)
+                    Text("\(number)")
+                        .font(.system(size: 9, weight: .black, design: .rounded))
+                        .foregroundStyle(AppColors.onAction)
+                        .frame(width: 17, height: 17)
+                        .background(color)
+                        .clipShape(Circle())
+                        .offset(x: 4, y: -4)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
                             .font(.system(size: 15, weight: .bold, design: .rounded))
                             .foregroundStyle(colors.textPrimary)
                         Text(subtitle)
@@ -649,19 +789,14 @@ struct LearningCenterView: View {
 
                     Spacer(minLength: 8)
 
-                    LucideIcon(image: Lucide.chevronRight, size: 16)
-                        .foregroundStyle(colors.textTertiary)
-                }
-                .padding(14)
-                .background(colors.backgroundSecondary)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(colors.border.opacity(0.28), lineWidth: 1)
-                }
+                LucideIcon(image: Lucide.chevronRight, size: 16)
+                    .foregroundStyle(colors.textTertiary)
             }
-            .buttonStyle(.plain)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
         }
+        .buttonStyle(.plain)
+    }
     }
 
     // MARK: - Filter Chips
@@ -706,118 +841,76 @@ struct LearningCenterView: View {
         VStack(alignment: .leading, spacing: 14) {
             // Section header
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(section.name)
                         .font(.system(size: 19, weight: .bold, design: .rounded))
                         .foregroundStyle(colors.textPrimary)
+                    Text(articleSectionSubtitle(section.name))
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                        .lineLimit(2)
                 }
                 Spacer()
             }
 
-            // Featured first, then grid for the rest
-            if let featured = section.articles.first {
-                featuredCard(featured)
-            }
-
-            let remaining = Array(section.articles.dropFirst())
-            if !remaining.isEmpty {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                    ForEach(remaining) { article in
-                        NavigationLink {
-                            ArticleDetailView(article: article)
-                        } label: {
-                            articleGridCard(article)
-                        }
-                        .buttonStyle(.plain)
+            VStack(spacing: 10) {
+                ForEach(section.articles) { article in
+                    NavigationLink {
+                        ArticleDetailView(article: article)
+                    } label: {
+                        articleListRow(article)
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
     }
 
-    // MARK: - Featured Card
-    private func featuredCard(_ article: LearningArticle) -> some View {
-        NavigationLink {
-            ArticleDetailView(article: article)
-        } label: {
-            HStack(spacing: 0) {
-                learningArticleImage(article, height: 160)
-                .frame(width: 140, height: 160)
+    // MARK: - Article Row
+    private func articleListRow(_ article: LearningArticle) -> some View {
+        HStack(spacing: 12) {
+            learningArticleImage(article, height: 86)
+                .frame(width: 92, height: 86)
                 .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(article.category)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(article.categoryColor)
-
-                    Text(article.title)
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                        .lineSpacing(2)
-                        .multilineTextAlignment(.leading)
-
-                    Text(article.description)
-                        .font(.system(size: 12))
-                        .foregroundStyle(colors.textSecondary)
-                        .lineSpacing(2)
-                        .lineLimit(2)
-
-                    HStack(spacing: 4) {
-                        LucideIcon(image: Lucide.clock, size: 11)
-                            .foregroundStyle(AppColors.mist)
-                        Text(article.readTime + " read")
-                            .font(.system(size: 11, design: .rounded))
-                            .foregroundStyle(AppColors.mist)
-                    }
-                    .padding(.top, 2)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 20)
-            }
-            .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xxl))
-            .overlay(
-                RoundedRectangle(cornerRadius: AppCornerRadius.xxl)
-                    .stroke(colors.border.opacity(0.35), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Article Grid Card
-    private func articleGridCard(_ article: LearningArticle) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            learningArticleImage(article, height: 104)
-            .frame(height: 100)
-
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(article.category)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
                     .foregroundStyle(article.categoryColor)
 
                 Text(article.title)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
                     .lineSpacing(2)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
+                Text(article.description)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+
                 HStack(spacing: 4) {
                     LucideIcon(image: Lucide.clock, size: 10)
-                        .foregroundStyle(AppColors.mist)
+                        .foregroundStyle(colors.textTertiary)
                     Text(article.readTime)
                         .font(.system(size: 11, design: .rounded))
-                        .foregroundStyle(AppColors.mist)
+                        .foregroundStyle(colors.textTertiary)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 10)
-            .padding(.bottom, 14)
+
+            Spacer(minLength: 6)
+
+            LucideIcon(image: Lucide.chevronRight, size: 16)
+                .foregroundStyle(colors.textTertiary)
         }
+        .padding(10)
         .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: AppCornerRadius.xl)
+            RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous)
                 .stroke(colors.border.opacity(0.35), lineWidth: 1)
         )
     }
@@ -854,87 +947,85 @@ struct LearningCenterView: View {
     private var guidesSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Expert Guides")
+                Text("Guided courses")
                     .font(.system(size: 19, weight: .bold, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
+                Text("Longer walkthroughs when you want a complete plan.")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(allGuides) { guide in
-                        NavigationLink {
-                            GuideDetailView(guide: guide)
-                        } label: {
-                            guideCard(guide)
-                        }
-                        .buttonStyle(.plain)
+            VStack(spacing: 10) {
+                ForEach(allGuides) { guide in
+                    NavigationLink {
+                        GuideDetailView(guide: guide)
+                    } label: {
+                        guideRow(guide)
                     }
+                    .buttonStyle(.plain)
                 }
             }
-            .padding(.trailing, -20) // Bleed past padding
         }
     }
 
-    private func guideCard(_ guide: LearningGuide) -> some View {
-        ZStack(alignment: .topTrailing) {
-            // Background gradient
-            LinearGradient(colors: guide.gradient, startPoint: .topLeading, endPoint: .bottomTrailing)
+    private func guideRow(_ guide: LearningGuide) -> some View {
+        HStack(spacing: 14) {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: guide.gradient,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 52, height: 52)
+                .overlay {
+                    LucideIcon(image: Lucide.route, size: 22)
+                        .foregroundStyle(AppColors.onAction)
+                }
 
-            // Blob
-            Circle()
-                .fill(guide.blobColor)
-                .frame(width: 60, height: 60)
-                .blur(radius: 8)
-                .offset(x: 10, y: -10)
-                .opacity(0.15)
-
-            // Darkening overlay at bottom
-            LinearGradient(colors: [.clear, .black.opacity(0.15)], startPoint: .center, endPoint: .bottom)
-
-            VStack(alignment: .leading) {
-                Text("\(guide.lessons.count) lessons")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(AppColors.onAction.opacity(0.82))
-
-                Spacer()
-
+            VStack(alignment: .leading, spacing: 4) {
                 Text(guide.title)
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(AppColors.onAction)
-                    .lineSpacing(2)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
-                HStack {
-                    Text(guide.totalTime)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.65))
-                    Spacer()
-                    // Play circle
-                    Circle()
-                        .strokeBorder(.white.opacity(0.7), lineWidth: 2)
-                        .frame(width: 32, height: 32)
-                        .overlay(
-                            Triangle()
-                                .fill(.white.opacity(0.9))
-                                .frame(width: 9, height: 10)
-                                .offset(x: 1)
-                        )
-                }
+                Text(guide.description)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+
+                Text("\(guide.lessons.count) lessons · \(guide.totalTime)")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(colors.textTertiary)
             }
-            .padding(20)
+
+            Spacer(minLength: 6)
+
+            LucideIcon(image: Lucide.chevronRight, size: 16)
+                .foregroundStyle(colors.textTertiary)
         }
-        .frame(width: 220, height: 170)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .padding(14)
+        .background(colors.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous)
+                .stroke(colors.border.opacity(0.35), lineWidth: 1)
+        }
     }
 
     // MARK: - Quick Reads
     private var quickReadsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Bite-Sized Tips")
+                Text("Quick answers")
                     .font(.system(size: 19, weight: .bold, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
+                Text("Short reference notes for common recordkeeping questions.")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
             }
 
             ForEach(allQuickReads) { item in
@@ -951,7 +1042,7 @@ struct LearningCenterView: View {
     private func quickReadRow(_ item: QuickRead) -> some View {
         HStack(spacing: 14) {
             RoundedRectangle(cornerRadius: 12)
-                .fill(item.iconWash)
+                .fill(item.iconWash.opacity(colorScheme == .dark ? 0.22 : 1))
                 .frame(width: 40, height: 40)
                 .overlay(
                     LucideIcon(image: item.iconImage, size: 20)
@@ -964,13 +1055,13 @@ struct LearningCenterView: View {
                     .foregroundStyle(colors.textPrimary)
                 Text(item.readTime + " read")
                     .font(.system(size: 11))
-                    .foregroundStyle(AppColors.mist)
+                    .foregroundStyle(colors.textTertiary)
             }
 
             Spacer()
 
             LucideIcon(image: Lucide.chevronRight, size: 16)
-                .foregroundStyle(AppColors.cloud)
+                .foregroundStyle(colors.textTertiary)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 16)
@@ -1023,10 +1114,10 @@ struct ArticleDetailView: View {
 
                     HStack(spacing: 8) {
                         LucideIcon(image: Lucide.clock, size: 12)
-                            .foregroundStyle(AppColors.mist)
+                            .foregroundStyle(colors.textTertiary)
                         Text(article.readTime + " read")
                             .font(.system(size: 12))
-                            .foregroundStyle(AppColors.mist)
+                            .foregroundStyle(colors.textTertiary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1062,6 +1153,8 @@ struct ArticleDetailView: View {
 
                 // Content sections
                 VStack(alignment: .leading, spacing: 24) {
+                    articleQuickMapCard
+
                     ForEach(article.content) { section in
                         VStack(alignment: .leading, spacing: 10) {
                             Text(section.heading)
@@ -1102,6 +1195,52 @@ struct ArticleDetailView: View {
         .hidesAppTabBar()
     }
 
+    private var articleQuickMapCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Quick map")
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
+
+            VStack(spacing: 10) {
+                ForEach(Array(articleQuickMap(article).enumerated()), id: \.offset) { index, item in
+                    HStack(spacing: 12) {
+                        Text("\(index + 1)")
+                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .foregroundStyle(article.categoryColor)
+                            .frame(width: 26, height: 26)
+                            .background(article.categoryWash.opacity(colorScheme == .dark ? 0.22 : 1))
+                            .clipShape(Circle())
+
+                        LucideIcon(image: item.0, size: 16)
+                            .foregroundStyle(article.categoryColor)
+                            .frame(width: 30, height: 30)
+                            .background(article.categoryWash.opacity(colorScheme == .dark ? 0.18 : 0.82))
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.1)
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(colors.textPrimary)
+                            Text(item.2)
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .foregroundStyle(colors.textSecondary)
+                                .lineLimit(2)
+                        }
+
+                        Spacer(minLength: 8)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(colors.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous)
+                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
+        }
+    }
+
     private var relatedArticlesSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Related Articles")
@@ -1120,7 +1259,7 @@ struct ArticleDetailView: View {
                             Spacer()
                             Text(related.readTime)
                                 .font(.system(size: 11))
-                                .foregroundStyle(AppColors.mist)
+                                .foregroundStyle(colors.textTertiary)
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 14)
@@ -1197,15 +1336,11 @@ struct GuideDetailView: View {
                     } label: {
                         Text("Start Guide")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(AppColors.charcoal)
+                            .foregroundStyle(AppColors.onAction)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(colors.sageWash)
+                            .background(colors.action)
                             .clipShape(Capsule())
-                            .overlay {
-                                Capsule()
-                                    .strokeBorder(AppColors.sage.opacity(0.7), lineWidth: 1)
-                            }
                     }
                     .buttonStyle(.plain)
                     .padding(.top, 20)
@@ -1229,10 +1364,10 @@ struct GuideDetailView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Created with IRS guidance")
                             .font(.system(size: 12))
-                            .foregroundStyle(AppColors.slate)
+                            .foregroundStyle(colors.textSecondary)
                         Text(guide.source)
                             .font(.system(size: 10))
-                            .foregroundStyle(AppColors.mist)
+                            .foregroundStyle(colors.textTertiary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
@@ -1269,11 +1404,11 @@ struct GuideDetailView: View {
             Group {
                 if completedLessons.contains(lesson.id) {
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(AppColors.sageWash)
+                        .fill(colors.positiveSurface)
                         .frame(width: 30, height: 30)
                         .overlay(
                             LucideIcon(image: Lucide.check, size: 14)
-                                .foregroundStyle(AppColors.sage)
+                                .foregroundStyle(colors.positive)
                         )
                 } else if lesson.id == currentLesson {
                     RoundedRectangle(cornerRadius: 10)
@@ -1286,12 +1421,12 @@ struct GuideDetailView: View {
                         )
                 } else {
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(AppColors.snow)
+                        .fill(colors.backgroundTertiary)
                         .frame(width: 30, height: 30)
                         .overlay(
                             Text("\(lesson.id)")
                                 .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(AppColors.mist)
+                                .foregroundStyle(colors.textTertiary)
                         )
                 }
             }
@@ -1304,13 +1439,13 @@ struct GuideDetailView: View {
                     .multilineTextAlignment(.leading)
                 Text(lesson.duration)
                     .font(.system(size: 11))
-                    .foregroundStyle(AppColors.mist)
+                    .foregroundStyle(colors.textTertiary)
             }
 
             Spacer()
 
             LucideIcon(image: Lucide.chevronRight, size: 16)
-                .foregroundStyle(AppColors.cloud)
+                .foregroundStyle(colors.textTertiary)
         }
         .padding(.vertical, 14)
         .overlay(alignment: .bottom) {
@@ -1353,10 +1488,10 @@ struct LessonDetailView: View {
 
                     HStack(spacing: 8) {
                         LucideIcon(image: Lucide.clock, size: 12)
-                            .foregroundStyle(AppColors.mist)
+                            .foregroundStyle(colors.textTertiary)
                         Text(lesson.duration + " read")
                             .font(.system(size: 12))
-                            .foregroundStyle(AppColors.mist)
+                            .foregroundStyle(colors.textTertiary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1384,14 +1519,14 @@ struct LessonDetailView: View {
 
                             Text(section.body)
                                 .font(.system(size: 13))
-                                .foregroundStyle(AppColors.ink)
+                                .foregroundStyle(colors.textSecondary)
                                 .lineSpacing(6)
 
                             if let callout = section.callout {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(callout)
                                         .font(.system(size: 12))
-                                        .foregroundStyle(AppColors.ink)
+                                        .foregroundStyle(colors.textPrimary)
                                         .lineSpacing(4)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1446,7 +1581,7 @@ struct QuickReadDetailView: View {
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: 10) {
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(quickRead.iconWash)
+                        .fill(quickRead.iconWash.opacity(colorScheme == .dark ? 0.22 : 1))
                         .frame(width: 44, height: 44)
                         .overlay(
                             LucideIcon(image: quickRead.iconImage, size: 22)
@@ -1459,17 +1594,17 @@ struct QuickReadDetailView: View {
 
                     HStack(spacing: 8) {
                         LucideIcon(image: Lucide.clock, size: 12)
-                            .foregroundStyle(AppColors.mist)
+                            .foregroundStyle(colors.textTertiary)
                         Text(quickRead.readTime + " read")
                             .font(.system(size: 12))
-                            .foregroundStyle(AppColors.mist)
+                            .foregroundStyle(colors.textTertiary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(20)
                 .background(
                     LinearGradient(
-                        colors: [quickRead.iconWash, colors.background],
+                        colors: [quickRead.iconWash.opacity(colorScheme == .dark ? 0.18 : 1), colors.background],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -1489,14 +1624,14 @@ struct QuickReadDetailView: View {
 
                             Text(section.body)
                                 .font(.system(size: 13))
-                                .foregroundStyle(AppColors.ink)
+                                .foregroundStyle(colors.textSecondary)
                                 .lineSpacing(6)
 
                             if let callout = section.callout {
                                 VStack(alignment: .leading) {
                                     Text(callout)
                                         .font(.system(size: 12))
-                                        .foregroundStyle(AppColors.ink)
+                                        .foregroundStyle(colors.textPrimary)
                                         .lineSpacing(4)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)

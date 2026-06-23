@@ -29,7 +29,9 @@ class SubscriptionManager: ObservableObject {
 
         // Load products from App Store
         Task {
-            await refreshEntitlements()
+            if !Self.shouldSkipStoreKitRefreshForDebugLaunch {
+                await refreshEntitlements()
+            }
             await loadProducts()
         }
     }
@@ -176,7 +178,16 @@ class SubscriptionManager: ObservableObject {
     func reload() {
         hasPurchased = UserDefaults.standard.bool(forKey: hasPurchasedKey)
         checkSubscriptionStatus()
+        guard !Self.shouldSkipStoreKitRefreshForDebugLaunch else { return }
         Task { await refreshEntitlements() }
+    }
+
+    private static var shouldSkipStoreKitRefreshForDebugLaunch: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-LHMockScenario")
+        #else
+        false
+        #endif
     }
 
     /// Reset subscription state on sign-out without starting a new trial

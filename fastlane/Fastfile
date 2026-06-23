@@ -1,0 +1,123 @@
+default_platform(:ios)
+
+LANE_DERIVED_DATA_PATH = ENV.fetch("LANE_DERIVED_DATA_PATH", "/Volumes/Home/XcodeStorage/DerivedData/landlordhours-fastlane")
+LANE_OUTPUT_DIRECTORY = ENV.fetch("LANE_OUTPUT_DIRECTORY", "/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/fastlane")
+
+def app_store_connect_xcargs
+  [
+    "-allowProvisioningUpdates",
+    "-authenticationKeyPath #{ENV.fetch('ASC_KEY_PATH')}",
+    "-authenticationKeyID #{ENV.fetch('ASC_KEY_ID')}",
+    "-authenticationKeyIssuerID #{ENV.fetch('ASC_ISSUER_ID')}"
+  ].join(" ")
+end
+
+platform :ios do
+  before_all do
+    app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_filepath: ENV.fetch("ASC_KEY_PATH"),
+      in_house: false
+    )
+  end
+
+  desc "Build and upload to App Store Connect (TestFlight)"
+  lane :beta do
+    build_number = Time.now.strftime("%Y%m%d%H%M")
+    marketing_version = ENV.fetch("MARKETING_VERSION", "1.0.3")
+
+    build_app(
+      scheme: "LandlordHours",
+      project: "LandlordHours.xcodeproj",
+      export_method: "app-store",
+      clean: true,
+      derived_data_path: LANE_DERIVED_DATA_PATH,
+      output_directory: LANE_OUTPUT_DIRECTORY,
+      xcargs: "CURRENT_PROJECT_VERSION=#{build_number} MARKETING_VERSION=#{marketing_version} DEVELOPMENT_TEAM=G68NLC3DA3 #{app_store_connect_xcargs}"
+    )
+
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true
+    )
+  end
+
+  desc "Build and upload to App Store Connect without submitting for review"
+  lane :release do
+    build_number = Time.now.strftime("%Y%m%d%H%M")
+    marketing_version = ENV.fetch("MARKETING_VERSION", "1.0.3")
+
+    build_app(
+      scheme: "LandlordHours",
+      project: "LandlordHours.xcodeproj",
+      export_method: "app-store",
+      clean: true,
+      export_options: {
+        signingStyle: "automatic",
+        teamID: "G68NLC3DA3"
+      },
+      derived_data_path: LANE_DERIVED_DATA_PATH,
+      output_directory: LANE_OUTPUT_DIRECTORY,
+      xcargs: "CURRENT_PROJECT_VERSION=#{build_number} MARKETING_VERSION=#{marketing_version} DEVELOPMENT_TEAM=G68NLC3DA3 #{app_store_connect_xcargs}"
+    )
+
+    upload_to_app_store(
+      skip_screenshots: false,
+      skip_metadata: false,
+      overwrite_screenshots: true,
+      submit_for_review: false,
+      precheck_include_in_app_purchases: false,
+      force: true
+    )
+  end
+
+  desc "Submit the prepared App Store version for review"
+  lane :submit_review do
+    upload_to_app_store(
+      skip_binary_upload: true,
+      skip_screenshots: true,
+      skip_metadata: true,
+      submit_for_review: true,
+      precheck_include_in_app_purchases: false,
+      run_precheck_before_submit: false,
+      force: true,
+      app_review_information: {
+        first_name: "Brian",
+        last_name: "Le Vu",
+        phone_number: ENV.fetch("APP_REVIEW_PHONE"),
+        email_address: ENV.fetch("APP_REVIEW_EMAIL"),
+        demo_user: ENV.fetch("APP_REVIEW_DEMO_USER", "test@landlordhours.local"),
+        demo_password: ENV.fetch("APP_REVIEW_DEMO_PASSWORD"),
+        notes: "Please review with the provided demo account. Account deletion is available inside the app at Settings > Plan & Account > Delete Account and Data. The flow asks for confirmation, deletes the app account's local data and LandlordHours iCloud backup records for properties, time entries, categories, goals, and tax profile, then signs the user out. LandlordHours Pro is a one-time non-consumable purchase (com.openclaw.landlordhours.pro). It is not a subscription, has no free trial, and does not automatically renew. The app does not provide tax, legal, or financial advice."
+      }
+    )
+  end
+
+  desc "Upload the latest exported IPA to App Store Connect without changing metadata or screenshots"
+  lane :upload_binary_only do
+    upload_to_app_store(
+      ipa: "#{LANE_OUTPUT_DIRECTORY}/LandlordHours.ipa",
+      app_version: ENV.fetch("APP_VERSION", "1.0.3"),
+      skip_binary_upload: false,
+      skip_screenshots: true,
+      skip_metadata: true,
+      submit_for_review: false,
+      precheck_include_in_app_purchases: false,
+      force: true
+    )
+  end
+
+  desc "Update App Store screenshots for the prepared version without uploading a binary"
+  lane :update_screenshots do
+    upload_to_app_store(
+      skip_binary_upload: true,
+      skip_screenshots: false,
+      skip_metadata: true,
+      overwrite_screenshots: true,
+      submit_for_review: false,
+      skip_app_version_update: true,
+      precheck_include_in_app_purchases: false,
+      force: true
+    )
+  end
+end

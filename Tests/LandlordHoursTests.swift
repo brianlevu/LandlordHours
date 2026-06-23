@@ -726,6 +726,413 @@ final class AppViewModelFlowTests: XCTestCase {
     }
 }
 
+// MARK: - Engagement Intelligence Tests
+
+final class EngagementIntelligenceServiceTests: XCTestCase {
+    private let service = EngagementIntelligenceService()
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
+
+    func testNewUserWithoutPropertyGetsSetupNudgeNotPaceReminder() {
+        let context = makeContext(
+            now: date(year: 2026, month: 3, day: 15),
+            properties: [],
+            entries: []
+        )
+
+        let recommendation = service.recommendation(for: context, calendar: calendar)
+
+        XCTAssertEqual(recommendation.surface, .homeNudge)
+        XCTAssertEqual(recommendation.reason, .setupProperty)
+        XCTAssertEqual(recommendation.destination, .addProperty)
+    }
+
+    func testRecentLogChoosesSilence() {
+        let property = makeProperty()
+        let context = makeContext(
+            now: date(year: 2026, month: 6, day: 15),
+            properties: [property],
+            entries: [
+                makeEntry(propertyId: property.id, date: date(year: 2026, month: 6, day: 14), hours: 350)
+            ]
+        )
+
+        let recommendation = service.recommendation(for: context, calendar: calendar)
+
+        XCTAssertEqual(recommendation, .doNothing)
+    }
+
+    func testInactiveUserGetsQuietLoggingReminder() {
+        let property = makeProperty()
+        let context = makeContext(
+            now: date(year: 2026, month: 6, day: 15),
+            properties: [property],
+            entries: [
+                makeEntry(propertyId: property.id, date: date(year: 2026, month: 6, day: 1), hours: 2)
+            ]
+        )
+
+        let recommendation = service.recommendation(for: context, calendar: calendar)
+
+        XCTAssertEqual(recommendation.surface, .notification)
+        XCTAssertEqual(recommendation.reason, .inactiveLogging)
+        XCTAssertEqual(recommendation.destination, .track)
+        XCTAssertTrue(recommendation.message.contains("14 days"))
+    }
+
+    func testRepeatedDismissalSuppressesSimilarReminder() {
+        let property = makeProperty()
+        let context = makeContext(
+            now: date(year: 2026, month: 6, day: 15),
+            properties: [property],
+            entries: [
+                makeEntry(propertyId: property.id, date: date(year: 2026, month: 6, day: 1), hours: 2)
+            ],
+            dismissals: [
+                EngagementDismissal(reason: .inactiveLogging, dismissedAt: date(year: 2026, month: 6, day: 10)),
+                EngagementDismissal(reason: .inactiveLogging, dismissedAt: date(year: 2026, month: 6, day: 12))
+            ]
+        )
+
+        let recommendation = service.recommendation(for: context, calendar: calendar)
+
+        XCTAssertEqual(recommendation, .doNothing)
+    }
+
+    func testCalendarDraftsOutrankGenericInactivity() {
+        let property = makeProperty()
+        let context = makeContext(
+            now: date(year: 2026, month: 6, day: 15),
+            properties: [property],
+            entries: [
+                makeEntry(propertyId: property.id, date: date(year: 2026, month: 6, day: 1), hours: 2)
+            ],
+            calendarDraftCount: 2
+        )
+
+        let recommendation = service.recommendation(for: context, calendar: calendar)
+
+        XCTAssertEqual(recommendation.surface, .notification)
+        XCTAssertEqual(recommendation.reason, .calendarDraftsReady)
+        XCTAssertEqual(recommendation.destination, .calendarReview)
+    }
+
+    func testLongRunningTimerUsesLiveActivityReview() {
+        let property = makeProperty()
+        let context = makeContext(
+            now: date(year: 2026, month: 6, day: 15, hour: 14),
+            properties: [property],
+            entries: [
+                makeEntry(propertyId: property.id, date: date(year: 2026, month: 6, day: 14), hours: 1)
+            ],
+            isTimerRunning: true,
+            timerStartTime: date(year: 2026, month: 6, day: 15, hour: 9)
+        )
+
+        let recommendation = service.recommendation(for: context, calendar: calendar)
+
+        XCTAssertEqual(recommendation.surface, .liveActivity)
+        XCTAssertEqual(recommendation.reason, .timerSafety)
+        XCTAssertEqual(recommendation.destination, .timerReview)
+    }
+
+    func testBehindPaceUsesWidgetWhenThereIsNoStrongerPrompt() {
+        let property = makeProperty()
+        let context = makeContext(
+            now: date(year: 2026, month: 10, day: 1),
+            properties: [property],
+            entries: [
+                makeEntry(propertyId: property.id, date: date(year: 2026, month: 9, day: 28), hours: 100)
+            ]
+        )
+
+        let recommendation = service.recommendation(for: context, calendar: calendar)
+
+        XCTAssertEqual(recommendation.surface, .widget)
+        XCTAssertEqual(recommendation.reason, .behindPace)
+        XCTAssertEqual(recommendation.destination, .reports)
+    }
+
+    func testYearEndExportOutranksInactivityWhenRecordsExist() {
+        let property = makeProperty()
+        let context = makeContext(
+            now: date(year: 2026, month: 12, day: 10),
+            properties: [property],
+            entries: [
+                makeEntry(propertyId: property.id, date: date(year: 2026, month: 11, day: 1), hours: 20)
+            ]
+        )
+
+        let recommendation = service.recommendation(for: context, calendar: calendar)
+
+        XCTAssertEqual(recommendation.surface, .notification)
+        XCTAssertEqual(recommendation.reason, .yearEndExport)
+        XCTAssertEqual(recommendation.destination, .export)
+    }
+
+    func testNoCalendarCandidatesDoesNotCreateCalendarPrompt() {
+        let property = makeProperty()
+        let context = makeContext(
+            now: date(year: 2026, month: 6, day: 15),
+            properties: [property],
+            entries: [
+                makeEntry(propertyId: property.id, date: date(year: 2026, month: 6, day: 14), hours: 350)
+            ],
+            calendarDraftCount: 0
+        )
+
+        let recommendation = service.recommendation(for: context, calendar: calendar)
+
+        XCTAssertEqual(recommendation, .doNothing)
+    }
+
+    func testNotificationPlannerCreatesCalendarReviewPlan() {
+        let property = makeProperty()
+        let context = makeContext(
+            now: date(year: 2026, month: 6, day: 15),
+            properties: [property],
+            entries: [
+                makeEntry(propertyId: property.id, date: date(year: 2026, month: 6, day: 1), hours: 2)
+            ],
+            calendarDraftCount: 2
+        )
+
+        let plan = EngagementNotificationScheduler(service: service).plan(for: context)
+
+        XCTAssertEqual(plan?.identifier, "engagement.calendarDraftsReady")
+        XCTAssertEqual(plan?.reason, .calendarDraftsReady)
+        XCTAssertEqual(plan?.destination, .calendarReview)
+        XCTAssertEqual(plan?.delay, 60)
+        XCTAssertEqual(plan?.playsSound, false)
+        XCTAssertTrue(plan?.body.contains("2 calendar items may be landlord work") == true)
+    }
+
+    func testNotificationPlannerDoesNotScheduleWhenPermissionDenied() {
+        let property = makeProperty()
+        var context = makeContext(
+            now: date(year: 2026, month: 6, day: 15),
+            properties: [property],
+            entries: [
+                makeEntry(propertyId: property.id, date: date(year: 2026, month: 6, day: 1), hours: 2)
+            ]
+        )
+        context.notificationPermission = .denied
+
+        let plan = EngagementNotificationScheduler(service: service).plan(for: context)
+
+        XCTAssertNil(plan)
+    }
+
+    func testNotificationPlannerDoesNotScheduleSilentOrWidgetRecommendations() {
+        let property = makeProperty()
+        let recentContext = makeContext(
+            now: date(year: 2026, month: 6, day: 15),
+            properties: [property],
+            entries: [
+                makeEntry(propertyId: property.id, date: date(year: 2026, month: 6, day: 14), hours: 350)
+            ]
+        )
+        let widgetContext = makeContext(
+            now: date(year: 2026, month: 10, day: 1),
+            properties: [property],
+            entries: [
+                makeEntry(propertyId: property.id, date: date(year: 2026, month: 9, day: 28), hours: 100)
+            ]
+        )
+        let scheduler = EngagementNotificationScheduler(service: service)
+
+        XCTAssertNil(scheduler.plan(for: recentContext))
+        XCTAssertNil(scheduler.plan(for: widgetContext))
+    }
+
+    func testNotificationPlannerCreatesYearEndExportPlan() {
+        let property = makeProperty()
+        let context = makeContext(
+            now: date(year: 2026, month: 12, day: 10),
+            properties: [property],
+            entries: [
+                makeEntry(propertyId: property.id, date: date(year: 2026, month: 11, day: 1), hours: 20)
+            ]
+        )
+
+        let plan = EngagementNotificationScheduler(service: service).plan(for: context)
+
+        XCTAssertEqual(plan?.identifier, "engagement.yearEndExport")
+        XCTAssertEqual(plan?.reason, .yearEndExport)
+        XCTAssertEqual(plan?.destination, .export)
+        XCTAssertEqual(plan?.cooldownDays, 14)
+        XCTAssertEqual(plan?.playsSound, false)
+    }
+
+    func testNotificationPlannerSuppressesRecentlyScheduledPlanWhenRespectingCooldown() {
+        let property = makeProperty()
+        let suiteName = "LandlordHoursTests.notificationCooldown.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let context = makeContext(
+            now: date(year: 2026, month: 6, day: 15),
+            properties: [property],
+            entries: [
+                makeEntry(propertyId: property.id, date: date(year: 2026, month: 6, day: 1), hours: 2)
+            ]
+        )
+        let scheduler = EngagementNotificationScheduler(service: service, defaults: defaults)
+        let firstPlan = scheduler.plan(for: context)
+
+        XCTAssertNotNil(firstPlan)
+
+        scheduler.markScheduled(firstPlan!, at: date(year: 2026, month: 6, day: 14))
+
+        XCTAssertNil(scheduler.plan(for: context, respectingCooldown: true))
+        XCTAssertNotNil(scheduler.plan(for: context, respectingCooldown: false))
+    }
+
+    func testWidgetSnapshotKeepsSetupStateActionable() {
+        let snapshot = EngagementWidgetSnapshot.empty
+
+        XCTAssertEqual(snapshot.headline, "Set up tracking")
+        XCTAssertEqual(snapshot.detail, "Add a property before pace checks begin.")
+        XCTAssertEqual(snapshot.actionLabel, "Add property")
+        XCTAssertEqual(snapshot.recommendationDestination, .addProperty)
+        XCTAssertEqual(snapshot.progress, 0)
+        XCTAssertEqual(snapshot.targetLabel, "750h REPS")
+    }
+
+    func testWidgetSnapshotShowsBehindPaceAsReportAction() {
+        let snapshot = EngagementWidgetSnapshot(
+            updatedAt: date(year: 2026, month: 10, day: 1),
+            taxYear: 2026,
+            propertyCount: 2,
+            yearHours: 100,
+            targetHours: 750,
+            targetLabel: "750h REPS",
+            targetShortLabel: "750h",
+            requiredHoursToDate: 560,
+            daysRemainingInYear: 91,
+            lastLogDate: date(year: 2026, month: 9, day: 28),
+            isTimerRunning: false,
+            timerStartTime: nil,
+            recommendationSurface: .widget,
+            recommendationReason: .behindPace,
+            recommendationDestination: .reports,
+            recommendationTitle: "Behind REPS pace",
+            recommendationMessage: "Review your pace before the year gets tighter."
+        )
+
+        XCTAssertEqual(snapshot.headline, "460h behind")
+        XCTAssertEqual(snapshot.actionLabel, "Review pace")
+        XCTAssertTrue(snapshot.isBehindPace)
+        XCTAssertEqual(snapshot.progress, 100.0 / 750.0, accuracy: 0.001)
+    }
+
+    func testWidgetSnapshotUsesConfiguredGoalTarget() {
+        let snapshot = EngagementWidgetSnapshot(
+            updatedAt: date(year: 2026, month: 6, day: 15),
+            taxYear: 2026,
+            propertyCount: 1,
+            yearHours: 40,
+            targetHours: 100,
+            targetLabel: "100h STR",
+            targetShortLabel: "100h",
+            requiredHoursToDate: 45,
+            daysRemainingInYear: 199,
+            lastLogDate: date(year: 2026, month: 6, day: 14),
+            isTimerRunning: false,
+            timerStartTime: nil,
+            recommendationSurface: .none,
+            recommendationReason: .noActionNeeded,
+            recommendationDestination: .none,
+            recommendationTitle: "",
+            recommendationMessage: ""
+        )
+
+        XCTAssertEqual(snapshot.progress, 0.4, accuracy: 0.001)
+        XCTAssertEqual(snapshot.targetShortLabel, "100h")
+    }
+
+    func testWidgetSnapshotPrioritizesRunningTimer() {
+        let start = date(year: 2026, month: 6, day: 15, hour: 9)
+        let snapshot = EngagementWidgetSnapshot(
+            updatedAt: date(year: 2026, month: 6, day: 15, hour: 11),
+            taxYear: 2026,
+            propertyCount: 1,
+            yearHours: 42,
+            targetHours: 750,
+            targetLabel: "750h REPS",
+            targetShortLabel: "750h",
+            requiredHoursToDate: 340,
+            daysRemainingInYear: 199,
+            lastLogDate: nil,
+            isTimerRunning: true,
+            timerStartTime: start,
+            recommendationSurface: .liveActivity,
+            recommendationReason: .timerSafety,
+            recommendationDestination: .timerReview,
+            recommendationTitle: "Timer still running",
+            recommendationMessage: "Review the session before saving."
+        )
+
+        XCTAssertEqual(snapshot.headline, "Timer active")
+        XCTAssertEqual(snapshot.detail, "Review before saving.")
+        XCTAssertEqual(snapshot.actionLabel, "Review")
+        XCTAssertEqual(snapshot.timerStartTime, start)
+    }
+
+    private func makeContext(
+        now: Date,
+        properties: [RentalProperty],
+        entries: [TimeEntry],
+        calendarDraftCount: Int = 0,
+        isTimerRunning: Bool = false,
+        timerStartTime: Date? = nil,
+        dismissals: [EngagementDismissal] = [],
+        isProUser: Bool = false
+    ) -> EngagementContext {
+        EngagementContext(
+            now: now,
+            taxYear: calendar.component(.year, from: now),
+            properties: properties,
+            timeEntries: entries,
+            calendarDraftCount: calendarDraftCount,
+            isTimerRunning: isTimerRunning,
+            timerStartTime: timerStartTime,
+            notificationPermission: .authorized,
+            recentDismissals: dismissals,
+            isProUser: isProUser
+        )
+    }
+
+    private func makeProperty() -> RentalProperty {
+        RentalProperty(name: "Oak Street Duplex", address: "123 Oak St", propertyType: .ltr)
+    }
+
+    private func makeEntry(propertyId: UUID, date: Date, hours: Double) -> TimeEntry {
+        TimeEntry(
+            propertyId: propertyId,
+            participant: .selfParticipant,
+            category: .management,
+            hours: hours,
+            date: date,
+            notes: "Test landlord work"
+        )
+    }
+
+    private func date(year: Int, month: Int, day: Int, hour: Int = 12) -> Date {
+        var components = DateComponents()
+        components.calendar = calendar
+        components.timeZone = calendar.timeZone
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        return components.date!
+    }
+}
+
 // MARK: - Date Extension Tests
 
 final class DateExtensionTests: XCTestCase {

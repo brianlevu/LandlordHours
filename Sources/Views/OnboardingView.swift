@@ -23,6 +23,27 @@ enum OnboardingStep: Int, CaseIterable {
         }
     }
     static var totalSegments: Int { 5 }
+
+    static func fromLaunchArgument(_ value: String) -> OnboardingStep? {
+        if let index = Int(value) {
+            return OnboardingStep(rawValue: index)
+        }
+
+        switch value.lowercased() {
+        case "goal", "goalselection":
+            return .goalSelection
+        case "property", "addproperty":
+            return .addProperty
+        case "paywall", "pro":
+            return .paywall
+        case "notifications", "notification":
+            return .notifications
+        case "calendar":
+            return .calendar
+        default:
+            return nil
+        }
+    }
 }
 
 // MARK: - Goal Option for Screen C
@@ -46,10 +67,28 @@ enum OnboardingGoal: String, CaseIterable, Identifiable {
 
     var subtitle: String {
         switch self {
-        case .reps: return "Track more than 750 hours for REPS tax benefits"
-        case .materialParticipation: return "Track the 100-hour material participation test"
-        case .generalTracking: return "Keep organized property work records"
-        case .notSure: return "Start with guided tracking. You can choose a goal later."
+        case .reps: return "For owners working toward the 750-hour REPS test."
+        case .materialParticipation: return "For STR owners proving active participation."
+        case .generalTracking: return "For clean property work records and exports."
+        case .notSure: return "Start guided now. You can change this later."
+        }
+    }
+
+    var decisionLabel: String {
+        switch self {
+        case .reps: return "750h + 50% rule"
+        case .materialParticipation: return "100h STR test"
+        case .generalTracking: return "Records first"
+        case .notSure: return "Guided setup"
+        }
+    }
+
+    var setupHint: String {
+        switch self {
+        case .reps: return "Reports emphasize pace, spouse hours, and work split."
+        case .materialParticipation: return "Reports focus on STR participation evidence."
+        case .generalTracking: return "Logging stays flexible without qualification pressure."
+        case .notSure: return "We'll keep the basics on and explain goals as you go."
         }
     }
 
@@ -80,6 +119,15 @@ enum OnboardingGoal: String, CaseIterable, Identifiable {
         }
     }
 
+    var secondaryAccent: Color {
+        switch self {
+        case .reps: return AppColors.sage
+        case .materialParticipation: return AppColors.honey
+        case .generalTracking: return AppColors.sky
+        case .notSure: return AppColors.rose
+        }
+    }
+
     /// Map onboarding goal to the existing HourGoalType for persistence
     var hourGoalType: HourGoalType {
         switch self {
@@ -88,6 +136,221 @@ enum OnboardingGoal: String, CaseIterable, Identifiable {
         case .generalTracking: return .both
         case .notSure: return .both
         }
+    }
+}
+
+private struct GoalDecisionVisual: View {
+    let goal: OnboardingGoal
+    let isSelected: Bool
+
+    @Environment(\.colorScheme) private var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            goal.iconColor.opacity(colorScheme == .dark ? 0.34 : 0.18),
+                            goal.secondaryAccent.opacity(colorScheme == .dark ? 0.20 : 0.12),
+                            colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.30 : 0.85)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.70), lineWidth: 1)
+
+            visualContent
+                .padding(10)
+        }
+        .overlay(alignment: .topTrailing) {
+            if isSelected {
+                Circle()
+                    .fill(colors.action)
+                    .frame(width: 11, height: 11)
+                    .overlay(Circle().stroke(colors.backgroundSecondary, lineWidth: 2))
+                    .offset(x: 4, y: -4)
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .lhMotion(AppAnimation.smooth, value: isSelected)
+    }
+
+    @ViewBuilder
+    private var visualContent: some View {
+        switch goal {
+        case .reps:
+            repsVisual
+        case .materialParticipation:
+            materialParticipationVisual
+        case .generalTracking:
+            generalTrackingVisual
+        case .notSure:
+            guidedVisual
+        }
+    }
+
+    private var repsVisual: some View {
+        ZStack {
+            VStack(spacing: 4) {
+                ZStack(alignment: .bottom) {
+                    Path { path in
+                        path.move(to: CGPoint(x: 8, y: 21))
+                        path.addLine(to: CGPoint(x: 24, y: 8))
+                        path.addLine(to: CGPoint(x: 40, y: 21))
+                        path.addLine(to: CGPoint(x: 40, y: 43))
+                        path.addLine(to: CGPoint(x: 8, y: 43))
+                        path.closeSubpath()
+                    }
+                    .fill(
+                        LinearGradient(
+                            colors: [goal.iconColor.opacity(0.95), goal.secondaryAccent.opacity(0.72)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 48, height: 48)
+
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.84 : 0.92))
+                        .frame(width: 34, height: 18)
+                        .overlay {
+                            HStack(spacing: 2) {
+                                Text("750")
+                                    .font(.system(size: 10, weight: .heavy, design: .rounded))
+                                Circle()
+                                    .fill(goal.secondaryAccent)
+                                    .frame(width: 5, height: 5)
+                            }
+                            .foregroundStyle(colors.textPrimary)
+                        }
+                        .offset(y: -4)
+                }
+
+                Capsule()
+                    .fill(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.52 : 0.78))
+                    .frame(width: 44, height: 5)
+                    .overlay(alignment: .leading) {
+                        Capsule()
+                            .fill(goal.secondaryAccent)
+                            .frame(width: 26, height: 5)
+                    }
+            }
+        }
+    }
+
+    private var materialParticipationVisual: some View {
+        ZStack(alignment: .bottomTrailing) {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.62 : 0.88))
+                .frame(width: 48, height: 48)
+                .overlay(alignment: .top) {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(goal.iconColor.opacity(0.86))
+                        .frame(height: 13)
+                        .overlay {
+                            Text("STR")
+                                .font(.system(size: 8, weight: .heavy, design: .rounded))
+                                .foregroundStyle(AppColors.onAction)
+                        }
+                }
+                .overlay(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        ForEach([0.78, 0.56, 0.36], id: \.self) { width in
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(goal.secondaryAccent)
+                                    .frame(width: 5, height: 5)
+                                Capsule()
+                                    .fill(goal.iconColor.opacity(width > 0.5 ? 0.60 : 0.28))
+                                    .frame(width: 24 * width, height: 5)
+                            }
+                        }
+                    }
+                    .padding(.leading, 8)
+                    .padding(.top, 14)
+                }
+
+            Circle()
+                .fill(goal.secondaryAccent)
+                .frame(width: 24, height: 24)
+                .overlay {
+                    Text("100")
+                        .font(.system(size: 8, weight: .heavy, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                }
+                .shadow(color: goal.secondaryAccent.opacity(0.20), radius: 6, y: 3)
+        }
+    }
+
+    private var generalTrackingVisual: some View {
+        ZStack(alignment: .bottomTrailing) {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.36 : 0.68))
+                .frame(width: 38, height: 44)
+                .offset(x: -6, y: -4)
+
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.78 : 0.94))
+                .frame(width: 42, height: 48)
+                .overlay(alignment: .topLeading) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 4) {
+                            Capsule().fill(goal.iconColor).frame(width: 16, height: 4)
+                            Circle().fill(goal.secondaryAccent).frame(width: 4, height: 4)
+                        }
+                        Capsule().fill(colors.border).frame(width: 25, height: 4)
+                        Capsule().fill(colors.border).frame(width: 20, height: 4)
+                        Capsule().fill(colors.border.opacity(0.58)).frame(width: 28, height: 4)
+                    }
+                    .padding(8)
+                }
+
+            Circle()
+                .fill(goal.secondaryAccent)
+                .frame(width: 23, height: 23)
+                .overlay {
+                    LucideIcon(image: Lucide.check, size: 12)
+                        .foregroundStyle(AppColors.onAction)
+                }
+                .shadow(color: goal.secondaryAccent.opacity(0.24), radius: 7, y: 3)
+        }
+    }
+
+    private var guidedVisual: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.42 : 0.70))
+                .frame(width: 50, height: 42)
+
+            Path { path in
+                path.move(to: CGPoint(x: 11, y: 35))
+                path.addCurve(to: CGPoint(x: 25, y: 22), control1: CGPoint(x: 14, y: 28), control2: CGPoint(x: 20, y: 28))
+                path.addCurve(to: CGPoint(x: 40, y: 11), control1: CGPoint(x: 30, y: 16), control2: CGPoint(x: 35, y: 16))
+            }
+            .stroke(goal.iconColor.opacity(0.76), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+
+            ForEach([
+                CGPoint(x: 11, y: 35),
+                CGPoint(x: 25, y: 22),
+                CGPoint(x: 40, y: 11)
+            ], id: \.x) { point in
+                ZStack {
+                    Circle()
+                        .fill(colors.backgroundSecondary)
+                        .frame(width: 15, height: 15)
+                    Circle()
+                        .fill(goal.secondaryAccent)
+                        .frame(width: 7, height: 7)
+                }
+                .position(point)
+            }
+        }
+        .frame(width: 58, height: 52)
     }
 }
 
@@ -151,7 +414,7 @@ struct OnboardingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
-    @State private var currentStep: OnboardingStep = .goalSelection
+    @State private var currentStep: OnboardingStep = Self.initialStepFromLaunchArguments()
     @State private var appeared = false
 
     // Screen C state
@@ -165,6 +428,16 @@ struct OnboardingView: View {
     @State private var addressResults: [MKMapItem] = []
     @State private var isSearchingAddress = false
     @FocusState private var isAddressFocused: Bool
+
+    private static func initialStepFromLaunchArguments() -> OnboardingStep {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "-LHOnboardingStep"),
+              args.indices.contains(index + 1),
+              let step = OnboardingStep.fromLaunchArgument(args[index + 1]) else {
+            return .goalSelection
+        }
+        return step
+    }
 
     var body: some View {
         ZStack {
@@ -358,52 +631,79 @@ struct OnboardingView: View {
     }
 
     private func goalCard(_ goal: OnboardingGoal) -> some View {
-        Button {
+        let isSelected = selectedGoal == goal
+
+        return Button {
             animate(AppAnimation.quick) {
                 selectedGoal = goal
             }
         } label: {
-            HStack(spacing: 16) {
-                // Icon badge
-                JellyBadge(
-                    systemName: goal.iconName,
-                    color: goal.iconColor,
-                    wash: goal.iconWash,
-                    size: 48
-                )
+            HStack(alignment: .top, spacing: 16) {
+                GoalDecisionVisual(goal: goal, isSelected: isSelected)
+                    .frame(width: 70, height: 70)
 
-                // Text
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(goal.title)
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(goal.decisionLabel)
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(isSelected ? colors.action : colors.textSecondary)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule()
+                                    .fill(isSelected ? colors.actionSurface : colors.backgroundTertiary)
+                            )
 
-                    Text(goal.subtitle)
-                        .font(AppTypography.bodySmall)
-                        .foregroundStyle(AppColors.slate)
-                        .lineSpacing(2)
+                        Spacer(minLength: 8)
+
+                        radioButton(isSelected: isSelected)
+                    }
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(goal.title)
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .foregroundStyle(colors.textPrimary)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Text(goal.subtitle)
+                            .font(AppTypography.bodySmall)
+                            .foregroundStyle(colors.textSecondary)
+                            .lineSpacing(2)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    if isSelected {
+                        Text(goal.setupHint)
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(colors.textSecondary)
+                            .lineSpacing(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                            .accessibilityIdentifier("onboarding.goalSetupHint")
+                    }
                 }
-
-                Spacer()
-
-                // Radio button
-                radioButton(isSelected: selectedGoal == goal)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 18)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
             .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(selectedGoal == goal ? AppColors.lavenderPanel.opacity(colorScheme == .dark ? 0.15 : 1) : colors.backgroundSecondary)
+                RoundedRectangle(cornerRadius: AppCornerRadius.large, style: .continuous)
+                    .fill(isSelected ? colors.actionSurface.opacity(colorScheme == .dark ? 0.32 : 0.78) : colors.backgroundSecondary)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: AppCornerRadius.large, style: .continuous)
                     .stroke(
-                        selectedGoal == goal ? AppColors.primary : AppColors.snow,
+                        isSelected ? colors.action : colors.border.opacity(colorScheme == .dark ? 0.8 : 0.55),
                         lineWidth: 2
                     )
             )
+            .shadow(color: isSelected ? colors.action.opacity(colorScheme == .dark ? 0.18 : 0.16) : .clear, radius: 12, y: 6)
+            .contentShape(RoundedRectangle(cornerRadius: AppCornerRadius.large, style: .continuous))
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(goal.title). \(goal.decisionLabel). \(goal.subtitle)")
     }
 
     // MARK: - Screen D: Add Property
@@ -414,22 +714,22 @@ struct OnboardingView: View {
                 // Header
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Add your first\nproperty")
-                        .font(.system(size: 28, weight: .regular, design: .serif))
+                        .font(.system(size: 25, weight: .regular, design: .serif))
                         .foregroundStyle(colors.textPrimary)
-                        .lineSpacing(2)
+                        .lineSpacing(0)
 
                 Text("We'll tailor your tracking based on property type and who manages it. You can add this later from Properties.")
-                    .font(AppTypography.body)
+                    .font(.system(size: 14, weight: .regular, design: .rounded))
                     .foregroundStyle(AppColors.slate)
-                    .lineSpacing(4)
+                    .lineSpacing(3)
                 }
                 .padding(.horizontal, 28)
-                .padding(.top, 20)
+                .padding(.top, 12)
 
                 VStack(alignment: .leading, spacing: 0) {
                     // Property type label
                     sectionLabel("Property Type")
-                        .padding(.top, 24)
+                        .padding(.top, 18)
 
                     // Property type toggle
                     HStack(spacing: 10) {
@@ -440,7 +740,7 @@ struct OnboardingView: View {
 
                     // Management label
                     sectionLabel("Who manages this property?")
-                        .padding(.top, 20)
+                        .padding(.top, 16)
 
                     // Management cards
                     VStack(spacing: 8) {
@@ -454,7 +754,7 @@ struct OnboardingView: View {
                     Rectangle()
                         .fill(AppColors.snow)
                         .frame(height: 1)
-                        .padding(.vertical, 14)
+                        .padding(.vertical, 10)
 
                     // Property Name
                     formField(
@@ -507,10 +807,10 @@ struct OnboardingView: View {
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .foregroundStyle(selectedPropertyType == type ? AppColors.primary : AppColors.slate)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                .padding(.vertical, 10)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(selectedPropertyType == type ? AppColors.lavenderPanel : Color.clear)
+                        .fill(selectedPropertyType == type ? AppColors.lavenderPanel.opacity(colorScheme == .dark ? 0.16 : 1) : Color.clear)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
@@ -534,9 +834,9 @@ struct OnboardingView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10)
                         .fill(option.iconWash)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 32, height: 32)
 
-                    LucideIcon(image: UIImage(lucideId: option.iconName) ?? UIImage(), size: 16)
+                    LucideIcon(image: UIImage(lucideId: option.iconName) ?? UIImage(), size: 15)
                         .foregroundStyle(option.iconColor)
                 }
 
@@ -547,7 +847,7 @@ struct OnboardingView: View {
                         .foregroundStyle(colors.textPrimary)
 
                     Text(option.subtitle)
-                        .font(.system(size: 11, weight: .regular, design: .rounded))
+                        .font(.system(size: 10, weight: .regular, design: .rounded))
                         .foregroundStyle(AppColors.mist)
                 }
 
@@ -557,7 +857,7 @@ struct OnboardingView: View {
                 smallRadioButton(isSelected: selectedManagement == option)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 14)
                     .fill(selectedManagement == option ? AppColors.lavenderPanel.opacity(colorScheme == .dark ? 0.15 : 1) : colors.backgroundSecondary)
@@ -589,7 +889,7 @@ struct OnboardingView: View {
                 .foregroundStyle(colors.textPrimary)
                 .accessibilityIdentifier(accessibilityIdentifier ?? placeholder)
                 .padding(.horizontal, 16)
-                .padding(.vertical, 14)
+                .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 14)
                         .fill(text.wrappedValue.isEmpty ? colors.backgroundTertiary : colors.backgroundSecondary)
@@ -598,7 +898,7 @@ struct OnboardingView: View {
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(
                             text.wrappedValue.isEmpty ? colors.border.opacity(0.35) : AppColors.sage,
-                            lineWidth: 2
+                            lineWidth: 1.5
                         )
                 )
         }
@@ -626,7 +926,7 @@ struct OnboardingView: View {
                         .foregroundStyle(colors.textPrimary)
                         .accessibilityIdentifier("onboarding.streetAddress")
                         .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
+                        .padding(.vertical, 12)
                         .background(
                             RoundedRectangle(cornerRadius: 14)
                                 .fill(streetAddress.isEmpty ? colors.backgroundTertiary : colors.backgroundSecondary)
@@ -635,7 +935,7 @@ struct OnboardingView: View {
                             RoundedRectangle(cornerRadius: 14)
                                 .stroke(
                                     streetAddress.isEmpty ? colors.border.opacity(0.35) : AppColors.sage,
-                                    lineWidth: 2
+                                    lineWidth: 1.5
                                 )
                         )
                         .onChange(of: streetAddress) { _, newValue in
@@ -739,115 +1039,101 @@ struct OnboardingView: View {
 
     private var paywallScreen: some View {
         ZStack {
-            // Pastel gradient background
-            LinearGradient(
-                colors: [
-                    AppColors.indigoMist,
-                    AppColors.reportsAccentWash,
-                    AppColors.lavenderPale,
-                    AppColors.skyMist,
-                    AppColors.aquaMist
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            // Organic blur blobs
-            Circle()
-                .fill(AppColors.lavenderSoft.opacity(0.35))
-                .frame(width: 320, height: 320)
-                .blur(radius: 80)
-                .offset(x: -60, y: -280)
-
-            Circle()
-                .fill(AppColors.blueSoft.opacity(0.3))
-                .frame(width: 280, height: 280)
-                .blur(radius: 70)
-                .offset(x: 100, y: -80)
-
-            Circle()
-                .fill(AppColors.lavenderSoft.opacity(0.2))
-                .frame(width: 240, height: 240)
-                .blur(radius: 60)
-                .offset(x: -40, y: 200)
+            onboardingSoftBackground(accent: AppColors.primary)
 
             // Content
             VStack(spacing: 0) {
-                Spacer().frame(height: 20)
+                onboardingHeader(
+                    title: "Upgrade when your\nrecords matter",
+                    subtitle: "Start free today. Pro is for export-ready reporting and growing rental portfolios.",
+                    centered: true
+                )
+                .padding(.top, 20)
 
-                // Headline
-                Text("Choose your path,\nthen start tracking")
-                    .font(.system(size: 26, weight: .regular, design: .serif))
-                    .foregroundStyle(colors.textPrimary)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(2)
-                    .padding(.bottom, 16)
-
-                // Value props
-                VStack(spacing: 10) {
-                    paywallProp("AI-assisted logging with review before save")
-                    paywallProp("CPA-ready PDF exports")
-                    paywallProp("Unlimited properties and PDF exports")
-                }
-                .padding(.bottom, 24)
-
-                // One-time purchase card
-                VStack(spacing: 8) {
-                    if let product = SubscriptionManager.shared.proProduct {
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text(product.displayPrice)
-                                .font(.system(size: 42, weight: .heavy))
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(spacing: 10) {
+                        onboardingMiniBadge(icon: Lucide.badgeCheck, color: AppColors.primary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("LandlordHours Pro")
+                                .font(.system(size: 17, weight: .bold, design: .rounded))
                                 .foregroundStyle(colors.textPrimary)
+                            Text("One purchase for export-ready records.")
+                                .font(.system(size: 13, weight: .regular, design: .rounded))
+                                .foregroundStyle(colors.textSecondary)
+                        }
+                    }
+
+                    VStack(spacing: 10) {
+                        paywallBenefitRow(
+                            icon: Lucide.fileText,
+                            title: "Export audit-ready PDFs",
+                            subtitle: "Package hours by property, category, and year.",
+                            color: AppColors.primary
+                        )
+                        paywallBenefitRow(
+                            icon: Lucide.building2,
+                            title: "Track unlimited properties",
+                            subtitle: "Keep each rental's evidence clean and separate.",
+                            color: AppColors.sky
+                        )
+                        paywallBenefitRow(
+                            icon: Lucide.sparkles,
+                            title: "Faster review before save",
+                            subtitle: "Use assisted logging while keeping final control.",
+                            color: AppColors.sage
+                        )
+                    }
+
+                    Divider()
+                        .overlay(colors.border.opacity(0.4))
+
+                    if let product = SubscriptionManager.shared.proProduct {
+                        HStack(alignment: .center) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("one-time")
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(colors.textSecondary)
-                                Text("lifetime access")
-                                    .font(.system(size: 13, weight: .semibold))
+                                Text(product.displayPrice)
+                                    .font(.system(size: 40, weight: .heavy, design: .rounded))
+                                    .foregroundStyle(colors.textPrimary)
+                                Text("One-time lifetime access")
+                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
                                     .foregroundStyle(AppColors.sage)
                             }
+                            Spacer()
+                            Text("No subscription")
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .foregroundStyle(AppColors.primary)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(AppColors.primarySurface)
+                                .clipShape(Capsule())
                         }
-                        Text("Use the App Store price shown here")
+                        Text("Final App Store pricing is shown before purchase.")
                             .font(.system(size: 13))
                             .foregroundStyle(colors.textSecondary)
                     } else {
-                        VStack(spacing: 8) {
-                            LucideIcon(image: Lucide.store, size: 22)
-                                .foregroundStyle(AppColors.primary)
-                            Text("Pro availability check")
-                                .font(AppTypography.title3)
-                                .foregroundStyle(colors.textPrimary)
-                            Text("Start free now. We will check the App Store before showing a Pro price.")
-                                .font(.system(size: 13))
-                                .foregroundStyle(colors.textSecondary)
-                                .multilineTextAlignment(.center)
-                                .lineSpacing(3)
+                        HStack(spacing: 12) {
+                            onboardingMiniBadge(icon: Lucide.store, color: AppColors.sky)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Pro availability check")
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .foregroundStyle(colors.textPrimary)
+                                Text("You can continue free while the App Store price loads.")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(colors.textSecondary)
+                                    .lineSpacing(3)
+                            }
                         }
                     }
                 }
-                .padding(.vertical, 20)
-                .padding(.horizontal, 28)
+                .padding(18)
                 .frame(maxWidth: .infinity)
-                .background(Color.white.opacity(0.7))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .background(onboardingCardFill)
+                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
+                .overlay(
+                    RoundedRectangle(cornerRadius: AppCornerRadius.large)
+                        .stroke(colors.border.opacity(colorScheme == .dark ? 0.5 : 0.2), lineWidth: 1)
+                )
                 .padding(.horizontal, 28)
-                .padding(.bottom, 20)
-
-                // Social proof
-                VStack(spacing: 4) {
-                    HStack(spacing: 3) {
-                        ForEach(0..<5, id: \.self) { _ in
-                            Image(systemName: "star.fill")
-                                .font(.system(size: 14))
-                                .foregroundStyle(AppColors.caution)
-                        }
-                    }
-                    Text("Built for rental owners tracking tax-year hours")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(AppColors.slate)
-                }
-                .padding(.bottom, 16)
+                .padding(.top, 22)
 
                 Spacer()
 
@@ -873,7 +1159,7 @@ struct OnboardingView: View {
                         .foregroundStyle(AppColors.onAction)
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
-                        .background(AppColors.charcoal)
+                        .background(colors.action)
                         .overlay(
                             Capsule()
                                 .stroke(Color.clear, lineWidth: 1)
@@ -903,7 +1189,7 @@ struct OnboardingView: View {
                         }
                         .padding(12)
                         .frame(maxWidth: .infinity)
-                        .background(Color.white.opacity(0.65))
+                        .background(onboardingCardFill)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
 
@@ -927,52 +1213,221 @@ struct OnboardingView: View {
         }
     }
 
-    private func paywallProp(_ text: String) -> some View {
+    private func paywallBenefitRow(icon: UIImage, title: String, subtitle: String, color: Color) -> some View {
         HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color.white.opacity(0.7))
-                    .frame(width: 22, height: 22)
-                LucideIcon(image: Lucide.check, size: 12)
-                    .foregroundStyle(AppColors.primary)
+            onboardingMiniBadge(icon: icon, color: color)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(subtitle)
+                    .font(.system(size: 12, weight: .regular, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Text(text)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(colors.textPrimary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var onboardingCardFill: some ShapeStyle {
+        colorScheme == .dark ? colors.backgroundSecondary : Color.white.opacity(0.82)
+    }
+
+    private func onboardingSoftBackground(accent: Color) -> some View {
+        LinearGradient(
+            colors: colorScheme == .dark
+            ? [
+                colors.background,
+                colors.backgroundSecondary,
+                colors.background
+            ]
+            : [
+                AppColors.lavenderPale,
+                AppColors.skyMist,
+                AppColors.aquaMist
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .overlay(alignment: .topTrailing) {
+            Circle()
+                .fill(accent.opacity(colorScheme == .dark ? 0.12 : 0.16))
+                .frame(width: 220, height: 220)
+                .blur(radius: 70)
+                .offset(x: 80, y: -90)
+        }
+        .ignoresSafeArea()
+    }
+
+    private func onboardingHeader(title: String, subtitle: String, centered: Bool) -> some View {
+        VStack(alignment: centered ? .center : .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 27, weight: .regular, design: .serif))
+                .foregroundStyle(colors.textPrimary)
+                .multilineTextAlignment(centered ? .center : .leading)
+                .lineSpacing(1)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(subtitle)
+                .font(.system(size: 15, weight: .regular, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
+                .multilineTextAlignment(centered ? .center : .leading)
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: centered ? .center : .leading)
         .padding(.horizontal, 28)
+    }
+
+    private func onboardingMiniBadge(icon: UIImage, color: Color) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(color.opacity(colorScheme == .dark ? 0.22 : 0.14))
+                .frame(width: 36, height: 36)
+            LucideIcon(image: icon, size: 17)
+                .foregroundStyle(color)
+        }
+    }
+
+    private func permissionBenefitCard(icon: UIImage, title: String, subtitle: String, color: Color) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            onboardingMiniBadge(icon: icon, color: color)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                Text(subtitle)
+                    .font(.system(size: 13, weight: .regular, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(colors.backgroundTertiary.opacity(colorScheme == .dark ? 0.55 : 0.72))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func calendarDetectionRow(title: String, detail: String, hours: String, color: Color) -> some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(color)
+                .frame(width: 4, height: 34)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                    .lineLimit(1)
+                Text(detail)
+                    .font(.system(size: 12, weight: .regular, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+            }
+
+            Spacer()
+
+            Text(hours)
+                .font(.system(size: 16, weight: .heavy, design: .rounded))
+                .foregroundStyle(AppColors.primary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(colors.backgroundTertiary.opacity(colorScheme == .dark ? 0.55 : 0.72))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func onboardingFlowStep(number: String, title: String, detail: String) -> some View {
+        VStack(spacing: 6) {
+            Text(number)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(AppColors.onAction)
+                .frame(width: 26, height: 26)
+                .background(colors.action)
+                .clipShape(Circle())
+            VStack(spacing: 1) {
+                Text(title)
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(detail)
+                    .font(.system(size: 10, weight: .regular, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var onboardingFlowConnector: some View {
+        Rectangle()
+            .fill(colors.border.opacity(0.45))
+            .frame(width: 12, height: 1)
+            .padding(.bottom, 34)
     }
 
     // MARK: - Screen F: Notifications
 
     private var notificationsScreen: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Never miss a task!")
-                    .font(.system(size: 28, weight: .regular, design: .serif))
-                    .foregroundStyle(colors.textPrimary)
-                    .lineSpacing(2)
-
-                Text("Smart reminders so you stay on track for qualification.")
-                    .font(AppTypography.body)
-                    .foregroundStyle(AppColors.slate)
-                    .lineSpacing(4)
-            }
-            .padding(.horizontal, 28)
+            onboardingHeader(
+                title: "Get reminded when\nhours are easy to forget",
+                subtitle: "Use reminders for the moments that become hard to reconstruct later.",
+                centered: false
+            )
             .padding(.top, 20)
 
             Spacer()
 
-            // Notification mockup
-            notificationMockup
-                .padding(.horizontal, 28)
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 12) {
+                    onboardingMiniBadge(icon: Lucide.bellRing, color: AppColors.primary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Reminder plan")
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .foregroundStyle(colors.textPrimary)
+                        Text("Quiet nudges tied to evidence, not noise.")
+                            .font(.system(size: 13, weight: .regular, design: .rounded))
+                            .foregroundStyle(colors.textSecondary)
+                    }
+                }
+
+                permissionBenefitCard(
+                    icon: Lucide.mapPin,
+                    title: "After property visits",
+                    subtitle: "A same-day prompt helps you log while the details are still fresh.",
+                    color: AppColors.primary
+                )
+                permissionBenefitCard(
+                    icon: Lucide.calendarClock,
+                    title: "Before tax-year drift",
+                    subtitle: "Weekly summaries show whether your pace needs attention.",
+                    color: AppColors.honey
+                )
+                permissionBenefitCard(
+                    icon: Lucide.shieldCheck,
+                    title: "Only useful reminders",
+                    subtitle: "You stay in control and can change notification settings anytime.",
+                    color: AppColors.sage
+                )
+            }
+            .padding(18)
+            .background(onboardingCardFill)
+            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
+            .overlay(
+                RoundedRectangle(cornerRadius: AppCornerRadius.large)
+                    .stroke(colors.border.opacity(colorScheme == .dark ? 0.5 : 0.2), lineWidth: 1)
+            )
+            .padding(.horizontal, 28)
 
             Spacer()
 
             // CTA
-            ctaSection(primaryLabel: "Enable Notifications", showSkip: true) {
+            ctaSection(primaryLabel: "Allow reminders", showSkip: true) {
                 requestNotifications()
             }
         }
@@ -1141,31 +1596,77 @@ struct OnboardingView: View {
 
     private var calendarScreen: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Import your calendar\nfor a quick start")
-                    .font(.system(size: 28, weight: .regular, design: .serif))
-                    .foregroundStyle(colors.textPrimary)
-                    .lineSpacing(2)
-
-                Text("We'll auto-detect property appointments and pre-fill your hours.")
-                    .font(AppTypography.body)
-                    .foregroundStyle(AppColors.slate)
-                    .lineSpacing(4)
-            }
-            .padding(.horizontal, 28)
+            onboardingHeader(
+                title: "Calendar can start\nyour draft logs",
+                subtitle: "Find likely property work from Calendar. You review before anything becomes part of your records.",
+                centered: false
+            )
             .padding(.top, 20)
 
             Spacer()
 
-            // Calendar mockup
-            calendarMockup
-                .padding(.horizontal, 28)
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 12) {
+                    onboardingMiniBadge(icon: Lucide.calendarPlus, color: AppColors.sky)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Import preview")
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .foregroundStyle(colors.textPrimary)
+                        Text("Calendar finds candidates. You decide what counts.")
+                            .font(.system(size: 13, weight: .regular, design: .rounded))
+                            .foregroundStyle(colors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                VStack(spacing: 10) {
+                    calendarDetectionRow(
+                        title: "Plumber at Oak St",
+                        detail: "10:00 AM - 12:00 PM",
+                        hours: "2h",
+                        color: AppColors.coral
+                    )
+                    calendarDetectionRow(
+                        title: "Tenant meeting",
+                        detail: "2:00 PM - 3:00 PM",
+                        hours: "1h",
+                        color: AppColors.primary
+                    )
+                }
+
+                HStack(spacing: 8) {
+                    onboardingFlowStep(number: "1", title: "Scan", detail: "Find events")
+                    onboardingFlowConnector
+                    onboardingFlowStep(number: "2", title: "Review", detail: "Check details")
+                    onboardingFlowConnector
+                    onboardingFlowStep(number: "3", title: "Save", detail: "Draft entries")
+                }
+
+                HStack(spacing: 10) {
+                    onboardingMiniBadge(icon: Lucide.listChecks, color: AppColors.sage)
+                    Text("Calendar import never replaces your review. It only starts the draft.")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                        .lineSpacing(3)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(colors.actionSurface.opacity(colorScheme == .dark ? 0.22 : 0.75))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .padding(18)
+            .background(onboardingCardFill)
+            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
+            .overlay(
+                RoundedRectangle(cornerRadius: AppCornerRadius.large)
+                    .stroke(colors.border.opacity(colorScheme == .dark ? 0.5 : 0.2), lineWidth: 1)
+            )
+            .padding(.horizontal, 28)
 
             Spacer()
 
             // CTA
-            ctaSection(primaryLabel: "Import Calendar", showSkip: false) {
+            ctaSection(primaryLabel: "Connect Calendar", showSkip: true) {
                 requestCalendarAccess()
             }
         }
@@ -1588,7 +2089,7 @@ struct OnboardingView: View {
                 .foregroundStyle(AppColors.onAction)
                 .frame(maxWidth: .infinity)
                 .frame(height: 56)
-                .background(AppColors.charcoal)
+                .background(colors.action)
                 .clipShape(Capsule())
             }
             .accessibilityIdentifier(primaryIdentifier ?? "")

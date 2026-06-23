@@ -1,5 +1,6 @@
 import SwiftUI
 import LucideIcons
+import UserNotifications
 
 // MARK: - Design System for LandlordHours
 // Tiimo-inspired — soft, rounded, friendly, modern
@@ -494,8 +495,11 @@ let availableCategoryColors = [
 
 // MARK: - App Delegate (CloudKit remote notifications)
 
-class AppDelegate: NSObject, UIApplicationDelegate {
+class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        let notificationCenter = UNUserNotificationCenter.current()
+        notificationCenter.delegate = self
+        registerEngagementNotificationCategories(center: notificationCenter)
         application.registerForRemoteNotifications()
         return true
     }
@@ -514,6 +518,112 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             await viewModel.syncService.pullChanges()
             completionHandler(.newData)
         }
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        if let rawDestination = response.notification.request.content.userInfo["destination"] as? String,
+           let destination = notificationDestination(for: rawDestination) {
+            UserDefaults.standard.set(destination.rawValue, forKey: AppIntentNavigationRequest.pendingDestinationKey)
+
+            Task { @MainActor in
+                NotificationCenter.default.post(name: .switchToTab, object: destination.tabIndex)
+            }
+        }
+
+        completionHandler()
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        #if DEBUG
+        completionHandler([.banner, .list])
+        #else
+        completionHandler([.list])
+        #endif
+    }
+
+    private func notificationDestination(for rawDestination: String) -> LandlordHoursIntentDestination? {
+        if let directDestination = LandlordHoursIntentDestination(rawValue: rawDestination) {
+            return directDestination
+        }
+
+        guard let engagementDestination = EngagementDestination(rawValue: rawDestination) else {
+            return nil
+        }
+
+        switch engagementDestination {
+        case .addProperty:
+            return .properties
+        case .track, .timerReview:
+            return .track
+        case .reports, .calendarReview, .export:
+            return .reports
+        case .none:
+            return .home
+        }
+    }
+
+    private func registerEngagementNotificationCategories(center: UNUserNotificationCenter) {
+        let foreground: UNNotificationActionOptions = [.foreground]
+        let categories: Set<UNNotificationCategory> = [
+            UNNotificationCategory(
+                identifier: "LANDLORDHOURS_TRACK",
+                actions: [
+                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_TRACK", title: "Log Time", options: foreground)
+                ],
+                intentIdentifiers: [],
+                options: []
+            ),
+            UNNotificationCategory(
+                identifier: "LANDLORDHOURS_REVIEW_CALENDAR",
+                actions: [
+                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_REVIEW_CALENDAR", title: "Review Drafts", options: foreground)
+                ],
+                intentIdentifiers: [],
+                options: []
+            ),
+            UNNotificationCategory(
+                identifier: "LANDLORDHOURS_EXPORT",
+                actions: [
+                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_EXPORT", title: "Prepare Export", options: foreground)
+                ],
+                intentIdentifiers: [],
+                options: []
+            ),
+            UNNotificationCategory(
+                identifier: "LANDLORDHOURS_REPORTS",
+                actions: [
+                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_REPORTS", title: "Open Reports", options: foreground)
+                ],
+                intentIdentifiers: [],
+                options: []
+            ),
+            UNNotificationCategory(
+                identifier: "LANDLORDHOURS_ADD_PROPERTY",
+                actions: [
+                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_ADD_PROPERTY", title: "Add Property", options: foreground)
+                ],
+                intentIdentifiers: [],
+                options: []
+            ),
+            UNNotificationCategory(
+                identifier: "LANDLORDHOURS_TIMER",
+                actions: [
+                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_TIMER", title: "Review Timer", options: foreground)
+                ],
+                intentIdentifiers: [],
+                options: []
+            )
+        ]
+
+        center.setNotificationCategories(categories)
     }
 
     @MainActor static var sharedViewModel: AppViewModel?
@@ -560,6 +670,7 @@ struct LandlordHoursApp: App {
                 }
         }
     }
+
 }
 
 // MARK: - UIFont Rounded Extension

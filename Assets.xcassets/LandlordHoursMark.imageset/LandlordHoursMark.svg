@@ -1,0 +1,30 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="base" x1="512" y1="0" x2="512" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#D8D0FF"/>
+      <stop offset="1" stop-color="#B8AFFE"/>
+    </linearGradient>
+    <linearGradient id="wave1" x1="0" y1="310" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A899F7"/>
+      <stop offset="1" stop-color="#9485F0"/>
+    </linearGradient>
+    <linearGradient id="wave2" x1="0" y1="440" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8B78F0"/>
+      <stop offset="1" stop-color="#7B68EE"/>
+    </linearGradient>
+    <linearGradient id="wave3" x1="0" y1="580" x2="512" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6B58DE"/>
+      <stop offset="1" stop-color="#4A38B0"/>
+    </linearGradient>
+    <clipPath id="houseClip">
+      <path d="M512 140L168 390V880C168 896.569 181.431 910 198 910H826C842.569 910 856 896.569 856 880V390L512 140ZM700 180V280H780V250C780 211.34 765.641 180 740 180H700Z"/>
+    </clipPath>
+  </defs>
+  <rect width="1024" height="1024" rx="225" fill="#F4F1FF"/>
+  <g clip-path="url(#houseClip)">
+    <rect width="1024" height="1024" fill="url(#base)"/>
+    <path d="M0 380C133 333.45 266 330 400 370C600 430 800 360 800 360C900 330 1024 350 1024 350V1024H0V380Z" fill="url(#wave1)"/>
+    <path d="M0 520C160 468.8 320 461.3 480 510C700 580 900 480 900 480C980 450 1024 470 1024 470V1024H0V520Z" fill="url(#wave2)"/>
+    <path d="M0 660C140 615.45 280 608 420 650C650 720 850 620 850 620C950 580 1024 610 1024 610V1024H0V660Z" fill="url(#wave3)"/>
+  </g>
+</svg>

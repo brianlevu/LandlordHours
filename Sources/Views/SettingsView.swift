@@ -740,6 +740,9 @@ struct SettingsView: View {
     @State private var isDeletingAccount = false
     @State private var deleteAccountError: String?
     @State private var showDeveloperTools = false
+    #if DEBUG
+    @State private var showEngagementLab = false
+    #endif
 
     var body: some View {
         NavigationStack {
@@ -747,10 +750,10 @@ struct SettingsView: View {
                 VStack(spacing: 22) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Settings")
-                            .font(.system(size: 42, weight: .black, design: .rounded))
+                            .font(.system(size: 34, weight: .black, design: .rounded))
                             .foregroundStyle(colors.textPrimary)
                             .minimumScaleFactor(0.82)
-                        Text("Account, tax profile, exports, and support.")
+                        Text("Manage account, tax setup, exports, and reminders.")
                             .font(.system(size: 15, weight: .medium, design: .rounded))
                             .foregroundStyle(colors.textSecondary)
                     }
@@ -986,7 +989,7 @@ struct SettingsView: View {
                         Divider().background(colors.border.opacity(0.35))
 
                         Button {
-                            if let url = URL(string: "https://www.openclaw.com/landlord-hours/terms") {
+                            if let url = URL(string: "https://www.altaiventures.co/landlord-hours/terms") {
                                 UIApplication.shared.open(url)
                             }
                         } label: {
@@ -1047,7 +1050,7 @@ struct SettingsView: View {
                         .padding(.bottom, AppSpacing.tabContentBottomInset)
                 }
                 .padding(.horizontal, 24)
-                .padding(.top, 18)
+                .padding(.top, 8)
             }
             .background {
                 LHMobileCanvas()
@@ -1103,6 +1106,17 @@ struct SettingsView: View {
             .sheet(isPresented: $showingIconPicker) {
                 AppIconPickerView()
             }
+            #if DEBUG
+            .navigationDestination(isPresented: $showEngagementLab) {
+                EngagementLabView()
+            }
+            .onAppear {
+                guard ProcessInfo.processInfo.arguments.contains("-LHOpenEngagementLab") else { return }
+                DispatchQueue.main.async {
+                    showEngagementLab = true
+                }
+            }
+            #endif
         }
     }
 
@@ -1146,6 +1160,44 @@ struct SettingsView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .buttonStyle(.plain)
+
+                Button {
+                    showEngagementLab = true
+                } label: {
+                    HStack(spacing: 12) {
+                        LHIconTile(
+                            icon: Lucide.bell,
+                            color: AppColors.informational,
+                            wash: colors.informationalSurface,
+                            size: 38,
+                            isActive: true
+                        )
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Engagement Lab")
+                                .font(AppTypography.body)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(colors.textPrimary)
+                            Text("Preview notifications, widgets, Live Activities, and Siri")
+                                .font(AppTypography.caption)
+                                .foregroundStyle(colors.textSecondary)
+                        }
+
+                        Spacer()
+
+                        LucideIcon(image: Lucide.chevronRight, size: 18)
+                            .foregroundStyle(colors.textTertiary)
+                    }
+                    .padding(12)
+                    .background(colors.backgroundSecondary)
+                    .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: AppCornerRadius.large)
+                            .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("settings.engagementLab")
 
                 ForEach(AppViewModel.MockDataScenario.allCases) { scenario in
                     Button {

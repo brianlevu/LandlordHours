@@ -1,0 +1,1677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LandlordHours - Screen Designs</title>
+<script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    /* AppColors - Light Theme */
+    --background: #F5F5F5;
+    --bg-secondary: #FFFFFF;
+    --bg-tertiary: #EBEBEB;
+    --primary: #7C6FF7;
+    --primary-light: #A78BFA;
+    --primary-surface: #EDE9FE;
+    --primary-dark: #6355E8;
+    --success: #34D399;
+    --warning: #FBBF24;
+    --error: #F472B6;
+    --info: #60A5FA;
+    --text-primary: #0D0D0D;
+    --text-secondary: #6B7280;
+    --text-tertiary: #9CA3AF;
+    --border: #D1D5DB;
+    --border-light: #E5E7EB;
+
+    /* Spacing */
+    --xxs: 4px;
+    --xs: 8px;
+    --sm: 12px;
+    --md: 16px;
+    --lg: 20px;
+    --xl: 24px;
+    --xxl: 32px;
+    --xxxl: 48px;
+
+    /* Corner Radius */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #E8E8E8;
+    padding: 40px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 40px;
+    justify-content: center;
+  }
+
+  .screen-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .screen-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #6B7280;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .phone {
+    width: 393px;
+    height: 852px;
+    background: var(--background);
+    border-radius: 40px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05);
+  }
+
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 126px;
+    height: 34px;
+    background: #000;
+    border-radius: 0 0 20px 20px;
+    z-index: 100;
+  }
+
+  .status-bar {
+    height: 54px;
+    padding: 14px 24px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .status-bar .time { margin-left: 4px; }
+  .status-bar .icons { display: flex; gap: 5px; font-size: 13px; }
+
+  .screen-content {
+    height: calc(100% - 54px - 83px);
+    overflow-y: auto;
+    padding: 0 20px;
+    scrollbar-width: none;
+  }
+  .screen-content::-webkit-scrollbar { display: none; }
+
+  .tab-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 83px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-start;
+    padding-top: 8px;
+    padding-bottom: 28px;
+  }
+
+  .tab-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    font-size: 10px;
+    color: var(--text-tertiary);
+    font-weight: 500;
+  }
+
+  .tab-item.active {
+    color: var(--primary);
+  }
+
+  .tab-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  /* Card */
+  .card {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    padding: var(--md);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  }
+
+  /* Badge */
+  .badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    color: var(--primary);
+    background: var(--primary-surface);
+    padding: 3px 8px;
+    border-radius: 999px;
+    display: inline-block;
+  }
+
+  .badge-success {
+    color: #059669;
+    background: #D1FAE5;
+  }
+
+  /* Button */
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 14px 28px;
+    border-radius: 999px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .btn-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: none;
+    padding: 10px 20px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* Progress Ring */
+  .progress-ring-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 0 16px;
+  }
+
+  .progress-ring {
+    width: 200px;
+    height: 200px;
+    position: relative;
+  }
+
+  .progress-ring svg {
+    width: 200px;
+    height: 200px;
+    transform: rotate(-90deg);
+  }
+
+  .progress-ring circle {
+    fill: none;
+    stroke-linecap: round;
+  }
+
+  .ring-bg {
+    stroke: var(--bg-tertiary);
+    stroke-width: 14;
+  }
+
+  .ring-progress {
+    stroke: url(#gradient);
+    stroke-width: 14;
+    stroke-dasharray: 534;
+    stroke-dashoffset: 348; /* ~35% progress = 262.5h */
+    transition: stroke-dashoffset 1s ease;
+  }
+
+  .ring-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+
+  .ring-hours {
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+  }
+
+  .ring-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+
+  /* Section */
+  .section-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+  }
+
+  .section-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+  }
+
+  /* Stats Row */
+  .stats-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    flex: 1;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  }
+
+  .stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+
+  /* Entry Row */
+  .entry-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .entry-row:last-child { border-bottom: none; }
+
+  .entry-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .entry-info { flex: 1; }
+
+  .entry-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .entry-subtitle {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+
+  .entry-hours {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--primary);
+  }
+
+  .entry-date {
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+
+  .entry-right {
+    text-align: right;
+  }
+
+  /* Property Card */
+  .property-card {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .property-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: var(--primary-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+
+  .property-info { flex: 1; }
+
+  .property-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .property-address {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+
+  .property-hours {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    margin-top: 4px;
+  }
+
+  /* Category Chips */
+  .category-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .chip {
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .chip.active {
+    background: var(--primary);
+    color: white;
+  }
+
+  /* Input Field */
+  .input-field {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-light);
+    background: var(--bg-tertiary);
+    font-size: 15px;
+    color: var(--text-primary);
+    outline: none;
+    font-family: inherit;
+  }
+
+  .input-field::placeholder {
+    color: var(--text-tertiary);
+  }
+
+  /* Hours Stepper */
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .stepper-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .stepper-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+    min-width: 60px;
+    text-align: center;
+  }
+
+  /* Segment */
+  .segment-control {
+    display: flex;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+  }
+
+  .segment-item {
+    flex: 1;
+    text-align: center;
+    padding: 8px 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .segment-item.active {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+
+  /* Quick Log Grid */
+  .quick-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .quick-btn {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    padding: 16px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    cursor: pointer;
+    border: none;
+  }
+
+  .quick-btn-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: white;
+  }
+
+  .quick-btn-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  /* Report Chart Bars */
+  .bar-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .bar-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .bar-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    width: 100px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bar-track {
+    flex: 1;
+    height: 8px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--primary), var(--primary-light));
+  }
+
+  .bar-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    width: 45px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* Settings */
+  .settings-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .settings-row:last-child { border-bottom: none; }
+
+  .settings-icon-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .settings-label {
+    flex: 1;
+    font-size: 15px;
+    color: var(--text-primary);
+  }
+
+  .settings-chevron {
+    font-size: 14px;
+    color: var(--text-tertiary);
+  }
+
+  /* Toggle */
+  .toggle {
+    width: 51px;
+    height: 31px;
+    border-radius: 16px;
+    background: var(--success);
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 27px;
+    height: 27px;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+
+  .toggle.off {
+    background: var(--bg-tertiary);
+  }
+
+  .toggle.off::after {
+    right: auto;
+    left: 2px;
+  }
+
+  /* Membership Banner */
+  .membership-banner {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    border-radius: var(--radius-md);
+    padding: 20px;
+    color: white;
+    margin-bottom: 20px;
+  }
+
+  .membership-badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    background: rgba(255,255,255,0.2);
+    padding: 4px 10px;
+    border-radius: 999px;
+    display: inline-block;
+    margin-bottom: 8px;
+  }
+
+  .membership-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .membership-subtitle {
+    font-size: 13px;
+    opacity: 0.8;
+  }
+
+  /* Header */
+  .page-header {
+    padding: 8px 0 16px;
+  }
+
+  .greeting {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+  }
+
+  .page-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .date-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+
+  /* Soft Badge (icon with pastel bg) */
+  .soft-badge {
+    width: 72px;
+    height: 72px;
+    border-radius: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+  }
+
+  /* Empty State */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 40px 20px;
+    gap: 16px;
+  }
+
+  .empty-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .empty-desc {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  /* Year Selector */
+  .year-selector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 8px 0 16px;
+  }
+
+  .year-arrow {
+    font-size: 16px;
+    color: var(--text-tertiary);
+    cursor: pointer;
+  }
+
+  .year-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  /* 50% Rule */
+  .rule-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: #D1FAE5;
+    border-radius: var(--radius-sm);
+    margin-top: 12px;
+  }
+
+  .rule-check {
+    color: #059669;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .rule-text {
+    font-size: 13px;
+    color: #059669;
+    font-weight: 500;
+  }
+
+  /* Onboarding */
+  .onboarding-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: calc(100% - 54px);
+    padding: 40px 30px;
+    text-align: center;
+    gap: 24px;
+  }
+
+  .onboarding-circles {
+    position: relative;
+    width: 200px;
+    height: 200px;
+  }
+
+  .circle-outer {
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background: var(--primary-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .circle-mid {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: var(--primary-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+  }
+
+  .circle-inner {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    color: white;
+  }
+
+  .onboarding-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+  }
+
+  .onboarding-desc {
+    font-size: 16px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .dots {
+    display: flex;
+    gap: 8px;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+  }
+
+  .dot.active {
+    background: var(--primary);
+    width: 24px;
+    border-radius: 4px;
+  }
+
+  .skip-btn {
+    font-size: 15px;
+    color: var(--text-secondary);
+    position: absolute;
+    top: 60px;
+    right: 24px;
+  }
+
+  /* Stats strip for Track */
+  .stats-strip {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .stats-strip-item {
+    flex: 1;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    padding: 10px;
+    text-align: center;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  }
+
+  .stats-strip-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--primary);
+  }
+
+  .stats-strip-label {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+  }
+
+  /* Form group */
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  /* SVG definitions hidden */
+  .defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+  /* Dark mode screens */
+  .phone.dark {
+    --background: #0D0D0D;
+    --bg-secondary: #1C1C1C;
+    --bg-tertiary: #2A2A2A;
+    --primary-surface: #2D2A4A;
+    --primary: #9D8FF5;
+    --text-primary: #FFFFFF;
+    --text-secondary: #ADB0BD;
+    --text-tertiary: #7A7D8A;
+    --border: rgba(71,71,77,1);
+    --border-light: rgba(50,50,55,1);
+  }
+
+  .phone.dark .status-bar { color: white; }
+  .phone.dark::before { background: #333; }
+
+  /* Paywall */
+  .paywall-features {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 20px 0;
+  }
+
+  .paywall-feature {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .paywall-feature-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--primary-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .paywall-feature-text {
+    font-size: 15px;
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+</style>
+</head>
+<body>
+
+<!-- SVG Gradient Def -->
+<svg class="defs">
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7C6FF7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#A78BFA;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+</svg>
+
+<!-- ===================== SCREEN 1: ONBOARDING ===================== -->
+<div class="screen-container">
+  <div class="screen-label">Onboarding</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <span class="icons">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="onboarding-content">
+      <span class="skip-btn">Skip</span>
+      <div class="onboarding-circles">
+        <div class="circle-outer">
+          <div class="circle-mid">
+            <div class="circle-inner">&#9201;</div>
+          </div>
+        </div>
+      </div>
+      <div class="onboarding-title">Track Your Hours<br>Effortlessly</div>
+      <div class="onboarding-desc">Log time spent on rental property activities to qualify for Real Estate Professional Status.</div>
+      <div class="dots">
+        <div class="dot active"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+      <button class="btn-primary" style="max-width: 280px;">Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SCREEN 2: DASHBOARD ===================== -->
+<div class="screen-container">
+  <div class="screen-label">Dashboard (Home)</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <span class="icons">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="screen-content">
+      <div class="page-header">
+        <div class="greeting">Good morning, Brian</div>
+        <div class="page-title">Dashboard</div>
+        <div class="date-label">February 24, 2026</div>
+      </div>
+
+      <!-- Progress Ring Card -->
+      <div class="card" style="margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span class="badge">REPS PROGRESS</span>
+          <span class="badge badge-success">ON TRACK</span>
+        </div>
+        <div class="progress-ring-container">
+          <div class="progress-ring">
+            <svg viewBox="0 0 200 200">
+              <circle class="ring-bg" cx="100" cy="100" r="85"/>
+              <circle class="ring-progress" cx="100" cy="100" r="85"/>
+            </svg>
+            <div class="ring-center">
+              <div class="ring-hours">262.5</div>
+              <div class="ring-label">of 750 hours</div>
+            </div>
+          </div>
+        </div>
+        <div class="rule-indicator">
+          <span class="rule-check">&#10003;</span>
+          <span class="rule-text">50% Rule: 68% real estate time</span>
+        </div>
+      </div>
+
+      <!-- Quick Stats -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-value">14.5h</div>
+          <div class="stat-label">This Week</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">58.2h</div>
+          <div class="stat-label">This Month</div>
+        </div>
+      </div>
+
+      <!-- Recent Entries -->
+      <div style="margin-bottom: 24px;">
+        <div class="section-title">Recent Entries</div>
+        <div class="card">
+          <div class="entry-row">
+            <div class="entry-icon" style="background: #7C6FF7;">&#128295;</div>
+            <div class="entry-info">
+              <div class="entry-title">123 Oak Street</div>
+              <div class="entry-subtitle">Repairs &amp; Maintenance</div>
+            </div>
+            <div class="entry-right">
+              <div class="entry-hours">2.5h</div>
+              <div class="entry-date">Today</div>
+            </div>
+          </div>
+          <div class="entry-row">
+            <div class="entry-icon" style="background: #34D399;">&#128209;</div>
+            <div class="entry-info">
+              <div class="entry-title">456 Pine Ave</div>
+              <div class="entry-subtitle">Property Management</div>
+            </div>
+            <div class="entry-right">
+              <div class="entry-hours">1.0h</div>
+              <div class="entry-date">Yesterday</div>
+            </div>
+          </div>
+          <div class="entry-row">
+            <div class="entry-icon" style="background: #60A5FA;">&#128221;</div>
+            <div class="entry-info">
+              <div class="entry-title">789 Elm Blvd</div>
+              <div class="entry-subtitle">Bookkeeping &amp; Financial</div>
+            </div>
+            <div class="entry-right">
+              <div class="entry-hours">3.0h</div>
+              <div class="entry-date">Feb 22</div>
+            </div>
+          </div>
+          <div class="entry-row">
+            <div class="entry-icon" style="background: #FBBF24;">&#128747;</div>
+            <div class="entry-info">
+              <div class="entry-title">123 Oak Street</div>
+              <div class="entry-subtitle">Travel to Property</div>
+            </div>
+            <div class="entry-right">
+              <div class="entry-hours">0.75h</div>
+              <div class="entry-date">Feb 21</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item active"><div class="tab-icon">&#127968;</div>Home</div>
+      <div class="tab-item"><div class="tab-icon">&#127970;</div>Properties</div>
+      <div class="tab-item"><div class="tab-icon">&#9201;</div>Track</div>
+      <div class="tab-item"><div class="tab-icon">&#128202;</div>Reports</div>
+      <div class="tab-item"><div class="tab-icon">&#9881;</div>Settings</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SCREEN 3: PROPERTIES ===================== -->
+<div class="screen-container">
+  <div class="screen-label">Properties</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <span class="icons">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="screen-content">
+      <div class="page-header">
+        <div class="page-title">Properties</div>
+        <div class="date-label">3 properties</div>
+      </div>
+
+      <div class="property-card">
+        <div class="property-icon">&#127968;</div>
+        <div class="property-info">
+          <div class="property-name">123 Oak Street</div>
+          <div class="property-address">Oakland, CA</div>
+          <div class="property-hours">
+            <span class="badge" style="margin-right: 6px;">LTR</span>
+            142.5 hours tracked
+          </div>
+        </div>
+        <div class="settings-chevron">&#8250;</div>
+      </div>
+
+      <div class="property-card">
+        <div class="property-icon" style="background: #D1FAE5;">&#127965;</div>
+        <div class="property-info">
+          <div class="property-name">456 Pine Ave</div>
+          <div class="property-address">Lake Tahoe, CA</div>
+          <div class="property-hours">
+            <span class="badge" style="background: #DBEAFE; color: #2563EB; margin-right: 6px;">STR</span>
+            86.0 hours tracked
+          </div>
+        </div>
+        <div class="settings-chevron">&#8250;</div>
+      </div>
+
+      <div class="property-card">
+        <div class="property-icon" style="background: #FEF3C7;">&#127970;</div>
+        <div class="property-info">
+          <div class="property-name">789 Elm Blvd</div>
+          <div class="property-address">San Francisco, CA</div>
+          <div class="property-hours">
+            <span class="badge" style="margin-right: 6px;">LTR</span>
+            34.0 hours tracked
+          </div>
+        </div>
+        <div class="settings-chevron">&#8250;</div>
+      </div>
+
+      <button class="btn-primary" style="margin-top: 16px; margin-bottom: 24px;">
+        + Add Property
+      </button>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item"><div class="tab-icon">&#127968;</div>Home</div>
+      <div class="tab-item active"><div class="tab-icon">&#127970;</div>Properties</div>
+      <div class="tab-item"><div class="tab-icon">&#9201;</div>Track</div>
+      <div class="tab-item"><div class="tab-icon">&#128202;</div>Reports</div>
+      <div class="tab-item"><div class="tab-icon">&#9881;</div>Settings</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SCREEN 4: TRACK TIME ===================== -->
+<div class="screen-container">
+  <div class="screen-label">Track Time</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <span class="icons">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="screen-content">
+      <div class="page-header">
+        <div class="page-title">Track Time</div>
+        <div class="date-label">Monday, February 24</div>
+      </div>
+
+      <!-- Stats Strip -->
+      <div class="stats-strip">
+        <div class="stats-strip-item">
+          <div class="stats-strip-value">2.5h</div>
+          <div class="stats-strip-label">Today</div>
+        </div>
+        <div class="stats-strip-item">
+          <div class="stats-strip-value">14.5h</div>
+          <div class="stats-strip-label">Week</div>
+        </div>
+        <div class="stats-strip-item">
+          <div class="stats-strip-value">58.2h</div>
+          <div class="stats-strip-label">Month</div>
+        </div>
+      </div>
+
+      <!-- Main Entry Card -->
+      <div class="card" style="margin-bottom: 20px;">
+        <div class="form-group">
+          <textarea class="input-field" rows="2" placeholder="What did you work on?" style="resize: none;"></textarea>
+        </div>
+
+        <div class="form-group">
+          <div class="form-label">Category</div>
+          <div class="category-chips">
+            <div class="chip active">&#128295; Repairs</div>
+            <div class="chip">&#128209; Management</div>
+            <div class="chip">&#128221; Bookkeeping</div>
+            <div class="chip">&#128218; Legal</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="form-label">Property</div>
+          <div class="input-field" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>123 Oak Street</span>
+            <span class="settings-chevron">&#8250;</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="form-label">Hours</div>
+          <div class="stepper">
+            <div class="stepper-btn">-</div>
+            <div class="stepper-value">1.5</div>
+            <div class="stepper-btn">+</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="form-label">Participant</div>
+          <div class="segment-control">
+            <div class="segment-item active">Self</div>
+            <div class="segment-item">Spouse</div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+          <button class="btn-secondary" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;">&#128247; Photo</button>
+          <button class="btn-secondary" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;">&#10024; AI Assist</button>
+        </div>
+
+        <button class="btn-primary">Log Time</button>
+      </div>
+
+      <!-- Quick Log -->
+      <div class="section-title">Quick Log</div>
+      <div class="quick-grid" style="margin-bottom: 32px;">
+        <div class="quick-btn">
+          <div class="quick-btn-icon" style="background: #7C6FF7;">&#128295;</div>
+          <div class="quick-btn-label">Repairs</div>
+        </div>
+        <div class="quick-btn">
+          <div class="quick-btn-icon" style="background: #34D399;">&#128209;</div>
+          <div class="quick-btn-label">Management</div>
+        </div>
+        <div class="quick-btn">
+          <div class="quick-btn-icon" style="background: #60A5FA;">&#128221;</div>
+          <div class="quick-btn-label">Bookkeeping</div>
+        </div>
+        <div class="quick-btn">
+          <div class="quick-btn-icon" style="background: #F472B6;">&#128218;</div>
+          <div class="quick-btn-label">Legal</div>
+        </div>
+        <div class="quick-btn">
+          <div class="quick-btn-icon" style="background: #FBBF24;">&#128747;</div>
+          <div class="quick-btn-label">Travel</div>
+        </div>
+        <div class="quick-btn">
+          <div class="quick-btn-icon" style="background: #818CF8;">&#127959;</div>
+          <div class="quick-btn-label">Renovations</div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item"><div class="tab-icon">&#127968;</div>Home</div>
+      <div class="tab-item"><div class="tab-icon">&#127970;</div>Properties</div>
+      <div class="tab-item active"><div class="tab-icon">&#9201;</div>Track</div>
+      <div class="tab-item"><div class="tab-icon">&#128202;</div>Reports</div>
+      <div class="tab-item"><div class="tab-icon">&#9881;</div>Settings</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SCREEN 5: REPORTS ===================== -->
+<div class="screen-container">
+  <div class="screen-label">Reports</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <span class="icons">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="screen-content">
+      <div class="page-header">
+        <div class="page-title">Reports</div>
+      </div>
+
+      <!-- Year Selector -->
+      <div class="year-selector">
+        <span class="year-arrow">&#8249;</span>
+        <span class="year-value">2026</span>
+        <span class="year-arrow">&#8250;</span>
+      </div>
+
+      <!-- REPS Progress -->
+      <div class="card" style="margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span class="badge">REPS PROGRESS</span>
+          <span style="font-size: 13px; color: var(--text-secondary);">35%</span>
+        </div>
+        <div class="progress-ring-container" style="padding: 16px 0 8px;">
+          <div class="progress-ring" style="width: 160px; height: 160px;">
+            <svg viewBox="0 0 200 200" style="width: 160px; height: 160px;">
+              <circle class="ring-bg" cx="100" cy="100" r="85"/>
+              <circle class="ring-progress" cx="100" cy="100" r="85"/>
+            </svg>
+            <div class="ring-center">
+              <div class="ring-hours" style="font-size: 28px;">262.5</div>
+              <div class="ring-label">of 750h</div>
+            </div>
+          </div>
+        </div>
+        <div class="rule-indicator">
+          <span class="rule-check">&#10003;</span>
+          <span class="rule-text">50% Rule: On track</span>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-value" style="font-size: 20px;">14.5h</div>
+          <div class="stat-label">This Week</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="font-size: 20px;">58.2h</div>
+          <div class="stat-label">This Month</div>
+        </div>
+      </div>
+
+      <!-- Property Breakdown -->
+      <div style="margin-bottom: 20px;">
+        <div class="section-title">By Property</div>
+        <div class="card">
+          <div class="bar-chart">
+            <div class="bar-item">
+              <span class="bar-label">123 Oak St</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 54%;"></div></div>
+              <span class="bar-value">142.5h</span>
+            </div>
+            <div class="bar-item">
+              <span class="bar-label">456 Pine Ave</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 33%;"></div></div>
+              <span class="bar-value">86.0h</span>
+            </div>
+            <div class="bar-item">
+              <span class="bar-label">789 Elm Blvd</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 13%;"></div></div>
+              <span class="bar-value">34.0h</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category Breakdown -->
+      <div style="margin-bottom: 20px;">
+        <div class="section-title">By Category</div>
+        <div class="card">
+          <div class="bar-chart">
+            <div class="bar-item">
+              <span class="bar-label">Repairs</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 40%;"></div></div>
+              <span class="bar-value">105.0h</span>
+            </div>
+            <div class="bar-item">
+              <span class="bar-label">Management</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 25%;"></div></div>
+              <span class="bar-value">65.5h</span>
+            </div>
+            <div class="bar-item">
+              <span class="bar-label">Travel</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 18%;"></div></div>
+              <span class="bar-value">48.0h</span>
+            </div>
+            <div class="bar-item">
+              <span class="bar-label">Bookkeeping</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 12%;"></div></div>
+              <span class="bar-value">32.0h</span>
+            </div>
+            <div class="bar-item">
+              <span class="bar-label">Legal</span>
+              <div class="bar-track"><div class="bar-fill" style="width: 5%;"></div></div>
+              <span class="bar-value">12.0h</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-primary" style="margin-bottom: 32px;">Export PDF Report</button>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item"><div class="tab-icon">&#127968;</div>Home</div>
+      <div class="tab-item"><div class="tab-icon">&#127970;</div>Properties</div>
+      <div class="tab-item"><div class="tab-icon">&#9201;</div>Track</div>
+      <div class="tab-item active"><div class="tab-icon">&#128202;</div>Reports</div>
+      <div class="tab-item"><div class="tab-icon">&#9881;</div>Settings</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SCREEN 6: SETTINGS ===================== -->
+<div class="screen-container">
+  <div class="screen-label">Settings</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <span class="icons">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="screen-content">
+      <div class="page-header">
+        <div class="page-title">Settings</div>
+      </div>
+
+      <!-- Membership Banner -->
+      <div class="membership-banner">
+        <div class="membership-badge">PRO MEMBER</div>
+        <div class="membership-title">LandlordHours Pro</div>
+        <div class="membership-subtitle">Unlimited properties &amp; PDF export</div>
+      </div>
+
+      <!-- Profile Section -->
+      <div class="card" style="margin-bottom: 16px;">
+        <div style="font-size: 12px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">PROFILE</div>
+        <div class="settings-row">
+          <div class="settings-icon-circle" style="background: var(--primary);">&#128100;</div>
+          <div style="flex: 1;">
+            <div style="font-size: 16px; font-weight: 600; color: var(--text-primary);">Brian Le Vu</div>
+            <div style="font-size: 13px; color: var(--text-secondary);">brian@altaiventures.co</div>
+          </div>
+          <div class="settings-chevron">&#8250;</div>
+        </div>
+      </div>
+
+      <!-- General Section -->
+      <div class="card" style="margin-bottom: 16px;">
+        <div style="font-size: 12px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">GENERAL</div>
+        <div class="settings-row">
+          <div class="settings-icon-circle" style="background: #34D399;">&#127919;</div>
+          <span class="settings-label">Goal Management</span>
+          <div class="settings-chevron">&#8250;</div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-icon-circle" style="background: #60A5FA;">&#9729;</div>
+          <span class="settings-label">iCloud Sync</span>
+          <div class="toggle"></div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-icon-circle" style="background: #FBBF24;">&#128278;</div>
+          <span class="settings-label">Custom Categories</span>
+          <div class="settings-chevron">&#8250;</div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-icon-circle" style="background: #818CF8;">&#128197;</div>
+          <span class="settings-label">Tax Years</span>
+          <div class="settings-chevron">&#8250;</div>
+        </div>
+      </div>
+
+      <!-- Support Section -->
+      <div class="card" style="margin-bottom: 16px;">
+        <div style="font-size: 12px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">SUPPORT</div>
+        <div class="settings-row">
+          <div class="settings-icon-circle" style="background: #F472B6;">&#128172;</div>
+          <span class="settings-label">Contact Support</span>
+          <div class="settings-chevron">&#8250;</div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-icon-circle" style="background: #FB923C;">&#9888;</div>
+          <span class="settings-label">Reset All Data</span>
+          <div class="settings-chevron">&#8250;</div>
+        </div>
+      </div>
+
+      <!-- Sign Out -->
+      <button class="btn-secondary" style="width: 100%; margin-bottom: 32px; color: var(--error);">Sign Out</button>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item"><div class="tab-icon">&#127968;</div>Home</div>
+      <div class="tab-item"><div class="tab-icon">&#127970;</div>Properties</div>
+      <div class="tab-item"><div class="tab-icon">&#9201;</div>Track</div>
+      <div class="tab-item"><div class="tab-icon">&#128202;</div>Reports</div>
+      <div class="tab-item active"><div class="tab-icon">&#9881;</div>Settings</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SCREEN 7: PAYWALL ===================== -->
+<div class="screen-container">
+  <div class="screen-label">Paywall</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <span class="icons">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="screen-content" style="display: flex; flex-direction: column; justify-content: center; padding-top: 40px;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <!-- Logo mark -->
+        <div style="width: 80px; height: 80px; border-radius: 24px; background: linear-gradient(135deg, #7C6FF7, #6355E8); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 36px; color: white; box-shadow: 0 8px 24px rgba(124,111,247,0.3);">&#127968;</div>
+        <div style="font-size: 28px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">Upgrade to Pro</div>
+        <div style="font-size: 15px; color: var(--text-secondary);">Unlock the full LandlordHours experience</div>
+      </div>
+
+      <div class="paywall-features">
+        <div class="paywall-feature">
+          <div class="paywall-feature-icon">&#127970;</div>
+          <span class="paywall-feature-text">Unlimited Properties</span>
+        </div>
+        <div class="paywall-feature">
+          <div class="paywall-feature-icon">&#128196;</div>
+          <span class="paywall-feature-text">Export PDF Reports</span>
+        </div>
+        <div class="paywall-feature">
+          <div class="paywall-feature-icon">&#9729;</div>
+          <span class="paywall-feature-text">iCloud Backup &amp; Sync</span>
+        </div>
+        <div class="paywall-feature">
+          <div class="paywall-feature-icon">&#10024;</div>
+          <span class="paywall-feature-text">AI-Powered Time Entry</span>
+        </div>
+        <div class="paywall-feature">
+          <div class="paywall-feature-icon">&#128197;</div>
+          <span class="paywall-feature-text">Multi-Year Tax Tracking</span>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin: 20px 0 12px;">
+        <div style="font-size: 36px; font-weight: 700; color: var(--text-primary);">$9.99</div>
+        <div style="font-size: 13px; color: var(--text-secondary);">One-time purchase</div>
+      </div>
+
+      <button class="btn-primary" style="margin-bottom: 12px;">Upgrade Now</button>
+      <div style="text-align: center; font-size: 13px; color: var(--text-tertiary); margin-bottom: 16px;">Restore Purchase</div>
+    </div>
+    <div class="tab-bar" style="border-top: none; background: transparent;">
+      <div style="text-align: center; width: 100; font-size: 13px; color: var(--text-tertiary); cursor: pointer;">Maybe Later</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SCREEN 8: DARK MODE DASHBOARD ===================== -->
+<div class="screen-container">
+  <div class="screen-label">Dashboard (Dark Mode)</div>
+  <div class="phone dark">
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <span class="icons">&#9679; &#9679; &#9679;</span>
+    </div>
+    <div class="screen-content">
+      <div class="page-header">
+        <div class="greeting">Good morning, Brian</div>
+        <div class="page-title">Dashboard</div>
+        <div class="date-label">February 24, 2026</div>
+      </div>
+
+      <div class="card" style="margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span class="badge">REPS PROGRESS</span>
+          <span class="badge badge-success">ON TRACK</span>
+        </div>
+        <div class="progress-ring-container">
+          <div class="progress-ring">
+            <svg viewBox="0 0 200 200">
+              <circle class="ring-bg" cx="100" cy="100" r="85"/>
+              <circle class="ring-progress" cx="100" cy="100" r="85"/>
+            </svg>
+            <div class="ring-center">
+              <div class="ring-hours">262.5</div>
+              <div class="ring-label">of 750 hours</div>
+            </div>
+          </div>
+        </div>
+        <div class="rule-indicator" style="background: rgba(52,211,153,0.15);">
+          <span class="rule-check">&#10003;</span>
+          <span class="rule-text">50% Rule: 68% real estate time</span>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-value">14.5h</div>
+          <div class="stat-label">This Week</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">58.2h</div>
+          <div class="stat-label">This Month</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <div class="section-title">Recent Entries</div>
+        <div class="card">
+          <div class="entry-row">
+            <div class="entry-icon" style="background: #9D8FF5;">&#128295;</div>
+            <div class="entry-info">
+              <div class="entry-title">123 Oak Street</div>
+              <div class="entry-subtitle">Repairs &amp; Maintenance</div>
+            </div>
+            <div class="entry-right">
+              <div class="entry-hours">2.5h</div>
+              <div class="entry-date">Today</div>
+            </div>
+          </div>
+          <div class="entry-row">
+            <div class="entry-icon" style="background: #34D399;">&#128209;</div>
+            <div class="entry-info">
+              <div class="entry-title">456 Pine Ave</div>
+              <div class="entry-subtitle">Property Management</div>
+            </div>
+            <div class="entry-right">
+              <div class="entry-hours">1.0h</div>
+              <div class="entry-date">Yesterday</div>
+            </div>
+          </div>
+          <div class="entry-row">
+            <div class="entry-icon" style="background: #60A5FA;">&#128221;</div>
+            <div class="entry-info">
+              <div class="entry-title">789 Elm Blvd</div>
+              <div class="entry-subtitle">Bookkeeping &amp; Financial</div>
+            </div>
+            <div class="entry-right">
+              <div class="entry-hours">3.0h</div>
+              <div class="entry-date">Feb 22</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-item active"><div class="tab-icon">&#127968;</div>Home</div>
+      <div class="tab-item"><div class="tab-icon">&#127970;</div>Properties</div>
+      <div class="tab-item"><div class="tab-icon">&#9201;</div>Track</div>
+      <div class="tab-item"><div class="tab-icon">&#128202;</div>Reports</div>
+      <div class="tab-item"><div class="tab-icon">&#9881;</div>Settings</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

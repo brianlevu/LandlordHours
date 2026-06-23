@@ -215,8 +215,8 @@ Use the project-specific Xcode 27 lane documented at:
 
 Current lane:
 
-- Simulator: `LandlordHours iPhone iOS 27`
-- Simulator UUID: `C8B22181-D398-477F-91D3-ED67F1B8851C`
+- Simulator: `LandlordHours iPhone 17 Pro Max iOS 27`
+- Simulator UUID: `B119FCEA-3C7B-4022-A57E-28357879F07D`
 - DerivedData: `/Volumes/Home/XcodeStorage/DerivedData/landlordhours-xcode27`
 - Results: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results`
 - Logs/screenshots/tmp: `/Users/brian/Projects/LandlordHours/tmp/xcode27`
@@ -235,7 +235,7 @@ Updated: 2026-06-22 02:51 America/Los_Angeles
 
 The dedicated lane is now encoded in project-local files:
 
-- `.xcodebuildmcp/config.yaml` points to `LandlordHours iPhone iOS 27` (`C8B22181-D398-477F-91D3-ED67F1B8851C`), not the shared Codex simulator.
+- `.xcodebuildmcp/config.yaml` points to `LandlordHours iPhone 17 Pro Max iOS 27` (`B119FCEA-3C7B-4022-A57E-28357879F07D`), not the shared Codex simulator.
 - `ci_scripts/test_xcode27_lane.sh` is the canonical local test runner.
 - `ci_scripts/capture_iphone_e2e_visuals.sh` defaults to the same Xcode 27 simulator and SSD DerivedData path.
 - `.gitignore` ignores local `tmp/`, generated `.ipa`, and generated `.app.dSYM.zip` artifacts.
@@ -263,6 +263,46 @@ If XCTest hangs under the iOS 27 beta runner, use a bounded run:
 LANE_TIMEOUT_SECONDS=180 ./ci_scripts/test_xcode27_lane.sh unit
 ```
 
+## Latest Release Gate
+
+Updated: 2026-06-22 23:00 America/Los_Angeles
+
+Current automated status:
+
+- Xcode 27 beta build gate: passed.
+- Unit test gate: passed, 85 / 85 after system-surface hardening.
+- Full UI test gate: passed, 10 / 10.
+- Targeted Engagement Lab system-surface UI gate: passed, 1 / 1.
+- Physical-device iOS 27 build gate: passed on `BLV-Phone`.
+- Release archive gate: passed.
+- App Store Connect export dry run: passed and produced an IPA without uploading or submitting.
+- Privacy manifest: added and packaged in the app bundle.
+- Widget extension: embedded in the app bundle.
+- Lock Screen accessory widget families: added for circular, rectangular, and inline.
+- Dynamic Island preview/action path: added for the active timer review flow.
+- Local notification action categories: added for track, calendar review, export, reports, property setup, and timer review.
+- App Intents metadata: generated in the app bundle.
+- Fastlane build/output paths: moved to the LandlordHours SSD-backed lane instead of shared `/tmp`.
+
+Evidence:
+
+- Latest build result: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-build-for-testing-20260622224343.xcresult`
+- Latest unit result: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-unit-test-20260622224511.xcresult`
+- Targeted Engagement Lab UI result: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-ui-engagement-lab-r3-20260622225608.xcresult`
+- Release-gate build result: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-build-for-testing-20260622214920.xcresult`
+- Release-gate unit result: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-unit-test-20260622214112.xcresult`
+- UI result: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-ui-full-patched-20260622214920.xcresult`
+- Device build result: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-device-build-20260622215713.xcresult`
+- Archive: `/Volumes/Home/XcodeStorage/Archives/LandlordHours-20260622215945.xcarchive`
+- Export: `/Volumes/Home/XcodeStorage/Archives/LandlordHours-20260622215945-export/LandlordHours.ipa`
+
+Remaining manual checks:
+
+- Do not upload to TestFlight or submit for App Review without Brian's explicit approval.
+- Run real-device hands-on QA for Siri phrases, Shortcuts discovery, widgets, Live Activity / Dynamic Island, notification tap routing under Focus modes, and voice logging.
+- Validate StoreKit product lookup and purchase/restore behavior through sandbox or TestFlight.
+- Investigate the two non-fatal SwiftUI `Invalid frame dimension (negative or non-finite)` warnings in the final UI result if visible layout issues appear.
+
 ## Recommended Post-Upgrade Commands
 
 After Xcode 27 beta is installed and selected:
@@ -284,7 +324,7 @@ Then use XcodeBuildMCP:
 For distribution validation:
 
 ```sh
-MARKETING_VERSION=1.0.1 bundle exec fastlane ios beta
+MARKETING_VERSION=1.0.3 fastlane ios beta
 ```
 
 Only run a real TestFlight upload when Brian explicitly wants it. App Store review submission must remain explicit.

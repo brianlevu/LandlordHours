@@ -100,8 +100,13 @@ struct DashboardView: View {
 
     @State private var showPaywall = false
     @State private var isReady = false
-    @State private var showLearningCenter = false
+    @State private var showLearningCenter = Self.shouldOpenLearningCenterFromLaunchArguments
     @State private var showHistory = false
+    @State private var scrollOffset: CGFloat = 0
+
+    private static var shouldOpenLearningCenterFromLaunchArguments: Bool {
+        ProcessInfo.processInfo.arguments.contains("-LHOpenLearningCenter")
+    }
 
     private var shouldShowActivationCard: Bool {
         viewModel.properties.isEmpty || viewModel.timeEntries.isEmpty
@@ -114,9 +119,17 @@ struct DashboardView: View {
 
                 if isReady {
                     ScrollView(showsIndicators: false) {
-                        VStack(spacing: 26) {
+                        GeometryReader { proxy in
+                            Color.clear
+                                .preference(
+                                    key: DashboardScrollOffsetPreferenceKey.self,
+                                    value: proxy.frame(in: .named("dashboardScroll")).minY
+                                )
+                        }
+                        .frame(height: 0)
+
+                        VStack(spacing: 22) {
                             headerSection
-                            quickActionsRow
                             if shouldShowActivationCard {
                                 homeActivationCard
                                 progressRingCard
@@ -129,8 +142,20 @@ struct DashboardView: View {
                             trialStatusNudge
                         }
                         .padding(.horizontal, 24)
-                        .padding(.top, 18)
+                        .padding(.top, 8)
                         .padding(.bottom, AppSpacing.tabContentBottomInset)
+                    }
+                    .coordinateSpace(name: "dashboardScroll")
+                    .onPreferenceChange(DashboardScrollOffsetPreferenceKey.self) { value in
+                        scrollOffset = value
+                    }
+                    .overlay(alignment: .top) {
+                        if isCompactHeaderVisible {
+                            compactDashboardBar
+                                .padding(.horizontal, 24)
+                                .padding(.top, 8)
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                        }
                     }
                     .transition(.opacity)
                 } else {
@@ -171,9 +196,13 @@ struct DashboardView: View {
         }
     }
 
+    private var isCompactHeaderVisible: Bool {
+        scrollOffset < -70
+    }
+
     // MARK: - Header
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center) {
                 Button {
                     NotificationCenter.default.post(name: .switchToTab, object: 4)
@@ -219,13 +248,83 @@ struct DashboardView: View {
                 .accessibilityLabel("Open reports")
             }
 
-            Text(dashboardTitle)
-                .font(.system(size: 42, weight: .black, design: .rounded))
-                .foregroundStyle(colors.textPrimary)
-                .lineSpacing(-2)
-                .minimumScaleFactor(0.78)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(dashboardTitle)
+                    .font(.system(size: dashboardTitleSize, weight: .black, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                    .lineSpacing(-1)
+                    .minimumScaleFactor(0.82)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(dashboardSubtitle)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            quickActionsRow
         }
+    }
+
+    private var compactDashboardBar: some View {
+        HStack(spacing: 12) {
+            Button {
+                NotificationCenter.default.post(name: .switchToTab, object: 4)
+            } label: {
+                Text(userInitials)
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                    .frame(width: 34, height: 34)
+                    .background(colors.backgroundTertiary)
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open profile and settings")
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(compactHeaderTitle)
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                    .lineLimit(1)
+                Text(compactHeaderSubtitle)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            Button {
+                NotificationCenter.default.post(name: .switchToTab, object: 2)
+            } label: {
+                HStack(spacing: 6) {
+                    LucideIcon(image: Lucide.plus, size: 14)
+                    Text("Log")
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                }
+                .foregroundStyle(AppColors.onAction)
+                .padding(.horizontal, 14)
+                .frame(height: 34)
+                .background(colors.action)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Log time")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.88 : 0.94))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(colors.border.opacity(0.28), lineWidth: 1)
+        }
+        .shadow(color: colors.textPrimary.opacity(colorScheme == .dark ? 0.22 : 0.08), radius: 12, y: 6)
+        .lhMotion(AppAnimation.reveal, value: isCompactHeaderVisible)
     }
 
     private var displayName: String {
@@ -237,9 +336,38 @@ struct DashboardView: View {
 
     private var dashboardTitle: String {
         if viewModel.properties.isEmpty {
-            return "Welcome to LandlordHours"
+            return "Add your first property"
         }
-        return "Welcome back, \(displayName)"
+        if viewModel.timeEntries.isEmpty {
+            return "Log your first hour"
+        }
+        return "Today's work"
+    }
+
+    private var dashboardTitleSize: CGFloat {
+        shouldShowActivationCard ? 31 : 32
+    }
+
+    private var dashboardSubtitle: String {
+        if viewModel.properties.isEmpty {
+            return "Start with a property so every hour has a clean record."
+        }
+        if viewModel.timeEntries.isEmpty {
+            return "\(viewModel.properties.count) property ready. Capture the first activity while details are fresh."
+        }
+        return "\(AppFormat.hours(totalHours)) logged toward \(Int(targetHours)) hours. \(isOnTrack ? "You're on pace." : "\(Int(hoursPerWeekNeeded))h per week gets you back on pace.")"
+    }
+
+    private var compactHeaderTitle: String {
+        if shouldShowActivationCard { return "Finish setup" }
+        return "\(AppFormat.hours(totalHours)) logged"
+    }
+
+    private var compactHeaderSubtitle: String {
+        if shouldShowActivationCard {
+            return "\(completedActivationSteps)/2 essentials complete"
+        }
+        return "\(Int(progress * 100))% of \(Int(targetHours))h target"
     }
 
     private var userInitials: String {
@@ -251,39 +379,85 @@ struct DashboardView: View {
         return String(source.prefix(2)).uppercased()
     }
 
-    // MARK: - Quick Actions
+    // MARK: - Home Commands
+    @ViewBuilder
     private var quickActionsRow: some View {
-        HStack(spacing: 8) {
-            dashboardPill("Log time", isPrimary: true) {
-                NotificationCenter.default.post(name: .switchToTab, object: 2)
+        if viewModel.properties.isEmpty {
+            HStack(spacing: 10) {
+                dashboardPrimaryPill("Add property", icon: Lucide.building2) {
+                    openAddPropertyFromHome()
+                }
+                dashboardSecondaryPill("What counts", icon: Lucide.bookOpenText, width: 138) {
+                    showLearningCenter = true
+                }
             }
-            dashboardPill("Property") {
-                NotificationCenter.default.post(name: .switchToTab, object: 1)
-                NotificationCenter.default.post(name: .openAddProperty, object: nil)
+        } else if viewModel.timeEntries.isEmpty {
+            HStack(spacing: 10) {
+                dashboardPrimaryPill("Log time", icon: Lucide.clock) {
+                    NotificationCenter.default.post(name: .switchToTab, object: 2)
+                }
+                dashboardSecondaryPill("Learn", icon: Lucide.bookOpenText, width: 92) {
+                    showLearningCenter = true
+                }
+                dashboardSecondaryPill("Property", icon: Lucide.building2, width: 104) {
+                    NotificationCenter.default.post(name: .switchToTab, object: 1)
+                }
             }
-            dashboardPill("Entries") {
-                showHistory = true
+        } else {
+            HStack(spacing: 10) {
+                dashboardPrimaryPill("Log time", icon: Lucide.clock) {
+                    NotificationCenter.default.post(name: .switchToTab, object: 2)
+                }
+                dashboardSecondaryPill("Entries", icon: Lucide.list, width: 98) {
+                    showHistory = true
+                }
+                dashboardSecondaryPill("Reports", icon: Lucide.chartColumnIncreasing, width: 100) {
+                    NotificationCenter.default.post(name: .switchToTab, object: 3)
+                }
             }
         }
     }
 
-    private func dashboardPill(_ title: String, isPrimary: Bool = false, action: @escaping () -> Void) -> some View {
+    private func dashboardPrimaryPill(_ title: String, icon: UIImage, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title)
-                .font(.system(size: 15, weight: .black, design: .rounded))
-                .foregroundStyle(isPrimary ? AppColors.onAction : colors.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-                .frame(maxWidth: .infinity)
-                .frame(height: 48)
-                .background(isPrimary ? colors.action : colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.72 : 1))
-                .clipShape(Capsule())
-                .overlay {
-                    Capsule()
-                        .strokeBorder(isPrimary ? Color.clear : colors.border.opacity(0.35), lineWidth: 1)
-                }
+            HStack(spacing: 8) {
+                LucideIcon(image: icon, size: 17)
+                Text(title)
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+            }
+            .foregroundStyle(AppColors.onAction)
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
+            .background(colors.action)
+            .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.lhPressable)
+        .accessibilityLabel(title)
+    }
+
+    private func dashboardSecondaryPill(_ title: String, icon: UIImage, width: CGFloat, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                LucideIcon(image: icon, size: 15)
+                Text(title)
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+            .foregroundStyle(colors.textPrimary)
+            .frame(width: width)
+            .frame(height: 50)
+            .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.72 : 1))
+            .clipShape(Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.lhPressable)
+        .accessibilityLabel(title)
     }
 
     // MARK: - Pro Status Nudge
@@ -391,7 +565,7 @@ struct DashboardView: View {
 
     private var goalCardSubtitle: String {
         if isGoalMet { return "Your tracked work has reached the current goal." }
-        return "\(Int(hoursPerWeekNeeded))h per week keeps you on pace for \(currentYear)."
+        return "\(Int(hoursPerWeekNeeded))h per week \(isOnTrack ? "keeps you on pace" : "gets you back on pace") for \(currentYear)."
     }
 
     private func dashboardMiniMetric(title: String, value: String) -> some View {
@@ -448,11 +622,9 @@ struct DashboardView: View {
                     subtitle: viewModel.properties.isEmpty ? "Add first" : "\(viewModel.properties.count) ready",
                     icon: Lucide.building2,
                     isComplete: !viewModel.properties.isEmpty,
+                    accessibilityIdentifier: "home.activation.property",
                     action: {
-                        NotificationCenter.default.post(name: .switchToTab, object: 1)
-                        if viewModel.properties.isEmpty {
-                            NotificationCenter.default.post(name: .openAddProperty, object: nil)
-                        }
+                        openAddPropertyFromHome()
                     }
                 )
 
@@ -461,6 +633,7 @@ struct DashboardView: View {
                     subtitle: viewModel.timeEntries.isEmpty ? "Log now" : AppFormat.hours(totalHours),
                     icon: Lucide.clock,
                     isComplete: !viewModel.timeEntries.isEmpty,
+                    accessibilityIdentifier: "home.activation.firstHour",
                     action: {
                         NotificationCenter.default.post(name: .switchToTab, object: 2)
                     }
@@ -471,6 +644,7 @@ struct DashboardView: View {
                     subtitle: "What counts",
                     icon: Lucide.bookOpenText,
                     isComplete: false,
+                    accessibilityIdentifier: "home.activation.learn",
                     action: {
                         showLearningCenter = true
                     }
@@ -481,6 +655,7 @@ struct DashboardView: View {
                     subtitle: "Check pace",
                     icon: Lucide.chartColumnIncreasing,
                     isComplete: false,
+                    accessibilityIdentifier: "home.activation.report",
                     action: {
                         NotificationCenter.default.post(name: .switchToTab, object: 3)
                     }
@@ -501,11 +676,20 @@ struct DashboardView: View {
         (viewModel.properties.isEmpty ? 0 : 1) + (viewModel.timeEntries.isEmpty ? 0 : 1)
     }
 
+    private func openAddPropertyFromHome() {
+        if viewModel.properties.isEmpty {
+            NotificationCenter.default.post(name: .switchToPropertiesAndOpenAddProperty, object: nil)
+        } else {
+            NotificationCenter.default.post(name: .switchToTab, object: 1)
+        }
+    }
+
     private func activationActionTile(
         title: String,
         subtitle: String,
         icon: UIImage,
         isComplete: Bool,
+        accessibilityIdentifier: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -545,6 +729,7 @@ struct DashboardView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(title). \(subtitle)")
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 
     // MARK: - Pace Chips
@@ -854,6 +1039,14 @@ struct EntryListRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 13)
+    }
+}
+
+private struct DashboardScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

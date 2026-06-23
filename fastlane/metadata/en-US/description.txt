@@ -1,0 +1,17 @@
+LandlordHours helps rental property owners track the work hours that matter for tax-year records.
+
+Log time by property, category, date, and participant. Monitor Real Estate Professional Status, material participation, and short-term rental activity in one focused iPhone app.
+
+Key features:
+
+• Track hours by property and activity category
+• Use AI-assisted entry to turn plain-English notes into structured time logs
+• Monitor REPS 750-hour progress and the 50% rule
+• Track 100-hour and 500-hour material participation goals
+• Add spouse participation when it applies to your filing situation
+• Import calendar events to speed up time logging
+• Attach records and notes to time entries
+• Export PDF reports for your CPA or tax records
+• Back up records with iCloud sync when available
+
+LandlordHours is built for organized recordkeeping. It does not provide tax, legal, or financial advice. Review your reports with a qualified tax professional.
