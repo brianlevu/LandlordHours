@@ -8,7 +8,7 @@ Branch before merge: `codex/landlordhours-voice-logging-ios27`
 
 Use Xcode 26.5 for the App Store release artifact.
 
-Keep Xcode 27 beta as the forward-looking development/test lane, but do not submit an Xcode 27 / iOS 27 SDK build for App Review until Apple explicitly supports that path for App Store release. The current Xcode 27 IPA uploaded successfully through Transporter/Fastlane, but it did not become an eligible App Store build and could not be attached to version `1.0.3`.
+Keep Xcode 27 beta as the forward-looking development/test lane. The earlier June 23 App Store uploads did not become eligible because App Store Connect rejected the package's alternate-icon metadata, not because of a confirmed Xcode 27-only rejection.
 
 ## Release State
 
@@ -16,28 +16,49 @@ Keep Xcode 27 beta as the forward-looking development/test lane, but do not subm
 - Bundle ID: `com.openclaw.landlordhours`
 - Prepared App Store version: `1.0.3`
 - Current App Store version state from API: `PREPARE_FOR_SUBMISSION`
-- Current selected build on version `1.0.3`: none (`/appStoreVersions/<id>/build` returned `data: null`)
+- Current selected build on version `1.0.3`: none until a newly processed build is attached (`/appStoreVersions/<id>/build` returned `data: null`)
 - Review information exists and is populated in App Store Connect.
 - App Store screenshots remain in `appstore-screenshots/` and should be kept for metadata upload.
 
-## Why The Xcode 27 Upload Was Not Submitted
+## App Store Upload Failure Root Cause
 
-The uploaded IPA was verified as:
+The first June 23 Xcode 26.5 IPA was verified as:
 
 - `CFBundleIdentifier`: `com.openclaw.landlordhours`
 - `CFBundleShortVersionString`: `1.0.3`
-- `CFBundleVersion`: `202606230116`
-- `DTXcode`: `2700`
-- `DTSDKName`: `iphoneos27.0`
-- `DTPlatformVersion`: `27.0`
+- `CFBundleVersion`: `202606230738`
+- `DTXcode`: `2650`
+- `DTSDKName`: `iphoneos26.5`
+- `DTPlatformVersion`: `26.5`
 - `MinimumOSVersion`: `17.0`
 
-Fastlane/Transporter reported the package upload as successful, but App Store Connect's build API did not list the June 23 build as an available App Store build. The `1.0.3` app version had no selected build, and the new `reviewSubmissions` API returned Apple server errors:
+Fastlane/Transporter reported upload success, but App Store Connect's build-upload API showed the package failed validation:
 
-- `GET /reviewSubmissions`: `500 UNEXPECTED_ERROR`
-- `POST /reviewSubmissions`: `500 UNEXPECTED_ERROR`
+- Build `202606230738`: `FAILED`
+- Error `90032`: `Invalid Image Path - No image found at the path referenced under key 'CFBundleAlternateIcons'`
+- Missing referenced names: `AppIcon-Violet`, `AppIcon-Clock`, `AppIcon-Sunset`, `AppIcon-Aurora`
 
-The likely root cause is that Xcode 27 beta / iOS 27 SDK builds are currently suitable for TestFlight testing but not App Store production review. The actionable blocker is no eligible build attached to version `1.0.3`.
+Root cause: `Sources/App/Info.plist` manually declared alternate icons using `CFBundleIconFiles`, but the alternate icons are asset-catalog entries. Xcode-generated asset-catalog metadata correctly uses `CFBundleIconName`; the manual plist block overrode that and made App Store processing look for root PNG files that were not packaged.
+
+Fix:
+
+- Added `ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES` for all four alternate icons in Debug and Release.
+- Added `ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES`.
+- Removed the manual `CFBundleIcons` block from `Sources/App/Info.plist` so Xcode generates correct `CFBundleIconName` metadata for iPhone and iPad.
+
+The corrected Xcode 26.5 IPA was verified locally as:
+
+- `CFBundleShortVersionString`: `1.0.3`
+- `CFBundleVersion`: `202606230805`
+- `DTXcode`: `2650`
+- `DTSDKName`: `iphoneos26.5`
+- Alternate icons present in `Assets.car`
+- Alternate plist entries use only `CFBundleIconName`, not stale `CFBundleIconFiles`
+
+App Store Connect build-upload status immediately after upload:
+
+- Build `202606230805`: `PROCESSING`
+- Validation errors: none reported at first status check
 
 ## Stable Xcode 26 Readiness
 
@@ -111,15 +132,16 @@ After archive, export/upload with App Store Connect API key authentication. Do n
 
 ## Verification After Stable Upload
 
-After uploading the Xcode 26.5 build, verify:
+After uploading the corrected Xcode 26.5 build, verify:
 
-1. App Store Connect build list includes the new build.
-2. Build attributes show:
+1. App Store Connect build-upload state becomes `COMPLETE`.
+2. App Store Connect build list includes the new build.
+3. Build attributes show:
    - `processingState`: `VALID`
    - `buildAudienceType`: `APP_STORE_ELIGIBLE`
    - `minOsVersion`: `17.0`
-3. App Store version `1.0.3` has a build attached.
-4. Review submission moves from `PREPARE_FOR_SUBMISSION` to `WAITING_FOR_REVIEW`.
+4. App Store version `1.0.3` has a build attached.
+5. Review submission moves from `PREPARE_FOR_SUBMISSION` to `WAITING_FOR_REVIEW`.
 
 ## Next Resume Prompt
 
@@ -131,7 +153,6 @@ Use stable Xcode 26.5 for App Store release:
 2. Confirm `tmp` is still the SSD symlink.
 3. Build/archive with `/Volumes/Home/Applications/Xcode.app/Contents/Developer`.
 4. Upload the Xcode 26.5 / iOS 26.5 SDK build to App Store Connect for version `1.0.3`.
-5. Verify the new build appears as `APP_STORE_ELIGIBLE`.
+5. Verify build `202606230805` or any newer corrected build appears as `APP_STORE_ELIGIBLE`.
 6. Attach it to version `1.0.3`.
 7. Submit version `1.0.3` for App Review.
-8. Do not use the Xcode 27 beta IPA for App Review until Apple supports that release path.

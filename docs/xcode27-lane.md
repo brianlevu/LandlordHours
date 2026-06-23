@@ -203,9 +203,10 @@ This uploads to the prepared App Store Connect version but does not submit for A
 
 App Store review note:
 
-- Do not submit the Xcode 27 beta / iOS 27 SDK IPA for App Review until Apple explicitly supports that path for App Store production release.
-- On 2026-06-23, the Xcode 27 IPA uploaded but did not appear as an eligible App Store build. Version `1.0.3` had no selected build, and the review-submission API returned Apple `500 UNEXPECTED_ERROR`.
-- Use the stable Xcode 26.5 release path documented in `docs/session-handoff-2026-06-23-stable-appstore-resubmission.md` for App Store review.
+- Use the stable Xcode 26.5 release path documented in `docs/session-handoff-2026-06-23-stable-appstore-resubmission.md` for the current App Store review submission.
+- On 2026-06-23, both the Xcode 27 and first Xcode 26 uploads failed App Store processing because `Info.plist` manually referenced alternate icons through `CFBundleIconFiles` while the icons were packaged in the asset catalog.
+- The fix is to let Xcode generate alternate-icon metadata from `ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES` and keep manual `CFBundleIcons` out of `Sources/App/Info.plist`.
+- If an Xcode 27 beta IPA still does not become App Store eligible after the icon fix, treat that as a separate toolchain policy issue and confirm with current Apple release guidance before submitting.
 
 ## Verification Status
 
@@ -216,6 +217,7 @@ Latest lane verification:
 - Corrected IPA version/build: `1.0.3` / `202606230116`
 - Metadata/screenshots upload log: `/Users/brian/Projects/LandlordHours/tmp/xcode27/logs/appstore-release-20260623011007.log`
 - Corrected binary-only upload log: `/Users/brian/Projects/LandlordHours/tmp/xcode27/logs/appstore-binary-only-20260623013127-v103.log`
+- App Store upload failure root cause found on 2026-06-23: alternate icon metadata validation (`90032 Invalid Image Path`), fixed in the stable Xcode 26 release lane with build `202606230805`.
 - `LANE_TIMEOUT_SECONDS=900 ./ci_scripts/test_xcode27_lane.sh build` passed with Xcode 27 beta after Lock Screen widget, Dynamic Island action, notification action, and Engagement Lab QA hardening.
 - Build result: `/Volumes/Home/XcodeStorage/XcodeBuildMCP/workspaces/landlordhours/results/lane-build-for-testing-20260622224343.xcresult`
 - `LANE_TIMEOUT_SECONDS=900 ./ci_scripts/test_xcode27_lane.sh unit` passed, confirmed from xcresult as 85 passed / 0 failed.
