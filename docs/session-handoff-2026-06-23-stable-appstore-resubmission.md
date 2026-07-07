@@ -1,5 +1,14 @@
 # LandlordHours Stable App Store Resubmission Handoff
 
+> **Status update — 2026-07-07:** This doc's "Remaining Submission Blocker" section is resolved. Verified via the App Store Connect API on 2026-07-07:
+> - Version `1.0.3` is `READY_FOR_SALE` / `READY_FOR_DISTRIBUTION` (created 2026-06-23). The app is live on the App Store.
+> - Versions `1.0`, `1.0.1`, and `1.0.2` are also `READY_FOR_SALE`.
+> - The `Add for Review` blocker described below was resolved after this document was written; the review submission went through.
+> - The legacy orphaned consumable IAP `premium` (App Store Connect id `6759509066`), called out below as a likely contributing cause, was deleted on 2026-07-07 with Brian's approval.
+> - The only remaining IAP is `com.openclaw.landlordhours.pro`, type `NON_CONSUMABLE`, state `APPROVED`.
+>
+> The body below is left as-written for historical record of the investigation; do not treat its "Remaining Submission Blocker" / "Next Resume Prompt" sections as current TODOs.
+
 Date: 2026-06-23
 Project: `/Users/brian/Projects/LandlordHours`
 Branch before merge: `codex/landlordhours-voice-logging-ios27`

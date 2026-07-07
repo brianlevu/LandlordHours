@@ -44,7 +44,7 @@ LandlordHours is a mobile-first time tracking app designed for real estate inves
 - [x] Hours by Category
 - [x] Hours by Participant
 - [x] Year-over-Year Comparison
-- [ ] Export to PDF (Planned)
+- [x] Export to PDF (Shipped — `Sources/Views/ExportPDFView.swift`, gated behind Pro purchase)
 
 ---
 

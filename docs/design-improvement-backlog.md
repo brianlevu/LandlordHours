@@ -25,7 +25,7 @@ For each milestone:
 
 ### P0 - Release Readiness / Xcode 27 Ship Gate
 
-Status: Automated build, test, device build, archive, and export gates passed; manual system-surface QA remains open
+Status: Automated build, test, device build, archive, and export gates passed; manual system-surface QA remains open. Update 2026-07-07: version 1.0.3 is live on the App Store (`READY_FOR_SALE` / `READY_FOR_DISTRIBUTION`, verified via App Store Connect API), the prior "Add for Review" submission blocker is resolved, and the orphaned legacy `premium` IAP was deleted — see `docs/session-handoff-2026-06-23-stable-appstore-resubmission.md` for the addendum. Manual system-surface QA below remains open regardless of ship status.
 Files: `Sources/App/PrivacyInfo.xcprivacy`, `UITests/LandlordHoursUITests.swift`, `fastlane/Fastfile`, `LandlordHours.xcodeproj/project.pbxproj`
 
 Outcome:
