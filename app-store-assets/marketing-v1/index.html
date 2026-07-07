@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LandlordHours — App Store Screenshot Set</title>
+    <style>
+      /* marketing-v1 · follows the poster-first grammar (skill v3.1).
+         Palette = the app's own system: cream/lavender wash, violet action. */
+      :root {
+        --ink: #1a1a2e;
+        --violet: #7c6ff7;
+        --violet-deep: #6355e8;
+        --g0: #faf7f2;
+        --g1: #f2eeff;
+        --g2: #e4ddfa;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { width: 100%; height: 100%; }
+
+      body {
+        overflow: hidden;
+        background: #fff;
+        color: var(--ink);
+        font-family: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .poster {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        background: linear-gradient(180deg, var(--g0) 0%, var(--g1) 55%, var(--g2) 100%);
+      }
+
+      .bleed {
+        position: absolute; inset: 0;
+        width: 100%; height: 100%;
+        object-fit: cover;
+      }
+
+      .head {
+        position: absolute;
+        top: 5.4%;
+        left: 0; right: 0;
+        text-align: center;
+        padding: 0 80px;
+        z-index: 6;
+      }
+      .head h1 {
+        font-size: 172px;
+        line-height: 1.0;
+        font-weight: 900;
+        letter-spacing: -1px;
+        text-wrap: balance;
+      }
+      .head h1 .hl { color: var(--violet-deep); }
+
+      .on-scene h1 { color: #fff; text-shadow: 0 6px 40px rgba(26, 16, 60, 0.55), 0 2px 10px rgba(26, 16, 60, 0.4); }
+      .on-scene .laurel { color: rgba(255, 255, 255, 0.92); text-shadow: 0 2px 16px rgba(26, 16, 60, 0.5); }
+
+      .laurel {
+        margin-top: 30px;
+        font-size: 46px;
+        font-weight: 900;
+        letter-spacing: 0.5px;
+      }
+
+      /* Borderless modern screen — no bezel, white hairline rim, layered lift. */
+      .device {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        border-radius: 120px;
+        overflow: hidden;
+        box-shadow:
+          0 0 0 3px rgba(255, 255, 255, 0.85),
+          0 60px 110px rgba(46, 32, 92, 0.32),
+          0 22px 44px rgba(46, 32, 92, 0.2);
+        z-index: 3;
+      }
+      .device img { display: block; width: 100%; }
+
+      .sprite {
+        position: absolute;
+        z-index: 5;
+        filter: drop-shadow(0 34px 44px rgba(30, 20, 70, 0.3));
+      }
+
+      .hidden { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <!-- 1 · HERO — pure poster: the cozy rental world at dusk. -->
+    <section class="poster panel on-scene" id="panel-hero">
+      <img class="bleed" src="assets/sprites/hero-raw.png" alt=""
+        style="object-position: 50% 62%;" />
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(26,16,60,0.36) 0%,transparent 36%,transparent 72%,rgba(26,16,60,0.42) 100%);"></div>
+      <div class="head">
+        <h1>Hours that<br />hold up.</h1>
+        <div class="laurel">〜 for landlords chasing REPS 〜</div>
+      </div>
+      <div class="head" style="top:auto;bottom:5%;">
+        <div class="laurel" style="font-size:52px;">Track · Prove · Export</div>
+      </div>
+    </section>
+
+    <!-- 2 · TRACK — the logging moment; clock rests on the frame edge. -->
+    <section class="poster panel hidden" id="panel-track">
+      <div class="head">
+        <h1>Log it in<br /><span class="hl">seconds.</span></h1>
+      </div>
+      <div class="device" style="width: 1170px; bottom: -430px;">
+        <img src="assets/screens/tab2.png" alt="" />
+      </div>
+      <img class="sprite" src="assets/sprites/clock.png"
+        style="width: 330px; left: 30px; top: 14.2%; transform: rotate(-7deg); z-index: 6;" alt="" />
+    </section>
+
+    <!-- 3 · GOAL MET — the reward screen: 186 of 100, confirmed. -->
+    <section class="poster panel hidden" id="panel-goalmet">
+      <div class="head">
+        <h1>Hours into<br /><span class="hl">proof.</span></h1>
+      </div>
+      <div class="device" style="width: 1170px; bottom: -430px;">
+        <img src="assets/screens/ut-confirmed.png" alt="" />
+      </div>
+      <img class="sprite" src="assets/sprites/house.png"
+        style="width: 360px; right: 34px; top: 17.7%; transform: rotate(6deg); z-index: 6;" alt="" />
+    </section>
+
+    <!-- 4 · PORTFOLIO — evidence across properties; clipboard on the edge. -->
+    <section class="poster panel hidden" id="panel-portfolio">
+      <div class="head">
+        <h1>Every property,<br /><span class="hl">one file.</span></h1>
+      </div>
+      <div class="device" style="width: 1170px; bottom: -430px;">
+        <img src="assets/screens/tab1.png" alt="" />
+      </div>
+      <img class="sprite" src="assets/sprites/clipboard.png"
+        style="width: 250px; left: 20px; top: 13.3%; transform: rotate(-8deg); z-index: 6;" alt="" />
+    </section>
+
+    <!-- 5 · HONEST — the signature trust interaction, zoomed micro-interaction
+         pattern: the 100-hour confirmation sheet cropped to the sheet itself
+         (dimmed parent behind a sheet reads as two stacked apps — grammar #9). -->
+    <section class="poster panel hidden" id="panel-honest">
+      <div class="head">
+        <h1>Honest by<br /><span class="hl">design.</span></h1>
+      </div>
+      <div class="device" style="width: 1300px; bottom: -60px; border-radius: 90px;">
+        <img src="assets/screens/sheet-crop.png" alt="" />
+      </div>
+      <img class="sprite" src="assets/sprites/keys.png"
+        style="width: 330px; right: 56px; top: 36.5%; transform: rotate(8deg); z-index: 6;" alt="" />
+    </section>
+
+    <script>
+      const params = new URLSearchParams(location.search);
+      const want = params.get("panel") || "hero";
+      document.querySelectorAll(".panel").forEach((el) => {
+        const active = el.id === `panel-${want}`;
+        el.classList.toggle("hidden", !active);
+        if (active && el.dataset.bg) el.style.background = el.dataset.bg;
+      });
+    </script>
+  </body>
+</html>

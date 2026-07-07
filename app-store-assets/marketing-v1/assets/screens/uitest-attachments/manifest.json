@@ -1,0 +1,35 @@
+[
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "8275BA1A-1B76-47D9-9303-3DAB126C692E",
+        "deviceName" : "LensWords QA iPhone 17 Pro Max",
+        "exportedFileName" : "AFD76505-F6DA-467D-A2A9-05AC1E3385F0.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "mp100-3-confirmed-reports_0_2C642352-A4F8-4076-997A-9850DA8B164E.png",
+        "timestamp" : 1783413559.138
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "8275BA1A-1B76-47D9-9303-3DAB126C692E",
+        "deviceName" : "LensWords QA iPhone 17 Pro Max",
+        "exportedFileName" : "282A71C1-9353-477F-B09D-03CCE3640FC7.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "mp100-2-confirmation-ui_0_1AA26F7D-1AFD-4046-9923-DA8639A623D9.png",
+        "timestamp" : 1783413555.882
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "8275BA1A-1B76-47D9-9303-3DAB126C692E",
+        "deviceName" : "LensWords QA iPhone 17 Pro Max",
+        "exportedFileName" : "4493A1BA-A78F-4FBA-AB9F-7F7EB50BCFE2.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "mp100-1-conditional-reports_0_79CCDD51-E245-4AB4-9877-B25220DD9E1F.png",
+        "timestamp" : 1783413554.141
+      }
+    ],
+    "testIdentifier" : "LandlordHoursUITests/testMaterialParticipation100HourConfirmationStates()",
+    "testIdentifierURL" : "test://com.apple.xcode/LandlordHours/LandlordHoursUITests/LandlordHoursUITests/testMaterialParticipation100HourConfirmationStates"
+  }
+]
