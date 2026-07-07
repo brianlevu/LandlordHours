@@ -3,6 +3,8 @@ import SwiftUI
 import AuthenticationServices
 import WidgetKit
 import ActivityKit
+import UIKit
+import os.log
 
 // MARK: - Per-User Key Scoping
 
@@ -439,6 +441,8 @@ class AppViewModel: ObservableObject {
             cancelTimer()
         }
         properties.removeAll { $0.id == property.id }
+        let removedEntries = timeEntries.filter { $0.propertyId == property.id }
+        deleteAttachmentFiles(for: removedEntries)
         timeEntries.removeAll { $0.propertyId == property.id }
         saveData()
         Task { await syncService.deletePropertyFromCloud(property) }
@@ -476,9 +480,20 @@ class AppViewModel: ObservableObject {
     }
 
     func deleteTimeEntry(_ entry: TimeEntry) {
+        deleteAttachmentFiles(for: [entry])
         timeEntries.removeAll { $0.id == entry.id }
         saveData()
         Task { await syncService.deleteEntryFromCloud(entry) }
+    }
+
+    /// Remove the on-disk attachment files backing the given entries. Safe to call
+    /// for entries with no attachments; missing files are ignored.
+    private func deleteAttachmentFiles(for entries: [TimeEntry]) {
+        for entry in entries {
+            for attachment in entry.attachments {
+                AttachmentStore.shared.delete(attachment)
+            }
+        }
     }
 
     // MARK: - Calendar Import
@@ -749,32 +764,117 @@ class AppViewModel: ObservableObject {
     }
     
     // MARK: - Persistence
+
+    /// Non-blocking, user-facing persistence error surfaced as a banner. `nil` when healthy.
+    @Published var persistenceError: String?
+
+    private static let persistenceLogger = Logger(subsystem: "com.openclaw.landlordhours", category: "Persistence")
+
+    private static let saveFailureMessage =
+        "Couldn't save your latest changes — free up space and try again."
+    private static let loadFailureMessage =
+        "Couldn't open your saved records. They're still on your device — reopen the app, and contact support if this keeps happening."
+
     private func saveData() {
-        if let propertiesData = try? JSONEncoder().encode(properties) {
-            UserDefaults.standard.set(propertiesData, forKey: propertiesKey)
-        }
-        if let entriesData = try? JSONEncoder().encode(timeEntries) {
-            UserDefaults.standard.set(entriesData, forKey: entriesKey)
-        }
+        writePersistentStore()
         refreshWidgetSnapshot()
         // Trigger debounced cloud push
         syncService.schedulePush()
     }
-    
+
+    /// Flushes any pending attachment bytes to disk, then encodes and writes
+    /// properties + entries. Sets `persistenceError` on failure instead of
+    /// swallowing it. Returns `true` on a fully successful write.
+    @discardableResult
+    private func writePersistentStore() -> Bool {
+        do {
+            // Write attachment files first so the encoded blob never carries photo
+            // bytes and files are verified before any inline copy is dropped.
+            try persistPendingAttachments()
+            let propertiesData = try JSONEncoder().encode(properties)
+            let entriesData = try JSONEncoder().encode(timeEntries)
+            UserDefaults.standard.set(propertiesData, forKey: propertiesKey)
+            UserDefaults.standard.set(entriesData, forKey: entriesKey)
+            persistenceError = nil
+            return true
+        } catch {
+            Self.persistenceLogger.error("Save failed: \(error.localizedDescription, privacy: .public)")
+            persistenceError = Self.saveFailureMessage
+            return false
+        }
+    }
+
+    /// Writes every attachment's still-in-memory bytes (freshly picked photos, or
+    /// legacy inline blobs) out to a verified file, then drops the in-memory copy.
+    /// Idempotent: attachments with no pending bytes are skipped. On a thrown
+    /// error, already-flushed attachments stay safely on disk and the persisted
+    /// blob (untouched by this method) still holds every inline copy, so a later
+    /// attempt re-runs without data loss.
+    private func persistPendingAttachments() throws {
+        for entryIndex in timeEntries.indices {
+            for attachmentIndex in timeEntries[entryIndex].attachments.indices {
+                let attachment = timeEntries[entryIndex].attachments[attachmentIndex]
+                guard let bytes = attachment.pendingBytes else { continue }
+                try AttachmentStore.shared.write(bytes, for: attachment)
+                timeEntries[entryIndex].attachments[attachmentIndex].clearPendingData()
+            }
+        }
+    }
+
     private func loadData() {
         // Always reset before loading — prevents stale data from leaking across user scopes
         properties = []
         timeEntries = []
+        persistenceError = nil
 
-        if let propertiesData = UserDefaults.standard.data(forKey: propertiesKey),
-           let decoded = try? JSONDecoder().decode([RentalProperty].self, from: propertiesData) {
-            properties = decoded
+        // A present-but-undecodable blob is corruption: surface it rather than
+        // silently presenting an empty dataset as if it were the real records.
+        if let propertiesData = UserDefaults.standard.data(forKey: propertiesKey) {
+            do {
+                properties = try JSONDecoder().decode([RentalProperty].self, from: propertiesData)
+            } catch {
+                Self.persistenceLogger.error("Property load failed (corrupt store): \(error.localizedDescription, privacy: .public)")
+                persistenceError = Self.loadFailureMessage
+            }
         }
-        if let entriesData = UserDefaults.standard.data(forKey: entriesKey),
-           let decoded = try? JSONDecoder().decode([TimeEntry].self, from: entriesData) {
-            timeEntries = decoded
+        if let entriesData = UserDefaults.standard.data(forKey: entriesKey) {
+            do {
+                timeEntries = try JSONDecoder().decode([TimeEntry].self, from: entriesData)
+            } catch {
+                Self.persistenceLogger.error("Entry load failed (corrupt store): \(error.localizedDescription, privacy: .public)")
+                persistenceError = Self.loadFailureMessage
+            }
         }
+
+        migrateInlineAttachmentsIfNeeded()
         refreshWidgetSnapshot()
+    }
+
+    /// One-time migration of legacy inline attachment bytes to file storage.
+    ///
+    /// Detection is data-driven — it runs only when a just-decoded entry still
+    /// carries inline bytes — which makes it inherently idempotent: after a
+    /// successful flush the persisted blob has no inline bytes, so a re-run finds
+    /// nothing to migrate. It is crash-safe: if the process dies before the
+    /// re-save, the persisted blob still holds the inline bytes and the next
+    /// launch migrates again. Bytes are never dropped before their file write is
+    /// verified (see `persistPendingAttachments`).
+    private func migrateInlineAttachmentsIfNeeded() {
+        let hasLegacyInlineBytes = timeEntries.contains { entry in
+            entry.attachments.contains { $0.hasPendingData }
+        }
+        guard hasLegacyInlineBytes else { return }
+
+        do {
+            try persistPendingAttachments()
+            let entriesData = try JSONEncoder().encode(timeEntries)
+            UserDefaults.standard.set(entriesData, forKey: entriesKey)
+            Self.persistenceLogger.info("Migrated legacy inline attachments to file storage.")
+        } catch {
+            // Leave the persisted blob untouched (it still holds the inline bytes)
+            // so a later launch retries. No data is lost; log for diagnostics.
+            Self.persistenceLogger.error("Attachment migration deferred: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     private func refreshWidgetSnapshot() {
@@ -1078,12 +1178,7 @@ extension AppViewModel: CloudKitSyncDelegate {
 
     /// Save to UserDefaults only (no cloud push — avoids loop when merging remote data)
     private func saveDataLocal() {
-        if let propertiesData = try? JSONEncoder().encode(properties) {
-            UserDefaults.standard.set(propertiesData, forKey: propertiesKey)
-        }
-        if let entriesData = try? JSONEncoder().encode(timeEntries) {
-            UserDefaults.standard.set(entriesData, forKey: entriesKey)
-        }
+        writePersistentStore()
     }
 
 #if DEBUG
@@ -1193,6 +1288,19 @@ extension AppViewModel: CloudKitSyncDelegate {
             }
         }
 
+        // Journey-test hook: attach a real, file-backed photo to the most-recent
+        // seeded entry so the persistence/relaunch path can be exercised end-to-end
+        // without driving the system photo picker. DEBUG-only, opt-in via launch arg.
+        if ProcessInfo.processInfo.arguments.contains("-LHSeedAttachment"), !timeEntries.isEmpty {
+            let bytes = Self.debugSeedAttachmentData()
+            if !bytes.isEmpty {
+                timeEntries[0].date = Date()
+                timeEntries[0].attachments = [
+                    TimeAttachment(filename: "seed_receipt.png", data: bytes, mimeType: "image/png")
+                ]
+            }
+        }
+
         saveDataLocal()
         goalManager.saveGoals()
         SubscriptionManager.shared.reload()
@@ -1201,6 +1309,19 @@ extension AppViewModel: CloudKitSyncDelegate {
         defaults.synchronize()
 
         suppressCelebrations = false
+    }
+
+    /// A small solid image used only by the `-LHSeedAttachment` journey hook.
+    private static func debugSeedAttachmentData() -> Data {
+        let size = CGSize(width: 160, height: 160)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let image = renderer.image { context in
+            UIColor(red: 0.49, green: 0.44, blue: 0.97, alpha: 1).setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            UIColor.white.setFill()
+            context.fill(CGRect(x: 30, y: 62, width: 100, height: 36))
+        }
+        return image.pngData() ?? Data()
     }
 
     private static func launchMockEmail(defaultValue: String) -> String {

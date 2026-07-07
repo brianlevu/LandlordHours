@@ -145,6 +145,18 @@ struct ContentView: View {
                 .zIndex(999)
             }
         }
+        .overlay(alignment: .top) {
+            if let message = viewModel.persistenceError {
+                LHErrorBanner(message: message) {
+                    animate(AppAnimation.reveal) { viewModel.persistenceError = nil }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(1000)
+            }
+        }
+        .lhMotion(AppAnimation.reveal, value: viewModel.persistenceError)
         .environmentObject(CategoryManager.shared)
         .environmentObject(goalManager)
         .onAppear {

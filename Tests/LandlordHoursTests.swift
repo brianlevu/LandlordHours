@@ -1452,3 +1452,255 @@ final class CalendarImportServiceTests: XCTestCase {
         XCTAssertEqual(service.categorizeEvent(title: "Random meeting"), .management)
     }
 }
+
+// MARK: - TimeAttachment File Storage Tests
+
+final class TimeAttachmentStorageTests: XCTestCase {
+
+    func testEncodeOmitsInlineData() throws {
+        let attachment = TimeAttachment(filename: "receipt.jpg", data: Data([1, 2, 3]), mimeType: "image/jpeg")
+        let encoded = try JSONEncoder().encode(attachment)
+        let json = String(decoding: encoded, as: UTF8.self)
+        // Bytes must never ride along in the persisted blob — that is the whole point.
+        XCTAssertFalse(json.contains("\"data\""))
+        XCTAssertTrue(attachment.hasPendingData)
+    }
+
+    func testDecodeLegacyInlineDataBecomesPending() throws {
+        let bytes = Data([9, 8, 7, 6, 5])
+        let base64 = bytes.base64EncodedString()
+        let id = UUID()
+        let json = "{\"id\":\"\(id.uuidString)\",\"filename\":\"receipt.jpg\",\"data\":\"\(base64)\",\"mimeType\":\"image/jpeg\",\"createdAt\":0,\"modifiedAt\":0}"
+        let decoded = try JSONDecoder().decode(TimeAttachment.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.id, id)
+        XCTAssertTrue(decoded.hasPendingData)
+        XCTAssertEqual(decoded.pendingBytes, bytes)
+    }
+
+    func testFileExtensionDerivation() {
+        XCTAssertEqual(TimeAttachment(filename: "receipt.PNG", data: Data(), mimeType: "image/png").fileExtension, "png")
+        XCTAssertEqual(TimeAttachment(filename: "noextension", data: Data(), mimeType: "image/jpeg").fileExtension, "jpeg")
+    }
+
+    func testAttachmentStoreWriteReadDeleteRoundTrip() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = AttachmentStore(directory: dir)
+        let attachment = TimeAttachment(filename: "receipt.jpg", data: Data([1, 2, 3]), mimeType: "image/jpeg")
+        let bytes = Data([4, 5, 6, 7, 8])
+
+        try store.write(bytes, for: attachment)
+        XCTAssertTrue(store.fileExists(for: attachment))
+        XCTAssertEqual(store.read(attachment), bytes)
+
+        store.delete(attachment)
+        XCTAssertFalse(store.fileExists(for: attachment))
+        XCTAssertNil(store.read(attachment))
+    }
+
+    func testAttachmentStoreWriteThrowsWhenDirectoryUnwritable() throws {
+        // Point the store at a path nested under a regular file so directory creation fails.
+        let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data("x".utf8).write(to: fileURL)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let store = AttachmentStore(directory: fileURL.appendingPathComponent("nested", isDirectory: true))
+        let attachment = TimeAttachment(filename: "receipt.jpg", data: Data(), mimeType: "image/jpeg")
+
+        XCTAssertThrowsError(try store.write(Data([1, 2, 3]), for: attachment))
+    }
+}
+
+// MARK: - Persistence Hardening Tests
+
+@MainActor
+final class PersistenceHardeningTests: XCTestCase {
+
+    private let testUserId = "persistence-test-user"
+    private var savedAppleUserId: String?
+    private var savedEmailUserId: String?
+    private var savedAttachmentStore: AttachmentStore!
+    private var attachmentDir: URL!
+
+    override func setUp() {
+        super.setUp()
+        savedAppleUserId = UserDefaults.standard.string(forKey: "appleUserId")
+        savedEmailUserId = UserDefaults.standard.string(forKey: "emailUserId")
+        UserDefaults.standard.removeObject(forKey: "appleUserId")
+        UserDefaults.standard.set(testUserId, forKey: "emailUserId")
+        AppViewModel.clearScopedAccountData(for: testUserId)
+        UserDefaults.standard.synchronize()
+
+        // Isolate attachment storage to a fresh temp directory for each test.
+        savedAttachmentStore = AttachmentStore.shared
+        attachmentDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("attachments-test-\(UUID().uuidString)", isDirectory: true)
+        AttachmentStore.shared = AttachmentStore(directory: attachmentDir)
+    }
+
+    override func tearDown() {
+        AttachmentStore.shared = savedAttachmentStore
+        if let attachmentDir { try? FileManager.default.removeItem(at: attachmentDir) }
+        AppViewModel.clearScopedAccountData(for: testUserId)
+        if let savedAppleUserId {
+            UserDefaults.standard.set(savedAppleUserId, forKey: "appleUserId")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "appleUserId")
+        }
+        if let savedEmailUserId {
+            UserDefaults.standard.set(savedEmailUserId, forKey: "emailUserId")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "emailUserId")
+        }
+        UserDefaults.standard.synchronize()
+        super.tearDown()
+    }
+
+    private func makeLocalDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int) -> Date {
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        return Calendar.current.date(from: components)!
+    }
+
+    func testSaveLoadRoundTripWithAttachments() {
+        let viewModel = AppViewModel()
+        viewModel.suppressCelebrations = true
+        viewModel.addProperty(name: "Oak", address: "123 Oak St", type: .ltr)
+        let propertyId = viewModel.properties[0].id
+
+        let bytes = Data([10, 20, 30, 40, 50])
+        viewModel.addTimeEntry(
+            propertyId: propertyId,
+            participant: .selfParticipant,
+            category: .repairs,
+            hours: 2.0,
+            date: Date(),
+            notes: "Fixed sink",
+            attachments: [TimeAttachment(filename: "receipt.jpg", data: bytes, mimeType: "image/jpeg")]
+        )
+
+        XCTAssertNil(viewModel.persistenceError)
+        let attachment = viewModel.timeEntries[0].attachments[0]
+        XCTAssertTrue(AttachmentStore.shared.fileExists(for: attachment))
+        XCTAssertFalse(attachment.hasPendingData, "Bytes should be flushed to disk after save")
+
+        // Fresh view model reloads from the persisted store.
+        let reloaded = AppViewModel()
+        XCTAssertEqual(reloaded.properties.count, 1)
+        XCTAssertEqual(reloaded.timeEntries.count, 1)
+        let reloadedAttachment = reloaded.timeEntries[0].attachments[0]
+        XCTAssertFalse(reloadedAttachment.hasPendingData)
+        XCTAssertEqual(reloadedAttachment.data, bytes, "Attachment bytes must survive a reload from disk")
+        XCTAssertNil(reloaded.persistenceError)
+    }
+
+    func testLegacyInlineAttachmentMigratesToFileAndIsIdempotent() {
+        let bytes = Data([1, 2, 3, 4, 5, 6])
+        let base64 = bytes.base64EncodedString()
+        let propertyId = UUID()
+        let entryId = UUID()
+        let attachmentId = UUID()
+
+        // Hand-crafted legacy blob with inline base64 `data`, as older builds wrote it.
+        let legacyJSON = "[{\"id\":\"\(entryId.uuidString)\",\"propertyId\":\"\(propertyId.uuidString)\",\"participant\":\"Self\",\"category\":\"Repairs & Maintenance\",\"hours\":2.0,\"date\":0,\"notes\":\"legacy\",\"attachments\":[{\"id\":\"\(attachmentId.uuidString)\",\"filename\":\"receipt.jpg\",\"data\":\"\(base64)\",\"mimeType\":\"image/jpeg\",\"createdAt\":0,\"modifiedAt\":0}],\"createdAt\":0,\"modifiedAt\":0}]"
+        UserDefaults.standard.set(Data(legacyJSON.utf8), forKey: UserScope.key("LandlordHours.entries"))
+
+        // First launch: decode + migrate.
+        let viewModel = AppViewModel()
+        XCTAssertEqual(viewModel.timeEntries.count, 1)
+        let attachment = viewModel.timeEntries[0].attachments[0]
+        XCTAssertTrue(AttachmentStore.shared.fileExists(for: attachment), "Legacy bytes must be written to a file")
+        XCTAssertEqual(attachment.data, bytes)
+        XCTAssertFalse(attachment.hasPendingData, "Migration should clear the in-memory inline copy")
+
+        // The re-saved blob must no longer carry the inline bytes.
+        let savedData = UserDefaults.standard.data(forKey: UserScope.key("LandlordHours.entries"))!
+        let savedString = String(decoding: savedData, as: UTF8.self)
+        XCTAssertFalse(savedString.contains(base64), "Migration must drop inline bytes from the persisted blob")
+
+        // Second launch on the migrated blob: idempotent no-op, bytes still load from disk.
+        let reloaded = AppViewModel()
+        XCTAssertEqual(reloaded.timeEntries.count, 1)
+        let reloadedAttachment = reloaded.timeEntries[0].attachments[0]
+        XCTAssertFalse(reloadedAttachment.hasPendingData)
+        XCTAssertEqual(reloadedAttachment.data, bytes, "Re-running migration must be safe and preserve bytes")
+    }
+
+    func testCorruptBlobSurfacesErrorWithoutCrashOrSilentEmptyState() {
+        // A present-but-undecodable entries blob is corruption, not an empty dataset.
+        UserDefaults.standard.set(Data("this is not valid json".utf8), forKey: UserScope.key("LandlordHours.entries"))
+
+        let viewModel = AppViewModel()
+
+        XCTAssertNotNil(viewModel.persistenceError, "Corrupt store must surface an error")
+        XCTAssertTrue(viewModel.timeEntries.isEmpty)
+    }
+
+    func testFreshInstallDoesNotSurfaceErrorForEmptyStore() {
+        // No saved blob at all is a legitimate empty dataset — no error banner.
+        let viewModel = AppViewModel()
+        XCTAssertNil(viewModel.persistenceError)
+        XCTAssertTrue(viewModel.timeEntries.isEmpty)
+        XCTAssertTrue(viewModel.properties.isEmpty)
+    }
+
+    func testSaveFailureSetsPublishedError() throws {
+        // Redirect attachment storage to a path that cannot be written.
+        let unwritableFile = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data("x".utf8).write(to: unwritableFile)
+        defer { try? FileManager.default.removeItem(at: unwritableFile) }
+        AttachmentStore.shared = AttachmentStore(directory: unwritableFile.appendingPathComponent("nested", isDirectory: true))
+
+        let viewModel = AppViewModel()
+        viewModel.suppressCelebrations = true
+        // A save without attachments succeeds.
+        viewModel.addProperty(name: "Oak", address: "123 Oak St", type: .ltr)
+        XCTAssertNil(viewModel.persistenceError)
+
+        // A save that must flush an attachment file fails and surfaces the error.
+        viewModel.addTimeEntry(
+            propertyId: viewModel.properties[0].id,
+            participant: .selfParticipant,
+            category: .repairs,
+            hours: 1.0,
+            date: Date(),
+            notes: "receipt",
+            attachments: [TimeAttachment(filename: "receipt.jpg", data: Data([1, 2, 3]), mimeType: "image/jpeg")]
+        )
+
+        XCTAssertNotNil(viewModel.persistenceError, "A failed save must set the published error")
+    }
+
+    func testEntriesForYearTaxBoundaries() {
+        let viewModel = AppViewModel()
+        viewModel.suppressCelebrations = true
+        let propertyId = UUID()
+        func entry(on date: Date) -> TimeEntry {
+            TimeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs, hours: 1.0, date: date)
+        }
+
+        let dec31_2025_2300 = makeLocalDate(2025, 12, 31, 23, 0)
+        let jan1_2026_0000 = makeLocalDate(2026, 1, 1, 0, 0)
+        let mid2024 = makeLocalDate(2024, 6, 15, 12, 0)
+
+        viewModel.timeEntries = [entry(on: dec31_2025_2300), entry(on: jan1_2026_0000), entry(on: mid2024)]
+
+        // Dec 31 23:00 local belongs to 2025, not 2026.
+        let year2025 = viewModel.entriesForYear(2025)
+        XCTAssertEqual(year2025.count, 1)
+        XCTAssertEqual(year2025.first?.date, dec31_2025_2300)
+
+        // Jan 1 00:00 local belongs to 2026.
+        let year2026 = viewModel.entriesForYear(2026)
+        XCTAssertEqual(year2026.count, 1)
+        XCTAssertEqual(year2026.first?.date, jan1_2026_0000)
+
+        // Prior-year entry is excluded from both boundary years.
+        XCTAssertFalse(year2025.contains { $0.date == mid2024 })
+        XCTAssertFalse(year2026.contains { $0.date == mid2024 })
+        XCTAssertEqual(viewModel.entriesForYear(2024).count, 1)
+    }
+}

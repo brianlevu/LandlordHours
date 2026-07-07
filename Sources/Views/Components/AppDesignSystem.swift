@@ -227,6 +227,53 @@ struct LHSuccessToast: View {
     }
 }
 
+// MARK: - Error Banner
+
+/// Non-blocking banner for a surfaced persistence/save failure. Uses the
+/// destructive intent tokens. Tapping the dismiss control clears it.
+struct LHErrorBanner: View {
+    let message: String
+    let onDismiss: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            LHIconTile(
+                icon: UIImage(lucideId: "triangle-alert") ?? UIImage(),
+                color: AppColors.destructive,
+                wash: AppColors.destructiveSurface,
+                size: 38,
+                isActive: true
+            )
+
+            Text(message)
+                .font(AppTypography.bodySmall)
+                .foregroundStyle(colors.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button(action: onDismiss) {
+                LucideIcon(image: Lucide.x, size: 16)
+                    .foregroundStyle(colors.textSecondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(colors.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: AppCornerRadius.large, style: .continuous)
+                .strokeBorder(AppColors.destructive.opacity(0.35), lineWidth: 1)
+        )
+        .shadow(color: AppColors.destructive.opacity(0.14), radius: 10, y: 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("persistence.errorBanner")
+    }
+}
+
 // MARK: - Guided First-Run Overlay
 
 struct GuidedOnboardingOverlay: View {
