@@ -94,9 +94,11 @@ struct ReportsView: View {
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     @StateObject private var goalManager = GoalManager.shared
     @StateObject private var subscriptionManager = SubscriptionManager.shared
+    @StateObject private var taxProfile = TaxProfileManager.shared
     @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
     @State private var showingExportSheet = false
     @State private var showingPaywall = false
+    @State private var showingParticipationSheet = false
     @State private var selectedGoal: GoalMode = .reps750
     @State private var ringAppeared = false
 
@@ -230,6 +232,10 @@ struct ReportsView: View {
 
                     ringHeroSection
 
+                    if showMP100ParticipationRow {
+                        mp100ParticipationRow
+                    }
+
                     legendRow
 
                     paceIndicator
@@ -264,6 +270,14 @@ struct ReportsView: View {
             }
             .sheet(isPresented: $showingPaywall) {
                 PaywallView(showPaywall: $showingPaywall)
+            }
+            .sheet(isPresented: $showingParticipationSheet) {
+                ParticipationConfirmationSheet(
+                    year: selectedYear,
+                    currentAnswer: materialParticipationStatus.noOneParticipatedMore
+                ) { answer in
+                    taxProfile.setNoOneParticipatedMore(answer, forYear: selectedYear)
+                }
             }
             .onAppear {
                 // Sync selected goal from GoalManager settings
@@ -486,6 +500,108 @@ struct ReportsView: View {
             }
             .transition(.opacity)
         }
+    }
+
+    // MARK: - 100-Hour Test Confirmation Row
+    //
+    // Surfaces the 100-hour material participation state only once hours clear the
+    // threshold and the 500-hour test hasn't already established participation.
+    private var showMP100ParticipationRow: Bool {
+        selectedGoal == .mp100
+            && materialParticipationStatus.ownerAndSpouseHours > 100
+            && !materialParticipationStatus.meets500HourTest
+    }
+
+    @ViewBuilder
+    private var mp100ParticipationRow: some View {
+        switch materialParticipationStatus.noOneParticipatedMore {
+        case .none:
+            participationRow(
+                icon: Lucide.circleAlert,
+                iconTint: AppColors.cautionText,
+                iconWash: colors.cautionSurface,
+                borderTint: AppColors.caution,
+                title: "100-hour threshold reached",
+                detail: "Confirm no one participated more to pass this test.",
+                actionLabel: "Confirm"
+            )
+        case .some(true):
+            participationRow(
+                icon: Lucide.badgeCheck,
+                iconTint: AppColors.successGreen,
+                iconWash: AppColors.successGreenWash,
+                borderTint: AppColors.successGreenLight,
+                title: "No one participated more",
+                detail: "You confirmed the 100-hour test for \(String(selectedYear)).",
+                actionLabel: "Change"
+            )
+        case .some(false):
+            participationRow(
+                icon: Lucide.circleSlash,
+                iconTint: AppColors.cautionText,
+                iconWash: colors.cautionSurface,
+                borderTint: AppColors.caution,
+                title: "Someone participated more",
+                detail: "The 100-hour test isn't met. Your 500-hour path still counts.",
+                actionLabel: "Change"
+            )
+        }
+    }
+
+    private func participationRow(
+        icon: UIImage,
+        iconTint: Color,
+        iconWash: Color,
+        borderTint: Color,
+        title: String,
+        detail: String,
+        actionLabel: String
+    ) -> some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            showingParticipationSheet = true
+        } label: {
+            HStack(spacing: 12) {
+                LucideIcon(image: icon, size: 20)
+                    .foregroundStyle(iconTint)
+                    .frame(width: 40, height: 40)
+                    .background(iconWash)
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                        .multilineTextAlignment(.leading)
+                    Text(detail)
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 8)
+
+                Text(actionLabel)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(AppColors.onAction)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(colors.action)
+                    .clipShape(Capsule())
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity)
+            .background(colors.backgroundSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(borderTint.opacity(0.4), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.lhPressable)
+        .accessibilityIdentifier("reports.mp100.confirmRow")
+        .accessibilityHint("Opens the 100-hour test confirmation")
     }
 
     // MARK: - Legend Row
@@ -1150,6 +1266,140 @@ extension ActivityCategory {
         case .financing: return "Financing"
         case .contractNegotiation: return "Contracts"
         }
+    }
+}
+
+// MARK: - 100-Hour Test Confirmation Sheet
+//
+// Shared by Reports and the Settings tax profile. Records the per-tax-year answer to
+// IRS Test 3's "did anyone else participate more?" prong. Answers are icon + text so
+// the choice never depends on color alone.
+struct ParticipationConfirmationSheet: View {
+    let year: Int
+    let currentAnswer: Bool?
+    let onAnswer: (Bool?) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: AppSpacing.xl) {
+                VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                    Text("100-HOUR TEST")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .tracking(0.8)
+                        .foregroundStyle(AppColors.slate)
+
+                    Text("Did anyone else — like a property manager or contractor — spend more time on this property than you (and your spouse) this year?")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text("\u{201C}Someone else\u{201D} means a property manager, contractor, or co-owner who isn\u{2019}t your spouse. Answering for \(String(year)).")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                VStack(spacing: AppSpacing.sm) {
+                    answerButton(
+                        title: "No one did more",
+                        subtitle: "You (and your spouse) put in the most time",
+                        icon: Lucide.badgeCheck,
+                        tint: AppColors.successGreen,
+                        tintWash: AppColors.successGreenWash,
+                        isSelected: currentAnswer == true,
+                        identifier: "participation.answer.yes"
+                    ) {
+                        onAnswer(true)
+                        dismiss()
+                    }
+
+                    answerButton(
+                        title: "Someone did more",
+                        subtitle: "A manager, contractor, or co-owner outpaced you",
+                        icon: Lucide.circleSlash,
+                        tint: AppColors.cautionText,
+                        tintWash: colors.cautionSurface,
+                        isSelected: currentAnswer == false,
+                        identifier: "participation.answer.no"
+                    ) {
+                        onAnswer(false)
+                        dismiss()
+                    }
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                LHMobileCanvas()
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func answerButton(
+        title: String,
+        subtitle: String,
+        icon: UIImage,
+        tint: Color,
+        tintWash: Color,
+        isSelected: Bool,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                LucideIcon(image: icon, size: 22)
+                    .foregroundStyle(tint)
+                    .frame(width: 44, height: 44)
+                    .background(tintWash)
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(colors.textPrimary)
+                    Text(subtitle)
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textSecondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 8)
+
+                if isSelected {
+                    LucideIcon(image: Lucide.check, size: 18)
+                        .foregroundStyle(tint)
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity)
+            .background(colors.backgroundSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppCornerRadius.large, style: .continuous)
+                    .stroke(isSelected ? tint.opacity(0.6) : colors.border.opacity(0.28),
+                            lineWidth: isSelected ? 1.5 : 1)
+            }
+        }
+        .buttonStyle(.lhPressable)
+        .accessibilityIdentifier(identifier)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 

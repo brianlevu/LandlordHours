@@ -292,9 +292,19 @@ struct TaxQualificationEngine {
         let ownerAndSpouseHours: Double
         let meets500HourTest: Bool
         let meets100HourTest: Bool
+        /// Per-tax-year answer to IRS Test 3's second prong: did no other individual
+        /// (property manager, contractor, co-owner) participate more?
+        /// nil = unanswered, true = no one did more, false = someone did more.
+        let noOneParticipatedMore: Bool?
 
         var isMateriallyParticipating: Bool {
             meets500HourTest || meets100HourTest
+        }
+
+        /// Hours clear the 100-hour threshold, but the "did anyone participate more?"
+        /// question is still unanswered — Test 3 can't be asserted until the user confirms.
+        var meets100HourThresholdPendingConfirmation: Bool {
+            ownerAndSpouseHours > 100 && noOneParticipatedMore == nil
         }
     }
 
@@ -328,7 +338,8 @@ struct TaxQualificationEngine {
         entries: [TimeEntry],
         year: Int,
         propertyId: UUID?,
-        groupingElection: Bool
+        groupingElection: Bool,
+        noOneParticipatedMore: Bool? = nil
     ) -> MaterialParticipationResult {
         let scoped = entriesForYear(entries, year: year)
             .filter { $0.countsForREPS }
@@ -339,11 +350,14 @@ struct TaxQualificationEngine {
             }
         let hours = scoped.reduce(0) { $0 + $1.hours }
 
+        // IRS Test 3 requires >100 hours AND that no other individual participated more.
+        // An unanswered confirmation (nil) is treated as not-yet-met, not as a pass.
         return MaterialParticipationResult(
             propertyId: groupingElection ? nil : propertyId,
             ownerAndSpouseHours: hours,
             meets500HourTest: hours > 500,
-            meets100HourTest: hours > 100
+            meets100HourTest: hours > 100 && noOneParticipatedMore == true,
+            noOneParticipatedMore: noOneParticipatedMore
         )
     }
 

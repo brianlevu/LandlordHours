@@ -88,6 +88,36 @@ final class LandlordHoursUITests: XCTestCase {
         XCTAssertTrue(app.buttons["export.sharePDF"].exists)
     }
 
+    func testMaterialParticipation100HourConfirmationStates() {
+        launch(scenario: "frequent", tab: 3)
+
+        XCTAssertTrue(app.staticTexts["Reports"].waitForExistence(timeout: 8))
+
+        // Switch to the 100-hour material participation goal.
+        let mp100Pill = app.buttons["100h"]
+        XCTAssertTrue(mp100Pill.waitForExistence(timeout: 5))
+        mp100Pill.tap()
+
+        // State 1: conditional prompt (hours over 100, confirmation unanswered).
+        let confirmRow = app.buttons["reports.mp100.confirmRow"]
+        XCTAssertTrue(confirmRow.waitForExistence(timeout: 5))
+        assertVisibleText("100-hour threshold reached", timeout: 5)
+        attachScreenshot(named: "mp100-1-conditional-reports")
+
+        // State 2: the confirmation question sheet.
+        confirmRow.tap()
+        let answerYes = app.buttons["participation.answer.yes"]
+        XCTAssertTrue(answerYes.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["participation.answer.no"].exists)
+        attachScreenshot(named: "mp100-2-confirmation-ui")
+
+        // State 3: confirmed — the 100-hour test passes.
+        answerYes.tap()
+        XCTAssertTrue(app.staticTexts["No one participated more"].waitForExistence(timeout: 5))
+        assertVisibleText("Goal met!", timeout: 5)
+        attachScreenshot(named: "mp100-3-confirmed-reports")
+    }
+
     func testSettingsSecondaryFlowsOpenWithoutSwitchingTabs() {
         launch(scenario: "frequent", tab: 4)
 
