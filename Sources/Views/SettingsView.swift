@@ -174,6 +174,14 @@ final class TaxProfileManager: ObservableObject {
         didSet { save(scopedKey("nonREWorkHours"), nonREWorkHours) }
     }
 
+    /// IRS Test 3 (100-hour) confirmation, keyed by tax year.
+    /// A missing entry means unanswered (nil). The whole map is user-scoped like the
+    /// other tax-profile fields, so each user + tax year carries its own answer.
+    /// Mutated only through `setNoOneParticipatedMore(_:forYear:)` so loads don't re-persist.
+    @Published private(set) var noOneParticipatedMoreByYear: [Int: Bool] = [:]
+
+    private var participationKey: String { scopedKey("noOneParticipatedMore") }
+
     private init() {
         // Set defaults first (didSet won't fire during init)
         filingStatus = .marriedJoint
@@ -197,6 +205,7 @@ final class TaxProfileManager: ObservableObject {
         if savedYear > 0 { taxYear = savedYear }
         groupingElection = ud.bool(forKey: scopedKey("groupingElection"))
         nonREWorkHours = ud.double(forKey: scopedKey("nonREWorkHours"))
+        loadParticipationConfirmations()
     }
 
     func resetForSignOut() {
@@ -205,6 +214,7 @@ final class TaxProfileManager: ObservableObject {
         taxYear = Calendar.current.component(.year, from: Date())
         groupingElection = false
         nonREWorkHours = 0
+        noOneParticipatedMoreByYear = [:]
     }
 
     func resetForDataReset() {
@@ -213,12 +223,50 @@ final class TaxProfileManager: ObservableObject {
         taxYear = Calendar.current.component(.year, from: Date())
         groupingElection = false
         nonREWorkHours = 0
+        noOneParticipatedMoreByYear = [:]
 
         let ud = UserDefaults.standard
-        for field in ["filingStatus", "spouseTracking", "taxYear", "groupingElection", "nonREWorkHours"] {
+        for field in ["filingStatus", "spouseTracking", "taxYear", "groupingElection", "nonREWorkHours", "noOneParticipatedMore"] {
             ud.removeObject(forKey: scopedKey(field))
         }
         onDidChange?()
+    }
+
+    // MARK: - 100-Hour Test Confirmation
+
+    /// Answer for the given tax year: nil = unanswered, true = no one else participated
+    /// more, false = someone else did.
+    func noOneParticipatedMore(forYear year: Int) -> Bool? {
+        noOneParticipatedMoreByYear[year]
+    }
+
+    /// Records (or clears, when `value` is nil) the confirmation for a tax year and persists it.
+    func setNoOneParticipatedMore(_ value: Bool?, forYear year: Int) {
+        if let value {
+            noOneParticipatedMoreByYear[year] = value
+        } else {
+            noOneParticipatedMoreByYear.removeValue(forKey: year)
+        }
+        saveParticipationConfirmations()
+    }
+
+    private func loadParticipationConfirmations() {
+        guard let data = UserDefaults.standard.data(forKey: participationKey),
+              let decoded = try? JSONDecoder().decode([String: Bool].self, from: data) else {
+            noOneParticipatedMoreByYear = [:]
+            return
+        }
+        noOneParticipatedMoreByYear = Dictionary(uniqueKeysWithValues: decoded.compactMap { key, value in
+            Int(key).map { ($0, value) }
+        })
+    }
+
+    private func saveParticipationConfirmations() {
+        // Persist as [String: Bool] since JSON object keys must be strings.
+        let encodable = Dictionary(uniqueKeysWithValues: noOneParticipatedMoreByYear.map { (String($0.key), $0.value) })
+        if let data = try? JSONEncoder().encode(encodable) {
+            save(participationKey, data)
+        }
     }
 }
 
@@ -1312,6 +1360,7 @@ struct TaxProfileView: View {
     @State private var showGoalPicker = false
     @State private var showYearPicker = false
     @State private var showWorkHoursInput = false
+    @State private var showParticipationConfirmation = false
     @State private var showAddProperty = false
     @State private var workHoursText = ""
     @State private var newPropertyName = ""
@@ -1344,6 +1393,7 @@ struct TaxProfileView: View {
 
                 filingStatusSection
                 qualificationGoalSection
+                materialParticipationSection
                 propertiesSection
                 fiftyPercentRuleSection
                 Spacer().frame(height: 100)
@@ -1383,6 +1433,14 @@ struct TaxProfileView: View {
         }
         .sheet(isPresented: $showAddProperty) {
             addPropertySheet
+        }
+        .sheet(isPresented: $showParticipationConfirmation) {
+            ParticipationConfirmationSheet(
+                year: taxProfile.taxYear,
+                currentAnswer: taxProfile.noOneParticipatedMore(forYear: taxProfile.taxYear)
+            ) { answer in
+                taxProfile.setNoOneParticipatedMore(answer, forYear: taxProfile.taxYear)
+            }
         }
     }
 
@@ -1488,6 +1546,56 @@ struct TaxProfileView: View {
             tpInfoTip {
                 (Text("Grouping Election (1.469-9g): ").fontWeight(.semibold).foregroundStyle(colors.textPrimary) +
                  Text("If you qualify as REP, you can test Material Participation across all properties combined instead of individually.").foregroundStyle(AppColors.slate))
+                    .font(.system(size: 12))
+                    .lineSpacing(4)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+    }
+
+    // MARK: - Material Participation Section
+
+    private var participationAnswer: Bool? {
+        taxProfile.noOneParticipatedMore(forYear: taxProfile.taxYear)
+    }
+
+    private var participationAnswerLabel: String {
+        switch participationAnswer {
+        case .none: return "Not answered"
+        case .some(true): return "No one did more"
+        case .some(false): return "Someone did more"
+        }
+    }
+
+    private var materialParticipationSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            tpSectionTitle("Material Participation")
+
+            VStack(spacing: 0) {
+                Button { showParticipationConfirmation = true } label: {
+                    tpRow(
+                        icon: Lucide.badgeCheck,
+                        iconBg: AppColors.sageWash,
+                        iconFg: AppColors.charcoal,
+                        title: "100-Hour Test",
+                        subtitle: "Confirm no one else participated more",
+                        rightText: participationAnswerLabel
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+            .background(colors.backgroundSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .stroke(colors.border.opacity(0.28), lineWidth: 1)
+            }
+
+            tpInfoTip {
+                (Text("Test 3 needs 100+ hours ").foregroundStyle(AppColors.slate) +
+                 Text("and").fontWeight(.semibold).foregroundStyle(colors.textPrimary) +
+                 Text(" no one else — a property manager, contractor, or co-owner who isn\u{2019}t your spouse — putting in more time than you this year.").foregroundStyle(AppColors.slate))
                     .font(.system(size: 12))
                     .lineSpacing(4)
             }

@@ -192,16 +192,176 @@ final class TaxQualificationEngineTests: XCTestCase {
             makeEntry(propertyId: propertyId, participant: .spouse, category: .leasing, hours: 50)
         ]
 
+        // Spouse hours still combine (60 + 50 = 110). The 100-hour test now also
+        // requires confirming no one else participated more.
         let result = TaxQualificationEngine.materialParticipationStatus(
             entries: entries,
             year: currentYear,
             propertyId: propertyId,
-            groupingElection: false
+            groupingElection: false,
+            noOneParticipatedMore: true
         )
 
         XCTAssertEqual(result.ownerAndSpouseHours, 110)
         XCTAssertTrue(result.meets100HourTest)
         XCTAssertTrue(result.isMateriallyParticipating)
+    }
+
+    // MARK: - 100-Hour Test Confirmation (IRS Test 3)
+
+    func testHundredHourTestUnconfirmedIsConditionalNotMet() {
+        let propertyId = UUID()
+        let entries = [
+            makeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs, hours: 101)
+        ]
+
+        // nil = unanswered: threshold cleared but the test cannot be asserted yet.
+        let result = TaxQualificationEngine.materialParticipationStatus(
+            entries: entries,
+            year: currentYear,
+            propertyId: propertyId,
+            groupingElection: false,
+            noOneParticipatedMore: nil
+        )
+
+        XCTAssertEqual(result.ownerAndSpouseHours, 101)
+        XCTAssertFalse(result.meets100HourTest)
+        XCTAssertFalse(result.isMateriallyParticipating)
+        XCTAssertTrue(result.meets100HourThresholdPendingConfirmation)
+        XCTAssertNil(result.noOneParticipatedMore)
+    }
+
+    func testHundredHourTestConfirmedYesPasses() {
+        let propertyId = UUID()
+        let entries = [
+            makeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs, hours: 101)
+        ]
+
+        let result = TaxQualificationEngine.materialParticipationStatus(
+            entries: entries,
+            year: currentYear,
+            propertyId: propertyId,
+            groupingElection: false,
+            noOneParticipatedMore: true
+        )
+
+        XCTAssertTrue(result.meets100HourTest)
+        XCTAssertTrue(result.isMateriallyParticipating)
+        XCTAssertFalse(result.meets100HourThresholdPendingConfirmation)
+    }
+
+    func testHundredHourTestConfirmedSomeoneElseDidMoreFails() {
+        let propertyId = UUID()
+        let entries = [
+            makeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs, hours: 101)
+        ]
+
+        // false = someone else participated more: Test 3 fails even though hours > 100.
+        let result = TaxQualificationEngine.materialParticipationStatus(
+            entries: entries,
+            year: currentYear,
+            propertyId: propertyId,
+            groupingElection: false,
+            noOneParticipatedMore: false
+        )
+
+        XCTAssertEqual(result.ownerAndSpouseHours, 101)
+        XCTAssertFalse(result.meets100HourTest)
+        XCTAssertFalse(result.isMateriallyParticipating)
+        XCTAssertFalse(result.meets100HourThresholdPendingConfirmation)
+    }
+
+    func testHundredHourBoundaryIsNotConditionalAtExactly100EvenIfConfirmed() {
+        let propertyId = UUID()
+        let entries = [
+            makeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs, hours: 100)
+        ]
+
+        // Exactly 100 is not "more than 100"; confirmation can't manufacture a pass.
+        for answer: Bool? in [nil, true, false] {
+            let result = TaxQualificationEngine.materialParticipationStatus(
+                entries: entries,
+                year: currentYear,
+                propertyId: propertyId,
+                groupingElection: false,
+                noOneParticipatedMore: answer
+            )
+            XCTAssertEqual(result.ownerAndSpouseHours, 100)
+            XCTAssertFalse(result.meets100HourTest, "100h should never pass Test 3 (answer: \(String(describing: answer)))")
+            XCTAssertFalse(result.meets100HourThresholdPendingConfirmation)
+            XCTAssertFalse(result.isMateriallyParticipating)
+        }
+    }
+
+    func testFiveHundredHourPathIsUnaffectedByConfirmation() {
+        let propertyId = UUID()
+        let entries = [
+            makeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs, hours: 501)
+        ]
+
+        // The 500-hour test stands on its own regardless of the 100-hour confirmation.
+        for answer: Bool? in [nil, true, false] {
+            let result = TaxQualificationEngine.materialParticipationStatus(
+                entries: entries,
+                year: currentYear,
+                propertyId: propertyId,
+                groupingElection: false,
+                noOneParticipatedMore: answer
+            )
+            XCTAssertTrue(result.meets500HourTest, "500h path must hold (answer: \(String(describing: answer)))")
+            XCTAssertTrue(result.isMateriallyParticipating)
+        }
+
+        // Unanswered at 501h is not a pending 100-hour prompt: participation is already established.
+        let unanswered = TaxQualificationEngine.materialParticipationStatus(
+            entries: entries,
+            year: currentYear,
+            propertyId: propertyId,
+            groupingElection: false,
+            noOneParticipatedMore: nil
+        )
+        XCTAssertTrue(unanswered.isMateriallyParticipating)
+    }
+
+    func testConfirmationDoesNotChangeREPSOutputs() {
+        let propertyId = UUID()
+        let entries = [
+            makeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs, hours: 800)
+        ]
+
+        // REPS is measured independently of the 100-hour confirmation.
+        let reps = TaxQualificationEngine.repsStatus(
+            entries: entries,
+            participant: .selfParticipant,
+            year: currentYear,
+            nonRealEstateHours: 100
+        )
+
+        XCTAssertEqual(reps.realEstateHours, 800)
+        XCTAssertTrue(reps.meets750HourTest)
+        XCTAssertTrue(reps.meetsMoreThanHalfPersonalServicesTest)
+        XCTAssertTrue(reps.isQualified)
+    }
+
+    func testSpouseCombinationUnchangedWhenSomeoneElseDidMore() {
+        let propertyId = UUID()
+        let entries = [
+            makeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs, hours: 60),
+            makeEntry(propertyId: propertyId, participant: .spouse, category: .leasing, hours: 50)
+        ]
+
+        // Combination math (110h) is unchanged; only the Test 3 pass is gated.
+        let result = TaxQualificationEngine.materialParticipationStatus(
+            entries: entries,
+            year: currentYear,
+            propertyId: propertyId,
+            groupingElection: false,
+            noOneParticipatedMore: false
+        )
+
+        XCTAssertEqual(result.ownerAndSpouseHours, 110)
+        XCTAssertFalse(result.meets100HourTest)
+        XCTAssertFalse(result.isMateriallyParticipating)
     }
 
     func testMaterialParticipationGroupingCombinesProperties() {

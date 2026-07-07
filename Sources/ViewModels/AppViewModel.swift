@@ -352,7 +352,8 @@ class AppViewModel: ObservableObject {
             "spouseTracking",
             "taxYear",
             "groupingElection",
-            "nonREWorkHours"
+            "nonREWorkHours",
+            "noOneParticipatedMore"
         ]
         let baseKeys = unscopedLegacyKeys + [
             "legacyDataMigrated",
@@ -731,7 +732,8 @@ class AppViewModel: ObservableObject {
             entries: timeEntries,
             year: year,
             propertyId: propertyId,
-            groupingElection: TaxProfileManager.shared.groupingElection
+            groupingElection: TaxProfileManager.shared.groupingElection,
+            noOneParticipatedMore: TaxProfileManager.shared.noOneParticipatedMore(forYear: year)
         )
     }
 
