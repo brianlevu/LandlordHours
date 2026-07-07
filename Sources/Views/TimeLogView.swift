@@ -1093,24 +1093,31 @@ struct TimeLogView: View {
 
     // MARK: - Attach Button
     private var attachButton: some View {
-        PhotosPicker(
-            selection: $entryPhotoItems,
-            maxSelectionCount: 5,
-            matching: .images
-        ) {
-            HStack(spacing: 8) {
-                LucideIcon(image: Lucide.paperclip, size: 16)
-                Text(entryAttachments.isEmpty ? "Attach receipt or document" : "Attached (\(entryAttachments.count))")
-                    .font(.system(size: 13, weight: .medium))
+        VStack(alignment: .leading, spacing: 6) {
+            PhotosPicker(
+                selection: $entryPhotoItems,
+                maxSelectionCount: 5,
+                matching: .images
+            ) {
+                HStack(spacing: 8) {
+                    LucideIcon(image: Lucide.paperclip, size: 16)
+                    Text(entryAttachments.isEmpty ? "Attach receipt or document" : "Attached (\(entryAttachments.count))")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .foregroundStyle(entryAttachments.isEmpty ? colors.textSecondary : colors.action)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(colors.backgroundTertiary)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .foregroundStyle(entryAttachments.isEmpty ? colors.textSecondary : colors.action)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(colors.backgroundTertiary)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-        }
-        .onChange(of: entryPhotoItems) { _, newItems in
-            Task { await loadPhotos(from: newItems) }
+            .onChange(of: entryPhotoItems) { _, newItems in
+                Task { await loadPhotos(from: newItems) }
+            }
+
+            Text("Photos are stored on this device only and aren't included in iCloud sync.")
+                .font(.system(size: 12))
+                .foregroundStyle(colors.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

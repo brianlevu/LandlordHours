@@ -1,4 +1,5 @@
 import Foundation
+import os.log
 
 // MARK: - Property Entity
 enum PropertyType: String, Codable, CaseIterable {
@@ -138,31 +139,165 @@ enum Participant: String, Codable, CaseIterable {
 }
 
 // MARK: - Attachment Model
+//
+// Attachment bytes are stored as files under Application Support/Attachments,
+// not inline in the persisted JSON blob (photos would otherwise blow past
+// UserDefaults' practical size limits and fail to save silently). The struct
+// keeps its identity/metadata; bytes load lazily from disk via `data`.
+//
+// `pendingData` is the transient in-memory buffer for bytes that have not yet
+// been flushed to disk — either a freshly picked photo or a legacy inline blob
+// decoded from an older store. It is never encoded; migration/save flushes it to
+// a file and clears it. Old blobs that still carry an inline `data` key decode
+// into `pendingData` so the one-time migration can move them to files.
 struct TimeAttachment: Identifiable, Codable {
     let id: UUID
     var filename: String
-    var data: Data
     var mimeType: String
     var createdAt: Date
     var modifiedAt: Date
 
+    /// Bytes not yet persisted to disk. Never encoded — file storage is the source of truth.
+    private var pendingData: Data?
+
+    enum CodingKeys: String, CodingKey {
+        case id, filename, data, mimeType, createdAt, modifiedAt
+    }
+
     init(id: UUID = UUID(), filename: String, data: Data, mimeType: String) {
         self.id = id
         self.filename = filename
-        self.data = data
         self.mimeType = mimeType
         self.createdAt = Date()
         self.modifiedAt = Date()
+        self.pendingData = data
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
         filename = try c.decode(String.self, forKey: .filename)
-        data = try c.decode(Data.self, forKey: .data)
         mimeType = try c.decode(String.self, forKey: .mimeType)
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         modifiedAt = try c.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? createdAt
+        // Legacy inline bytes (pre file-based storage) decode here so migration can flush them.
+        pendingData = try c.decodeIfPresent(Data.self, forKey: .data)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(filename, forKey: .filename)
+        try c.encode(mimeType, forKey: .mimeType)
+        try c.encode(createdAt, forKey: .createdAt)
+        try c.encode(modifiedAt, forKey: .modifiedAt)
+        // Intentionally omit `data`: bytes live in files, not in the persisted blob.
+    }
+
+    /// True while inline bytes are still waiting to be written to disk.
+    var hasPendingData: Bool { pendingData != nil }
+
+    /// Inline bytes awaiting a disk flush, if any.
+    var pendingBytes: Data? { pendingData }
+
+    /// Attachment bytes, from the pending buffer or from disk. `nil` if the file is missing/unreadable.
+    var data: Data? {
+        if let pendingData { return pendingData }
+        return AttachmentStore.shared.read(self)
+    }
+
+    /// Drop the in-memory copy once the bytes are safely on disk.
+    mutating func clearPendingData() { pendingData = nil }
+
+    /// File extension used for the on-disk file, derived from the filename, then the MIME type.
+    var fileExtension: String {
+        let ext = (filename as NSString).pathExtension
+        if !ext.isEmpty { return ext.lowercased() }
+        if let sub = mimeType.split(separator: "/").last, !sub.isEmpty {
+            return String(sub).lowercased()
+        }
+        return "dat"
+    }
+}
+
+// MARK: - Attachment File Store
+
+enum AttachmentStoreError: Error {
+    /// The file written to disk did not read back at the expected size.
+    case verificationFailed(UUID)
+}
+
+/// Stores time-entry attachment bytes as files under
+/// `Application Support/Attachments/<attachment-uuid>.<ext>`, keeping the
+/// persisted JSON blob small. Photos never enter UserDefaults.
+///
+/// `shared` is a settable `static var` so tests can point it at an isolated
+/// temporary directory and restore it afterward.
+final class AttachmentStore {
+    static var shared = AttachmentStore()
+
+    private let directory: URL
+    private let fileManager: FileManager
+    private let logger = Logger(subsystem: "com.openclaw.landlordhours", category: "AttachmentStore")
+
+    init(directory: URL? = nil, fileManager: FileManager = .default) {
+        self.fileManager = fileManager
+        if let directory {
+            self.directory = directory
+        } else {
+            let base = (try? fileManager.url(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: true
+            )) ?? fileManager.temporaryDirectory
+            self.directory = base.appendingPathComponent("Attachments", isDirectory: true)
+        }
+    }
+
+    private func ensureDirectory() throws {
+        if !fileManager.fileExists(atPath: directory.path) {
+            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+    }
+
+    func fileURL(for attachment: TimeAttachment) -> URL {
+        directory.appendingPathComponent("\(attachment.id.uuidString).\(attachment.fileExtension)", isDirectory: false)
+    }
+
+    /// True if a non-empty file already exists for this attachment.
+    func fileExists(for attachment: TimeAttachment) -> Bool {
+        let url = fileURL(for: attachment)
+        guard let values = try? url.resourceValues(forKeys: [.fileSizeKey]),
+              let size = values.fileSize else { return false }
+        return size > 0
+    }
+
+    /// Write bytes atomically and verify the file reads back at the expected size.
+    /// Throws (never silently succeeds) so callers can hold the inline copy until the file is proven.
+    func write(_ data: Data, for attachment: TimeAttachment) throws {
+        try ensureDirectory()
+        let url = fileURL(for: attachment)
+        try data.write(to: url, options: .atomic)
+        let written = try Data(contentsOf: url)
+        guard written.count == data.count else {
+            throw AttachmentStoreError.verificationFailed(attachment.id)
+        }
+    }
+
+    func read(_ attachment: TimeAttachment) -> Data? {
+        let url = fileURL(for: attachment)
+        guard fileManager.fileExists(atPath: url.path) else { return nil }
+        do {
+            return try Data(contentsOf: url)
+        } catch {
+            logger.error("Failed to read attachment \(attachment.id.uuidString, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
+    func delete(_ attachment: TimeAttachment) {
+        try? fileManager.removeItem(at: fileURL(for: attachment))
     }
 }
 

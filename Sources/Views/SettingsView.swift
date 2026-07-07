@@ -902,6 +902,14 @@ struct SettingsView: View {
                         .accessibilityIdentifier("settings.importCalendar")
                     }
 
+                    Text("Photos attached to time entries are stored on this device only and aren't included in iCloud sync.")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(colors.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 4)
+                        .padding(.top, -2)
+                        .accessibilityIdentifier("settings.photoStorageDisclosure")
+
                     SettingsGroup(title: "App Preferences", subtitle: "Personalize reminders, icon, and setup guidance.") {
                         AppearancePreferenceRow(appearanceManager: appearanceManager)
                             .accessibilityIdentifier("settings.appearance")

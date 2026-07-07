@@ -290,7 +290,7 @@ struct TimeEntryDetailView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(entry.attachments) { attachment in
-                        if let uiImage = UIImage(data: attachment.data) {
+                        if let bytes = attachment.data, let uiImage = UIImage(data: bytes) {
                             Image(uiImage: uiImage)
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)

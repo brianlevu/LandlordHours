@@ -264,6 +264,38 @@ final class LandlordHoursUITests: XCTestCase {
         XCTAssertFalse(app.buttons["home.activation.firstHour"].exists)
     }
 
+    func testAttachmentPhotoSurvivesForceQuitAndRelaunch() {
+        // Launch 1: seed an entry that carries a real, file-backed attachment.
+        launch(scenario: "occasional", tab: 0, extraArguments: ["-LHSeedAttachment"])
+
+        let entryRow = app.staticTexts["Property Management"]
+        XCTAssertTrue(entryRow.waitForExistence(timeout: 12))
+        entryRow.tap()
+
+        XCTAssertTrue(app.staticTexts["Attachments (1)"].waitForExistence(timeout: 6),
+                      "Seeded attachment should render before relaunch")
+        attachScreenshot(named: "attachment-before-relaunch")
+
+        // Force-quit and relaunch WITHOUT reseeding: the entry and its photo must
+        // load from disk (the user stays signed in via the persisted scope keys).
+        app.terminate()
+        app.launchArguments = [
+            "-LHInitialTab", "0",
+            "-AppleLanguages", "(en)",
+            "-AppleLocale", "en_US"
+        ]
+        app.launch()
+
+        let entryRowAgain = app.staticTexts["Property Management"]
+        XCTAssertTrue(entryRowAgain.waitForExistence(timeout: 12),
+                      "Persisted entry should still be present after relaunch")
+        entryRowAgain.tap()
+
+        XCTAssertTrue(app.staticTexts["Attachments (1)"].waitForExistence(timeout: 6),
+                      "Attachment must still render after a true process restart")
+        attachScreenshot(named: "attachment-after-relaunch")
+    }
+
     private func launch(scenario: String, tab: Int, extraArguments: [String] = []) {
         app.terminate()
         app.launchArguments = [
