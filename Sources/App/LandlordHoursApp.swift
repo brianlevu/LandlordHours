@@ -501,6 +501,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         notificationCenter.delegate = self
         registerEngagementNotificationCategories(center: notificationCenter)
         application.registerForRemoteNotifications()
+        Analytics.configure()
+        Analytics.appOpened()
         return true
     }
 

@@ -1,5 +1,5 @@
 {
-  "originHash" : "96ab2f40c501bdadeea99efa9dac83a750832d041073e6a0d2c11e227196dab3",
+  "originHash" : "a126fefe3c463a6f756bb1cbe5b27a68f3832c597da1ff5440c01910742a7be5",
   "pins" : [
     {
       "identity" : "lucide-icons-swift",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "ae62faae3ce8e1a6f7a2f7d24e58e5098adf5405",
         "version" : "0.575.0"
+      }
+    },
+    {
+      "identity" : "posthog-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/PostHog/posthog-ios",
+      "state" : {
+        "revision" : "131859db52a6d65bc77a6f8846239a22bad8dd14",
+        "version" : "3.68.2"
       }
     }
   ],

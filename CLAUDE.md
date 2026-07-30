@@ -757,3 +757,10 @@ In SwiftUI, map DM Serif Display to `.system(design: .serif)` and DM Sans to `.s
 ---
 
 *Design System v2.0 — February 2026*
+
+
+## Xcode Build Rules (MANDATORY)
+
+- **DerivedData**: ALWAYS pass `-derivedDataPath /Volumes/Home/DerivedData` when running `xcodebuild`. The boot disk is only 228GB. Never use the default ~/Library/Developer/Xcode/DerivedData/.
+- **Simulators**: Local simulators OK — device files symlinked to external SSD. Use Device Hub to manage. Max 1-2 at a time (16GB RAM). Always use `-derivedDataPath /Volumes/Home/DerivedData`.
+- **Temp files**: Build artifacts in /tmp fill the boot disk. Prefer `/Volumes/Home/tmp` for large intermediate files.

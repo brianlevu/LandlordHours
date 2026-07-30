@@ -16,6 +16,9 @@ packages:
   LucideIcons:
     url: https://github.com/JakubMazur/lucide-icons-swift.git
     from: 0.575.0
+  PostHog:
+    url: https://github.com/PostHog/posthog-ios
+    from: "3.66.1"
 
 targets:
   LandlordHours:
@@ -23,12 +26,18 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+        excludes:
+          - "**/Info.plist"
+          - "Widget/**"
       - path: Assets.xcassets
     dependencies:
       - package: LucideIcons
+      - package: PostHog
     entitlements:
       path: LandlordHours.entitlements
       properties:
+        com.apple.security.application-groups:
+          - group.com.openclaw.landlordhours
         com.apple.developer.icloud-container-identifiers:
           - iCloud.com.openclaw.landlordhours
         com.apple.developer.icloud-services:

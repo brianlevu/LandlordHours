@@ -290,6 +290,7 @@ struct ReportsView: View {
                 animate(AppAnimation.ringProgress.delay(0.3)) {
                     ringAppeared = true
                 }
+                Analytics.reportViewed()
             }
         }
     }

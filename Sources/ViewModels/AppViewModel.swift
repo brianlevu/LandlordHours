@@ -424,6 +424,7 @@ class AppViewModel: ObservableObject {
         properties.append(property)
         saveData()
         triggerCelebration(.propertyAdded)
+        Analytics.propertyAdded()
     }
     
     func updateProperty(_ property: RentalProperty) {
@@ -470,6 +471,7 @@ class AppViewModel: ObservableObject {
         timeEntries.append(entry)
         saveData()
         checkHourMilestones()
+        Analytics.sessionLogged(category: category, participant: participant)
     }
     
     func updateTimeEntry(_ entry: TimeEntry) {
