@@ -24,6 +24,30 @@ timestamp() {
   date +%Y%m%d%H%M%S
 }
 
+# XCUITest attaches a .mov screen recording per run, staged by testmanagerd under
+#   <device>/data/Containers/Data/InternalDaemon/<uuid>/tmp/Attachments/
+# On a clean run xcodebuild collects them into the .xcresult and they are removed. On
+# a killed run nothing reaps them. Found 2026-08-04: 15GB in 85 orphaned .mov files
+# (up to 3.3GB each) from this lane's timeouts, which filled the boot disk to 87%.
+purge_orphaned_test_attachments() {
+  local log_path="${1:-/dev/null}"
+  local dev_dir="$HOME/Library/Developer/CoreSimulator/Devices/$SIMULATOR_ID"
+  [[ -d "$dev_dir" ]] || return 0
+
+  local before_mb after_mb
+  before_mb=$(du -sm "$dev_dir" 2>/dev/null | awk '{print $1}')
+
+  # The test host must be down or testmanagerd will hold the files open.
+  /usr/bin/xcrun simctl shutdown "$SIMULATOR_ID" >/dev/null 2>&1 || true
+
+  find "$dev_dir/data/Containers/Data/InternalDaemon" -mindepth 3 -maxdepth 3 \
+    -path '*/tmp/*' -exec rm -rf {} + 2>/dev/null
+
+  after_mb=$(du -sm "$dev_dir" 2>/dev/null | awk '{print $1}')
+  echo "Reaped orphaned test attachments: ${before_mb:-?}MB -> ${after_mb:-?}MB" \
+    | tee -a "$log_path"
+}
+
 run_xcodebuild() {
   local name="$1"
   shift
@@ -65,6 +89,15 @@ run_xcodebuild() {
     if (( now_seconds - start_seconds > LANE_TIMEOUT_SECONDS )); then
       echo "Timed out after ${LANE_TIMEOUT_SECONDS}s; stopping xcodebuild pid ${build_pid}." | tee -a "$log_path"
       kill "$build_pid" >/dev/null 2>&1 || true
+      # SIGTERM to xcodebuild alone leaves the simulator-side test host running, and
+      # testmanagerd keeps the .mov screen recording it staged for the run. Give the
+      # parent a moment, then make sure it is really gone before reaping the scratch.
+      for _ in 1 2 3 4 5; do
+        kill -0 "$build_pid" >/dev/null 2>&1 || break
+        sleep 1
+      done
+      kill -9 "$build_pid" >/dev/null 2>&1 || true
+      purge_orphaned_test_attachments "$log_path"
       status=124
       break
     fi
