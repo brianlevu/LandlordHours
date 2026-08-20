@@ -1,0 +1,76 @@
+# Store archive on RELEASE macOS.
+# Why this exists: the Mac Mini runs beta macOS, and Apple validates
+# BuildMachineOSBuild — a locally-archived store build was flipped to
+# INVALID_BINARY after an initially-VALID processingState. This workflow
+# produces an UNSIGNED .xcarchive on a release-macOS runner; signing/export/
+# upload happen locally on the Mini (signing does not touch the build-machine
+# stamp). No secrets live in GitHub.
+#
+# Adapted from the Handly poker repo's proven store-archive.yml
+# (poker/.github/workflows/store-archive.yml).
+name: store-archive
+
+on:
+  workflow_dispatch:
+    inputs:
+      marketing_version:
+        description: "MARKETING_VERSION to inject (e.g. 1.0.5)"
+        required: true
+      build_number:
+        description: "CURRENT_PROJECT_VERSION to inject (YYYYMMDDHHMM)"
+        required: true
+
+jobs:
+  archive:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify release macOS and select Xcode
+        run: |
+          sw_vers
+          BUILD=$(sw_vers -buildVersion)
+          if [[ "$BUILD" =~ [a-z]$ ]]; then
+            echo "::error::Runner macOS build $BUILD is a beta seed — archive would be invalidated"
+            exit 1
+          fi
+          ls -d /Applications/Xcode*.app || true
+          CANDIDATE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -iv beta | sort -V | tail -1 || true)
+          if [ -n "$CANDIDATE" ]; then
+            sudo xcode-select -s "$CANDIDATE/Contents/Developer"
+          fi
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos
+
+      - name: Archive (unsigned)
+        run: |
+          xcodebuild archive \
+            -project LandlordHours.xcodeproj \
+            -scheme LandlordHours \
+            -destination generic/platform=iOS \
+            -archivePath "$RUNNER_TEMP/LandlordHours.xcarchive" \
+            MARKETING_VERSION="${{ github.event.inputs.marketing_version }}" \
+            CURRENT_PROJECT_VERSION="${{ github.event.inputs.build_number }}" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+
+      - name: Verify build-machine stamp is release
+        run: |
+          plutil -p "$RUNNER_TEMP/LandlordHours.xcarchive/Products/Applications/LandlordHours.app/Info.plist" \
+            | grep -E "BuildMachineOSBuild|CFBundleVersion|CFBundleShortVersionString|DTXcodeBuild|DTSDKName"
+          STAMP=$(plutil -extract BuildMachineOSBuild raw "$RUNNER_TEMP/LandlordHours.xcarchive/Products/Applications/LandlordHours.app/Info.plist")
+          if [[ "$STAMP" =~ [a-z]$ ]]; then
+            echo "::error::BuildMachineOSBuild $STAMP looks like a beta seed"
+            exit 1
+          fi
+
+      # tar preserves exec bits + xattrs; upload-artifact alone strips permissions
+      - name: Pack archive
+        run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/LandlordHours.xcarchive.tgz" LandlordHours.xcarchive
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: landlordhours-xcarchive
+          path: ${{ runner.temp }}/LandlordHours.xcarchive.tgz
+          if-no-files-found: error
+          retention-days: 7
