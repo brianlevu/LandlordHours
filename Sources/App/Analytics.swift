@@ -21,8 +21,7 @@ import PostHog
 ///   the simulator (even under a `-LH*` launch) so event flow can be verified without polluting a
 ///   real QA capture run.
 enum Analytics {
-    /// Persisted user opt-out (not yet surfaced in Settings — mechanism is wired so a future "Share
-    /// usage data" toggle only needs to flip this key).
+    /// Persisted user opt-out, surfaced as the "Share Anonymous Usage Data" toggle in Settings → Privacy.
     static let optOutKey = "landlordHoursAnalyticsOptOut"
 
     /// Written exactly once, on the main thread, from the app-launch path before any capture call
