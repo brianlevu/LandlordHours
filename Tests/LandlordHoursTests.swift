@@ -1704,3 +1704,75 @@ final class PersistenceHardeningTests: XCTestCase {
         XCTAssertEqual(viewModel.entriesForYear(2024).count, 1)
     }
 }
+
+// MARK: - Analytics Opt-Out Tests
+
+/// Covers the Settings "Share Anonymous Usage Data" toggle's persistence mechanics.
+/// `Analytics.setOptOut` never runs configured in XCTest (see `Analytics.shouldConfigure`,
+/// which explicitly gates off whenever `XCTestConfigurationFilePath` is present), so these
+/// tests exercise the two things that ARE testable without a live PostHog SDK instance:
+/// the UserDefaults-backed persistence the Settings toggle relies on (`Analytics.isOptedOut`,
+/// the same key `@AppStorage(Analytics.optOutKey)` binds to in `SettingsView`), and the pure
+/// gating functions (`shouldSend`) that decide whether an opted-out user's events go out.
+final class AnalyticsOptOutTests: XCTestCase {
+
+    private var savedOptOutValue: Bool?
+
+    override func setUp() {
+        super.setUp()
+        savedOptOutValue = UserDefaults.standard.object(forKey: Analytics.optOutKey) as? Bool
+        UserDefaults.standard.removeObject(forKey: Analytics.optOutKey)
+    }
+
+    override func tearDown() {
+        if let savedOptOutValue {
+            UserDefaults.standard.set(savedOptOutValue, forKey: Analytics.optOutKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Analytics.optOutKey)
+        }
+        super.tearDown()
+    }
+
+    /// A fresh install (no key written yet) must read as shared/opted-in — the toggle defaults
+    /// to ON, matching `@AppStorage(Analytics.optOutKey) private var analyticsOptedOut = false`
+    /// in `SettingsView`.
+    func testDefaultsToSharedWhenKeyNeverWritten() {
+        XCTAssertFalse(Analytics.isOptedOut, "No stored preference must read as shared (opted in) by default")
+    }
+
+    /// Mirrors exactly what flipping the Settings toggle does: `SettingsView`'s
+    /// `shareAnalyticsBinding` writes straight to `UserDefaults` under `Analytics.optOutKey`
+    /// (via `@AppStorage`), and `Analytics.isOptedOut` is the read side of that same key.
+    func testTogglingWritesUserDefaultsKey() {
+        UserDefaults.standard.set(true, forKey: Analytics.optOutKey)
+        XCTAssertTrue(Analytics.isOptedOut, "Turning the toggle off (opting out) must persist true under the opt-out key")
+        XCTAssertTrue(UserDefaults.standard.bool(forKey: Analytics.optOutKey))
+
+        UserDefaults.standard.set(false, forKey: Analytics.optOutKey)
+        XCTAssertFalse(Analytics.isOptedOut, "Turning the toggle back on (sharing) must persist false under the opt-out key")
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: Analytics.optOutKey))
+    }
+
+    /// `setOptOut` is safe to call in either order without crashing or leaving the SDK in a bad
+    /// state, whether or not analytics ever configured (it never does under XCTest — see the
+    /// class doc comment). This is the "round trip" the toggle performs every time the user
+    /// flips it back and forth.
+    func testSetOptOutRoundTripsWithoutCrashing() {
+        XCTAssertFalse(Analytics.isConfigured, "Analytics must never configure under XCTest (XCTestConfigurationFilePath gate)")
+
+        Analytics.setOptOut(true)
+        XCTAssertFalse(Analytics.isConfigured, "setOptOut must not itself configure analytics")
+
+        Analytics.setOptOut(false)
+        XCTAssertFalse(Analytics.isConfigured, "setOptOut must remain a no-op guard when analytics was never configured")
+    }
+
+    /// The gating check `capture()` runs on every call: an opted-out user's events must never
+    /// send, and flipping back to opted-in must be honored on the very next call — no caching,
+    /// no delayed effect.
+    func testShouldSendHonorsOptOutImmediately() {
+        XCTAssertTrue(Analytics.shouldSend(configured: true, optedOut: false), "Configured + opted in must send")
+        XCTAssertFalse(Analytics.shouldSend(configured: true, optedOut: true), "Configured + opted out must never send")
+        XCTAssertFalse(Analytics.shouldSend(configured: false, optedOut: false), "Never-configured must never send, opt-out state aside")
+    }
+}

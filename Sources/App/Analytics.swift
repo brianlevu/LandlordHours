@@ -111,6 +111,13 @@ enum Analytics {
         }
     }
 
+    /// Current opt-out status, read straight from `UserDefaults` so SwiftUI (e.g. `@AppStorage`)
+    /// and this type always agree on the source of truth. `false` (shared) is the default for a
+    /// user who has never touched the Settings toggle.
+    static var isOptedOut: Bool {
+        UserDefaults.standard.bool(forKey: optOutKey)
+    }
+
     /// Captures an event. No-op when analytics never configured or opted out. Kept private — call
     /// sites use the typed helpers below so the event taxonomy stays centralized and reviewable in
     /// one place.

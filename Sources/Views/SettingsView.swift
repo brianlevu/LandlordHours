@@ -331,9 +331,14 @@ private struct SettingRow: View {
 private struct SettingToggleRow: View {
     let icon: UIImage
     let iconColor: Color
+    var iconWash: Color? = nil
     let title: String
     var subtitle: String? = nil
     @Binding var isOn: Bool
+    /// Toggle tint follows the same intent framework as the rest of Settings: neutral setting
+    /// changes use `action` (matches `tpToggleRow`'s convention below), not `positive`/sage —
+    /// sage is reserved for success/qualified states, not ordinary toggles.
+    var tint: Color = AppColors.action
 
     @Environment(\.colorScheme) var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
@@ -343,7 +348,7 @@ private struct SettingToggleRow: View {
             LucideIcon(image: icon, size: 20)
                 .foregroundStyle(iconColor)
                 .frame(width: 38, height: 38)
-                .background(colors.backgroundTertiary)
+                .background(iconWash ?? colors.backgroundTertiary)
                 .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 1) {
@@ -361,7 +366,7 @@ private struct SettingToggleRow: View {
 
             Toggle("", isOn: $isOn)
                 .labelsHidden()
-                .tint(AppColors.sage)
+                .tint(tint)
         }
         .padding(.vertical, 13)
     }
@@ -788,9 +793,25 @@ struct SettingsView: View {
     @State private var isDeletingAccount = false
     @State private var deleteAccountError: String?
     @State private var showDeveloperTools = false
+    /// Backs the "Share Anonymous Usage Data" toggle. Stores whether the user opted OUT (default
+    /// `false`, i.e. shared/opted-in by default) directly against `Analytics.optOutKey` so this
+    /// view and `Analytics` always read the same UserDefaults value.
+    @AppStorage(Analytics.optOutKey) private var analyticsOptedOut = false
     #if DEBUG
     @State private var showEngagementLab = false
     #endif
+
+    /// Presents the opt-out state as an opt-IN toggle ("Share…") while writing straight through
+    /// to `Analytics.setOptOut`, so the SDK is updated the moment the user flips it.
+    private var shareAnalyticsBinding: Binding<Bool> {
+        Binding(
+            get: { !analyticsOptedOut },
+            set: { isSharing in
+                analyticsOptedOut = !isSharing
+                Analytics.setOptOut(analyticsOptedOut)
+            }
+        )
+    }
 
     var body: some View {
         NavigationStack {
@@ -1025,6 +1046,25 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("settings.skipGuidedSetup")
+                    }
+
+                    SettingsGroup(title: "Privacy", subtitle: "Control what usage data leaves this device.") {
+                        SettingToggleRow(
+                            icon: Lucide.chartNoAxesCombined,
+                            iconColor: AppColors.informational,
+                            iconWash: colors.informationalSurface,
+                            title: "Share Anonymous Usage Data",
+                            subtitle: "Helps us find bugs and improve the app",
+                            isOn: shareAnalyticsBinding
+                        )
+                        .accessibilityIdentifier("settings.analyticsOptOut")
+
+                        Text("Anonymous signals like \"a session was logged.\" Never your notes, properties, or personal data.")
+                            .font(AppTypography.caption)
+                            .foregroundStyle(colors.textTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.bottom, 12)
+                            .accessibilityIdentifier("settings.analyticsOptOutCaption")
                     }
 
                     SettingsGroup(title: "Support & Legal", subtitle: "Help, policies, and account exits.") {
