@@ -19,6 +19,15 @@ packages:
   PostHog:
     url: https://github.com/PostHog/posthog-ios
     from: "3.66.1"
+  # RevenueCat (observer-mode monetization tracking, 2026-08-26): wired ANALYTICS/OBSERVER MODE
+  # ONLY — `purchasesAreCompletedBy: .myApp` — so the existing StoreKit 2 purchase path in
+  # `Sources/Services/SubscriptionManager.swift` stays untouched; RC only observes transactions
+  # for its dashboards. See `Sources/Services/LandlordPurchases.swift` for the feature/key gates
+  # (ships dark until a real key replaces REVENUECAT_API_KEY below). Pinned to the exact version
+  # resolved by the LensWords / Bee Buddy reference apps (Package.resolved), not a floating range.
+  RevenueCat:
+    url: https://github.com/RevenueCat/purchases-ios-spm.git
+    exactVersion: "5.86.0"
 
 targets:
   LandlordHours:
@@ -33,6 +42,8 @@ targets:
     dependencies:
       - package: LucideIcons
       - package: PostHog
+      - package: RevenueCat
+        product: RevenueCat
     entitlements:
       path: LandlordHours.entitlements
       properties:
@@ -55,6 +66,17 @@ targets:
         CODE_SIGN_IDENTITY: "Apple Development"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        # RevenueCat public SDK key (observer mode). Real production `appl_` public SDK key from
+        # app.revenuecat.com (activated 2026-08-26) — used in BOTH Debug and Release: observer mode
+        # just records whatever StoreKit transactions the app actually makes, and RC itself
+        # segregates Debug/sandbox purchases from production ones in its dashboard.
+        # `LandlordPurchases.swift` still treats the placeholder string
+        # (`REPLACE_WITH_REVENUECAT_PUBLIC_SDK_KEY`) and any empty value as "no key" and no-ops on
+        # top of its own `isEnabled` gate — that guard path stays in place and is unit-tested even
+        # though a real key ships today. Never a secret worth encrypting — RC's own docs describe
+        # this as a public, client-embeddable key (same category as the PostHog key already
+        # inlined in Analytics.swift).
+        REVENUECAT_API_KEY: "appl_nekSXCuphljAxqntEkeFUyDJFrY"
   LandlordHoursTests:
     type: bundle.unit-test
     platform: iOS

@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!--
+	Bundled third-party SDKs (PostHog, RevenueCat) each carry their OWN PrivacyInfo.xcprivacy inside
+	their frameworks and are not restated here for NSPrivacyAccessedAPITypes — this file's
+	NSPrivacyAccessedAPITypes only justifies required-reason API calls made by this app's own code.
+	NSPrivacyCollectedDataTypes below reconciles what the app + its SDKs collect in aggregate.
+	-->
 	<key>NSPrivacyAccessedAPITypes</key>
 	<array>
 		<dict>
@@ -14,7 +20,29 @@
 		</dict>
 	</array>
 	<key>NSPrivacyCollectedDataTypes</key>
-	<array/>
+	<array>
+		<!--
+		RevenueCat (LandlordPurchases.swift) — ANALYTICS/OBSERVER MODE ONLY
+		(purchasesAreCompletedBy: .myApp; StoreKit 2's own SubscriptionManager.swift keeps doing
+		real entitlement + transaction.finish()). RC never calls Purchases.shared.logIn(); its
+		anonymous appUserID is the only identifier, so this is not linked to identity. Purpose
+		mirrors RevenueCat's own bundled PrivacyInfo.xcprivacy (App Functionality), which declares
+		the identical NSPrivacyCollectedDataTypePurchaseHistory / not-linked / not-tracking triple
+		for consistency between the app-level and SDK-level manifests.
+		-->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePurchaseHistory</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSPrivacyTracking</key>
 	<false/>
 	<key>NSPrivacyTrackingDomains</key>

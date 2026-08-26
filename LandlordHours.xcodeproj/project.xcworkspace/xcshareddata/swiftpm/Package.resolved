@@ -1,5 +1,5 @@
 {
-  "originHash" : "a126fefe3c463a6f756bb1cbe5b27a68f3832c597da1ff5440c01910742a7be5",
+  "originHash" : "36f5e07e7a74df91923aebc5d389bbae610921111c27fba63c51d441313656db",
   "pins" : [
     {
       "identity" : "lucide-icons-swift",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "131859db52a6d65bc77a6f8846239a22bad8dd14",
         "version" : "3.68.2"
+      }
+    },
+    {
+      "identity" : "purchases-ios-spm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/RevenueCat/purchases-ios-spm.git",
+      "state" : {
+        "revision" : "57043e7e0173c48d64e171944ac76a34d2467fa1",
+        "version" : "5.86.0"
       }
     }
   ],

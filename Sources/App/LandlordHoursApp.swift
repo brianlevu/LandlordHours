@@ -503,6 +503,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         application.registerForRemoteNotifications()
         Analytics.configure()
         Analytics.appOpened()
+        LandlordPurchases.configure()
         return true
     }
 
