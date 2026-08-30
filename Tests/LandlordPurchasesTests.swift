@@ -15,34 +15,46 @@ final class LandlordPurchasesTests: XCTestCase {
 
     func testNeverConfiguresWhenDisabledEvenWithARealKey() {
         XCTAssertFalse(LandlordPurchases.shouldConfigure(
-            isEnabled: false, apiKey: "appl_realkey123", analyticsOptedOut: false))
+            isEnabled: false, apiKey: "appl_realkey123", analyticsOptedOut: false,
+            isSimulator: false
+        ))
     }
 
     func testNeverConfiguresWithNilKeyEvenWhenEnabled() {
         XCTAssertFalse(LandlordPurchases.shouldConfigure(
-            isEnabled: true, apiKey: nil, analyticsOptedOut: false))
+            isEnabled: true, apiKey: nil, analyticsOptedOut: false,
+            isSimulator: false
+        ))
     }
 
     func testNeverConfiguresWithEmptyKeyEvenWhenEnabled() {
         XCTAssertFalse(LandlordPurchases.shouldConfigure(
-            isEnabled: true, apiKey: "", analyticsOptedOut: false))
+            isEnabled: true, apiKey: "", analyticsOptedOut: false,
+            isSimulator: false
+        ))
     }
 
     func testNeverConfiguresWithThePlaceholderKeyEvenWhenEnabled() {
         XCTAssertFalse(LandlordPurchases.shouldConfigure(
-            isEnabled: true, apiKey: LandlordPurchases.placeholderAPIKey, analyticsOptedOut: false))
+            isEnabled: true, apiKey: LandlordPurchases.placeholderAPIKey, analyticsOptedOut: false,
+            isSimulator: false
+        ))
     }
 
     func testConfiguresOnlyWhenBothEnabledAndARealKeyArePresent() {
         XCTAssertTrue(LandlordPurchases.shouldConfigure(
-            isEnabled: true, apiKey: "appl_realkey123", analyticsOptedOut: false))
+            isEnabled: true, apiKey: "appl_realkey123", analyticsOptedOut: false,
+            isSimulator: false
+        ))
     }
 
     // MARK: - shouldConfigure — usage-sharing opt-out gate
 
     func testNeverConfiguresWhenUserOptedOutOfUsageSharing() {
         XCTAssertFalse(LandlordPurchases.shouldConfigure(
-            isEnabled: true, apiKey: "appl_realkey123", analyticsOptedOut: true))
+            isEnabled: true, apiKey: "appl_realkey123", analyticsOptedOut: true,
+            isSimulator: false
+        ))
     }
 
     // MARK: - shouldConfigure — XCTest gate (mirrors Analytics.shouldConfigure)
@@ -52,7 +64,8 @@ final class LandlordPurchasesTests: XCTestCase {
             isEnabled: true,
             apiKey: "appl_realkey123",
             environment: ["XCTestConfigurationFilePath": "/tmp/whatever.xctestconfiguration"],
-            analyticsOptedOut: false
+            analyticsOptedOut: false,
+            isSimulator: false
         ))
     }
 
@@ -64,7 +77,8 @@ final class LandlordPurchasesTests: XCTestCase {
                 "XCTestConfigurationFilePath": "/tmp/whatever.xctestconfiguration",
                 LandlordPurchases.testHarnessLiveOverrideKey: "1",
             ],
-            analyticsOptedOut: false
+            analyticsOptedOut: false,
+            isSimulator: false
         ))
     }
 
@@ -76,7 +90,8 @@ final class LandlordPurchasesTests: XCTestCase {
                 "XCTestConfigurationFilePath": "/tmp/whatever.xctestconfiguration",
                 LandlordPurchases.testHarnessLiveOverrideKey: "1",
             ],
-            analyticsOptedOut: false
+            analyticsOptedOut: false,
+            isSimulator: false
         ))
     }
 
@@ -88,7 +103,8 @@ final class LandlordPurchasesTests: XCTestCase {
                 "XCTestConfigurationFilePath": "/tmp/whatever.xctestconfiguration",
                 LandlordPurchases.testHarnessLiveOverrideKey: "1",
             ],
-            analyticsOptedOut: false
+            analyticsOptedOut: false,
+            isSimulator: false
         ))
     }
 
@@ -96,7 +112,31 @@ final class LandlordPurchasesTests: XCTestCase {
         // No `XCTestConfigurationFilePath` key at all (a real launch) — behaves exactly like the
         // pre-gate overload above.
         XCTAssertTrue(LandlordPurchases.shouldConfigure(
-            isEnabled: true, apiKey: "appl_realkey123", environment: [:], analyticsOptedOut: false))
+            isEnabled: true, apiKey: "appl_realkey123", environment: [:], analyticsOptedOut: false,
+            isSimulator: false
+        ))
+    }
+
+    // MARK: - shouldConfigure — simulator gate (dev sims mint fresh RC "customers," 2026-08-28)
+
+    func testSimulatorGateBlocksConfigurationOnASimulatorBuild() {
+        XCTAssertFalse(LandlordPurchases.shouldConfigure(
+            isEnabled: true, apiKey: "appl_realkey123", analyticsOptedOut: false, isSimulator: true))
+    }
+
+    func testSimulatorGateIsPermissiveOnADeviceBuild() {
+        XCTAssertTrue(LandlordPurchases.shouldConfigure(
+            isEnabled: true, apiKey: "appl_realkey123", analyticsOptedOut: false, isSimulator: false))
+    }
+
+    func testSimulatorGateStillAllowsTheHarnessOverride() {
+        XCTAssertTrue(LandlordPurchases.shouldConfigure(
+            isEnabled: true,
+            apiKey: "appl_realkey123",
+            environment: [LandlordPurchases.testHarnessLiveOverrideKey: "1"],
+            analyticsOptedOut: false,
+            isSimulator: true
+        ))
     }
 
     /// Runtime proof, not just pure-logic coverage: THIS test process is genuinely running under
@@ -118,7 +158,8 @@ final class LandlordPurchasesTests: XCTestCase {
             isEnabled: true,
             apiKey: "appl_realkey123",
             arguments: ["-LHMockScenario", "qualified"],
-            analyticsOptedOut: false
+            analyticsOptedOut: false,
+            isSimulator: false
         ))
     }
 
@@ -127,13 +168,16 @@ final class LandlordPurchasesTests: XCTestCase {
             isEnabled: true,
             apiKey: "appl_realkey123",
             arguments: ["-LHInitialTab", "reports"],
-            analyticsOptedOut: false
+            analyticsOptedOut: false,
+            isSimulator: false
         ))
     }
 
     func testNoLaunchArgumentsIsPermissive() {
         XCTAssertTrue(LandlordPurchases.shouldConfigure(
-            isEnabled: true, apiKey: "appl_realkey123", arguments: [], analyticsOptedOut: false))
+            isEnabled: true, apiKey: "appl_realkey123", arguments: [], analyticsOptedOut: false,
+            isSimulator: false
+        ))
     }
 
     func testUnrelatedLaunchArgumentsAreIgnored() {
@@ -141,7 +185,8 @@ final class LandlordPurchasesTests: XCTestCase {
             isEnabled: true,
             apiKey: "appl_realkey123",
             arguments: ["-SomeOtherFlag"],
-            analyticsOptedOut: false
+            analyticsOptedOut: false,
+            isSimulator: false
         ))
     }
 
