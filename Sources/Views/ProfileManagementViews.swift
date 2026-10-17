@@ -396,7 +396,7 @@ struct ProfileSwitchConfirmSheet: View {
         .padding(.horizontal, 24)
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity)
-        .background(colors.backgroundSecondary.ignoresSafeArea())
+        .presentationBackground(colors.backgroundSecondary)
         .presentationDetents([.height(340)])
         .presentationDragIndicator(.visible)
     }
