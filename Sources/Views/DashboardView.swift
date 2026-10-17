@@ -1007,7 +1007,7 @@ struct EntryListRow: View {
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 HStack(spacing: 4) {
-                    if entry.importSource != nil {
+                    if entry.isCalendarImport {
                         HStack(spacing: 2) {
                             LucideIcon(image: Lucide.calendar, size: 9)
                             Text("Cal")

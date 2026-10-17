@@ -22,7 +22,7 @@ struct HistoryView: View {
             entries = entries.filter { $0.propertyId == property.id }
         }
         if filterImportedOnly {
-            entries = entries.filter { $0.importSource != nil }
+            entries = entries.filter { $0.isCalendarImport }
         }
         return entries.sorted { $0.date > $1.date }
     }

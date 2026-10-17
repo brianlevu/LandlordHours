@@ -21,6 +21,7 @@
 		38B5E98FF26323E43143DBF3 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 1AF16D81B372852B91B92405 /* LaunchScreen.storyboard */; };
 		3B3DCEF447585EB5C06E7B68 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = 160AF93CAE65FC3E3A8033B2 /* PostHog */; };
 		3B7CC2060463C21BC9ECAD07 /* TasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 368AC8C360A71EB0FAFB1D52 /* TasksView.swift */; };
+		41608B6514C2E6C81B7359F2 /* AuditReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA55F7A788AAB40693166F60 /* AuditReportTests.swift */; };
 		494B71178010F1EDB70BC3A5 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 884A37AD32EE90EF18CEDAE9 /* RevenueCat */; };
 		4C04E70D3E5565A29188DAF4 /* CalendarImportReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FFC13B6D335F226D0DD7B81 /* CalendarImportReviewView.swift */; };
 		518F77E3248E5C1571182B28 /* LandlordHoursAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 965D319F27D7A4A2332D47B2 /* LandlordHoursAppIntents.swift */; };
@@ -31,8 +32,10 @@
 		691B932AEB4ECA321D667151 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7002A4C1E561833705DE3B43 /* PaywallView.swift */; };
 		708EDA426351E4E5ECB2A0BC /* CloudKitSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E942608EE77393A2E7F17F89 /* CloudKitSyncService.swift */; };
 		7BE636161E5D4B92208041FC /* LandlordHoursTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E078FA57ABF4C028DDE04C86 /* LandlordHoursTimerAttributes.swift */; };
+		7CB9BA413496A06323C90A38 /* AuditReportBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = D87C61D0D4C65EDFDCB0649B /* AuditReportBuilder.swift */; };
 		8ED697DE6FEC7270E36DAABE /* VoiceEntryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 838ADFB389C9D4AD52D16B41 /* VoiceEntryService.swift */; };
 		8EED89E8FC89005138C20B59 /* LandlordPurchases.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA1DF3BCE5385BCFDC7627DC /* LandlordPurchases.swift */; };
+		91BC16EB0083668060809989 /* AuditReportCSV.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111C91DE9EE369C07CE2F490 /* AuditReportCSV.swift */; };
 		93C20D864969D6F6EC85B191 /* TimeLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11377EC6BD95D70E1AF5A9A6 /* TimeLogView.swift */; };
 		98B8F1C68BDAB98363098499 /* TrialBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6479CEE1FE815563D8292734 /* TrialBannerView.swift */; };
 		A0635C304AF19BD05633788E /* WeeklySummaryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CDD5A26F0EDE1AF0DB43F2D /* WeeklySummaryService.swift */; };
@@ -54,6 +57,7 @@
 		CB4A4FF6CB46CB23A628AA19 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD25AA91ABB5FB4C307E491 /* DashboardView.swift */; };
 		CC3AD4AEC85263A4DB7CC2EE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7987DD5DAFB64A0DD0B89D /* SettingsView.swift */; };
 		D0FB50644A3E4250418CF25F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8F16B919639EBDE7C821FEC2 /* Assets.xcassets */; };
+		D944AA90DB2DCE59079C61F9 /* AuditReportPDFRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46C2C28508D1F64A007B6BF9 /* AuditReportPDFRenderer.swift */; };
 		E64013AB37CFBCDFB9E4001D /* LandlordHours.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 61925A55B4CDBDF1584A392E /* LandlordHours.storekit */; };
 		EA9388030050C4067B4212BE /* AppleSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = C85EE25AEEEC23C7341BEA7B /* AppleSignIn.swift */; };
 		ECCEECAF864DD8D63F3C84B9 /* ContactSupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B38BCF663A8276A105CBCC1 /* ContactSupportView.swift */; };
@@ -82,6 +86,7 @@
 		02AE3372F32CD60F04CF317C /* CategoryManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryManagementView.swift; sourceTree = "<group>"; };
 		0914D43BECE24E5CB862706D /* LandlordPurchasesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordPurchasesTests.swift; sourceTree = "<group>"; };
 		0FFC13B6D335F226D0DD7B81 /* CalendarImportReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarImportReviewView.swift; sourceTree = "<group>"; };
+		111C91DE9EE369C07CE2F490 /* AuditReportCSV.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditReportCSV.swift; sourceTree = "<group>"; };
 		11377EC6BD95D70E1AF5A9A6 /* TimeLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeLogView.swift; sourceTree = "<group>"; };
 		1552DA58D14D98D9473D352A /* SubscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
 		1AA72A2C13136E24A749E14C /* LandlordHoursUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LandlordHoursUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -95,6 +100,7 @@
 		3B38BCF663A8276A105CBCC1 /* ContactSupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactSupportView.swift; sourceTree = "<group>"; };
 		3BDA44BD54B97B0B3D60A429 /* CalendarImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarImportService.swift; sourceTree = "<group>"; };
 		434AE320C71AE1DAFBBBD038 /* LearningCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningCenterView.swift; sourceTree = "<group>"; };
+		46C2C28508D1F64A007B6BF9 /* AuditReportPDFRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditReportPDFRenderer.swift; sourceTree = "<group>"; };
 		46D2C2173FB64791CCAAB8FD /* EngagementNotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementNotificationScheduler.swift; sourceTree = "<group>"; };
 		499428642ACE937E7B98B111 /* LHLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHLogo.swift; sourceTree = "<group>"; };
 		4F7DEC5DC48828C8FF4C48C2 /* EngagementLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementLabView.swift; sourceTree = "<group>"; };
@@ -124,7 +130,9 @@
 		C9291FAFB4986AA2BF4F05D4 /* Analytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Analytics.swift; sourceTree = "<group>"; };
 		CF68DBFF1FFD763363015B42 /* CelebrationOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CelebrationOverlayView.swift; sourceTree = "<group>"; };
 		CFBF76FD610DF2D0CDA40C0A /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
+		D87C61D0D4C65EDFDCB0649B /* AuditReportBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditReportBuilder.swift; sourceTree = "<group>"; };
 		D91BDD921FD02E42B58FE334 /* PropertiesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertiesView.swift; sourceTree = "<group>"; };
+		DA55F7A788AAB40693166F60 /* AuditReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditReportTests.swift; sourceTree = "<group>"; };
 		DE13F908989158FDAB28BF57 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		E078FA57ABF4C028DDE04C86 /* LandlordHoursTimerAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordHoursTimerAttributes.swift; sourceTree = "<group>"; };
 		E6D41E394791AE4ADCA1F725 /* EngagementIntelligenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementIntelligenceService.swift; sourceTree = "<group>"; };
@@ -190,6 +198,7 @@
 		A9B21080B278EBA44EB8A4E8 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				DA55F7A788AAB40693166F60 /* AuditReportTests.swift */,
 				A01B3B8EADDB251440528314 /* LandlordHoursTests.swift */,
 				0914D43BECE24E5CB862706D /* LandlordPurchasesTests.swift */,
 				22F2A5256E57CEBACC7BDAAC /* StoreKitLocalIntegrationTests.swift */,
@@ -233,6 +242,9 @@
 			children = (
 				F63814CFFD3A0284AC85988D /* AITimeEntryService.swift */,
 				C85EE25AEEEC23C7341BEA7B /* AppleSignIn.swift */,
+				D87C61D0D4C65EDFDCB0649B /* AuditReportBuilder.swift */,
+				111C91DE9EE369C07CE2F490 /* AuditReportCSV.swift */,
+				46C2C28508D1F64A007B6BF9 /* AuditReportPDFRenderer.swift */,
 				3BDA44BD54B97B0B3D60A429 /* CalendarImportService.swift */,
 				E942608EE77393A2E7F17F89 /* CloudKitSyncService.swift */,
 				E6D41E394791AE4ADCA1F725 /* EngagementIntelligenceService.swift */,
@@ -426,6 +438,9 @@
 				B6FC290317CCEE66FC6E7333 /* AppDesignSystem.swift in Sources */,
 				C6B50842EA064CEACA38BA96 /* AppViewModel.swift in Sources */,
 				EA9388030050C4067B4212BE /* AppleSignIn.swift in Sources */,
+				7CB9BA413496A06323C90A38 /* AuditReportBuilder.swift in Sources */,
+				91BC16EB0083668060809989 /* AuditReportCSV.swift in Sources */,
+				D944AA90DB2DCE59079C61F9 /* AuditReportPDFRenderer.swift in Sources */,
 				4C04E70D3E5565A29188DAF4 /* CalendarImportReviewView.swift in Sources */,
 				B7EE89E0AFD88DD021946318 /* CalendarImportService.swift in Sources */,
 				063B1B913810D3C73CD378C4 /* CategoryManagementView.swift in Sources */,
@@ -469,6 +484,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				41608B6514C2E6C81B7359F2 /* AuditReportTests.swift in Sources */,
 				2846D3E26FF2EA4A60FAF7D6 /* LandlordHoursTests.swift in Sources */,
 				A130AD4A0C3826D57BDE0E2C /* LandlordPurchasesTests.swift in Sources */,
 				1424FAA16D7E9B48091EBE67 /* StoreKitLocalIntegrationTests.swift in Sources */,
