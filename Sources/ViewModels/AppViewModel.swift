@@ -1358,6 +1358,30 @@ struct StaleTimerRecovery: Codable, Equatable, Identifiable {
         return minutes < 1 ? "under 1 min" : "\(minutes) min"
     }
 
+    static let capNote = "We stopped it at 24 hours. Check it before you save."
+
+    /// Copy for the Track recovery card, per draft reason. Kept here so it is unit-tested.
+    func cardMessage(propertyName: String?, hasAnyProperty: Bool, remainingAfterThis: Int) -> String {
+        let start = startTime.formatted(date: .abbreviated, time: .shortened)
+        let more = remainingAfterThis > 0 ? " \(remainingAfterThis) more after this one." : ""
+        let cap = wasCapped ? " \(Self.capNote)" : ""
+        guard let propertyName else {
+            let pick = hasAnyProperty
+                ? "Pick a property to save it to, or discard it."
+                : "Add a property to save it, or discard it."
+            return "Started \(start). The property for this timer was deleted.\(cap) \(pick)\(more)"
+        }
+        switch reason {
+        case .pausedAtSwitch:
+            let paused = (pausedAt ?? startTime).formatted(date: .abbreviated, time: .shortened)
+            let action = wasCapped ? Self.capNote : "Save the time it ran, or discard it."
+            return "Started \(start) for \(propertyName). We paused it when you switched profiles at \(paused). \(action)\(more)"
+        case .forgotten:
+            let note = wasCapped ? Self.capNote : "Review it before saving so the record stays accurate."
+            return "Started \(start) for \(propertyName). \(note)\(more)"
+        }
+    }
+
     var accessibilityTitle: String {
         switch reason {
         case .forgotten: return "Timer left running."

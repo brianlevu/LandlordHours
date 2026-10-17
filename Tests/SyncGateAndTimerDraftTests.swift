@@ -108,6 +108,36 @@ final class TimerDraftTests: XCTestCase {
         XCTAssertFalse(twoMinutes.wasCapped)
     }
 
+    func testForgottenTimerNoteAndCapCopy() {
+        let forgotten = StaleTimerRecovery(startTime: Date(), propertyId: UUID(), category: .repairs, elapsedHours: 30)
+        XCTAssertEqual(forgotten.entryNote, "Recovered from a timer that was left running.")
+        XCTAssertEqual(forgotten.accessibilityTitle, "Timer left running.")
+        let message = forgotten.cardMessage(propertyName: "Oak", hasAnyProperty: true, remainingAfterThis: 0)
+        XCTAssertTrue(message.contains("We stopped it at 24 hours. Check it before you save."), message)
+
+        let short = StaleTimerRecovery(startTime: Date(), propertyId: UUID(), category: .repairs, elapsedHours: 3)
+        XCTAssertFalse(short.cardMessage(propertyName: "Oak", hasAnyProperty: true, remainingAfterThis: 0)
+            .contains("24 hours"))
+    }
+
+    func testPausedOver24hShowsCapNoteAndPausedUnderDoesNot() {
+        let over = StaleTimerRecovery(startTime: Date(), propertyId: UUID(), category: .repairs,
+                                      elapsedHours: 26, reason: .pausedAtSwitch)
+        let overMessage = over.cardMessage(propertyName: "Oak", hasAnyProperty: true, remainingAfterThis: 1)
+        XCTAssertTrue(overMessage.contains("We stopped it at 24 hours. Check it before you save."), overMessage)
+        XCTAssertTrue(overMessage.contains("1 more after this one."))
+        XCTAssertEqual(over.suggestedHours, 24)
+
+        let under = StaleTimerRecovery(startTime: Date(), propertyId: UUID(), category: .repairs,
+                                       elapsedHours: 0.5, reason: .pausedAtSwitch)
+        let underMessage = under.cardMessage(propertyName: "Oak", hasAnyProperty: true, remainingAfterThis: 0)
+        XCTAssertFalse(underMessage.contains("24 hours"))
+        XCTAssertTrue(underMessage.contains("switched profiles"))
+
+        let deleted = under.cardMessage(propertyName: nil, hasAnyProperty: false, remainingAfterThis: 0)
+        XCTAssertTrue(deleted.contains("Add a property to save it"))
+    }
+
     func testLegacyDraftWithoutReasonDecodesAsForgotten() throws {
         let recovery = StaleTimerRecovery(startTime: Date(timeIntervalSince1970: 0), propertyId: UUID(),
                                           category: .repairs, elapsedHours: 25)

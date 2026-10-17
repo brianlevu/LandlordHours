@@ -82,8 +82,10 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
             syncError = "iCloud sync is unavailable in this build."
             logger.warning("CloudKit disabled: missing iCloud CloudKit entitlement")
         }
-        // Signing in to iCloud (or switching Apple Accounts) while the app runs re-checks
-        // the account, which re-runs the initial pull and opens the push gate.
+        // Signing in to iCloud while the app runs re-checks the account; if it went from
+        // unavailable to available, that re-runs the initial pull and opens the push gate.
+        // Switching to a different iCloud account while it stays available does NOT re-run
+        // the pull (no change of availability is detected).
         accountChangeObserver = NotificationCenter.default.addObserver(
             forName: .CKAccountChanged, object: nil, queue: .main
         ) { [weak self] _ in
