@@ -30,7 +30,7 @@ struct TaxProfileFields {
 // MARK: - CloudKit Sync Service
 
 @MainActor
-final class CloudKitSyncService: ObservableObject {
+final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
 
     // MARK: Public state
     @Published var isSyncing = false
@@ -80,12 +80,47 @@ final class CloudKitSyncService: ObservableObject {
         guard accountAvailable else { return }
         await ensureZoneExists()
         await ensureSubscriptionExists()
-        // Initial sync: push local then pull remote
-        if !UserDefaults.standard.bool(forKey: migrationDoneKey) {
-            await pushAll()
-            UserDefaults.standard.set(true, forKey: migrationDoneKey)
+        // Initial sync: push local then pull remote — but never push an empty local
+        // state before the first pull (it would overwrite iCloud copies of
+        // GoalSettings-<id> / TaxProfile-<id> with defaults on a reinstall/restore).
+        let viewModel = getViewModel()
+        let hasLocalData = !(viewModel?.properties.isEmpty ?? true)
+            || !(viewModel?.timeEntries.isEmpty ?? true)
+            || !CategoryManager.shared.customCategories.isEmpty
+        await Self.runInitialSync(
+            defaults: .standard,
+            migrationDoneKey: migrationDoneKey,
+            hasLocalData: hasLocalData,
+            push: { await self.pushAll() },
+            pull: { await self.pullChanges() }
+        )
+    }
+
+    /// Initial-sync ordering, extracted so tests can drive it with fakes.
+    ///
+    /// - Push first only when the one-time initial push hasn't run AND there is local
+    ///   data to protect. Restored iCloud-only profiles arrive with `migrationDone`
+    ///   already set (see `ProfileRestore.activate`), so they always pull first.
+    /// - When the push is skipped for empty state, the initial push is marked done
+    ///   after the pull; later edits push through `schedulePush()` as usual.
+    static func runInitialSync(
+        defaults: UserDefaults,
+        migrationDoneKey: String,
+        hasLocalData: Bool,
+        push: () async -> Void,
+        pull: () async -> Void
+    ) async {
+        let migrationDone = defaults.bool(forKey: migrationDoneKey)
+        if !migrationDone && hasLocalData {
+            await push()
+            defaults.set(true, forKey: migrationDoneKey)
+            await pull()
+            return
         }
-        await pullChanges()
+        await pull()
+        if !migrationDone {
+            defaults.set(true, forKey: migrationDoneKey)
+        }
     }
 
     func stop() {
@@ -415,6 +450,56 @@ final class CloudKitSyncService: ObservableObject {
             )
             delegate?.syncDidReceiveTaxProfile(fields)
         }
+    }
+
+    // MARK: - Profile Discovery (iCloud)
+
+    /// Discovery-only fetch of the whole zone (no change token) that reduces each record
+    /// to its owner, type and date. Unlike `pullChanges()` it does NOT drop other app
+    /// users' records — that is the point — and it never touches local state.
+    /// Returns `[]` when iCloud is unavailable, so offline discovery is device-only.
+    func fetchProfileRecordSummaries() async throws -> [CloudRecordSummary] {
+        guard container != nil, let database else { return [] }
+        await checkAccountStatus()
+        guard accountAvailable else { return [] }
+
+        var summaries: [CloudRecordSummary] = []
+        let config = CKFetchRecordZoneChangesOperation.ZoneConfiguration()
+        config.previousServerChangeToken = nil
+        config.desiredKeys = ["appUserId", "date"]
+
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                let op = CKFetchRecordZoneChangesOperation(
+                    recordZoneIDs: [zoneID],
+                    configurationsByRecordZoneID: [zoneID: config]
+                )
+                op.recordWasChangedBlock = { _, result in
+                    if case .success(let record) = result {
+                        summaries.append(CloudRecordSummary(
+                            appUserId: record["appUserId"] as? String,
+                            recordType: record.recordType,
+                            date: record["date"] as? Date
+                        ))
+                    }
+                }
+                op.fetchRecordZoneChangesResultBlock = { result in
+                    switch result {
+                    case .success: continuation.resume()
+                    case .failure(let error): continuation.resume(throwing: error)
+                    }
+                }
+                op.qualityOfService = .userInitiated
+                database.add(op)
+            }
+        } catch let error as CKError where error.code == .zoneNotFound || error.code == .userDeletedZone {
+            return []
+        } catch let error as CKError where error.code == .partialFailure {
+            let codes = error.partialErrorsByItemID?.values.compactMap { ($0 as? CKError)?.code } ?? []
+            if codes.allSatisfy({ $0 == .zoneNotFound || $0 == .userDeletedZone }) { return [] }
+            throw error
+        }
+        return summaries
     }
 
     // MARK: - Delete from Cloud

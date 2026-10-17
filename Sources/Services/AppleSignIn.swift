@@ -20,7 +20,12 @@ struct AppleSignInButton: View {
             case .success(let authorization):
                 if let appleIdCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
                     let userId = appleIdCredential.user
-                    let isNewUser = UserDefaults.standard.string(forKey: "appleUserId") != userId
+                    // "New" means this Apple ID has never finished setup on this device — not
+                    // merely "not the currently stored ID" (a returning user who switched
+                    // profiles must not be sent through onboarding again).
+                    let isNewUser = !UserDefaults.standard.bool(
+                        forKey: UserScope.key("hasCompletedOnboarding", userId: userId)
+                    )
                     UserDefaults.standard.set(userId, forKey: "appleUserId")
 
                     AppleSignInManager.shared.userId = userId
@@ -50,7 +55,7 @@ struct AppleSignInButton: View {
                 let nsError = error as NSError
                 // Code 1001 = user cancelled — don't show an error
                 if nsError.code != 1001 {
-                    errorMessage = "Apple Sign In isn't available right now. Please use email sign-up or make sure you're signed into your Apple ID in Settings."
+                    errorMessage = "Sign in with Apple isn't available right now. You can continue without an account, or check that you're signed in to your Apple Account in Settings."
                     showError = true
                 }
                 logger.error("Apple Sign-In failed: \(error.localizedDescription)")
@@ -69,15 +74,19 @@ struct AppleSignInButton: View {
 
 enum LoginType: String, Codable {
     case apple
+    /// Legacy ≤1.0.6 email "account". Still decodes; migrated to `.local` at launch.
     case email
+    /// 1.1 local profile (no account): `local-<UUID>` or a migrated `email-…` ID.
+    case local
 }
 
 enum AdminAccess {
     static let adminEmails: Set<String> = ["brianlevu@gmail.com"]
 
     static var currentEmail: String? {
-        UserDefaults.standard.string(forKey: "appleUserEmail")
-        ?? UserDefaults.standard.string(forKey: "emailUserEmail")
+        UserDefaults.standard.string(forKey: ProfileKeys.appleUserEmail)
+        ?? UserDefaults.standard.string(forKey: ProfileKeys.localProfileEmail)
+        ?? UserDefaults.standard.string(forKey: ProfileKeys.emailUserEmail)
         ?? AppleSignInManager.shared.email
     }
 
@@ -104,81 +113,74 @@ class AppleSignInManager: ObservableObject {
     }
     
     func checkExistingSignIn() {
-        if let userId = UserDefaults.standard.string(forKey: "appleUserId") {
+        let defaults = UserDefaults.standard
+        if let userId = defaults.string(forKey: ProfileKeys.appleUserId) {
             self.userId = userId
             self.isSignedIn = true
-            self.fullName = UserDefaults.standard.string(forKey: "appleUserName")
-            self.email = UserDefaults.standard.string(forKey: "appleUserEmail")
-            self.profileImageData = UserDefaults.standard.data(forKey: UserScope.key("profileImageData"))
-            if let typeRaw = UserDefaults.standard.string(forKey: "loginType"),
-               let type = LoginType(rawValue: typeRaw) {
-                self.loginType = type
-            }
-        } else if let emailUserId = UserDefaults.standard.string(forKey: "emailUserId") {
+            self.fullName = defaults.string(forKey: ProfileKeys.appleUserName)
+            self.email = defaults.string(forKey: ProfileKeys.appleUserEmail)
+            self.loginType = .apple
+        } else if let localId = defaults.string(forKey: ProfileKeys.localProfileId) {
+            self.userId = localId
+            self.isSignedIn = true
+            self.fullName = defaults.string(forKey: ProfileKeys.localProfileName)
+            self.email = defaults.string(forKey: ProfileKeys.localProfileEmail)
+            self.loginType = .local
+        } else if let emailUserId = defaults.string(forKey: ProfileKeys.emailUserId) {
+            // Legacy fallback: only seen before `ProfileMigration` has run.
             self.userId = emailUserId
             self.isSignedIn = true
-            self.fullName = UserDefaults.standard.string(forKey: "emailUserName")
-            self.email = UserDefaults.standard.string(forKey: "emailUserEmail")
-            self.profileImageData = UserDefaults.standard.data(forKey: UserScope.key("profileImageData"))
+            self.fullName = defaults.string(forKey: ProfileKeys.emailUserName)
+            self.email = defaults.string(forKey: ProfileKeys.emailUserEmail)
             self.loginType = .email
+        } else {
+            userId = nil
+            fullName = nil
+            email = nil
+            profileImageData = nil
+            isSignedIn = false
+            return
         }
+        self.profileImageData = defaults.data(forKey: UserScope.key("profileImageData"))
     }
-    
-    func signInWithEmail(email: String, password: String, name: String) {
-        // Use a deterministic userId based on email so the same account always
-        // maps to the same data scope (no random UUID that changes every login)
-        let normalizedEmail = email.lowercased().trimmingCharacters(in: .whitespaces)
-        let userId = "email-" + normalizedEmail
-        UserDefaults.standard.set(userId, forKey: "emailUserId")
-        UserDefaults.standard.set(email, forKey: "emailUserEmail")
-        if !name.isEmpty {
-            UserDefaults.standard.set(name, forKey: "emailUserName")
-        }
-        UserDefaults.standard.set(LoginType.email.rawValue, forKey: "loginType")
 
-        self.userId = userId
-        self.email = email
-        if !name.isEmpty {
-            self.fullName = name
-        }
-        self.isSignedIn = true
-        self.loginType = .email
-    }
-    
     func updateProfile(name: String?, email: String?, imageData: Data?) {
+        let defaults = UserDefaults.standard
+        let nameKey: String
+        let emailKey: String
+        switch loginType {
+        case .apple:
+            nameKey = ProfileKeys.appleUserName
+            emailKey = ProfileKeys.appleUserEmail
+        case .local:
+            nameKey = ProfileKeys.localProfileName
+            emailKey = ProfileKeys.localProfileEmail
+        case .email:
+            nameKey = ProfileKeys.emailUserName
+            emailKey = ProfileKeys.emailUserEmail
+        }
+
         if let name = name {
             fullName = name
-            if loginType == .apple {
-                UserDefaults.standard.set(name, forKey: "appleUserName")
-            } else {
-                UserDefaults.standard.set(name, forKey: "emailUserName")
-            }
+            defaults.set(name, forKey: nameKey)
         }
-        
+
         if let email = email {
             self.email = email
-            if loginType == .apple {
-                UserDefaults.standard.set(email, forKey: "appleUserEmail")
-            } else {
-                UserDefaults.standard.set(email, forKey: "emailUserEmail")
-            }
+            defaults.set(email, forKey: emailKey)
         }
-        
+
         if let imageData = imageData {
             profileImageData = imageData
-            UserDefaults.standard.set(imageData, forKey: UserScope.key("profileImageData"))
+            defaults.set(imageData, forKey: UserScope.key("profileImageData"))
         }
     }
-    
+
     func signOut() {
-        UserDefaults.standard.removeObject(forKey: "appleUserId")
-        UserDefaults.standard.removeObject(forKey: "appleUserName")
-        UserDefaults.standard.removeObject(forKey: "appleUserEmail")
-        UserDefaults.standard.removeObject(forKey: "emailUserId")
-        UserDefaults.standard.removeObject(forKey: "emailUserName")
-        UserDefaults.standard.removeObject(forKey: "emailUserEmail")
-        UserDefaults.standard.removeObject(forKey: "loginType")
-        
+        for key in ProfileKeys.signOutKeys {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+
         userId = nil
         fullName = nil
         email = nil
@@ -195,8 +197,8 @@ struct LoginView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     @State private var appeared = false
-    @State private var showCreateAccount = false
-    @State private var showEmailLogin = false
+    @State private var restorableProfiles: [DiscoveredProfile] = []
+    @State private var showRestoreSheet = false
 
     var body: some View {
         NavigationStack {
@@ -235,16 +237,25 @@ struct LoginView: View {
                         .ignoresSafeArea()
                     }
             }
-            .navigationDestination(isPresented: $showCreateAccount) {
-                EmailSignUpView()
-            }
-            .sheet(isPresented: $showEmailLogin) {
-                EmailLoginSheetView()
+            .sheet(isPresented: $showRestoreSheet) {
+                ProfileRestoreSheet(profiles: restorableProfiles, context: .welcome) { profile in
+                    showRestoreSheet = false
+                    viewModel.switchToProfile(profile)
+                }
+                .environmentObject(viewModel)
             }
             .onAppear {
                 withAnimation(reduceMotion ? .linear(duration: 0.01) : .easeOut(duration: 0.35).delay(0.08)) {
                     appeared = true
                 }
+            }
+            .task {
+                restorableProfiles = await viewModel.discoverRestorableProfiles()
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("-LHOpenRestoreSheet"), !restorableProfiles.isEmpty {
+                    showRestoreSheet = true
+                }
+                #endif
             }
         }
     }
@@ -418,37 +429,66 @@ struct LoginView: View {
             }
             .clipShape(Capsule())
             .frame(height: 54)
+            .accessibilityIdentifier("welcome.signInWithApple")
 
-            HStack(spacing: 12) {
+            Button {
+                viewModel.continueWithoutAccount()
+            } label: {
+                Text("Continue without an account")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .background(colors.action)
+                    .foregroundStyle(AppColors.onAction)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.lhPressable)
+            .accessibilityIdentifier("welcome.continueWithoutAccount")
+
+            if restorableProfiles.isEmpty {
+                Text("Hours, properties and settings sync to your iCloud. Photos stay on this iPhone.")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
+            } else {
                 Button {
-                    showEmailLogin = true
+                    showRestoreSheet = true
                 } label: {
-                    Text("Log in")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(colors.backgroundSecondary)
-                        .foregroundStyle(colors.textPrimary)
-                        .clipShape(Capsule())
-                        .overlay {
-                            Capsule()
-                                .strokeBorder(colors.border.opacity(0.45), lineWidth: 1)
+                    HStack(spacing: 10) {
+                        LucideIcon(image: Lucide.history, size: 16)
+                            .foregroundStyle(colors.action)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Restore earlier data")
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                                .foregroundStyle(colors.textPrimary)
+                            Text(restoreSummary)
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .foregroundStyle(colors.textSecondary)
                         }
+                        Spacer(minLength: 0)
+                        LucideIcon(image: Lucide.chevronRight, size: 14)
+                            .foregroundStyle(colors.textTertiary)
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 52)
+                    .background(colors.backgroundSecondary)
+                    .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: AppCornerRadius.large, style: .continuous)
+                            .strokeBorder(colors.border.opacity(0.45), lineWidth: 1)
+                    }
                 }
-
-                Button {
-                    showCreateAccount = true
-                } label: {
-                    Text("Create account")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(colors.action)
-                        .foregroundStyle(AppColors.onAction)
-                        .clipShape(Capsule())
-                }
+                .buttonStyle(.lhPressable)
+                .accessibilityIdentifier("welcome.restoreEarlierData")
             }
         }
+    }
+
+    private var restoreSummary: String {
+        let count = restorableProfiles.count
+        return count == 1 ? "1 earlier profile found" : "\(count) earlier profiles found"
     }
 }
 
@@ -500,235 +540,4 @@ private extension View {
         }
     }
 
-}
-
-// MARK: - Email Login Sheet (for "Already have an account?")
-
-struct EmailLoginSheetView: View {
-    @EnvironmentObject var viewModel: AppViewModel
-    @Environment(\.dismiss) var dismiss
-    @State private var email = ""
-    @State private var password = ""
-    @State private var errorMessage = ""
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    WaveHouseIcon(size: 48)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .shadow(color: AppColors.primary.opacity(0.25), radius: 8, y: 3)
-                        .padding(.top, 8)
-
-                    Text("Welcome back")
-                        .font(.system(size: 22, weight: .regular, design: .serif))
-                        .foregroundStyle(AppColors.charcoal)
-
-                    VStack(spacing: 16) {
-                        loginFormField(label: "Email", placeholder: "your@email.com", text: $email, contentType: .emailAddress, keyboard: .emailAddress)
-                        loginSecureField(label: "Password", placeholder: "Password", text: $password)
-                    }
-
-                    if !errorMessage.isEmpty {
-                        HStack(spacing: 6) {
-                            LucideIcon(image: Lucide.circleAlert, size: 14)
-                                .foregroundStyle(AppColors.error)
-                            Text(errorMessage)
-                                .font(.system(size: 13))
-                                .foregroundStyle(AppColors.error)
-                        }
-                    }
-
-                    Button {
-                        guard !email.isEmpty, !password.isEmpty else {
-                            errorMessage = "Enter both email and password."
-                            return
-                        }
-                        guard email.contains("@") && email.contains(".") else {
-                            errorMessage = "Please enter a valid email address"
-                            return
-                        }
-                        guard password.count >= 6 else {
-                            errorMessage = "Password must be at least 6 characters"
-                            return
-                        }
-                        AppleSignInManager.shared.signInWithEmail(email: email, password: password, name: "")
-                        viewModel.signIn()
-                        dismiss()
-                    } label: {
-                        Text("Log In")
-                            .font(.system(size: 16, weight: .semibold))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .background(AppColors.primary)
-                            .foregroundColor(.white)
-                            .clipShape(Capsule())
-                            .shadow(color: AppColors.primary.opacity(0.3), radius: 8, y: 3)
-                    }
-                    .padding(.top, 8)
-                }
-                .padding(AppSpacing.xl)
-            }
-            .background(AppColors.background)
-            .navigationTitle("Log In")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundStyle(AppColors.primary)
-                }
-            }
-        }
-    }
-
-    private func loginFormField(label: String, placeholder: String, text: Binding<String>, contentType: UITextContentType? = nil, keyboard: UIKeyboardType = .default) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.system(size: 12))
-                .foregroundStyle(AppColors.slate)
-            TextField(placeholder, text: text)
-                .textFieldStyle(.plain)
-                .textContentType(contentType)
-                .keyboardType(keyboard)
-                .autocapitalization(keyboard == .emailAddress ? .none : .words)
-                .font(.system(size: 16, design: .rounded))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .background(AppColors.snow)
-                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
-        }
-    }
-
-    private func loginSecureField(label: String, placeholder: String, text: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.system(size: 12))
-                .foregroundStyle(AppColors.slate)
-            SecureField(placeholder, text: text)
-                .textFieldStyle(.plain)
-                .textContentType(.password)
-                .font(.system(size: 16, design: .rounded))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .background(AppColors.snow)
-                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
-        }
-    }
-}
-
-// MARK: - Email Sign Up View (Redesigned)
-
-struct EmailSignUpView: View {
-    @EnvironmentObject var viewModel: AppViewModel
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-    @State private var email = ""
-    @State private var password = ""
-    @State private var confirmPassword = ""
-    @State private var name = ""
-    @State private var errorMessage = ""
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Header
-                WaveHouseIcon(size: 48)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .shadow(color: AppColors.primary.opacity(0.25), radius: 8, y: 3)
-                    .padding(.top, 8)
-
-                Text("Create Account")
-                    .font(.system(size: 22, weight: .regular, design: .serif))
-                    .foregroundStyle(AppColors.charcoal)
-
-                // Form fields
-                VStack(spacing: 16) {
-                    formField(label: "Name", placeholder: "Your name", text: $name, contentType: .name)
-                    formField(label: "Email", placeholder: "your@email.com", text: $email, contentType: .emailAddress, keyboard: .emailAddress)
-                    secureFormField(label: "Password", placeholder: "Password", text: $password)
-                    secureFormField(label: "Confirm Password", placeholder: "Confirm password", text: $confirmPassword)
-                }
-
-                if !errorMessage.isEmpty {
-                    HStack(spacing: 6) {
-                        LucideIcon(image: Lucide.circleAlert, size: 14)
-                            .foregroundStyle(AppColors.error)
-                        Text(errorMessage)
-                            .font(AppTypography.bodySmall)
-                            .foregroundStyle(AppColors.error)
-                    }
-                }
-
-                Button {
-                    if password != confirmPassword {
-                        errorMessage = "Passwords don't match"
-                        return
-                    }
-                    if password.count < 6 {
-                        errorMessage = "Password must be at least 6 characters"
-                        return
-                    }
-                    if name.isEmpty || email.isEmpty {
-                        errorMessage = "Enter your name and email."
-                        return
-                    }
-                    guard email.contains("@") && email.contains(".") else {
-                        errorMessage = "Please enter a valid email address"
-                        return
-                    }
-
-                    AppleSignInManager.shared.signInWithEmail(email: email, password: password, name: name)
-                    viewModel.signUp()
-                } label: {
-                    Text("Create Account")
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                        .background(AppColors.primary)
-                        .foregroundColor(.white)
-                        .clipShape(Capsule())
-                        .shadow(color: AppColors.primary.opacity(0.3), radius: 8, y: 3)
-                }
-                .padding(.top, 8)
-            }
-            .padding(AppSpacing.xl)
-        }
-        .background(colors.background)
-        .navigationTitle("Sign Up")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private func formField(label: String, placeholder: String, text: Binding<String>, contentType: UITextContentType? = nil, keyboard: UIKeyboardType = .default) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(AppTypography.caption)
-                .foregroundStyle(colors.textSecondary)
-            TextField(placeholder, text: text)
-                .textFieldStyle(.plain)
-                .textContentType(contentType)
-                .keyboardType(keyboard)
-                .autocapitalization(keyboard == .emailAddress ? .none : .words)
-                .font(.system(size: 16, design: .rounded))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .background(colors.backgroundTertiary)
-                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
-        }
-    }
-
-    private func secureFormField(label: String, placeholder: String, text: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(AppTypography.caption)
-                .foregroundStyle(colors.textSecondary)
-            SecureField(placeholder, text: text)
-                .textFieldStyle(.plain)
-                .textContentType(.newPassword)
-                .font(.system(size: 16, design: .rounded))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .background(colors.backgroundTertiary)
-                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
-        }
-    }
 }

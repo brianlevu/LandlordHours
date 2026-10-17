@@ -9,12 +9,11 @@ import os.log
 // MARK: - Per-User Key Scoping
 
 /// Scopes UserDefaults keys to the current signed-in user.
-/// Auth keys (appleUserId, emailUserId, etc.) remain unscoped.
+/// Auth keys (appleUserId, localProfileId, legacy emailUserId, etc.) remain unscoped.
 enum UserScope {
-    /// Current userId, read directly from UserDefaults auth keys
+    /// Current userId: `appleUserId ?? localProfileId ?? emailUserId` (legacy fallback).
     static var userId: String? {
-        UserDefaults.standard.string(forKey: "appleUserId")
-        ?? UserDefaults.standard.string(forKey: "emailUserId")
+        ProfileKeys.resolveUserId(.standard)
     }
 
     /// Returns a user-scoped key. Falls back to unscoped if no user signed in.
@@ -63,6 +62,12 @@ class AppViewModel: ObservableObject {
     private var staleTimerRecoveryKey: String { UserScope.key("LandlordHours.staleTimerRecovery") }
 
     init() {
+#if DEBUG
+        seedLegacyEmailFixtureIfNeeded()
+#endif
+        // 1.1: turn a ≤1.0.6 email "account" into a local profile with the SAME ID.
+        // Must run before anything reads auth keys or migrates unscoped legacy data.
+        ProfileMigration.migrateEmailProfile(defaults: .standard)
         checkSignInState()
 #if DEBUG
         applyLaunchMockScenarioIfNeeded()
@@ -98,13 +103,31 @@ class AppViewModel: ObservableObject {
     }
     
     func checkSignInState() {
-        if UserDefaults.standard.string(forKey: "appleUserId") != nil {
+        let defaults = UserDefaults.standard
+        if defaults.string(forKey: ProfileKeys.appleUserId) != nil {
             isSignedIn = true
-            userName = UserDefaults.standard.string(forKey: "appleUserName") ?? "User"
-        } else if UserDefaults.standard.string(forKey: "emailUserId") != nil {
+            userName = defaults.string(forKey: ProfileKeys.appleUserName) ?? "User"
+        } else if defaults.string(forKey: ProfileKeys.localProfileId) != nil {
             isSignedIn = true
-            userName = UserDefaults.standard.string(forKey: "emailUserName") ?? "User"
+            userName = defaults.string(forKey: ProfileKeys.localProfileName) ?? "User"
+        } else if defaults.string(forKey: ProfileKeys.emailUserId) != nil {
+            isSignedIn = true
+            userName = defaults.string(forKey: ProfileKeys.emailUserName) ?? "User"
         }
+    }
+
+    /// Name shown for the active profile, from whichever identity is active.
+    static func resolvedProfileName(_ defaults: UserDefaults = .standard) -> String {
+        let candidate: String?
+        if defaults.string(forKey: ProfileKeys.appleUserId) != nil {
+            candidate = defaults.string(forKey: ProfileKeys.appleUserName)
+        } else if defaults.string(forKey: ProfileKeys.localProfileId) != nil {
+            candidate = defaults.string(forKey: ProfileKeys.localProfileName)
+        } else {
+            candidate = defaults.string(forKey: ProfileKeys.emailUserName)
+        }
+        guard let candidate, !candidate.isEmpty else { return "User" }
+        return candidate
     }
 
     func signIn() {
@@ -118,6 +141,10 @@ class AppViewModel: ObservableObject {
         // Load user-scoped data (UserScope.userId is now set via auth keys)
         loadData()
         loadTimerState()
+        // Pro belongs to this device's App Store account, not to a profile: carry the
+        // cached flag from the previous profile, then reload() re-checks StoreKit
+        // (Transaction.currentEntitlements) for the new profile.
+        ProEntitlementCarryOver.carryFromPreviousProfile(defaults: .standard)
         // Reload all singleton managers for this user
         SubscriptionManager.shared.reload()
         GoalManager.shared.loadGoals()
@@ -125,16 +152,54 @@ class AppViewModel: ObservableObject {
         TaxProfileManager.shared.reload()
         MilestoneTracker.shared.reload()
 
-        if let name = UserDefaults.standard.string(forKey: "appleUserName"), !name.isEmpty {
-            userName = name
-        } else if let name = UserDefaults.standard.string(forKey: "emailUserName"), !name.isEmpty {
-            userName = name
-        } else {
-            userName = "User"
-        }
+        userName = Self.resolvedProfileName(.standard)
+        AppleSignInManager.shared.checkExistingSignIn()
 
         // Start CloudKit sync
         Task { await syncService.start() }
+    }
+
+    /// "Continue without an account": creates a `local-<UUID>` profile.
+    ///
+    /// Deliberately does NOT call `signUp()`, which would wipe unscoped legacy data.
+    /// Unscoped legacy data is migrated into the new profile instead.
+    func continueWithoutAccount() {
+        let defaults = UserDefaults.standard
+        let id = ProfileKeys.newLocalProfileId()
+        defaults.set(id, forKey: ProfileKeys.localProfileId)
+        defaults.removeObject(forKey: ProfileKeys.localProfileName)
+        defaults.removeObject(forKey: ProfileKeys.localProfileEmail)
+        defaults.set(LoginType.local.rawValue, forKey: ProfileKeys.loginType)
+        migrateUnscopedLegacyData()
+        defaults.removeObject(forKey: UserScope.key("hasCompletedOnboarding"))
+        signIn()
+    }
+
+    /// Restores an earlier profile found on this device or in iCloud and makes it active.
+    /// The currently active profile's data stays on this device.
+    func switchToProfile(_ profile: DiscoveredProfile) {
+        if isSignedIn || UserScope.userId != nil {
+            signOut()
+        }
+        ProfileRestore.activate(profile, defaults: .standard)
+        signIn()
+    }
+
+    /// Inactive earlier profiles found on this device and (when reachable) in iCloud.
+    func discoverRestorableProfiles(cloudSource: CloudProfileRecordSource? = nil) async -> [DiscoveredProfile] {
+        let activeId = UserScope.userId
+        let device = ProfileDiscovery.deviceProfiles(defaults: .standard, excluding: activeId)
+        let source: CloudProfileRecordSource = cloudSource ?? syncService
+        let cloud: [DiscoveredProfile]
+        do {
+            cloud = ProfileDiscovery.cloudProfiles(
+                from: try await source.fetchProfileRecordSummaries(),
+                excluding: activeId
+            )
+        } catch {
+            cloud = []
+        }
+        return ProfileDiscovery.merge(device: device, cloud: cloud)
     }
 
     /// Call when a new account is created (not for returning sign-in).
@@ -146,28 +211,45 @@ class AppViewModel: ObservableObject {
         signIn()
     }
 
-    func signOut() {
+    /// Signs out / switches away from the active profile. Per-profile data stays on the
+    /// device under `u.<id>.*`.
+    ///
+    /// - Parameter keepProfileState: false only when the profile's data was just deleted,
+    ///   so nothing is written back into the deleted scope.
+    func signOut(keepProfileState: Bool = true) {
         // Stop CloudKit sync
         syncService.stop()
+        let defaults = UserDefaults.standard
+        let outgoingId = UserScope.userId
+
+        // Timer: stop the visible timer and save its state to THIS profile while its ID
+        // is still set. (Before 1.1 this ran after the ID was cleared and wrote unscoped
+        // `LandlordHours.timer*` keys.) A running timer resumes — or is offered for
+        // recovery if stale — when the profile comes back.
+        if keepProfileState, let outgoingId {
+            saveTimerState()
+            if defaults.string(forKey: ProfileKeys.localProfileId) == outgoingId,
+               let name = defaults.string(forKey: ProfileKeys.localProfileName), !name.isEmpty {
+                defaults.set(name, forKey: UserScope.key(ProfileRestore.profileNameKey, userId: outgoingId))
+            }
+            defaults.set(outgoingId, forKey: ProfileKeys.previousProfileId)
+        }
+        endTimerLiveActivity(propertyId: timerPropertyId, category: timerCategory, startDate: timerStartTime, needsReview: false)
 
         // Clear auth keys (unscoped — shared on device)
-        UserDefaults.standard.removeObject(forKey: "appleUserId")
-        UserDefaults.standard.removeObject(forKey: "appleUserName")
-        UserDefaults.standard.removeObject(forKey: "appleUserEmail")
-        UserDefaults.standard.removeObject(forKey: "emailUserId")
-        UserDefaults.standard.removeObject(forKey: "emailUserName")
-        UserDefaults.standard.removeObject(forKey: "emailUserEmail")
-        UserDefaults.standard.removeObject(forKey: "loginType")
+        for key in ProfileKeys.signOutKeys {
+            defaults.removeObject(forKey: key)
+        }
         // Clear any stale unscoped legacy data to prevent leaking to next user
         Self.clearUnscopedLegacyData()
         // Note: per-user data stays in UserDefaults under scoped keys (u.<userId>.*)
 
-        // Cancel any running timer and clear persisted timer state
-        endTimerLiveActivity(propertyId: timerPropertyId, category: timerCategory, startDate: timerStartTime, needsReview: false)
+        // Reset in-memory timer state only; never persist it after the ID is gone.
         isTimerRunning = false
         timerStartTime = nil
         timerPropertyId = nil
-        saveTimerState()
+        timerCategory = .repairs
+        staleTimerRecovery = nil
 
         // Reset in-memory state
         properties = []
@@ -184,15 +266,38 @@ class AppViewModel: ObservableObject {
         CategoryManager.shared.resetForSignOut()
         TaxProfileManager.shared.resetForSignOut()
         MilestoneTracker.shared.reload()
+        AppleSignInManager.shared.signOut()
     }
 
-    func deleteAccountAndData() async throws {
+    enum ProfileDeletionError: LocalizedError, Equatable {
+        /// iCloud is off/unreachable, so copies saved there can't be removed now.
+        case iCloudUnavailable
+
+        var errorDescription: String? {
+            switch self {
+            case .iCloudUnavailable:
+                return "iCloud is off, so copies saved there can't be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?"
+            }
+        }
+    }
+
+    /// Deletes the active profile's data (Apple: "Delete Account and Data"; local:
+    /// "Delete All Data"): iCloud records, scoped keys, attachment files and
+    /// notification keys, then signs out.
+    ///
+    /// - Parameter allowLocalOnly: when iCloud is unavailable the call throws
+    ///   `ProfileDeletionError.iCloudUnavailable` BEFORE deleting anything, unless the
+    ///   user explicitly chose "Delete from this iPhone anyway".
+    func deleteAccountAndData(allowLocalOnly: Bool = false) async throws {
         guard let userId = UserScope.userId else {
             signOut()
             return
         }
 
         syncService.stop()
+        if !syncService.accountAvailable {
+            await syncService.checkAccountStatus()
+        }
         if syncService.accountAvailable {
             try await syncService.deleteCurrentUserRecords(
                 properties: properties,
@@ -200,18 +305,12 @@ class AppViewModel: ObservableObject {
                 categories: CategoryManager.shared.customCategories,
                 userId: userId
             )
-        } else {
-            await syncService.checkAccountStatus()
-            if syncService.accountAvailable {
-                try await syncService.deleteCurrentUserRecords(
-                    properties: properties,
-                    entries: timeEntries,
-                    categories: CategoryManager.shared.customCategories,
-                    userId: userId
-                )
-            }
+        } else if !allowLocalOnly {
+            throw ProfileDeletionError.iCloudUnavailable
         }
 
+        // Photo files are not keyed by user; delete the ones this profile references.
+        deleteAttachmentFiles(for: timeEntries)
         Self.clearScopedAccountData(for: userId)
 
         properties = []
@@ -222,7 +321,11 @@ class AppViewModel: ObservableObject {
         timerStartTime = nil
         timerPropertyId = nil
 
-        signOut()
+        signOut(keepProfileState: false)
+        let defaults = UserDefaults.standard
+        if defaults.string(forKey: ProfileKeys.previousProfileId) == userId {
+            defaults.removeObject(forKey: ProfileKeys.previousProfileId)
+        }
     }
 
     func resetCurrentUserLocalData() {
@@ -374,11 +477,21 @@ class AppViewModel: ObservableObject {
             "cloudkit.subscriptionCreated",
             "cloudkit.migrationDone",
             GuidedOnboardingStore.completedKey,
-            GuidedOnboardingStore.skippedKey
+            GuidedOnboardingStore.skippedKey,
+            "LandlordHours.timer",
+            ProfileRestore.profileNameKey
         ] + taxProfileFields.map { "LandlordHours.taxProfile.\($0)" }
 
         for key in Set(baseKeys) {
             defaults.removeObject(forKey: UserScope.key(key, userId: userId))
+        }
+
+        // Notification cooldown keys (`LandlordHours.notification.lastScheduled.<reason>`).
+        // Match the full `u.<id>.LandlordHours.notification.` prefix so a profile whose ID
+        // merely starts with this one (e.g. `email-a@x.com.au`) is never touched.
+        let notificationPrefix = UserScope.key("LandlordHours.notification.", userId: userId)
+        for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(notificationPrefix) {
+            defaults.removeObject(forKey: key)
         }
     }
     
@@ -1238,10 +1351,13 @@ extension AppViewModel: CloudKitSyncDelegate {
         Self.clearScopedAccountData(for: userId)
 
         let defaults = UserDefaults.standard
-        defaults.set(userId, forKey: "emailUserId")
-        defaults.set(Self.launchMockEmail(defaultValue: "brianlevu@gmail.com"), forKey: "emailUserEmail")
-        defaults.set(Self.launchMockName(defaultValue: scenario.userName), forKey: "emailUserName")
-        defaults.set(LoginType.email.rawValue, forKey: "loginType")
+        defaults.removeObject(forKey: ProfileKeys.emailUserId)
+        defaults.removeObject(forKey: ProfileKeys.emailUserName)
+        defaults.removeObject(forKey: ProfileKeys.emailUserEmail)
+        defaults.set(userId, forKey: ProfileKeys.localProfileId)
+        defaults.set(Self.launchMockEmail(defaultValue: "brianlevu@gmail.com"), forKey: ProfileKeys.localProfileEmail)
+        defaults.set(Self.launchMockName(defaultValue: scenario.userName), forKey: ProfileKeys.localProfileName)
+        defaults.set(LoginType.local.rawValue, forKey: ProfileKeys.loginType)
 
         isSignedIn = true
         userName = Self.launchMockName(defaultValue: scenario.userName)

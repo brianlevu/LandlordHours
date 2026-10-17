@@ -272,7 +272,7 @@ final class TaxProfileManager: ObservableObject {
 
 // MARK: - Setting Row Component
 
-private struct SettingRow: View {
+struct SettingRow: View {
     let icon: UIImage
     let iconColor: Color
     var iconWash: Color? = nil
@@ -789,9 +789,6 @@ struct SettingsView: View {
     @State private var profileImage: Data?
     @State private var showingIconPicker = false
     @State private var restoreStatusMessage: String?
-    @State private var showingDeleteAccountAlert = false
-    @State private var isDeletingAccount = false
-    @State private var deleteAccountError: String?
     @State private var showDeveloperTools = false
     /// Backs the "Share Anonymous Usage Data" toggle. Stores whether the user opted OUT (default
     /// `false`, i.e. shared/opted-in by default) directly against `Analytics.optOutKey` so this
@@ -872,6 +869,8 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(subscriptionManager.isLoading)
+
+                        SettingsProfileRestoreRow()
                     }
 
                     SettingsGroup(title: "Tax Setup", subtitle: "The assumptions that drive qualification math.") {
@@ -1097,40 +1096,7 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.plain)
 
-                        Divider().background(colors.border.opacity(0.35))
-
-                        Button {
-                            viewModel.signOut()
-                            AppleSignInManager.shared.signOut()
-                        } label: {
-                            SettingRow(
-                                icon: Lucide.logOut,
-                                iconColor: AppColors.coral,
-                                iconWash: colors.destructiveSurface,
-                                title: "Sign Out",
-                                showChevron: false,
-                                isDanger: true
-                            )
-                        }
-                        .buttonStyle(.plain)
-
-                        Divider().background(colors.border.opacity(0.35))
-
-                        Button {
-                            showingDeleteAccountAlert = true
-                        } label: {
-                            SettingRow(
-                                icon: Lucide.trash2,
-                                iconColor: AppColors.coral,
-                                iconWash: colors.destructiveSurface,
-                                title: isDeletingAccount ? "Deleting Account..." : "Delete Account and Data",
-                                subtitle: "Permanently remove this account and records",
-                                showChevron: false,
-                                isDanger: true
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(isDeletingAccount)
+                        SettingsProfileExitRows()
                     }
 
                     #if DEBUG
@@ -1159,31 +1125,6 @@ struct SettingsView: View {
                 }
             } message: {
                 Text("This will delete your local properties, time entries, goals, tax profile, categories, and setup state for this account. Your sign-in and Pro purchase status stay intact.")
-            }
-            .alert("Delete Account and Data?", isPresented: $showingDeleteAccountAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete Account", role: .destructive) {
-                    Task {
-                        isDeletingAccount = true
-                        do {
-                            try await viewModel.deleteAccountAndData()
-                            AppleSignInManager.shared.signOut()
-                        } catch {
-                            deleteAccountError = error.localizedDescription
-                        }
-                        isDeletingAccount = false
-                    }
-                }
-            } message: {
-                Text("This permanently deletes your LandlordHours account data on this device and any LandlordHours iCloud backup records for this app account, including properties, time entries, categories, goals, and tax profile. This cannot be undone.")
-            }
-            .alert("Account Deletion Failed", isPresented: Binding(
-                get: { deleteAccountError != nil },
-                set: { if !$0 { deleteAccountError = nil } }
-            )) {
-                Button("OK", role: .cancel) { deleteAccountError = nil }
-            } message: {
-                Text(deleteAccountError ?? "")
             }
             .alert("Restore Purchase", isPresented: Binding(
                 get: { restoreStatusMessage != nil },
