@@ -8,8 +8,10 @@ struct ExportPDFView: View {
     @Environment(\.colorScheme) var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     let year: Int
-    @State private var shareItem: PDFShareItem?
+    @State private var shareItem: ExportShareItem?
     @State private var exportError: String?
+    @State private var isGenerating = false
+    @State private var sharing: ShareRequest?
 
     var body: some View {
         NavigationStack {
@@ -20,7 +22,7 @@ struct ExportPDFView: View {
                             .font(.system(size: 42, weight: .black, design: .rounded))
                             .foregroundStyle(colors.textPrimary)
                             .minimumScaleFactor(0.82)
-                        Text("Create a \(String(year)) PDF for your records or accountant.")
+                        Text("Create a \(String(year)) report for your records or your CPA.")
                             .font(.system(size: 15, weight: .medium, design: .rounded))
                             .foregroundStyle(colors.textSecondary)
                     }
@@ -50,13 +52,15 @@ struct ExportPDFView: View {
                             VStack(spacing: 10) {
                                 HStack(spacing: 8) {
                                     LucideIcon(image: Lucide.check, size: 16)
-                                        .foregroundStyle(AppColors.sage)
-                                    Text("PDF ready")
+                                        .foregroundStyle(colors.positive)
+                                    Text("Report ready")
                                         .font(AppTypography.button)
                                         .foregroundStyle(colors.textPrimary)
                                 }
 
-                                ShareLink(item: shareItem.url) {
+                                Button {
+                                    sharing = ShareRequest(url: shareItem.pdfURL, format: .pdf)
+                                } label: {
                                     HStack(spacing: 8) {
                                         LucideIcon(image: Lucide.share2, size: 16)
                                         Text("Share PDF")
@@ -70,30 +74,53 @@ struct ExportPDFView: View {
                                 }
                                 .buttonStyle(.lhPressable)
                                 .accessibilityIdentifier("export.sharePDF")
+
+                                Button {
+                                    sharing = ShareRequest(url: shareItem.csvURL, format: .csv)
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        LucideIcon(image: Lucide.fileText, size: 16)
+                                        Text("Share CSV spreadsheet")
+                                    }
+                                    .font(AppTypography.button)
+                                    .foregroundStyle(colors.action)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .background(colors.actionSurface)
+                                    .clipShape(Capsule())
+                                }
+                                .buttonStyle(.lhPressable)
+                                .accessibilityIdentifier("export.shareCSV")
                             }
                         } else {
                             Button {
-                                generateAndSharePDF()
+                                generateExports()
                             } label: {
                                 HStack(spacing: 8) {
-                                    LucideIcon(image: Lucide.fileDown, size: 16)
-                                    Text(canExport ? "Generate PDF" : "No entries to export")
+                                    if isGenerating {
+                                        ProgressView()
+                                            .tint(AppColors.onAction)
+                                    } else {
+                                        LucideIcon(image: Lucide.fileDown, size: 16)
+                                    }
+                                    Text(generateButtonTitle)
                                 }
                                 .font(AppTypography.button)
-                                .foregroundStyle(canExport ? AppColors.charcoal : .white)
+                                .foregroundStyle(canExport ? AppColors.onAction : colors.textSecondary)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
-                                .background(canExport ? AppColors.sage : AppColors.mist)
+                                .background(canExport ? colors.action : colors.backgroundTertiary)
                                 .clipShape(Capsule())
                             }
-                            .disabled(!canExport)
+                            .buttonStyle(.lhPressable)
+                            .disabled(!canExport || isGenerating)
                             .accessibilityIdentifier("export.generatePDF")
                         }
 
                         if let exportError {
                             Text(exportError)
                                 .font(AppTypography.caption)
-                                .foregroundStyle(AppColors.error)
+                                .foregroundStyle(colors.destructive)
                                 .multilineTextAlignment(.center)
                         }
                     }
@@ -116,7 +143,7 @@ struct ExportPDFView: View {
                         }
 
                         VStack(spacing: 0) {
-                            reportRow(label: "Properties", value: "\(viewModel.properties.count) properties", icon: "building-2", color: AppColors.sky)
+                            reportRow(label: "Properties", value: "\(activePropertyCount) with time logged", icon: "building-2", color: AppColors.sky)
                             Divider().padding(.leading, 48)
                             reportRow(label: "Time Entries", value: "\(yearEntries.count) entries", icon: "clock", color: AppColors.primary)
                             Divider().padding(.leading, 48)
@@ -148,6 +175,14 @@ struct ExportPDFView: View {
             }
         }
         .hidesAppTabBar()
+        .sheet(item: $sharing) { request in
+            ActivityShareSheet(items: [request.url]) { completed in
+                sharing = nil
+                if completed { viewModel.exportShared(format: request.format) }
+            }
+            .presentationDetents([.medium, .large])
+            .ignoresSafeArea()
+        }
     }
 
     private func reportRow(label: String, value: String, icon: String, color: Color) -> some View {
@@ -173,146 +208,115 @@ struct ExportPDFView: View {
         yearEntries.reduce(0) { $0 + $1.hours }
     }
 
+    var activePropertyCount: Int {
+        Set(yearEntries.map(\.propertyId)).count
+    }
+
     var canExport: Bool {
         !yearEntries.isEmpty
     }
 
+    private var generateButtonTitle: String {
+        if !canExport { return "No entries to export" }
+        return isGenerating ? "Creating report…" : "Create PDF and CSV"
+    }
+
     var exportSummaryText: String {
         if canExport {
-            return "Create a PDF with properties, entries, notes, participants, and total hours."
+            return "A PDF for your CPA, plus a spreadsheet. It shows hours by property, category, and person, every entry, and your photos."
         }
-        return "Log time entries for \(year), then export a PDF for your CPA or records."
+        return "Log time entries for \(String(year)), then export a report for your CPA or records."
     }
 
     var repsQualifiedHours: Double {
         yearEntries.filter { $0.countsForREPS }.reduce(0) { $0 + $1.hours }
     }
 
-    private func generateAndSharePDF() {
-        let pdfData = generatePDF()
-
-        // Save to temp file
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("LandlordHours_\(year).pdf")
-        do {
-            try pdfData.write(to: tempURL, options: .atomic)
-            shareItem = PDFShareItem(url: tempURL)
-            exportError = nil
-        } catch {
-            exportError = "Could not generate the PDF. Please try again."
-        }
+    private func makeReport() -> AuditReport {
+        let taxProfile = TaxProfileManager.shared
+        var participants: [Participant] = [.selfParticipant]
+        if taxProfile.spouseTracking { participants.append(.spouse) }
+        return AuditReportBuilder.build(AuditReportBuilder.Input(
+            entries: viewModel.timeEntries,
+            properties: viewModel.properties,
+            taxYear: year,
+            participants: participants,
+            nonRealEstateHours: [.selfParticipant: taxProfile.nonREWorkHours],
+            groupingElection: taxProfile.groupingElection,
+            noOneParticipatedMore: taxProfile.noOneParticipatedMore(forYear: year)
+        ))
     }
 
-    func generatePDF() -> Data {
-        let pageWidth: CGFloat = 612
-        let pageHeight: CGFloat = 792
-        let margin: CGFloat = 50
-
-        let pdfMetaData = [
-            kCGPDFContextCreator: "LandlordHours",
-            kCGPDFContextAuthor: "LandlordHours App",
-            kCGPDFContextTitle: "REPS Time Report \(year)"
-        ]
-
-        let format = UIGraphicsPDFRendererFormat()
-        format.documentInfo = pdfMetaData as [String: Any]
-
-        let pageRect = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
-        let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
-
-        let data = renderer.pdfData { context in
-            context.beginPage()
-
-            // Title
-            let titleFont = UIFont.boldSystemFont(ofSize: 24)
-            let title = "LandlordHours REPS Report"
-            title.draw(at: CGPoint(x: margin, y: margin), withAttributes: [.font: titleFont])
-
-            // Year
-            let yearFont = UIFont.systemFont(ofSize: 18)
-            "Year \(year)".draw(at: CGPoint(x: margin, y: margin + 35), withAttributes: [.font: yearFont])
-
-            // Summary
-            let headerFont = UIFont.boldSystemFont(ofSize: 14)
-            let bodyFont = UIFont.systemFont(ofSize: 12)
-
-            var yPosition: CGFloat = margin + 80
-
-            "Summary".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: [.font: headerFont])
-            yPosition += 25
-
-            "Total Hours Logged: \(String(format: "%.1f", totalHours)) hours".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: [.font: bodyFont])
-            yPosition += 20
-
-            "REPS-counted Hours: \(String(format: "%.1f", repsQualifiedHours)) hours".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: [.font: bodyFont])
-            yPosition += 20
-
-            "Total Entries: \(yearEntries.count)".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: [.font: bodyFont])
-            yPosition += 35
-
-            // Properties
-            "Properties".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: [.font: headerFont])
-            yPosition += 25
-
-            for property in viewModel.properties {
-                property.name.draw(at: CGPoint(x: margin, y: yPosition), withAttributes: [.font: bodyFont])
-                yPosition += 18
-                property.address.draw(at: CGPoint(x: margin + 20, y: yPosition), withAttributes: [.font: bodyFont, .foregroundColor: UIColor.gray])
-                yPosition += 25
-
-                if yPosition > pageHeight - 100 {
-                    context.beginPage()
-                    yPosition = margin
+    private func generateExports() {
+        guard !isGenerating else { return }
+        isGenerating = true
+        exportError = nil
+        let report = makeReport()
+        let year = year
+        Task.detached(priority: .userInitiated) {
+            let result = AuditExportFiles.write(report: report, year: year)
+            await MainActor.run {
+                isGenerating = false
+                switch result {
+                case .success(let files):
+                    shareItem = files
+                case .failure:
+                    exportError = "Could not create the report. Please try again."
                 }
             }
-
-            yPosition += 15
-
-            // Time Entries
-            "Time Entries".draw(at: CGPoint(x: margin, y: yPosition), withAttributes: [.font: headerFont])
-            yPosition += 25
-
-            // Table header
-            let entries = yearEntries.sorted { $0.date > $1.date }
-
-            let maxTextWidth = pageWidth - 2 * margin
-
-            for entry in entries {
-                let property = viewModel.properties.first { $0.id == entry.propertyId }
-                let propertyName = property?.name ?? "Unknown"
-
-                let entryText = "\(entry.formattedDate) | \(propertyName) | \(entry.category.rawValue) | \(String(format: "%.1f", entry.hours))h | \(entry.participant.rawValue)" as NSString
-                let entryAttrs: [NSAttributedString.Key: Any] = [.font: bodyFont]
-                let entrySize = entryText.boundingRect(with: CGSize(width: maxTextWidth, height: .greatestFiniteMagnitude), options: .usesLineFragmentOrigin, attributes: entryAttrs, context: nil)
-                entryText.draw(in: CGRect(x: margin, y: yPosition, width: maxTextWidth, height: entrySize.height), withAttributes: entryAttrs)
-                yPosition += entrySize.height + 4
-
-                if !entry.notes.isEmpty {
-                    let notesText = "  Notes: \(entry.notes)" as NSString
-                    let notesAttrs: [NSAttributedString.Key: Any] = [.font: bodyFont, .foregroundColor: UIColor.gray]
-                    let notesWidth = maxTextWidth - 20
-                    let notesSize = notesText.boundingRect(with: CGSize(width: notesWidth, height: .greatestFiniteMagnitude), options: .usesLineFragmentOrigin, attributes: notesAttrs, context: nil)
-                    notesText.draw(in: CGRect(x: margin + 20, y: yPosition, width: notesWidth, height: notesSize.height), withAttributes: notesAttrs)
-                    yPosition += notesSize.height + 4
-                }
-
-                if yPosition > pageHeight - 50 {
-                    context.beginPage()
-                    yPosition = margin
-                }
-            }
-
-            // Footer
-            let footerFont = UIFont.systemFont(ofSize: 10)
-            let footer = "Generated by LandlordHours on \(Date().formatted(date: .long, time: .omitted))"
-            let footerRect = CGRect(x: margin, y: pageHeight - 30, width: pageWidth - 2 * margin, height: 20)
-            footer.draw(in: footerRect, withAttributes: [.font: footerFont, .foregroundColor: UIColor.gray])
         }
-
-        return data
     }
 }
 
-private struct PDFShareItem: Identifiable {
+/// Writes the PDF and CSV for a report into a fresh temporary folder.
+enum AuditExportFiles {
+    static func write(report: AuditReport, year: Int, directory: URL? = nil) -> Result<ExportShareItem, Error> {
+        do {
+            let folder = directory ?? FileManager.default.temporaryDirectory
+                .appendingPathComponent("LandlordHoursExport-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let pdfURL = folder.appendingPathComponent("LandlordHours_\(year)_Activity_Log.pdf")
+            let csvURL = folder.appendingPathComponent("LandlordHours_\(year)_Activity_Log.csv")
+            try AuditReportPDFRenderer().render(report).write(to: pdfURL, options: .atomic)
+            try Data(AuditReportCSV.make(report).utf8).write(to: csvURL, options: .atomic)
+            return .success(ExportShareItem(pdfURL: pdfURL, csvURL: csvURL))
+        } catch {
+            return .failure(error)
+        }
+    }
+}
+
+struct ExportShareItem: Identifiable {
+    let id = UUID()
+    let pdfURL: URL
+    let csvURL: URL
+}
+
+/// The kind of file the user shared from the export screen.
+enum ExportFormat: String {
+    case pdf
+    case csv
+}
+
+private struct ShareRequest: Identifiable {
     let id = UUID()
     let url: URL
+    let format: ExportFormat
+}
+
+/// UIActivityViewController wrapper that reports whether the user actually shared
+/// (`completed == true`), unlike SwiftUI's ShareLink.
+struct ActivityShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    let onFinish: (_ completed: Bool) -> Void
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        controller.completionWithItemsHandler = { _, completed, _, _ in
+            onFinish(completed)
+        }
+        return controller
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }

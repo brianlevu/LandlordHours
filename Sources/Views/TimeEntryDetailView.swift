@@ -198,7 +198,7 @@ struct TimeEntryDetailView: View {
                 attachmentsSection
             }
 
-            if entry.importSource != nil {
+            if entry.isCalendarImport {
                 divider
                 detailRow(icon: Lucide.calendar, label: "Source", value: "Calendar Import")
             }

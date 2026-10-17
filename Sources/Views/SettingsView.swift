@@ -907,7 +907,7 @@ struct SettingsView: View {
                     }
 
                     SettingsGroup(title: "Records", subtitle: "Import, sync, and export your tracking evidence.") {
-                        if subscriptionManager.isPro && !subscriptionManager.isTrialActive {
+                        if viewModel.canExportPDF() {
                             NavigationLink {
                                 ExportPDFView(year: Calendar.current.component(.year, from: Date()))
                             } label: {
