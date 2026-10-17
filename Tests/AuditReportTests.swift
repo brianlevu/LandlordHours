@@ -223,12 +223,19 @@ final class AuditReportBuilderTests: XCTestCase {
         ]
         let report = build(entries, nonRE: [.selfParticipant: 100])
         let lines = report.qualifications.map(\.coverLine)
-        XCTAssertEqual(lines[0], "You: 412.00 of 750 hours. Does not meet the 750-hour test yet.")
+        XCTAssertEqual(lines[0], "You: 412.00 hours. The 750-hour test needs more than 750 hours.")
         XCTAssertEqual(lines[1], "Spouse: 760.00 hours. Meets the 750-hour test; more-than-half test not evaluated.")
         for line in lines {
             XCTAssertFalse(line.lowercased().contains("qualifies"))
             XCTAssertFalse(line.lowercased().contains("guarantee"))
         }
+    }
+
+    func testCoverLineAtExactly750Hours() {
+        let report = build([F.entry(property: F.oak, hours: 750, date: F.date(2026, 3, 1))], participants: [.selfParticipant])
+        let me = report.qualifications[0]
+        XCTAssertFalse(me.meets750HourTest, "IRS test is more than 750 hours")
+        XCTAssertEqual(me.coverLine, "You: 750.00 hours. The 750-hour test needs more than 750 hours.")
     }
 
     func testSpouseIncludedWhenTheyLoggedTimeEvenIfNotRequested() {
@@ -337,6 +344,20 @@ final class AuditReportCSVTests: XCTestCase {
         XCTAssertEqual(field("entry_ref"), "E1")
     }
 
+    func testHoursColumnStaysNumericForNegativeOrNegativeZero() {
+        let negZero = F.entry(property: F.oak, hours: -0.0, date: F.date(2026, 4, 1))
+        let negative = F.entry(property: F.oak, hours: -2, date: F.date(2026, 4, 2))
+        let normal = F.entry(property: F.oak, hours: 1.25, date: F.date(2026, 4, 3))
+        let report = AuditReportBuilder.build(AuditReportBuilder.Input(entries: [negZero, negative, normal], properties: [F.oak], taxYear: 2026))
+        let rows = Self.parse(AuditReportCSV.make(report))
+        let index = rows[0].firstIndex(of: "hours")!
+        XCTAssertEqual(rows[1...].map { $0[index] }, ["0.00", "0.00", "1.25"])
+        for row in rows.dropFirst() {
+            XCTAssertNotNil(Double(row[index]), "hours must parse as a number, got \(row[index])")
+            XCTAssertFalse(row[index].hasPrefix("'"))
+        }
+    }
+
     func testTimestampColumnsAreISO8601() {
         let logged = F.date(2026, 4, 2, 18, 30)
         let edited = F.date(2026, 4, 9, 7, 5)
@@ -399,11 +420,32 @@ final class AuditReportPDFTests: XCTestCase {
 
     static func sampleReport() -> (AuditReport, [UUID: Data]) {
         var images: [UUID: Data] = [:]
-        func photo(_ name: String, _ color: UIColor) -> TimeAttachment {
-            let image = UIGraphicsImageRenderer(size: CGSize(width: 800, height: 600)).jpegData(withCompressionQuality: 0.8) { ctx in
-                color.setFill(); ctx.fill(CGRect(x: 0, y: 0, width: 800, height: 600))
-                UIColor.white.setFill(); ctx.fill(CGRect(x: 100, y: 100, width: 600, height: 400))
-                (name as NSString).draw(at: CGPoint(x: 140, y: 260), withAttributes: [.font: UIFont.boldSystemFont(ofSize: 48)])
+        /// A small JPEG "photo" of a paper receipt or note lying on a table, slightly rotated.
+        func photo(_ name: String, title: String, lines: [String], tint: UIColor) -> TimeAttachment {
+            let size = CGSize(width: 600, height: 800)
+            let image = UIGraphicsImageRenderer(size: size).jpegData(withCompressionQuality: 0.75) { ctx in
+                let cg = ctx.cgContext
+                // Table surface with a soft gradient.
+                let colors = [tint.withAlphaComponent(0.55).cgColor, UIColor.darkGray.cgColor] as CFArray
+                let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1])!
+                cg.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: size.width, y: size.height), options: [])
+                // Paper, rotated a few degrees, with a shadow.
+                cg.translateBy(x: size.width / 2, y: size.height / 2)
+                cg.rotate(by: -0.05)
+                let paper = CGRect(x: -210, y: -330, width: 420, height: 660)
+                cg.setShadow(offset: CGSize(width: 6, height: 10), blur: 18, color: UIColor.black.withAlphaComponent(0.45).cgColor)
+                UIColor(white: 0.97, alpha: 1).setFill()
+                cg.fill(paper)
+                cg.setShadow(offset: .zero, blur: 0, color: nil)
+                let mono = UIFont(name: "Courier-Bold", size: 26) ?? .boldSystemFont(ofSize: 26)
+                let body = UIFont(name: "Courier", size: 20) ?? .systemFont(ofSize: 20)
+                (title as NSString).draw(in: CGRect(x: paper.minX + 24, y: paper.minY + 30, width: paper.width - 48, height: 70),
+                                         withAttributes: [.font: mono, .foregroundColor: UIColor.black])
+                var lineY = paper.minY + 110
+                for line in lines {
+                    (line as NSString).draw(at: CGPoint(x: paper.minX + 24, y: lineY), withAttributes: [.font: body, .foregroundColor: UIColor(white: 0.15, alpha: 1)])
+                    lineY += 34
+                }
             }
             let attachment = TimeAttachment(filename: name, data: image, mimeType: "image/jpeg")
             images[attachment.id] = image
@@ -417,8 +459,25 @@ final class AuditReportPDFTests: XCTestCase {
             let participant: Participant = i % 3 == 0 ? .spouse : .selfParticipant
             let day = F.date(2026, 1 + (i % 9), 1 + (i * 3) % 27, 8 + i % 8)
             var attachments: [TimeAttachment] = []
-            if i == 4 { attachments = [photo("water-heater-receipt.jpg", .systemBlue)] }
-            if i == 11 { attachments = [photo("roof-before.jpg", .systemOrange), photo("roof-after.jpg", .systemGreen)] }
+            if i == 4 {
+                attachments = [photo("water-heater-receipt.jpg", title: "CASCADE PLUMBING\nSUPPLY CO.", lines: [
+                    "2026-05-13  08:12", "--------------------------", "40 GAL WATER HEATER  612.00", "FLEX CONNECTOR x2     18.40",
+                    "TEFLON TAPE            3.29", "--------------------------", "SUBTOTAL             633.69", "TAX                    0.00",
+                    "TOTAL                633.69", "", "VISA ****4417", "THANK YOU",
+                ], tint: .systemBlue)]
+            }
+            if i == 11 {
+                attachments = [
+                    photo("roof-before.jpg", title: "ROOF INSPECTION\nNOTES", lines: [
+                        "Oak Street Duplex", "2026-03-07", "", "- NE corner: 3 shingles", "  missing", "- Flashing lifted at", "  chimney",
+                        "- Gutter clogged (west)", "", "Before photos: 4",
+                    ], tint: .systemOrange),
+                    photo("roof-after.jpg", title: "RIDGELINE ROOFING\nINVOICE #20431", lines: [
+                        "2026-03-07", "--------------------------", "Shingle repair       240.00", "Re-seal flashing     160.00",
+                        "Gutter clean-out      85.00", "--------------------------", "TOTAL                485.00", "", "PAID - CHECK 1182",
+                    ], tint: .systemGreen),
+                ]
+            }
             let notes: String
             switch i {
             case 4: notes = "Replaced water heater, \"40 gal\" unit; met plumber at 8am"
@@ -452,6 +511,24 @@ final class AuditReportPDFTests: XCTestCase {
         return (report, images)
     }
 
+    func testPDFTextIsSearchableWithoutLigatureGaps() throws {
+        let (report, images) = Self.sampleReport()
+        let pdf = AuditReportPDFRenderer(attachmentData: { images[$0.id] }).render(report)
+        let text = try XCTUnwrap(PDFDocument(data: pdf)?.string)
+        XCTAssertTrue(text.contains("financing"), "\"fi\" ligature must extract as text")
+        XCTAssertTrue(text.contains("Tax Profile"))
+        XCTAssertFalse(text.contains("Tax Pro le"))
+    }
+
+    func testMaterialParticipationNoteStaysWithItsTable() throws {
+        let (report, images) = Self.sampleReport()
+        let document = try XCTUnwrap(PDFDocument(data: AuditReportPDFRenderer(attachmentData: { images[$0.id] }).render(report)))
+        let pages = (0..<document.pageCount).map { document.page(at: $0)?.string ?? "" }
+        let notePage = try XCTUnwrap(pages.firstIndex { $0.contains("The 100-hour test also requires") })
+        XCTAssertTrue(pages[notePage].contains("500-hour test"), "note must share a page with the material participation table")
+        XCTAssertTrue(pages[notePage].contains("Material participation by property"), "small tables move whole instead of splitting")
+    }
+
     func testPDFHasFooterOnEveryPageAndAllSections() throws {
         let (report, images) = Self.sampleReport()
         let pdf = AuditReportPDFRenderer(attachmentData: { images[$0.id] }).render(report)
@@ -479,7 +556,7 @@ final class AuditReportPDFTests: XCTestCase {
         let (report, images) = Self.sampleReport()
         let directory: URL
         if let hostHome = ProcessInfo.processInfo.environment["SIMULATOR_HOST_HOME"] {
-            directory = URL(fileURLWithPath: hostHome).appendingPathComponent("AgentScratch/landlordhours/2026-10-17/export-samples-r2", isDirectory: true)
+            directory = URL(fileURLWithPath: hostHome).appendingPathComponent("AgentScratch/landlordhours/2026-10-17/export-samples-r3", isDirectory: true)
         } else {
             directory = FileManager.default.temporaryDirectory.appendingPathComponent("export-samples", isDirectory: true)
         }

@@ -27,6 +27,7 @@ enum AuditReportCSV {
         timestampFormatter.timeZone = report.timeZone
         timestampFormatter.formatOptions = [.withInternetDateTime]
 
+        let hoursIndex = header.firstIndex(of: "hours")!
         var lines = [header.map(escape).joined(separator: ",")]
         for row in report.entries {
             let attachments = zip(row.attachmentRefs, row.attachmentFilenames)
@@ -39,16 +40,25 @@ enum AuditReportCSV {
                 row.category.rawValue,
                 row.category.countsForREPS ? "yes" : "no",
                 row.participant.rawValue,
-                AuditReportFormat.hours(row.hours),
+                numeric(row.hours),
                 row.description,
                 timestampFormatter.string(from: row.loggedAt),
                 row.lastEditedAt.map { timestampFormatter.string(from: $0) } ?? "",
                 row.source.displayName,
                 attachments,
             ]
-            lines.append(fields.map(escape).joined(separator: ","))
+            // Numeric columns skip the formula guard so they stay numbers in spreadsheets.
+            let cells = fields.enumerated().map { index, field in
+                index == hoursIndex ? field : escape(field)
+            }
+            lines.append(cells.joined(separator: ","))
         }
         return lines.joined(separator: "\r\n") + "\r\n"
+    }
+
+    /// Hours as a plain non-negative number ("-0.00" and negatives clamp to "0.00").
+    static func numeric(_ hours: Double) -> String {
+        AuditReportFormat.hours(hours > 0 ? hours : 0)
     }
 
     /// Characters that make spreadsheet apps treat a cell as a formula.

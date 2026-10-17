@@ -121,7 +121,7 @@ private final class Composer {
             ["Entry dates", range],
             ["Times shown in", "\(report.timeZone.identifier) (\(report.timeZone.abbreviation(for: report.generatedAt) ?? ""))"],
         ]
-        table(columns: [Column(title: "Item", width: 300), Column(title: "Value", width: 200, alignment: .right)], rows: rows, font: bodyFont, headerFont: bodyBoldFont)
+        table(columns: [Column(title: "Item", width: 520), Column(title: "Value", width: 200, alignment: .right)], rows: rows, font: bodyFont, headerFont: bodyBoldFont)
 
         if report.isEmpty {
             y += 6
@@ -154,13 +154,12 @@ private final class Composer {
                 Column(title: "More than half of work time", width: 125),
                 Column(title: "Result", width: 210),
             ],
-            rows: rows
+            rows: rows,
+            trailingNote: "REPS is tested for each spouse separately; spouse hours are not combined for the 750-hour test. Investor-level tasks (investing, financing, purchase negotiation) are excluded. Non-real-estate work hours come from the Tax Profile in the app; spouse work hours aren't tracked in the app yet, so the spouse's more-than-half test is not evaluated."
         )
-        note("REPS is tested for each spouse separately; spouse hours are not combined for the 750-hour test. Investor-level tasks (investing, financing, purchase negotiation) are excluded. Non-real-estate work hours come from the Tax Profile in the app; spouse work hours aren't tracked in the app yet, so the spouse's more-than-half test is not evaluated.")
 
         if !report.materialParticipation.isEmpty {
             y += 8
-            sectionTitle(report.groupingElection ? "Material participation (grouped activity)" : "Material participation by property")
             let mpRows = report.materialParticipation.map { line -> [String] in
                 [
                     line.label,
@@ -171,16 +170,17 @@ private final class Composer {
                 ]
             }
             table(
+                title: report.groupingElection ? "Material participation (grouped activity)" : "Material participation by property",
                 columns: [
                     Column(title: "Activity", width: 200),
-                    Column(title: "Owner + spouse hours", width: 100, alignment: .right),
+                    Column(title: "Countable hours (excl. investor)", width: 100, alignment: .right),
                     Column(title: "500-hour test", width: 90),
                     Column(title: "100-hour test", width: 100),
                     Column(title: "Result", width: 230),
                 ],
-                rows: mpRows
+                rows: mpRows,
+                trailingNote: "Countable hours leave out investor-level tasks, so they can be lower than the totals in the Hours by property table. The 100-hour test also requires that no other individual participated more. LandlordHours only marks it met after you confirm that in the app."
             )
-            note("The 100-hour test also requires that no other individual participated more. LandlordHours only marks it met after you confirm that in the app.")
         }
         y += 10
     }
@@ -341,7 +341,9 @@ private final class Composer {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = alignment
         paragraph.lineBreakMode = .byWordWrapping
-        return [.font: font, .foregroundColor: color, .paragraphStyle: paragraph]
+        // Ligatures off: fonts embed without ToUnicode for ligature glyphs, so "fi" would
+        // extract as missing text and break copy/search for "financing" or "Tax Profile".
+        return [.font: font, .foregroundColor: color, .paragraphStyle: paragraph, .ligature: 0]
     }
 
     private func measure(_ text: String, font: UIFont, width: CGFloat) -> CGFloat {
@@ -404,7 +406,9 @@ private final class Composer {
         cg.restoreGState()
     }
 
-    private func table(columns: [Column], rows: [[String]], font: UIFont? = nil, headerFont: UIFont? = nil) {
+    /// Draws a table. A `trailingNote` is kept on the same page as the table's last row.
+    /// With a `title`, a table that fits on one page is moved whole to a new page rather than split.
+    private func table(title: String? = nil, columns: [Column], rows: [[String]], font: UIFont? = nil, headerFont: UIFont? = nil, trailingNote: String? = nil) {
         let cellFont = font ?? tableFont
         let headFont = headerFont ?? tableHeaderFont
         let padX: CGFloat = 3
@@ -436,16 +440,25 @@ private final class Composer {
             drawRow(headerCells, headFont, height: headerHeight, header: true)
         }
 
+        let noteHeight = trailingNote.map { 4 + measure($0, font: tableFont, width: contentWidth) } ?? 0
+        if let title {
+            let titleHeight = measure(title, font: sectionFont, width: contentWidth) + 6
+            let total = titleHeight + headerHeight + rows.reduce(0) { $0 + rowHeight($1, cellFont) } + noteHeight
+            if y + total > contentBottom && total <= contentBottom - margin { newPage() }
+            sectionTitle(title)
+        }
         ensureSpace(headerHeight + (rows.first.map { rowHeight($0, cellFont) } ?? 0))
         drawHeader()
-        for row in rows {
+        for (index, row) in rows.enumerated() {
             let height = rowHeight(row, cellFont)
-            if y + height > contentBottom {
+            let keep = index == rows.count - 1 ? noteHeight : 0
+            if y + height + keep > contentBottom {
                 newPage()
                 drawHeader() // repeat the header on continuation pages
             }
             drawRow(row, cellFont, height: height, header: false)
         }
+        if let trailingNote { note(trailingNote) }
     }
 
     private func drawThumbnail(_ attachment: TimeAttachment, in box: CGRect) {

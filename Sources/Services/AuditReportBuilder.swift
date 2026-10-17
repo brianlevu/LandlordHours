@@ -113,7 +113,7 @@ struct AuditReport {
         var coverLine: String {
             let hours = AuditReportFormat.hours(realEstateHours)
             guard meets750HourTest else {
-                return "\(displayName): \(hours) of 750 hours. Does not meet the 750-hour test yet."
+                return "\(displayName): \(hours) hours. The 750-hour test needs more than 750 hours."
             }
             switch meetsMoreThanHalfTest {
             case .some(true): return "\(displayName): \(hours) hours. Meets the 750-hour and more-than-half tests."
