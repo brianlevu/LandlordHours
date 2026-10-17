@@ -75,19 +75,16 @@ struct ProfileRestoreSheet: View {
                         .foregroundStyle(colors.action)
                 }
             }
-            .alert(
-                "Switch to this profile?",
-                isPresented: Binding(get: { pendingSwitch != nil }, set: { if !$0 { pendingSwitch = nil } }),
-                presenting: pendingSwitch
-            ) { profile in
-                Button("Cancel", role: .cancel) { pendingSwitch = nil }
-                Button("Switch") {
-                    pendingSwitch = nil
-                    onRestore(profile)
-                }
-                .keyboardShortcut(.defaultAction)
-            } message: { _ in
-                Text("Your current data stays on this iPhone. You can come back to it from Restore other data.")
+            .sheet(item: $pendingSwitch) { profile in
+                ProfileSwitchConfirmSheet(
+                    title: "Switch to this profile?",
+                    message: "Your current data stays on this iPhone. You can come back to it from Restore other data.",
+                    onConfirm: {
+                        pendingSwitch = nil
+                        onRestore(profile)
+                    },
+                    onCancel: { pendingSwitch = nil }
+                )
             }
         }
     }
@@ -292,12 +289,16 @@ struct SettingsProfileExitRows: View {
             .disabled(isDeleting)
             .accessibilityIdentifier("settings.deleteData")
         }
-        .alert("Switch profile?", isPresented: $showSwitchConfirm) {
-            Button("Cancel", role: .cancel) { }
-            Button("Switch") { viewModel.signOut() }
-                .keyboardShortcut(.defaultAction)
-        } message: {
-            Text("Your data stays on this iPhone. Open it again anytime with Restore earlier data.")
+        .sheet(isPresented: $showSwitchConfirm) {
+            ProfileSwitchConfirmSheet(
+                title: "Switch profile?",
+                message: "Your data stays on this iPhone. Open it again anytime with Restore earlier data.",
+                onConfirm: {
+                    showSwitchConfirm = false
+                    viewModel.signOut()
+                },
+                onCancel: { showSwitchConfirm = false }
+            )
         }
         .alert("\(deleteTitle)?", isPresented: $showDeleteConfirm) {
             Button("Cancel", role: .cancel) { }
@@ -333,5 +334,70 @@ struct SettingsProfileExitRows: View {
                 deleteError = error.localizedDescription
             }
         }
+    }
+}
+
+// MARK: - Switch confirmation (custom so the primary action uses the action tokens)
+
+/// A system alert tints its default button with system blue under white text (2.50:1 in
+/// dark mode), so the switch confirmation is a small sheet with a violet primary button.
+struct ProfileSwitchConfirmSheet: View {
+    let title: String
+    let message: String
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        VStack(spacing: 14) {
+            LucideIcon(image: Lucide.arrowLeftRight, size: 22)
+                .foregroundStyle(colors.actionText)
+                .frame(width: 48, height: 48)
+                .background(colors.actionSurface)
+                .clipShape(Circle())
+                .padding(.top, 22)
+
+            Text(title)
+                .font(.system(size: 20, weight: .black, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
+                .multilineTextAlignment(.center)
+
+            Text(message)
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button(action: onConfirm) {
+                Text("Switch")
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .background(colors.action)
+                    .foregroundStyle(colors.onAction)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.lhPressable)
+            .padding(.top, 6)
+            .accessibilityIdentifier("switchConfirm.switch")
+
+            Button(action: onCancel) {
+                Text("Cancel")
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+            }
+            .buttonStyle(.lhPressable)
+            .accessibilityIdentifier("switchConfirm.cancel")
+        }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 12)
+        .frame(maxWidth: .infinity)
+        .background(colors.backgroundSecondary.ignoresSafeArea())
+        .presentationDetents([.height(340)])
+        .presentationDragIndicator(.visible)
     }
 }

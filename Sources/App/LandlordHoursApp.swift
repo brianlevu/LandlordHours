@@ -80,6 +80,7 @@ enum AppColors {
     static let informationalText = Color.lhDynamic(light: informationalTextLightHex, dark: "6CB4EE")
     // Caution TEXT on white/cards: #B45309 (5.0:1 on white); dark uses honey.
     static let cautionTextLightHex = "B45309"
+    static let positiveTextLightHex = "047857"
 
     // Reports goal palettes
     static let reportsAccent = Color(hex: "8B5CF6")
@@ -206,6 +207,10 @@ struct AdaptiveColors {
     var destructiveSurface: Color { coralWash }
     var informational: Color { sky }
     var informationalSurface: Color { skyWash }
+    /// Violet TEXT on actionSurface or cards: #5B4BC9 (5.34:1 on #EDE8FF) / #9D8FF5 (4.98:1 on #2D2A4A).
+    var actionText: Color { colorScheme == .dark ? AppColors.darkPrimary : AppColors.primaryDark }
+    /// Success TEXT on positiveSurface or cards: #047857 (4.85:1 on #E4F5EC) / sage (7.31:1 on #1A2E22).
+    var positiveText: Color { colorScheme == .dark ? AppColors.sage : Color(hex: AppColors.positiveTextLightHex) }
     var informationalText: Color { colorScheme == .dark ? sky : Color(hex: AppColors.informationalTextLightHex) }
     var cautionText: Color { colorScheme == .dark ? honey : Color(hex: AppColors.cautionTextLightHex) }
 
@@ -222,7 +227,8 @@ struct AdaptiveColors {
     var roseWash: Color { colorScheme == .dark ? AppColors.darkRoseWash : AppColors.roseWash }
 
     var textPrimary: Color { colorScheme == .dark ? AppColors.darkTextPrimary : AppColors.charcoal }
-    var textSecondary: Color { colorScheme == .dark ? AppColors.darkTextSecondary : AppColors.slate }
+    /// Light #636377: 5.13:1 on input/segment fills (#F0EFF4), where slate #6E6E82 was 4.35:1.
+    var textSecondary: Color { colorScheme == .dark ? AppColors.darkTextSecondary : Color(hex: "636377") }
     var textTertiary: Color { colorScheme == .dark ? AppColors.darkTextTertiary : AppColors.mist }
 
     var border: Color { colorScheme == .dark ? AppColors.darkBorder : AppColors.cloud }

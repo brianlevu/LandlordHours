@@ -55,6 +55,31 @@ final class ColorContrastTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(contrast(dark.informationalText, dark.informationalSurface, .dark), 4.5)
     }
 
+    /// Sweep of every text/surface token pair the Settings screen uses, both schemes.
+    func testSettingsTextPairsPassAA() {
+        for (scheme, style) in [(ColorScheme.light, UIUserInterfaceStyle.light), (.dark, .dark)] {
+            let c = AdaptiveColors(colorScheme: scheme)
+            let pairs: [(String, Color, Color)] = [
+                ("textPrimary/card", c.textPrimary, c.backgroundSecondary),
+                ("textSecondary/card", c.textSecondary, c.backgroundSecondary),
+                ("textSecondary/page", c.textSecondary, c.background),
+                ("textSecondary/tertiary", c.textSecondary, c.backgroundTertiary),
+                ("actionText/actionSurface", c.actionText, c.actionSurface),
+                ("actionText/card", c.actionText, c.backgroundSecondary),
+                ("positiveText/positiveSurface", c.positiveText, c.positiveSurface),
+                ("positiveText/card", c.positiveText, c.backgroundSecondary),
+                ("onAction/action", c.onAction, c.action),
+                ("destructive/card", c.destructive, c.backgroundSecondary),
+                ("cautionText/card", c.cautionText, c.backgroundSecondary),
+                ("informationalText/informationalSurface", c.informationalText, c.informationalSurface),
+            ]
+            for (name, fg, bg) in pairs {
+                let r = contrast(fg, bg, style)
+                XCTAssertGreaterThanOrEqual(r, 4.5, "\(scheme) \(name) = \(String(format: "%.2f", r))")
+            }
+        }
+    }
+
     func testSecondaryAndCautionTextPassOnCards() {
         for (scheme, style) in [(ColorScheme.light, UIUserInterfaceStyle.light), (.dark, .dark)] {
             let colors = AdaptiveColors(colorScheme: scheme)

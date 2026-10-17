@@ -314,7 +314,7 @@ struct SettingRow: View {
                 Text(value)
                     .font(AppTypography.bodySmall)
                     .fontWeight(.medium)
-                    .foregroundStyle(valueColor ?? colors.textTertiary)
+                    .foregroundStyle(valueColor ?? colors.textSecondary)
             }
 
             // Chevron
@@ -359,7 +359,7 @@ private struct SettingToggleRow: View {
                 if let subtitle {
                     Text(subtitle)
                         .font(AppTypography.caption)
-                        .foregroundStyle(colors.textTertiary)
+                        .foregroundStyle(colors.textSecondary)
                 }
             }
 
@@ -398,7 +398,7 @@ private struct AppearancePreferenceRow: View {
                         .foregroundStyle(colors.textPrimary)
                     Text("Follow the device or choose a theme")
                         .font(AppTypography.caption)
-                        .foregroundStyle(colors.textTertiary)
+                        .foregroundStyle(colors.textSecondary)
                 }
 
                 Spacer()
@@ -408,7 +408,7 @@ private struct AppearancePreferenceRow: View {
                     Text("Saved")
                 }
                 .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(colors.positive)
+                .foregroundStyle(colors.positiveText)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
                 .background(colors.positiveSurface)
@@ -532,17 +532,17 @@ private struct SubscriptionCard: View {
                 HStack(alignment: .top, spacing: 14) {
                     ZStack {
                         Circle()
-                            .fill(isPro ? AppColors.positiveSurface : AppColors.actionSurface)
+                            .fill(isPro ? colors.positiveSurface : colors.actionSurface)
                             .frame(width: 54, height: 54)
                         LucideIcon(image: isPro ? Lucide.badgeCheck : Lucide.sparkles, size: 24)
-                            .foregroundStyle(isPro ? AppColors.successGreen : AppColors.action)
+                            .foregroundStyle(isPro ? colors.positiveText : colors.actionText)
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(isPro ? "Pro is active" : "Upgrade to Pro")
                             .font(.system(size: 23, weight: .black, design: .rounded))
                             .foregroundStyle(colors.textPrimary)
-                        Text(isPro ? "Lifetime access is unlocked for this account." : "Unlock the audit-ready tools that make this app worth trusting at tax time.")
+                        Text(isPro ? "Lifetime access is unlocked." : "Unlock the audit-ready tools that make this app worth trusting at tax time.")
                             .font(.system(size: 13, weight: .medium, design: .rounded))
                             .foregroundStyle(colors.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -563,20 +563,20 @@ private struct SubscriptionCard: View {
                 HStack {
                     Text(isPro ? "Manage Pro" : "One-time lifetime purchase")
                         .font(.system(size: 13, weight: .black, design: .rounded))
-                        .foregroundStyle(isPro ? AppColors.successGreen : AppColors.onAction)
+                        .foregroundStyle(isPro ? colors.positiveText : colors.onAction)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
-                        .background(isPro ? AppColors.positiveSurface : AppColors.action)
+                        .background(isPro ? colors.positiveSurface : colors.action)
                         .clipShape(Capsule())
 
                     Spacer()
 
                     Text(isPro ? "ACTIVE" : "PRO")
                         .font(.system(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(isPro ? AppColors.successGreen : AppColors.action)
+                        .foregroundStyle(isPro ? colors.positiveText : colors.actionText)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 5)
-                        .background(isPro ? AppColors.positiveSurface : AppColors.actionSurface)
+                        .background(isPro ? colors.positiveSurface : colors.actionSurface)
                         .clipShape(Capsule())
                 }
             }
@@ -586,7 +586,7 @@ private struct SubscriptionCard: View {
                 LinearGradient(
                     colors: colorScheme == .dark
                         ? [colors.backgroundSecondary, AppColors.darkPlum.opacity(0.72)]
-                        : [Color.white, AppColors.lavenderPale, isPro ? AppColors.successGreenWash : AppColors.reportsAccentWash],
+                        : [Color.white, AppColors.lavenderPale, isPro ? AppColors.successGreenWash : AppColors.lavenderPale],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -594,7 +594,7 @@ private struct SubscriptionCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(isPro ? AppColors.positive.opacity(0.28) : AppColors.action.opacity(0.22), lineWidth: 1)
+                    .strokeBorder(isPro ? colors.positive.opacity(0.28) : colors.action.opacity(0.22), lineWidth: 1)
             }
         }
         .buttonStyle(.lhPressable)
@@ -604,7 +604,7 @@ private struct SubscriptionCard: View {
     private func planBenefit(_ text: String, icon: UIImage) -> some View {
         HStack(spacing: 6) {
             LucideIcon(image: icon, size: 13)
-                .foregroundStyle(isPro ? AppColors.successGreen : AppColors.action)
+                .foregroundStyle(isPro ? colors.positiveText : colors.actionText)
             Text(text)
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(colors.textSecondary)
@@ -666,7 +666,7 @@ private struct FeatureListView: View {
             FeatureItem(icon: Lucide.lock, text: "Unlimited Properties", badge: "PRO", isLocked: true)
 
             Divider()
-                .background(AppColors.snow)
+                .background(colors.border.opacity(0.35))
                 .padding(.vertical, 6)
 
             FeatureItem(icon: Lucide.check, text: "Basic hour tracking", badge: "FREE", isLocked: false)
@@ -683,24 +683,27 @@ private struct FeatureItem: View {
     let badge: String
     let isLocked: Bool
 
+    @Environment(\.colorScheme) var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
     var body: some View {
         HStack(spacing: 10) {
             LucideIcon(image: icon, size: 14)
-                .foregroundStyle(isLocked ? AppColors.mist : AppColors.sage)
+                .foregroundStyle(isLocked ? colors.textSecondary : colors.positiveText)
                 .frame(width: 18, height: 18)
 
             Text(text)
                 .font(AppTypography.bodySmall)
-                .foregroundStyle(isLocked ? AppColors.slate : AppColors.ink)
+                .foregroundStyle(isLocked ? colors.textSecondary : colors.textPrimary)
 
             Spacer()
 
             Text(badge)
                 .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(isLocked ? AppColors.primary : AppColors.sage)
+                .foregroundStyle(isLocked ? colors.actionText : colors.positiveText)
                 .padding(.horizontal, 7)
                 .padding(.vertical, 2)
-                .background(isLocked ? AppColors.primarySurface : AppColors.sageWash)
+                .background(isLocked ? colors.actionSurface : colors.positiveSurface)
                 .clipShape(Capsule())
         }
         .padding(.vertical, 7)
@@ -820,7 +823,7 @@ struct SettingsView: View {
                             .font(.system(size: 34, weight: .black, design: .rounded))
                             .foregroundStyle(colors.textPrimary)
                             .minimumScaleFactor(0.82)
-                        Text("Manage account, tax setup, exports, and reminders.")
+                        Text("Manage your profile, tax setup, exports, and reminders.")
                             .font(.system(size: 15, weight: .medium, design: .rounded))
                             .foregroundStyle(colors.textSecondary)
                     }
@@ -932,7 +935,7 @@ struct SettingsView: View {
                                     title: "Export Reports",
                                     subtitle: "Unlock accountant-ready PDF exports with Pro",
                                     value: "PRO",
-                                    valueColor: AppColors.action
+                                    valueColor: colors.actionText
                                 )
                             }
                             .buttonStyle(.plain)
@@ -974,7 +977,7 @@ struct SettingsView: View {
 
                     Text("Photos attached to time entries are stored on this device only and aren't included in iCloud sync.")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textTertiary)
+                        .foregroundStyle(colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 4)
                         .padding(.top, -2)
@@ -1042,7 +1045,7 @@ struct SettingsView: View {
                                 icon: Lucide.circleSlash,
                                 iconColor: AppColors.textSecondary,
                                 title: "Skip Guided Setup",
-                                subtitle: "Hide first-run prompts on this account"
+                                subtitle: "Hide first-run prompts"
                             )
                         }
                         .buttonStyle(.plain)
@@ -1062,13 +1065,13 @@ struct SettingsView: View {
 
                         Text("Anonymous signals like \"a session was logged.\" Never your notes, properties, or personal data.")
                             .font(AppTypography.caption)
-                            .foregroundStyle(colors.textTertiary)
+                            .foregroundStyle(colors.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.bottom, 12)
                             .accessibilityIdentifier("settings.analyticsOptOutCaption")
                     }
 
-                    SettingsGroup(title: "Support & Legal", subtitle: "Help, policies, and account exits.") {
+                    SettingsGroup(title: "Support & Legal", subtitle: "Help, policies, and your data.") {
                         NavigationLink {
                             ContactSupportView()
                         } label: {
@@ -1126,7 +1129,7 @@ struct SettingsView: View {
                     viewModel.resetCurrentUserLocalData()
                 }
             } message: {
-                Text("This will delete your local properties, time entries, goals, tax profile, categories, and setup state for this account. Your sign-in and Pro purchase status stay intact.")
+                Text("This will delete your local properties, time entries, goals, tax profile, categories, and setup state for this profile. Your profile and Pro purchase stay intact.")
             }
             .alert("Restore Purchase", isPresented: Binding(
                 get: { restoreStatusMessage != nil },

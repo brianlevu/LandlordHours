@@ -46,7 +46,7 @@ final class SignInReplacementUITests: XCTestCase {
         XCTAssertTrue(profileB.waitForExistence(timeout: 5))
         profileB.tap()
 
-        let confirm = app.alerts.buttons["Switch"]
+        let confirm = app.buttons["switchConfirm.switch"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         confirm.tap()
 
@@ -146,10 +146,22 @@ final class SignInReplacementUITests: XCTestCase {
 
         // 7. Switch profile confirmation.
         switchRow.tap()
-        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["switchConfirm.switch"].waitForExistence(timeout: 5))
         settle()
         attach("07-settings-switch-confirm-\(scheme)")
-        app.alerts.buttons["Cancel"].tap()
+        app.buttons["switchConfirm.cancel"].tap()
+        XCTAssertTrue(app.buttons["switchConfirm.switch"].waitForNonExistence(timeout: 5))
+
+        // 8. iCloud off (the simulator has no iCloud): Sync Now shows plain caution copy.
+        let syncRow = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Sync Now")).firstMatch
+        var swipes = 0
+        while (!syncRow.exists || !syncRow.isHittable || syncRow.frame.midY > 600) && swipes < 8 {
+            app.swipeDown()
+            swipes += 1
+        }
+        XCTAssertTrue(syncRow.label.contains("iCloud sync is off"), "Got: \(syncRow.label)")
+        settle()
+        attach("08-settings-icloud-off-\(scheme)")
     }
 
     // MARK: - Helpers
