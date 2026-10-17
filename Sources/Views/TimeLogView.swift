@@ -270,22 +270,48 @@ struct TimeLogView: View {
             }
 
             HStack(spacing: 10) {
-                Button {
-                    viewModel.saveRecoveredStaleTimer()
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-                } label: {
-                    Text("Save \(AppFormat.hours(recovery.suggestedHours))")
-                        .font(AppTypography.buttonSmall)
-                        .foregroundStyle(AppColors.onAction)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(AppColors.action)
-                        .clipShape(Capsule())
+                if viewModel.staleTimerRecoveryNeedsProperty(recovery) {
+                    if !viewModel.properties.isEmpty {
+                        Menu {
+                            ForEach(viewModel.properties) { property in
+                                Button(property.name) {
+                                    if viewModel.saveRecoveredStaleTimer(id: recovery.id, propertyId: property.id) {
+                                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                                    }
+                                }
+                            }
+                        } label: {
+                            Text("Save \(recovery.durationLabel) to…")
+                                .font(AppTypography.buttonSmall)
+                                .foregroundStyle(AppColors.onAction)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(AppColors.action)
+                                .clipShape(Capsule())
+                        }
+                        .accessibilityIdentifier("timerDraft.pickProperty")
+                    }
+                } else {
+                    Button {
+                        // Idempotent: saves only the draft shown on this card.
+                        if viewModel.saveRecoveredStaleTimer(id: recovery.id) {
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        }
+                    } label: {
+                        Text("Save \(recovery.durationLabel)")
+                            .font(AppTypography.buttonSmall)
+                            .foregroundStyle(AppColors.onAction)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(AppColors.action)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.lhPressable)
+                    .accessibilityIdentifier("timerDraft.save")
                 }
-                .buttonStyle(.lhPressable)
 
                 Button {
-                    viewModel.discardRecoveredStaleTimer()
+                    viewModel.discardRecoveredStaleTimer(id: recovery.id)
                 } label: {
                     Text("Discard")
                         .font(AppTypography.buttonSmall)
@@ -306,7 +332,7 @@ struct TimeLogView: View {
                 .strokeBorder(colors.border.opacity(0.45), lineWidth: 1)
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Forgotten timer recovery. \(staleTimerRecoveryMessage(recovery))")
+        .accessibilityLabel("\(recovery.accessibilityTitle) \(staleTimerRecoveryMessage(recovery))")
     }
 
     private func staleTimerRecoveryMessage(_ recovery: StaleTimerRecovery) -> String {
@@ -314,13 +340,19 @@ struct TimeLogView: View {
         let start = recovery.startTime.formatted(date: .abbreviated, time: .shortened)
         let remaining = viewModel.staleTimerRecoveries.count - 1
         let more = remaining > 0 ? " \(remaining) more after this one." : ""
+        if viewModel.staleTimerRecoveryNeedsProperty(recovery) {
+            let pick = viewModel.properties.isEmpty
+                ? "Add a property to save it, or discard it."
+                : "Pick a property to save it to, or discard it."
+            return "Started \(start). The property for this timer was deleted. \(pick)\(more)"
+        }
         switch recovery.reason {
         case .pausedAtSwitch:
             let paused = (recovery.pausedAt ?? recovery.startTime).formatted(date: .abbreviated, time: .shortened)
             return "Started \(start) for \(propertyName). We paused it when you switched profiles at \(paused). Save the time it ran, or discard it.\(more)"
         case .forgotten:
             let capNote = recovery.wasCapped
-                ? "We capped the suggested entry at 24 hours so you can review it instead of losing the record."
+                ? "We stopped it at 24 hours. Check it before you save."
                 : "Review it before saving so the record stays accurate."
             return "Started \(start) for \(propertyName). \(capNote)\(more)"
         }

@@ -762,29 +762,48 @@ class AppViewModel: ObservableObject {
         saveTimerState()
     }
 
-    func saveRecoveredStaleTimer(hours: Double? = nil, notes: String = "Recovered from a timer that was left running.") {
-        guard let recovery = staleTimerRecovery else { return }
+    /// Saves ONE timer draft as an entry. Pass the id of the draft the user is looking at:
+    /// if it was already saved/discarded (a double tap), nothing happens — the next draft is
+    /// never saved unseen.
+    ///
+    /// - Parameter propertyId: required when the draft's property was deleted; the user
+    ///   picks where the hours go.
+    /// - Returns: true if an entry was added.
+    @discardableResult
+    func saveRecoveredStaleTimer(id: UUID? = nil, hours: Double? = nil, propertyId: UUID? = nil, notes: String? = nil) -> Bool {
+        guard let recovery = id.map({ id in staleTimerRecoveries.first { $0.id == id } }) ?? staleTimerRecovery else {
+            return false
+        }
+        let targetProperty = propertyId ?? recovery.propertyId
+        guard properties.contains(where: { $0.id == targetProperty }) else { return false }
         // Same rule as stopTimer: exact elapsed time, capped at 24 h, never rounded up.
         let cappedHours = min(max(hours ?? recovery.suggestedHours, 0), 24)
         addTimeEntry(
-            propertyId: recovery.propertyId,
+            propertyId: targetProperty,
             participant: .selfParticipant,
             category: recovery.category,
             hours: cappedHours,
             date: recovery.startTime,
-            notes: notes,
+            notes: notes ?? recovery.entryNote,
             source: .timer
         )
-        removeFirstStaleTimerRecovery()
+        removeStaleTimerRecovery(id: recovery.id)
+        return true
     }
 
-    func discardRecoveredStaleTimer() {
-        removeFirstStaleTimerRecovery()
+    func discardRecoveredStaleTimer(id: UUID? = nil) {
+        guard let target = id ?? staleTimerRecovery?.id else { return }
+        removeStaleTimerRecovery(id: target)
     }
 
-    private func removeFirstStaleTimerRecovery() {
-        guard !staleTimerRecoveries.isEmpty else { return }
-        staleTimerRecoveries.removeFirst()
+    /// True when the draft's property no longer exists (it was deleted after the timer).
+    func staleTimerRecoveryNeedsProperty(_ recovery: StaleTimerRecovery) -> Bool {
+        !properties.contains { $0.id == recovery.propertyId }
+    }
+
+    private func removeStaleTimerRecovery(id: UUID) {
+        guard staleTimerRecoveries.contains(where: { $0.id == id }) else { return }
+        staleTimerRecoveries.removeAll { $0.id == id }
         writeStaleTimerRecoveries(staleTimerRecoveries)
     }
     
@@ -1150,11 +1169,11 @@ class AppViewModel: ObservableObject {
     }
 
     private func loadStaleTimerRecovery() {
+        // Keep every draft, including ones whose property was deleted: the card asks the
+        // user to pick a property (or discard) instead of dropping recorded time silently.
         let list = persistedStaleTimerRecoveries()
-        // Drafts for a property that no longer exists can't be saved as entries.
-        let usable = list.filter { recovery in properties.contains { $0.id == recovery.propertyId } }
-        staleTimerRecoveries = usable
-        writeStaleTimerRecoveries(usable)
+        staleTimerRecoveries = list
+        writeStaleTimerRecoveries(list)
     }
 
     private func clearStaleTimerRecovery() {
@@ -1272,7 +1291,7 @@ class AppViewModel: ObservableObject {
     }
 }
 
-struct StaleTimerRecovery: Codable, Equatable {
+struct StaleTimerRecovery: Codable, Equatable, Identifiable {
     enum Reason: String, Codable {
         /// Left running for more than 24 hours.
         case forgotten
@@ -1280,6 +1299,7 @@ struct StaleTimerRecovery: Codable, Equatable {
         case pausedAtSwitch
     }
 
+    var id = UUID()
     let startTime: Date
     let propertyId: UUID
     let category: ActivityCategory
@@ -1289,6 +1309,7 @@ struct StaleTimerRecovery: Codable, Equatable {
 
     init(startTime: Date, propertyId: UUID, category: ActivityCategory, elapsedHours: Double,
          reason: Reason = .forgotten, pausedAt: Date? = nil) {
+        self.id = UUID()
         self.startTime = startTime
         self.propertyId = propertyId
         self.category = category
@@ -1298,11 +1319,12 @@ struct StaleTimerRecovery: Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case startTime, propertyId, category, elapsedHours, reason, pausedAt
+        case id, startTime, propertyId, category, elapsedHours, reason, pausedAt
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         startTime = try c.decode(Date.self, forKey: .startTime)
         propertyId = try c.decode(UUID.self, forKey: .propertyId)
         category = try c.decode(ActivityCategory.self, forKey: .category)
@@ -1318,6 +1340,30 @@ struct StaleTimerRecovery: Codable, Equatable {
     }
 
     var wasCapped: Bool { elapsedHours > 24 }
+
+    /// The note saved on the entry. It goes into the audit export, so it must say what
+    /// actually happened.
+    var entryNote: String {
+        switch reason {
+        case .forgotten: return "Recovered from a timer that was left running."
+        case .pausedAtSwitch: return "Timer paused when switching profiles."
+        }
+    }
+
+    /// "2 min" under an hour (a 2-minute draft must not read "0.0h"), else "1.5h".
+    var durationLabel: String {
+        let hours = suggestedHours
+        guard hours < 1 else { return AppFormat.hours(hours) }
+        let minutes = Int((hours * 60).rounded())
+        return minutes < 1 ? "under 1 min" : "\(minutes) min"
+    }
+
+    var accessibilityTitle: String {
+        switch reason {
+        case .forgotten: return "Timer left running."
+        case .pausedAtSwitch: return "Timer paused when you switched profiles."
+        }
+    }
 }
 
 // MARK: - CloudKit Sync Delegate

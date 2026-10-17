@@ -1,4 +1,5 @@
 import XCTest
+import CloudKit
 @testable import LandlordHours
 
 // MARK: - Push gate, end to end through start()
@@ -174,5 +175,132 @@ final class TimerDraftFlowTests: XCTestCase {
         viewModel.discardRecoveredStaleTimer()
         XCTAssertTrue(viewModel.staleTimerRecoveries.isEmpty)
         XCTAssertNil(UserDefaults.standard.data(forKey: "u.\(id).LandlordHours.staleTimerRecoveries"))
+    }
+
+    private func makeTwoDrafts(_ viewModel: AppViewModel) -> UUID {
+        viewModel.suppressCelebrations = true
+        viewModel.addProperty(name: "Oak", address: "1 Oak", type: .ltr)
+        let propertyId = viewModel.properties[0].id
+        for category in [ActivityCategory.repairs, .management] {
+            viewModel.startTimer(propertyId: propertyId, category: category)
+            viewModel.signOut()
+            UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
+            viewModel.signIn()
+        }
+        return propertyId
+    }
+
+    func testPausedDraftSavesWithTruthfulNote() throws {
+        UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
+        let viewModel = AppViewModel()
+        _ = makeTwoDrafts(viewModel)
+        let first = try XCTUnwrap(viewModel.staleTimerRecovery)
+        XCTAssertTrue(viewModel.saveRecoveredStaleTimer(id: first.id))
+        let saved = try XCTUnwrap(viewModel.timeEntries.first)
+        XCTAssertEqual(saved.notes, "Timer paused when switching profiles.")
+        XCTAssertNotEqual(saved.notes, "Recovered from a timer that was left running.")
+        XCTAssertEqual(first.accessibilityTitle, "Timer paused when you switched profiles.")
+    }
+
+    func testDoubleTapSaveSavesOnlyTheDisplayedDraft() throws {
+        UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
+        let viewModel = AppViewModel()
+        _ = makeTwoDrafts(viewModel)
+        let shown = try XCTUnwrap(viewModel.staleTimerRecovery)
+        let before = viewModel.timeEntries.count
+
+        XCTAssertTrue(viewModel.saveRecoveredStaleTimer(id: shown.id))
+        XCTAssertFalse(viewModel.saveRecoveredStaleTimer(id: shown.id), "Second tap is a no-op")
+
+        XCTAssertEqual(viewModel.timeEntries.count, before + 1)
+        XCTAssertEqual(viewModel.staleTimerRecoveries.count, 1, "The unseen draft is still pending")
+        XCTAssertEqual(viewModel.staleTimerRecoveries.first?.category, .management)
+    }
+
+    func testDraftForDeletedPropertyIsKeptAndCanBeSavedElsewhere() throws {
+        UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
+        let viewModel = AppViewModel()
+        viewModel.suppressCelebrations = true
+        viewModel.addProperty(name: "Oak", address: "1 Oak", type: .ltr)
+        viewModel.addProperty(name: "Pine", address: "2 Pine", type: .ltr)
+        let oak = viewModel.properties[0], pine = viewModel.properties[1]
+        viewModel.startTimer(propertyId: oak.id, category: .repairs)
+        viewModel.signOut()
+        UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
+        viewModel.signIn()
+        viewModel.deleteProperty(viewModel.properties.first { $0.id == oak.id }!)
+
+        // Reload: the draft is kept, not dropped.
+        viewModel.signOut()
+        UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
+        viewModel.signIn()
+        let draft = try XCTUnwrap(viewModel.staleTimerRecovery)
+        XCTAssertTrue(viewModel.staleTimerRecoveryNeedsProperty(draft))
+        XCTAssertFalse(viewModel.saveRecoveredStaleTimer(id: draft.id), "Can't save to a deleted property")
+        XCTAssertTrue(viewModel.saveRecoveredStaleTimer(id: draft.id, propertyId: pine.id))
+        XCTAssertEqual(viewModel.timeEntries.filter { $0.propertyId == pine.id }.count, 1)
+        XCTAssertTrue(viewModel.staleTimerRecoveries.isEmpty)
+    }
+
+    func testDurationLabelShowsMinutesUnderAnHour() {
+        func label(_ hours: Double) -> String {
+            StaleTimerRecovery(startTime: Date(), propertyId: UUID(), category: .repairs,
+                               elapsedHours: hours, reason: .pausedAtSwitch).durationLabel
+        }
+        XCTAssertEqual(label(2.0 / 60.0), "2 min")
+        XCTAssertEqual(label(0.2 / 60.0), "under 1 min")
+        XCTAssertEqual(label(1.5), "1.5h")
+    }
+}
+
+@MainActor
+final class SyncStatusTests: XCTestCase {
+    private var authSnapshot: AuthStateSnapshot!
+    private var profileId = ""
+
+    override func setUp() {
+        super.setUp()
+        authSnapshot = AuthStateSnapshot.capture()
+        AuthStateSnapshot.clearAll()
+        profileId = "local-status-\(UUID().uuidString.prefix(8))"
+        UserDefaults.standard.set(profileId, forKey: ProfileKeys.localProfileId)
+    }
+
+    override func tearDown() {
+        AppViewModel.clearScopedAccountData(for: profileId)
+        authSnapshot.restore()
+        super.tearDown()
+    }
+
+    func testSyncNowDuringInitialSyncDoesNotReportFailure() async {
+        let service = CloudKitSyncService()
+        service.schedulePush()
+        var errorSeenDuringSync: String? = "unset"
+        var runningSeen = false
+        service.operationsOverride = CloudKitSyncService.InitialSyncOperations(
+            accountAvailable: { true },
+            prepare: {},
+            push: {},
+            pull: {
+                runningSeen = service.isRunningInitialSync
+                await service.syncNow()           // user taps Sync Now mid-sync
+                errorSeenDuringSync = service.syncError
+                return true
+            }
+        )
+        await service.start()
+        XCTAssertTrue(runningSeen)
+        XCTAssertNil(errorSeenDuringSync, "No false 'Couldn't reach iCloud' while syncing")
+        XCTAssertEqual(service.initialSyncCompletedFor, profileId)
+    }
+
+    func testAccountChangedNotificationRechecksAccount() async {
+        let service = CloudKitSyncService()
+        let before = service.accountStatusCheckCount
+        NotificationCenter.default.post(name: .CKAccountChanged, object: nil)
+        for _ in 0..<50 where service.accountStatusCheckCount == before {
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertGreaterThan(service.accountStatusCheckCount, before)
     }
 }

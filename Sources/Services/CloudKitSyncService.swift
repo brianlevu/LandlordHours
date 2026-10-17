@@ -82,6 +82,13 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
             syncError = "iCloud sync is unavailable in this build."
             logger.warning("CloudKit disabled: missing iCloud CloudKit entitlement")
         }
+        // Signing in to iCloud (or switching Apple Accounts) while the app runs re-checks
+        // the account, which re-runs the initial pull and opens the push gate.
+        accountChangeObserver = NotificationCenter.default.addObserver(
+            forName: .CKAccountChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in await self?.checkAccountStatus() }
+        }
     }
 
     /// The steps `start()` runs. Production uses CloudKit; tests inject fakes to drive
@@ -96,7 +103,10 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
 
     /// Test seam: when set, `start()` uses these instead of CloudKit.
     var operationsOverride: InitialSyncOperations?
-    private(set) var isRunningInitialSync = false
+    @Published private(set) var isRunningInitialSync = false
+    /// Instrumentation for tests: how many times the iCloud account status was checked.
+    private(set) var accountStatusCheckCount = 0
+    private var accountChangeObserver: NSObjectProtocol?
     /// Instrumentation for tests: held pushes flushed after a successful initial pull.
     private(set) var flushedHeldPushCount = 0
 
@@ -183,6 +193,12 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     /// pushes and pulls. Never holds silently: if iCloud is off or unreachable, `syncError`
     /// says so.
     func syncNow() async {
+        // The initial sync is already running: it will push and pull. Don't report a
+        // failure that hasn't happened; Settings shows "Syncing…" meanwhile.
+        if isRunningInitialSync {
+            syncError = nil
+            return
+        }
         if !isPushAllowed {
             await start()
         }
@@ -245,6 +261,7 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     // MARK: - Account Status
 
     func checkAccountStatus() async {
+        accountStatusCheckCount += 1
         guard let container else {
             accountAvailable = false
             syncError = "iCloud sync is unavailable in this build."

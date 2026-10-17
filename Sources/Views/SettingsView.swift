@@ -1188,12 +1188,12 @@ struct SettingsView: View {
     }
 
     private var syncNeedsAttention: Bool {
-        !viewModel.syncService.isSyncing
+        !viewModel.syncService.isSyncing && !viewModel.syncService.isRunningInitialSync
             && (!viewModel.syncService.accountAvailable || viewModel.syncService.syncError != nil)
     }
 
     private var syncSubtitle: String? {
-        if viewModel.syncService.isSyncing { return "Syncing..." }
+        if viewModel.syncService.isSyncing || viewModel.syncService.isRunningInitialSync { return "Syncing…" }
         if !viewModel.syncService.accountAvailable { return "iCloud sync is off. Your records are safe on this iPhone." }
         if viewModel.syncService.syncError != nil { return "Couldn't sync just now. Your records are safe on this iPhone." }
         if let date = viewModel.syncService.lastSyncDate {
