@@ -84,6 +84,17 @@ enum LandlordPurchases {
     /// environment opens the gate.
     static let testHarnessLiveOverrideKey = "LANDLORDHOURS_TEST_RC_LIVE"
 
+    /// Compile-time: dev simulators mint a fresh RC anonymous "customer" on every run,
+    /// polluting production analytics (86 fake LensWords customers, 2026-08).
+    /// TestFlight/device/App Store builds are unaffected.
+    static let isSimulatorBuild: Bool = {
+        #if targetEnvironment(simulator)
+        true
+        #else
+        false
+        #endif
+    }()
+
     /// Set exactly once, the first (and only) time `configure()` actually reaches
     /// `Purchases.configure(with:)`. Guards the SDK call itself against being invoked twice in one
     /// process. Resets to `false` on every fresh process launch (a plain static, not persisted), so
@@ -125,7 +136,8 @@ enum LandlordPurchases {
         apiKey: String?,
         arguments: [String] = [],
         environment: [String: String] = [:],
-        analyticsOptedOut: Bool = UserDefaults.standard.bool(forKey: Analytics.optOutKey)
+        analyticsOptedOut: Bool = UserDefaults.standard.bool(forKey: Analytics.optOutKey),
+        isSimulator: Bool = Self.isSimulatorBuild
     ) -> Bool {
         guard isEnabled else { return false }
         guard let apiKey, !apiKey.isEmpty, apiKey != placeholderAPIKey else { return false }
@@ -134,6 +146,11 @@ enum LandlordPurchases {
         let underTest = environment["XCTestConfigurationFilePath"] != nil
         let harnessOverride = environment[testHarnessLiveOverrideKey] == "1"
         if underTest && !harnessOverride { return false }
+
+        // Dev simulator runs still mint a fresh RC anonymous "customer" on every launch even
+        // outside XCTest — this closes that leak. The narrow harness override above still wins,
+        // mirroring LensWords' `RevenueCatObserver.shouldConfigure`.
+        if isSimulator && !harnessOverride { return false }
 
         // Mirrors `Analytics.shouldConfigure`'s exact QA/mock-scenario gate: any `-LH*` launch
         // argument (mock scenario seeding, UI test fixtures, screenshot capture) means this is not

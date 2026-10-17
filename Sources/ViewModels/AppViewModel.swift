@@ -520,6 +520,14 @@ class AppViewModel: ObservableObject {
     func canExportPDF() -> Bool {
         return SubscriptionManager.shared.isPro
     }
+
+    /// Called after the user actually shares an export (the share sheet reported completion).
+    /// Hook for the rating prompt and analytics; set by the lane that owns those.
+    var onExportShared: ((ExportFormat) -> Void)?
+
+    func exportShared(format: ExportFormat) {
+        onExportShared?(format)
+    }
     
     func getUpgradeMessage() -> String {
         if !canAddProperty() {
@@ -570,7 +578,8 @@ class AppViewModel: ObservableObject {
         hours: Double,
         date: Date,
         notes: String,
-        attachments: [TimeAttachment] = []
+        attachments: [TimeAttachment] = [],
+        source: EntrySource = .manual
     ) {
         let entry = TimeEntry(
             propertyId: propertyId,
@@ -579,7 +588,8 @@ class AppViewModel: ObservableObject {
             hours: hours,
             date: date,
             notes: notes,
-            attachments: attachments
+            attachments: attachments,
+            importSource: source.storedValue
         )
         timeEntries.append(entry)
         saveData()
@@ -705,7 +715,8 @@ class AppViewModel: ObservableObject {
             category: timerCategory,
             hours: hours,
             date: startTime,
-            notes: notes
+            notes: notes,
+            source: .timer
         )
 
         isTimerRunning = false
@@ -736,7 +747,8 @@ class AppViewModel: ObservableObject {
             category: recovery.category,
             hours: cappedHours,
             date: recovery.startTime,
-            notes: notes
+            notes: notes,
+            source: .timer
         )
         staleTimerRecovery = nil
         clearStaleTimerRecovery()

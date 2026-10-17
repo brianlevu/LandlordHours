@@ -363,7 +363,7 @@ struct ReportsView: View {
     }
 
     private func exportAction() {
-        if subscriptionManager.isPro && !subscriptionManager.isTrialActive {
+        if viewModel.canExportPDF() {
             showingExportSheet = true
         } else {
             showingPaywall = true

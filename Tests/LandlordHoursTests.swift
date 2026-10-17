@@ -1178,8 +1178,10 @@ final class EngagementIntelligenceServiceTests: XCTestCase {
     }
 
     func testWidgetSnapshotShowsBehindPaceAsReportAction() {
+        // isStale compares against the real clock, so anchor updatedAt to now;
+        // a fixed calendar date made this test fail once that date was 36h old.
         let snapshot = EngagementWidgetSnapshot(
-            updatedAt: date(year: 2026, month: 10, day: 1),
+            updatedAt: Date(),
             taxYear: 2026,
             propertyCount: 2,
             yearHours: 100,

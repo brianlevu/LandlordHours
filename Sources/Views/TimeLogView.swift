@@ -20,6 +20,7 @@ struct TimeLogView: View {
     @State private var entryParticipant: Participant = .selfParticipant
     @State private var entryPhotoItems: [PhotosPickerItem] = []
     @State private var entryAttachments: [TimeAttachment] = []
+    @State private var entryUsedVoice = false
     @State private var showingSaved: Bool = false
     @State private var isSaving: Bool = false
     @State private var isLogDetailsExpanded: Bool = false
@@ -1204,8 +1205,10 @@ struct TimeLogView: View {
             hours: entryHours,
             date: entryDate,
             notes: entryNotes,
-            attachments: entryAttachments
+            attachments: entryAttachments,
+            source: entryUsedVoice ? .voice : .manual
         )
+        entryUsedVoice = false
         // Reset form
         entryNotes = ""
         entryHours = 1.0
@@ -1342,6 +1345,7 @@ struct TimeLogView: View {
         let cleaned = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleaned.isEmpty else { return }
         entryNotes = cleaned
+        entryUsedVoice = true
     }
 
     private var voiceContextualStrings: [String] {
@@ -2205,7 +2209,8 @@ struct TimeLogView: View {
             category: stoppedCategory,
             hours: hours,
             date: stoppedStartDate,
-            notes: timerNotes
+            notes: timerNotes,
+            source: .timer
         )
 
         resetTimerState()
