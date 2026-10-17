@@ -12,6 +12,34 @@ struct AuditReportPDFRenderer {
 
     static let pageSize = CGSize(width: 792, height: 612)
 
+    /// Largest box an appendix photo is drawn into: two per row on the 720 pt content width,
+    /// tall enough for a portrait receipt while leaving room for its caption on one page.
+    static let appendixBox = CGSize(width: 340, height: 420)
+    static let minimumPPI: CGFloat = 200
+
+    /// Drawn size of an appendix photo: aspect-fit into `box`, never larger than the
+    /// source's pixel size (1 px = 1 pt) so small images are not upscaled.
+    static func appendixImageSize(pixelSize: CGSize, box: CGSize = appendixBox) -> CGSize {
+        guard pixelSize.width > 0, pixelSize.height > 0 else { return .zero }
+        let maxWidth = min(box.width, pixelSize.width)
+        let maxHeight = min(box.height, pixelSize.height)
+        let scale = min(maxWidth / pixelSize.width, maxHeight / pixelSize.height)
+        return CGSize(width: floor(pixelSize.width * scale), height: floor(pixelSize.height * scale))
+    }
+
+    /// Orientation-corrected pixel size of an image, or nil if it can't be decoded.
+    static func pixelSize(of data: Data) -> CGSize? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let widthNumber = props[kCGImagePropertyPixelWidth] as? NSNumber,
+              let heightNumber = props[kCGImagePropertyPixelHeight] as? NSNumber
+        else { return nil }
+        let width = CGFloat(widthNumber.doubleValue)
+        let height = CGFloat(heightNumber.doubleValue)
+        let orientation = (props[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+        return orientation >= 5 ? CGSize(width: height, height: width) : CGSize(width: width, height: height)
+    }
+
     func render(_ report: AuditReport) -> Data {
         let measuring = Composer(report: report, context: nil, totalPages: 0, attachmentData: attachmentData)
         measuring.layout()
@@ -287,27 +315,37 @@ private final class Composer {
         guard !report.attachments.isEmpty else { return }
         newPage()
         sectionTitle("Appendix: photos and receipts")
-        note("Each item lists its reference, the entry it belongs to, and the original file name.")
+        note("Each item lists its reference, the entry it belongs to, and the original file name. Photos are printed large enough to read.")
         y += 6
 
-        let perRow = 5
+        let perRow = 2
         let gap: CGFloat = 12
-        let cellWidth = (contentWidth - gap * CGFloat(perRow - 1)) / CGFloat(perRow)
-        let imageHeight: CGFloat = 130
-        let captionHeight: CGFloat = 40
-        let cellHeight = imageHeight + captionHeight
+        let cellWidth = (contentWidth - gap) / CGFloat(perRow)
+        let captionHeight: CGFloat = 30
+        let placeholder = CGSize(width: AuditReportPDFRenderer.appendixBox.width, height: 90)
 
         for chunkStart in stride(from: 0, to: report.attachments.count, by: perRow) {
-            ensureSpace(cellHeight + gap)
-            let chunk = report.attachments[chunkStart..<min(chunkStart + perRow, report.attachments.count)]
-            for (offset, ref) in chunk.enumerated() {
-                let x = margin + CGFloat(offset) * (cellWidth + gap)
-                let box = CGRect(x: x, y: y, width: cellWidth, height: imageHeight)
-                drawThumbnail(ref.attachment, in: box)
-                let caption = "\(ref.reference) · entry \(ref.entryReference) · \(dateFormatter.string(from: ref.entryDate))\n\(ref.attachment.filename)"
-                drawText(caption, font: tableFont, color: ink, in: CGRect(x: x, y: y + imageHeight + 4, width: cellWidth, height: captionHeight - 4))
+            let chunk = Array(report.attachments[chunkStart..<min(chunkStart + perRow, report.attachments.count)])
+            let items = chunk.map { ref -> (ref: AuditReport.AttachmentRef, data: Data?, size: CGSize) in
+                let data = attachmentData(ref.attachment)
+                let pixels = data.flatMap(AuditReportPDFRenderer.pixelSize(of:))
+                let size = pixels.map { AuditReportPDFRenderer.appendixImageSize(pixelSize: $0) } ?? placeholder
+                return (ref, data, size)
             }
-            y += cellHeight + gap
+            let imageRowHeight = items.map(\.size.height).max() ?? placeholder.height
+            // Keep each image with its caption: move the whole row to a new page if needed.
+            ensureSpace(imageRowHeight + captionHeight + gap)
+
+            for (offset, item) in items.enumerated() {
+                let cellX = margin + CGFloat(offset) * (cellWidth + gap)
+                let rect = CGRect(x: cellX + (cellWidth - item.size.width) / 2, y: y, width: item.size.width, height: item.size.height)
+                drawAttachment(item.ref.attachment, data: item.data, in: rect)
+                let caption = "\(item.ref.reference) · entry \(item.ref.entryReference) · \(dateFormatter.string(from: item.ref.entryDate))\n\(item.ref.attachment.filename)"
+                drawText(caption, font: tableFont, color: ink,
+                         in: CGRect(x: cellX, y: y + imageRowHeight + 4, width: cellWidth, height: captionHeight - 4),
+                         alignment: .center)
+            }
+            y += imageRowHeight + captionHeight + gap
         }
     }
 
@@ -461,23 +499,23 @@ private final class Composer {
         if let trailingNote { note(trailingNote) }
     }
 
-    private func drawThumbnail(_ attachment: TimeAttachment, in box: CGRect) {
+    private func drawAttachment(_ attachment: TimeAttachment, data: Data?, in rect: CGRect) {
         guard context != nil else { return }
-        strokeRect(box)
-        guard let data = attachmentData(attachment) else {
-            drawText("File not available on this device", font: tableFont, color: secondaryInk, in: box.insetBy(dx: 8, dy: box.height / 2 - 10), alignment: .center)
+        guard let data else {
+            strokeRect(rect)
+            drawText("File not available on this device", font: tableFont, color: secondaryInk, in: rect.insetBy(dx: 8, dy: rect.height / 2 - 10), alignment: .center)
             return
         }
-        guard let image = Self.thumbnail(from: data, maxPixel: 520) else {
+        // Resolution for the drawn size: at least 200 ppi, never more pixels than the source has.
+        let maxPixel = Int(ceil(max(rect.width, rect.height) * AuditReportPDFRenderer.minimumPPI / 72))
+        guard let image = Self.thumbnail(from: data, maxPixel: maxPixel) else {
+            strokeRect(rect)
             let kind = attachment.mimeType == "application/pdf" ? "PDF document" : "File"
-            drawText("\(kind) (no preview)", font: tableFont, color: secondaryInk, in: box.insetBy(dx: 8, dy: box.height / 2 - 10), alignment: .center)
+            drawText("\(kind) (no preview)", font: tableFont, color: secondaryInk, in: rect.insetBy(dx: 8, dy: rect.height / 2 - 10), alignment: .center)
             return
         }
-        let inner = box.insetBy(dx: 3, dy: 3)
-        let scale = min(inner.width / CGFloat(image.width), inner.height / CGFloat(image.height))
-        let size = CGSize(width: CGFloat(image.width) * scale, height: CGFloat(image.height) * scale)
-        let rect = CGRect(x: inner.midX - size.width / 2, y: inner.midY - size.height / 2, width: size.width, height: size.height)
         UIImage(cgImage: image).draw(in: rect)
+        strokeRect(rect)
     }
 
     private func strokeRect(_ rect: CGRect) {
@@ -501,7 +539,7 @@ private final class Composer {
 
         let jpeg = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(jpeg, UTType.jpeg.identifier as CFString, 1, nil) else { return thumb }
-        CGImageDestinationAddImage(destination, thumb, [kCGImageDestinationLossyCompressionQuality: 0.7] as CFDictionary)
+        CGImageDestinationAddImage(destination, thumb, [kCGImageDestinationLossyCompressionQuality: 0.8] as CFDictionary)
         guard CGImageDestinationFinalize(destination),
               let provider = CGDataProvider(data: jpeg as CFData),
               let encoded = CGImage(jpegDataProviderSource: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)

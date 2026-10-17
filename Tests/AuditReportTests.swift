@@ -418,12 +418,43 @@ final class AuditReportCSVTests: XCTestCase {
 final class AuditReportPDFTests: XCTestCase {
     private typealias F = AuditFixture
 
+    /// Fixture photos render at 2x: a 600x800 pt receipt is a 1200x1600 px JPEG, like a phone photo crop.
+    static let fixtureFormat: UIGraphicsImageRendererFormat = {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 2
+        format.opaque = true
+        return format
+    }()
+
+    func testPortraitReceiptIsDrawnLargeEnoughToRead() throws {
+        let (report, images) = Self.sampleReport()
+        let receipt = try XCTUnwrap(report.attachments.first { $0.attachment.filename == "water-heater-receipt.jpg" })
+        let data = try XCTUnwrap(images[receipt.attachment.id])
+        let pixels = try XCTUnwrap(AuditReportPDFRenderer.pixelSize(of: data))
+        XCTAssertEqual(pixels, CGSize(width: 1200, height: 1600))
+
+        let drawn = AuditReportPDFRenderer.appendixImageSize(pixelSize: pixels)
+        XCTAssertGreaterThanOrEqual(drawn.width, 240, "receipt text must print at a readable size")
+        XCTAssertLessThanOrEqual(drawn.width, 340)
+        XCTAssertLessThanOrEqual(drawn.height, AuditReportPDFRenderer.appendixBox.height)
+        XCTAssertEqual(drawn.width / drawn.height, 0.75, accuracy: 0.01, "aspect ratio preserved")
+        // Source has enough pixels for 200 ppi at the drawn size.
+        XCTAssertGreaterThanOrEqual(pixels.height / (drawn.height / 72), 200)
+    }
+
+    func testAppendixNeverUpscalesSmallImages() {
+        XCTAssertEqual(AuditReportPDFRenderer.appendixImageSize(pixelSize: CGSize(width: 200, height: 300)), CGSize(width: 200, height: 300))
+        let landscape = AuditReportPDFRenderer.appendixImageSize(pixelSize: CGSize(width: 4032, height: 3024))
+        XCTAssertEqual(landscape.width, 340)
+        XCTAssertEqual(landscape.height, 255)
+    }
+
     static func sampleReport() -> (AuditReport, [UUID: Data]) {
         var images: [UUID: Data] = [:]
         /// A small JPEG "photo" of a paper receipt or note lying on a table, slightly rotated.
         func photo(_ name: String, title: String, lines: [String], tint: UIColor) -> TimeAttachment {
             let size = CGSize(width: 600, height: 800)
-            let image = UIGraphicsImageRenderer(size: size).jpegData(withCompressionQuality: 0.75) { ctx in
+            let image = UIGraphicsImageRenderer(size: size, format: Self.fixtureFormat).jpegData(withCompressionQuality: 0.75) { ctx in
                 let cg = ctx.cgContext
                 // Table surface with a soft gradient.
                 let colors = [tint.withAlphaComponent(0.55).cgColor, UIColor.darkGray.cgColor] as CFArray
@@ -556,7 +587,7 @@ final class AuditReportPDFTests: XCTestCase {
         let (report, images) = Self.sampleReport()
         let directory: URL
         if let hostHome = ProcessInfo.processInfo.environment["SIMULATOR_HOST_HOME"] {
-            directory = URL(fileURLWithPath: hostHome).appendingPathComponent("AgentScratch/landlordhours/2026-10-17/export-samples-r3", isDirectory: true)
+            directory = URL(fileURLWithPath: hostHome).appendingPathComponent("AgentScratch/landlordhours/2026-10-17/export-samples-r4", isDirectory: true)
         } else {
             directory = FileManager.default.temporaryDirectory.appendingPathComponent("export-samples", isDirectory: true)
         }
