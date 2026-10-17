@@ -282,6 +282,7 @@ struct SettingRow: View {
     var valueColor: Color? = nil
     var showChevron: Bool = true
     var isDanger: Bool = false
+    var subtitleColor: Color? = nil
 
     @Environment(\.colorScheme) var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
@@ -289,7 +290,7 @@ struct SettingRow: View {
     var body: some View {
         HStack(spacing: 14) {
             LucideIcon(image: icon, size: 20)
-                .foregroundStyle(isDanger ? AppColors.coral : iconColor)
+                .foregroundStyle(isDanger ? colors.destructive : iconColor)
                 .frame(width: 38, height: 38)
                 .background(iconWash ?? colors.backgroundTertiary)
                 .clipShape(Circle())
@@ -298,11 +299,11 @@ struct SettingRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(isDanger ? AppColors.coral : colors.textPrimary)
+                    .foregroundStyle(isDanger ? colors.destructive : colors.textPrimary)
                 if let subtitle {
                     Text(subtitle)
                         .font(AppTypography.caption)
-                        .foregroundStyle(colors.textTertiary)
+                        .foregroundStyle(subtitleColor ?? colors.textSecondary)
                 }
             }
 
@@ -730,17 +731,17 @@ private struct ProfileRow: View {
                 } else {
                     ZStack {
                         Circle()
-                            .fill(AppColors.sage)
+                            .fill(colors.actionSurface)
                             .frame(width: 48, height: 48)
 
                         // Show initial or person icon
                         if !name.isEmpty && name != "Your Name" {
                             Text(String(name.prefix(1)).uppercased())
                                 .font(.system(size: 20, weight: .bold, design: .rounded))
-                                .foregroundStyle(AppColors.charcoal)
+                                .foregroundStyle(colors.action)
                         } else {
                             LucideIcon(image: Lucide.user, size: 20)
-                                .foregroundStyle(AppColors.charcoal)
+                                .foregroundStyle(colors.action)
                         }
                     }
                 }
@@ -753,7 +754,7 @@ private struct ProfileRow: View {
                     if let email, !email.isEmpty {
                         Text(email)
                             .font(AppTypography.caption)
-                            .foregroundStyle(colors.textTertiary)
+                            .foregroundStyle(colors.textSecondary)
                     }
                 }
 
@@ -947,7 +948,8 @@ struct SettingsView: View {
                                 iconColor: AppColors.informational,
                                 iconWash: colors.informationalSurface,
                                 title: "Sync Now",
-                                subtitle: syncSubtitle ?? "Back up latest records to iCloud"
+                                subtitle: syncSubtitle ?? "Back up latest records to iCloud",
+                                subtitleColor: syncNeedsAttention ? colors.cautionText : nil
                             )
                         }
                         .buttonStyle(.plain)
@@ -1106,9 +1108,9 @@ struct SettingsView: View {
                     #endif
 
                     // Version
-                    Text("LandlordHours v1.0.0")
+                    Text("LandlordHours v\(Self.appVersion)")
                         .font(AppTypography.caption)
-                        .foregroundStyle(AppColors.cloud)
+                        .foregroundStyle(colors.textSecondary)
                         .padding(.bottom, AppSpacing.tabContentBottomInset)
                 }
                 .padding(.horizontal, 24)
@@ -1157,9 +1159,19 @@ struct SettingsView: View {
         }
     }
 
+    private static var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+    }
+
+    private var syncNeedsAttention: Bool {
+        !viewModel.syncService.isSyncing
+            && (!viewModel.syncService.accountAvailable || viewModel.syncService.syncError != nil)
+    }
+
     private var syncSubtitle: String? {
         if viewModel.syncService.isSyncing { return "Syncing..." }
-        if let error = viewModel.syncService.syncError { return "Error: \(error)" }
+        if !viewModel.syncService.accountAvailable { return "iCloud sync is off. Your records are safe on this iPhone." }
+        if viewModel.syncService.syncError != nil { return "Couldn't sync just now. Your records are safe on this iPhone." }
         if let date = viewModel.syncService.lastSyncDate {
             let formatter = RelativeDateTimeFormatter()
             formatter.unitsStyle = .short

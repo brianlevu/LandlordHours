@@ -115,9 +115,19 @@ final class SignInReplacementUITests: XCTestCase {
         launch(["-LHSeedLegacyEmailProfile", "-LHInitialTab", "4"], scheme: scheme)
         let restoreRow = app.buttons["settings.restoreOtherData"]
         XCTAssertTrue(restoreRow.waitForExistence(timeout: 8))
-        scrollTo(restoreRow)
+        settle()
+        attach("04a-settings-top-\(scheme)")
+        // Bring the "Account" group header to the top of the screen (not under the status bar).
+        let accountHeader = app.staticTexts["Account"].firstMatch
+        if accountHeader.exists {
+            let start = accountHeader.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            let delta = accountHeader.frame.midY - 140
+            let end = start.withOffset(CGVector(dx: 0, dy: -delta))
+            start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.4)
+        }
         settle()
         attach("04-settings-account-restore-\(scheme)")
+        scrollTo(restoreRow)
 
         // 5. Settings › Restore other data sheet.
         restoreRow.tap()

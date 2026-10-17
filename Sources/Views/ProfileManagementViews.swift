@@ -85,6 +85,7 @@ struct ProfileRestoreSheet: View {
                     pendingSwitch = nil
                     onRestore(profile)
                 }
+                .keyboardShortcut(.defaultAction)
             } message: { _ in
                 Text("Your current data stays on this iPhone. You can come back to it from Restore other data.")
             }
@@ -120,7 +121,7 @@ private struct ProfileCandidateCard: View {
                     .font(.system(size: 10, weight: .bold))
                     .tracking(0.6)
                     .textCase(.uppercase)
-                    .foregroundStyle(colors.informational)
+                    .foregroundStyle(colors.informationalText)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(colors.informationalSurface)
@@ -294,6 +295,7 @@ struct SettingsProfileExitRows: View {
         .alert("Switch profile?", isPresented: $showSwitchConfirm) {
             Button("Cancel", role: .cancel) { }
             Button("Switch") { viewModel.signOut() }
+                .keyboardShortcut(.defaultAction)
         } message: {
             Text("Your data stays on this iPhone. Open it again anytime with Restore earlier data.")
         }

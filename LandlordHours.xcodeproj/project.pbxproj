@@ -52,6 +52,7 @@
 		B6FC290317CCEE66FC6E7333 /* AppDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7ECB76E7A5D6C4DDACBA2AD /* AppDesignSystem.swift */; };
 		B7EE89E0AFD88DD021946318 /* CalendarImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BDA44BD54B97B0B3D60A429 /* CalendarImportService.swift */; };
 		B9FC805AE95D83A85AB52FAE /* LearningCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434AE320C71AE1DAFBBBD038 /* LearningCenterView.swift */; };
+		BC8F6E92451777ADF3C1AE40 /* ColorContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1240689FADA6EC9A0D1883B /* ColorContrastTests.swift */; };
 		BFF6F8AE069FE01CE9E5414F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE13F908989158FDAB28BF57 /* Models.swift */; };
 		C033DAA5B2F3EB1B50CDA1CE /* LandlordHoursApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9CB28BC741E54912DBB35F /* LandlordHoursApp.swift */; };
 		C3E06B79C92F2D90F73CE57C /* CelebrationOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF68DBFF1FFD763363015B42 /* CelebrationOverlayView.swift */; };
@@ -124,6 +125,7 @@
 		988C76EAD03340B1FA9162E3 /* ProfileManagementViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileManagementViews.swift; sourceTree = "<group>"; };
 		9AD25AA91ABB5FB4C307E491 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		A01B3B8EADDB251440528314 /* LandlordHoursTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordHoursTests.swift; sourceTree = "<group>"; };
+		A1240689FADA6EC9A0D1883B /* ColorContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorContrastTests.swift; sourceTree = "<group>"; };
 		A1CAE53C865D5B8D680C6F0D /* LocalProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalProfileTests.swift; sourceTree = "<group>"; };
 		A2CA9BA1AD53F0ABA92A9F2F /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		AFF3C2F4E4EAC2D09DCB3F5B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -200,6 +202,7 @@
 		A9B21080B278EBA44EB8A4E8 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				A1240689FADA6EC9A0D1883B /* ColorContrastTests.swift */,
 				A01B3B8EADDB251440528314 /* LandlordHoursTests.swift */,
 				0914D43BECE24E5CB862706D /* LandlordPurchasesTests.swift */,
 				A1CAE53C865D5B8D680C6F0D /* LocalProfileTests.swift */,
@@ -487,6 +490,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BC8F6E92451777ADF3C1AE40 /* ColorContrastTests.swift in Sources */,
 				2846D3E26FF2EA4A60FAF7D6 /* LandlordHoursTests.swift in Sources */,
 				A130AD4A0C3826D57BDE0E2C /* LandlordPurchasesTests.swift in Sources */,
 				8DCDA53C99D6607B2EB138B8 /* LocalProfileTests.swift in Sources */,

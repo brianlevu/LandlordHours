@@ -9,6 +9,7 @@ private let logger = Logger(subsystem: "com.openclaw.landlordhours", category: "
 @available(iOS 16.0, *)
 struct AppleSignInButton: View {
     let onCompletion: (_ isNewUser: Bool) -> Void
+    @Environment(\.colorScheme) private var colorScheme
     @State private var errorMessage: String?
     @State private var showError = false
 
@@ -61,8 +62,10 @@ struct AppleSignInButton: View {
                 logger.error("Apple Sign-In failed: \(error.localizedDescription)")
             }
         }
-        .signInWithAppleButtonStyle(.black)
-        .frame(height: 50)
+        // Black on light, white on dark: a black button on the dark canvas measured 1.11:1.
+        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+        .id(colorScheme)
+        .frame(height: 52)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .alert("Sign In Failed", isPresented: $showError) {
             Button("OK", role: .cancel) {}
@@ -428,7 +431,7 @@ struct LoginView: View {
                 }
             }
             .clipShape(Capsule())
-            .frame(height: 54)
+            .frame(height: 52)
             .accessibilityIdentifier("welcome.signInWithApple")
 
             Button {
@@ -445,14 +448,7 @@ struct LoginView: View {
             .buttonStyle(.lhPressable)
             .accessibilityIdentifier("welcome.continueWithoutAccount")
 
-            if restorableProfiles.isEmpty {
-                Text("Hours, properties and settings sync to your iCloud. Photos stay on this iPhone.")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(colors.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 2)
-            } else {
+            if !restorableProfiles.isEmpty {
                 Button {
                     showRestoreSheet = true
                 } label: {
@@ -483,6 +479,13 @@ struct LoginView: View {
                 .buttonStyle(.lhPressable)
                 .accessibilityIdentifier("welcome.restoreEarlierData")
             }
+
+            Text("Hours, properties and settings sync to your iCloud. Photos stay on this iPhone.")
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 2)
         }
     }
 
