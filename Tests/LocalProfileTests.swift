@@ -547,11 +547,23 @@ final class LocalProfileFlowTests: XCTestCase {
         for key in ["LandlordHours.timer", "timerStartTime", "timerPropertyId", "timerCategory"] {
             XCTAssertNil(UserDefaults.standard.object(forKey: key), "Unscoped \(key) must not be written")
         }
-        XCTAssertTrue(UserDefaults.standard.bool(forKey: "u.\(id).LandlordHours.timer"), "Running timer kept for this profile")
-        XCTAssertNotNil(UserDefaults.standard.object(forKey: "u.\(id).timerStartTime"))
+        // Paused at switch: the timer stops counting and its elapsed time is saved to this
+        // profile as a recovery draft, offered when the profile comes back.
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: "u.\(id).LandlordHours.timer"), "Timer must not keep counting")
+        XCTAssertNil(UserDefaults.standard.object(forKey: "u.\(id).timerStartTime"))
+        let recoveryData = UserDefaults.standard.data(forKey: "u.\(id).LandlordHours.staleTimerRecovery")
+        XCTAssertNotNil(recoveryData, "Elapsed time saved to the outgoing profile")
+        let recovery = try? JSONDecoder().decode(StaleTimerRecovery.self, from: recoveryData ?? Data())
+        XCTAssertNotNil(recovery)
         XCTAssertFalse(viewModel.isTimerRunning)
         XCTAssertNil(UserDefaults.standard.string(forKey: ProfileKeys.localProfileId))
         XCTAssertEqual(UserDefaults.standard.string(forKey: ProfileKeys.previousProfileId), id)
+
+        // Coming back offers the paused time for review instead of a still-running timer.
+        UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
+        viewModel.signIn()
+        XCTAssertFalse(viewModel.isTimerRunning)
+        XCTAssertNotNil(viewModel.staleTimerRecovery)
     }
 
     func testDeleteWithICloudUnavailableRaisesErrorAndDeletesNothing() async throws {
@@ -641,6 +653,49 @@ final class LocalProfileFlowTests: XCTestCase {
         XCTAssertFalse(manager.isSignedIn)
         XCTAssertEqual(UserDefaults.standard.string(forKey: "u.\(id).\(ProfileRestore.profileNameKey)"), "Dana R",
                        "Name kept with the profile so Restore can show it")
+    }
+
+    func testSignInReloadDoesNotSchedulePushOrRewriteTaxProfile() {
+        // iCloud-only restore: the profile's tax profile exists only in iCloud, so local
+        // reload() applies defaults. Those must not reach CloudKit before the first pull.
+        let id = uniqueId("email-race-") + "@example.com"
+        createdIds.append(id)
+        let viewModel = AppViewModel()
+        // Make the outgoing in-memory values differ from the defaults reload() will apply.
+        TaxProfileManager.shared.groupingElection = true
+        TaxProfileManager.shared.nonREWorkHours = 321
+        // (No profile is active here, so those writes went to unscoped keys; clear them so
+        // they aren't treated as pre-scope legacy data on sign-in.)
+        for field in ["groupingElection", "nonREWorkHours"] {
+            UserDefaults.standard.removeObject(forKey: "LandlordHours.taxProfile.\(field)")
+        }
+
+        let before = viewModel.syncService.pushRequestCount
+        viewModel.switchToProfile(DiscoveredProfile(id: id, entryCount: 3, propertyCount: 1,
+                                                    lastEntryDate: nil, sources: [.iCloud], name: nil))
+
+        XCTAssertEqual(UserScope.userId, id)
+        XCTAssertFalse(TaxProfileManager.shared.groupingElection)
+        XCTAssertEqual(TaxProfileManager.shared.nonREWorkHours, 0)
+        XCTAssertEqual(viewModel.syncService.pushRequestCount, before,
+                       "signIn → reload must not schedule a push of default values")
+        XCTAssertNil(UserDefaults.standard.object(forKey: "u.\(id).LandlordHours.taxProfile.nonREWorkHours"),
+                     "reload must not write defaults into the restored profile")
+        XCTAssertNil(UserDefaults.standard.object(forKey: "LandlordHours.taxProfile.nonREWorkHours"),
+                     "resetForSignOut must not write unscoped keys")
+
+        // A real edit before the initial pull has completed is held, not pushed.
+        TaxProfileManager.shared.nonREWorkHours = 50
+        XCTAssertEqual(viewModel.syncService.pushRequestCount, before + 1)
+        XCTAssertGreaterThanOrEqual(viewModel.syncService.heldPushRequestCount, 1)
+        XCTAssertTrue(viewModel.syncService.hasHeldPush)
+    }
+
+    func testPushGateOpensOnlyForTheProfileWhoseInitialSyncFinished() {
+        XCTAssertFalse(CloudKitSyncService.isPushAllowed(initialSyncCompletedFor: nil, appUserId: "a"))
+        XCTAssertFalse(CloudKitSyncService.isPushAllowed(initialSyncCompletedFor: "a", appUserId: "b"))
+        XCTAssertFalse(CloudKitSyncService.isPushAllowed(initialSyncCompletedFor: "a", appUserId: nil))
+        XCTAssertTrue(CloudKitSyncService.isPushAllowed(initialSyncCompletedFor: "a", appUserId: "a"))
     }
 
     func testGuestWithProSigningInWithAppleKeepsPro() {

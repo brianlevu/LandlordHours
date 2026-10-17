@@ -153,9 +153,22 @@ final class TaxProfileManager: ObservableObject {
         UserScope.key("LandlordHours.taxProfile." + field)
     }
 
+    /// True while `reload()` / `resetForSignOut()` apply stored or default values. Their
+    /// didSets must neither write back (resetForSignOut runs after the profile ID is cleared,
+    /// so writes would land in unscoped keys) nor fire `onDidChange` (which schedules a
+    /// CloudKit push of defaults over the iCloud TaxProfile before the first pull).
+    private(set) var isApplyingStoredValues = false
+
     private func save(_ key: String, _ value: Any) {
+        guard !isApplyingStoredValues else { return }
         UserDefaults.standard.set(value, forKey: key)
         onDidChange?()
+    }
+
+    private func applyingStoredValues(_ body: () -> Void) {
+        isApplyingStoredValues = true
+        defer { isApplyingStoredValues = false }
+        body()
     }
 
     @Published var filingStatus: FilingStatus {
@@ -193,27 +206,35 @@ final class TaxProfileManager: ObservableObject {
     }
 
     func reload() {
-        let ud = UserDefaults.standard
-        if let raw = ud.string(forKey: scopedKey("filingStatus")),
-           let status = FilingStatus(rawValue: raw) {
-            filingStatus = status
+        applyingStoredValues {
+            let ud = UserDefaults.standard
+            if let raw = ud.string(forKey: scopedKey("filingStatus")),
+               let status = FilingStatus(rawValue: raw) {
+                filingStatus = status
+            } else {
+                filingStatus = .marriedJoint
+            }
+            if ud.object(forKey: scopedKey("spouseTracking")) != nil {
+                spouseTracking = ud.bool(forKey: scopedKey("spouseTracking"))
+            } else {
+                spouseTracking = true
+            }
+            let savedYear = ud.integer(forKey: scopedKey("taxYear"))
+            taxYear = savedYear > 0 ? savedYear : Calendar.current.component(.year, from: Date())
+            groupingElection = ud.bool(forKey: scopedKey("groupingElection"))
+            nonREWorkHours = ud.double(forKey: scopedKey("nonREWorkHours"))
         }
-        if ud.object(forKey: scopedKey("spouseTracking")) != nil {
-            spouseTracking = ud.bool(forKey: scopedKey("spouseTracking"))
-        }
-        let savedYear = ud.integer(forKey: scopedKey("taxYear"))
-        if savedYear > 0 { taxYear = savedYear }
-        groupingElection = ud.bool(forKey: scopedKey("groupingElection"))
-        nonREWorkHours = ud.double(forKey: scopedKey("nonREWorkHours"))
         loadParticipationConfirmations()
     }
 
     func resetForSignOut() {
-        filingStatus = .marriedJoint
-        spouseTracking = true
-        taxYear = Calendar.current.component(.year, from: Date())
-        groupingElection = false
-        nonREWorkHours = 0
+        applyingStoredValues {
+            filingStatus = .marriedJoint
+            spouseTracking = true
+            taxYear = Calendar.current.component(.year, from: Date())
+            groupingElection = false
+            nonREWorkHours = 0
+        }
         noOneParticipatedMoreByYear = [:]
     }
 

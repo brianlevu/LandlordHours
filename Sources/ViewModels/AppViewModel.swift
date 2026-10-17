@@ -227,6 +227,21 @@ class AppViewModel: ObservableObject {
         // `LandlordHours.timer*` keys.) A running timer resumes — or is offered for
         // recovery if stale — when the profile comes back.
         if keepProfileState, let outgoingId {
+            // Pause a running timer at switch time: record the elapsed time as a recovery
+            // draft for this profile (offered when the profile comes back) instead of
+            // leaving the timer counting while another profile is active.
+            if isTimerRunning, let start = timerStartTime, let propertyId = timerPropertyId {
+                saveStaleTimerRecovery(StaleTimerRecovery(
+                    startTime: start,
+                    propertyId: propertyId,
+                    category: timerCategory,
+                    elapsedHours: max(Date().timeIntervalSince(start), 0) / 3600.0
+                ))
+                endTimerLiveActivity(propertyId: propertyId, category: timerCategory, startDate: start, needsReview: true)
+                isTimerRunning = false
+                timerStartTime = nil
+                timerPropertyId = nil
+            }
             saveTimerState()
             if defaults.string(forKey: ProfileKeys.localProfileId) == outgoingId,
                let name = defaults.string(forKey: ProfileKeys.localProfileName), !name.isEmpty {

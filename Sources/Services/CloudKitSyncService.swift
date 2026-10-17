@@ -54,6 +54,16 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     private var migrationDoneKey: String { UserScope.key("cloudkit.migrationDone") }
 
     private var pushDebounceTask: Task<Void, Never>?
+
+    /// Profile whose initial sync (optional first push, then the first pull) has finished.
+    /// Pushes for any other profile are held until it has, so default local state can never
+    /// overwrite iCloud copies (TaxProfile-<id>, GoalSettings-<id>) on a restore/reinstall.
+    private(set) var initialSyncCompletedFor: String?
+    /// A push requested while the initial sync was running; flushed once it completes.
+    private(set) var hasHeldPush = false
+    /// Instrumentation for tests: push requests received / held by the gate.
+    private(set) var pushRequestCount = 0
+    private(set) var heldPushRequestCount = 0
     /// Counter-based guard to prevent push loops when merging remote changes.
     /// Incremented before delegate callbacks, decremented after. Using a counter
     /// instead of a boolean is safer if delegate callbacks trigger nested paths.
@@ -75,6 +85,8 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     }
 
     func start() async {
+        let startingFor = appUserId
+        if initialSyncCompletedFor != startingFor { initialSyncCompletedFor = nil }
         guard container != nil else { return }
         await checkAccountStatus()
         guard accountAvailable else { return }
@@ -91,9 +103,26 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
             defaults: .standard,
             migrationDoneKey: migrationDoneKey,
             hasLocalData: hasLocalData,
-            push: { await self.pushAll() },
+            push: { await self.performPushAll() },
             pull: { await self.pullChanges() }
         )
+        // Only open the gate if the active profile didn't change while we were syncing.
+        guard appUserId == startingFor, startingFor != nil else { return }
+        initialSyncCompletedFor = startingFor
+        if hasHeldPush {
+            hasHeldPush = false
+            schedulePush()
+        }
+    }
+
+    /// Whether a push for `appUserId` may run now: only after that profile's initial sync.
+    static func isPushAllowed(initialSyncCompletedFor: String?, appUserId: String?) -> Bool {
+        guard let appUserId else { return false }
+        return initialSyncCompletedFor == appUserId
+    }
+
+    private var isPushAllowed: Bool {
+        Self.isPushAllowed(initialSyncCompletedFor: initialSyncCompletedFor, appUserId: appUserId)
     }
 
     /// Initial-sync ordering, extracted so tests can drive it with fakes.
@@ -126,6 +155,8 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     func stop() {
         pushDebounceTask?.cancel()
         pushDebounceTask = nil
+        initialSyncCompletedFor = nil
+        hasHeldPush = false
     }
 
     // MARK: - Account Status
@@ -191,8 +222,15 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
 
     /// Debounced push — waits 2 seconds after last call before actually pushing.
     func schedulePush() {
-        guard container != nil else { return }
+        pushRequestCount += 1
         guard remoteUpdateDepth == 0 else { return }
+        guard isPushAllowed else {
+            // Hold, don't drop: the edit is pushed once the initial pull has finished.
+            heldPushRequestCount += 1
+            hasHeldPush = true
+            return
+        }
+        guard container != nil else { return }
         pushDebounceTask?.cancel()
         pushDebounceTask = Task {
             try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -201,8 +239,17 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         }
     }
 
-    /// Push all local data to CloudKit.
+    /// Push all local data to CloudKit (manual "Sync Now" and debounced edits). Held until
+    /// the active profile's initial sync has completed.
     func pushAll() async {
+        guard isPushAllowed else {
+            hasHeldPush = true
+            return
+        }
+        await performPushAll()
+    }
+
+    private func performPushAll() async {
         guard accountAvailable else { return }
         isSyncing = true
         syncError = nil
