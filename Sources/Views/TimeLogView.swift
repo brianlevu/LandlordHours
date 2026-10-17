@@ -312,7 +312,18 @@ struct TimeLogView: View {
     private func staleTimerRecoveryMessage(_ recovery: StaleTimerRecovery) -> String {
         let propertyName = viewModel.properties.first { $0.id == recovery.propertyId }?.name ?? "this property"
         let start = recovery.startTime.formatted(date: .abbreviated, time: .shortened)
-        return "Started \(start) for \(propertyName). We capped the suggested entry at 24 hours so you can review it instead of losing the record."
+        let remaining = viewModel.staleTimerRecoveries.count - 1
+        let more = remaining > 0 ? " \(remaining) more after this one." : ""
+        switch recovery.reason {
+        case .pausedAtSwitch:
+            let paused = (recovery.pausedAt ?? recovery.startTime).formatted(date: .abbreviated, time: .shortened)
+            return "Started \(start) for \(propertyName). We paused it when you switched profiles at \(paused). Save the time it ran, or discard it.\(more)"
+        case .forgotten:
+            let capNote = recovery.wasCapped
+                ? "We capped the suggested entry at 24 hours so you can review it instead of losing the record."
+                : "Review it before saving so the record stays accurate."
+            return "Started \(start) for \(propertyName). \(capNote)\(more)"
+        }
     }
 
     // MARK: - Main Entry Card

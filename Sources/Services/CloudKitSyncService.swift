@@ -84,14 +84,70 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         }
     }
 
+    /// The steps `start()` runs. Production uses CloudKit; tests inject fakes to drive
+    /// `start()` end to end (account check → prepare → initial push/pull → gate → flush).
+    struct InitialSyncOperations {
+        var accountAvailable: () async -> Bool
+        var prepare: () async -> Void
+        var push: () async -> Void
+        /// Returns true when the pull reached iCloud and merged.
+        var pull: () async -> Bool
+    }
+
+    /// Test seam: when set, `start()` uses these instead of CloudKit.
+    var operationsOverride: InitialSyncOperations?
+    private(set) var isRunningInitialSync = false
+    /// Instrumentation for tests: held pushes flushed after a successful initial pull.
+    private(set) var flushedHeldPushCount = 0
+
+    static let heldChangesMessage = "Couldn't reach iCloud. Your changes are safe on this iPhone and will sync when iCloud is back."
+
+    private var liveOperations: InitialSyncOperations {
+        InitialSyncOperations(
+            accountAvailable: { [weak self] in
+                guard let self, self.container != nil else { return false }
+                await self.checkAccountStatus()
+                return self.accountAvailable
+            },
+            prepare: { [weak self] in
+                await self?.ensureZoneExists()
+                await self?.ensureSubscriptionExists()
+            },
+            push: { [weak self] in await self?.performPushAll() },
+            pull: { [weak self] in await self?.pullChanges() ?? false }
+        )
+    }
+
+    /// Initial sync for the active profile, then opens the push gate and flushes any held
+    /// push. Safe to call again (Sync Now, iCloud becoming available): a failed pull keeps
+    /// the gate closed and says so instead of holding silently.
     func start() async {
+        // One initial sync at a time; a request that arrives meanwhile (profile switch,
+        // iCloud coming back, Sync Now) re-runs it afterwards instead of being dropped.
+        if isRunningInitialSync {
+            rerunRequested = true
+            return
+        }
+        isRunningInitialSync = true
+        defer { isRunningInitialSync = false }
+        repeat {
+            rerunRequested = false
+            await runInitialSyncOnce()
+        } while rerunRequested
+    }
+
+    private var rerunRequested = false
+
+    private func runInitialSyncOnce() async {
         let startingFor = appUserId
         if initialSyncCompletedFor != startingFor { initialSyncCompletedFor = nil }
-        guard container != nil else { return }
-        await checkAccountStatus()
-        guard accountAvailable else { return }
-        await ensureZoneExists()
-        await ensureSubscriptionExists()
+        let ops = operationsOverride ?? liveOperations
+        guard await ops.accountAvailable() else {
+            accountAvailable = false
+            return
+        }
+        accountAvailable = true
+        await ops.prepare()
         // Initial sync: push local then pull remote — but never push an empty local
         // state before the first pull (it would overwrite iCloud copies of
         // GoalSettings-<id> / TaxProfile-<id> with defaults on a reinstall/restore).
@@ -99,20 +155,47 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         let hasLocalData = !(viewModel?.properties.isEmpty ?? true)
             || !(viewModel?.timeEntries.isEmpty ?? true)
             || !CategoryManager.shared.customCategories.isEmpty
+        var pullSucceeded = false
         await Self.runInitialSync(
             defaults: .standard,
             migrationDoneKey: migrationDoneKey,
             hasLocalData: hasLocalData,
-            push: { await self.performPushAll() },
-            pull: { await self.pullChanges() }
+            push: { await ops.push() },
+            pull: { pullSucceeded = await ops.pull() }
         )
         // Only open the gate if the active profile didn't change while we were syncing.
         guard appUserId == startingFor, startingFor != nil else { return }
+        guard pullSucceeded else {
+            // Keep the gate closed (pushing now could overwrite iCloud with defaults), but
+            // never hold silently: say so. Sync Now or iCloud returning retries start().
+            if hasHeldPush { syncError = Self.heldChangesMessage }
+            return
+        }
         initialSyncCompletedFor = startingFor
         if hasHeldPush {
             hasHeldPush = false
-            schedulePush()
+            flushedHeldPushCount += 1
+            await ops.push()
         }
+    }
+
+    /// Manual "Sync Now": runs the initial sync first when the gate isn't open yet, then
+    /// pushes and pulls. Never holds silently: if iCloud is off or unreachable, `syncError`
+    /// says so.
+    func syncNow() async {
+        if !isPushAllowed {
+            await start()
+        }
+        guard isPushAllowed else {
+            if !accountAvailable {
+                syncError = "iCloud is off. Turn on iCloud for LandlordHours in Settings to sync."
+            } else if syncError == nil {
+                syncError = Self.heldChangesMessage
+            }
+            return
+        }
+        await pushAll()
+        _ = await pullChanges()
     }
 
     /// Whether a push for `appUserId` may run now: only after that profile's initial sync.
@@ -169,7 +252,14 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         }
         do {
             let status = try await container.accountStatus()
+            let wasAvailable = accountAvailable
             accountAvailable = (status == .available)
+            // iCloud came back (it was off at launch, or signed in later): run the initial
+            // pull for the active profile so the push gate can open.
+            if accountAvailable, !wasAvailable, !isRunningInitialSync,
+               appUserId != nil, initialSyncCompletedFor != appUserId {
+                Task { await self.start() }
+            }
         } catch {
             accountAvailable = false
             logger.error("Account status error: \(error.localizedDescription)")
@@ -322,22 +412,24 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
 
     // MARK: - Pull (Cloud → Local)
 
-    func pullChanges() async {
-        guard accountAvailable else { return }
+    @discardableResult
+    func pullChanges() async -> Bool {
+        guard accountAvailable else { return false }
         isSyncing = true
         syncError = nil
+        defer { isSyncing = false }
 
         do {
             try await withRetry {
                 try await self.fetchZoneChanges()
             }
             lastSyncDate = Date()
+            return true
         } catch {
             syncError = error.localizedDescription
             logger.error("Pull error: \(error.localizedDescription)")
+            return false
         }
-
-        isSyncing = false
     }
 
     private func fetchZoneChanges() async throws {

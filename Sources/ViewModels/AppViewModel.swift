@@ -53,13 +53,21 @@ class AppViewModel: ObservableObject {
     @Published var timerStartTime: Date?
     @Published var timerPropertyId: UUID?
     @Published var timerCategory: ActivityCategory = .repairs
-    @Published var staleTimerRecovery: StaleTimerRecovery?
+    /// Timer drafts waiting for review (forgotten >24 h timers, timers paused at a profile
+    /// switch). Oldest first; the Track card shows the first one, then the next.
+    @Published var staleTimerRecoveries: [StaleTimerRecovery] = []
+    var staleTimerRecovery: StaleTimerRecovery? {
+        get { staleTimerRecoveries.first }
+        set { staleTimerRecoveries = newValue.map { [$0] } ?? [] }
+    }
 
     // Data persistence (user-scoped)
     private var propertiesKey: String { UserScope.key("LandlordHours.properties") }
     private var entriesKey: String { UserScope.key("LandlordHours.entries") }
     private var timerKey: String { UserScope.key("LandlordHours.timer") }
+    /// Legacy single-draft key (≤1.1 builds before the list); migrated into the list on load.
     private var staleTimerRecoveryKey: String { UserScope.key("LandlordHours.staleTimerRecovery") }
+    private var staleTimerRecoveriesKey: String { UserScope.key("LandlordHours.staleTimerRecoveries") }
 
     init() {
 #if DEBUG
@@ -235,7 +243,9 @@ class AppViewModel: ObservableObject {
                     startTime: start,
                     propertyId: propertyId,
                     category: timerCategory,
-                    elapsedHours: max(Date().timeIntervalSince(start), 0) / 3600.0
+                    elapsedHours: max(Date().timeIntervalSince(start), 0) / 3600.0,
+                    reason: .pausedAtSwitch,
+                    pausedAt: Date()
                 ))
                 endTimerLiveActivity(propertyId: propertyId, category: timerCategory, startDate: start, needsReview: true)
                 isTimerRunning = false
@@ -370,6 +380,7 @@ class AppViewModel: ObservableObject {
             "timerPropertyId",
             "timerCategory",
             "LandlordHours.staleTimerRecovery",
+            "LandlordHours.staleTimerRecoveries",
             "LandlordHours.stoppedTimerDraft",
             "LandlordHours.celebratedMilestones",
             "hasCompletedOnboarding",
@@ -481,6 +492,7 @@ class AppViewModel: ObservableObject {
             "timerPropertyId",
             "timerCategory",
             "LandlordHours.staleTimerRecovery",
+            "LandlordHours.staleTimerRecoveries",
             "LandlordHours.stoppedTimerDraft",
             "customCategories",
             "selectedTaxYear",
@@ -512,10 +524,7 @@ class AppViewModel: ObservableObject {
     
     // MARK: - Sync Now (manual trigger for Settings)
     func syncNow() {
-        Task {
-            await syncService.pushAll()
-            await syncService.pullChanges()
-        }
+        Task { await syncService.syncNow() }
     }
 
     // MARK: - Subscription Features
@@ -755,7 +764,8 @@ class AppViewModel: ObservableObject {
 
     func saveRecoveredStaleTimer(hours: Double? = nil, notes: String = "Recovered from a timer that was left running.") {
         guard let recovery = staleTimerRecovery else { return }
-        let cappedHours = min(max(hours ?? recovery.suggestedHours, 0.25), 24)
+        // Same rule as stopTimer: exact elapsed time, capped at 24 h, never rounded up.
+        let cappedHours = min(max(hours ?? recovery.suggestedHours, 0), 24)
         addTimeEntry(
             propertyId: recovery.propertyId,
             participant: .selfParticipant,
@@ -765,13 +775,17 @@ class AppViewModel: ObservableObject {
             notes: notes,
             source: .timer
         )
-        staleTimerRecovery = nil
-        clearStaleTimerRecovery()
+        removeFirstStaleTimerRecovery()
     }
 
     func discardRecoveredStaleTimer() {
-        staleTimerRecovery = nil
-        clearStaleTimerRecovery()
+        removeFirstStaleTimerRecovery()
+    }
+
+    private func removeFirstStaleTimerRecovery() {
+        guard !staleTimerRecoveries.isEmpty else { return }
+        staleTimerRecoveries.removeFirst()
+        writeStaleTimerRecoveries(staleTimerRecoveries)
     }
     
     var timerElapsedTime: TimeInterval {
@@ -1102,24 +1116,50 @@ class AppViewModel: ObservableObject {
         refreshWidgetSnapshot()
     }
 
+    /// Appends a draft to this profile's list. Never replaces one awaiting review.
     private func saveStaleTimerRecovery(_ recovery: StaleTimerRecovery) {
-        if let data = try? JSONEncoder().encode(recovery) {
-            UserDefaults.standard.set(data, forKey: staleTimerRecoveryKey)
+        var list = persistedStaleTimerRecoveries()
+        if !list.contains(recovery) { list.append(recovery) }
+        writeStaleTimerRecoveries(list)
+    }
+
+    private func persistedStaleTimerRecoveries() -> [StaleTimerRecovery] {
+        let defaults = UserDefaults.standard
+        var list: [StaleTimerRecovery] = []
+        if let data = defaults.data(forKey: staleTimerRecoveriesKey),
+           let decoded = try? JSONDecoder().decode([StaleTimerRecovery].self, from: data) {
+            list = decoded
         }
+        // Migrate the legacy single-draft key into the list (never drop it).
+        if let data = defaults.data(forKey: staleTimerRecoveryKey),
+           let legacy = try? JSONDecoder().decode(StaleTimerRecovery.self, from: data),
+           !list.contains(legacy) {
+            list.insert(legacy, at: 0)
+        }
+        return list
+    }
+
+    private func writeStaleTimerRecoveries(_ list: [StaleTimerRecovery]) {
+        let defaults = UserDefaults.standard
+        if list.isEmpty {
+            defaults.removeObject(forKey: staleTimerRecoveriesKey)
+        } else if let data = try? JSONEncoder().encode(list) {
+            defaults.set(data, forKey: staleTimerRecoveriesKey)
+        }
+        defaults.removeObject(forKey: staleTimerRecoveryKey)
     }
 
     private func loadStaleTimerRecovery() {
-        guard let data = UserDefaults.standard.data(forKey: staleTimerRecoveryKey),
-              let recovery = try? JSONDecoder().decode(StaleTimerRecovery.self, from: data),
-              properties.contains(where: { $0.id == recovery.propertyId }) else {
-            clearStaleTimerRecovery()
-            return
-        }
-        staleTimerRecovery = recovery
+        let list = persistedStaleTimerRecoveries()
+        // Drafts for a property that no longer exists can't be saved as entries.
+        let usable = list.filter { recovery in properties.contains { $0.id == recovery.propertyId } }
+        staleTimerRecoveries = usable
+        writeStaleTimerRecoveries(usable)
     }
 
     private func clearStaleTimerRecovery() {
         UserDefaults.standard.removeObject(forKey: staleTimerRecoveryKey)
+        UserDefaults.standard.removeObject(forKey: staleTimerRecoveriesKey)
     }
 
     private func loadTimerState() {
@@ -1142,15 +1182,14 @@ class AppViewModel: ObservableObject {
             let stalePropertyId = timerPropertyId
             if let propertyId = timerPropertyId,
                properties.contains(where: { $0.id == propertyId }) {
-                staleTimerRecovery = StaleTimerRecovery(
+                let forgotten = StaleTimerRecovery(
                     startTime: start,
                     propertyId: propertyId,
                     category: timerCategory,
                     elapsedHours: Date().timeIntervalSince(start) / 3600.0
                 )
-                if let staleTimerRecovery {
-                    saveStaleTimerRecovery(staleTimerRecovery)
-                }
+                saveStaleTimerRecovery(forgotten)
+                staleTimerRecoveries = persistedStaleTimerRecoveries()
             }
             isTimerRunning = false
             timerStartTime = nil
@@ -1234,14 +1273,51 @@ class AppViewModel: ObservableObject {
 }
 
 struct StaleTimerRecovery: Codable, Equatable {
+    enum Reason: String, Codable {
+        /// Left running for more than 24 hours.
+        case forgotten
+        /// Paused when the user switched profiles.
+        case pausedAtSwitch
+    }
+
     let startTime: Date
     let propertyId: UUID
     let category: ActivityCategory
     let elapsedHours: Double
+    var reason: Reason = .forgotten
+    var pausedAt: Date? = nil
 
-    var suggestedHours: Double {
-        min(max(elapsedHours, 0.25), 24)
+    init(startTime: Date, propertyId: UUID, category: ActivityCategory, elapsedHours: Double,
+         reason: Reason = .forgotten, pausedAt: Date? = nil) {
+        self.startTime = startTime
+        self.propertyId = propertyId
+        self.category = category
+        self.elapsedHours = elapsedHours
+        self.reason = reason
+        self.pausedAt = pausedAt
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case startTime, propertyId, category, elapsedHours, reason, pausedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        startTime = try c.decode(Date.self, forKey: .startTime)
+        propertyId = try c.decode(UUID.self, forKey: .propertyId)
+        category = try c.decode(ActivityCategory.self, forKey: .category)
+        elapsedHours = try c.decode(Double.self, forKey: .elapsedHours)
+        reason = try c.decodeIfPresent(Reason.self, forKey: .reason) ?? .forgotten
+        pausedAt = try c.decodeIfPresent(Date.self, forKey: .pausedAt)
+    }
+
+    /// Exact elapsed time capped at 24 h — the same rule as `stopTimer`. Never rounded
+    /// up: a 2-minute timer suggests 2 minutes, not 15, so tax hours are never inflated.
+    var suggestedHours: Double {
+        min(max(elapsedHours, 0), 24)
+    }
+
+    var wasCapped: Bool { elapsedHours > 24 }
 }
 
 // MARK: - CloudKit Sync Delegate
