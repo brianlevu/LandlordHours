@@ -97,6 +97,31 @@ struct AuditReport {
             return meetsMoreThanHalfTest
         }
 
+        var displayName: String {
+            participant == .selfParticipant ? "You" : "Spouse"
+        }
+
+        /// Plain text for the more-than-half column.
+        var moreThanHalfText: String {
+            if let met = meetsMoreThanHalfTest { return met ? "Met" : "Not met" }
+            return participant == .spouse
+                ? "Not evaluated — spouse work hours aren't tracked in the app yet"
+                : "Not evaluated — add your other work hours"
+        }
+
+        /// One calm, factual line for the cover page.
+        var coverLine: String {
+            let hours = AuditReportFormat.hours(realEstateHours)
+            guard meets750HourTest else {
+                return "\(displayName): \(hours) of 750 hours. Does not meet the 750-hour test yet."
+            }
+            switch meetsMoreThanHalfTest {
+            case .some(true): return "\(displayName): \(hours) hours. Meets the 750-hour and more-than-half tests."
+            case .some(false): return "\(displayName): \(hours) hours. Meets the 750-hour test; does not meet the more-than-half test."
+            case .none: return "\(displayName): \(hours) hours. Meets the 750-hour test; more-than-half test not evaluated."
+            }
+        }
+
         var statusText: String {
             switch isQualified {
             case .some(true): return "Meets both REPS hour tests"
@@ -185,6 +210,36 @@ enum AuditReportBuilder {
         var noOneParticipatedMore: Bool? = nil
         var generatedAt: Date = Date()
         var calendar: Calendar = .current
+    }
+
+    /// Builds the export input from the user's Tax Profile settings — the exact path the
+    /// export screen uses. Non-real-estate work hours of 0 or less mean "not entered", so the
+    /// more-than-half test is reported as not evaluated instead of silently passing.
+    /// Spouse work hours are not tracked in the app, so the spouse's test is never evaluated.
+    static func inputFromTaxProfile(
+        entries: [TimeEntry],
+        properties: [RentalProperty],
+        taxYear: Int,
+        spouseTracking: Bool,
+        nonREWorkHours: Double,
+        groupingElection: Bool,
+        noOneParticipatedMore: Bool?,
+        generatedAt: Date = Date()
+    ) -> Input {
+        var participants: [Participant] = [.selfParticipant]
+        if spouseTracking { participants.append(.spouse) }
+        var nonRE: [Participant: Double] = [:]
+        if nonREWorkHours > 0 { nonRE[.selfParticipant] = nonREWorkHours }
+        return Input(
+            entries: entries,
+            properties: properties,
+            taxYear: taxYear,
+            participants: participants,
+            nonRealEstateHours: nonRE,
+            groupingElection: groupingElection,
+            noOneParticipatedMore: noOneParticipatedMore,
+            generatedAt: generatedAt
+        )
     }
 
     /// Edits less than this long after logging are treated as part of creation.

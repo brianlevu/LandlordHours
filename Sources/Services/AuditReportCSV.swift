@@ -51,9 +51,16 @@ enum AuditReportCSV {
         return lines.joined(separator: "\r\n") + "\r\n"
     }
 
-    /// Quote a field when it contains a comma, quote, CR or LF (or edge whitespace);
-    /// embedded quotes are doubled.
-    static func escape(_ field: String) -> String {
+    /// Characters that make spreadsheet apps treat a cell as a formula.
+    static let formulaTriggers: Set<Character> = ["=", "+", "-", "@", "\t", "\r", "\r\n"]
+
+    /// Neutralize formula injection by prefixing a single quote, then quote the field when
+    /// it contains a comma, quote, CR or LF (or edge whitespace); embedded quotes are doubled.
+    static func escape(_ raw: String) -> String {
+        var field = raw
+        if let first = field.first, formulaTriggers.contains(first) {
+            field = "'" + field
+        }
         let needsQuoting = field.contains(where: { $0 == "," || $0 == "\"" || $0 == "\n" || $0 == "\r" || $0 == "\r\n" })
             || field.first?.isWhitespace == true
             || field.last?.isWhitespace == true

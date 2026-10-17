@@ -61,7 +61,7 @@ private final class Composer {
     let bodyBoldFont = UIFont(name: "Helvetica-Bold", size: 10) ?? .boldSystemFont(ofSize: 10)
     let tableFont = UIFont(name: "Helvetica", size: 8) ?? .systemFont(ofSize: 8)
     let tableHeaderFont = UIFont(name: "Helvetica-Bold", size: 8) ?? .boldSystemFont(ofSize: 8)
-    let footerFont = UIFont(name: "Helvetica", size: 7.5) ?? .systemFont(ofSize: 7.5)
+    let footerFont = UIFont(name: "Helvetica", size: 8) ?? .systemFont(ofSize: 8)
 
     let ink = UIColor.black
     let secondaryInk = UIColor(white: 0.25, alpha: 1)
@@ -98,7 +98,12 @@ private final class Composer {
         drawText("Rental Activity Time Log: Tax Year \(report.taxYear)", font: titleFont)
         y += 4
         drawText("Prepared with LandlordHours. Generated \(generatedFormatter.string(from: report.generatedAt)).", font: bodyFont, color: secondaryInk)
-        y += 14
+        y += 10
+        for qualification in report.qualifications {
+            drawText(qualification.coverLine, font: bodyBoldFont)
+            y += 2
+        }
+        y += 10
 
         sectionTitle("Summary")
         let s = report.summary
@@ -136,7 +141,7 @@ private final class Composer {
                 AuditReportFormat.hours(q.realEstateHours),
                 q.meets750HourTest ? "Met" : "Not met",
                 q.nonRealEstateHours.map(AuditReportFormat.hours) ?? "Not entered",
-                q.meetsMoreThanHalfTest.map { $0 ? "Met" : "Not met" } ?? "Not evaluated",
+                q.moreThanHalfText,
                 q.statusText,
             ]
         }
@@ -151,7 +156,7 @@ private final class Composer {
             ],
             rows: rows
         )
-        note("REPS is tested for each spouse separately; spouse hours are not combined for the 750-hour test. Investor-level tasks (investing, financing, purchase negotiation) are excluded. Non-real-estate work hours come from the Tax Profile in the app.")
+        note("REPS is tested for each spouse separately; spouse hours are not combined for the 750-hour test. Investor-level tasks (investing, financing, purchase negotiation) are excluded. Non-real-estate work hours come from the Tax Profile in the app; spouse work hours aren't tracked in the app yet, so the spouse's more-than-half test is not evaluated.")
 
         if !report.materialParticipation.isEmpty {
             y += 8

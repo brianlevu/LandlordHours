@@ -234,14 +234,12 @@ struct ExportPDFView: View {
 
     private func makeReport() -> AuditReport {
         let taxProfile = TaxProfileManager.shared
-        var participants: [Participant] = [.selfParticipant]
-        if taxProfile.spouseTracking { participants.append(.spouse) }
-        return AuditReportBuilder.build(AuditReportBuilder.Input(
+        return AuditReportBuilder.build(AuditReportBuilder.inputFromTaxProfile(
             entries: viewModel.timeEntries,
             properties: viewModel.properties,
             taxYear: year,
-            participants: participants,
-            nonRealEstateHours: [.selfParticipant: taxProfile.nonREWorkHours],
+            spouseTracking: taxProfile.spouseTracking,
+            nonREWorkHours: taxProfile.nonREWorkHours,
             groupingElection: taxProfile.groupingElection,
             noOneParticipatedMore: taxProfile.noOneParticipatedMore(forYear: year)
         ))

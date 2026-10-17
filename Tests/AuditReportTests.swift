@@ -190,6 +190,47 @@ final class AuditReportBuilderTests: XCTestCase {
         XCTAssertNil(me.isQualified)
     }
 
+    func testTaxProfileInputTreatsZeroOtherWorkHoursAsNotEntered() {
+        // Real export path: Tax Profile defaults nonREWorkHours to 0.
+        let entries = [F.entry(property: F.oak, hours: 800, date: F.date(2026, 3, 1))]
+        let input = AuditReportBuilder.inputFromTaxProfile(
+            entries: entries, properties: [F.oak], taxYear: 2026,
+            spouseTracking: true, nonREWorkHours: 0,
+            groupingElection: false, noOneParticipatedMore: nil
+        )
+        let report = AuditReportBuilder.build(input)
+        let me = report.qualifications.first { $0.participant == .selfParticipant }!
+        XCTAssertNil(me.meetsMoreThanHalfTest, "0 other work hours must not pass the more-than-half test")
+        XCTAssertNil(me.isQualified)
+        XCTAssertEqual(me.moreThanHalfText, "Not evaluated — add your other work hours")
+        let spouse = report.qualifications.first { $0.participant == .spouse }!
+        XCTAssertTrue(spouse.moreThanHalfText.contains("spouse work hours aren't tracked"))
+
+        let entered = AuditReportBuilder.build(AuditReportBuilder.inputFromTaxProfile(
+            entries: entries, properties: [F.oak], taxYear: 2026,
+            spouseTracking: false, nonREWorkHours: 300,
+            groupingElection: false, noOneParticipatedMore: nil
+        ))
+        XCTAssertEqual(entered.qualifications.map(\.participant), [.selfParticipant])
+        XCTAssertEqual(entered.qualifications[0].meetsMoreThanHalfTest, true)
+        XCTAssertEqual(entered.qualifications[0].nonRealEstateHours, 300)
+    }
+
+    func testCoverLinesAreFactual() {
+        let entries = [
+            F.entry(property: F.oak, participant: .selfParticipant, hours: 412, date: F.date(2026, 3, 1)),
+            F.entry(property: F.oak, participant: .spouse, hours: 760, date: F.date(2026, 3, 2)),
+        ]
+        let report = build(entries, nonRE: [.selfParticipant: 100])
+        let lines = report.qualifications.map(\.coverLine)
+        XCTAssertEqual(lines[0], "You: 412.00 of 750 hours. Does not meet the 750-hour test yet.")
+        XCTAssertEqual(lines[1], "Spouse: 760.00 hours. Meets the 750-hour test; more-than-half test not evaluated.")
+        for line in lines {
+            XCTAssertFalse(line.lowercased().contains("qualifies"))
+            XCTAssertFalse(line.lowercased().contains("guarantee"))
+        }
+    }
+
     func testSpouseIncludedWhenTheyLoggedTimeEvenIfNotRequested() {
         let entries = [F.entry(property: F.oak, participant: .spouse, hours: 2, date: F.date(2026, 3, 1))]
         let report = build(entries, participants: [.selfParticipant])
@@ -261,6 +302,18 @@ final class AuditReportCSVTests: XCTestCase {
         XCTAssertEqual(AuditReportCSV.escape("line1\r\nline2"), "\"line1\r\nline2\"")
         XCTAssertEqual(AuditReportCSV.escape(" padded"), "\" padded\"")
         XCTAssertEqual(AuditReportCSV.escape(""), "")
+    }
+
+    func testFormulaInjectionIsNeutralized() {
+        XCTAssertEqual(AuditReportCSV.escape("=HYPERLINK(\"x\")"), "\"'=HYPERLINK(\"\"x\"\")\"")
+        XCTAssertEqual(AuditReportCSV.escape("=1+1"), "'=1+1")
+        XCTAssertEqual(AuditReportCSV.escape("+15551234"), "'+15551234")
+        XCTAssertEqual(AuditReportCSV.escape("-2 hours"), "'-2 hours")
+        XCTAssertEqual(AuditReportCSV.escape("@SUM(A1)"), "'@SUM(A1)")
+        XCTAssertEqual(AuditReportCSV.escape("\tcmd"), "'\tcmd")
+        XCTAssertEqual(AuditReportCSV.escape("\rcmd"), "\"'\rcmd\"")
+        XCTAssertEqual(AuditReportCSV.escape("a=b"), "a=b", "only a leading trigger is neutralized")
+        XCTAssertEqual(AuditReportCSV.escape("1.50"), "1.50")
     }
 
     func testRowsRoundTripThroughRFC4180Parser() {
@@ -370,6 +423,7 @@ final class AuditReportPDFTests: XCTestCase {
             switch i {
             case 4: notes = "Replaced water heater, \"40 gal\" unit; met plumber at 8am"
             case 9: notes = "Showed unit 2 to three applicants.\nScreened credit reports, called references."
+            case 2: notes = "=SUM(1+1) pasted from a spreadsheet"
             case 17: notes = String(repeating: "Long description of a full renovation day, demo and haul-off. ", count: 8)
             default: notes = "\(categories[i % categories.count].rawValue) at \(property.name)"
             }
@@ -425,7 +479,7 @@ final class AuditReportPDFTests: XCTestCase {
         let (report, images) = Self.sampleReport()
         let directory: URL
         if let hostHome = ProcessInfo.processInfo.environment["SIMULATOR_HOST_HOME"] {
-            directory = URL(fileURLWithPath: hostHome).appendingPathComponent("AgentScratch/landlordhours/2026-10-17/export-samples", isDirectory: true)
+            directory = URL(fileURLWithPath: hostHome).appendingPathComponent("AgentScratch/landlordhours/2026-10-17/export-samples-r2", isDirectory: true)
         } else {
             directory = FileManager.default.temporaryDirectory.appendingPathComponent("export-samples", isDirectory: true)
         }
