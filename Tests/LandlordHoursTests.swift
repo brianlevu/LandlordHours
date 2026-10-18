@@ -1839,3 +1839,16 @@ final class AITimeEntryServiceNetworkTests: XCTestCase {
         }
     }
 }
+
+// MARK: - 1.1: no Live Activity without the widget extension
+
+final class LiveActivityGateTests: XCTestCase {
+    func testLiveActivitiesAreOffInThisBuild() {
+        XCTAssertFalse(AppViewModel.liveActivitiesEnabled)
+    }
+
+    func testInfoPlistDoesNotAdvertiseLiveActivities() {
+        let value = Bundle.main.object(forInfoDictionaryKey: "NSSupportsLiveActivities") as? Bool
+        XCTAssertEqual(value, false)
+    }
+}

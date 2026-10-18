@@ -1232,8 +1232,13 @@ class AppViewModel: ObservableObject {
         }
     }
 
+    /// The widget extension (and its Live Activity UI) is not in the 1.1 build, so no Live Activity
+    /// is requested. Flip back on in 2.0 when the extension returns.
+    static let liveActivitiesEnabled = false
+
     private func startOrUpdateTimerLiveActivity() {
-        guard isTimerRunning,
+        guard Self.liveActivitiesEnabled,
+              isTimerRunning,
               let timerStartTime,
               let timerPropertyId,
               ActivityAuthorizationInfo().areActivitiesEnabled else { return }
