@@ -411,8 +411,15 @@ struct TaxQualificationEngine {
         let meets750HourTest: Bool
         let meetsMoreThanHalfPersonalServicesTest: Bool
 
+        /// Both REPS tests met. Other work hours of 0 or less count as "not entered", so an
+        /// empty field never reads as qualified (the same rule the audit export uses).
         var isQualified: Bool {
-            meets750HourTest && meetsMoreThanHalfPersonalServicesTest
+            meets750HourTest && moreThanHalfStatus == .met
+        }
+
+        /// 750 hours reached, but the 50% rule is not met or can't be checked yet.
+        var hoursMetButRuleOpen: Bool {
+            meets750HourTest && moreThanHalfStatus != .met
         }
 
         var realEstateWorkPercentage: Double {
@@ -420,6 +427,25 @@ struct TaxQualificationEngine {
             guard total > 0 else { return 0 }
             return realEstateHours / total
         }
+
+        /// The more-than-half test as the app shows it. Other work hours of 0 or less mean
+        /// "not entered", the same rule the audit export uses, so the test is never shown as
+        /// met just because the field is empty.
+        var moreThanHalfStatus: MoreThanHalfStatus {
+            guard nonRealEstateHours > 0 else { return .notEntered }
+            return meetsMoreThanHalfPersonalServicesTest ? .met : .notMet
+        }
+
+    }
+
+    enum MoreThanHalfStatus: Equatable {
+        case met
+        case notMet
+        case notEntered
+
+        static let notEnteredPrompt = "Add your other work hours to check this"
+        /// The one short label for "other work hours not entered", used on Home and Reports.
+        static let notEnteredValue = "Not checked"
     }
 
     struct MaterialParticipationResult: Equatable {
@@ -440,6 +466,17 @@ struct TaxQualificationEngine {
         /// question is still unanswered — Test 3 can't be asserted until the user confirms.
         var meets100HourThresholdPendingConfirmation: Bool {
             ownerAndSpouseHours > 100 && noOneParticipatedMore == nil
+        }
+    }
+
+    /// Reports and Home wording when 750 hours are met but the 50% rule is still open.
+    /// nil when that isn't the situation.
+    static func hoursMetRuleOpenStatus(_ result: REPSResult) -> (label: String, detail: String)? {
+        guard result.hoursMetButRuleOpen else { return nil }
+        switch result.moreThanHalfStatus {
+        case .notEntered: return ("Hours target met", "Add your other work hours to check the 50% rule")
+        case .notMet: return ("Hours target met", "50% rule not met yet")
+        case .met: return nil
         }
     }
 

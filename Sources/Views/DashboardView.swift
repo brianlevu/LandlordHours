@@ -1,6 +1,29 @@
 import SwiftUI
 import LucideIcons
 
+/// State of the Home goal card. The surface follows the intent rules: sage only when the
+/// goal is met, honey when the user is behind or something still needs them, violet wash
+/// otherwise.
+enum GoalCardTone: Equatable {
+    case onTrack
+    case needsAttention
+    case met
+
+    static func resolve(isGoalMet: Bool, isOnTrack: Bool, needsOtherWorkHours: Bool) -> GoalCardTone {
+        if isGoalMet { return .met }
+        if needsOtherWorkHours || !isOnTrack { return .needsAttention }
+        return .onTrack
+    }
+
+    func surface(_ colors: AdaptiveColors) -> Color {
+        switch self {
+        case .onTrack: return colors.actionSurface
+        case .needsAttention: return colors.cautionSurface
+        case .met: return colors.positiveSurface
+        }
+    }
+}
+
 struct DashboardView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @EnvironmentObject var goalManager: GoalManager
@@ -41,6 +64,24 @@ struct DashboardView: View {
     // 50% rule compliance: ratio of RE hours to total working hours (incl. non-RE employment)
     private var fiftyPercentCompliance: Double {
         min(repsStatus.realEstateWorkPercentage, 1.0)
+    }
+
+    /// The 50% rule can't be checked until other work hours are entered (same rule as the export).
+    private var otherWorkHoursMissing: Bool {
+        isREPS && repsStatus.moreThanHalfStatus == .notEntered
+    }
+
+    private var fiftyPercentValue: String {
+        otherWorkHoursMissing ? TaxQualificationEngine.MoreThanHalfStatus.notEnteredValue : "\(Int(fiftyPercentCompliance * 100))%"
+    }
+
+    /// 750 hours reached, but the 50% rule still needs the user's other work hours.
+    private var hoursMetButRuleUnchecked: Bool {
+        otherWorkHoursMissing && repsStatus.meets750HourTest
+    }
+
+    private var hoursMetRuleOpen: (label: String, detail: String)? {
+        isREPS ? TaxQualificationEngine.hoursMetRuleOpenStatus(repsStatus) : nil
     }
 
     // Pace calculations
@@ -167,7 +208,7 @@ struct DashboardView: View {
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showPaywall) {
-                PaywallView(showPaywall: $showPaywall)
+                PaywallView(context: .dashboardUnlock, onClose: { showPaywall = false })
             }
             .navigationDestination(isPresented: $showLearningCenter) {
                 LearningCenterView()
@@ -488,6 +529,7 @@ struct DashboardView: View {
                 .lhSurfaceCard(cornerRadius: 20)
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("dashboard.unlockPro")
         }
     }
 
@@ -540,14 +582,19 @@ struct DashboardView: View {
             HStack(spacing: 12) {
                 dashboardMiniMetric(title: "Pace", value: isOnTrack ? "On track" : "Behind")
                 if isREPS {
-                    dashboardMiniMetric(title: "50% rule", value: "\(Int(fiftyPercentCompliance * 100))%")
+                    dashboardMiniMetric(
+                        title: "50% rule",
+                        value: fiftyPercentValue,
+                        detail: otherWorkHoursMissing ? TaxQualificationEngine.MoreThanHalfStatus.notEnteredPrompt : nil
+                    )
+                    .accessibilityIdentifier("dashboard.fiftyPercent")
                 } else {
                     dashboardMiniMetric(title: "Days left", value: "\(daysLeftInYear)")
                 }
             }
         }
         .padding(24)
-        .background(isGoalMet ? AppColors.sage : colors.sageWash)
+        .background(goalCardTone.surface(colors))
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 26, style: .continuous)
@@ -559,16 +606,22 @@ struct DashboardView: View {
             : "\(AppFormat.hours(totalHours)) of \(Int(targetHours)) hours, \(Int(progress * 100)) percent complete")
     }
 
+    private var goalCardTone: GoalCardTone {
+        GoalCardTone.resolve(isGoalMet: isGoalMet, isOnTrack: isOnTrack, needsOtherWorkHours: hoursMetRuleOpen != nil)
+    }
+
     private var goalCardTitle: String {
-        isGoalMet ? "Goal met" : "\(Int(targetHours)) hour target"
+        if let open = hoursMetRuleOpen { return open.label }
+        return isGoalMet ? "Goal met" : "\(Int(targetHours)) hour target"
     }
 
     private var goalCardSubtitle: String {
+        if let open = hoursMetRuleOpen { return "\(open.detail)." }
         if isGoalMet { return "Your tracked work has reached the current goal." }
         return "\(Int(hoursPerWeekNeeded))h per week \(isOnTrack ? "keeps you on pace" : "gets you back on pace") for \(currentYear)."
     }
 
-    private func dashboardMiniMetric(title: String, value: String) -> some View {
+    private func dashboardMiniMetric(title: String, value: String, detail: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
                 .font(.system(size: 12, weight: .bold, design: .rounded))
@@ -576,7 +629,14 @@ struct DashboardView: View {
             Text(value)
                 .font(.system(size: 16, weight: .black, design: .rounded))
                 .foregroundStyle(colors.textPrimary)
+            if let detail {
+                Text(detail)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+        .accessibilityElement(children: .combine)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.62 : 0.72))
@@ -766,7 +826,7 @@ struct DashboardView: View {
                     .font(.system(size: 11, weight: .regular, design: .rounded))
                     .foregroundStyle(colors.textSecondary)
                 Spacer()
-                Text("\(Int(fiftyPercentCompliance * 100))%")
+                Text(fiftyPercentValue)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(AppColors.primary)
             }
@@ -805,7 +865,7 @@ struct DashboardView: View {
                         ZStack {
                             RoundedRectangle(cornerRadius: 10)
                                 .fill(
-                                    isToday ? AppColors.sage :
+                                    isToday ? colors.action :
                                     hours > 0 ? AppColors.sageWash :
                                     colors.backgroundTertiary
                                 )
@@ -814,11 +874,11 @@ struct DashboardView: View {
                             if hours > 0 {
                                 Text(String(format: "%.0f", hours))
                                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .foregroundStyle(isToday ? AppColors.charcoal : colors.textPrimary)
+                                    .foregroundStyle(isToday ? colors.onAction : colors.textPrimary)
                             } else {
                                 Text("\u{2013}")
                                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .foregroundStyle(isToday ? AppColors.charcoal : colors.textTertiary)
+                                    .foregroundStyle(isToday ? colors.onAction : colors.textSecondary)
                             }
                         }
                         Text(dayLabels[i])
@@ -854,9 +914,9 @@ struct DashboardView: View {
                         HStack(spacing: 2) {
                             Text("See all")
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(AppColors.primary)
+                                .foregroundStyle(colors.actionText)
                             LucideIcon(image: Lucide.chevronRight, size: 14)
-                                .foregroundStyle(AppColors.primary)
+                                .foregroundStyle(colors.actionText)
                         }
                     }
                 }

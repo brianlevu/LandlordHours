@@ -96,6 +96,9 @@ targets:
     platform: iOS
     sources:
       - path: UITests
+      # SKTestSession(configurationFileNamed:) resets StoreKit test purchases between UI tests.
+      - path: LandlordHours.storekit
+        buildPhase: resources
     dependencies:
       - target: LandlordHours
     settings:
@@ -111,6 +114,10 @@ schemes:
     build:
       targets:
         LandlordHours: all
+    # Local StoreKit config so Debug runs and free-user UI journeys load the real
+    # $29.99 Pro product and reach the purchase sheet without App Store Connect.
+    run:
+      storeKitConfiguration: LandlordHours.storekit
     test:
       targets:
         - LandlordHoursTests

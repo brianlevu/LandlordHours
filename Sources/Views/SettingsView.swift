@@ -12,7 +12,7 @@ enum HourGoalType: String, CaseIterable, Codable {
     var description: String {
         switch self {
         case .reps:
-            return "750 hours - Full Real Estate Professional Status"
+            return "750 hours plus the 50% rule (REPS)"
         case .str:
             return "100 hours - STR Material Participation"
         case .both:
@@ -563,7 +563,7 @@ private struct SubscriptionCard: View {
                         Text(isPro ? "Pro is active" : "Upgrade to Pro")
                             .font(.system(size: 23, weight: .black, design: .rounded))
                             .foregroundStyle(colors.textPrimary)
-                        Text(isPro ? "Lifetime access is unlocked." : "Unlock the audit-ready tools that make this app worth trusting at tax time.")
+                        Text(isPro ? "Lifetime access is unlocked." : "Export your records and track every rental. Pay once.")
                             .font(.system(size: 13, weight: .medium, design: .rounded))
                             .foregroundStyle(colors.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -620,6 +620,7 @@ private struct SubscriptionCard: View {
         }
         .buttonStyle(.lhPressable)
         .accessibilityLabel(isPro ? "Manage Pro. Lifetime access is active." : "Upgrade to Pro. One-time lifetime purchase.")
+        .accessibilityIdentifier("settings.proCard")
     }
 
     private func planBenefit(_ text: String, icon: UIImage) -> some View {
@@ -656,7 +657,7 @@ private struct SettingsGroup<Content: View>: View {
                 if let subtitle {
                     Text(subtitle)
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
+                        .foregroundStyle(colors.textSecondaryOnCanvas)
                 }
             }
 
@@ -671,6 +672,34 @@ private struct SettingsGroup<Content: View>: View {
                     .strokeBorder(colors.border.opacity(colorScheme == .dark ? 0.42 : 0.28), lineWidth: 1)
             }
         }
+    }
+}
+
+// MARK: - Not tax advice
+
+/// Plain disclaimer under Support & Legal. The PDF export carries its own version.
+struct NotTaxAdviceNote: View {
+    static let text = "LandlordHours keeps your records. It doesn't give tax advice. Check your qualification with a tax professional."
+
+    @Environment(\.colorScheme) private var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            LucideIcon(image: Lucide.info, size: 15)
+                .foregroundStyle(colors.textSecondaryOnCanvas)
+                .padding(.top, 2)
+                .accessibilityHidden(true)
+            Text(Self.text)
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(colors.textSecondaryOnCanvas)
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("settings.notTaxAdvice")
     }
 }
 
@@ -807,7 +836,8 @@ struct SettingsView: View {
 
     @State private var showingResetAlert = false
     @State private var showingProfileEdit = false
-    @State private var showingPaywall = false
+    @State private var paywallContext: PaywallContext?
+    @State private var showExportAfterUnlock = false
     @State private var userName = ""
     @State private var userEmail = ""
     @State private var selectedPhotoItem: PhotosPickerItem?
@@ -846,13 +876,13 @@ struct SettingsView: View {
                             .minimumScaleFactor(0.82)
                         Text("Manage your profile, tax setup, exports, and reminders.")
                             .font(.system(size: 15, weight: .medium, design: .rounded))
-                            .foregroundStyle(colors.textSecondary)
+                            .foregroundStyle(colors.textSecondaryOnCanvas)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     SubscriptionCard(
                         isPro: subscriptionManager.isPro,
-                        onTap: { showingPaywall = true }
+                        onTap: { paywallContext = .settingsUpgrade }
                     )
 
                     if !subscriptionManager.isPro {
@@ -947,19 +977,20 @@ struct SettingsView: View {
                             .accessibilityIdentifier("settings.exportReports")
                         } else {
                             Button {
-                                showingPaywall = true
+                                paywallContext = .export
                             } label: {
                                 SettingRow(
                                     icon: Lucide.download,
                                     iconColor: AppColors.action,
                                     iconWash: colors.actionSurface,
                                     title: "Export Reports",
-                                    subtitle: "Unlock accountant-ready PDF exports with Pro",
+                                    subtitle: "PDF and CSV of your hours, with Pro",
                                     value: "PRO",
                                     valueColor: colors.actionText
                                 )
                             }
                             .buttonStyle(.plain)
+                            .accessibilityIdentifier("settings.exportReportsLocked")
                         }
 
                         Divider().background(colors.border.opacity(0.35))
@@ -1125,6 +1156,8 @@ struct SettingsView: View {
                         SettingsProfileExitRows()
                     }
 
+                    NotTaxAdviceNote()
+
                     #if DEBUG
                     if AdminAccess.isCurrentUserAdmin {
                         developerToolsSection
@@ -1134,7 +1167,7 @@ struct SettingsView: View {
                     // Version
                     Text("LandlordHours v\(Self.appVersion)")
                         .font(AppTypography.caption)
-                        .foregroundStyle(colors.textSecondary)
+                        .foregroundStyle(colors.textSecondaryOnCanvas)
                         .padding(.bottom, AppSpacing.tabContentBottomInset)
                 }
                 .padding(.horizontal, 24)
@@ -1163,8 +1196,18 @@ struct SettingsView: View {
             .sheet(isPresented: $showingProfileEdit) {
                 ProfileEditView(userName: $userName, userEmail: $userEmail, profileImage: $profileImage)
             }
-            .sheet(isPresented: $showingPaywall) {
-                PaywallView(showPaywall: $showingPaywall)
+            .sheet(item: $paywallContext) { context in
+                PaywallView(
+                    context: context,
+                    // After a purchase from the export row, carry on to the export.
+                    onUnlocked: { if context == .export { showExportAfterUnlock = true } },
+                    // Close through the binding: environment dismiss did not close an
+                    // item-driven sheet here (caught by the free-user journey test).
+                    onClose: { paywallContext = nil }
+                )
+            }
+            .navigationDestination(isPresented: $showExportAfterUnlock) {
+                ExportPDFView(year: Calendar.current.component(.year, from: Date()))
             }
             .sheet(isPresented: $showingIconPicker) {
                 AppIconPickerView()

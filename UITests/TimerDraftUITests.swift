@@ -7,6 +7,7 @@ final class TimerDraftUITests: XCTestCase {
 
     override func setUp() {
         super.setUp()
+        UITestIsolation.resetStoreKit()
         continueAfterFailure = false
         app = XCUIApplication()
     }
@@ -19,6 +20,7 @@ final class TimerDraftUITests: XCTestCase {
     private func launch(_ scenario: String, scheme: String = "light") {
         app.terminate()
         app.launchArguments = [
+            UITestIsolation.resetProfilesArgument,
             "-LHSeedTimerDraft", scenario,
             "-LHInitialTab", "2",
             "-LHColorScheme", scheme,
@@ -76,7 +78,29 @@ final class TimerDraftUITests: XCTestCase {
         if !app.buttons["timerDraftReview.save"].waitForExistence(timeout: 4) {
             review.tap()
         }
-        XCTAssertTrue(app.buttons["timerDraftReview.save"].waitForExistence(timeout: 5))
+        let save = app.buttons["timerDraftReview.save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+
+        // One tap can't commit 24 h: Save stays off until the hours are changed or confirmed.
+        XCTAssertFalse(save.isEnabled, "Save is disabled before review")
+        let confirm = app.buttons["timerDraftReview.confirm"]
+        XCTAssertTrue(confirm.exists)
+        confirm.tap()
+        XCTAssertTrue(save.isEnabled, "Confirming the hours enables Save")
+        confirm.tap()
+        XCTAssertFalse(save.isEnabled, "Unchecking disables Save again")
+        let minus = app.buttons["timerDraftReview.decrement"]
+        XCTAssertGreaterThanOrEqual(minus.frame.width, 32, "Step button hit area")
+        XCTAssertGreaterThanOrEqual(confirm.frame.height, 32, "Checkbox row hit area")
+        minus.tap()
+        XCTAssertTrue(save.isEnabled, "Changing the hours enables Save")
+    }
+
+    func testCappedDraftHeadlineLeadsWithTheCap() {
+        launch("forgotten24h")
+        let summary = app.descendants(matching: .any)["timerDraft.summary"]
+        XCTAssertTrue(summary.waitForExistence(timeout: 10))
+        XCTAssertTrue(summary.label.contains("Ran 30.0h. We stopped counting at 24h"), summary.label)
     }
 
     func testCaptureTimerDraftFramesLight() { captureAll(scheme: "light") }

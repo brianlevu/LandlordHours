@@ -80,7 +80,7 @@ struct TimerDraftCard: View {
                             .accessibilityIdentifier("timerDraft.queueChip")
                     }
                 }
-                Text(recovery.ranLabel)
+                Text(recovery.cardHeadline)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
                     .monospacedDigit()
@@ -105,7 +105,7 @@ struct TimerDraftCard: View {
 
     private var accessibilitySummary: String {
         let more = remaining > 0 ? " \(remaining) more timer drafts after this one." : ""
-        return "\(recovery.accessibilityTitle) \(recovery.ranLabel). \(message)\(more)"
+        return "\(recovery.accessibilityTitle) \(recovery.cardHeadline). \(message)\(more)"
     }
 
     // MARK: Property picker (deleted property)
@@ -217,6 +217,9 @@ struct TimerDraftReviewSheet: View {
     @Environment(\.colorScheme) private var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     @State private var hours: Double
+    @State private var confirmed = false
+
+    private var canSave: Bool { recovery.canSaveReview(hours: hours, confirmed: confirmed) }
 
     init(recovery: StaleTimerRecovery, propertyName: String, onSave: @escaping (Double) -> Void) {
         self.recovery = recovery
@@ -232,33 +235,44 @@ struct TimerDraftReviewSheet: View {
                     .font(.system(size: 22, weight: .black, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("\(recovery.ranLabel) at \(propertyName), so we stopped it at 24 hours. Set the real time before saving.")
+                Text("\(recovery.ranLabel) at \(propertyName), so we stopped it at 24 hours. Change the hours to the time you really worked, or confirm 24 hours is right.")
                     .font(.system(size: 15, weight: .medium, design: .rounded))
                     .foregroundStyle(colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Stepper(value: $hours, in: 0.25...24, step: 0.25) {
+                HStack(spacing: 12) {
                     Text(AppFormat.hours(hours))
                         .font(.system(size: 34, weight: .black, design: .rounded))
                         .foregroundStyle(colors.textPrimary)
                         .monospacedDigit()
+                        .accessibilityIdentifier("timerDraftReview.hours")
+                    Spacer(minLength: 0)
+                    stepButton(icon: Lucide.minus, label: "Fewer hours", id: "timerDraftReview.decrement",
+                               enabled: hours > 0.25) { hours = max(hours - 0.25, 0.25) }
+                    stepButton(icon: Lucide.plus, label: "More hours", id: "timerDraftReview.increment",
+                               enabled: hours < 24) { hours = min(hours + 0.25, 24) }
                 }
-                .accessibilityIdentifier("timerDraftReview.hours")
+                .accessibilityElement(children: .contain)
+
+                confirmRow
 
                 Spacer(minLength: 0)
 
                 Button {
+                    guard canSave else { return }
                     onSave(hours)
                 } label: {
                     Text("Save \(AppFormat.hours(hours))")
                         .font(.system(size: 16, weight: .bold, design: .rounded))
                         .frame(maxWidth: .infinity, minHeight: 52)
-                        .background(colors.action)
-                        .foregroundStyle(colors.onAction)
+                        .background(canSave ? colors.action : colors.backgroundTertiary)
+                        .foregroundStyle(canSave ? colors.onAction : colors.textSecondary)
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.lhPressable)
+                .disabled(!canSave)
                 .accessibilityIdentifier("timerDraftReview.save")
+                .accessibilityHint(canSave ? "" : "Change the hours or confirm them first.")
             }
             .padding(20)
             .background(colors.background.ignoresSafeArea())
@@ -269,6 +283,55 @@ struct TimerDraftReviewSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
+    }
+
+    /// 44 pt round step button (the stock Stepper's segments measured 30.7 pt).
+    private func stepButton(icon: UIImage, label: String, id: String, enabled: Bool,
+                            action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            LucideIcon(image: icon, size: 18)
+                .foregroundStyle(enabled ? colors.textPrimary : colors.textSecondary)
+                .frame(width: 44, height: 44)
+                .background(colors.backgroundTertiary)
+                .clipShape(Circle())
+        }
+        .buttonStyle(.lhPressable)
+        .disabled(!enabled)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(id)
+    }
+
+    /// An explicit "these hours are right" check. A drawn box, not a stock Toggle: on
+    /// iOS 27 the stock off track is close to invisible on a light card.
+    private var confirmRow: some View {
+        Button {
+            confirmed.toggle()
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(confirmed ? colors.action : colors.backgroundSecondary)
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .strokeBorder(confirmed ? colors.action : colors.textSecondary, lineWidth: 2)
+                    if confirmed {
+                        LucideIcon(image: Lucide.check, size: 16)
+                            .foregroundStyle(colors.onAction)
+                    }
+                }
+                .frame(width: 32, height: 32)
+                Text("These hours are right")
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundStyle(colors.textPrimary)
+                Spacer(minLength: 0)
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.lhPressable)
+        .accessibilityLabel("These hours are right")
+        .accessibilityValue(confirmed ? "Checked" : "Not checked")
+        .accessibilityAddTraits(confirmed ? [.isSelected] : [])
+        .accessibilityIdentifier("timerDraftReview.confirm")
     }
 }

@@ -8,6 +8,7 @@ final class SignInReplacementUITests: XCTestCase {
 
     override func setUp() {
         super.setUp()
+        UITestIsolation.resetStoreKit()
         continueAfterFailure = false
         app = XCUIApplication()
     }
@@ -166,7 +167,8 @@ final class SignInReplacementUITests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func launch(_ arguments: [String], scheme: String, resetDefaults: Bool = false) {
+    /// Every launch seeds its own fixture, so profiles are reset first by default.
+    private func launch(_ arguments: [String], scheme: String, resetDefaults: Bool = true) {
         app.terminate()
         var args = arguments + [
             "-LHColorScheme", scheme,
@@ -174,7 +176,7 @@ final class SignInReplacementUITests: XCTestCase {
             "-AppleLocale", "en_US"
         ]
         if resetDefaults {
-            args.append("-LHResetProfilesForTesting")
+            args.append(UITestIsolation.resetProfilesArgument)
         }
         app.launchArguments = args
         app.launch()

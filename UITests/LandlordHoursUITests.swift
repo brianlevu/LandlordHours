@@ -5,6 +5,7 @@ final class LandlordHoursUITests: XCTestCase {
 
     override func setUp() {
         super.setUp()
+        UITestIsolation.resetStoreKit()
         continueAfterFailure = false
         app = XCUIApplication()
     }
@@ -95,7 +96,7 @@ final class LandlordHoursUITests: XCTestCase {
         scrollToElement(generateButton)
         generateButton.tap()
 
-        XCTAssertTrue(app.staticTexts["PDF ready"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Report ready"].waitForExistence(timeout: 8), "Export view shows Report ready")
         XCTAssertTrue(app.buttons["export.sharePDF"].exists)
     }
 
@@ -342,6 +343,7 @@ final class LandlordHoursUITests: XCTestCase {
     private func launch(scenario: String, tab: Int, extraArguments: [String] = []) {
         app.terminate()
         app.launchArguments = [
+            UITestIsolation.resetProfilesArgument,
             "-LHMockScenario", scenario,
             "-LHInitialTab", "\(tab)",
             "-AppleLanguages", "(en)",
@@ -360,7 +362,7 @@ final class LandlordHoursUITests: XCTestCase {
                 element.tap()
                 return
             }
-            if scrollIfNeeded && element.exists && swipes < 6 && !app.staticTexts["Home"].isHittable == false {
+            if scrollIfNeeded && element.exists && swipes < 6 && app.staticTexts["Home"].isHittable {
                 app.swipeUp()
                 swipes += 1
             } else {

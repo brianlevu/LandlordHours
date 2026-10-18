@@ -260,6 +260,7 @@ struct ExportPDFView: View {
                     shareItem = files
                 case .failure:
                     exportError = "Could not create the report. Please try again."
+                    RatingPromptCoordinator.shared.noteError()
                 }
             }
         }

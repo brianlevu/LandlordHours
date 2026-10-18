@@ -70,7 +70,8 @@ enum AppColors {
     static let cautionSurface = honeyWash
     // Destructive text/icons: #C2412D on white is 5.14:1 (coral #FF8A7A was 2.29:1).
     // Dark keeps coral (7.79:1 on #161626). Coral stays the repair-category accent.
-    static let destructiveLightHex = "C2412D"
+    /// #B93A26: 4.97:1 on the #F0EFF4 pill fill (was #C2412D at 4.49:1), 5.68:1 on white.
+    static let destructiveLightHex = "B93A26"
     static let destructive = Color.lhDynamic(light: destructiveLightHex, dark: "FF8A7A")
     static let destructiveSurface = coralWash
     static let informational = sky
@@ -154,6 +155,9 @@ enum AppColors {
     static let darkTextPrimary = Color(hex: "E8E8F0")
     static let darkTextSecondary = Color(hex: "A8A8BC")
     static let darkTextTertiary = Color(hex: "6E6E82")
+    /// Secondary text that sits directly on the LHMobileCanvas ambient wash in dark mode.
+    /// #A8A8BC measured 4.18–4.45:1 on the top of that wash; #C4C4D4 is about 5.7:1 there.
+    static let darkTextSecondaryOnCanvasHex = "C4C4D4"
 
     static let darkBorder = Color.white.opacity(0.08)
 }
@@ -230,6 +234,10 @@ struct AdaptiveColors {
     /// Light #636377: 5.13:1 on input/segment fills (#F0EFF4), where slate #6E6E82 was 4.35:1.
     var textSecondary: Color { colorScheme == .dark ? AppColors.darkTextSecondary : Color(hex: "636377") }
     var textTertiary: Color { colorScheme == .dark ? AppColors.darkTextTertiary : AppColors.mist }
+    /// Secondary text placed straight on the ambient page canvas (not on a card).
+    var textSecondaryOnCanvas: Color {
+        colorScheme == .dark ? Color(hex: AppColors.darkTextSecondaryOnCanvasHex) : textSecondary
+    }
 
     var border: Color { colorScheme == .dark ? AppColors.darkBorder : AppColors.cloud }
 
@@ -554,6 +562,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         application.registerForRemoteNotifications()
         Analytics.configure()
         Analytics.appOpened()
+        RatingPromptCoordinator.shared.recordLaunch()
         LandlordPurchases.configure()
         return true
     }
