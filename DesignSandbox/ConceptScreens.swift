@@ -128,7 +128,8 @@ struct ConceptSuggestionRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 5) {
                     Image(systemName: s.kind.badgeSymbol).font(.system(size: 11, weight: .semibold))
-                    Text("\(s.kind.label) · \(s.when)").lineLimit(1)
+                    Text("\(s.kind.label) · \(s.when)").lineLimit(1).fixedSize(horizontal: false, vertical: true)
+                        .minimumScaleFactor(0.9)
                 }
                 .font(.subheadline).foregroundStyle(LH.secondaryText)
                 Text("\(Text(s.noun).fontWeight(.semibold)) \(s.joiner) \(Text(nbsp(s.property)).fontWeight(.semibold))")
@@ -144,7 +145,8 @@ struct ConceptSuggestionRow: View {
                     Text(s.category.label).font(.subheadline.weight(.medium)).foregroundStyle(BP.material(s.category))
                 }
             }
-            Spacer(minLength: 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
             ConceptPropertyThumb(prop: Prop.named(s.property), size: 40)
         }
         .padding(.vertical, 12)

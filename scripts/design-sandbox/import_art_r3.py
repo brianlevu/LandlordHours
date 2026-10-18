@@ -92,6 +92,39 @@ def register_lines(N=300):
     print(f'linework registered: scale {s:.4f}, shift ({dx * full / N:.0f}, {dy * full / N:.0f}) px')
 
 
+def derive_from_master():
+    built = Image.open(os.path.join(DST, 'bp-house-built.png')).convert('RGBA')
+    a = np.asarray(built).astype(float)
+    alpha = a[..., 3] / 255
+    lum = (0.299 * a[..., 0] + 0.587 * a[..., 1] + 0.114 * a[..., 2]) * alpha
+
+    def sobel(x):
+        gy, gx = np.gradient(x)
+        return np.hypot(gx, gy)
+
+    # Linework: luminance edges inside the house + the silhouette outline, as drafting cyan.
+    e = sobel(lum) + sobel(alpha * 255) * 0.9
+    e = e / np.percentile(e[alpha > 0.5], 99.3)
+    line_a = np.clip((e - 0.18) * 1.9, 0, 1)
+    # slight thicken: max of 3x3 neighbourhood
+    pad = np.pad(line_a, 1)
+    thick = np.max([pad[dy:dy + line_a.shape[0], dx:dx + line_a.shape[1]] for dy in range(3) for dx in range(3)], axis=0)
+    line_a = np.clip(0.55 * line_a + 0.45 * thick, 0, 1)
+    rgba = np.zeros_like(a)
+    rgba[..., 0], rgba[..., 1], rgba[..., 2] = 0x8F, 0xD3, 0xFF
+    rgba[..., 3] = line_a * 255
+    Image.fromarray(rgba.astype(np.uint8)).save(os.path.join(DST, 'bp-house-lines.png'), optimize=True)
+
+    # Frame: the same house in raw timber (sheathing going up), darker grain on the edges.
+    t = np.clip(lum / np.maximum(alpha, 1e-3) / 255, 0, 1)
+    lo, hi = np.array([0x8A, 0x5A, 0x2C], float), np.array([0xF2, 0xC6, 0x8A], float)
+    wood = lo + (hi - lo) * t[..., None]
+    wood = wood * (1 - 0.35 * np.clip(e, 0, 1)[..., None])
+    fr = np.dstack([np.clip(wood, 0, 255), a[..., 3]])
+    Image.fromarray(fr.astype(np.uint8)).save(os.path.join(DST, 'bp-house-frame.png'), optimize=True)
+    print('lines + frame derived from the built master')
+
+
 def crop_to(im, box, size):
     out = im.crop(box)
     out.thumbnail((size, size), Image.LANCZOS)
@@ -130,7 +163,9 @@ if os.path.exists(os.path.join(bp, 'house_master.png')):
     print('house box', box, 'opaque extent y', y0, y1, 'fraction in box', (y0 - box[1]) / side, (y1 - box[1]) / side)
     for k, l in layers.items():
         crop_to(l, box, 900).save(os.path.join(DST, k + '.png'), optimize=True)
-    register_lines()
+    # One master geometry: linework and frame are DERIVED from the built master, so every
+    # Blueprint state (Today, Welcome, milestone, Live Activity) shares one silhouette.
+    derive_from_master()
 
 objects = {
     'empty_lot_stake': 'bp-empty-lot', 'plaque_blank': 'bp-plaque-blank', 'rolled_blueprint_tools': 'bp-rolled-blueprint',

@@ -45,6 +45,8 @@ enum BP {
     static let plasterShade = Color(hex: 0xDCD3C3)
     static let brass = Color(hex: 0xD9B45A)
     static let window = Color(hex: 0xFFD27A)
+    /// Hatched suggestions: pale timber (hours waiting to be placed), never the cyan of the drawing.
+    static let suggested = Color(hex: 0xF5C98E)
     static let glass = Color(hex: 0x2B3B66)
     static let slate = Color(hex: 0x5A6B8C)
     static let concrete = Color(hex: 0xA7AFBF)

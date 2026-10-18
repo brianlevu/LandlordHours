@@ -44,9 +44,9 @@ struct BlueprintHouse: View {
                     .opacity(hours >= 500 && roofFill >= 1 ? 0.55 : 1)
                 if hatchHours > hours {
                     // Suggestions: hatched in drafting cyan, never solid.
-                    built.opacity(0.16).mask(FeatherMask(y: hy, feather: 0.02))
+                    built.opacity(0.14).mask(FeatherMask(y: hy, feather: 0.02))
                     Hatch()
-                        .stroke(BP.drafting, lineWidth: 1.6)
+                        .stroke(BP.suggested, lineWidth: 1.6)
                         .mask(built)
                         .mask(FeatherMask(y: hy, feather: 0.015))
                 }
@@ -56,9 +56,12 @@ struct BlueprintHouse: View {
                 }
                 built.mask(FeatherMask(y: by, feather: 0.028))
                 if hours >= 500 {
-                    built.mask(TopCut(y: BlueprintHouse.eave, keepAbove: true))
-                        .opacity(roofFill)
-                        .offset(y: roofDrop)
+                    ZStack {
+                        frame.mask(TopCut(y: BlueprintHouse.eave, keepAbove: true))
+                        built.mask(TopCut(y: BlueprintHouse.eave, keepAbove: true))
+                            .opacity(roofFill)
+                    }
+                    .offset(y: roofDrop)
                 }
                 Rectangle()
                     .fill(LinearGradient(colors: [BP.timber.opacity(0), BP.window, BP.timber.opacity(0)], startPoint: .leading, endPoint: .trailing))
@@ -146,15 +149,27 @@ struct BlueprintHouse: View {
 
 /// Soft construction wipe: opaque below `y`, fading to clear over `feather` above it.
 /// Applied on top of the render's own alpha, so the reveal follows the house silhouette.
-struct FeatherMask: View {
+struct FeatherMask: View, @MainActor Animatable {
     var y: CGFloat
     var feather: CGFloat
+    // Animate the edge position itself (geometry), never the gradient: interpolating gradient
+    // stops crossfades two masks and momentarily hides built plaster.
+    var animatableData: CGFloat {
+        get { y }
+        set { y = newValue }
+    }
     var body: some View {
-        LinearGradient(stops: [
-            .init(color: .clear, location: max(0, y - feather)),
-            .init(color: .black.opacity(0.55), location: max(0, y - feather * 0.35)),
-            .init(color: .black, location: min(1, y + feather * 0.25)),
-        ], startPoint: .top, endPoint: .bottom)
+        GeometryReader { g in
+            let h = g.size.height
+            VStack(spacing: 0) {
+                Color.clear.frame(height: max(0, (y - feather) * h))
+                LinearGradient(colors: [.clear, .black.opacity(0.6), .black], startPoint: .top, endPoint: .bottom)
+                    .frame(height: feather * 1.2 * h)
+                Color.black
+            }
+            .frame(width: g.size.width, height: h, alignment: .top)
+            .clipped()
+        }
     }
 }
 

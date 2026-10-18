@@ -116,7 +116,7 @@ struct SuggestionDetailSheet: View {
 
     private func statusBand(_ h: Double) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Scheduled \(Text(fmtDur(h)).foregroundStyle(LH.positive))")
+            Text("Scheduled \(Text(fmtDur(h)).foregroundStyle(.primary))")
                 .font(.title3.weight(.semibold))
             Text("Your calendar had this from 9:00 to 11:00. Change it if the work ran long or short.")
                 .font(.subheadline)

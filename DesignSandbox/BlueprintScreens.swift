@@ -72,7 +72,7 @@ struct BlueprintHero: View {
 
                     if let board {
                         Clapboard(label: boardText, tagShown: boardTag)
-                            .frame(width: hs * 0.62, height: 13)
+                            .frame(width: hs * 0.56, height: 13)
                             .scaleEffect(x: 1, y: boardScale)
                             .rotationEffect(.degrees(-6))
                             .position(board)
@@ -94,13 +94,15 @@ struct BlueprintHero: View {
                         }
                         // 1. slide in and settle
                         boardTag = false; boardOpacity = 1; boardScale = 1
-                        board = CGPoint(x: -hs * 0.4, y: lineY - 26)
+                        // Enters from above the house, inside the illustration's bounds (never over the text column).
+                        board = CGPoint(x: houseCX + hs * 0.05, y: lineY - hs * 0.32)
                         withAnimation(.spring(response: 0.42, dampingFraction: 0.68)) { board = CGPoint(x: houseCX, y: lineY) }
                         try? await Task.sleep(for: .milliseconds(320))
                         // 2. land: haptic, tag, the house takes the course, count up
                         landTick += 1
                         withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) { boardTag = true }
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) { shownHours = new }
+                        // Critically damped: the house only ever gains, never overshoots back.
+                        withAnimation(.spring(response: 0.5, dampingFraction: 1.0)) { shownHours = max(shownHours, new) }
                         withAnimation(.easeOut(duration: 0.15)) { glow = 1 }
                         let from = count, to = Int(new)
                         let steps = max(1, to - from)
@@ -451,7 +453,7 @@ struct BlueprintEmptyHero: View {
                 }
                 .padding(20)
                 Spacer(minLength: 0)
-                EmptyLot().frame(width: 200, height: 200).padding(.trailing, 4).padding(.bottom, 6)
+                EmptyLot().frame(width: 188, height: 188).padding(.trailing, 16).padding(.bottom, 16)
             }
         }
         .frame(height: 300)

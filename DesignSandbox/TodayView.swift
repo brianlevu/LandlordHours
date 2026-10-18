@@ -296,10 +296,11 @@ struct CompactSuggestionRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(Text(s.noun).fontWeight(.semibold)) \(s.joiner) \(Text(nbsp(s.property)).fontWeight(.semibold))")
                     .font(.body)
-                    .lineLimit(2)
+                    .lineLimit(LHConcept.current == .none ? 2 : 1)
                 Text("\(s.kind.label) · \(s.when)")
                     .font(.subheadline)
                     .foregroundStyle(LH.secondaryText)
+                    .lineLimit(1)
             }
             Spacer(minLength: 8)
             Group {
@@ -313,6 +314,7 @@ struct CompactSuggestionRow: View {
             }
             .font(.body)
             .monospacedDigit()
+            .fixedSize()
             if LHConcept.current != .none {
                 ConceptPropertyThumb(prop: Prop.named(s.property), size: 32)
             } else if LHDirection.current != .baseline {
@@ -320,6 +322,7 @@ struct CompactSuggestionRow: View {
             }
         }
         .padding(.vertical, 10)
+        .frame(height: LHConcept.current == .none ? nil : 62)
     }
 }
 

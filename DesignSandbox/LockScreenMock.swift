@@ -93,11 +93,23 @@ struct Wallpaper: View {
             Color(hex: 0x15123D), Color(hex: 0x2B2270), Color(hex: 0x5A2C55),
             Color(hex: 0x07061A), Color(hex: 0x120F33), Color(hex: 0x3A1A3A),
         ]
+        let blueprintLight: [Color] = [
+            Color(hex: 0x3D63C9), Color(hex: 0x2F55BE), Color(hex: 0x4A78D6),
+            Color(hex: 0x1E3FA6), Color(hex: 0x2A4DB5), Color(hex: 0x3A66C4),
+            Color(hex: 0x132E85), Color(hex: 0x1A3A9C), Color(hex: 0x24489F),
+        ]
+        let blueprintDark: [Color] = [
+            Color(hex: 0x16307F), Color(hex: 0x10276E), Color(hex: 0x1B3A8C),
+            Color(hex: 0x0B1D5A), Color(hex: 0x0F2468), Color(hex: 0x16307F),
+            Color(hex: 0x060F33), Color(hex: 0x0A1645), Color(hex: 0x0E1D52),
+        ]
+        let bp = LHConcept.current == .blueprint
         MeshGradient(width: 3, height: 3,
                      points: [[0, 0], [0.5, 0], [1, 0],
                               [0, 0.5], [0.55, 0.45], [1, 0.55],
                               [0, 1], [0.5, 1], [1, 1]],
-                     colors: scheme == .dark ? dark : light)
+                     colors: bp ? (scheme == .dark ? blueprintDark : blueprintLight) : (scheme == .dark ? dark : light))
+        .overlay { if bp { BlueprintPaper().opacity(0.35).blendMode(.softLight) } }
     }
 }
 
