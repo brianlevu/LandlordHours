@@ -211,8 +211,6 @@ struct SuggestionRow: View {
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(LH.positive)
             .transition(.opacity.combined(with: .scale(scale: 0.9)))
-        } else {
-            Text("Suggested").transition(.opacity)
         }
     }
 

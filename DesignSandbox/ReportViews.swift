@@ -149,6 +149,8 @@ struct ExportView: View {
                             Spacer()
                             Text("This is the record your accountant gets.")
                                 .font(.subheadline.weight(.medium))
+                                .foregroundStyle(Color(hex: 0x1A1A1A))
+                                .frame(width: 200)
                                 .multilineTextAlignment(.center)
                             Button {
                                 paywall = true

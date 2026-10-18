@@ -344,12 +344,13 @@ struct SettingsLabel: LabelStyle {
 struct OnboardingLocation: View {
     var body: some View {
         OnboardingScaffold(step: 3, title: "Notice when you're at Oak Street",
-                           body_: "Your iPhone can tell us when you arrive at and leave a property you added. To do that while the app is closed, iOS asks for Always access.",
+                           body_: "To notice when you arrive and leave while the app is closed, iOS asks for Always access.",
                            tag: "BETA") {
-            VStack(spacing: 14) {
+            VStack(spacing: 10) {
                 SystemAlertPreview()
-                    .scaleEffect(0.88)
-                    .frame(height: 300)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .scaleEffect(0.84)
+                    .padding(.vertical, -30)
                 Text("When iOS asks, pick “Change to Always Allow.”")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -386,7 +387,7 @@ struct SystemAlertPreview: View {
             .padding(.bottom, 16)
 
             MiniMap()
-                .frame(height: 92)
+                .frame(height: 72)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .padding(.horizontal, 16)
 

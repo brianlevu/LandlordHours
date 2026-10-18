@@ -7,6 +7,7 @@ struct PaywallView: View {
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
+        NavigationStack {
         ScrollView {
             VStack(spacing: 0) {
                 hero
@@ -22,11 +23,14 @@ struct PaywallView: View {
         .scrollBounceBehavior(.basedOnSize)
         .background(LH.canvas)
         .ignoresSafeArea(edges: .top)
-        .overlay(alignment: .topTrailing) {
-            GlassCircleButton { dismiss() }
-                .environment(\.colorScheme, .dark)
-                .padding(.trailing, 16)
-                .padding(.top, 4)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(role: .close) { dismiss() }
+            }
+        }
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .statusBarHidden(true)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         }
     }
 
@@ -37,14 +41,15 @@ struct PaywallView: View {
             VStack(spacing: 18) {
                 Text("The record your\naccountant gets")
                     .font(.system(size: 24, weight: .bold))
+                    .fixedSize(horizontal: false, vertical: true)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.white)
-                PDFThumb(width: 228)
+                PDFThumb(width: 214)
                     .shadow(color: .black.opacity(0.35), radius: 24, y: 12)
             }
-            .padding(.top, 70)
+            .padding(.top, 104)
         }
-        .frame(height: 420)
+        .frame(height: 470)
         .clipped()
     }
 

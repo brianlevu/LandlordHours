@@ -101,9 +101,9 @@ struct SuggestionDetailSheet: View {
     private var eyebrowText: String {
         guard let s = suggestion else { return "Added by you · Today" }
         switch s.kind {
-        case .calendar: return "From your calendar · Tue, Oct 14"
-        case .receipt: return "From a receipt · Thu, Oct 16"
-        case .location: return "From location · Sun, Oct 12"
+        case .calendar: return "Calendar · Tue, Oct 14"
+        case .receipt: return "Receipt · Thu, Oct 16"
+        case .location: return "Location · Sun, Oct 12"
         default: return s.when
         }
     }

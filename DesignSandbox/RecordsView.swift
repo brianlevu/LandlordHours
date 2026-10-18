@@ -56,8 +56,8 @@ struct RecordsView: View {
             .safeAreaInset(edge: .bottom) {
                 if store.pendingCount > 0 {
                     AttentionPill(count: store.pendingCount, action: goInbox)
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 8)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 74)
                 }
             }
         }
@@ -88,9 +88,9 @@ struct RecordRow: View {
         HStack(spacing: 12) {
             SourceTile(kind: e.kind)
             VStack(alignment: .leading, spacing: 3) {
-                Text("\(e.title) · \(e.property)")
+                Text("\(Text(e.title).fontWeight(.medium)) · \(e.property)")
                     .font(.body)
-                    .lineLimit(1)
+                    .lineLimit(2)
                 HStack(spacing: 6) {
                     StatusDot(color: e.kind.tint)
                     Text(e.status)

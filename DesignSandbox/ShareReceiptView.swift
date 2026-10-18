@@ -10,7 +10,7 @@ struct ShareReceiptHost: View {
             ReceiptPaper()
                 .frame(width: 260)
                 .rotationEffect(.degrees(-2))
-                .padding(.bottom, 260)
+                .padding(.bottom, 420)
         }
         .task {
             try? await Task.sleep(for: .milliseconds(300))
@@ -18,7 +18,7 @@ struct ShareReceiptHost: View {
         }
         .sheet(isPresented: $show) {
             ShareReceiptSheet()
-                .presentationDetents([.fraction(0.86)])
+                .presentationDetents([.fraction(0.84)])
                 .presentationDragIndicator(.visible)
                 .interactiveDismissDisabled()
         }

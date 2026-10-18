@@ -140,29 +140,16 @@ struct RootTabs: View {
     }
 
     var body: some View {
-        TabView(selection: $tab) {
-            Tab("Today", systemImage: "sun.max", value: AppTab.today) {
-                TodayView(showSettings: $showSettings, goInbox: { tab = .inbox })
-            }
-            Tab("Inbox", systemImage: "tray", value: AppTab.inbox) {
-                InboxView(openDetail: openDetail)
-            }
-            .badge(store.pendingCount)
-            Tab("Records", systemImage: "list.bullet.rectangle", value: AppTab.records) {
-                RecordsView(goInbox: { tab = .inbox })
-            }
-            Tab("Properties", systemImage: "house", value: AppTab.properties) {
-                PropertiesView()
-            }
-            Tab("Log time", systemImage: "plus", value: AppTab.add, role: .search) {
-                Color.clear
+        ZStack {
+            switch tab {
+            case .today: TodayView(showSettings: $showSettings, goInbox: { tab = .inbox })
+            case .inbox: InboxView(openDetail: openDetail)
+            case .records: RecordsView(goInbox: { tab = .inbox })
+            case .properties, .add: PropertiesView()
             }
         }
-        .onChange(of: tab) { old, new in
-            if new == .add {
-                tab = old
-                showAdd = true
-            }
+        .overlay(alignment: .bottom) {
+            FloatingTabBar(selection: $tab, inboxBadge: store.pendingCount) { showAdd = true }
         }
         .sheet(isPresented: $showAdd) {
             SuggestionDetailSheet(suggestion: nil) { _ in }
@@ -170,5 +157,84 @@ struct RootTabs: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
+    }
+}
+
+/// Floating Liquid Glass tab bar: four tabs in one capsule, a separate round "+" (Flighty / Craft).
+struct FloatingTabBar: View {
+    @Binding var selection: AppTab
+    var inboxBadge: Int
+    var onAdd: () -> Void
+    @Namespace private var ns
+    @Environment(\.accessibilityReduceMotion) private var reduce
+
+    private let items: [(AppTab, String, String)] = [
+        (.today, "Today", "sun.max"),
+        (.inbox, "Inbox", "tray"),
+        (.records, "Records", "list.bullet.rectangle"),
+        (.properties, "Properties", "house"),
+    ]
+
+    var body: some View {
+        GlassEffectContainer(spacing: 12) {
+            HStack(spacing: 12) {
+                HStack(spacing: 0) {
+                    ForEach(items, id: \.0) { item in
+                        let on = selection == item.0
+                        Button {
+                            withAnimation(Motion.snappy(reduce)) { selection = item.0 }
+                        } label: {
+                            VStack(spacing: 3) {
+                                Image(systemName: on ? item.2 + ".fill" : item.2)
+                                    .font(.system(size: 19, weight: .medium))
+                                    .frame(height: 24)
+                                    .overlay(alignment: .topTrailing) {
+                                        if item.0 == .inbox && inboxBadge > 0 {
+                                            Text("\(inboxBadge)")
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .monospacedDigit()
+                                                .foregroundStyle(.white)
+                                                .contentTransition(.numericText(value: Double(inboxBadge)))
+                                                .padding(.horizontal, 5)
+                                                .frame(minWidth: 18, minHeight: 18)
+                                                .background(Color(uiColor: .systemRed), in: Capsule())
+                                                .offset(x: 12, y: -6)
+                                        }
+                                    }
+                                Text(item.1)
+                                    .font(.system(size: 10, weight: .medium))
+                            }
+                            .foregroundStyle(on ? LH.action : Color.primary)
+                            .frame(maxWidth: .infinity, minHeight: 54)
+                            .background {
+                                if on {
+                                    Capsule()
+                                        .fill(Color.primary.opacity(0.08))
+                                        .matchedGeometryEffect(id: "sel", in: ns)
+                                }
+                            }
+                            .contentShape(Capsule())
+                        }
+                        .buttonStyle(Pressable())
+                        .accessibilityLabel(item.1)
+                        .accessibilityAddTraits(on ? .isSelected : [])
+                    }
+                }
+                .padding(4)
+                .glassEffect(.regular.interactive(), in: Capsule())
+
+                Button(action: onAdd) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 22, weight: .medium))
+                        .foregroundStyle(.primary)
+                        .frame(width: 62, height: 62)
+                }
+                .buttonStyle(Pressable())
+                .glassEffect(.regular.interactive(), in: Circle())
+                .accessibilityLabel("Log time")
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 0)
     }
 }
