@@ -107,3 +107,37 @@ for concept, prefix in [('porchlight', 'pl-'), ('tilework', 'tw-')]:
                 if im.mode == 'RGBA':
                     save_obj(os.path.join(d, f), prefix + f[:-4].replace('_', '-'), 640)
 print(sorted(x for x in os.listdir(DST) if x.startswith(('bp-', 'pl-', 'tw-'))))
+
+# Porchlight extras: unlit lamp (cone + glow removed), softer lit cone, autumn ground strip.
+pl = os.path.join(SRC, 'porchlight')
+lp = os.path.join(DST, 'pl-lamp-lit.png')
+if os.path.exists(lp):
+    a = np.asarray(Image.open(lp).convert('RGBA')).astype(np.int32)
+    lum = 0.299 * a[..., 0] + 0.587 * a[..., 1] + 0.114 * a[..., 2]
+    unlit = a.copy()
+    unlit[..., 3] = np.where(lum < 150, a[..., 3], 0)
+    Image.fromarray(unlit.astype(np.uint8)).save(os.path.join(DST, 'pl-lamp-unlit.png'), optimize=True)
+    lit = a.copy()
+    lit[..., 3] = np.where(lum >= 150, (a[..., 3] * 0.6).astype(np.int32), a[..., 3])
+    Image.fromarray(lit.astype(np.uint8)).save(os.path.join(DST, 'pl-lamp-lit.png'), optimize=True)
+gp = os.path.join(pl, 'ground_autumn.png')
+if os.path.exists(gp):
+    g = Image.open(gp).convert('RGB')
+    g = g.crop((0, 0, g.width, int(g.height * 0.62)))   # lawn + sidewalk; drop the lower band
+    g.thumbnail((1400, 1400), Image.LANCZOS)
+    g.save(os.path.join(DST, 'pl-ground-autumn.png'), optimize=True)
+print('porchlight extras done')
+
+# Blueprint tools set (assets/blueprint/tools): one consistent 3D object per category.
+tools = os.path.join(bp, 'tools')
+tool_map = {'repairs': 'tool_wrench', 'renovation': 'tool_roller', 'cleaning': 'tool_bucket_sponge', 'leasing': 'tool_key',
+            'tenant': 'tool_phone', 'bookkeeping': 'tool_ledger', 'travel': 'tool_carkey', 'inspections': 'tool_flashlight',
+            'legal': 'tool_stamp', 'supplies': 'tool_hardware_bag', 'management': 'tool_clipboard'}
+missing = []
+for cat, f in tool_map.items():
+    p = os.path.join(tools, f + '.png')
+    if os.path.exists(p):
+        save_obj(p, 'bp-tool-' + cat, 320)
+    else:
+        missing.append(cat)
+print('tools missing:', missing)

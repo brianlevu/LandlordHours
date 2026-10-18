@@ -9,7 +9,8 @@ final class SandboxDemoTests: XCTestCase {
         let app = XCUIApplication()
         let appearance = ProcessInfo.processInfo.environment["SANDBOX_APPEARANCE"] ?? "light"
         let direction = ProcessInfo.processInfo.environment["SANDBOX_DIRECTION"] ?? "baseline"
-        app.launchArguments = ["-screen", screen, "-appearance", appearance, "-LHDirection", direction]
+        let concept = ProcessInfo.processInfo.environment["SANDBOX_CONCEPT"] ?? "none"
+        app.launchArguments = ["-screen", screen, "-appearance", appearance, "-LHDirection", direction, "-LHConcept", concept]
         app.launch()
         return app
     }
@@ -79,5 +80,21 @@ final class SandboxDemoTests: XCTestCase {
         sleep(1)
         app.buttons["receipt-save"].tap()
         sleep(3)
+    }
+
+    /// Round-3 concepts: real taps on Today's "To confirm" row, then Log in the sheet.
+    func testConceptConfirm() {
+        let app = launch("concept-tap")
+        let row = app.buttons["today-row-plumber"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        sleep(1)
+        mark()
+        sleep(1)
+        row.tap()
+        let log = app.buttons["confirm-log"]
+        XCTAssertTrue(log.waitForExistence(timeout: 5))
+        sleep(1)
+        log.tap()
+        sleep(4)
     }
 }

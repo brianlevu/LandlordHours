@@ -24,6 +24,7 @@ enum SandboxScreen: String, CaseIterable, Identifiable {
     case emptyInbox = "empty-inbox"
     case conceptToday = "concept-today"
     case conceptConfirm = "concept-confirm"
+    case conceptTap = "concept-tap"
     case conceptMilestone = "concept-milestone"
     case conceptWelcome = "concept-welcome"
     case conceptLockscreen = "concept-lockscreen"
@@ -36,7 +37,7 @@ enum SandboxScreen: String, CaseIterable, Identifiable {
         switch self {
         case .todayOnPace, .todayOnPaceScrolled: .onPace
         case .emptyToday, .conceptEmpty: .empty
-        case .conceptConfirm: .conceptConfirm
+        case .conceptConfirm, .conceptTap: .conceptConfirm
         case .conceptMilestone: .milestone
         case .emptyInbox: .emptyInbox
         default: .behind
@@ -108,6 +109,7 @@ struct ScreenHost: View {
         case .paywall: PaywallView()
         case .conceptToday, .conceptEmpty: ConceptTodayView()
         case .conceptConfirm: ConceptTodayView(autoConfirm: true)
+        case .conceptTap: ConceptTodayView()
         case .conceptMilestone: BlueprintMilestone()
         case .conceptWelcome: BlueprintWelcome()
         case .conceptLockscreen: LockScreenMock()

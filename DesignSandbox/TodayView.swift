@@ -220,6 +220,8 @@ struct ProgressTrack: View {
 
 struct ToConfirmBlock: View {
     @Environment(MockStore.self) private var store
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    @State private var selected: Suggestion?
     var goInbox: () -> Void
 
     var body: some View {
@@ -250,7 +252,9 @@ struct ToConfirmBlock: View {
 
                 VStack(spacing: 0) {
                     ForEach(Array(top.enumerated()), id: \.element.id) { idx, s in
-                        CompactSuggestionRow(s: s)
+                        Button { selected = s } label: { CompactSuggestionRow(s: s) }
+                            .buttonStyle(Pressable())
+                            .accessibilityIdentifier("today-row-\(s.id)")
                         if idx < top.count - 1 {
                             Divider().padding(.leading, 48)
                         }
@@ -266,8 +270,16 @@ struct ToConfirmBlock: View {
                 .lhCard()
             }
         }
+        .sheet(item: $selected) { s in
+            SuggestionDetailSheet(suggestion: s) { hours in
+                store.confirm(s.id, hours: hours, reduceMotion: reduce)
+            } onDismissItem: {
+                store.dismiss(s.id, reduceMotion: reduce)
+            }
+        }
     }
 }
+
 
 struct CompactSuggestionRow: View {
     let s: Suggestion

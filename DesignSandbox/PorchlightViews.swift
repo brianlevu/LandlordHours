@@ -243,8 +243,12 @@ struct PorchlightHero: View {
     @State private var lampTick = 0
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            StreetScene(hours: shown, litWindows: lit, lampHalo: halo)
+        ZStack(alignment: StreetSceneArt.available ? .topTrailing : .topLeading) {
+            if StreetSceneArt.available {
+                StreetSceneArt(hours: shown, litWindows: lit, lampHalo: halo)
+            } else {
+                StreetScene(hours: shown, litWindows: lit, lampHalo: halo)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("\(Int(store.hoursLogged))")
@@ -271,8 +275,10 @@ struct PorchlightHero: View {
         .sensoryFeedback(.impact(weight: .medium), trigger: lampTick)
         .onAppear { shown = store.hoursLogged }
         .onChange(of: store.hoursLogged) { old, new in
+            Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(450))     // let a sheet finish dismissing
             let add = Int((new - old).rounded())
-            lit["pine"] = min(4, (lit["pine"] ?? 0) + max(1, add))
+            withAnimation(reduce ? .easeInOut(duration: 0.2) : nil) { lit["pine"] = min(4, (lit["pine"] ?? 0) + max(1, add)) }
             windowTick += 1
             if Int(new / 50) > Int(old / 50) {
                 Task { @MainActor in
@@ -284,6 +290,7 @@ struct PorchlightHero: View {
                 }
             } else {
                 shown = new
+            }
             }
         }
     }

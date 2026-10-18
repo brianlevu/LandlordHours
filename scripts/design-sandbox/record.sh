@@ -10,7 +10,7 @@ xcrun simctl io "$U" recordVideo --codec=h264 --force "$RAW" > "/Users/brian/tmp
 RP=$!
 REC_START=$(python3 -c 'import time;print(time.time())')
 sleep 1
-TEST_RUNNER_SANDBOX_DIRECTION=${SANDBOX_DIRECTION:-baseline} xcodebuild test-without-building -project LandlordHours.xcodeproj -scheme LHDesignSandbox \
+TEST_RUNNER_SANDBOX_DIRECTION=${SANDBOX_DIRECTION:-baseline} TEST_RUNNER_SANDBOX_CONCEPT=${SANDBOX_CONCEPT:-none} xcodebuild test-without-building -project LandlordHours.xcodeproj -scheme LHDesignSandbox \
   -destination "id=$U" -derivedDataPath /Users/brian/tmp/DerivedData/landlordhours-sandbox \
   -only-testing:LHDesignSandboxUITests/SandboxDemoTests/$1 > "/Users/brian/tmp/lh-test-$2.log" 2>&1
 TRC=$?

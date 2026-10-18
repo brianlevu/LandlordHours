@@ -6,8 +6,10 @@ struct BlueprintHero: View {
     @Environment(MockStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var shownHours: Double = 0
-    @State private var beam: CGPoint? = nil
-    @State private var beamText = ""
+    @State private var board: CGPoint? = nil
+    @State private var boardText = ""
+    @State private var boardTag = false
+    @State private var boardOpacity = 1.0
     @State private var glow = 0.0
     @State private var landTick = 0
 
@@ -52,37 +54,39 @@ struct BlueprintHero: View {
                         .frame(width: hs, height: hs)
                         .position(x: g.size.width - hs / 2 + 2, y: g.size.height - hs / 2 + 4)
 
-                    if let beam {
-                        Text(beamText)
-                            .font(.caption.weight(.heavy)).monospacedDigit()
-                            .foregroundStyle(Color(hex: 0x5A3A12))
-                            .padding(.horizontal, 10).frame(height: 18)
-                            .background(LinearGradient(colors: [BP.timber, BP.timberDark], startPoint: .top, endPoint: .bottom),
-                                        in: RoundedRectangle(cornerRadius: 3))
-                            .shadow(color: .black.opacity(0.3), radius: 3, y: 2)
-                            .position(beam)
+                    if let board {
+                    Clapboard(label: boardText, tagShown: boardTag)
+                        .frame(width: hs * 0.62, height: 13)
+                        .rotationEffect(.degrees(-6))
+                        .position(board)
+                        .opacity(boardOpacity)
                     }
                 }
                 .onChange(of: store.hoursLogged) { old, new in
                     guard new > old else { shownHours = new; return }
                     let hs2 = hs
-                    let target = CGPoint(x: g.size.width - hs2 / 2 + 2, y: g.size.height - hs2 + hs2 * BlueprintHouse.buildY(new) + 4)
-                    beamText = "+\(fmtDur(new - old))"
-                    if reduce {
-                        withAnimation(.easeInOut(duration: 0.2)) { shownHours = new }
-                        landTick += 1
-                        return
-                    }
-                    beam = CGPoint(x: 70, y: g.size.height + 10)
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { beam = target }
+                    let houseCX = g.size.width - hs2 / 2 + 2
+                    let lineY = g.size.height - hs2 + hs2 * BlueprintHouse.buildY(new) + 4
+                    boardText = "+\(fmtDur(new - old))"
                     Task { @MainActor in
-                        try? await Task.sleep(for: .milliseconds(300))
+                        try? await Task.sleep(for: .milliseconds(450))     // let a sheet finish dismissing
+                        if reduce {
+                            board = CGPoint(x: houseCX, y: lineY); boardTag = true
+                            withAnimation(.easeInOut(duration: 0.2)) { boardOpacity = 1; shownHours = new }
+                            landTick += 1
+                            return
+                        }
+                        boardTag = false
+                        boardOpacity = 1
+                        board = CGPoint(x: -hs2 * 0.4, y: lineY - 26)
+                        withAnimation(.spring(response: 0.42, dampingFraction: 0.68)) { board = CGPoint(x: houseCX, y: lineY) }
+                        try? await Task.sleep(for: .milliseconds(330))
                         landTick += 1
-                        withAnimation(.easeOut(duration: 0.15)) { beam = nil }
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.55)) { boardTag = true }
                         withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) { shownHours = new }
                         withAnimation(.easeOut(duration: 0.2)) { glow = 1 }
-                        try? await Task.sleep(for: .milliseconds(900))
-                        withAnimation(.easeOut(duration: 0.8)) { glow = 0 }
+                        try? await Task.sleep(for: .milliseconds(1400))
+                        withAnimation(.easeOut(duration: 0.6)) { glow = 0; boardTag = false }
                     }
                 }
             }
@@ -103,13 +107,16 @@ struct ToolIcon: View {
     var body: some View {
         let m = BP.material(cat)
         RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-            .fill(m.opacity(0.14))
+            .fill(m.opacity(0.12))
             .frame(width: size, height: size)
             .overlay {
                 if let img = conceptImage("bp-tool-\(cat.rawValue)") {
-                    img.resizable().scaledToFit().padding(size * 0.08)
+                    img.resizable().scaledToFit().padding(size * 0.06)
                 } else {
-                    Image(systemName: filled(BP.tool(cat))).font(.system(size: size * 0.46, weight: .semibold)).foregroundStyle(m)
+                    // Neutral placeholder: never mix flat SF Symbols into the 3D set.
+                    RoundedRectangle(cornerRadius: size * 0.2, style: .continuous)
+                        .strokeBorder(BP.drafting.opacity(0.8), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        .padding(size * 0.18)
                 }
             }
     }
@@ -477,5 +484,39 @@ struct BlueprintInboxBanner: View {
         }
         .padding(16)
         .background(BlueprintPaper().clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous)))
+    }
+}
+
+/// The newest course of the house: a timber clapboard with grain and nail heads.
+struct Clapboard: View {
+    var label: String
+    var tagShown: Bool
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 2.5)
+                .fill(LinearGradient(colors: [Color(hex: 0xF0BE7A), BP.timber, BP.timberDark], startPoint: .top, endPoint: .bottom))
+            Path { p in
+                p.move(to: .init(x: 6, y: 4)); p.addCurve(to: .init(x: 120, y: 5), control1: .init(x: 40, y: 2), control2: .init(x: 80, y: 7))
+                p.move(to: .init(x: 30, y: 9)); p.addCurve(to: .init(x: 150, y: 8), control1: .init(x: 70, y: 11), control2: .init(x: 110, y: 6))
+            }.stroke(Color(hex: 0x9E6A2E).opacity(0.35), lineWidth: 0.8)
+            HStack {
+                Circle().fill(Color(hex: 0x6E4A20)).frame(width: 3, height: 3)
+                Spacer()
+                Circle().fill(Color(hex: 0x6E4A20)).frame(width: 3, height: 3)
+            }
+            .padding(.horizontal, 6)
+        }
+        .shadow(color: .black.opacity(0.35), radius: 3, y: 2)
+        .overlay(alignment: .top) {
+            Text(label)
+                .font(.caption.weight(.heavy)).monospacedDigit()
+                .foregroundStyle(BP.blueprint)
+                .padding(.horizontal, 8).frame(height: 20)
+                .background(.white, in: Capsule())
+                .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
+                .offset(y: -26)
+                .scaleEffect(tagShown ? 1 : 0.6, anchor: .bottom)
+                .opacity(tagShown ? 1 : 0)
+        }
     }
 }

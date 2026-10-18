@@ -47,6 +47,7 @@
 		47F2F948AD342BF981017EAC /* bp-house-frame.png in Resources */ = {isa = PBXBuildFile; fileRef = 824E35D167C873A9E90AD798 /* bp-house-frame.png */; };
 		494B71178010F1EDB70BC3A5 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 884A37AD32EE90EF18CEDAE9 /* RevenueCat */; };
 		4A14E0CA9ECD2742910D2C70 /* ConceptCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C007B0CDD0CA8428A7911176 /* ConceptCore.swift */; };
+		4B0639908CE5EBF5D5D6901A /* pl-ground-autumn.png in Resources */ = {isa = PBXBuildFile; fileRef = 142636AD75CF85097F4E66C9 /* pl-ground-autumn.png */; };
 		4C04E70D3E5565A29188DAF4 /* CalendarImportReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FFC13B6D335F226D0DD7B81 /* CalendarImportReviewView.swift */; };
 		4C79FB6429AEC2D4D383C41C /* clay-icon-renovation.png in Resources */ = {isa = PBXBuildFile; fileRef = F538D4BDB861902A9DBF31DA /* clay-icon-renovation.png */; };
 		4EC10E7EB73FF707B44E5974 /* TileworkViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C082BDDD0F38D1EE93251A8 /* TileworkViews.swift */; };
@@ -59,27 +60,32 @@
 		591F1F8B7870974109E9F9AC /* CategoryPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E5A94C2FA181F38E6888ADE /* CategoryPickerSheet.swift */; };
 		592D49597AA064D5E494E87F /* pl-lamp-lit.png in Resources */ = {isa = PBXBuildFile; fileRef = 25E6CC2EFE9958AF4C1BECD8 /* pl-lamp-lit.png */; };
 		595644C754F5418184AC4740 /* EngagementNotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D2C2173FB64791CCAAB8FD /* EngagementNotificationScheduler.swift */; };
+		59FEC49F18A8CF7AA520D510 /* bp-tool-supplies.png in Resources */ = {isa = PBXBuildFile; fileRef = 8A6399E265BE70C0DAFC6F99 /* bp-tool-supplies.png */; };
 		5A44B45762C944964A296F92 /* ink-receipt-envelope.png in Resources */ = {isa = PBXBuildFile; fileRef = 74B4FF48284FA5EF6C3A541B /* ink-receipt-envelope.png */; };
 		5A9DF54A28B492DC7FDFA64F /* clay-icon-cleaning-turnover.png in Resources */ = {isa = PBXBuildFile; fileRef = 9F566D22744E32DA0161DB8A /* clay-icon-cleaning-turnover.png */; };
 		5AA0D982BB42E25BA085B2A6 /* UITestIsolation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DC428FA6B6EF8A5244CC123 /* UITestIsolation.swift */; };
 		5AFC939B91357BDE9567875F /* LegacyProfileFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C69AE5A6A99BBB20034F16BA /* LegacyProfileFixture.swift */; };
 		5B3F022C7A5A8E5978AF1EB7 /* bp-type-duplex.png in Resources */ = {isa = PBXBuildFile; fileRef = 0181C335F567990677A7B633 /* bp-type-duplex.png */; };
+		609BD579AC700D21B850FCEB /* pl-lamp-unlit.png in Resources */ = {isa = PBXBuildFile; fileRef = 917142CBFF276BB7C713FE57 /* pl-lamp-unlit.png */; };
 		6145256E78B6FF599DFB3B9D /* EngagementIntelligenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D41E394791AE4ADCA1F725 /* EngagementIntelligenceService.swift */; };
 		68FC9200CCE8BE10AF895E36 /* bp-plaque-blank.png in Resources */ = {isa = PBXBuildFile; fileRef = BD3AA8E0F537E7DB8A9B4321 /* bp-plaque-blank.png */; };
 		691B932AEB4ECA321D667151 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7002A4C1E561833705DE3B43 /* PaywallView.swift */; };
 		6D69ADF82BC3E2BE46E1ADC3 /* way-scene-empty-inbox.png in Resources */ = {isa = PBXBuildFile; fileRef = FE39ECA96F7000005779F096 /* way-scene-empty-inbox.png */; };
 		708EDA426351E4E5ECB2A0BC /* CloudKitSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E942608EE77393A2E7F17F89 /* CloudKitSyncService.swift */; };
+		76931ACFDD67E56F2C5DB807 /* bp-tool-tenant.png in Resources */ = {isa = PBXBuildFile; fileRef = 2F268EADE6ADE7D4A8F35F8D /* bp-tool-tenant.png */; };
 		7BE636161E5D4B92208041FC /* LandlordHoursTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E078FA57ABF4C028DDE04C86 /* LandlordHoursTimerAttributes.swift */; };
 		7CB9BA413496A06323C90A38 /* AuditReportBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = D87C61D0D4C65EDFDCB0649B /* AuditReportBuilder.swift */; };
 		7D5B5EFF409BABD0E41A86EB /* pl-spot-key.png in Resources */ = {isa = PBXBuildFile; fileRef = 889ED380A5BA961C2DB11B56 /* pl-spot-key.png */; };
 		7E0B82EEBC8E67989BB1C257 /* TimerDraftUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27D9AE994D0696BCE6E017B9 /* TimerDraftUITests.swift */; };
 		81C2E3343267B99573A20E43 /* bp-tool-bookkeeping.png in Resources */ = {isa = PBXBuildFile; fileRef = 779DD87C19971FCC18F1D99E /* bp-tool-bookkeeping.png */; };
+		822843EA3BB55948C6417FC4 /* PorchlightArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3A159C34AFDE61575BBF433 /* PorchlightArt.swift */; };
 		833AA85624FAC915F2A42D6E /* SandboxDemoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3D252CBD10DD31063B716CD /* SandboxDemoTests.swift */; };
 		83BA1FC07145480611FC87F3 /* clay-scene-empty-inbox.png in Resources */ = {isa = PBXBuildFile; fileRef = 40EE8D8182926E6A6FB5FD60 /* clay-scene-empty-inbox.png */; };
 		86277D1C3EF4C21CAB223CB5 /* ProMoments.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF39EBE443D66C2EA654096 /* ProMoments.swift */; };
 		863C3075E0189086608D24F7 /* bp-house-built.png in Resources */ = {isa = PBXBuildFile; fileRef = C4488698F236E7A977355A78 /* bp-house-built.png */; };
 		877787F8ED2EB5C41E44B17D /* clay-house-single-family.png in Resources */ = {isa = PBXBuildFile; fileRef = 4A2CB7BA288101AD90A41337 /* clay-house-single-family.png */; };
 		87DDF9CFBAAE7676D8368B8F /* SignInReplacementUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ABD160E56491F781779A536 /* SignInReplacementUITests.swift */; };
+		8831DF72CB8AE08B256B1D9C /* bp-tool-cleaning.png in Resources */ = {isa = PBXBuildFile; fileRef = E757D4E38BED4241ED6A7018 /* bp-tool-cleaning.png */; };
 		8A79DE214A36A15071DB0706 /* tw-tile-bookkeeping.png in Resources */ = {isa = PBXBuildFile; fileRef = 1712B98D80BED524F6E4C99B /* tw-tile-bookkeeping.png */; };
 		8C7B95F9AB3B004160114387 /* clay-icon-repairs.png in Resources */ = {isa = PBXBuildFile; fileRef = 77EEF450B8654D6DA0021D63 /* clay-icon-repairs.png */; };
 		8DCDA53C99D6607B2EB138B8 /* LocalProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1CAE53C865D5B8D680C6F0D /* LocalProfileTests.swift */; };
@@ -91,9 +97,11 @@
 		93C20D864969D6F6EC85B191 /* TimeLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11377EC6BD95D70E1AF5A9A6 /* TimeLogView.swift */; };
 		99888C2A31D856B15B475CD0 /* pl-house-cabin.png in Resources */ = {isa = PBXBuildFile; fileRef = 5D1674C729AB1CB94724C2C3 /* pl-house-cabin.png */; };
 		9CE36BEB3B657BB6CDCEF7D4 /* ShareReceiptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B1541850E32F72545D67D3 /* ShareReceiptView.swift */; };
+		9D78711994AE65340A49DA7F /* bp-tool-legal.png in Resources */ = {isa = PBXBuildFile; fileRef = 0BEAF5CFB2C59B211FEBAC61 /* bp-tool-legal.png */; };
 		A0635C304AF19BD05633788E /* WeeklySummaryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CDD5A26F0EDE1AF0DB43F2D /* WeeklySummaryService.swift */; };
 		A130AD4A0C3826D57BDE0E2C /* LandlordPurchasesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0914D43BECE24E5CB862706D /* LandlordPurchasesTests.swift */; };
 		A19B27FA79300AEB0C1C6CAE /* bp-tool-inspections.png in Resources */ = {isa = PBXBuildFile; fileRef = 5BE8AB6D898C7DEF82776408 /* bp-tool-inspections.png */; };
+		A3C4CFA10D9F2DD7C054F4F2 /* bp-tool-renovation.png in Resources */ = {isa = PBXBuildFile; fileRef = AA6DA100AE533D23763B27B5 /* bp-tool-renovation.png */; };
 		A3E4068064D7EDB66035D174 /* clay-house-cabin-str.png in Resources */ = {isa = PBXBuildFile; fileRef = 24B3FA1037FE3A0BD2ACB6FF /* clay-house-cabin-str.png */; };
 		A47503D607E3D15AB9B78D16 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 754B9E894A2C95D4E5C635B0 /* HistoryView.swift */; };
 		A49044187F5AE0A06C0F229B /* SuggestionDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9695EE6BC4C3313705E270E9 /* SuggestionDetailSheet.swift */; };
@@ -121,6 +129,7 @@
 		BFF6F8AE069FE01CE9E5414F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE13F908989158FDAB28BF57 /* Models.swift */; };
 		C033DAA5B2F3EB1B50CDA1CE /* LandlordHoursApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9CB28BC741E54912DBB35F /* LandlordHoursApp.swift */; };
 		C0A08CB6A71D4D2F6CF858B3 /* SandboxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E16721049E2F563A89E24935 /* SandboxApp.swift */; };
+		C35399E906E330EC747D6A50 /* bp-tool-management.png in Resources */ = {isa = PBXBuildFile; fileRef = 412BF09B620129DC2BD608D4 /* bp-tool-management.png */; };
 		C3E06B79C92F2D90F73CE57C /* CelebrationOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF68DBFF1FFD763363015B42 /* CelebrationOverlayView.swift */; };
 		C408F01AC2AF6808FB83EFDA /* bp-type-apartment.png in Resources */ = {isa = PBXBuildFile; fileRef = CDF6A4822293C457C4527EFE /* bp-type-apartment.png */; };
 		C5046F51FE176FE3159C598D /* ReportViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73FECCEAAAB14D81BA455765 /* ReportViews.swift */; };
@@ -145,6 +154,7 @@
 		ECCEECAF864DD8D63F3C84B9 /* ContactSupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B38BCF663A8276A105CBCC1 /* ContactSupportView.swift */; };
 		EF39259AAA4B78AD285FB003 /* pl-house-duplex.png in Resources */ = {isa = PBXBuildFile; fileRef = 52148C3D0CF37A9B8972FA65 /* pl-house-duplex.png */; };
 		F20713D35465CC3396393B14 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2CA9BA1AD53F0ABA92A9F2F /* OnboardingView.swift */; };
+		F31C433EBB5DE7FB19F29418 /* bp-tool-travel.png in Resources */ = {isa = PBXBuildFile; fileRef = 5A395CD49EA501C5E5BC7F36 /* bp-tool-travel.png */; };
 		F478FF9794A68575342F3808 /* pl-spot-mailbox.png in Resources */ = {isa = PBXBuildFile; fileRef = B48AB9F391B776DA5DBBE85F /* pl-spot-mailbox.png */; };
 		F5F772DCA214E238BAD9BF40 /* way-scene-welcome.png in Resources */ = {isa = PBXBuildFile; fileRef = A8FE35C1E899CCC8EFEE74C0 /* way-scene-welcome.png */; };
 		F6BE7D0ED3855E96C6BE9A59 /* clay-scene-welcome.png in Resources */ = {isa = PBXBuildFile; fileRef = 3D1A308AD5A685DDEDC7827C /* clay-scene-welcome.png */; };
@@ -185,9 +195,11 @@
 		0181C335F567990677A7B633 /* bp-type-duplex.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "bp-type-duplex.png"; sourceTree = "<group>"; };
 		02AE3372F32CD60F04CF317C /* CategoryManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryManagementView.swift; sourceTree = "<group>"; };
 		0914D43BECE24E5CB862706D /* LandlordPurchasesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordPurchasesTests.swift; sourceTree = "<group>"; };
+		0BEAF5CFB2C59B211FEBAC61 /* bp-tool-legal.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "bp-tool-legal.png"; sourceTree = "<group>"; };
 		0FFC13B6D335F226D0DD7B81 /* CalendarImportReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarImportReviewView.swift; sourceTree = "<group>"; };
 		111C91DE9EE369C07CE2F490 /* AuditReportCSV.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditReportCSV.swift; sourceTree = "<group>"; };
 		11377EC6BD95D70E1AF5A9A6 /* TimeLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeLogView.swift; sourceTree = "<group>"; };
+		142636AD75CF85097F4E66C9 /* pl-ground-autumn.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "pl-ground-autumn.png"; sourceTree = "<group>"; };
 		1552DA58D14D98D9473D352A /* SubscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
 		1712B98D80BED524F6E4C99B /* tw-tile-bookkeeping.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "tw-tile-bookkeeping.png"; sourceTree = "<group>"; };
 		172B3D3B09786621DD123327 /* TimerDraftCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerDraftCard.swift; sourceTree = "<group>"; };
@@ -202,6 +214,7 @@
 		27D9AE994D0696BCE6E017B9 /* TimerDraftUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerDraftUITests.swift; sourceTree = "<group>"; };
 		2ADDDB975045852EFCE28FCE /* bp-tool-repairs.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "bp-tool-repairs.png"; sourceTree = "<group>"; };
 		2CDD5A26F0EDE1AF0DB43F2D /* WeeklySummaryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklySummaryService.swift; sourceTree = "<group>"; };
+		2F268EADE6ADE7D4A8F35F8D /* bp-tool-tenant.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "bp-tool-tenant.png"; sourceTree = "<group>"; };
 		31A39D3EEA4003C1B931EDA8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		368AC8C360A71EB0FAFB1D52 /* TasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksView.swift; sourceTree = "<group>"; };
 		37718C6C352F5146B1B19AAA /* ExportPDFView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPDFView.swift; sourceTree = "<group>"; };
@@ -214,6 +227,7 @@
 		3DDFFCB72B1B6BB5B396193C /* ink-keyring.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "ink-keyring.png"; sourceTree = "<group>"; };
 		40A0AF0742A962397484C42F /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		40EE8D8182926E6A6FB5FD60 /* clay-scene-empty-inbox.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-scene-empty-inbox.png"; sourceTree = "<group>"; };
+		412BF09B620129DC2BD608D4 /* bp-tool-management.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "bp-tool-management.png"; sourceTree = "<group>"; };
 		434AE320C71AE1DAFBBBD038 /* LearningCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningCenterView.swift; sourceTree = "<group>"; };
 		46C2C28508D1F64A007B6BF9 /* AuditReportPDFRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditReportPDFRenderer.swift; sourceTree = "<group>"; };
 		46D2C2173FB64791CCAAB8FD /* EngagementNotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementNotificationScheduler.swift; sourceTree = "<group>"; };
@@ -229,6 +243,7 @@
 		52148C3D0CF37A9B8972FA65 /* pl-house-duplex.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "pl-house-duplex.png"; sourceTree = "<group>"; };
 		548394DDA38D7BBFDD18E815 /* FreeUserPaywallUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FreeUserPaywallUITests.swift; sourceTree = "<group>"; };
 		5490464EB91A5699EED6EFCE /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
+		5A395CD49EA501C5E5BC7F36 /* bp-tool-travel.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "bp-tool-travel.png"; sourceTree = "<group>"; };
 		5BE8AB6D898C7DEF82776408 /* bp-tool-inspections.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "bp-tool-inspections.png"; sourceTree = "<group>"; };
 		5C50B0C40A29E39E7B5E6BE9 /* EngagementWidgetSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementWidgetSnapshotStore.swift; sourceTree = "<group>"; };
 		5D1674C729AB1CB94724C2C3 /* pl-house-cabin.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "pl-house-cabin.png"; sourceTree = "<group>"; };
@@ -254,12 +269,14 @@
 		87021923814C102EEE7A0666 /* pl-spot-calendar.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "pl-spot-calendar.png"; sourceTree = "<group>"; };
 		889ED380A5BA961C2DB11B56 /* pl-spot-key.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "pl-spot-key.png"; sourceTree = "<group>"; };
 		8A1269F8E8320CC31B0C8EFF /* Directions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Directions.swift; sourceTree = "<group>"; };
+		8A6399E265BE70C0DAFC6F99 /* bp-tool-supplies.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "bp-tool-supplies.png"; sourceTree = "<group>"; };
 		8ABD160E56491F781779A536 /* SignInReplacementUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInReplacementUITests.swift; sourceTree = "<group>"; };
 		8C0AEFAF47FA35FA04567644 /* tw-tile-repairs.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "tw-tile-repairs.png"; sourceTree = "<group>"; };
 		8E5A94C2FA181F38E6888ADE /* CategoryPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryPickerSheet.swift; sourceTree = "<group>"; };
 		8F16B919639EBDE7C821FEC2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8FCEB78C87CE37B6387EC6A4 /* pl-maple-autumn.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "pl-maple-autumn.png"; sourceTree = "<group>"; };
 		9135E50473E5416DA22ADB11 /* way-scene-empty-today.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "way-scene-empty-today.png"; sourceTree = "<group>"; };
+		917142CBFF276BB7C713FE57 /* pl-lamp-unlit.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "pl-lamp-unlit.png"; sourceTree = "<group>"; };
 		95834A15C18661C7066155C1 /* LandlordHoursTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LandlordHoursTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		965D319F27D7A4A2332D47B2 /* LandlordHoursAppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordHoursAppIntents.swift; sourceTree = "<group>"; };
 		9695EE6BC4C3313705E270E9 /* SuggestionDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestionDetailSheet.swift; sourceTree = "<group>"; };
@@ -280,6 +297,7 @@
 		A2CA9BA1AD53F0ABA92A9F2F /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		A45A5E898E99F37E67CE51D1 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
 		A8FE35C1E899CCC8EFEE74C0 /* way-scene-welcome.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "way-scene-welcome.png"; sourceTree = "<group>"; };
+		AA6DA100AE533D23763B27B5 /* bp-tool-renovation.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "bp-tool-renovation.png"; sourceTree = "<group>"; };
 		AF514D22B9745ADD5748D16E /* BlueprintHouse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlueprintHouse.swift; sourceTree = "<group>"; };
 		AF63DC10108B9EAC40FE0C4C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		AFF3C2F4E4EAC2D09DCB3F5B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -318,6 +336,7 @@
 		E16721049E2F563A89E24935 /* SandboxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SandboxApp.swift; sourceTree = "<group>"; };
 		E6D41E394791AE4ADCA1F725 /* EngagementIntelligenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementIntelligenceService.swift; sourceTree = "<group>"; };
 		E75072D3D1741921AAD89CE5 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		E757D4E38BED4241ED6A7018 /* bp-tool-cleaning.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "bp-tool-cleaning.png"; sourceTree = "<group>"; };
 		E942608EE77393A2E7F17F89 /* CloudKitSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitSyncService.swift; sourceTree = "<group>"; };
 		E97CC17BB58AC9A73B0B7133 /* clay-icon-showing-leasing.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-icon-showing-leasing.png"; sourceTree = "<group>"; };
 		EA1DF3BCE5385BCFDC7627DC /* LandlordPurchases.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordPurchases.swift; sourceTree = "<group>"; };
@@ -325,6 +344,7 @@
 		EC9D2F407BFAD0EBB8E9F948 /* RecordsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsView.swift; sourceTree = "<group>"; };
 		EF8D0CC022750B11F752E840 /* pl-maple-winter.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "pl-maple-winter.png"; sourceTree = "<group>"; };
 		F35FE0D4E616BBC5040D9C4A /* OnboardingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingViews.swift; sourceTree = "<group>"; };
+		F3A159C34AFDE61575BBF433 /* PorchlightArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PorchlightArt.swift; sourceTree = "<group>"; };
 		F466E060081461E36AC54CC1 /* clay-icon-legal-admin.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-icon-legal-admin.png"; sourceTree = "<group>"; };
 		F538D4BDB861902A9DBF31DA /* clay-icon-renovation.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-icon-renovation.png"; sourceTree = "<group>"; };
 		F63814CFFD3A0284AC85988D /* AITimeEntryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITimeEntryService.swift; sourceTree = "<group>"; };
@@ -385,9 +405,16 @@
 				BD3AA8E0F537E7DB8A9B4321 /* bp-plaque-blank.png */,
 				992079972A5A44750FF6C917 /* bp-rolled-blueprint.png */,
 				779DD87C19971FCC18F1D99E /* bp-tool-bookkeeping.png */,
+				E757D4E38BED4241ED6A7018 /* bp-tool-cleaning.png */,
 				5BE8AB6D898C7DEF82776408 /* bp-tool-inspections.png */,
 				D6B7D12ADDA91D35B4BB366A /* bp-tool-leasing.png */,
+				0BEAF5CFB2C59B211FEBAC61 /* bp-tool-legal.png */,
+				412BF09B620129DC2BD608D4 /* bp-tool-management.png */,
+				AA6DA100AE533D23763B27B5 /* bp-tool-renovation.png */,
 				2ADDDB975045852EFCE28FCE /* bp-tool-repairs.png */,
+				8A6399E265BE70C0DAFC6F99 /* bp-tool-supplies.png */,
+				2F268EADE6ADE7D4A8F35F8D /* bp-tool-tenant.png */,
+				5A395CD49EA501C5E5BC7F36 /* bp-tool-travel.png */,
 				CDF6A4822293C457C4527EFE /* bp-type-apartment.png */,
 				3B68F40BC5341BA828B3272A /* bp-type-cabin.png */,
 				0181C335F567990677A7B633 /* bp-type-duplex.png */,
@@ -413,11 +440,13 @@
 				51644436D6AC313CEBB86FB6 /* ink-cabin.png */,
 				3DDFFCB72B1B6BB5B396193C /* ink-keyring.png */,
 				74B4FF48284FA5EF6C3A541B /* ink-receipt-envelope.png */,
+				142636AD75CF85097F4E66C9 /* pl-ground-autumn.png */,
 				5D1674C729AB1CB94724C2C3 /* pl-house-cabin.png */,
 				52148C3D0CF37A9B8972FA65 /* pl-house-duplex.png */,
 				D4D0E61C3FC2481940ED9618 /* pl-house-single.png */,
 				CF5E965283E9948E449AE93E /* pl-house-walkup.png */,
 				25E6CC2EFE9958AF4C1BECD8 /* pl-lamp-lit.png */,
+				917142CBFF276BB7C713FE57 /* pl-lamp-unlit.png */,
 				8FCEB78C87CE37B6387EC6A4 /* pl-maple-autumn.png */,
 				CBD94E790388D2593195907C /* pl-maple-spring.png */,
 				3B87BDB94CCF9FCDCB1AAB8C /* pl-maple-summer.png */,
@@ -542,6 +571,7 @@
 				4A24AF19BB69722DE09DEABF /* MockStore.swift */,
 				F35FE0D4E616BBC5040D9C4A /* OnboardingViews.swift */,
 				E75072D3D1741921AAD89CE5 /* PaywallView.swift */,
+				F3A159C34AFDE61575BBF433 /* PorchlightArt.swift */,
 				9B34BAB20FB369C597DD8D39 /* PorchlightViews.swift */,
 				EC9D2F407BFAD0EBB8E9F948 /* RecordsView.swift */,
 				73FECCEAAAB14D81BA455765 /* ReportViews.swift */,
@@ -793,9 +823,16 @@
 				68FC9200CCE8BE10AF895E36 /* bp-plaque-blank.png in Resources */,
 				1DFF09C47356CF639AE05FBC /* bp-rolled-blueprint.png in Resources */,
 				81C2E3343267B99573A20E43 /* bp-tool-bookkeeping.png in Resources */,
+				8831DF72CB8AE08B256B1D9C /* bp-tool-cleaning.png in Resources */,
 				A19B27FA79300AEB0C1C6CAE /* bp-tool-inspections.png in Resources */,
 				E3786A74C8B6296A50BC16E5 /* bp-tool-leasing.png in Resources */,
+				9D78711994AE65340A49DA7F /* bp-tool-legal.png in Resources */,
+				C35399E906E330EC747D6A50 /* bp-tool-management.png in Resources */,
+				A3C4CFA10D9F2DD7C054F4F2 /* bp-tool-renovation.png in Resources */,
 				E1D35EB260F73BC1CB946712 /* bp-tool-repairs.png in Resources */,
+				59FEC49F18A8CF7AA520D510 /* bp-tool-supplies.png in Resources */,
+				76931ACFDD67E56F2C5DB807 /* bp-tool-tenant.png in Resources */,
+				F31C433EBB5DE7FB19F29418 /* bp-tool-travel.png in Resources */,
 				C408F01AC2AF6808FB83EFDA /* bp-type-apartment.png in Resources */,
 				14E8AC6010817E3C66C24497 /* bp-type-cabin.png in Resources */,
 				5B3F022C7A5A8E5978AF1EB7 /* bp-type-duplex.png in Resources */,
@@ -821,11 +858,13 @@
 				19E893316FE25F2D839C1AFB /* ink-cabin.png in Resources */,
 				28F85A7ABE20887069028D25 /* ink-keyring.png in Resources */,
 				5A44B45762C944964A296F92 /* ink-receipt-envelope.png in Resources */,
+				4B0639908CE5EBF5D5D6901A /* pl-ground-autumn.png in Resources */,
 				99888C2A31D856B15B475CD0 /* pl-house-cabin.png in Resources */,
 				EF39259AAA4B78AD285FB003 /* pl-house-duplex.png in Resources */,
 				B004554AA7F36E797219B3AF /* pl-house-single.png in Resources */,
 				1875A09538C2AEEC3422D45C /* pl-house-walkup.png in Resources */,
 				592D49597AA064D5E494E87F /* pl-lamp-lit.png in Resources */,
+				609BD579AC700D21B850FCEB /* pl-lamp-unlit.png in Resources */,
 				BE87D2F1AB152080F6C8EA46 /* pl-maple-autumn.png in Resources */,
 				F7D4EA3D0A1D0ED9FFCD39DB /* pl-maple-spring.png in Resources */,
 				3DD7D74447B7BC078ABCC789 /* pl-maple-summer.png in Resources */,
@@ -935,6 +974,7 @@
 				93038CF8F63FA8C1F44A1081 /* MockStore.swift in Sources */,
 				2E574ECE1DF447E91AE20ADC /* OnboardingViews.swift in Sources */,
 				E71040DEA4484EFC4BD37024 /* PaywallView.swift in Sources */,
+				822843EA3BB55948C6417FC4 /* PorchlightArt.swift in Sources */,
 				BD3F42BE5B3B404A363FB01B /* PorchlightViews.swift in Sources */,
 				A9F81AF25E79929DA5615F3C /* RecordsView.swift in Sources */,
 				C5046F51FE176FE3159C598D /* ReportViews.swift in Sources */,

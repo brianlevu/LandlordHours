@@ -30,6 +30,6 @@ for c in $CONCEPTS; do
     else
       SANDBOX_CONCEPT=$c SANDBOX_OUT="$ROOT/$c" "$HERE/capture.sh" $ap concept-today | sed "s#^#$c/#"
     fi
-    burst $c $ap concept-confirm confirm 1.2 1.95 2.25 3.6
+    burst $c $ap concept-confirm confirm ${CONFIRM_DELAYS:-1.2 1.95 2.25 3.6}
   done
 done
