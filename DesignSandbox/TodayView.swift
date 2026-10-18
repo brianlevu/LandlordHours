@@ -273,7 +273,9 @@ struct CompactSuggestionRow: View {
     let s: Suggestion
     var body: some View {
         HStack(spacing: 12) {
-            if LHDirection.current == .baseline {
+            if LHConcept.current != .none {
+                ConceptRowIcon(cat: s.category, size: 36)
+            } else if LHDirection.current == .baseline {
                 SourceTile(kind: s.kind, size: 36)
             } else {
                 CategoryIcon(cat: s.category, size: 36)
@@ -298,7 +300,9 @@ struct CompactSuggestionRow: View {
             }
             .font(.body)
             .monospacedDigit()
-            if LHDirection.current != .baseline {
+            if LHConcept.current != .none {
+                ConceptPropertyThumb(prop: Prop.named(s.property), size: 32)
+            } else if LHDirection.current != .baseline {
                 PropertyMark(prop: Prop.named(s.property), size: 32)
             }
         }

@@ -62,8 +62,14 @@ struct InboxView: View {
     private var list: some View {
         List {
             Section {
-                BackfillBanner()
-                    .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
+                if LHConcept.current == .blueprint {
+                    BlueprintInboxBanner()
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                } else {
+                    BackfillBanner()
+                        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16))
+                }
             }
             ForEach(groups, id: \.0) { title, items in
                 Section {
@@ -106,6 +112,8 @@ struct InboxView: View {
         }
         .listStyle(.insetGrouped)
         .listSectionSpacing(20)
+        .scrollContentBackground(LHConcept.current == .none ? .automatic : .hidden)
+        .background(LH.canvas)
         .contentMargins(.bottom, 100, for: .scrollContent)
     }
 }
@@ -161,7 +169,8 @@ struct SuggestionRow: View {
     let s: Suggestion
 
     var body: some View {
-        if LHDirection.current == .baseline { baselineBody } else { DirectionSuggestionRow(s: s) }
+        if LHConcept.current != .none { ConceptSuggestionRow(s: s) }
+        else if LHDirection.current == .baseline { baselineBody } else { DirectionSuggestionRow(s: s) }
     }
 
     private var baselineBody: some View {

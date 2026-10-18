@@ -22,13 +22,22 @@ enum SandboxScreen: String, CaseIterable, Identifiable {
     case settings
     case emptyToday = "empty-today"
     case emptyInbox = "empty-inbox"
+    case conceptToday = "concept-today"
+    case conceptConfirm = "concept-confirm"
+    case conceptMilestone = "concept-milestone"
+    case conceptWelcome = "concept-welcome"
+    case conceptLockscreen = "concept-lockscreen"
+    case conceptEmpty = "concept-empty"
+    case conceptBackfill = "concept-backfill"
 
     var id: String { rawValue }
 
     var scenario: Scenario {
         switch self {
         case .todayOnPace, .todayOnPaceScrolled: .onPace
-        case .emptyToday: .empty
+        case .emptyToday, .conceptEmpty: .empty
+        case .conceptConfirm: .conceptConfirm
+        case .conceptMilestone: .milestone
         case .emptyInbox: .emptyInbox
         default: .behind
         }
@@ -97,6 +106,12 @@ struct ScreenHost: View {
         case .export: NavigationStack { ExportView(locked: false) }
         case .locked: NavigationStack { ExportView(locked: true) }
         case .paywall: PaywallView()
+        case .conceptToday, .conceptEmpty: ConceptTodayView()
+        case .conceptConfirm: ConceptTodayView(autoConfirm: true)
+        case .conceptMilestone: BlueprintMilestone()
+        case .conceptWelcome: BlueprintWelcome()
+        case .conceptLockscreen: LockScreenMock()
+        case .conceptBackfill: BlueprintBackfill()
         }
     }
 }

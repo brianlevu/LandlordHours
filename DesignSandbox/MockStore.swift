@@ -66,7 +66,7 @@ struct RecordGroup: Identifiable {
 }
 
 enum Scenario: String {
-    case behind, onPace, empty, emptyInbox
+    case behind, onPace, empty, emptyInbox, conceptConfirm, milestone
 }
 
 @MainActor
@@ -102,6 +102,15 @@ final class MockStore {
         case .emptyInbox:
             suggestions = []
             hoursLogged = 236
+            hasProperties = true
+        case .conceptConfirm:
+            suggestions = MockStore.backfill
+            // Porchlight starts 2h short of a lamp so the confirm visibly lights one.
+            hoursLogged = LHConcept.current == .porchlight ? 248 : 212
+            hasProperties = true
+        case .milestone:
+            suggestions = []
+            hoursLogged = 500
             hasProperties = true
         }
     }

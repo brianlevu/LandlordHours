@@ -49,8 +49,9 @@ enum LH {
     /// Secondary text. System secondaryLabel composites to ~3.4:1 on white, so it is replaced:
     /// #636366 = 5.9:1 on white, 5.3:1 on #F2F2F7; #9A9AA0 = 6.1:1 on #1C1C1E, 7.5:1 on black.
     static let secondaryText = Color(light: 0x636366, dark: 0x9A9AA0)
-    static let canvas = Color(uiColor: .systemGroupedBackground)
-    static let card = Color(uiColor: .secondarySystemGroupedBackground)
+    // Concepts (round 3) re-skin the page and card surfaces app-wide.
+    static let canvas: Color = LHConcept.current.canvas ?? Color(uiColor: .systemGroupedBackground)
+    static let card: Color = LHConcept.current.card ?? Color(uiColor: .secondarySystemGroupedBackground)
     static let fill = Color(uiColor: .systemFill)
     static let tertiaryFill = Color(uiColor: .tertiarySystemFill)
     static let separator = Color(uiColor: .separator)

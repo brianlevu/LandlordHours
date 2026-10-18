@@ -34,7 +34,11 @@ struct LockScreenMock: View {
                 Spacer(minLength: 12)
 
                 VStack(spacing: 10) {
-                    LiveActivityCard(start: start)
+                    if LHConcept.current == .blueprint {
+                        BlueprintLiveActivity(start: start)
+                    } else {
+                        LiveActivityCard(start: start)
+                    }
                     NotificationExpanded()
                 }
                 .padding(.horizontal, 10)
@@ -215,7 +219,7 @@ struct NotificationExpanded: View {
             .background(NeutralPlatter(radius: 24))
 
             VStack(spacing: 0) {
-                actionRow("Log 2h", symbol: "checkmark.circle")
+                actionRow(LHConcept.current == .blueprint ? "Log 2h and build" : "Log 2h", symbol: "checkmark.circle")
                 Divider().padding(.leading, 16)
                 actionRow("Edit…", symbol: "pencil")
                 Divider().padding(.leading, 16)
