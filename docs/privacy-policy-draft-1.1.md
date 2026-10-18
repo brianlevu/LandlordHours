@@ -6,11 +6,11 @@ LandlordHours ("we", "the app") helps you track rental property hours. This page
 
 ## What stays on your device and in your iCloud
 
-Your time entries, properties, notes, addresses, receipts and reports are yours. They live on your device. If iCloud is on, they also sync to your own private iCloud account. We run no server that stores them. We cannot read them.
+Your time entries, properties, notes, addresses, receipts and reports are yours. They live on your device. If iCloud is on, your entries, properties and settings also sync to your own private iCloud account. Receipt photos stay on this device and are not synced. We run no server that stores them. We cannot read them.
 
 ## The note-to-fields feature runs on your device
 
-When you type or dictate a note, the app reads it on your device to suggest a category, property and hours. Nothing is sent anywhere for this. We do not use a third-party AI service. Dictation uses Apple's on-device speech recognition.
+When you type or dictate a note, the app reads it on your device to suggest a category, property and hours. Nothing is sent anywhere for this. We do not use a third-party AI service. Dictation uses Apple's speech recognition. On most recent iPhones it runs on the device; on some older devices Apple may process the audio on its servers.
 
 ## Anonymous usage analytics (PostHog)
 
@@ -42,7 +42,7 @@ The app asks first before using notifications, calendar, location or the microph
 
 ## Delete your data
 
-In Settings, choose "Delete Account and Data" (or "Delete All Data" if you use the app without signing in). This removes your data from the device and from your iCloud copy, including receipts. If iCloud is unreachable, the app tells you, and iCloud copies can be removed later. Deleting the app removes the on-device copy.
+In Settings, choose "Delete Account and Data" (or "Delete All Data" if you use the app without signing in). This removes your data from the device, including receipt photos, and from your iCloud copy. If iCloud is unreachable, the app tells you, and iCloud copies can be removed later. Deleting the app removes the on-device copy.
 
 You can export your records any time as PDF or CSV.
 
