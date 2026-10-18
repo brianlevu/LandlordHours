@@ -56,7 +56,7 @@ struct HeroCard: View {
     }
     private var statusColor: Color {
         switch status {
-        case .starting: .secondary
+        case .starting: LH.secondaryText
         case .onPace: LH.positive
         case .behind: LH.caution
         }
@@ -67,14 +67,14 @@ struct HeroCard: View {
             Text("2026 · REPS goal").eyebrow()
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(fmt(store.hoursLogged))
+                Text("\(Int(store.hoursLogged))")
                     .font(.system(size: 48, weight: .semibold))
                     .monospacedDigit()
                     .contentTransition(.numericText(value: store.hoursLogged))
                     .animation(Motion.snappy(reduce), value: store.hoursLogged)
-                Text("of \(Int(store.goal)) h")
+                Text("of \(Int(store.goal))h")
                     .font(.title2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(LH.secondaryText)
             }
             .padding(.top, 6)
 
@@ -85,13 +85,13 @@ struct HeroCard: View {
                 .padding(.top, 20)
 
             HStack {
-                Text("\(fmt(max(store.goal - store.hoursLogged, 0))) h to go")
+                Text("\(fmtDur(max(store.goal - store.hoursLogged, 0))) to go")
                     .contentTransition(.numericText(value: store.hoursLogged))
                 Spacer()
                 Text("By Dec 31")
             }
             .font(.footnote)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(LH.secondaryText)
             .monospacedDigit()
             .padding(.top, 10)
         }
@@ -105,16 +105,16 @@ struct HeroCard: View {
         switch status {
         case .starting:
             Label("Getting started", systemImage: "circle.dashed")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(LH.secondaryText)
                 .font(.body.weight(.medium))
         case .onPace:
-            Label { Text("On pace · \(fmt(store.pace)) h ahead") } icon: {
+            Label { Text("On pace · \(fmtDur(store.pace)) ahead") } icon: {
                 Image(systemName: "arrow.up.circle.fill")
             }
             .foregroundStyle(LH.positive)
             .font(.body.weight(.semibold))
         case .behind:
-            Label { Text("Behind by \(fmt(-store.pace)) h") } icon: {
+            Label { Text("Behind by \(fmtDur(-store.pace))") } icon: {
                 Image(systemName: "exclamationmark.circle.fill")
             }
             .foregroundStyle(LH.caution)
@@ -160,7 +160,7 @@ struct ToConfirmBlock: View {
         let top = Array(store.pending.prefix(3))
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text("To confirm").eyebrow()
+                Text("To confirm").sectionLabel()
                 Spacer()
                 Button(action: goInbox) {
                     HStack(spacing: 2) {
@@ -186,7 +186,7 @@ struct ToConfirmBlock: View {
                     ForEach(Array(top.enumerated()), id: \.element.id) { idx, s in
                         CompactSuggestionRow(s: s)
                         if idx < top.count - 1 {
-                            Divider().padding(.leading, 64)
+                            Divider().padding(.leading, 48)
                         }
                     }
                     Button(action: goInbox) {
@@ -214,14 +214,14 @@ struct CompactSuggestionRow: View {
                     .lineLimit(2)
                 Text("\(s.kind.label) · \(s.when)")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(LH.secondaryText)
             }
             Spacer(minLength: 8)
             Group {
                 if let h = s.hours {
-                    Text("\(fmt(h)) h")
+                    Text(fmtDur(h))
                 } else if let m = s.capMinutes {
-                    Text("≤\(m / 60)h \(m % 60)m")
+                    Text("≤" + fmtDur(Double(m) / 60))
                 } else {
                     Text("Add hours").foregroundStyle(LH.caution)
                 }
@@ -239,21 +239,21 @@ struct MetricGrid: View {
     @Environment(MockStore.self) private var store
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("This year").eyebrow().padding(.horizontal, 4)
+            Text("This year").sectionLabel().padding(.horizontal, 4)
             Grid(horizontalSpacing: 12, verticalSpacing: 12) {
                 GridRow {
                     MetricCard(symbol: "chart.pie", label: "50% rule", value: "64", unit: "%",
                                status: "Above 50%", statusSymbol: "checkmark.circle.fill", statusColor: LH.positive)
-                    MetricCard(symbol: "calendar", label: "This week", value: "9.5", unit: "h",
-                               status: "2 h more than last week", statusSymbol: nil, statusColor: .secondary,
+                    MetricCard(symbol: "calendar", label: "This week", value: "9h 30m", unit: nil,
+                               status: "2h more than last week", statusSymbol: nil, statusColor: LH.secondaryText,
                                bars: [1, 2, 0, 3.5, 1, 0, 2])
                 }
                 GridRow {
-                    MetricCard(symbol: "person.2", label: "Spouse", value: "38.5", unit: "h",
-                               status: "Counts if filing jointly", statusSymbol: nil, statusColor: .secondary)
+                    MetricCard(symbol: "person.2", label: "Spouse", value: "38h 30m", unit: nil,
+                               status: "Counts if filing jointly", statusSymbol: nil, statusColor: LH.secondaryText)
                     MetricCard(symbol: "hourglass", label: "Days left", value: "74", unit: nil,
-                               status: store.pace >= 0 ? "7 h a week keeps pace" : "8 h a week to catch up",
-                               statusSymbol: nil, statusColor: .secondary)
+                               status: store.pace >= 0 ? "7h a week keeps pace" : "8h a week to catch up",
+                               statusSymbol: nil, statusColor: LH.secondaryText)
                 }
             }
         }
@@ -272,18 +272,17 @@ struct MetricCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label(label, systemImage: symbol)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
-            HStack(alignment: .lastTextBaseline) {
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text(value).font(.system(size: 28, weight: .semibold)).monospacedDigit()
-                    if let unit { Text(unit).font(.title3).foregroundStyle(.secondary) }
-                }
+            HStack(alignment: .top) {
+                Label(label, systemImage: symbol)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(LH.secondaryText)
                 Spacer(minLength: 4)
-                if let bars {
-                    MiniBars(values: bars)
-                }
+                if let bars { MiniBars(values: bars) }
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(value).font(.system(size: 28, weight: .semibold)).monospacedDigit()
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                if let unit { Text(unit).font(.title3).foregroundStyle(LH.secondaryText) }
             }
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 if let statusSymbol { Image(systemName: statusSymbol) }
@@ -341,14 +340,14 @@ struct EmptyStateView: View {
                 .overlay {
                     Image(systemName: symbol)
                         .font(.system(size: 24, weight: .regular))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(LH.secondaryText)
                 }
             Text(title)
                 .font(.body.weight(.semibold))
                 .padding(.top, 16)
             Text(message)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(LH.secondaryText)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 290)
                 .padding(.top, 4)

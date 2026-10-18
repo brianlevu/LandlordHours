@@ -6,11 +6,11 @@ struct ShareReceiptHost: View {
     @State private var show = false
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color(uiColor: .systemBackground).ignoresSafeArea()
             ReceiptPaper()
                 .frame(width: 260)
                 .rotationEffect(.degrees(-2))
-                .padding(.bottom, 420)
+                .padding(.bottom, 470)
         }
         .task {
             try? await Task.sleep(for: .milliseconds(300))
@@ -18,7 +18,7 @@ struct ShareReceiptHost: View {
         }
         .sheet(isPresented: $show) {
             ShareReceiptSheet()
-                .presentationDetents([.fraction(0.84)])
+                .presentationDetents([.fraction(0.9)])
                 .presentationDragIndicator(.visible)
                 .interactiveDismissDisabled()
         }
@@ -57,7 +57,7 @@ struct ShareReceiptSheet: View {
                             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(LH.separator, lineWidth: 0.5))
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Home Depot").font(.body.weight(.semibold))
-                            Text("$212.40 · Thu, Oct 16").font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
+                            Text("$212.40 · Thu, Oct 16").font(.subheadline).foregroundStyle(LH.secondaryText).monospacedDigit()
                         }
                         Spacer()
                     }
@@ -66,7 +66,7 @@ struct ShareReceiptSheet: View {
                     VStack(spacing: 10) {
                         Text("Read from the receipt, on your iPhone")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(LH.secondaryText)
                         HStack(spacing: 8) {
                             ReadChip("Store")
                             ReadChip("Total")
@@ -89,7 +89,7 @@ struct ShareReceiptSheet: View {
                                 .transition(.opacity)
                         }
                     }
-                    .padding(.top, 28)
+                    .padding(.top, 24)
 
                     HStack(spacing: 12) {
                         StepButton(symbol: "minus", enabled: (hours ?? 0) > 0.5) {
@@ -100,20 +100,20 @@ struct ShareReceiptSheet: View {
                         Group {
                             if let hours {
                                 let (h, m) = fmtHM(hours)
-                                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                HStack(alignment: .firstTextBaseline, spacing: 1) {
                                     Text("\(h)").font(.system(size: 34, weight: .semibold))
                                         .contentTransition(.numericText(value: Double(h)))
-                                    Text("h").font(.title3).foregroundStyle(.secondary)
+                                    Text("h").font(.title3).foregroundStyle(LH.secondaryText)
                                     Text(String(format: "%02d", m)).font(.system(size: 34, weight: .semibold))
                                         .contentTransition(.numericText(value: Double(m)))
-                                        .padding(.leading, 4)
-                                    Text("m").font(.title3).foregroundStyle(.secondary)
+                                        .padding(.leading, 8)
+                                    Text("m").font(.title3).foregroundStyle(LH.secondaryText)
                                 }
                                 .monospacedDigit()
                             } else {
                                 Text("Add hours")
                                     .font(.title3)
-                                    .foregroundStyle(.tertiary)
+                                    .foregroundStyle(LH.secondaryText)
                             }
                         }
                         .frame(height: 44)
@@ -132,13 +132,13 @@ struct ShareReceiptSheet: View {
                     }
                     .padding(.top, 10)
 
-                    Text("A receipt can't say how long you worked, so we never guess. Count the shopping trip and the time spent using what you bought.")
+                    Text("A receipt can't say how long you worked, so we never guess.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(LH.secondaryText)
                         .padding(.top, 8)
 
                     // Add to
-                    Text("Add to").font(.body.weight(.semibold)).padding(.top, 28)
+                    Text("Add to").sectionLabel().padding(.top, 24)
                     VStack(spacing: 0) {
                         ForEach(properties.indices, id: \.self) { i in
                             Button {
@@ -147,12 +147,12 @@ struct ShareReceiptSheet: View {
                                 HStack(spacing: 12) {
                                     Image(systemName: i == 0 ? "house.lodge" : "building.2")
                                         .font(.system(size: 16))
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(LH.secondaryText)
                                         .frame(width: 32, height: 32)
                                         .background(LH.fill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                                     VStack(alignment: .leading, spacing: 1) {
                                         Text(properties[i].0).foregroundStyle(.primary)
-                                        Text(properties[i].1).font(.footnote).foregroundStyle(.secondary)
+                                        Text(properties[i].1).font(.footnote).foregroundStyle(LH.secondaryText)
                                     }
                                     Spacer()
                                     if property == i {
@@ -168,6 +168,7 @@ struct ShareReceiptSheet: View {
                             .buttonStyle(.plain)
                             Divider().padding(.leading, 58)
                         }
+                        // (the divider above separates the last property from "Other work")
                         HStack(spacing: 12) {
                             Image(systemName: "plus")
                                 .font(.system(size: 16, weight: .semibold))
@@ -179,7 +180,8 @@ struct ShareReceiptSheet: View {
                         .padding(.horizontal, 14)
                         .frame(minHeight: 52)
                     }
-                    .background(LH.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(LH.card)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .padding(.top, 10)
                 }
                 .padding(.horizontal, 20)
@@ -203,7 +205,7 @@ struct ShareReceiptSheet: View {
                     Button {
                         withAnimation(Motion.collapse(reduce)) { saved = true }
                     } label: {
-                        Text(hours == nil ? "Add hours to save" : "Add \(fmt(hours ?? 0)) h to \(properties[property].0)")
+                        Text(hours == nil ? "Add hours to save" : "Add \(fmtDur(hours ?? 0)) to \(properties[property].0)")
                             .contentTransition(.numericText(value: hours ?? 0))
                     }
                     .buttonStyle(PrimaryCapsule())

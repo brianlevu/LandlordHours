@@ -205,23 +205,23 @@ struct NotificationExpanded: View {
                         Spacer()
                         Text("now")
                             .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(LH.secondaryText)
                     }
-                    Text("Log 2 h at Pine Cabin? It goes in your record only if you say so.")
+                    Text("Log 2h at Pine Cabin? It goes in your record only if you say so.")
                         .font(.system(size: 15))
                 }
             }
             .padding(14)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(NeutralPlatter(radius: 24))
 
             VStack(spacing: 0) {
-                actionRow("Log 2 h", symbol: "checkmark.circle")
+                actionRow("Log 2h", symbol: "checkmark.circle")
                 Divider().padding(.leading, 16)
                 actionRow("Edit…", symbol: "pencil")
                 Divider().padding(.leading, 16)
                 actionRow("Not work", symbol: "xmark.circle")
             }
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(NeutralPlatter(radius: 22))
             .frame(width: 250)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -235,5 +235,18 @@ struct NotificationExpanded: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 46)
+    }
+}
+
+/// Near-neutral frosted platter like iOS notifications: blur the wallpaper, then wash out its hue.
+struct NeutralPlatter: View {
+    var radius: CGFloat
+    @Environment(\.colorScheme) private var scheme
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        ZStack {
+            shape.fill(.ultraThinMaterial)
+            shape.fill(scheme == .dark ? Color(hex: 0x1C1C1E, alpha: 0.72) : Color(hex: 0xF4F4F6, alpha: 0.80))
+        }
     }
 }

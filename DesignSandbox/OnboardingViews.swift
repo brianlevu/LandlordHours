@@ -33,19 +33,12 @@ struct OnboardingScaffold<Content: View, Footer: View>: View {
                             .font(.title.weight(.bold))
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    if let tag {
-                        Text(tag)
-                            .font(.caption2.weight(.bold))
-                            .tracking(0.6)
-                            .foregroundStyle(LH.action)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(LH.actionWash, in: Capsule())
-                            .padding(.top, 10)
+                    if tag != nil {
+                        BetaTag().padding(.top, 10)
                     }
                     Text(body_)
                         .font(.body)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(LH.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 10)
                     content
@@ -89,7 +82,7 @@ struct PrivacyFooter: View {
                 .foregroundStyle(LH.positive)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(LH.positive)
-                Text(message).font(.footnote).foregroundStyle(.secondary)
+                Text(message).font(.footnote).foregroundStyle(LH.secondaryText)
             }
             Spacer(minLength: 0)
         }
@@ -111,7 +104,7 @@ struct OnboardingWelcome: View {
                 .padding(.top, 28)
             Text("LandlordHours finds the hours you already spend on your rentals and builds the record your accountant needs.")
                 .font(.body)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(LH.secondaryText)
                 .padding(.top, 12)
 
             VStack(alignment: .leading, spacing: 22) {
@@ -129,7 +122,7 @@ struct OnboardingWelcome: View {
                 .buttonStyle(PrimaryCapsule())
             Text("Your records stay on your iPhone and in your iCloud.")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(LH.secondaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 14)
                 .padding(.bottom, 8)
@@ -174,7 +167,7 @@ struct Feature: View {
                 .frame(width: 28)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.body.weight(.semibold))
-                Text(text).font(.subheadline).foregroundStyle(.secondary)
+                Text(text).font(.subheadline).foregroundStyle(LH.secondaryText)
             }
         }
     }
@@ -198,18 +191,18 @@ struct OnboardingProperty: View {
                 .background(LH.tertiaryFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("How do guests stay?").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                    Text("How do guests stay?").sectionLabel()
                     Picker("Type", selection: $type) {
                         Text("Long-term").tag(0)
                         Text("Short-term").tag(1)
                     }
                     .pickerStyle(.segmented)
                     Text("Short-term means an average stay of 7 days or less.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(LH.secondaryText)
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Who does the work?").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                    Text("Who does the work?").sectionLabel()
                     VStack(spacing: 0) {
                         RadioRow(symbol: "person", title: "Just me", text: "I look after it myself", on: manager == 0)
                         Divider().padding(.leading, 52)
@@ -231,7 +224,7 @@ struct FieldRow: View {
     var value: String
     var body: some View {
         HStack {
-            Text(label).foregroundStyle(.secondary).frame(width: 80, alignment: .leading)
+            Text(label).foregroundStyle(LH.secondaryText).frame(width: 80, alignment: .leading)
             Text(value)
             Spacer()
         }
@@ -250,11 +243,11 @@ struct RadioRow: View {
         HStack(spacing: 14) {
             Image(systemName: symbol)
                 .font(.system(size: 18))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(LH.secondaryText)
                 .frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.body)
-                Text(text).font(.footnote).foregroundStyle(.secondary)
+                Text(text).font(.footnote).foregroundStyle(LH.secondaryText)
             }
             Spacer()
             Image(systemName: on ? "checkmark.circle.fill" : "circle")
@@ -285,7 +278,7 @@ struct OnboardingCalendar: View {
                     HStack {
                         Label("Choose calendars", systemImage: "checklist")
                         Spacer()
-                        Text("2 of 4").foregroundStyle(.secondary)
+                        Text("2 of 4").foregroundStyle(LH.secondaryText)
                         Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
                     }
                     .padding(.horizontal, 16)
@@ -295,17 +288,21 @@ struct OnboardingCalendar: View {
                 .background(LH.tertiaryFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("What a suggestion looks like").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                    Text("What a suggestion looks like").sectionLabel()
                     HStack(spacing: 12) {
                         VStack(spacing: 0) {
                             Text("2").font(.system(size: 24, weight: .semibold))
-                            Text("Hours").font(.caption2.weight(.semibold)).textCase(.uppercase).foregroundStyle(.secondary)
+                            Text("Hours").font(.caption2.weight(.semibold)).textCase(.uppercase).foregroundStyle(LH.secondaryText)
                         }
                         .frame(width: 52)
                         VStack(alignment: .leading, spacing: 2) {
-                            Label("Calendar · Tue 9–11", systemImage: "calendar")
-                                .labelStyle(TightLabel())
-                                .font(.subheadline).foregroundStyle(.secondary)
+                            Label {
+                                Text("Calendar · Tue 9–11")
+                            } icon: {
+                                Image(systemName: "calendar").foregroundStyle(LH.srcCalendar)
+                            }
+                            .labelStyle(TightLabel())
+                            .font(.subheadline).foregroundStyle(LH.secondaryText)
                             Text("\(Text("Plumber").fontWeight(.semibold)) at \(Text("Pine Cabin").fontWeight(.semibold))")
                         }
                         Spacer()
@@ -313,7 +310,7 @@ struct OnboardingCalendar: View {
                     .padding(14)
                     .background(LH.tertiaryFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     Text("We'll look back 90 days, so your first suggestions are ready right away.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(LH.secondaryText)
                 }
             }
         } footer: {
@@ -332,7 +329,7 @@ struct SettingsLabel: LabelStyle {
         HStack(spacing: 14) {
             configuration.icon
                 .font(.system(size: 18))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(LH.secondaryText)
                 .frame(width: 22)
             configuration.title
         }
@@ -345,7 +342,7 @@ struct OnboardingLocation: View {
     var body: some View {
         OnboardingScaffold(step: 3, title: "Notice when you're at Oak Street",
                            body_: "To notice when you arrive and leave while the app is closed, iOS asks for Always access.",
-                           tag: "BETA") {
+                           tag: "Beta") {
             VStack(spacing: 10) {
                 SystemAlertPreview()
                     .fixedSize(horizontal: false, vertical: true)
@@ -353,14 +350,14 @@ struct OnboardingLocation: View {
                     .padding(.vertical, -30)
                 Text("When iOS asks, pick “Change to Always Allow.”")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(LH.secondaryText)
                     .multilineTextAlignment(.center)
+                PrivacyFooter(title: "Only your property addresses",
+                              message: "We check for arrivals at the addresses you add. Your location history is never stored or sent.")
+                    .padding(.top, 24)
             }
             .frame(maxWidth: .infinity)
         } footer: {
-            PrivacyFooter(title: "Only your property addresses",
-                          message: "We check for arrivals at the addresses you add. Your location history is never stored or sent.")
-                .padding(.bottom, 8)
             Button("Continue") {}.buttonStyle(PrimaryCapsule())
             Button("Not now") {}
                 .font(.body).foregroundStyle(LH.action).frame(minHeight: 44)
@@ -380,7 +377,7 @@ struct SystemAlertPreview: View {
                 Text("We only check the addresses of the properties you add.")
                     .font(.footnote)
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(LH.secondaryText)
             }
             .padding(.horizontal, 20)
             .padding(.top, 22)

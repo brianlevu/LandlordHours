@@ -18,34 +18,34 @@ struct ReportView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text("Your hours").font(.title3.weight(.semibold))
+                        Text("Your hours").sectionLabel()
                         Spacer()
                         SharePill()
                     }
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text("212 h").font(.system(size: 44, weight: .bold)).monospacedDigit()
-                        Text("of 750").font(.title2).foregroundStyle(.secondary)
+                        Text("212h").font(.system(size: 44, weight: .bold)).monospacedDigit()
+                        Text("of 750").font(.title2).foregroundStyle(LH.secondaryText)
                     }
                     .padding(.top, 4)
                     Text("Through Oct 18 · 74 days left in the year")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                        .font(.subheadline).foregroundStyle(LH.secondaryText)
                 }
 
                 BreakdownSection(title: "By property", rows: [
-                    ("Pine Cabin", 0.60, "128 h"), ("Oak Street", 0.40, "84 h"),
+                    ("Pine Cabin", 0.60, "128h"), ("Oak Street", 0.40, "84h"),
                 ], color: LH.action)
 
                 BreakdownSection(title: "By kind of work", rows: [
-                    ("Repairs", 0.38, "81 h"), ("Leasing", 0.21, "44 h"), ("Cleaning", 0.16, "34 h"),
-                    ("Admin", 0.14, "30 h"), ("Management", 0.11, "23 h"),
+                    ("Repairs", 0.38, "81h"), ("Leasing", 0.21, "44h"), ("Cleaning", 0.16, "34h"),
+                    ("Admin", 0.14, "30h"), ("Management", 0.11, "23h"),
                 ], color: LH.action.opacity(0.75))
 
                 BreakdownSection(title: "Who did it", rows: [
-                    ("Me", 0.82, "173.5 h"), ("Spouse", 0.18, "38.5 h"),
+                    ("Me", 0.82, "173h 30m"), ("Spouse", 0.18, "38h 30m"),
                 ], color: LH.action.opacity(0.75))
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Where the hours came from").font(.title3.weight(.semibold))
+                    Text("Where the hours came from").sectionLabel()
                     HStack(spacing: 0) {
                         SourceStat(kind: .calendar, value: "61%")
                         SourceStat(kind: .manual, value: "22%")
@@ -55,7 +55,7 @@ struct ReportView: View {
                     .padding(.vertical, 14)
                     .lhCard(radius: 16)
                     Text("Every entry was confirmed by you. The PDF shows when each was detected and confirmed.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(LH.secondaryText)
                 }
 
                 Button("Export PDF") { showExport = true }
@@ -89,7 +89,7 @@ struct SourceStat: View {
         VStack(spacing: 6) {
             SourceTile(kind: kind, size: 32)
             Text(value).font(.body.weight(.semibold)).monospacedDigit()
-            Text(kind == .manual ? "By hand" : kind.label).font(.caption).foregroundStyle(.secondary)
+            Text(kind == .manual ? "By hand" : kind.label).font(.caption).foregroundStyle(LH.secondaryText)
         }
         .frame(maxWidth: .infinity)
     }
@@ -101,11 +101,11 @@ struct BreakdownSection: View {
     var color: Color
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.title3.weight(.semibold))
+            Text(title).sectionLabel()
             VStack(spacing: 12) {
                 ForEach(rows, id: \.0) { r in
                     HStack(spacing: 12) {
-                        Text(r.0).font(.subheadline.weight(.semibold)).frame(width: 96, alignment: .leading)
+                        Text(r.0).font(.subheadline.weight(.semibold)).lineLimit(1).fixedSize().frame(width: 100, alignment: .leading)
                         GeometryReader { g in
                             ZStack(alignment: .leading) {
                                 Capsule().fill(LH.fill)
@@ -113,8 +113,8 @@ struct BreakdownSection: View {
                             }
                         }
                         .frame(height: 10)
-                        Text(r.2).font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
-                            .frame(width: 62, alignment: .trailing)
+                        Text(r.2).font(.subheadline).foregroundStyle(LH.secondaryText).monospacedDigit()
+                            .frame(width: 76, alignment: .trailing).lineLimit(1).fixedSize()
                     }
                 }
             }
@@ -178,8 +178,7 @@ struct ExportView: View {
                     ToggleRow(title: "Show where each entry came from", isOn: $sources)
                 }
                 .background(LH.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .disabled(locked)
-                .opacity(locked ? 0.6 : 1)
+                .allowsHitTesting(!locked)
             }
             .padding(.horizontal, 20)
             .padding(.top, 4)
@@ -189,11 +188,13 @@ struct ExportView: View {
         .navigationTitle("PDF")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Export") { if locked { paywall = true } }
-                    .buttonStyle(.glassProminent)
-                    .tint(LH.action)
-                    .fontWeight(.semibold)
+            if !locked {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Export") {}
+                        .buttonStyle(.glassProminent)
+                        .tint(LH.action)
+                        .fontWeight(.semibold)
+                }
             }
         }
         .fullScreenCover(isPresented: $paywall) { PaywallView() }
@@ -260,19 +261,19 @@ struct PDFThumb: View {
 /// The real report page, drawn at US Letter points (612×792). Used by Export, Locked and the Paywall hero.
 struct ReportPage: View {
     private let rows: [(String, String, String, String, String, String)] = [
-        ("Oct 16", "Home Depot run (repairs)", "Pine Cabin", "1.5", "Receipt", "Oct 16"),
-        ("Oct 14", "Plumber visit", "Pine Cabin", "2.0", "Calendar", "Oct 15"),
-        ("Oct 12", "Site visit", "Oak Street", "1.25", "Location", "Oct 12"),
-        ("Oct 11", "Unit 2 repairs", "Oak Street", "3.5", "Timer", "Oct 11"),
-        ("Oct 10", "Tenant calls", "Oak Street", "0.75", "Manual", "Oct 10"),
-        ("Oct 9", "Turnover clean (spouse)", "Pine Cabin", "3.0", "Calendar", "Oct 9"),
-        ("Oct 6", "Bookkeeping", "Both", "1.5", "Calendar", "Oct 7"),
-        ("Oct 2", "Insurance review", "Oak Street", "1.0", "Calendar", "Oct 2"),
-        ("Sep 23", "HOA meeting", "Oak Street", "2.0", "Calendar", "Sep 24"),
-        ("Sep 21", "Bookkeeping", "Both", "2.5", "Manual", "Sep 21"),
-        ("Sep 12", "Roof inspection", "Pine Cabin", "1.5", "Calendar", "Sep 21"),
-        ("Sep 8", "Lease signing (spouse)", "Oak Street", "1.0", "Calendar", "Sep 8"),
-        ("Sep 3", "Fridge delivery", "Pine Cabin", "2.0", "Calendar", "Sep 3"),
+        ("Oct 16", "Home Depot run (repairs)", "Pine Cabin", "1h 30m", "Receipt", "Oct 16"),
+        ("Oct 14", "Plumber visit", "Pine Cabin", "2h", "Calendar", "Oct 15"),
+        ("Oct 12", "Site visit", "Oak Street", "1h 15m", "Location", "Oct 12"),
+        ("Oct 11", "Unit 2 repairs", "Oak Street", "3h 30m", "Timer", "Oct 11"),
+        ("Oct 10", "Tenant calls", "Oak Street", "45m", "Manual", "Oct 10"),
+        ("Oct 9", "Turnover clean (spouse)", "Pine Cabin", "3h", "Calendar", "Oct 9"),
+        ("Oct 6", "Bookkeeping", "Both", "1h 30m", "Calendar", "Oct 7"),
+        ("Oct 2", "Insurance review", "Oak Street", "1h", "Calendar", "Oct 2"),
+        ("Sep 23", "HOA meeting", "Oak Street", "2h", "Calendar", "Sep 24"),
+        ("Sep 21", "Bookkeeping", "Both", "2h 30m", "Manual", "Sep 21"),
+        ("Sep 12", "Roof inspection", "Pine Cabin", "1h 30m", "Calendar", "Sep 21"),
+        ("Sep 8", "Lease signing (spouse)", "Oak Street", "1h", "Calendar", "Sep 8"),
+        ("Sep 3", "Fridge delivery", "Pine Cabin", "2h", "Calendar", "Sep 3"),
     ]
 
     var body: some View {
@@ -291,18 +292,18 @@ struct ReportPage: View {
             }
 
             HStack(spacing: 0) {
-                pageStat("212.0", "Hours logged")
-                pageStat("750", "REPS goal")
+                pageStat("212h", "Hours logged")
+                pageStat("750h", "REPS goal")
                 pageStat("64%", "Share of work time")
-                pageStat("38.5", "Spouse hours")
+                pageStat("38h 30m", "Spouse hours")
             }
             .padding(.vertical, 12)
             .background(Color(hex: 0xF4F3FA))
             .padding(.top, 18)
 
             Text("By property").font(.system(size: 11, weight: .semibold)).padding(.top, 18)
-            pageBar("Pine Cabin · short-term", 0.6, "128.0 h")
-            pageBar("Oak Street Duplex · long-term", 0.4, "84.0 h")
+            pageBar("Pine Cabin · short-term", 0.6, "128h")
+            pageBar("Oak Street Duplex · long-term", 0.4, "84h")
 
             Text("Entries").font(.system(size: 11, weight: .semibold)).padding(.top, 18).padding(.bottom, 6)
             tableRow(("Date", "Activity", "Property", "Hours", "Source", "Confirmed"), header: true)
@@ -349,7 +350,7 @@ struct ReportPage: View {
             Text(r.0).frame(width: 44, alignment: .leading)
             Text(r.1).frame(maxWidth: .infinity, alignment: .leading)
             Text(r.2).frame(width: 74, alignment: .leading)
-            Text(r.3).frame(width: 36, alignment: .trailing)
+            Text(r.3).frame(width: 46, alignment: .trailing)
             Text(r.4).frame(width: 56, alignment: .leading).padding(.leading, 8)
             Text(r.5).frame(width: 54, alignment: .leading)
         }

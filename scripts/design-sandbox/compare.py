@@ -1,6 +1,7 @@
 from PIL import Image, ImageDraw, ImageFont
 R = '/Users/brian/AgentScratch/landlordhours/2026-10-18/refs-hifi'
-F = '/Users/brian/AgentScratch/landlordhours/2026-10-18/hifi-frames'
+import os
+F = os.environ.get('SANDBOX_OUT', '/Users/brian/AgentScratch/landlordhours/2026-10-18/hifi-frames-r2')
 O = F + '/compare'
 pairs = [
     ('a-home', 'a-home/bevel-2-trends.png', 'today-behind'),

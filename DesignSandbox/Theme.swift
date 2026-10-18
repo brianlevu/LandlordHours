@@ -46,6 +46,9 @@ enum LH {
     static let srcLocation = Color(light: 0x0A7C8C, dark: 0x5AD1E0)
     static let srcReceipt = Color(light: 0x6C6C70, dark: 0xAEAEB2)
 
+    /// Secondary text. System secondaryLabel composites to ~3.4:1 on white, so it is replaced:
+    /// #636366 = 5.9:1 on white, 5.3:1 on #F2F2F7; #9A9AA0 = 6.1:1 on #1C1C1E, 7.5:1 on black.
+    static let secondaryText = Color(light: 0x636366, dark: 0x9A9AA0)
     static let canvas = Color(uiColor: .systemGroupedBackground)
     static let card = Color(uiColor: .secondarySystemGroupedBackground)
     static let fill = Color(uiColor: .systemFill)
@@ -73,8 +76,11 @@ extension View {
         self.font(.footnote.weight(.semibold))
             .textCase(.uppercase)
             .tracking(0.3)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(LH.secondaryText)
     }
+
+    /// One section-label style everywhere (SPEC §13: 13pt semibold caps, secondary).
+    func sectionLabel() -> some View { eyebrow() }
 
     /// Bevel card: radius 20, padding inside handled by caller, barely-there shadow in light.
     func lhCard(radius: CGFloat = 20) -> some View {
@@ -110,7 +116,7 @@ struct PrimaryCapsule: ButtonStyle {
         configuration.label
             .font(.body.weight(.semibold))
             .frame(maxWidth: .infinity, minHeight: 52)
-            .foregroundStyle(enabled ? LH.onAction : Color.secondary)
+            .foregroundStyle(enabled ? LH.onAction : LH.secondaryText)
             .background(enabled ? LH.action : LH.fill, in: Capsule())
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
@@ -181,7 +187,28 @@ func fmt(_ h: Double) -> String {
     h == h.rounded() ? "\(Int(h))" : String(format: "%g", h)
 }
 
+/// One duration format everywhere: "2h", "45m", "2h 15m".
+func fmtDur(_ h: Double) -> String {
+    let t = Int((h * 60).rounded())
+    let hh = t / 60, mm = t % 60
+    if mm == 0 { return "\(hh)h" }
+    if hh == 0 { return "\(mm)m" }
+    return "\(hh)h \(mm)m"
+}
+
 func fmtHM(_ h: Double) -> (Int, Int) {
     let total = Int((h * 60).rounded())
     return (total / 60, total % 60)
+}
+
+/// Quiet "Beta" tag.
+struct BetaTag: View {
+    var body: some View {
+        Text("Beta")
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(LH.secondaryText)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .overlay(Capsule().strokeBorder(LH.separator, lineWidth: 1))
+    }
 }

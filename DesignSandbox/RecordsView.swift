@@ -2,7 +2,6 @@ import SwiftUI
 
 struct RecordsView: View {
     @Environment(MockStore.self) private var store
-    @State private var query = ""
     @State private var showReport = false
     var goInbox: () -> Void
 
@@ -10,42 +9,57 @@ struct RecordsView: View {
         NavigationStack {
             List {
                 Section {
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    VStack(spacing: 12) {
                         HStack(spacing: 8) {
-                            FilterChip(title: "2026", selected: true)
-                            FilterChip(title: "Property", menu: true)
-                            FilterChip(title: "Source", menu: true)
-                            FilterChip(title: "Who", menu: true)
+                            Image(systemName: "magnifyingglass")
+                            Text("Search records")
+                            Spacer()
                         }
+                        .font(.body)
+                        .foregroundStyle(LH.secondaryText)
+                        .padding(.horizontal, 12)
+                        .frame(height: 38)
+                        .background(LH.tertiaryFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                         .padding(.horizontal, 16)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                FilterChip(title: "2026", selected: true)
+                                FilterChip(title: "Property", menu: true)
+                                FilterChip(title: "Source", menu: true)
+                                FilterChip(title: "Who", menu: true)
+                            }
+                            .padding(.horizontal, 16)
+                        }
                     }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
                 }
-                .listSectionSpacing(8)
+                .listSectionSpacing(12)
 
                 ForEach(MockStore.records) { group in
                     Section {
                         ForEach(group.entries) { e in
                             RecordRow(e: e)
                                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-                                .alignmentGuide(.listRowSeparatorLeading) { _ in 56 }
+                                .alignmentGuide(.listRowSeparatorLeading) { _ in 52 }
                         }
                     } header: {
                         HStack(alignment: .firstTextBaseline) {
-                            Text(group.id).font(.title3.weight(.semibold)).foregroundStyle(.primary)
+                            Text(group.id).sectionLabel()
                             Spacer()
-                            Text("\(fmt(group.total)) h").font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
+                            Text(fmtDur(group.total))
+                                .font(.footnote.weight(.semibold))
+                                .monospacedDigit()
+                                .foregroundStyle(LH.secondaryText)
                         }
-                        .textCase(nil)
-                        .padding(.horizontal, -4)
                     }
                 }
             }
             .listStyle(.insetGrouped)
-            .contentMargins(.bottom, 120, for: .scrollContent)
+            .contentMargins(.bottom, 150, for: .scrollContent)
             .navigationTitle("Records")
-            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search records")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Export") { showReport = true }
@@ -53,11 +67,11 @@ struct RecordsView: View {
                 }
             }
             .navigationDestination(isPresented: $showReport) { ReportView() }
-            .safeAreaInset(edge: .bottom) {
+            .overlay(alignment: .bottom) {
                 if store.pendingCount > 0 {
                     AttentionPill(count: store.pendingCount, action: goInbox)
                         .padding(.horizontal, 20)
-                        .padding(.bottom, 74)
+                        .padding(.bottom, 82)
                 }
             }
         }
@@ -85,27 +99,32 @@ struct FilterChip: View {
 struct RecordRow: View {
     let e: RecordEntry
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             SourceTile(kind: e.kind)
-            VStack(alignment: .leading, spacing: 3) {
-                Text("\(Text(e.title).fontWeight(.medium)) · \(e.property)")
+            VStack(alignment: .leading, spacing: 2) {
+                Text(e.title)
                     .font(.body)
-                    .lineLimit(2)
+                    .lineLimit(1)
+                Text(e.property)
+                    .font(.subheadline)
+                    .foregroundStyle(LH.secondaryText)
+                    .lineLimit(1)
                 HStack(spacing: 6) {
                     StatusDot(color: e.kind.tint)
                     Text(e.status)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(LH.secondaryText)
                         .lineLimit(1)
                 }
+                .padding(.top, 1)
             }
             Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 3) {
-                Text("\(fmt(e.hours)) h").font(.body).monospacedDigit()
-                Text(e.date).font(.subheadline).foregroundStyle(.secondary)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(fmtDur(e.hours)).font(.body).monospacedDigit()
+                Text(e.date).font(.subheadline).foregroundStyle(LH.secondaryText)
             }
         }
-        .frame(minHeight: 72)
+        .padding(.vertical, 12)
     }
 }
 
@@ -178,12 +197,12 @@ struct PropertyRow: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(name).font(.body.weight(.semibold))
-                    Text(meta).font(.subheadline).foregroundStyle(.secondary)
+                    Text(meta).font(.subheadline).foregroundStyle(LH.secondaryText)
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(fmt(hours)) h").font(.body).monospacedDigit()
-                    Text("\(Int(share * 100))% of yours").font(.subheadline).foregroundStyle(.secondary)
+                    Text(fmtDur(hours)).font(.body).monospacedDigit()
+                    Text("\(Int(share * 100))% of yours").font(.subheadline).foregroundStyle(LH.secondaryText)
                 }
             }
             ProgressTrack(progress: share, tick: nil, color: LH.action, height: 6)

@@ -13,6 +13,9 @@ struct SuggestionDetailSheet: View {
     @State private var who = 0
     @State private var property = "Pine Cabin"
     @State private var pressTick = 0
+    @State private var fitHeight: CGFloat = 640
+    @State private var detent: PresentationDetent = .medium
+    private var detents: Set<PresentationDetent> { [.medium, .height(fitHeight)] }
 
     init(suggestion: Suggestion?, onConfirm: @escaping (Double) -> Void, onDismissItem: @escaping () -> Void = {}) {
         self.suggestion = suggestion
@@ -49,7 +52,7 @@ struct SuggestionDetailSheet: View {
                         onConfirm(hours)
                         dismiss()
                     } label: {
-                        Text("Log \(fmt(hours)) h")
+                        Text("Log \(fmtDur(hours))")
                             .contentTransition(.numericText(value: hours))
                     }
                     .buttonStyle(PrimaryCapsule())
@@ -66,13 +69,17 @@ struct SuggestionDetailSheet: View {
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 28)
-                .padding(.bottom, 24)
+                .padding(.top, 24)
+                .padding(.bottom, 8)
+            }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { h in
+                fitHeight = h + 8
+                detent = .height(fitHeight)
             }
         }
         .scrollBounceBehavior(.basedOnSize)
         .background(LH.canvas)
-        .presentationDetents([.large])
+        .presentationDetents(detents, selection: $detent)
         .presentationDragIndicator(.hidden)
         .presentationCornerRadius(nil)
         .sensoryFeedback(.selection, trigger: pressTick)
@@ -110,15 +117,16 @@ struct SuggestionDetailSheet: View {
 
     private func statusBand(_ h: Double) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Scheduled \(Text("\(fmt(h)) h").foregroundStyle(LH.positive))")
+            Text("Scheduled \(Text(fmtDur(h)).foregroundStyle(LH.positive))")
                 .font(.title3.weight(.semibold))
             Text("Your calendar had this from 9:00 to 11:00. Change it if the work ran long or short.")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(LH.secondaryText)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(LH.positiveWash)
+        .background(LH.tertiaryFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 16)
     }
 
     private var hoursHero: some View {
@@ -126,7 +134,7 @@ struct SuggestionDetailSheet: View {
         return VStack(alignment: .leading, spacing: 12) {
             Text("How long were you working?")
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(LH.secondaryText)
             HStack(spacing: 12) {
                 StepButton(symbol: "minus", enabled: hours > 0.25) {
                     withAnimation(Motion.snappy(reduce)) { hours = max(0.25, hours - 0.25) }
@@ -136,11 +144,11 @@ struct SuggestionDetailSheet: View {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("\(h)").font(.system(size: 40, weight: .semibold))
                         .contentTransition(.numericText(value: Double(h)))
-                    Text("h").font(.title2).foregroundStyle(.secondary)
+                    Text("h").font(.title2).foregroundStyle(LH.secondaryText).padding(.leading, -3)
                     Text(String(format: "%02d", m)).font(.system(size: 40, weight: .semibold))
                         .contentTransition(.numericText(value: Double(m)))
-                        .padding(.leading, 6)
-                    Text("m").font(.title2).foregroundStyle(.secondary)
+                        .padding(.leading, 8)
+                    Text("m").font(.title2).foregroundStyle(LH.secondaryText).padding(.leading, -3)
                 }
                 .monospacedDigit()
                 .accessibilityElement(children: .combine)
@@ -155,9 +163,9 @@ struct SuggestionDetailSheet: View {
             .padding(16)
             .lhCard(radius: 16)
             if let cap = suggestion?.capMinutes {
-                Text("You were there for \(cap / 60) h \(cap % 60) m, so we cap it there.")
+                Text("You were there for \(fmtDur(Double(cap) / 60)), so we cap it there.")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(LH.secondaryText)
             }
         }
     }
@@ -207,7 +215,7 @@ struct ValueRow<Trailing: View>: View {
     @ViewBuilder var trailing: Trailing
     var body: some View {
         HStack {
-            Text(label).foregroundStyle(.secondary)
+            Text(label).foregroundStyle(LH.secondaryText)
             Spacer()
             trailing
         }
@@ -226,7 +234,7 @@ struct StepButton: View {
             Image(systemName: symbol)
                 .font(.system(size: 17, weight: .semibold))
                 .frame(width: 44, height: 44)
-                .foregroundStyle(enabled ? Color.primary : Color.secondary)
+                .foregroundStyle(enabled ? Color.primary : LH.secondaryText)
                 .background(LH.fill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(Pressable())

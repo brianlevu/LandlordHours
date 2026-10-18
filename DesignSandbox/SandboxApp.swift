@@ -63,7 +63,8 @@ struct LHDesignSandboxApp: App {
             }
             .environment(store)
             .tint(LH.action)
-            .preferredColorScheme(scheme)
+            .environment(\.requestedScheme, scheme)
+            .preferredColorScheme(screen == .paywall ? .dark : scheme)
         }
     }
 }
@@ -166,6 +167,9 @@ struct FloatingTabBar: View {
     var inboxBadge: Int
     var onAdd: () -> Void
     @Namespace private var ns
+    @Environment(\.colorScheme) private var scheme
+    /// Denser glass than the default so content doesn't read through (Flighty's bar is near-opaque).
+    private var barTint: Color { scheme == .dark ? Color(hex: 0x1C1C1E, alpha: 0.72) : Color.white.opacity(0.78) }
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     private let items: [(AppTab, String, String)] = [
@@ -221,7 +225,7 @@ struct FloatingTabBar: View {
                     }
                 }
                 .padding(4)
-                .glassEffect(.regular.interactive(), in: Capsule())
+                .glassEffect(.regular.tint(barTint).interactive(), in: Capsule())
 
                 Button(action: onAdd) {
                     Image(systemName: "plus")
@@ -230,7 +234,7 @@ struct FloatingTabBar: View {
                         .frame(width: 62, height: 62)
                 }
                 .buttonStyle(Pressable())
-                .glassEffect(.regular.interactive(), in: Circle())
+                .glassEffect(.regular.tint(barTint).interactive(), in: Circle())
                 .accessibilityLabel("Log time")
             }
         }

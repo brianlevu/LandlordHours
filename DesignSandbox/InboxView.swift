@@ -100,6 +100,7 @@ struct InboxView: View {
                     Text(title)
                         .font(.footnote.weight(.semibold))
                         .textCase(.uppercase)
+                        .foregroundStyle(LH.secondaryText)
                 }
             }
         }
@@ -126,24 +127,24 @@ struct BackfillBanner: View {
                     .font(.body.weight(.semibold))
                 Text("Keep the ones that were work. Nothing is saved until you confirm.")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(LH.secondaryText)
                 HStack(spacing: 16) {
-                    stat(Double(store.pendingCount), "to confirm")
-                    stat(store.hoursLogged, "h logged in 2026")
+                    stat(Double(store.pendingCount), "to confirm", text: "\(store.pendingCount)")
+                    stat(store.hoursLogged, "logged in 2026", text: fmtDur(store.hoursLogged))
                 }
                 .padding(.top, 8)
             }
         }
     }
 
-    private func stat(_ v: Double, _ label: String) -> some View {
+    private func stat(_ v: Double, _ label: String, text: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text(fmt(v))
+            Text(text)
                 .font(.body.weight(.semibold))
                 .monospacedDigit()
                 .contentTransition(.numericText(value: v))
                 .animation(Motion.snappy(reduce), value: v)
-            Text(label).font(.subheadline).foregroundStyle(.secondary)
+            Text(label).font(.subheadline).foregroundStyle(LH.secondaryText)
         }
     }
 }
@@ -169,7 +170,7 @@ struct SuggestionRow: View {
                     trailing
                 }
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(LH.secondaryText)
 
                 Text("\(Text(s.noun).fontWeight(.semibold)) \(s.joiner) \(Text(s.property).fontWeight(.semibold))")
                     .font(.body)
@@ -189,14 +190,17 @@ struct SuggestionRow: View {
         VStack(spacing: 0) {
             if let m = s.capMinutes, s.hours == nil {
                 Text("\(m)").font(.system(size: 28, weight: .semibold)).monospacedDigit()
-                Text("Minutes").font(.caption2.weight(.semibold)).textCase(.uppercase).foregroundStyle(.secondary)
+                Text("Minutes").font(.caption2.weight(.semibold)).textCase(.uppercase).foregroundStyle(LH.secondaryText)
             } else if let h = s.hours {
-                Text(fmt(h)).font(.system(size: 28, weight: .semibold)).monospacedDigit()
-                    .contentTransition(.numericText(value: h))
-                Text(h == 1 ? "Hour" : "Hours").font(.caption2.weight(.semibold)).textCase(.uppercase).foregroundStyle(.secondary)
+                // Whole hours read as HOURS; anything else as MINUTES (Flighty "25 MINUTES"), never "2.25".
+                let whole = h == h.rounded()
+                let v = whole ? h : (h * 60).rounded()
+                Text("\(Int(v))").font(.system(size: 28, weight: .semibold)).monospacedDigit()
+                    .contentTransition(.numericText(value: v))
+                Text(whole ? (h == 1 ? "Hour" : "Hours") : "Minutes").font(.caption2.weight(.semibold)).textCase(.uppercase).foregroundStyle(LH.secondaryText)
             } else {
                 Text("—").font(.system(size: 28, weight: .semibold)).foregroundStyle(.tertiary)
-                Text("Hours").font(.caption2.weight(.semibold)).textCase(.uppercase).foregroundStyle(.secondary)
+                Text("Hours").font(.caption2.weight(.semibold)).textCase(.uppercase).foregroundStyle(LH.secondaryText)
             }
         }
     }
@@ -217,11 +221,14 @@ struct SuggestionRow: View {
     @ViewBuilder private var detailLine: some View {
         switch s.kind {
         case .receipt:
-            Text("\(Text(s.detail).foregroundStyle(.secondary)) · \(Text("Needs hours").foregroundStyle(LH.caution).fontWeight(.medium))")
+            Text("\(Text(s.detail).foregroundStyle(LH.secondaryText)) · \(Text("Needs hours").foregroundStyle(LH.caution).fontWeight(.medium))")
         case .location:
-            Text("\(Text(s.detail).foregroundStyle(.secondary))")
+            HStack(spacing: 6) {
+                Text(s.detail).foregroundStyle(LH.secondaryText)
+                BetaTag()
+            }
         default:
-            Text(s.detail).foregroundStyle(.secondary)
+            Text(s.detail).foregroundStyle(LH.secondaryText)
         }
     }
 }

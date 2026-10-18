@@ -40,20 +40,21 @@ struct SettingsView: View {
                                    subtitle: "Suggest work from events. Titles are read on your iPhone.", isOn: $calendar)
                     SubtitleToggle(symbol: "doc.text", title: "Receipts from the Share sheet",
                                    subtitle: "Reads store, total and date. You add the hours.", isOn: $receipts)
-                    SubtitleToggle(symbol: "location", title: "Location", badge: "BETA",
+                    SubtitleToggle(symbol: "location", title: "Location", badge: "Beta",
                                    subtitle: "Notice visits to your property addresses. Needs Always access.", isOn: $location)
                     SubtitleToggle(symbol: "bell.badge", title: "Ask when an event ends",
                                    subtitle: "At most twice a day, never after 9 pm.", isOn: $notify)
-                    SubtitleToggle(symbol: "lock.icloud", title: "Private Cloud Compute",
+                    SubtitleToggle(symbol: "lock.icloud", title: "Apple's private cloud",
                                    subtitle: "Apple's private servers help read hard receipts. Nothing is stored.", isOn: $pcc)
                 } header: {
                     SectionHeader("Auto-capture")
                 } footer: {
                     Text("Nothing goes in your record until you confirm it. Reading happens on your iPhone first.")
+                        .foregroundStyle(LH.secondaryText)
                 }
 
                 Section {
-                    ValueRowNav(symbol: "target", title: "Goal", value: "REPS · 750 h")
+                    ValueRowNav(symbol: "target", title: "Goal", value: "REPS · 750h")
                     ValueRowNav(symbol: "calendar.badge.clock", title: "Tax year", value: "2026")
                     SubtitleToggle(symbol: "person.2", title: "Track spouse hours",
                                    subtitle: "Counts toward the 750 hours if you file jointly.", isOn: $spouse)
@@ -88,11 +89,7 @@ struct SectionHeader: View {
     init(_ t: String) { text = t }
     var body: some View {
         Text(text)
-            .font(.title3.weight(.semibold))
-            .foregroundStyle(.primary)
-            .textCase(nil)
-            .padding(.leading, -4)
-            .padding(.bottom, 2)
+            .sectionLabel()
     }
 }
 
@@ -107,22 +104,14 @@ struct SubtitleToggle: View {
             HStack(alignment: .top, spacing: 14) {
                 Image(systemName: symbol)
                     .font(.system(size: 20))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(LH.secondaryText)
                     .frame(width: 26)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(title)
-                        if let badge {
-                            Text(badge)
-                                .font(.caption2.weight(.bold))
-                                .tracking(0.5)
-                                .foregroundStyle(LH.action)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(LH.actionWash, in: Capsule())
-                        }
+                        if badge != nil { BetaTag() }
                     }
-                    Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+                    Text(subtitle).font(.subheadline).foregroundStyle(LH.secondaryText)
                 }
             }
         }
@@ -139,11 +128,11 @@ struct ValueRowNav: View {
         HStack(spacing: 14) {
             Image(systemName: symbol)
                 .font(.system(size: 20))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(LH.secondaryText)
                 .frame(width: 26)
             Text(title)
             Spacer()
-            Text(value).foregroundStyle(.secondary)
+            Text(value).foregroundStyle(LH.secondaryText)
             Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
         }
         .frame(minHeight: 36)

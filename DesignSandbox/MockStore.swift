@@ -143,7 +143,7 @@ final class MockStore {
                    detail: "$212.40", amount: "$212.40"),
         Suggestion(id: "oakvisit", kind: .location, group: "This week", when: "Sun 1:10–2:50",
                    noun: "Visit", joiner: "at", property: "Oak Street Duplex", hours: nil, capMinutes: 100,
-                   detail: "Up to 1 h 40 m · Beta"),
+                   detail: "Up to 1h 40m"),
         Suggestion(id: "turnover", kind: .calendar, group: "Earlier in October", when: "Thu, Oct 9 · 10–1",
                    noun: "Turnover clean", joiner: "at", property: "Pine Cabin", hours: 3,
                    detail: "Cleaning · Spouse"),

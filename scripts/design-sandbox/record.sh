@@ -1,7 +1,7 @@
 #!/bin/bash
 # usage: lh-record.sh <testName> <outName>
 U=${SANDBOX_UDID:?set SANDBOX_UDID to a simboot-leased sim}
-OUT=/Users/brian/AgentScratch/landlordhours/2026-10-18/hifi-frames/video
+OUT=${SANDBOX_OUT:-$HOME/AgentScratch/landlordhours/2026-10-18/hifi-frames-r2}/video
 mkdir -p "$OUT"
 RAW=/Users/brian/tmp/lh-rec-$2.mov
 rm -f "$RAW"
@@ -20,5 +20,5 @@ MARK=$(grep -o "DEMO_START [0-9.]*" "/Users/brian/tmp/lh-test-$2.log" | head -1 
 echo "test rc=$TRC rec_start=$REC_START mark=$MARK"
 grep -E "Executed|error:|failed" "/Users/brian/tmp/lh-test-$2.log" | tail -3
 OFF=$(python3 -c "print(max(0,${MARK:-0}-$REC_START-4.5))")
-ffmpeg -y -loglevel error -ss "$OFF" -i "$RAW" -t 14.5 -vf "scale=590:-2" -c:v libx264 -pix_fmt yuv420p -movflags +faststart "$OUT/$2.mp4"
+ffmpeg -y -loglevel error -ss "$OFF" -i "$RAW" -t 14.5 -vf "fps=30,scale=590:-2" -r 30 -c:v libx264 -pix_fmt yuv420p -movflags +faststart "$OUT/$2.mp4"
 ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT/$2.mp4"
