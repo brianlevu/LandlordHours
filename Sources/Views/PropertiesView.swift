@@ -88,7 +88,11 @@ struct PropertiesView: View {
                 AddPropertyView()
             }
             .sheet(isPresented: $showingPaywall) {
-                PaywallView(showPaywall: $showingPaywall)
+                // After a purchase, carry on to adding the property.
+                PaywallView(context: .secondProperty) {
+                    NotificationCenter.default.post(name: .suspendGuidedOnboardingOverlay, object: nil)
+                    showingAddProperty = true
+                }
             }
             .sheet(item: $selectedProperty) { property in
                 PropertyDetailView(property: property)
@@ -332,6 +336,7 @@ struct PropertiesView: View {
             }
             .guidedSpotlightTarget(.addProperty)
             .accessibilityLabel("Add property")
+            .accessibilityIdentifier("properties.add")
         }
     }
 

@@ -1,30 +1,30 @@
 import SwiftUI
 import LucideIcons
 
+/// The one Pro paywall. It opens at the moment of need, speaks to the thing tapped
+/// (`context`), and after a purchase or restore it hands control back through `onUnlocked`
+/// so the caller can carry on (open the export, open Add Property).
 struct PaywallView: View {
-    @Environment(\.colorScheme) var colorScheme
+    let context: PaywallContext
+    var year: Int = Calendar.current.component(.year, from: Date())
+    /// Called once Pro is unlocked from this sheet, after it closes.
+    var onUnlocked: (() -> Void)?
+    /// Overrides the close behaviour when the paywall is not presented as a sheet.
+    var onClose: (() -> Void)?
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-    @ObservedObject var subscriptionManager = SubscriptionManager.shared
-    @Binding var showPaywall: Bool
-    var onDismiss: (() -> Void)?
+    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
 
-    // Hero animation
-    @State private var heroScale: CGFloat = 0.5
-    @State private var heroOpacity: Double = 0
-    @State private var pulseScale: CGFloat = 1.0
-    // Features stagger
-    @State private var featureOffsets: [CGFloat] = Array(repeating: 32, count: 3)
-    @State private var featureOpacities: [Double] = Array(repeating: 0, count: 3)
-    // Bottom section
-    @State private var bottomOffset: CGFloat = 40
-    @State private var bottomOpacity: Double = 0
+    @State private var appeared = false
+    @State private var didUnlockHere = false
+    @State private var didFinish = false
+    @State private var isRestoring = false
+    @State private var priceLoadFinished = false
 
-    private let proFeatures: [(icon: UIImage, title: String, desc: String, color: Color, wash: Color)] = [
-        (Lucide.fileText,   "Accountant-ready exports", "Clean PDF reports by tax year, property, and category.", AppColors.action, AppColors.primarySurface),
-        (Lucide.building2,  "Portfolio tracking",       "Add every rental you manage without hitting a property cap.", AppColors.informational, AppColors.informationalSurface),
-        (Lucide.badgeCheck, "Lifetime recovery",        "Restore Pro from the App Store whenever you move devices.", AppColors.positive, AppColors.positiveSurface),
-    ]
+    private var showsUnlockedState: Bool { didUnlockHere || subscriptionManager.isPro }
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -32,392 +32,342 @@ struct PaywallView: View {
                 .ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    heroSection
-                        .padding(.top, 70)
-
-                    featuresSection
-                        .padding(.horizontal, 24)
-
-                    pricingAndCTA
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 34)
+                VStack(alignment: .leading, spacing: 24) {
+                    header
+                    if !showsUnlockedState {
+                        benefits
+                    }
                 }
+                .padding(.horizontal, 24)
+                .padding(.top, 72)
+                .padding(.bottom, 24)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                bottomPanel
             }
 
-            // Close button
-            Button {
-                showPaywall = false
-                onDismiss?()
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(colors.backgroundTertiary)
-                        .frame(width: 44, height: 44)
-                    LucideIcon(image: Lucide.x, size: 18)
-                        .foregroundStyle(AppColors.charcoal)
-                }
-            }
-            .accessibilityLabel("Close")
-            .padding(.top, 16)
-            .padding(.trailing, 20)
+            closeButton
         }
-        .onAppear { animateIn() }
+        .opacity(appeared ? 1 : 0)
+        .onAppear {
+            Analytics.paywallViewed(context: context)
+            RatingPromptCoordinator.shared.notePaywallShown()
+            subscriptionManager.purchaseError = nil
+            if reduceMotion {
+                appeared = true
+            } else {
+                withAnimation(.easeOut(duration: 0.2)) { appeared = true }
+            }
+            Task { await loadPriceIfNeeded() }
+        }
+        // A container keeps the children's own identifiers (paywall.buy, paywall.restore).
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("paywall.\(context.rawValue)")
     }
 
-    // MARK: - Hero
-    private var heroSection: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(subscriptionManager.hasPurchased ? AppColors.positiveSurface : AppColors.actionSurface)
-                        .frame(width: 58, height: 58)
-                        .scaleEffect(pulseScale)
+    // MARK: Header
 
-                    LucideIcon(image: subscriptionManager.hasPurchased ? Lucide.badgeCheck : Lucide.sparkles, size: 26)
-                        .foregroundStyle(subscriptionManager.hasPurchased ? AppColors.successGreen : AppColors.action)
-                }
-                .scaleEffect(heroScale)
-                .opacity(heroOpacity)
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            LucideIcon(image: showsUnlockedState ? Lucide.badgeCheck : contextIcon, size: 24)
+                .foregroundStyle(showsUnlockedState ? colors.positiveText : colors.actionText)
+                .frame(width: 52, height: 52)
+                .background(showsUnlockedState ? colors.positiveSurface : colors.actionSurface)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(subscriptionManager.hasPurchased ? "Pro is active" : "LandlordHours Pro")
-                        .font(.system(size: 31, weight: .black, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.82)
-
-                    Text(subscriptionManager.hasPurchased ? "Lifetime access is unlocked on this account." : "Export clean records and track every rental with one lifetime purchase.")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .opacity(heroOpacity)
-
-            HStack(spacing: 8) {
-                trustChip("One-time purchase", icon: Lucide.receiptText)
-                trustChip("No renewal", icon: Lucide.refreshCwOff)
-            }
-            .opacity(heroOpacity)
-        }
-        .padding(.horizontal, 24)
-    }
-
-    // MARK: - Features
-    private var featuresSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Built for tax review")
-                .font(.system(size: 19, weight: .black, design: .rounded))
+            Text(showsUnlockedState ? "Pro is active" : context.title(year: year))
+                .font(.system(size: 30, weight: .black, design: .rounded))
                 .foregroundStyle(colors.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("paywall.title")
 
-            VStack(spacing: 0) {
-                ForEach(Array(proFeatures.enumerated()), id: \.offset) { index, feature in
-                    featureRow(feature, index: index)
-
-                    if index < proFeatures.count - 1 {
-                        Divider()
-                            .background(colors.border.opacity(0.35))
-                            .padding(.leading, 62)
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(colors.border.opacity(0.28), lineWidth: 1)
-            }
+            Text(showsUnlockedState
+                 ? "Thanks. Pro stays with your Apple Account, and you can restore it on any device."
+                 : context.body)
+                .font(.system(size: 16, weight: .medium, design: .rounded))
+                .foregroundStyle(colors.textSecondaryOnCanvas)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("paywall.body")
         }
     }
 
-    private func featureRow(_ feature: (icon: UIImage, title: String, desc: String, color: Color, wash: Color), index: Int) -> some View {
-        HStack(spacing: 14) {
-            LHIconTile(icon: feature.icon, color: feature.color, wash: feature.wash, size: 44, isActive: true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(feature.title)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                Text(feature.desc)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(colors.textSecondary)
-                    .lineSpacing(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer()
-            LucideIcon(image: Lucide.check, size: 16)
-                .foregroundStyle(AppColors.successGreen)
+    private var contextIcon: UIImage {
+        switch context {
+        case .export: return Lucide.fileText
+        case .secondProperty: return Lucide.building2
+        case .dashboardUnlock, .settingsUpgrade: return Lucide.sparkles
         }
-        .padding(.vertical, 12)
-        .offset(y: featureOffsets[index])
-        .opacity(featureOpacities[index])
     }
 
-    // MARK: - Pricing + CTA
-    private var pricingAndCTA: some View {
-        VStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 14) {
-                if let product = subscriptionManager.proProduct {
-                    HStack(alignment: .center) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(product.displayPrice)
-                                .font(.system(size: 48, weight: .black, design: .rounded))
-                                .foregroundStyle(colors.textPrimary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.72)
-                            Text("Lifetime access. Paid once through the App Store.")
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(colors.textSecondary)
-                        }
+    // MARK: Benefits
 
-                        Spacer()
-
-                        VStack(spacing: 5) {
-                            Text("PRO")
-                                .font(.system(size: 11, weight: .black, design: .rounded))
-                                .foregroundStyle(AppColors.action)
-                            Text("no renewal")
-                                .font(.system(size: 10, weight: .bold, design: .rounded))
-                                .foregroundStyle(colors.textSecondary)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
+    private var benefits: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(context.benefits.enumerated()), id: \.element) { index, benefit in
+                HStack(alignment: .top, spacing: 12) {
+                    LucideIcon(image: Lucide.check, size: 16)
+                        .foregroundStyle(colors.actionText)
+                        .frame(width: 28, height: 28)
                         .background(colors.actionSurface)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    }
-                } else {
-                    VStack(alignment: .leading, spacing: 8) {
-                        LucideIcon(image: Lucide.store, size: 22)
-                            .foregroundStyle(AppColors.primary)
-                        Text("Pro availability check")
-                            .font(AppTypography.title3)
+                        .clipShape(Circle())
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(benefit.title)
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
                             .foregroundStyle(colors.textPrimary)
-                        Text("We will check the App Store before showing a price or starting purchase.")
-                            .font(AppTypography.bodySmall)
+                        Text(benefit.detail)
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
                             .foregroundStyle(colors.textSecondary)
-                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                    Spacer(minLength: 0)
                 }
+                .padding(.vertical, 14)
+                .accessibilityElement(children: .combine)
 
-                primaryAction
-
-                Text(subscriptionManager.proProduct == nil ? "You can keep using free tracking while Pro is unavailable." : "Free plan still includes basic time tracking and the learning center.")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(colors.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-            }
-            .padding(18)
-            .background(
-                LinearGradient(
-                    colors: colorScheme == .dark
-                        ? [colors.backgroundSecondary, AppColors.darkPlum.opacity(0.72)]
-                        : [Color.white, AppColors.lavenderPale, AppColors.reportsAccentWash.opacity(0.72)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .strokeBorder(AppColors.action.opacity(0.18), lineWidth: 1)
-            }
-
-            if !subscriptionManager.hasPurchased {
-                Button {
-                    Task {
-                        await subscriptionManager.restorePurchases()
-                        if subscriptionManager.isPro {
-                            showPaywall = false
-                            onDismiss?()
-                        }
-                    }
-                } label: {
-                    Text("Restore purchase")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(colors.action)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                if index < context.benefits.count - 1 {
+                    Divider().overlay(colors.border.opacity(0.4))
+                        .padding(.leading, 40)
                 }
-                .buttonStyle(.lhPressable)
-            }
-
-            if let error = subscriptionManager.purchaseError {
-                errorMessage(error)
-            }
-
-            Button {
-                showPaywall = false
-                onDismiss?()
-            } label: {
-                Text(subscriptionManager.hasPurchased ? "Close" : "Continue free")
-                    .font(AppTypography.bodySmall)
-                    .foregroundStyle(colors.textSecondary)
             }
         }
-        .offset(y: bottomOffset)
-        .opacity(bottomOpacity)
+        .padding(.horizontal, 16)
+        .background(colors.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(colors.border.opacity(colorScheme == .dark ? 0.5 : 0.3), lineWidth: 1)
+        }
+    }
+
+    // MARK: Price + actions
+
+    private var bottomPanel: some View {
+        VStack(spacing: 0) {
+            Divider().overlay(colors.border.opacity(0.35))
+            VStack(spacing: 12) {
+                if showsUnlockedState {
+                    unlockedActions
+                } else {
+                    priceBlock
+                    buyButton
+                    restoreButton
+                    if let error = subscriptionManager.purchaseError {
+                        errorMessage(error)
+                    }
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+        }
+        .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.96 : 0.94).ignoresSafeArea(edges: .bottom))
     }
 
     @ViewBuilder
-    private var primaryAction: some View {
-        if subscriptionManager.isLoading {
-            ProgressView("Checking App Store...")
-                .frame(maxWidth: .infinity)
-                .frame(height: 56)
-        } else if subscriptionManager.hasPurchased {
-            Button {
-                showPaywall = false
-                onDismiss?()
-            } label: {
-                HStack(spacing: 8) {
-                    LucideIcon(image: Lucide.check, size: 20)
-                        .foregroundStyle(AppColors.onAction)
-                    Text("Continue with Pro")
-                }
-                .font(AppTypography.buttonLarge)
-                .foregroundStyle(AppColors.onAction)
-                .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .background(colors.action)
-                .clipShape(Capsule())
+    private var priceBlock: some View {
+        if let product = subscriptionManager.proProduct {
+            VStack(spacing: 2) {
+                Text(product.displayPrice)
+                    .font(.system(size: 44, weight: .black, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(colors.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .accessibilityIdentifier("paywall.price")
+                Text("One-time purchase. No subscription.")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
             }
-            .buttonStyle(.lhPressable)
+            .frame(maxWidth: .infinity)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(product.displayPrice), one-time purchase. No subscription.")
+        } else if !priceLoadFinished {
+            HStack(spacing: 8) {
+                ProgressView()
+                Text("Getting the price from the App Store")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 60)
         } else {
-            Button {
-                Task { await subscriptionManager.purchasePro() }
-            } label: {
-                Group {
-                    if let product = subscriptionManager.proProduct {
-                        Text("Buy lifetime Pro - \(product.displayPrice)")
-                    } else {
-                        Text(subscriptionManager.purchaseError == nil ? "Check Pro availability" : "Try Pro purchase again")
-                    }
-                }
-                .font(AppTypography.buttonLarge)
-                .foregroundStyle(AppColors.onAction)
-                .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .background(colors.action)
-                .clipShape(Capsule())
-            }
-            .buttonStyle(.lhPressable)
+            Text("We couldn't load the price. Check your connection, then try again.")
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundStyle(colors.textSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, minHeight: 60)
         }
     }
 
+    private var buyButton: some View {
+        Button {
+            Task { await buy() }
+        } label: {
+            ZStack {
+                if subscriptionManager.isLoading && !isRestoring {
+                    ProgressView().tint(colors.onAction)
+                } else {
+                    Text(subscriptionManager.proProduct == nil && priceLoadFinished ? "Try again" : "Unlock Pro")
+                }
+            }
+            .font(.system(size: 17, weight: .bold, design: .rounded))
+            .foregroundStyle(colors.onAction)
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .background(colors.action)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.lhPressable)
+        .disabled(subscriptionManager.isLoading || (subscriptionManager.proProduct == nil && !priceLoadFinished))
+        .accessibilityIdentifier("paywall.buy")
+    }
+
+    private var restoreButton: some View {
+        Button {
+            Task { await restore() }
+        } label: {
+            Group {
+                if isRestoring {
+                    ProgressView()
+                } else {
+                    Text("Restore purchases")
+                }
+            }
+            .font(.system(size: 15, weight: .bold, design: .rounded))
+            .foregroundStyle(colors.actionText)
+            .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(.lhPressable)
+        .disabled(subscriptionManager.isLoading)
+        .accessibilityIdentifier("paywall.restore")
+    }
+
+    private var unlockedActions: some View {
+        Button {
+            finish()
+        } label: {
+            Text(context.continueLabel)
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .foregroundStyle(colors.onAction)
+                .frame(maxWidth: .infinity, minHeight: 56)
+                .background(colors.action)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.lhPressable)
+        .accessibilityIdentifier("paywall.continue")
+    }
+
     private func errorMessage(_ error: String) -> some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             HStack(alignment: .top, spacing: 8) {
                 LucideIcon(image: Lucide.circleAlert, size: 14)
-                    .foregroundStyle(AppColors.error)
+                    .foregroundStyle(colors.destructive)
                     .padding(.top, 1)
+                    .accessibilityHidden(true)
                 Text(error)
-                    .font(AppTypography.caption)
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
-                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
             }
-
             #if DEBUG
             if AdminAccess.isCurrentUserAdmin {
-                Button {
+                Button("Use local Pro for testing") {
                     subscriptionManager.unlockPro()
-                    showPaywall = false
-                    onDismiss?()
-                } label: {
-                    Text("Use local Pro for testing")
-                        .font(AppTypography.buttonSmall)
-                        .foregroundStyle(AppColors.primary)
+                    markUnlocked()
                 }
+                .font(AppTypography.buttonSmall)
+                .foregroundStyle(colors.actionText)
             }
             #endif
         }
         .padding(12)
-        .frame(maxWidth: .infinity)
-        .background(AppColors.error.opacity(0.08))
-        .overlay(
-            RoundedRectangle(cornerRadius: AppCornerRadius.medium)
-                .stroke(AppColors.error.opacity(0.18), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
+        .background(colors.destructiveSurface.opacity(colorScheme == .dark ? 0.35 : 0.6))
+        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("paywall.error")
     }
 
-    // MARK: - Helpers
-    private func trustChip(_ text: String, icon: UIImage) -> some View {
-        HStack(spacing: 6) {
-            LucideIcon(image: icon, size: 13)
-                .foregroundStyle(AppColors.action)
-            Text(text)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(colors.textSecondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.84)
+    private var closeButton: some View {
+        Button {
+            close()
+        } label: {
+            LucideIcon(image: Lucide.x, size: 18)
+                .foregroundStyle(colors.textPrimary)
+                .frame(width: 44, height: 44)
+                .background(colors.backgroundTertiary)
+                .clipShape(Circle())
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
-        .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.62 : 0.78))
-        .clipShape(Capsule())
-        .overlay {
-            Capsule()
-                .strokeBorder(colors.border.opacity(0.22), lineWidth: 1)
-        }
+        .buttonStyle(.lhPressable)
+        .accessibilityLabel("Close")
+        .accessibilityIdentifier("paywall.close")
+        .padding(.top, 16)
+        .padding(.trailing, 20)
     }
 
-    private func sectionPill(icon: UIImage, label: String) -> some View {
-        HStack(spacing: 5) {
-            LucideIcon(image: icon, size: 11)
-                .foregroundStyle(colors.textSecondary)
-            Text(label)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+    // MARK: Actions
+
+    private func loadPriceIfNeeded() async {
+        if subscriptionManager.proProduct == nil {
+            await subscriptionManager.loadProducts()
         }
-        .foregroundStyle(colors.textSecondary)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(colors.backgroundTertiary)
-        .clipShape(Capsule())
+        priceLoadFinished = true
     }
-    // MARK: - Animations
-    private func animateIn() {
-        guard !reduceMotion else {
-            heroScale = 1.0
-            heroOpacity = 1.0
-            featureOffsets = Array(repeating: 0, count: proFeatures.count)
-            featureOpacities = Array(repeating: 1, count: proFeatures.count)
-            bottomOffset = 0
-            bottomOpacity = 1.0
+
+    private func buy() async {
+        if subscriptionManager.proProduct == nil {
+            priceLoadFinished = false
+            await loadPriceIfNeeded()
             return
         }
-
-        animate(.easeOut(duration: 0.22).delay(0.05)) {
-            heroScale = 1.0
-            heroOpacity = 1.0
-        }
-
-        for i in 0..<proFeatures.count {
-            animate(.easeOut(duration: 0.22).delay(0.18 + Double(i) * 0.04)) {
-                featureOffsets[i] = 0
-                featureOpacities[i] = 1.0
-            }
-        }
-
-        animate(.easeOut(duration: 0.24).delay(0.36)) {
-            bottomOffset = 0
-            bottomOpacity = 1.0
+        let outcome = await subscriptionManager.purchasePro()
+        if outcome == .purchased {
+            Analytics.purchaseCompleted(context: context)
+            markUnlocked()
         }
     }
 
-    private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
+    private func restore() async {
+        isRestoring = true
+        let restored = await subscriptionManager.restorePurchases()
+        isRestoring = false
+        if restored { markUnlocked() }
+    }
+
+    /// Shows the "Pro is active" state for a moment, then carries on with what the user
+    /// was doing.
+    private func markUnlocked() {
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
         if reduceMotion {
-            updates()
+            didUnlockHere = true
         } else {
-            withAnimation(animation, updates)
+            withAnimation(.easeOut(duration: 0.2)) { didUnlockHere = true }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { finish() }
+    }
+
+    private func finish() {
+        guard !didFinish else { return }
+        didFinish = true
+        let continuation = didUnlockHere ? onUnlocked : nil
+        close()
+        if let continuation {
+            // Let the sheet finish dismissing before the next screen is presented.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { continuation() }
+        }
+    }
+
+    private func close() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
         }
     }
 }
 
 #Preview {
-    PaywallView(showPaywall: .constant(true))
+    PaywallView(context: .export, year: 2026)
 }

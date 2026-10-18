@@ -420,6 +420,27 @@ struct TaxQualificationEngine {
             guard total > 0 else { return 0 }
             return realEstateHours / total
         }
+
+        /// The more-than-half test as the app shows it. Other work hours of 0 or less mean
+        /// "not entered", the same rule the audit export uses, so the test is never shown as
+        /// met just because the field is empty.
+        var moreThanHalfStatus: MoreThanHalfStatus {
+            guard nonRealEstateHours > 0 else { return .notEntered }
+            return meetsMoreThanHalfPersonalServicesTest ? .met : .notMet
+        }
+
+        /// Both REPS tests met on the hours the user has actually entered.
+        var isQualifiedOnEnteredHours: Bool {
+            meets750HourTest && moreThanHalfStatus == .met
+        }
+    }
+
+    enum MoreThanHalfStatus: Equatable {
+        case met
+        case notMet
+        case notEntered
+
+        static let notEnteredPrompt = "Add your other work hours to check this"
     }
 
     struct MaterialParticipationResult: Equatable {

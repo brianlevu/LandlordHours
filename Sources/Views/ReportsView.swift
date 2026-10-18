@@ -140,7 +140,7 @@ struct ReportsView: View {
     }
 
     private var innerProgress: Double {
-        guard selectedGoal.showInnerRing else { return 0 }
+        guard selectedGoal.showInnerRing, repsStatus.moreThanHalfStatus != .notEntered else { return 0 }
         return min(repsStatus.realEstateWorkPercentage, 1.0)
     }
 
@@ -151,7 +151,7 @@ struct ReportsView: View {
     private var isGoalMet: Bool {
         switch selectedGoal {
         case .reps750:
-            return repsStatus.isQualified
+            return repsStatus.isQualifiedOnEnteredHours
         case .mp500:
             return materialParticipationStatus.meets500HourTest
         case .mp100:
@@ -176,6 +176,7 @@ struct ReportsView: View {
     private var stat3Value: String {
         switch selectedGoal {
         case .reps750:
+            if repsStatus.moreThanHalfStatus == .notEntered { return "Not set" }
             return String(format: "%.0f%%", repsStatus.realEstateWorkPercentage * 100)
         case .mp500:
             let pct = (totalHours / 500.0) * 100
@@ -269,7 +270,10 @@ struct ReportsView: View {
                 ExportPDFView(year: selectedYear)
             }
             .sheet(isPresented: $showingPaywall) {
-                PaywallView(showPaywall: $showingPaywall)
+                // After a purchase, carry on to the export the user asked for.
+                PaywallView(context: .export, year: selectedYear) {
+                    showingExportSheet = true
+                }
             }
             .sheet(isPresented: $showingParticipationSheet) {
                 ParticipationConfirmationSheet(
@@ -339,14 +343,15 @@ struct ReportsView: View {
                 Button {
                     exportAction()
                 } label: {
-                    LucideIcon(image: subscriptionManager.isPro && !subscriptionManager.isTrialActive ? Lucide.share2 : Lucide.lock, size: 20)
+                    LucideIcon(image: subscriptionManager.isPro ? Lucide.share2 : Lucide.lock, size: 20)
                         .foregroundStyle(colors.textPrimary)
                         .frame(width: 44, height: 44)
                         .background(colors.backgroundTertiary)
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(subscriptionManager.isPro && !subscriptionManager.isTrialActive ? "Export report" : "Unlock export")
+                .accessibilityLabel(subscriptionManager.isPro ? "Export report" : "Unlock export")
+                .accessibilityIdentifier("reports.export")
             }
 
             Text("Check pace, gaps, and export-ready evidence.")

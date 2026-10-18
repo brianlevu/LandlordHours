@@ -121,12 +121,24 @@ enum Analytics {
     /// sites use the typed helpers below so the event taxonomy stays centralized and reviewable in
     /// one place.
     private static func capture(_ event: String, properties: [String: Any]? = nil) {
+        #if DEBUG
+        // Unit-test seam: a spy sees exactly what would be sent, and nothing reaches PostHog.
+        if let spy = testSpy {
+            spy(event, properties ?? [:])
+            return
+        }
+        #endif
         guard shouldSend(
             configured: isConfigured,
             optedOut: UserDefaults.standard.bool(forKey: optOutKey)
         ) else { return }
         PostHogSDK.shared.capture(event, properties: properties)
     }
+
+    #if DEBUG
+    /// Set by unit tests to observe events. DEBUG only; never set in app code.
+    nonisolated(unsafe) static var testSpy: ((String, [String: Any]) -> Void)?
+    #endif
 
     // MARK: - Named events (v1 minimal taxonomy)
 
@@ -155,6 +167,64 @@ enum Analytics {
     /// The Reports tab/screen was viewed.
     static func reportViewed() {
         capture("report_viewed")
+    }
+
+    // MARK: - 1.1 funnel events
+    // Properties are fixed enums only: no names, notes, emails or free text, ever.
+
+    /// Any hours entry was saved. `source` is how it was made: manual, timer, voice or calendar.
+    static func entryLogged(source: EntrySource) {
+        capture("entry_logged", properties: ["source": source.rawValue])
+    }
+
+    /// The user finished sharing an export (the share sheet reported completion, not cancel).
+    static func exportShared(format: ExportFormat) {
+        capture("export_shared", properties: ["format": format.analyticsKey])
+    }
+
+    /// The paywall appeared. `context` is what the user tapped to get there.
+    static func paywallViewed(context: PaywallContext) {
+        capture("paywall_viewed", properties: ["context": context.rawValue])
+    }
+
+    /// A Pro purchase went through from the paywall opened in `context`.
+    static func purchaseCompleted(context: PaywallContext) {
+        capture("purchase_completed", properties: ["context": context.rawValue])
+    }
+
+    /// Restore found and re-applied an earlier Pro purchase.
+    static func purchaseRestored() {
+        capture("purchase_restored")
+    }
+
+    /// The first-run onboarding flow finished.
+    static func onboardingCompleted() {
+        capture("onboarding_completed")
+    }
+
+    enum ProfileKind: String {
+        case apple
+        case local
+    }
+
+    /// A new profile was created: with Sign in with Apple, or on this device only.
+    static func profileCreated(kind: ProfileKind) {
+        capture("profile_created", properties: ["kind": kind.rawValue])
+    }
+
+    /// We asked iOS to show its rating prompt. iOS decides whether it actually appears.
+    static func ratingPromptRequested(trigger: RatingPromptTrigger) {
+        capture("rating_prompt_requested", properties: ["trigger": trigger.rawValue])
+    }
+}
+
+extension ExportFormat {
+    /// Stable analytics value: "pdf" or "csv".
+    var analyticsKey: String {
+        switch self {
+        case .pdf: return "pdf"
+        case .csv: return "csv"
+        }
     }
 }
 

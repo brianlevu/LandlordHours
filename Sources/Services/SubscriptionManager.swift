@@ -8,11 +8,12 @@ class SubscriptionManager: ObservableObject {
     static let shared = SubscriptionManager()
     
     @Published var isPro = false
-    @Published var trialDaysRemaining = 0
     @Published var hasPurchased = false
     @Published var isLoading = false
     @Published var products: [Product] = []
-    @Published var purchaseError: String?
+    @Published var purchaseError: String? {
+        didSet { if purchaseError != nil { RatingPromptCoordinator.shared.noteError() } }
+    }
     
     private let proProductID = "com.openclaw.landlordhours.pro"
     private var isProKey: String { UserScope.key("isProUser") }
@@ -66,7 +67,6 @@ class SubscriptionManager: ObservableObject {
     }
     
     func checkSubscriptionStatus() {
-        trialDaysRemaining = 0
         isPro = UserDefaults.standard.bool(forKey: isProKey)
     }
 
@@ -88,8 +88,17 @@ class SubscriptionManager: ObservableObject {
         }
     }
     
+    enum PurchaseOutcome: Equatable {
+        case purchased
+        case cancelled
+        case pending
+        case failed
+    }
+
     @MainActor
-    func purchasePro() async {
+    @discardableResult
+    func purchasePro() async -> PurchaseOutcome {
+        var outcome: PurchaseOutcome = .failed
         isLoading = true
         purchaseError = nil
         
@@ -100,9 +109,9 @@ class SubscriptionManager: ObservableObject {
 
             // Find the pro product
             guard let product = products.first(where: { $0.id == proProductID }) else {
-                purchaseError = "LandlordHours Pro is temporarily unavailable in the App Store. Please try again later."
+                purchaseError = "We couldn't reach the App Store to load Pro. Check your connection and try again."
                 isLoading = false
-                return
+                return .failed
             }
             
             // Purchase the product
@@ -114,13 +123,18 @@ class SubscriptionManager: ObservableObject {
                 if case .verified(let transaction) = verification {
                     unlockPro()
                     await transaction.finish()
+                    outcome = .purchased
+                } else {
+                    purchaseError = "The App Store couldn't confirm this purchase. Please try again."
                 }
                 
             case .userCancelled:
                 purchaseError = nil // User cancelled, no error
+                outcome = .cancelled
                 
             case .pending:
                 purchaseError = "Purchase is pending approval. We'll unlock Pro after it is approved."
+                outcome = .pending
                 
             @unknown default:
                 purchaseError = "Purchase could not be completed. Please try again."
@@ -130,10 +144,13 @@ class SubscriptionManager: ObservableObject {
         }
         
         isLoading = false
+        return outcome
     }
     
+    /// Returns true when an earlier Pro purchase was found and applied.
     @MainActor
-    func restorePurchases() async {
+    @discardableResult
+    func restorePurchases() async -> Bool {
         isLoading = true
         purchaseError = nil
 
@@ -144,15 +161,17 @@ class SubscriptionManager: ObservableObject {
             await refreshEntitlements()
             if isPro {
                 isLoading = false
-                return
+                Analytics.purchaseRestored()
+                return true
             }
 
-            purchaseError = "No previous purchase found."
+            purchaseError = "We didn't find an earlier Pro purchase for this Apple Account."
         } catch {
             purchaseError = "Restore failed: \(error.localizedDescription)"
         }
 
         isLoading = false
+        return false
     }
 
     @MainActor
@@ -168,10 +187,6 @@ class SubscriptionManager: ObservableObject {
         UserDefaults.standard.set(false, forKey: isProKey)
         hasPurchased = false
         isPro = false
-    }
-    
-    var isTrialActive: Bool {
-        false
     }
     
     /// Reload subscription state for the current user (call after sign-in)
@@ -194,13 +209,8 @@ class SubscriptionManager: ObservableObject {
     func resetForSignOut() {
         isPro = false
         hasPurchased = false
-        trialDaysRemaining = 0
     }
 
-    var showPaywall: Bool {
-        false
-    }
-    
     var proProduct: Product? {
         products.first(where: { $0.id == proProductID })
     }

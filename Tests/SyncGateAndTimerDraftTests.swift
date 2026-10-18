@@ -113,7 +113,7 @@ final class TimerDraftTests: XCTestCase {
         XCTAssertEqual(forgotten.entryNote, "Recovered from a timer that was left running.")
         XCTAssertEqual(forgotten.accessibilityTitle, "Timer left running.")
         let message = forgotten.cardMessage(propertyName: "Oak", hasAnyProperty: true)
-        XCTAssertTrue(message.contains("We stopped it at 24 hours. Check it before you save."), message)
+        XCTAssertTrue(message.contains("It ran 30.0h. Set the real time before you save."), message)
 
         let short = StaleTimerRecovery(startTime: Date(), propertyId: UUID(), category: .repairs, elapsedHours: 3)
         XCTAssertFalse(short.cardMessage(propertyName: "Oak", hasAnyProperty: true)
@@ -124,7 +124,7 @@ final class TimerDraftTests: XCTestCase {
         let over = StaleTimerRecovery(startTime: Date(), propertyId: UUID(), category: .repairs,
                                       elapsedHours: 26, reason: .pausedAtSwitch)
         let overMessage = over.cardMessage(propertyName: "Oak", hasAnyProperty: true)
-        XCTAssertTrue(overMessage.contains("We stopped it at 24 hours. Check it before you save."), overMessage)
+        XCTAssertTrue(overMessage.contains("It ran 26.0h. Set the real time before you save."), overMessage)
         XCTAssertEqual(over.suggestedHours, 24)
 
         let under = StaleTimerRecovery(startTime: Date(), propertyId: UUID(), category: .repairs,

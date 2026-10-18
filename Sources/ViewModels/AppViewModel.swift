@@ -181,6 +181,7 @@ class AppViewModel: ObservableObject {
         migrateUnscopedLegacyData()
         defaults.removeObject(forKey: UserScope.key("hasCompletedOnboarding"))
         signIn()
+        Analytics.profileCreated(kind: .local)
     }
 
     /// Restores an earlier profile found on this device or in iCloud and makes it active.
@@ -217,6 +218,8 @@ class AppViewModel: ObservableObject {
         // Clear onboarding flag so new user sees onboarding flow
         UserDefaults.standard.removeObject(forKey: UserScope.key("hasCompletedOnboarding"))
         signIn()
+        // signUp() is only called for a brand-new Sign in with Apple profile.
+        Analytics.profileCreated(kind: .apple)
     }
 
     /// Signs out / switches away from the active profile. Per-profile data stays on the
@@ -546,10 +549,12 @@ class AppViewModel: ObservableObject {
     }
 
     /// Called after the user actually shares an export (the share sheet reported completion).
-    /// Hook for the rating prompt and analytics; set by the lane that owns those.
+    /// Records `export_shared` and offers Apple's rating prompt on the first shared export.
     var onExportShared: ((ExportFormat) -> Void)?
 
     func exportShared(format: ExportFormat) {
+        Analytics.exportShared(format: format)
+        RatingPromptCoordinator.shared.consider(.exportShared, entryCount: timeEntries.count)
         onExportShared?(format)
     }
     
@@ -619,6 +624,8 @@ class AppViewModel: ObservableObject {
         saveData()
         checkHourMilestones()
         Analytics.sessionLogged(category: category, participant: participant)
+        Analytics.entryLogged(source: source)
+        RatingPromptCoordinator.shared.consider(.entriesMilestone, entryCount: timeEntries.count)
     }
     
     func updateTimeEntry(_ entry: TimeEntry) {
@@ -842,7 +849,7 @@ class AppViewModel: ObservableObject {
         switch goalType {
         case .reps, .both:
             let reps = repsStatus(participant: .selfParticipant, year: year)
-            status = (reps.realEstateHours, reps.isQualified)
+            status = (reps.realEstateHours, reps.isQualifiedOnEnteredHours)
         case .str:
             let material = materialParticipationOverview(year: year)
             status = (material.ownerAndSpouseHours, material.isMateriallyParticipating)
@@ -903,8 +910,9 @@ class AppViewModel: ObservableObject {
         return min(hours / REPSRequirements.annualHourThreshold, 1.0)
     }
     
+    /// True only when other work hours are entered and real estate is more than half.
     func meets50PercentRule(year: Int) -> Bool {
-        repsStatus(participant: .selfParticipant, year: year).meetsMoreThanHalfPersonalServicesTest
+        repsStatus(participant: .selfParticipant, year: year).moreThanHalfStatus == .met
     }
 
     func repsStatus(participant: Participant, year: Int) -> TaxQualificationEngine.REPSResult {
@@ -943,7 +951,9 @@ class AppViewModel: ObservableObject {
     // MARK: - Persistence
 
     /// Non-blocking, user-facing persistence error surfaced as a banner. `nil` when healthy.
-    @Published var persistenceError: String?
+    @Published var persistenceError: String? {
+        didSet { if persistenceError != nil { RatingPromptCoordinator.shared.noteError() } }
+    }
 
     private static let persistenceLogger = Logger(subsystem: "com.openclaw.landlordhours", category: "Persistence")
 
@@ -1360,12 +1370,24 @@ struct StaleTimerRecovery: Codable, Equatable, Identifiable {
         return minutes < 1 ? "under 1 min" : "\(minutes) min"
     }
 
-    static let capNote = "We stopped it at 24 hours. Check it before you save."
+    static let capNote = "Set the real time before you save."
+    static let cappedHeadline = "We stopped it at 24 hours"
+
+    /// The card's headline. A capped draft leads with the figure it will save (24 hours),
+    /// never with the raw run time ("Ran 30.0h"), which isn't what goes on the record.
+    var cardHeadline: String {
+        wasCapped ? Self.cappedHeadline : ranLabel
+    }
+
+    /// "It ran 30.0h." — the real run time, shown as supporting detail on capped drafts.
+    private var cappedRanSentence: String {
+        "It ran \(AppFormat.hours(max(elapsedHours, 0)))."
+    }
 
     /// Copy for the Track recovery card, per draft reason. Kept here so it is unit-tested.
     func cardMessage(propertyName: String?, hasAnyProperty: Bool) -> String {
         let start = startTime.formatted(date: .abbreviated, time: .shortened)
-        let cap = wasCapped ? " \(Self.capNote)" : ""
+        let cap = wasCapped ? " \(cappedRanSentence) \(Self.capNote)" : ""
         guard let propertyName else {
             let pick = hasAnyProperty
                 ? "Choose a property below to save it to."
@@ -1375,10 +1397,10 @@ struct StaleTimerRecovery: Codable, Equatable, Identifiable {
         switch reason {
         case .pausedAtSwitch:
             let paused = (pausedAt ?? startTime).formatted(date: .abbreviated, time: .shortened)
-            let action = wasCapped ? Self.capNote : "Save the time it ran, or discard it."
+            let action = wasCapped ? "\(cappedRanSentence) \(Self.capNote)" : "Save the time it ran, or discard it."
             return "Started \(start) for \(propertyName). We paused it when you switched profiles at \(paused). \(action)"
         case .forgotten:
-            let note = wasCapped ? Self.capNote : "Review it before saving so the record stays accurate."
+            let note = wasCapped ? "\(cappedRanSentence) \(Self.capNote)" : "Review it before saving so the record stays accurate."
             return "Started \(start) for \(propertyName). \(note)"
         }
     }
@@ -1395,6 +1417,13 @@ struct StaleTimerRecovery: Codable, Equatable, Identifiable {
 
     /// Capped drafts (over 24 h) must be reviewed in the editor; no one-tap save.
     var requiresReview: Bool { wasCapped }
+
+    /// The review editor's Save is enabled only once the user has changed the hours, or
+    /// explicitly confirmed the suggested figure. One tap can never commit the 24 h cap.
+    func canSaveReview(hours: Double, confirmed: Bool) -> Bool {
+        guard hours > 0 else { return false }
+        return confirmed || abs(hours - suggestedHours) > 0.0001
+    }
 
     var accessibilityTitle: String {
         switch reason {
@@ -1567,6 +1596,13 @@ extension AppViewModel: CloudKitSyncDelegate {
         taxProfile.taxYear = Calendar.current.component(.year, from: Date())
         taxProfile.groupingElection = scenario == .frequent
         taxProfile.nonREWorkHours = scenario == .frequent ? 620 : 0
+        // Capture hook: `-LHOtherWorkHours 0` shows the "add your other work hours" state.
+        let launchArgs = ProcessInfo.processInfo.arguments
+        if let index = launchArgs.firstIndex(of: "-LHOtherWorkHours"),
+           launchArgs.indices.contains(index + 1),
+           let hours = Double(launchArgs[index + 1]) {
+            taxProfile.nonREWorkHours = hours
+        }
 
         let goalManager = GoalManager.shared
         goalManager.propertyGoals = []

@@ -1,4 +1,5 @@
 import SwiftUI
+import StoreKit
 import Combine
 import LucideIcons
 
@@ -66,11 +67,12 @@ struct ContentView: View {
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.requestReview) private var requestReview
+    @ObservedObject private var ratingPrompt = RatingPromptCoordinator.shared
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @StateObject private var goalManager = GoalManager.shared
     @State private var selectedTab = Self.initialTabFromLaunchArguments()
     @State private var showOnboarding = false
-    @State private var showPaywall = Self.shouldShowPaywallFromLaunchArguments
     @State private var showSplashAfterSignOut = false
     @State private var guidedOnboardingRefresh = false
     @State private var isReplayingGuidedOnboarding = false
@@ -78,7 +80,6 @@ struct ContentView: View {
     @State private var isForcingGuidedOnboardingHome = false
     @State private var hasAcknowledgedFirstActivityCoach = false
     @State private var didApplyGuidedReplayLaunchArgument = false
-    @State private var didApplyPaywallLaunchArgument = false
     @State private var isCustomTabBarHidden = false
     @State private var isSplashAnimating = true
     @State private var isShowingInitialLaunchBridge = true
@@ -110,26 +111,14 @@ struct ContentView: View {
         ProcessInfo.processInfo.arguments.contains("-LHForceGuidedSetupHome")
     }
 
-    private static var shouldShowPaywallFromLaunchArguments: Bool {
-        ProcessInfo.processInfo.arguments.contains("-LHShowPaywall")
-    }
-
     var body: some View {
         Group {
             if viewModel.isInitializing || showSplashAfterSignOut || isShowingInitialLaunchBridge {
                 splashScreen
             } else if !viewModel.isSignedIn {
                 LoginView()
-            } else if Self.shouldShowPaywallFromLaunchArguments && showPaywall {
-                PaywallView(showPaywall: $showPaywall) {
-                    showPaywall = false
-                }
             } else if showOnboarding {
                 OnboardingView(showOnboarding: $showOnboarding)
-            } else if showPaywall {
-                PaywallView(showPaywall: $showPaywall) {
-                    showPaywall = false
-                }
             } else {
                 mainContent
             }
@@ -162,7 +151,6 @@ struct ContentView: View {
         .onAppear {
             viewModel.checkSignInState()
             checkPostSignInFlow()
-            applyPaywallLaunchArgumentIfNeeded()
             scheduleInitialLaunchBridgeDismissIfReady()
             applyPendingAppIntentNavigationIfNeeded()
         }
@@ -180,11 +168,9 @@ struct ContentView: View {
         .onChange(of: viewModel.isSignedIn) { _, newValue in
             if newValue {
                 checkPostSignInFlow()
-                applyPaywallLaunchArgumentIfNeeded()
             } else {
                 // User signed out — show splash briefly, then login
                 showOnboarding = false
-                showPaywall = false
                 showSplashAfterSignOut = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                     animate(AppAnimation.standard) {
@@ -202,7 +188,6 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .restartGuidedOnboarding)) { _ in
             GuidedOnboardingStore.restart()
             showOnboarding = false
-            showPaywall = false
             animate(AppAnimation.smooth) {
                 isReplayingGuidedOnboarding = true
                 isGuidedOnboardingSuspended = false
@@ -228,7 +213,15 @@ struct ContentView: View {
         }
         .onAppear {
             applyGuidedReplayLaunchArgumentIfNeeded()
-            applyPaywallLaunchArgumentIfNeeded()
+        }
+        .onChange(of: ratingPrompt.pendingRequest) { _, trigger in
+            guard trigger != nil else { return }
+            // Apple's own prompt only. Wait a beat so it never lands mid-transition
+            // (e.g. while the share sheet is closing).
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                requestReview()
+                ratingPrompt.pendingRequest = nil
+            }
         }
     }
 
@@ -442,17 +435,11 @@ struct ContentView: View {
     /// Single entry point for post-sign-in UI flow. Prevents duplicate triggers
     /// from both onAppear and onChange(of: isSignedIn).
     private func checkPostSignInFlow() {
-        guard viewModel.isSignedIn, !showOnboarding, !showPaywall else { return }
+        guard viewModel.isSignedIn, !showOnboarding else { return }
+        // Pro is offered only at the moment of need (PaywallView(context:)), never on launch.
         if !UserDefaults.standard.bool(forKey: UserScope.key("hasCompletedOnboarding")) {
             showOnboarding = true
-        } else if subscriptionManager.showPaywall && shouldPresentPaywallAfterActivation {
-            showPaywall = true
         }
-    }
-
-    private var shouldPresentPaywallAfterActivation: Bool {
-        !viewModel.properties.isEmpty &&
-        (!viewModel.timeEntries.isEmpty || GuidedOnboardingStore.isCompleted || GuidedOnboardingStore.isSkipped)
     }
 
     private func applyPendingAppIntentNavigationIfNeeded() {
@@ -646,7 +633,6 @@ struct ContentView: View {
         _ = guidedOnboardingRefresh
         guard viewModel.isSignedIn,
               !showOnboarding,
-              !showPaywall,
               !isGuidedOnboardingSuspended else {
             return nil
         }
@@ -730,23 +716,12 @@ struct ContentView: View {
         didApplyGuidedReplayLaunchArgument = true
         GuidedOnboardingStore.restart()
         showOnboarding = false
-        showPaywall = false
         isForcingGuidedOnboardingHome = Self.shouldForceGuidedSetupHomeFromLaunchArguments
         isReplayingGuidedOnboarding = Self.shouldReplayGuidedSetupFromLaunchArguments
         isGuidedOnboardingSuspended = false
         hasAcknowledgedFirstActivityCoach = false
         selectedTab = Self.shouldForceGuidedSetupHomeFromLaunchArguments ? 0 : 1
         guidedOnboardingRefresh.toggle()
-    }
-
-    private func applyPaywallLaunchArgumentIfNeeded() {
-        guard Self.shouldShowPaywallFromLaunchArguments,
-              !didApplyPaywallLaunchArgument,
-              viewModel.isSignedIn,
-              !viewModel.isInitializing else { return }
-        didApplyPaywallLaunchArgument = true
-        showOnboarding = false
-        showPaywall = true
     }
 }
 

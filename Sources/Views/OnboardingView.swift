@@ -7,22 +7,15 @@ import LucideIcons
 // MARK: - Onboarding Step Enum
 
 enum OnboardingStep: Int, CaseIterable {
+    // 1.1: the onboarding paywall step was removed. Pro is offered only at the moment of need
+    // (PaywallView(context:)), never before the user has seen any value.
     case goalSelection = 0   // Screen C
     case addProperty = 1     // Screen D
-    case paywall = 2         // Screen E
-    case notifications = 3   // Screen F
-    case calendar = 4        // Screen G
+    case notifications = 2   // Screen F
+    case calendar = 3        // Screen G
 
-    var progressIndex: Int {
-        switch self {
-        case .goalSelection: return 0
-        case .addProperty: return 1
-        case .paywall: return 2
-        case .notifications: return 3
-        case .calendar: return 4
-        }
-    }
-    static var totalSegments: Int { 5 }
+    var progressIndex: Int { rawValue }
+    static var totalSegments: Int { allCases.count }
 
     static func fromLaunchArgument(_ value: String) -> OnboardingStep? {
         if let index = Int(value) {
@@ -34,8 +27,6 @@ enum OnboardingStep: Int, CaseIterable {
             return .goalSelection
         case "property", "addproperty":
             return .addProperty
-        case "paywall", "pro":
-            return .paywall
         case "notifications", "notification":
             return .notifications
         case "calendar":
@@ -456,8 +447,6 @@ struct OnboardingView: View {
                         goalSelectionScreen
                     case .addProperty:
                         addPropertyScreen
-                    case .paywall:
-                        paywallScreen
                     case .notifications:
                         notificationsScreen
                     case .calendar:
@@ -532,8 +521,6 @@ struct OnboardingView: View {
             case .addProperty:
                 // Save property if user filled it in
                 savePropertyIfNeeded()
-                currentStep = .paywall
-            case .paywall:
                 currentStep = .notifications
             case .notifications:
                 currentStep = .calendar
@@ -549,10 +536,8 @@ struct OnboardingView: View {
             break
         case .addProperty:
             currentStep = .goalSelection
-        case .paywall:
-            currentStep = .addProperty
         case .notifications:
-            currentStep = .paywall
+            currentStep = .addProperty
         case .calendar:
             currentStep = .notifications
         }
@@ -565,6 +550,7 @@ struct OnboardingView: View {
     private func completeOnboarding() {
         UserDefaults.standard.set(true, forKey: UserScope.key("hasCompletedOnboarding"))
         showOnboarding = false
+        Analytics.onboardingCompleted()
     }
 
     private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
@@ -1033,204 +1019,6 @@ struct OnboardingView: View {
         isAddressFocused = false
     }
 
-    // MARK: - Screen E: Paywall
-
-    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
-
-    private var paywallScreen: some View {
-        ZStack {
-            onboardingSoftBackground(accent: AppColors.primary)
-
-            // Content
-            VStack(spacing: 0) {
-                onboardingHeader(
-                    title: "Upgrade when your\nrecords matter",
-                    subtitle: "Start free today. Pro is for export-ready reporting and growing rental portfolios.",
-                    centered: true
-                )
-                .padding(.top, 20)
-
-                VStack(alignment: .leading, spacing: 18) {
-                    HStack(spacing: 10) {
-                        onboardingMiniBadge(icon: Lucide.badgeCheck, color: AppColors.primary)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("LandlordHours Pro")
-                                .font(.system(size: 17, weight: .bold, design: .rounded))
-                                .foregroundStyle(colors.textPrimary)
-                            Text("One purchase for export-ready records.")
-                                .font(.system(size: 13, weight: .regular, design: .rounded))
-                                .foregroundStyle(colors.textSecondary)
-                        }
-                    }
-
-                    VStack(spacing: 10) {
-                        paywallBenefitRow(
-                            icon: Lucide.fileText,
-                            title: "Export audit-ready PDFs",
-                            subtitle: "Package hours by property, category, and year.",
-                            color: AppColors.primary
-                        )
-                        paywallBenefitRow(
-                            icon: Lucide.building2,
-                            title: "Track unlimited properties",
-                            subtitle: "Keep each rental's evidence clean and separate.",
-                            color: AppColors.sky
-                        )
-                        paywallBenefitRow(
-                            icon: Lucide.sparkles,
-                            title: "Faster review before save",
-                            subtitle: "Use assisted logging while keeping final control.",
-                            color: AppColors.sage
-                        )
-                    }
-
-                    Divider()
-                        .overlay(colors.border.opacity(0.4))
-
-                    if let product = SubscriptionManager.shared.proProduct {
-                        HStack(alignment: .center) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(product.displayPrice)
-                                    .font(.system(size: 40, weight: .heavy, design: .rounded))
-                                    .foregroundStyle(colors.textPrimary)
-                                Text("One-time lifetime access")
-                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(AppColors.sage)
-                            }
-                            Spacer()
-                            Text("No subscription")
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(AppColors.primary)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(AppColors.primarySurface)
-                                .clipShape(Capsule())
-                        }
-                        Text("Final App Store pricing is shown before purchase.")
-                            .font(.system(size: 13))
-                            .foregroundStyle(colors.textSecondary)
-                    } else {
-                        HStack(spacing: 12) {
-                            onboardingMiniBadge(icon: Lucide.store, color: AppColors.sky)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Pro availability check")
-                                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                                    .foregroundStyle(colors.textPrimary)
-                                Text("You can continue free while the App Store price loads.")
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(colors.textSecondary)
-                                    .lineSpacing(3)
-                            }
-                        }
-                    }
-                }
-                .padding(18)
-                .frame(maxWidth: .infinity)
-                .background(onboardingCardFill)
-                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
-                .overlay(
-                    RoundedRectangle(cornerRadius: AppCornerRadius.large)
-                        .stroke(colors.border.opacity(colorScheme == .dark ? 0.5 : 0.2), lineWidth: 1)
-                )
-                .padding(.horizontal, 28)
-                .padding(.top, 22)
-
-                Spacer()
-
-                // CTA
-                VStack(spacing: 8) {
-                    Button {
-                        Task {
-                            await subscriptionManager.purchasePro()
-                            if subscriptionManager.hasPurchased { advance() }
-                        }
-                    } label: {
-                        Group {
-                            if subscriptionManager.isLoading {
-                                ProgressView()
-                                    .tint(AppColors.onAction)
-                            } else if let product = subscriptionManager.proProduct {
-                                Text("Buy lifetime Pro \u{00B7} \(product.displayPrice)")
-                            } else {
-                                Text(subscriptionManager.purchaseError == nil ? "Check Pro availability" : "Try Pro purchase again")
-                            }
-                        }
-                        .font(AppTypography.buttonLarge)
-                        .foregroundStyle(AppColors.onAction)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(colors.action)
-                        .overlay(
-                            Capsule()
-                                .stroke(Color.clear, lineWidth: 1)
-                        )
-                        .clipShape(Capsule())
-                    }
-
-                    if let error = subscriptionManager.purchaseError {
-                        VStack(spacing: 10) {
-                            Text(error)
-                                .font(.system(size: 12))
-                                .foregroundStyle(AppColors.coral)
-                                .multilineTextAlignment(.center)
-
-                            #if DEBUG
-                            if AdminAccess.isCurrentUserAdmin {
-                                Button {
-                                    subscriptionManager.unlockPro()
-                                    advance()
-                                } label: {
-                                    Text("Use local Pro for testing")
-                                        .font(AppTypography.buttonSmall)
-                                        .foregroundStyle(AppColors.primary)
-                                }
-                            }
-                            #endif
-                        }
-                        .padding(12)
-                        .frame(maxWidth: .infinity)
-                        .background(onboardingCardFill)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                    }
-
-                    Text(subscriptionManager.proProduct == nil ? "You can keep using the free plan while Pro is unavailable." : "One-time purchase. No subscription. No automatic renewal.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(colors.textSecondary)
-                        .multilineTextAlignment(.center)
-
-                    Button {
-                        animate(AppAnimation.smooth) { skip() }
-                    } label: {
-                        Text("Continue free")
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
-                            .foregroundStyle(AppColors.mist)
-                            .padding(.vertical, 6)
-                    }
-                }
-                .padding(.horizontal, 28)
-                .padding(.bottom, 48)
-            }
-        }
-    }
-
-    private func paywallBenefitRow(icon: UIImage, title: String, subtitle: String, color: Color) -> some View {
-        HStack(spacing: 12) {
-            onboardingMiniBadge(icon: icon, color: color)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(subtitle)
-                    .font(.system(size: 12, weight: .regular, design: .rounded))
-                    .foregroundStyle(colors.textSecondary)
-                    .lineSpacing(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     private var onboardingCardFill: some ShapeStyle {
         colorScheme == .dark ? colors.backgroundSecondary : Color.white.opacity(0.82)
     }
@@ -1525,7 +1313,7 @@ struct OnboardingView: View {
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
                             .foregroundStyle(colors.textPrimary)
 
-                        Text("You're on track for REPS. Keep it up!")
+                        Text("You're on pace for 750 hours. Keep it up!")
                             .font(.system(size: 11, weight: .regular, design: .rounded))
                             .foregroundStyle(AppColors.slate)
                             .lineSpacing(2)

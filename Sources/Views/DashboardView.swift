@@ -30,7 +30,7 @@ struct DashboardView: View {
     private var isGoalMet: Bool {
         switch goalManager.globalGoalType {
         case .reps, .both:
-            return repsStatus.isQualified
+            return repsStatus.isQualifiedOnEnteredHours
         case .str:
             return materialParticipationStatus.isMateriallyParticipating
         }
@@ -41,6 +41,20 @@ struct DashboardView: View {
     // 50% rule compliance: ratio of RE hours to total working hours (incl. non-RE employment)
     private var fiftyPercentCompliance: Double {
         min(repsStatus.realEstateWorkPercentage, 1.0)
+    }
+
+    /// The 50% rule can't be checked until other work hours are entered (same rule as the export).
+    private var otherWorkHoursMissing: Bool {
+        isREPS && repsStatus.moreThanHalfStatus == .notEntered
+    }
+
+    private var fiftyPercentValue: String {
+        otherWorkHoursMissing ? "Not checked" : "\(Int(fiftyPercentCompliance * 100))%"
+    }
+
+    /// 750 hours reached, but the 50% rule still needs the user's other work hours.
+    private var hoursMetButRuleUnchecked: Bool {
+        otherWorkHoursMissing && repsStatus.meets750HourTest
     }
 
     // Pace calculations
@@ -167,7 +181,7 @@ struct DashboardView: View {
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showPaywall) {
-                PaywallView(showPaywall: $showPaywall)
+                PaywallView(context: .dashboardUnlock)
             }
             .navigationDestination(isPresented: $showLearningCenter) {
                 LearningCenterView()
@@ -488,6 +502,7 @@ struct DashboardView: View {
                 .lhSurfaceCard(cornerRadius: 20)
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("dashboard.unlockPro")
         }
     }
 
@@ -540,7 +555,12 @@ struct DashboardView: View {
             HStack(spacing: 12) {
                 dashboardMiniMetric(title: "Pace", value: isOnTrack ? "On track" : "Behind")
                 if isREPS {
-                    dashboardMiniMetric(title: "50% rule", value: "\(Int(fiftyPercentCompliance * 100))%")
+                    dashboardMiniMetric(
+                        title: "50% rule",
+                        value: fiftyPercentValue,
+                        detail: otherWorkHoursMissing ? TaxQualificationEngine.MoreThanHalfStatus.notEnteredPrompt : nil
+                    )
+                    .accessibilityIdentifier("dashboard.fiftyPercent")
                 } else {
                     dashboardMiniMetric(title: "Days left", value: "\(daysLeftInYear)")
                 }
@@ -560,15 +580,17 @@ struct DashboardView: View {
     }
 
     private var goalCardTitle: String {
-        isGoalMet ? "Goal met" : "\(Int(targetHours)) hour target"
+        if hoursMetButRuleUnchecked { return "Hours target met" }
+        return isGoalMet ? "Goal met" : "\(Int(targetHours)) hour target"
     }
 
     private var goalCardSubtitle: String {
+        if hoursMetButRuleUnchecked { return "Add your other work hours to check the 50% rule." }
         if isGoalMet { return "Your tracked work has reached the current goal." }
         return "\(Int(hoursPerWeekNeeded))h per week \(isOnTrack ? "keeps you on pace" : "gets you back on pace") for \(currentYear)."
     }
 
-    private func dashboardMiniMetric(title: String, value: String) -> some View {
+    private func dashboardMiniMetric(title: String, value: String, detail: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
                 .font(.system(size: 12, weight: .bold, design: .rounded))
@@ -576,7 +598,14 @@ struct DashboardView: View {
             Text(value)
                 .font(.system(size: 16, weight: .black, design: .rounded))
                 .foregroundStyle(colors.textPrimary)
+            if let detail {
+                Text(detail)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+        .accessibilityElement(children: .combine)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.62 : 0.72))
@@ -766,7 +795,7 @@ struct DashboardView: View {
                     .font(.system(size: 11, weight: .regular, design: .rounded))
                     .foregroundStyle(colors.textSecondary)
                 Spacer()
-                Text("\(Int(fiftyPercentCompliance * 100))%")
+                Text(fiftyPercentValue)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(AppColors.primary)
             }
