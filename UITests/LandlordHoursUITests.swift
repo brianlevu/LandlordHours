@@ -77,7 +77,18 @@ final class LandlordHoursUITests: XCTestCase {
         launch(scenario: "frequent", tab: 3)
 
         XCTAssertTrue(app.staticTexts["Reports"].waitForExistence(timeout: 8))
-        app.buttons["Export report"].tap()
+        // The launch splash fades out over ~1s while the Reports tree already exists;
+        // tapping before the button is hittable lands on the splash overlay.
+        // The accessibility tree reports the button hittable while the splash still
+        // covers it, so retry the tap until the export sheet actually opens.
+        let exportTitle = app.staticTexts["Export report"]
+        for _ in 0..<5 where !exportTitle.exists {
+            let exportButton = app.buttons["Export report"]
+            if exportButton.waitForExistence(timeout: 3), exportButton.isHittable {
+                exportButton.tap()
+            }
+            _ = exportTitle.waitForExistence(timeout: 3)
+        }
 
         let generateButton = app.buttons["export.generatePDF"]
         assertVisibleText("Export report", timeout: 5)
@@ -298,9 +309,11 @@ final class LandlordHoursUITests: XCTestCase {
         // Launch 1: seed an entry that carries a real, file-backed attachment.
         launch(scenario: "occasional", tab: 0, extraArguments: ["-LHSeedAttachment"])
 
+        // Recent Activity sits below the fold on the redesigned Home, and the splash
+        // can still be fading: scroll until the row is hittable before tapping.
         let entryRow = app.staticTexts["Property Management"]
-        XCTAssertTrue(entryRow.waitForExistence(timeout: 12))
-        entryRow.tap()
+        XCTAssertTrue(entryRow.waitForExistence(timeout: 20))
+        tapWhenHittable(entryRow, scrollIfNeeded: true)
 
         XCTAssertTrue(app.staticTexts["Attachments (1)"].waitForExistence(timeout: 6),
                       "Seeded attachment should render before relaunch")
@@ -317,9 +330,9 @@ final class LandlordHoursUITests: XCTestCase {
         app.launch()
 
         let entryRowAgain = app.staticTexts["Property Management"]
-        XCTAssertTrue(entryRowAgain.waitForExistence(timeout: 12),
+        XCTAssertTrue(entryRowAgain.waitForExistence(timeout: 20),
                       "Persisted entry should still be present after relaunch")
-        entryRowAgain.tap()
+        tapWhenHittable(entryRowAgain, scrollIfNeeded: true)
 
         XCTAssertTrue(app.staticTexts["Attachments (1)"].waitForExistence(timeout: 6),
                       "Attachment must still render after a true process restart")
@@ -335,6 +348,26 @@ final class LandlordHoursUITests: XCTestCase {
             "-AppleLocale", "en_US"
         ] + extraArguments
         app.launch()
+    }
+
+    /// Waits until `element` is actually hittable (not under the splash overlay or the
+    /// floating tab bar), optionally scrolling, then taps it.
+    private func tapWhenHittable(_ element: XCUIElement, scrollIfNeeded: Bool = false, timeout: TimeInterval = 20) {
+        let deadline = Date().addingTimeInterval(timeout)
+        var swipes = 0
+        while Date() < deadline {
+            if element.exists && element.isHittable {
+                element.tap()
+                return
+            }
+            if scrollIfNeeded && element.exists && swipes < 6 && !app.staticTexts["Home"].isHittable == false {
+                app.swipeUp()
+                swipes += 1
+            } else {
+                Thread.sleep(forTimeInterval: 0.5)
+            }
+        }
+        XCTFail("Element never became hittable: \(element)")
     }
 
     private func assertVisibleText(_ text: String, timeout: TimeInterval = 5) {
