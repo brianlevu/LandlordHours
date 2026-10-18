@@ -76,7 +76,27 @@ final class TimerDraftUITests: XCTestCase {
         if !app.buttons["timerDraftReview.save"].waitForExistence(timeout: 4) {
             review.tap()
         }
-        XCTAssertTrue(app.buttons["timerDraftReview.save"].waitForExistence(timeout: 5))
+        let save = app.buttons["timerDraftReview.save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+
+        // One tap can't commit 24 h: Save stays off until the hours are changed or confirmed.
+        XCTAssertFalse(save.isEnabled, "Save is disabled before review")
+        let confirm = app.buttons["timerDraftReview.confirm"]
+        XCTAssertTrue(confirm.exists)
+        confirm.tap()
+        XCTAssertTrue(save.isEnabled, "Confirming the hours enables Save")
+        confirm.tap()
+        XCTAssertFalse(save.isEnabled, "Unchecking disables Save again")
+        app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Decrement' OR identifier CONTAINS[c] 'Decrement'")).firstMatch.tap()
+        XCTAssertTrue(save.isEnabled, "Changing the hours enables Save")
+    }
+
+    func testCappedDraftHeadlineLeadsWithTheCap() {
+        launch("forgotten24h")
+        let summary = app.descendants(matching: .any)["timerDraft.summary"]
+        XCTAssertTrue(summary.waitForExistence(timeout: 10))
+        XCTAssertTrue(summary.label.contains("We stopped it at 24 hours"), summary.label)
+        XCTAssertFalse(summary.label.contains("Ran 30"), summary.label)
     }
 
     func testCaptureTimerDraftFramesLight() { captureAll(scheme: "light") }
