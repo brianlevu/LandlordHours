@@ -1,22 +1,11 @@
 import Foundation
-import os.log
 
-private let logger = Logger(subsystem: "com.openclaw.landlordhours", category: "AI")
-
-// MARK: - AI Time Entry Service
+// MARK: - Time Entry Parser (on-device, keyword-based)
 class AITimeEntryService {
     static let shared = AITimeEntryService()
 
     /// Pre-compiled regex patterns for category matching — built once at init.
     private let categoryPatterns: [(ActivityCategory, NSRegularExpression)]
-
-    private var apiKey: String {
-        if let key = Bundle.main.object(forInfoDictionaryKey: "MINIMAX_API_KEY") as? String, !key.isEmpty {
-            return key
-        }
-        return ProcessInfo.processInfo.environment["MINIMAX_API_KEY"] ?? ""
-    }
-    private let endpoint = "https://api.minimax.chat/v1/text/chatcompletion_pro"
 
     private init() {
         // Pre-compile category keyword patterns into regexes (ordered by specificity)
@@ -64,34 +53,13 @@ class AITimeEntryService {
         }
     }
 
+    /// Reads the note on-device with keyword matching. Nothing leaves the phone:
+    /// this service makes no network requests.
     func parseTimeEntry(from text: String, properties: [RentalProperty]) async -> ParsedTimeEntry? {
-        // Always try local parsing first — it's instant and works offline
-        let localResult = parseLocally(text: text, properties: properties)
-
-        // If we have an API key, try the remote API for better accuracy
-        if !apiKey.isEmpty {
-            if let remoteResult = await parseRemotely(text: text, properties: properties) {
-                return mergeRemoteResult(remoteResult, with: localResult, sourceText: text)
-            }
-        }
-
-        return localResult
+        parseLocally(text: text, properties: properties)
     }
 
-    private func mergeRemoteResult(_ remote: ParsedTimeEntry, with local: ParsedTimeEntry?, sourceText: String) -> ParsedTimeEntry {
-        guard let local else { return remote }
-        let hasExplicitHours = extractExplicitHours(from: sourceText.lowercased()) != nil
-
-        return ParsedTimeEntry(
-            property: remote.property ?? local.property,
-            category: remote.category,
-            hours: (!hasExplicitHours && abs(remote.hours - 1.0) < 0.001) ? local.hours : remote.hours,
-            participant: remote.participant,
-            notes: remote.notes.isEmpty ? local.notes : remote.notes
-        )
-    }
-
-    // MARK: - Local Parser (keyword-based, no API needed)
+    // MARK: - Local Parser (keyword-based, on-device)
 
     private func parseLocally(text: String, properties: [RentalProperty]) -> ParsedTimeEntry? {
         let lower = text.lowercased()
@@ -315,119 +283,6 @@ class AITimeEntryService {
             text.components(separatedBy: CharacterSet.alphanumerics.inverted)
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { $0.count > 2 && !stopWords.contains($0) }
-        )
-    }
-
-    // MARK: - Remote API Parser (MiniMax — optional enhancement)
-
-    private func parseRemotely(text: String, properties: [RentalProperty]) async -> ParsedTimeEntry? {
-        let propertyList = properties.map { "- \($0.name): \($0.address)" }.joined(separator: "\n")
-
-        let prompt = """
-        Parse this time entry description and extract the relevant information.
-
-        Available properties:
-        \(propertyList)
-
-        Categories (IRS-qualified for REPS):
-        - Repairs & Maintenance
-        - Property Management
-        - Leasing & Tenant Relations
-        - Bookkeeping & Financial
-        - Legal & Compliance
-        - Insurance & Claims
-        - Travel to Property
-        - Renovations & Improvements
-
-        Participants: Self, Spouse
-
-        User's input: "\(text)"
-
-        Respond with JSON in this exact format:
-        {
-            "propertyName": "matched property name or empty string",
-            "category": "best matching category or empty string",
-            "hours": number (e.g., 2.0),
-            "participant": "Self" or "Spouse",
-            "notes": "any additional context extracted"
-        }
-
-        If no clear match, use empty strings. Estimate hours if mentioned (e.g., "4 hours" = 4.0).
-        """
-
-        guard let url = URL(string: endpoint) else { return nil }
-
-        var request = URLRequest(url: url, timeoutInterval: 10)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(apiKey, forHTTPHeaderField: "Authorization")
-
-        let body: [String: Any] = [
-            "model": "MiniMax-M2.5",
-            "messages": [
-                ["role": "system", "content": "You are a helpful assistant that parses time entry descriptions."],
-                ["role": "user", "content": prompt]
-            ],
-            "temperature": 0.3
-        ]
-
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-
-        do {
-            let (data, _) = try await URLSession.shared.data(for: request)
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let choices = json["choices"] as? [[String: Any]],
-               let message = choices.first?["message"] as? [String: Any],
-               let content = message["content"] as? String {
-                return parseJSONResponse(content, properties: properties)
-            }
-        } catch {
-            logger.error("Remote parse error: \(error.localizedDescription)")
-        }
-
-        return nil
-    }
-
-    private func parseJSONResponse(_ content: String, properties: [RentalProperty]) -> ParsedTimeEntry? {
-        guard let jsonStart = content.firstIndex(of: "{"),
-              let jsonEnd = content.lastIndex(of: "}") else { return nil }
-
-        let jsonString = String(content[jsonStart...jsonEnd])
-        guard let data = jsonString.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-
-        let propertyName = json["propertyName"] as? String ?? ""
-        let categoryRaw = json["category"] as? String ?? ""
-        // Accept string or number, clamp to valid range
-        let rawHours: Double
-        if let h = json["hours"] as? Double {
-            rawHours = h
-        } else if let s = json["hours"] as? String, let h = Double(s) {
-            rawHours = h
-        } else {
-            rawHours = 1.0
-        }
-        let hours = min(max(rawHours, 0.25), 24)
-        let participantRaw = json["participant"] as? String ?? "Self"
-
-        let matchedProperty = properties.first {
-            $0.name.lowercased() == propertyName.lowercased() ||
-            $0.name.lowercased().contains(propertyName.lowercased())
-        }
-
-        let matchedCategory = ActivityCategory.allCases.first {
-            $0.rawValue.lowercased().contains(categoryRaw.lowercased()) ||
-            categoryRaw.lowercased().contains($0.rawValue.lowercased())
-        }
-
-        let participant: Participant = participantRaw == "Spouse" ? .spouse : .selfParticipant
-
-        return ParsedTimeEntry(
-            property: matchedProperty,
-            category: matchedCategory ?? .repairs,
-            hours: hours,
-            participant: participant,
-            notes: ""
         )
     }
 }
