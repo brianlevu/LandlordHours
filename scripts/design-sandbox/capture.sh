@@ -11,7 +11,7 @@ xcrun simctl status_bar $U override --time "9:41" --batteryState discharging --b
 xcrun simctl install $U "$APP"
 for s in $SCREENS; do
   xcrun simctl terminate $U $BID 2>/dev/null
-  xcrun simctl launch $U $BID -screen $s -appearance $AP >/dev/null
+  xcrun simctl launch $U $BID -screen $s -appearance $AP -LHDirection ${SANDBOX_DIRECTION:-baseline} >/dev/null
   sleep 4
   xcrun simctl io $U screenshot "$OUT/$s-$AP.png" >/dev/null 2>&1
   echo "$s-$AP"

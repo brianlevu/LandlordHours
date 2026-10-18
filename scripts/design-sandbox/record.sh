@@ -10,7 +10,7 @@ xcrun simctl io "$U" recordVideo --codec=h264 --force "$RAW" > "/Users/brian/tmp
 RP=$!
 REC_START=$(python3 -c 'import time;print(time.time())')
 sleep 1
-xcodebuild test-without-building -project LandlordHours.xcodeproj -scheme LHDesignSandbox \
+TEST_RUNNER_SANDBOX_DIRECTION=${SANDBOX_DIRECTION:-baseline} xcodebuild test-without-building -project LandlordHours.xcodeproj -scheme LHDesignSandbox \
   -destination "id=$U" -derivedDataPath /Users/brian/tmp/DerivedData/landlordhours-sandbox \
   -only-testing:LHDesignSandboxUITests/SandboxDemoTests/$1 > "/Users/brian/tmp/lh-test-$2.log" 2>&1
 TRC=$?
@@ -20,5 +20,5 @@ MARK=$(grep -o "DEMO_START [0-9.]*" "/Users/brian/tmp/lh-test-$2.log" | head -1 
 echo "test rc=$TRC rec_start=$REC_START mark=$MARK"
 grep -E "Executed|error:|failed" "/Users/brian/tmp/lh-test-$2.log" | tail -3
 OFF=$(python3 -c "print(max(0,${MARK:-0}-$REC_START-4.5))")
-ffmpeg -y -loglevel error -ss "$OFF" -i "$RAW" -t 14.5 -vf "fps=30,scale=590:-2" -r 30 -c:v libx264 -pix_fmt yuv420p -movflags +faststart "$OUT/$2.mp4"
+ffmpeg -y -loglevel error -ss "$OFF" -i "$RAW" -t ${SANDBOX_CLIP:-14.5} -vf "fps=30,scale=590:-2" -r 30 -c:v libx264 -pix_fmt yuv420p -movflags +faststart "$OUT/$2.mp4"
 ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT/$2.mp4"

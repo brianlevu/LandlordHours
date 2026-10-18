@@ -42,7 +42,7 @@ struct RecordsView: View {
                         ForEach(group.entries) { e in
                             RecordRow(e: e)
                                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-                                .alignmentGuide(.listRowSeparatorLeading) { _ in 52 }
+                                .alignmentGuide(.listRowSeparatorLeading) { _ in LHDirection.current == .inkwell ? 44 : 52 }
                         }
                     } header: {
                         HStack(alignment: .firstTextBaseline) {
@@ -99,6 +99,9 @@ struct FilterChip: View {
 struct RecordRow: View {
     let e: RecordEntry
     var body: some View {
+        if LHDirection.current == .baseline { baselineBody } else { DirectionRecordRow(e: e) }
+    }
+    private var baselineBody: some View {
         HStack(alignment: .top, spacing: 12) {
             SourceTile(kind: e.kind)
             VStack(alignment: .leading, spacing: 2) {
@@ -208,5 +211,51 @@ struct PropertyRow: View {
             ProgressTrack(progress: share, tick: nil, color: LH.action, height: 6)
         }
         .padding(.vertical, 8)
+    }
+}
+
+struct DirectionRecordRow: View {
+    let e: RecordEntry
+    private let dir = LHDirection.current
+    private var confirmed: Bool { e.status.contains("confirmed") }
+    private var sourceWord: String {
+        switch e.kind {
+        case .calendar: "From calendar"
+        case .receipt: "From receipt"
+        case .location: "From location"
+        case .timer: "Timer"
+        case .manual: "Added by you"
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            CategoryIcon(cat: e.category, size: dir == .inkwell ? 32 : 40)
+                .padding(.top, dir == .inkwell ? 4 : 0)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(e.title).font(.body).lineLimit(1)
+                HStack(spacing: 6) {
+                    if dir != .waypoint { PropertyMark(prop: Prop.named(e.property), size: 20) }
+                    Text(e.property).font(.subheadline).foregroundStyle(LH.secondaryText).lineLimit(1)
+                }
+                HStack(spacing: 6) {
+                    SourceBadge(kind: e.kind, confirmed: confirmed && dir == .waypoint)
+                    if dir != .inkwell {
+                        Text(confirmed ? "Confirmed" : sourceWord).font(.subheadline).foregroundStyle(LH.secondaryText).lineLimit(1)
+                    }
+                    if confirmed && dir == .inkwell { LoggedStamp() }
+                }
+                .padding(.top, 1)
+            }
+            Spacer(minLength: 6)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(fmtDur(e.hours)).font(.body).monospacedDigit()
+                Text(e.date).font(.subheadline).foregroundStyle(LH.secondaryText)
+            }
+            if dir == .waypoint {
+                MapTile(prop: Prop.named(e.property), size: 40)
+            }
+        }
+        .padding(.vertical, 12)
     }
 }

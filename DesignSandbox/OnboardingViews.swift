@@ -95,27 +95,37 @@ struct PrivacyFooter: View {
 
 struct OnboardingWelcome: View {
     var body: some View {
+        let dir = LHDirection.current
         VStack(alignment: .leading, spacing: 0) {
-            Spacer().frame(height: 56)
-            AppMark(size: 64)
+            if dir == .baseline {
+                Spacer().frame(height: 56)
+                AppMark(size: 64)
+            } else {
+                DirectionArt(kind: .welcome)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: dir == .waypoint ? 150 : 230)
+                    .padding(.horizontal, dir == .waypoint ? -12 : 0)
+                    .padding(.top, dir == .waypoint ? 48 : 8)
+                    .padding(.bottom, dir == .waypoint ? 24 : 0)
+            }
             Text("Rental work,\nnoticed for you.")
                 .font(.system(size: 34, weight: .bold))
                 .tracking(-0.4)
-                .padding(.top, 28)
+                .padding(.top, dir == .baseline ? 28 : 12)
             Text("LandlordHours finds the hours you already spend on your rentals and builds the record your accountant needs.")
                 .font(.body)
                 .foregroundStyle(LH.secondaryText)
                 .padding(.top, 12)
 
             VStack(alignment: .leading, spacing: 22) {
-                Feature(symbol: "calendar", title: "Finds work on your calendar",
+                Feature(symbol: "calendar", tone: .tenant, title: "Finds work on your calendar",
                         text: "Plumber visits, showings and turnovers become suggestions.")
-                Feature(symbol: "checkmark.circle", title: "Asks before it saves",
+                Feature(symbol: "checkmark.circle", tone: .management, title: "Asks before it saves",
                         text: "Nothing goes in your record until you confirm it.")
-                Feature(symbol: "doc.text", title: "Ready for tax time",
+                Feature(symbol: "doc.text", tone: .legal, title: "Ready for tax time",
                         text: "A clean PDF of every hour, with where it came from.")
             }
-            .padding(.top, 40)
+            .padding(.top, dir == .baseline ? 40 : 28)
 
             Spacer()
             Button("Get started") {}
@@ -157,14 +167,19 @@ struct AppMark: View {
 
 struct Feature: View {
     var symbol: String
+    var tone: Category? = nil
     var title: String
     var text: String
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            Image(systemName: symbol)
-                .font(.system(size: 22))
-                .foregroundStyle(LH.action)
-                .frame(width: 28)
+            if let tone, LHDirection.current != .baseline {
+                ToneGlyph(symbol: symbol, tone: tone, size: 32)
+            } else {
+                Image(systemName: symbol)
+                    .font(.system(size: 22))
+                    .foregroundStyle(LH.action)
+                    .frame(width: 28)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.body.weight(.semibold))
                 Text(text).font(.subheadline).foregroundStyle(LH.secondaryText)

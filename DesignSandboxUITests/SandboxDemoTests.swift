@@ -8,7 +8,8 @@ final class SandboxDemoTests: XCTestCase {
     private func launch(_ screen: String) -> XCUIApplication {
         let app = XCUIApplication()
         let appearance = ProcessInfo.processInfo.environment["SANDBOX_APPEARANCE"] ?? "light"
-        app.launchArguments = ["-screen", screen, "-appearance", appearance]
+        let direction = ProcessInfo.processInfo.environment["SANDBOX_DIRECTION"] ?? "baseline"
+        app.launchArguments = ["-screen", screen, "-appearance", appearance, "-LHDirection", direction]
         app.launch()
         return app
     }

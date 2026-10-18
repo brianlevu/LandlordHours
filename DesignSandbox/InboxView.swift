@@ -22,7 +22,7 @@ struct InboxView: View {
                 if store.suggestions.isEmpty {
                     VStack {
                         Spacer()
-                        EmptyStateView(symbol: "tray", title: "Nothing waiting",
+                        EmptyStateView(symbol: "tray", art: .emptyInbox, title: "Nothing waiting",
                                        message: "We'll ask when something looks like rental work.")
                         Spacer()
                         Spacer()
@@ -49,7 +49,7 @@ struct InboxView: View {
                 store.dismiss(s.id, reduceMotion: reduce)
             }
         }
-        .sensoryFeedback(.success, trigger: store.confirmTick)
+        .sensoryFeedback(LHDirection.current == .inkwell ? .impact(flexibility: .rigid) : .success, trigger: store.confirmTick)
         .sensoryFeedback(.impact(weight: .light), trigger: store.dismissTick)
         .task {
             if let openDetail, let s = store.suggestions.first(where: { $0.id == openDetail }) {
@@ -116,12 +116,17 @@ struct BackfillBanner: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            Image(systemName: "calendar.badge.checkmark")
-                .font(.system(size: 22))
-                .foregroundStyle(LH.action)
-                .symbolRenderingMode(.hierarchical)
-                .frame(width: 40, height: 40)
-                .background(LH.actionWash, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            if LHDirection.current == .baseline {
+                Image(systemName: "calendar.badge.checkmark")
+                    .font(.system(size: 22))
+                    .foregroundStyle(LH.action)
+                    .symbolRenderingMode(.hierarchical)
+                    .frame(width: 40, height: 40)
+                    .background(LH.actionWash, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            } else {
+                DirectionArt(kind: .inboxBanner)
+                    .frame(width: 64, height: 64)
+            }
             VStack(alignment: .leading, spacing: 4) {
                 Text("We found 14 things from the last 90 days.")
                     .font(.body.weight(.semibold))
@@ -130,7 +135,7 @@ struct BackfillBanner: View {
                     .foregroundStyle(LH.secondaryText)
                 HStack(spacing: 16) {
                     stat(Double(store.pendingCount), "to confirm", text: "\(store.pendingCount)")
-                    stat(store.hoursLogged, "logged in 2026", text: fmtDur(store.hoursLogged))
+                    stat(store.hoursLogged, "logged", text: fmtDur(store.hoursLogged))
                 }
                 .padding(.top, 8)
             }
@@ -146,6 +151,8 @@ struct BackfillBanner: View {
                 .animation(Motion.snappy(reduce), value: v)
             Text(label).font(.subheadline).foregroundStyle(LH.secondaryText)
         }
+        .lineLimit(1)
+        .fixedSize()
     }
 }
 
@@ -154,6 +161,10 @@ struct SuggestionRow: View {
     let s: Suggestion
 
     var body: some View {
+        if LHDirection.current == .baseline { baselineBody } else { DirectionSuggestionRow(s: s) }
+    }
+
+    private var baselineBody: some View {
         HStack(alignment: .center, spacing: 8) {
             leading
                 .frame(width: 64)
@@ -243,5 +254,119 @@ struct TightLabel: LabelStyle {
             configuration.icon
             configuration.title
         }
+    }
+}
+
+// MARK: - Direction row: hours | category icon | text | property mark
+
+struct DirectionSuggestionRow: View {
+    let s: Suggestion
+    private let dir = LHDirection.current
+    @State private var hop: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduce
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            hoursColumn.frame(width: 50)
+            CategoryIcon(cat: s.category, size: dir == .inkwell ? 32 : 36)
+                .offset(y: hop)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    SourceBadge(kind: s.kind, confirmed: s.state == .logged)
+                    Text(dir == .inkwell ? s.when : "\(s.kind.label) · \(s.when)")
+                        .lineLimit(1)
+                }
+                .font(.subheadline)
+                .foregroundStyle(LH.secondaryText)
+                Text("\(Text(s.noun).fontWeight(.semibold)) \(s.joiner) \(Text(nbsp(s.property)).fontWeight(.semibold))")
+                    .font(.body)
+                    .lineLimit(2)
+                detail.font(.subheadline)
+            }
+            Spacer(minLength: 4)
+            PropertyMark(prop: Prop.named(s.property), size: dir == .inkwell ? 30 : 36)
+        }
+        .padding(.vertical, 12)
+        .frame(minHeight: 76)
+        .contentShape(Rectangle())
+        .onChange(of: s.state) { _, new in
+            guard new == .logged, dir == .clayhouse, !reduce else { return }
+            withAnimation(.spring(response: 0.18, dampingFraction: 0.5)) { hop = -6 }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.55).delay(0.16)) { hop = 0 }
+        }
+    }
+
+    @ViewBuilder private var hoursColumn: some View {
+        let h: Double? = s.hours ?? s.capMinutes.map { Double($0) / 60 }
+        VStack(spacing: 0) {
+            if s.hours == nil && s.capMinutes != nil {
+                Text("Up to").font(.caption2.weight(.semibold)).textCase(.uppercase).foregroundStyle(LH.secondaryText)
+            }
+            if let h {
+                let (hh, mm) = fmtHM(h)
+                if hh > 0 {
+                    Text("\(hh)h").font(.system(size: 24, weight: .semibold)).monospacedDigit()
+                        .contentTransition(.numericText(value: Double(hh)))
+                }
+                if mm > 0 {
+                    Text("\(mm)m").font(.system(size: hh > 0 ? 16 : 24, weight: .semibold)).monospacedDigit()
+                        .foregroundStyle(hh > 0 ? LH.secondaryText : Color.primary)
+                }
+            } else {
+                Text("—").font(.system(size: 24, weight: .semibold)).foregroundStyle(LH.secondaryText)
+            }
+        }
+    }
+
+    @ViewBuilder private var detail: some View {
+        if s.state == .logged {
+            switch dir {
+            case .inkwell:
+                HStack(spacing: 8) {
+                    Text("\(s.category.label) · \(Prop.named(s.property).seal)").foregroundStyle(LH.secondaryText)
+                    LoggedStamp(animated: true)
+                }
+            case .waypoint:
+                HStack(spacing: 4) {
+                    PinDrop()
+                    Text("Logged").fontWeight(.semibold).foregroundStyle(LH.positive)
+                }
+            default:
+                Label("Logged", systemImage: "checkmark.circle.fill")
+                    .labelStyle(TightLabel())
+                    .fontWeight(.semibold)
+                    .foregroundStyle(LH.positive)
+                    .symbolEffect(.bounce, value: s.state)
+            }
+        } else {
+            switch s.kind {
+            case .receipt:
+                Text("\(Text(s.detail).foregroundStyle(LH.secondaryText)) · \(Text("Needs hours").foregroundStyle(LH.caution).fontWeight(.medium))")
+            case .location:
+                HStack(spacing: 6) {
+                    Text("Time at the property").foregroundStyle(LH.secondaryText)
+                    BetaTag()
+                }
+            default:
+                Text(s.category.label).foregroundStyle(s.category.tone)
+                    .fontWeight(.medium)
+            }
+        }
+    }
+}
+
+/// Waypoint's confirm: a green check pin drops onto the row.
+struct PinDrop: View {
+    @State private var landed = false
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    var body: some View {
+        Image(systemName: "mappin.circle.fill")
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(.white, LH.positive)
+            .offset(y: landed || reduce ? 0 : -16)
+            .opacity(landed ? 1 : 0)
+            .onAppear {
+                withAnimation(reduce ? .easeOut(duration: 0.2) : .spring(response: 0.32, dampingFraction: 0.86)) { landed = true }
+            }
     }
 }

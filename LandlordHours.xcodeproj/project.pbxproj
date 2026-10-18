@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		05DF973582CDEFD602CFA162 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF63DC10108B9EAC40FE0C4C /* SettingsView.swift */; };
 		063B1B913810D3C73CD378C4 /* CategoryManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02AE3372F32CD60F04CF317C /* CategoryManagementView.swift */; };
+		09F77780E8FAB376669CAB17 /* clay-icon-showing-leasing.png in Resources */ = {isa = PBXBuildFile; fileRef = E97CC17BB58AC9A73B0B7133 /* clay-icon-showing-leasing.png */; };
 		0C6599A289D3958D0B6C65D9 /* LucideIcons in Frameworks */ = {isa = PBXBuildFile; productRef = 4FD8B0B1A7D7E8751EEF770F /* LucideIcons */; };
 		1086EA21B67B1F20B919AE95 /* InboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8406A07CC3C9CE12C40B4EA /* InboxView.swift */; };
 		12BA2B1FF6DA34B9708EABF4 /* ExportPDFView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37718C6C352F5146B1B19AAA /* ExportPDFView.swift */; };
@@ -16,10 +17,17 @@
 		183917104B86E5DC6FAFB97A /* TimeEntryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61F1A37F861D056973D6EC70 /* TimeEntryDetailView.swift */; };
 		1966A0BEB7460410F2A156D6 /* ProfileManagementViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 988C76EAD03340B1FA9162E3 /* ProfileManagementViews.swift */; };
 		19BD84C3A545BA2935D9A7CF /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFF3C2F4E4EAC2D09DCB3F5B /* ContentView.swift */; };
+		19E893316FE25F2D839C1AFB /* ink-cabin.png in Resources */ = {isa = PBXBuildFile; fileRef = 51644436D6AC313CEBB86FB6 /* ink-cabin.png */; };
 		1A2A80F489BB65C766EBA321 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5490464EB91A5699EED6EFCE /* ReportsView.swift */; };
+		1BF0169CAA60946F770A1853 /* Directions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A1269F8E8320CC31B0C8EFF /* Directions.swift */; };
+		1D2B4410343B29438923FC41 /* clay-icon-tenant-comms.png in Resources */ = {isa = PBXBuildFile; fileRef = C8CB044F5E167435BCB3A6F9 /* clay-icon-tenant-comms.png */; };
+		1E6063AC7D96DBFA6A580561 /* clay-icon-property-mgmt.png in Resources */ = {isa = PBXBuildFile; fileRef = CDF1F70708087E9102A0240C /* clay-icon-property-mgmt.png */; };
 		20622DC1C008655024F7676F /* LandlordHoursUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8248EAB41ECD1E6CF7808498 /* LandlordHoursUITests.swift */; };
 		24B4A91548115D49515C797B /* PropertiesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D91BDD921FD02E42B58FE334 /* PropertiesView.swift */; };
+		2756D1036DFF1E39C884B16A /* clay-icon-travel.png in Resources */ = {isa = PBXBuildFile; fileRef = B3136FEF70B8D0881382546B /* clay-icon-travel.png */; };
+		27C1FF6B4074F269E3F05759 /* clay-scene-empty-today.png in Resources */ = {isa = PBXBuildFile; fileRef = C38968C039CDBC2389B68FA9 /* clay-scene-empty-today.png */; };
 		2846D3E26FF2EA4A60FAF7D6 /* LandlordHoursTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01B3B8EADDB251440528314 /* LandlordHoursTests.swift */; };
+		28F85A7ABE20887069028D25 /* ink-keyring.png in Resources */ = {isa = PBXBuildFile; fileRef = 3DDFFCB72B1B6BB5B396193C /* ink-keyring.png */; };
 		2B843690B8A92B72AA874888 /* EngagementLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F7DEC5DC48828C8FF4C48C2 /* EngagementLabView.swift */; };
 		2E574ECE1DF447E91AE20ADC /* OnboardingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F35FE0D4E616BBC5040D9C4A /* OnboardingViews.swift */; };
 		38B5E98FF26323E43143DBF3 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 1AF16D81B372852B91B92405 /* LaunchScreen.storyboard */; };
@@ -28,23 +36,31 @@
 		41608B6514C2E6C81B7359F2 /* AuditReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA55F7A788AAB40693166F60 /* AuditReportTests.swift */; };
 		494B71178010F1EDB70BC3A5 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 884A37AD32EE90EF18CEDAE9 /* RevenueCat */; };
 		4C04E70D3E5565A29188DAF4 /* CalendarImportReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FFC13B6D335F226D0DD7B81 /* CalendarImportReviewView.swift */; };
+		4C79FB6429AEC2D4D383C41C /* clay-icon-renovation.png in Resources */ = {isa = PBXBuildFile; fileRef = F538D4BDB861902A9DBF31DA /* clay-icon-renovation.png */; };
 		4FEB158B22F5E540112D703C /* LandlordHours.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 61925A55B4CDBDF1584A392E /* LandlordHours.storekit */; };
 		518F77E3248E5C1571182B28 /* LandlordHoursAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 965D319F27D7A4A2332D47B2 /* LandlordHoursAppIntents.swift */; };
 		5237EDB83B597E6CAE0D5272 /* SyncGateAndTimerDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDAC9A2FCA588960D010499D /* SyncGateAndTimerDraftTests.swift */; };
+		52BA1A13A1D2BF6D0D6AB54A /* clay-house-condo.png in Resources */ = {isa = PBXBuildFile; fileRef = 9E3ED234E5430C8E62819D82 /* clay-house-condo.png */; };
 		571691826C340E4E727303CA /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1552DA58D14D98D9473D352A /* SubscriptionManager.swift */; };
 		591F1F8B7870974109E9F9AC /* CategoryPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E5A94C2FA181F38E6888ADE /* CategoryPickerSheet.swift */; };
 		595644C754F5418184AC4740 /* EngagementNotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D2C2173FB64791CCAAB8FD /* EngagementNotificationScheduler.swift */; };
+		5A44B45762C944964A296F92 /* ink-receipt-envelope.png in Resources */ = {isa = PBXBuildFile; fileRef = 74B4FF48284FA5EF6C3A541B /* ink-receipt-envelope.png */; };
+		5A9DF54A28B492DC7FDFA64F /* clay-icon-cleaning-turnover.png in Resources */ = {isa = PBXBuildFile; fileRef = 9F566D22744E32DA0161DB8A /* clay-icon-cleaning-turnover.png */; };
 		5AA0D982BB42E25BA085B2A6 /* UITestIsolation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DC428FA6B6EF8A5244CC123 /* UITestIsolation.swift */; };
 		5AFC939B91357BDE9567875F /* LegacyProfileFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C69AE5A6A99BBB20034F16BA /* LegacyProfileFixture.swift */; };
 		6145256E78B6FF599DFB3B9D /* EngagementIntelligenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D41E394791AE4ADCA1F725 /* EngagementIntelligenceService.swift */; };
 		691B932AEB4ECA321D667151 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7002A4C1E561833705DE3B43 /* PaywallView.swift */; };
+		6D69ADF82BC3E2BE46E1ADC3 /* way-scene-empty-inbox.png in Resources */ = {isa = PBXBuildFile; fileRef = FE39ECA96F7000005779F096 /* way-scene-empty-inbox.png */; };
 		708EDA426351E4E5ECB2A0BC /* CloudKitSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E942608EE77393A2E7F17F89 /* CloudKitSyncService.swift */; };
 		7BE636161E5D4B92208041FC /* LandlordHoursTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E078FA57ABF4C028DDE04C86 /* LandlordHoursTimerAttributes.swift */; };
 		7CB9BA413496A06323C90A38 /* AuditReportBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = D87C61D0D4C65EDFDCB0649B /* AuditReportBuilder.swift */; };
 		7E0B82EEBC8E67989BB1C257 /* TimerDraftUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27D9AE994D0696BCE6E017B9 /* TimerDraftUITests.swift */; };
 		833AA85624FAC915F2A42D6E /* SandboxDemoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3D252CBD10DD31063B716CD /* SandboxDemoTests.swift */; };
+		83BA1FC07145480611FC87F3 /* clay-scene-empty-inbox.png in Resources */ = {isa = PBXBuildFile; fileRef = 40EE8D8182926E6A6FB5FD60 /* clay-scene-empty-inbox.png */; };
 		86277D1C3EF4C21CAB223CB5 /* ProMoments.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF39EBE443D66C2EA654096 /* ProMoments.swift */; };
+		877787F8ED2EB5C41E44B17D /* clay-house-single-family.png in Resources */ = {isa = PBXBuildFile; fileRef = 4A2CB7BA288101AD90A41337 /* clay-house-single-family.png */; };
 		87DDF9CFBAAE7676D8368B8F /* SignInReplacementUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ABD160E56491F781779A536 /* SignInReplacementUITests.swift */; };
+		8C7B95F9AB3B004160114387 /* clay-icon-repairs.png in Resources */ = {isa = PBXBuildFile; fileRef = 77EEF450B8654D6DA0021D63 /* clay-icon-repairs.png */; };
 		8DCDA53C99D6607B2EB138B8 /* LocalProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1CAE53C865D5B8D680C6F0D /* LocalProfileTests.swift */; };
 		8ED697DE6FEC7270E36DAABE /* VoiceEntryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 838ADFB389C9D4AD52D16B41 /* VoiceEntryService.swift */; };
 		8EED89E8FC89005138C20B59 /* LandlordPurchases.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA1DF3BCE5385BCFDC7627DC /* LandlordPurchases.swift */; };
@@ -55,6 +71,7 @@
 		9CE36BEB3B657BB6CDCEF7D4 /* ShareReceiptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B1541850E32F72545D67D3 /* ShareReceiptView.swift */; };
 		A0635C304AF19BD05633788E /* WeeklySummaryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CDD5A26F0EDE1AF0DB43F2D /* WeeklySummaryService.swift */; };
 		A130AD4A0C3826D57BDE0E2C /* LandlordPurchasesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0914D43BECE24E5CB862706D /* LandlordPurchasesTests.swift */; };
+		A3E4068064D7EDB66035D174 /* clay-house-cabin-str.png in Resources */ = {isa = PBXBuildFile; fileRef = 24B3FA1037FE3A0BD2ACB6FF /* clay-house-cabin-str.png */; };
 		A47503D607E3D15AB9B78D16 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 754B9E894A2C95D4E5C635B0 /* HistoryView.swift */; };
 		A49044187F5AE0A06C0F229B /* SuggestionDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9695EE6BC4C3313705E270E9 /* SuggestionDetailSheet.swift */; };
 		A4FE1AD7DEFBD2001C328D9D /* LockScreenMock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 849CA475C8E78FFCBB3EF33E /* LockScreenMock.swift */; };
@@ -69,7 +86,9 @@
 		B6FC290317CCEE66FC6E7333 /* AppDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7ECB76E7A5D6C4DDACBA2AD /* AppDesignSystem.swift */; };
 		B7EE89E0AFD88DD021946318 /* CalendarImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BDA44BD54B97B0B3D60A429 /* CalendarImportService.swift */; };
 		B9FC805AE95D83A85AB52FAE /* LearningCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434AE320C71AE1DAFBBBD038 /* LearningCenterView.swift */; };
+		BA6AB699D9EEA29215AB6A13 /* clay-icon-supplies.png in Resources */ = {isa = PBXBuildFile; fileRef = D4747B3EDEF9FC905E637A81 /* clay-icon-supplies.png */; };
 		BC8F6E92451777ADF3C1AE40 /* ColorContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1240689FADA6EC9A0D1883B /* ColorContrastTests.swift */; };
+		BDC66E74B6955972D4A7579E /* clay-icon-legal-admin.png in Resources */ = {isa = PBXBuildFile; fileRef = F466E060081461E36AC54CC1 /* clay-icon-legal-admin.png */; };
 		BFF6F8AE069FE01CE9E5414F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE13F908989158FDAB28BF57 /* Models.swift */; };
 		C033DAA5B2F3EB1B50CDA1CE /* LandlordHoursApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9CB28BC741E54912DBB35F /* LandlordHoursApp.swift */; };
 		C0A08CB6A71D4D2F6CF858B3 /* SandboxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E16721049E2F563A89E24935 /* SandboxApp.swift */; };
@@ -78,17 +97,24 @@
 		C6B50842EA064CEACA38BA96 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFBF76FD610DF2D0CDA40C0A /* AppViewModel.swift */; };
 		CB4A4FF6CB46CB23A628AA19 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD25AA91ABB5FB4C307E491 /* DashboardView.swift */; };
 		CC3AD4AEC85263A4DB7CC2EE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7987DD5DAFB64A0DD0B89D /* SettingsView.swift */; };
+		D01061EEA6C315F4C3393627 /* clay-icon-bookkeeping.png in Resources */ = {isa = PBXBuildFile; fileRef = 6455D0570707F0AB52D98F00 /* clay-icon-bookkeeping.png */; };
 		D0FB50644A3E4250418CF25F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8F16B919639EBDE7C821FEC2 /* Assets.xcassets */; };
 		D890B77805878B83A7F72325 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45A5E898E99F37E67CE51D1 /* TodayView.swift */; };
 		D944AA90DB2DCE59079C61F9 /* AuditReportPDFRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46C2C28508D1F64A007B6BF9 /* AuditReportPDFRenderer.swift */; };
 		D9D7B6CEDA19FC24ED91F3BA /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40A0AF0742A962397484C42F /* Theme.swift */; };
+		DBA6CB6131E09EDC50BA07E8 /* clay-icon-inspection.png in Resources */ = {isa = PBXBuildFile; fileRef = 9F6AE2B079E55EA6AA1DB685 /* clay-icon-inspection.png */; };
+		DC77119DF8BBC2301180C7E1 /* clay-house-duplex.png in Resources */ = {isa = PBXBuildFile; fileRef = C2F55E30D1527070B365B8D3 /* clay-house-duplex.png */; };
+		E3BF34E8FE8179243B35080F /* way-scene-empty-today.png in Resources */ = {isa = PBXBuildFile; fileRef = 9135E50473E5416DA22ADB11 /* way-scene-empty-today.png */; };
 		E64013AB37CFBCDFB9E4001D /* LandlordHours.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 61925A55B4CDBDF1584A392E /* LandlordHours.storekit */; };
 		E71040DEA4484EFC4BD37024 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E75072D3D1741921AAD89CE5 /* PaywallView.swift */; };
 		EA9388030050C4067B4212BE /* AppleSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = C85EE25AEEEC23C7341BEA7B /* AppleSignIn.swift */; };
 		ECCEECAF864DD8D63F3C84B9 /* ContactSupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B38BCF663A8276A105CBCC1 /* ContactSupportView.swift */; };
 		F20713D35465CC3396393B14 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2CA9BA1AD53F0ABA92A9F2F /* OnboardingView.swift */; };
+		F5F772DCA214E238BAD9BF40 /* way-scene-welcome.png in Resources */ = {isa = PBXBuildFile; fileRef = A8FE35C1E899CCC8EFEE74C0 /* way-scene-welcome.png */; };
+		F6BE7D0ED3855E96C6BE9A59 /* clay-scene-welcome.png in Resources */ = {isa = PBXBuildFile; fileRef = 3D1A308AD5A685DDEDC7827C /* clay-scene-welcome.png */; };
 		F75C46FB8213306050CB9147 /* Analytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9291FAFB4986AA2BF4F05D4 /* Analytics.swift */; };
 		FA95A196F8212B3525A97088 /* FreeUserPaywallUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 548394DDA38D7BBFDD18E815 /* FreeUserPaywallUITests.swift */; };
+		FB47896CC8667F96748F2103 /* DirectionGraphics.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB0DCF8BB7B1A8BFFEB742D8 /* DirectionGraphics.swift */; };
 		FEF2ADF1DF06A3C6BA058BE9 /* ProMomentsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6252BC3F79F79B6164763816 /* ProMomentsTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -129,6 +155,7 @@
 		1AF16D81B372852B91B92405 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		1E4FDA46A18FD2D2EB716A39 /* LHIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHIcons.swift; sourceTree = "<group>"; };
 		22F2A5256E57CEBACC7BDAAC /* StoreKitLocalIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitLocalIntegrationTests.swift; sourceTree = "<group>"; };
+		24B3FA1037FE3A0BD2ACB6FF /* clay-house-cabin-str.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-house-cabin-str.png"; sourceTree = "<group>"; };
 		27D9AE994D0696BCE6E017B9 /* TimerDraftUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerDraftUITests.swift; sourceTree = "<group>"; };
 		2CDD5A26F0EDE1AF0DB43F2D /* WeeklySummaryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklySummaryService.swift; sourceTree = "<group>"; };
 		31A39D3EEA4003C1B931EDA8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -136,14 +163,19 @@
 		37718C6C352F5146B1B19AAA /* ExportPDFView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPDFView.swift; sourceTree = "<group>"; };
 		3B38BCF663A8276A105CBCC1 /* ContactSupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactSupportView.swift; sourceTree = "<group>"; };
 		3BDA44BD54B97B0B3D60A429 /* CalendarImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarImportService.swift; sourceTree = "<group>"; };
+		3D1A308AD5A685DDEDC7827C /* clay-scene-welcome.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-scene-welcome.png"; sourceTree = "<group>"; };
+		3DDFFCB72B1B6BB5B396193C /* ink-keyring.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "ink-keyring.png"; sourceTree = "<group>"; };
 		40A0AF0742A962397484C42F /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		40EE8D8182926E6A6FB5FD60 /* clay-scene-empty-inbox.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-scene-empty-inbox.png"; sourceTree = "<group>"; };
 		434AE320C71AE1DAFBBBD038 /* LearningCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningCenterView.swift; sourceTree = "<group>"; };
 		46C2C28508D1F64A007B6BF9 /* AuditReportPDFRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditReportPDFRenderer.swift; sourceTree = "<group>"; };
 		46D2C2173FB64791CCAAB8FD /* EngagementNotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementNotificationScheduler.swift; sourceTree = "<group>"; };
 		499428642ACE937E7B98B111 /* LHLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHLogo.swift; sourceTree = "<group>"; };
 		4A24AF19BB69722DE09DEABF /* MockStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockStore.swift; sourceTree = "<group>"; };
+		4A2CB7BA288101AD90A41337 /* clay-house-single-family.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-house-single-family.png"; sourceTree = "<group>"; };
 		4DC428FA6B6EF8A5244CC123 /* UITestIsolation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestIsolation.swift; sourceTree = "<group>"; };
 		4F7DEC5DC48828C8FF4C48C2 /* EngagementLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementLabView.swift; sourceTree = "<group>"; };
+		51644436D6AC313CEBB86FB6 /* ink-cabin.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "ink-cabin.png"; sourceTree = "<group>"; };
 		548394DDA38D7BBFDD18E815 /* FreeUserPaywallUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FreeUserPaywallUITests.swift; sourceTree = "<group>"; };
 		5490464EB91A5699EED6EFCE /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
 		5C50B0C40A29E39E7B5E6BE9 /* EngagementWidgetSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementWidgetSnapshotStore.swift; sourceTree = "<group>"; };
@@ -151,44 +183,60 @@
 		61925A55B4CDBDF1584A392E /* LandlordHours.storekit */ = {isa = PBXFileReference; path = LandlordHours.storekit; sourceTree = "<group>"; };
 		61F1A37F861D056973D6EC70 /* TimeEntryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeEntryDetailView.swift; sourceTree = "<group>"; };
 		6252BC3F79F79B6164763816 /* ProMomentsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProMomentsTests.swift; sourceTree = "<group>"; };
+		6455D0570707F0AB52D98F00 /* clay-icon-bookkeeping.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-icon-bookkeeping.png"; sourceTree = "<group>"; };
 		6D7987DD5DAFB64A0DD0B89D /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		7002A4C1E561833705DE3B43 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		73FECCEAAAB14D81BA455765 /* ReportViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportViews.swift; sourceTree = "<group>"; };
+		74B4FF48284FA5EF6C3A541B /* ink-receipt-envelope.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "ink-receipt-envelope.png"; sourceTree = "<group>"; };
 		74E7F35CA9ADFE290A5D0420 /* LandlordHours.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = LandlordHours.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		754B9E894A2C95D4E5C635B0 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		77EEF450B8654D6DA0021D63 /* clay-icon-repairs.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-icon-repairs.png"; sourceTree = "<group>"; };
 		80F41162CD4095B44C596373 /* LHDesignSandboxUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LHDesignSandboxUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8248EAB41ECD1E6CF7808498 /* LandlordHoursUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordHoursUITests.swift; sourceTree = "<group>"; };
 		838ADFB389C9D4AD52D16B41 /* VoiceEntryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceEntryService.swift; sourceTree = "<group>"; };
 		849CA475C8E78FFCBB3EF33E /* LockScreenMock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenMock.swift; sourceTree = "<group>"; };
+		8A1269F8E8320CC31B0C8EFF /* Directions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Directions.swift; sourceTree = "<group>"; };
 		8ABD160E56491F781779A536 /* SignInReplacementUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInReplacementUITests.swift; sourceTree = "<group>"; };
 		8E5A94C2FA181F38E6888ADE /* CategoryPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryPickerSheet.swift; sourceTree = "<group>"; };
 		8F16B919639EBDE7C821FEC2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		9135E50473E5416DA22ADB11 /* way-scene-empty-today.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "way-scene-empty-today.png"; sourceTree = "<group>"; };
 		95834A15C18661C7066155C1 /* LandlordHoursTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LandlordHoursTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		965D319F27D7A4A2332D47B2 /* LandlordHoursAppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordHoursAppIntents.swift; sourceTree = "<group>"; };
 		9695EE6BC4C3313705E270E9 /* SuggestionDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestionDetailSheet.swift; sourceTree = "<group>"; };
 		97C0F683B6B3BF53609A1D59 /* TaxYearView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaxYearView.swift; sourceTree = "<group>"; };
 		988C76EAD03340B1FA9162E3 /* ProfileManagementViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileManagementViews.swift; sourceTree = "<group>"; };
 		9AD25AA91ABB5FB4C307E491 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		9E3ED234E5430C8E62819D82 /* clay-house-condo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-house-condo.png"; sourceTree = "<group>"; };
+		9F566D22744E32DA0161DB8A /* clay-icon-cleaning-turnover.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-icon-cleaning-turnover.png"; sourceTree = "<group>"; };
+		9F6AE2B079E55EA6AA1DB685 /* clay-icon-inspection.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-icon-inspection.png"; sourceTree = "<group>"; };
 		A01B3B8EADDB251440528314 /* LandlordHoursTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordHoursTests.swift; sourceTree = "<group>"; };
 		A0F7A76A6F5BC739A3489F74 /* LHDesignSandbox.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = LHDesignSandbox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1240689FADA6EC9A0D1883B /* ColorContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorContrastTests.swift; sourceTree = "<group>"; };
 		A1CAE53C865D5B8D680C6F0D /* LocalProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalProfileTests.swift; sourceTree = "<group>"; };
 		A2CA9BA1AD53F0ABA92A9F2F /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		A45A5E898E99F37E67CE51D1 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		A8FE35C1E899CCC8EFEE74C0 /* way-scene-welcome.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "way-scene-welcome.png"; sourceTree = "<group>"; };
 		AF63DC10108B9EAC40FE0C4C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		AFF3C2F4E4EAC2D09DCB3F5B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B3136FEF70B8D0881382546B /* clay-icon-travel.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-icon-travel.png"; sourceTree = "<group>"; };
 		B7ECB76E7A5D6C4DDACBA2AD /* AppDesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDesignSystem.swift; sourceTree = "<group>"; };
 		BDAC9A2FCA588960D010499D /* SyncGateAndTimerDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncGateAndTimerDraftTests.swift; sourceTree = "<group>"; };
+		C2F55E30D1527070B365B8D3 /* clay-house-duplex.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-house-duplex.png"; sourceTree = "<group>"; };
+		C38968C039CDBC2389B68FA9 /* clay-scene-empty-today.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-scene-empty-today.png"; sourceTree = "<group>"; };
 		C69AE5A6A99BBB20034F16BA /* LegacyProfileFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyProfileFixture.swift; sourceTree = "<group>"; };
 		C85EE25AEEEC23C7341BEA7B /* AppleSignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignIn.swift; sourceTree = "<group>"; };
+		C8CB044F5E167435BCB3A6F9 /* clay-icon-tenant-comms.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-icon-tenant-comms.png"; sourceTree = "<group>"; };
 		C9291FAFB4986AA2BF4F05D4 /* Analytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Analytics.swift; sourceTree = "<group>"; };
 		CBF39EBE443D66C2EA654096 /* ProMoments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProMoments.swift; sourceTree = "<group>"; };
+		CDF1F70708087E9102A0240C /* clay-icon-property-mgmt.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-icon-property-mgmt.png"; sourceTree = "<group>"; };
 		CF68DBFF1FFD763363015B42 /* CelebrationOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CelebrationOverlayView.swift; sourceTree = "<group>"; };
 		CFBF76FD610DF2D0CDA40C0A /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
 		D3D252CBD10DD31063B716CD /* SandboxDemoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SandboxDemoTests.swift; sourceTree = "<group>"; };
+		D4747B3EDEF9FC905E637A81 /* clay-icon-supplies.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-icon-supplies.png"; sourceTree = "<group>"; };
 		D87C61D0D4C65EDFDCB0649B /* AuditReportBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditReportBuilder.swift; sourceTree = "<group>"; };
 		D91BDD921FD02E42B58FE334 /* PropertiesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertiesView.swift; sourceTree = "<group>"; };
 		DA55F7A788AAB40693166F60 /* AuditReportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditReportTests.swift; sourceTree = "<group>"; };
+		DB0DCF8BB7B1A8BFFEB742D8 /* DirectionGraphics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectionGraphics.swift; sourceTree = "<group>"; };
 		DBE81FD800D7C2747504BEC0 /* LocalProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalProfile.swift; sourceTree = "<group>"; };
 		DE13F908989158FDAB28BF57 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		E078FA57ABF4C028DDE04C86 /* LandlordHoursTimerAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordHoursTimerAttributes.swift; sourceTree = "<group>"; };
@@ -196,11 +244,15 @@
 		E6D41E394791AE4ADCA1F725 /* EngagementIntelligenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementIntelligenceService.swift; sourceTree = "<group>"; };
 		E75072D3D1741921AAD89CE5 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		E942608EE77393A2E7F17F89 /* CloudKitSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitSyncService.swift; sourceTree = "<group>"; };
+		E97CC17BB58AC9A73B0B7133 /* clay-icon-showing-leasing.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-icon-showing-leasing.png"; sourceTree = "<group>"; };
 		EA1DF3BCE5385BCFDC7627DC /* LandlordPurchases.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordPurchases.swift; sourceTree = "<group>"; };
 		EC9D2F407BFAD0EBB8E9F948 /* RecordsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsView.swift; sourceTree = "<group>"; };
 		F35FE0D4E616BBC5040D9C4A /* OnboardingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingViews.swift; sourceTree = "<group>"; };
+		F466E060081461E36AC54CC1 /* clay-icon-legal-admin.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-icon-legal-admin.png"; sourceTree = "<group>"; };
+		F538D4BDB861902A9DBF31DA /* clay-icon-renovation.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clay-icon-renovation.png"; sourceTree = "<group>"; };
 		F63814CFFD3A0284AC85988D /* AITimeEntryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITimeEntryService.swift; sourceTree = "<group>"; };
 		F8406A07CC3C9CE12C40B4EA /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
+		FE39ECA96F7000005779F096 /* way-scene-empty-inbox.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "way-scene-empty-inbox.png"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -243,6 +295,37 @@
 				CFBF76FD610DF2D0CDA40C0A /* AppViewModel.swift */,
 			);
 			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		7921DEBD12A11B1D4B387721 /* Art */ = {
+			isa = PBXGroup;
+			children = (
+				24B3FA1037FE3A0BD2ACB6FF /* clay-house-cabin-str.png */,
+				9E3ED234E5430C8E62819D82 /* clay-house-condo.png */,
+				C2F55E30D1527070B365B8D3 /* clay-house-duplex.png */,
+				4A2CB7BA288101AD90A41337 /* clay-house-single-family.png */,
+				6455D0570707F0AB52D98F00 /* clay-icon-bookkeeping.png */,
+				9F566D22744E32DA0161DB8A /* clay-icon-cleaning-turnover.png */,
+				9F6AE2B079E55EA6AA1DB685 /* clay-icon-inspection.png */,
+				F466E060081461E36AC54CC1 /* clay-icon-legal-admin.png */,
+				CDF1F70708087E9102A0240C /* clay-icon-property-mgmt.png */,
+				F538D4BDB861902A9DBF31DA /* clay-icon-renovation.png */,
+				77EEF450B8654D6DA0021D63 /* clay-icon-repairs.png */,
+				E97CC17BB58AC9A73B0B7133 /* clay-icon-showing-leasing.png */,
+				D4747B3EDEF9FC905E637A81 /* clay-icon-supplies.png */,
+				C8CB044F5E167435BCB3A6F9 /* clay-icon-tenant-comms.png */,
+				B3136FEF70B8D0881382546B /* clay-icon-travel.png */,
+				40EE8D8182926E6A6FB5FD60 /* clay-scene-empty-inbox.png */,
+				C38968C039CDBC2389B68FA9 /* clay-scene-empty-today.png */,
+				3D1A308AD5A685DDEDC7827C /* clay-scene-welcome.png */,
+				51644436D6AC313CEBB86FB6 /* ink-cabin.png */,
+				3DDFFCB72B1B6BB5B396193C /* ink-keyring.png */,
+				74B4FF48284FA5EF6C3A541B /* ink-receipt-envelope.png */,
+				FE39ECA96F7000005779F096 /* way-scene-empty-inbox.png */,
+				9135E50473E5416DA22ADB11 /* way-scene-empty-today.png */,
+				A8FE35C1E899CCC8EFEE74C0 /* way-scene-welcome.png */,
+			);
+			path = Art;
 			sourceTree = "<group>";
 		};
 		84A0BC1146FDB95F03019DC3 = {
@@ -337,6 +420,8 @@
 		DC5A5839F6B02D39F240ADCC /* DesignSandbox */ = {
 			isa = PBXGroup;
 			children = (
+				DB0DCF8BB7B1A8BFFEB742D8 /* DirectionGraphics.swift */,
+				8A1269F8E8320CC31B0C8EFF /* Directions.swift */,
 				F8406A07CC3C9CE12C40B4EA /* InboxView.swift */,
 				849CA475C8E78FFCBB3EF33E /* LockScreenMock.swift */,
 				4A24AF19BB69722DE09DEABF /* MockStore.swift */,
@@ -350,6 +435,7 @@
 				9695EE6BC4C3313705E270E9 /* SuggestionDetailSheet.swift */,
 				40A0AF0742A962397484C42F /* Theme.swift */,
 				A45A5E898E99F37E67CE51D1 /* TodayView.swift */,
+				7921DEBD12A11B1D4B387721 /* Art */,
 			);
 			path = DesignSandbox;
 			sourceTree = "<group>";
@@ -489,6 +575,7 @@
 			buildConfigurationList = 18A3AF71D6B3007319BEB3E4 /* Build configuration list for PBXNativeTarget "LHDesignSandbox" */;
 			buildPhases = (
 				7BDD5A82E3B2585AD10B71CE /* Sources */,
+				E685AF3F0D3887FE1558D2FB /* Resources */,
 			);
 			buildRules = (
 			);
@@ -578,6 +665,37 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E685AF3F0D3887FE1558D2FB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A3E4068064D7EDB66035D174 /* clay-house-cabin-str.png in Resources */,
+				52BA1A13A1D2BF6D0D6AB54A /* clay-house-condo.png in Resources */,
+				DC77119DF8BBC2301180C7E1 /* clay-house-duplex.png in Resources */,
+				877787F8ED2EB5C41E44B17D /* clay-house-single-family.png in Resources */,
+				D01061EEA6C315F4C3393627 /* clay-icon-bookkeeping.png in Resources */,
+				5A9DF54A28B492DC7FDFA64F /* clay-icon-cleaning-turnover.png in Resources */,
+				DBA6CB6131E09EDC50BA07E8 /* clay-icon-inspection.png in Resources */,
+				BDC66E74B6955972D4A7579E /* clay-icon-legal-admin.png in Resources */,
+				1E6063AC7D96DBFA6A580561 /* clay-icon-property-mgmt.png in Resources */,
+				4C79FB6429AEC2D4D383C41C /* clay-icon-renovation.png in Resources */,
+				8C7B95F9AB3B004160114387 /* clay-icon-repairs.png in Resources */,
+				09F77780E8FAB376669CAB17 /* clay-icon-showing-leasing.png in Resources */,
+				BA6AB699D9EEA29215AB6A13 /* clay-icon-supplies.png in Resources */,
+				1D2B4410343B29438923FC41 /* clay-icon-tenant-comms.png in Resources */,
+				2756D1036DFF1E39C884B16A /* clay-icon-travel.png in Resources */,
+				83BA1FC07145480611FC87F3 /* clay-scene-empty-inbox.png in Resources */,
+				27C1FF6B4074F269E3F05759 /* clay-scene-empty-today.png in Resources */,
+				F6BE7D0ED3855E96C6BE9A59 /* clay-scene-welcome.png in Resources */,
+				19E893316FE25F2D839C1AFB /* ink-cabin.png in Resources */,
+				28F85A7ABE20887069028D25 /* ink-keyring.png in Resources */,
+				5A44B45762C944964A296F92 /* ink-receipt-envelope.png in Resources */,
+				6D69ADF82BC3E2BE46E1ADC3 /* way-scene-empty-inbox.png in Resources */,
+				E3BF34E8FE8179243B35080F /* way-scene-empty-today.png in Resources */,
+				F5F772DCA214E238BAD9BF40 /* way-scene-welcome.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		EC54EFACC8FE592D24085E00 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -656,6 +774,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FB47896CC8667F96748F2103 /* DirectionGraphics.swift in Sources */,
+				1BF0169CAA60946F770A1853 /* Directions.swift in Sources */,
 				1086EA21B67B1F20B919AE95 /* InboxView.swift in Sources */,
 				A4FE1AD7DEFBD2001C328D9D /* LockScreenMock.swift in Sources */,
 				93038CF8F63FA8C1F44A1081 /* MockStore.swift in Sources */,
