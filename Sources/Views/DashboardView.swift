@@ -181,7 +181,7 @@ struct DashboardView: View {
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showPaywall) {
-                PaywallView(context: .dashboardUnlock)
+                PaywallView(context: .dashboardUnlock, onClose: { showPaywall = false })
             }
             .navigationDestination(isPresented: $showLearningCenter) {
                 LearningCenterView()

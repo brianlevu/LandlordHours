@@ -271,9 +271,12 @@ struct ReportsView: View {
             }
             .sheet(isPresented: $showingPaywall) {
                 // After a purchase, carry on to the export the user asked for.
-                PaywallView(context: .export, year: selectedYear) {
-                    showingExportSheet = true
-                }
+                PaywallView(
+                    context: .export,
+                    year: selectedYear,
+                    onUnlocked: { showingExportSheet = true },
+                    onClose: { showingPaywall = false }
+                )
             }
             .sheet(isPresented: $showingParticipationSheet) {
                 ParticipationConfirmationSheet(

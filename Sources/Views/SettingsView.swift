@@ -1197,10 +1197,14 @@ struct SettingsView: View {
                 ProfileEditView(userName: $userName, userEmail: $userEmail, profileImage: $profileImage)
             }
             .sheet(item: $paywallContext) { context in
-                PaywallView(context: context) {
+                PaywallView(
+                    context: context,
                     // After a purchase from the export row, carry on to the export.
-                    if context == .export { showExportAfterUnlock = true }
-                }
+                    onUnlocked: { if context == .export { showExportAfterUnlock = true } },
+                    // Close through the binding: environment dismiss did not close an
+                    // item-driven sheet here (caught by the free-user journey test).
+                    onClose: { paywallContext = nil }
+                )
             }
             .navigationDestination(isPresented: $showExportAfterUnlock) {
                 ExportPDFView(year: Calendar.current.component(.year, from: Date()))
