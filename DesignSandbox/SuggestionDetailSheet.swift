@@ -81,7 +81,6 @@ struct SuggestionDetailSheet: View {
         .background(LH.canvas)
         .presentationDetents(detents, selection: $detent)
         .presentationDragIndicator(.hidden)
-        .presentationCornerRadius(nil)
         .sensoryFeedback(.selection, trigger: pressTick)
     }
 
@@ -92,7 +91,7 @@ struct SuggestionDetailSheet: View {
                 Text(eyebrowText).eyebrow()
                 Group {
                     if let s = suggestion {
-                        Text("\(Text(s.noun).fontWeight(.semibold)) \(s.joiner) \(Text(s.property).fontWeight(.semibold))")
+                        Text("\(Text(s.noun).fontWeight(.semibold)) \(s.joiner) \(Text(nbsp(s.property)).fontWeight(.semibold))")
                     } else {
                         Text("Log time").fontWeight(.semibold)
                     }

@@ -127,9 +127,9 @@ struct PaywallHero: View {
         ZStack(alignment: .top) {
             LinearGradient(stops: [
                 .init(color: Color(hex: 0x0B0920), location: 0),
-                .init(color: Color(hex: 0x24196B), location: 0.45),
-                .init(color: Color(hex: 0x4A3CC4), location: 0.72),
-                .init(color: LH.canvas, location: 1),
+                .init(color: Color(hex: 0x24196B), location: 0.40),
+                .init(color: Color(hex: 0x4A3CC4), location: 0.62),
+                .init(color: LH.canvas, location: 0.86),
             ], startPoint: .top, endPoint: .bottom)
 
             VStack(spacing: 22) {

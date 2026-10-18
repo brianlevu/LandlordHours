@@ -209,7 +209,7 @@ struct CompactSuggestionRow: View {
         HStack(spacing: 12) {
             SourceTile(kind: s.kind, size: 36)
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(Text(s.noun).fontWeight(.semibold)) \(s.joiner) \(Text(s.property).fontWeight(.semibold))")
+                Text("\(Text(s.noun).fontWeight(.semibold)) \(s.joiner) \(Text(nbsp(s.property)).fontWeight(.semibold))")
                     .font(.body)
                     .lineLimit(2)
                 Text("\(s.kind.label) · \(s.when)")
@@ -272,21 +272,21 @@ struct MetricCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top) {
-                Label(label, systemImage: symbol)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(LH.secondaryText)
-                Spacer(minLength: 4)
-                if let bars { MiniBars(values: bars) }
-            }
+            Label(label, systemImage: symbol)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(LH.secondaryText)
+                .lineLimit(1)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value).font(.system(size: 28, weight: .semibold)).monospacedDigit()
                     .lineLimit(1).minimumScaleFactor(0.8)
                 if let unit { Text(unit).font(.title3).foregroundStyle(LH.secondaryText) }
             }
+            if let bars {
+                MiniBars(values: bars).padding(.vertical, 2)
+            }
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 if let statusSymbol { Image(systemName: statusSymbol) }
-                Text(status).lineLimit(2, reservesSpace: true)
+                Text(status).lineLimit(2, reservesSpace: bars == nil)
             }
             .font(.subheadline.weight(statusSymbol == nil ? .regular : .medium))
             .foregroundStyle(statusColor)

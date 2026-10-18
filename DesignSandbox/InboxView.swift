@@ -172,7 +172,7 @@ struct SuggestionRow: View {
                 .font(.subheadline)
                 .foregroundStyle(LH.secondaryText)
 
-                Text("\(Text(s.noun).fontWeight(.semibold)) \(s.joiner) \(Text(s.property).fontWeight(.semibold))")
+                Text("\(Text(s.noun).fontWeight(.semibold)) \(s.joiner) \(Text(nbsp(s.property)).fontWeight(.semibold))")
                     .font(.body)
                     .foregroundStyle(.primary)
                     .lineLimit(2)
@@ -187,20 +187,24 @@ struct SuggestionRow: View {
     }
 
     @ViewBuilder private var leading: some View {
+        let h: Double? = s.hours ?? s.capMinutes.map { Double($0) / 60 }
         VStack(spacing: 0) {
-            if let m = s.capMinutes, s.hours == nil {
-                Text("\(m)").font(.system(size: 28, weight: .semibold)).monospacedDigit()
-                Text("Minutes").font(.caption2.weight(.semibold)).textCase(.uppercase).foregroundStyle(LH.secondaryText)
-            } else if let h = s.hours {
-                // Whole hours read as HOURS; anything else as MINUTES (Flighty "25 MINUTES"), never "2.25".
-                let whole = h == h.rounded()
-                let v = whole ? h : (h * 60).rounded()
-                Text("\(Int(v))").font(.system(size: 28, weight: .semibold)).monospacedDigit()
-                    .contentTransition(.numericText(value: v))
-                Text(whole ? (h == 1 ? "Hour" : "Hours") : "Minutes").font(.caption2.weight(.semibold)).textCase(.uppercase).foregroundStyle(LH.secondaryText)
+            if s.hours == nil && s.capMinutes != nil {
+                Text("Up to").font(.caption2.weight(.semibold)).textCase(.uppercase).foregroundStyle(LH.secondaryText)
+            }
+            if let h {
+                let (hh, mm) = fmtHM(h)
+                if hh > 0 {
+                    Text("\(hh)h").font(.system(size: 26, weight: .semibold)).monospacedDigit()
+                        .contentTransition(.numericText(value: Double(hh)))
+                }
+                if mm > 0 {
+                    Text("\(mm)m").font(.system(size: hh > 0 ? 17 : 26, weight: .semibold)).monospacedDigit()
+                        .foregroundStyle(hh > 0 ? LH.secondaryText : Color.primary)
+                        .contentTransition(.numericText(value: Double(mm)))
+                }
             } else {
-                Text("—").font(.system(size: 28, weight: .semibold)).foregroundStyle(.tertiary)
-                Text("Hours").font(.caption2.weight(.semibold)).textCase(.uppercase).foregroundStyle(LH.secondaryText)
+                Text("—").font(.system(size: 26, weight: .semibold)).foregroundStyle(LH.secondaryText)
             }
         }
     }
@@ -224,7 +228,7 @@ struct SuggestionRow: View {
             Text("\(Text(s.detail).foregroundStyle(LH.secondaryText)) · \(Text("Needs hours").foregroundStyle(LH.caution).fontWeight(.medium))")
         case .location:
             HStack(spacing: 6) {
-                Text(s.detail).foregroundStyle(LH.secondaryText)
+                Text("Time at the property").foregroundStyle(LH.secondaryText)
                 BetaTag()
             }
         default:

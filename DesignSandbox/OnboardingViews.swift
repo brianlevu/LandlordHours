@@ -346,18 +346,18 @@ struct OnboardingLocation: View {
             VStack(spacing: 10) {
                 SystemAlertPreview()
                     .fixedSize(horizontal: false, vertical: true)
-                    .scaleEffect(0.84)
-                    .padding(.vertical, -30)
+                    .scaleEffect(0.8)
+                    .padding(.vertical, -36)
                 Text("When iOS asks, pick “Change to Always Allow.”")
                     .font(.footnote)
                     .foregroundStyle(LH.secondaryText)
                     .multilineTextAlignment(.center)
-                PrivacyFooter(title: "Only your property addresses",
-                              message: "We check for arrivals at the addresses you add. Your location history is never stored or sent.")
-                    .padding(.top, 24)
             }
             .frame(maxWidth: .infinity)
         } footer: {
+            PrivacyFooter(title: "Only your property addresses",
+                          message: "We check for arrivals at the addresses you add. Your location history is never stored or sent.")
+                .padding(.bottom, 8)
             Button("Continue") {}.buttonStyle(PrimaryCapsule())
             Button("Not now") {}
                 .font(.body).foregroundStyle(LH.action).frame(minHeight: 44)
@@ -384,7 +384,7 @@ struct SystemAlertPreview: View {
             .padding(.bottom, 16)
 
             MiniMap()
-                .frame(height: 72)
+                .frame(height: 56)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .padding(.horizontal, 16)
 

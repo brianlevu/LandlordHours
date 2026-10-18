@@ -196,6 +196,9 @@ func fmtDur(_ h: Double) -> String {
     return "\(hh)h \(mm)m"
 }
 
+/// Keep multi-word names ("Oak Street Duplex") on one line.
+func nbsp(_ s: String) -> String { s.replacingOccurrences(of: " ", with: "\u{00A0}") }
+
 func fmtHM(_ h: Double) -> (Int, Int) {
     let total = Int((h * 60).rounded())
     return (total / 60, total % 60)

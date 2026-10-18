@@ -143,7 +143,7 @@ struct ExportView: View {
                 }
 
                 ZStack {
-                    PDFThumb(width: 236, locked: locked)
+                    PDFThumb(width: 280, locked: locked)
                     if locked {
                         VStack(spacing: 10) {
                             Spacer()
@@ -164,7 +164,7 @@ struct ExportView: View {
                                     .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
                             }
                             .buttonStyle(Pressable())
-                            Spacer().frame(height: 70)
+                            Spacer().frame(height: 90)
                         }
                     }
                 }
