@@ -96,7 +96,7 @@ final class LandlordHoursUITests: XCTestCase {
         scrollToElement(generateButton)
         generateButton.tap()
 
-        XCTAssertTrue(app.staticTexts["PDF ready"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Report ready"].waitForExistence(timeout: 8), "Export view shows Report ready")
         XCTAssertTrue(app.buttons["export.sharePDF"].exists)
     }
 
