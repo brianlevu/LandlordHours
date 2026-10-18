@@ -177,7 +177,7 @@ struct HouseTypeThumb: View {
 struct BlueprintMilestone: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.dismiss) private var dismiss
-    @State private var roofDrop: CGFloat = -60
+    @State private var roofDrop: CGFloat = -34
     @State private var roofFill = 0.0
     @State private var plaque = false
     @State private var landed = 0
@@ -203,6 +203,8 @@ struct BlueprintMilestone: View {
                     .font(.system(size: 34, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .padding(.top, 20)
+                    .padding(.bottom, 26)       // the roof's drop path (34 pt) stays clear of the title
+                    .zIndex(1)
 
                 ZStack(alignment: .bottomTrailing) {
                     BlueprintHouse(hours: 500, roofDrop: roofDrop, roofFill: roofFill, showScale: false)

@@ -47,7 +47,7 @@ def iou(a, b):
 
 built = normalise(silhouette('bp-house-built'))
 res = {}
-for name, fill in [('bp-house-lines', True), ('bp-house-frame', False)]:
+for name, fill in [('bp-house-lines', True), ('bp-house-frame', True)]:
     if os.path.exists(os.path.join(ART, name + '.png')):
         res[name] = iou(built, normalise(silhouette(name, fill)))
 for k, v in res.items():

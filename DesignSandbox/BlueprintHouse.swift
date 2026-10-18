@@ -51,7 +51,7 @@ struct BlueprintHouse: View {
                         .mask(FeatherMask(y: hy, feather: 0.015))
                 }
                 if hours > 100 && hours < 500 {
-                    frame.mask(FeatherMask(y: max(BlueprintHouse.eave, by - 0.09), feather: 0.035))
+                    frame.mask(FeatherMask(y: max(BlueprintHouse.eave, by - 0.21), feather: 0.03))
                         .mask(TopCut(y: BlueprintHouse.eave))
                 }
                 built.mask(FeatherMask(y: by, feather: 0.028))

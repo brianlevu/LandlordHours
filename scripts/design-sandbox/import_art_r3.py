@@ -115,14 +115,63 @@ def derive_from_master():
     rgba[..., 3] = line_a * 255
     Image.fromarray(rgba.astype(np.uint8)).save(os.path.join(DST, 'bp-house-lines.png'), optimize=True)
 
-    # Frame: the same house in raw timber (sheathing going up), darker grain on the edges.
-    t = np.clip(lum / np.maximum(alpha, 1e-3) / 255, 0, 1)
-    lo, hi = np.array([0x8A, 0x5A, 0x2C], float), np.array([0xF2, 0xC6, 0x8A], float)
-    wood = lo + (hi - lo) * t[..., None]
-    wood = wood * (1 - 0.35 * np.clip(e, 0, 1)[..., None])
-    fr = np.dstack([np.clip(wood, 0, 255), a[..., 3]])
-    Image.fromarray(fr.astype(np.uint8)).save(os.path.join(DST, 'bp-house-frame.png'), optimize=True)
-    print('lines + frame derived from the built master')
+    frame_onto_master(built)
+    print('lines derived from the built master; frame registered + clipped to it')
+
+
+def frame_onto_master(built, N=180):
+    """Register the real timber-frame render (studs, plates, openings) onto the built master with a
+    non-uniform scale + shift that maximises silhouette IoU (plinth stone and bushes excluded), then
+    clip it to the master's alpha so its outline is the master's outline."""
+    fr_src = os.path.join(DST, 'bp-house-frame.png')        # shared-box crop of the matted stage_3 render
+    F = Image.open(fr_src).convert('RGBA')
+    B = built
+    def body(img, kind):
+        x = np.asarray(img.resize((N, N), Image.LANCZOS)).astype(int)
+        r, g, b, al = x[..., 0], x[..., 1], x[..., 2], x[..., 3]
+        sat = np.max(x[..., :3], axis=2) - np.min(x[..., :3], axis=2)
+        m = al > 128
+        if kind == 'frame':
+            m &= ~((sat < 28) & (r < 215))                   # grey stone plinth
+        else:
+            m &= ~((g > r + 10) & (g > b + 10))              # bushes
+        return m
+    fb, bb = body(F, 'frame'), body(B, 'built')
+
+    def warp(mask_or_img, sx, sy, dx, dy, n, nearest=True):
+        im = mask_or_img if isinstance(mask_or_img, Image.Image) else Image.fromarray((mask_or_img * 255).astype(np.uint8))
+        w, h = int(n * sx), int(n * sy)
+        im = im.resize((max(1, w), max(1, h)), Image.NEAREST if nearest else Image.LANCZOS)
+        out = Image.new(im.mode, (n, n), 0)
+        out.paste(im, (int(round((n - w) / 2 + dx)), int(round((n - h) / 2 + dy))))
+        return out
+
+    def iou(m):
+        return (m & bb).sum() / max(1, (m | bb).sum())
+
+    best = (0, (1, 1, 0, 0))
+    for sx in np.arange(0.86, 1.141, 0.02):
+        for sy in np.arange(0.86, 1.141, 0.02):
+            for dy in range(-20, 21, 2):
+                for dx in range(-20, 21, 2):
+                    v = iou(np.asarray(warp(fb, sx, sy, dx, dy, N)) > 127)
+                    if v > best[0]:
+                        best = (v, (sx, sy, dx, dy))
+    sx0, sy0, dx0, dy0 = best[1]
+    for sx in np.arange(sx0 - 0.02, sx0 + 0.021, 0.005):
+        for sy in np.arange(sy0 - 0.02, sy0 + 0.021, 0.005):
+            for dy in range(dy0 - 2, dy0 + 3):
+                for dx in range(dx0 - 2, dx0 + 3):
+                    v = iou(np.asarray(warp(fb, sx, sy, dx, dy, N)) > 127)
+                    if v > best[0]:
+                        best = (v, (sx, sy, dx, dy))
+    sx, sy, dx, dy = best[1]
+    full = F.size[0]
+    Fw = warp(F, sx, sy, dx * full / N, dy * full / N, full, nearest=False)
+    arr = np.asarray(Fw).astype(float)
+    arr[..., 3] = np.minimum(arr[..., 3], np.asarray(B.getchannel('A')).astype(float))   # master outline wins
+    Image.fromarray(arr.astype(np.uint8)).save(fr_src, optimize=True)
+    print(f'frame registered: body IoU {best[0]:.3f} (sx {sx:.3f}, sy {sy:.3f}, dx {dx * full / N:.0f}, dy {dy * full / N:.0f} px)')
 
 
 def crop_to(im, box, size):
