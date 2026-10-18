@@ -108,7 +108,49 @@ targets:
         TEST_TARGET_NAME: LandlordHours
         GENERATE_INFOPLIST_FILE: YES
 
+  # Throwaway design sandbox for 2.0 hi-fi mockups (mock data only, never shipped).
+  LHDesignSandbox:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: DesignSandbox
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.openclaw.landlordhours.designsandbox
+        PRODUCT_NAME: LHDesignSandbox
+        DEVELOPMENT_TEAM: G68NLC3DA3
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_CFBundleDisplayName: LH Sandbox
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: minimal
+        CODE_SIGN_STYLE: Automatic
+  LHDesignSandboxUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: DesignSandboxUITests
+    dependencies:
+      - target: LHDesignSandbox
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.openclaw.landlordhours.designsandbox.uitests
+        DEVELOPMENT_TEAM: G68NLC3DA3
+        TEST_TARGET_NAME: LHDesignSandbox
+        GENERATE_INFOPLIST_FILE: YES
+
 schemes:
+  LHDesignSandbox:
+    shared: true
+    build:
+      targets:
+        LHDesignSandbox: all
+    test:
+      targets:
+        - LHDesignSandboxUITests
   LandlordHours:
     shared: true
     build:
