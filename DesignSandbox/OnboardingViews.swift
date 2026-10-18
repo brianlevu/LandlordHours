@@ -290,11 +290,8 @@ struct OnboardingCalendar: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("What a suggestion looks like").sectionLabel()
                     HStack(spacing: 12) {
-                        VStack(spacing: 0) {
-                            Text("2").font(.system(size: 24, weight: .semibold))
-                            Text("Hours").font(.caption2.weight(.semibold)).textCase(.uppercase).foregroundStyle(LH.secondaryText)
-                        }
-                        .frame(width: 52)
+                        Text("2h").font(.system(size: 24, weight: .semibold))
+                            .frame(width: 52)
                         VStack(alignment: .leading, spacing: 2) {
                             Label {
                                 Text("Calendar · Tue 9–11")

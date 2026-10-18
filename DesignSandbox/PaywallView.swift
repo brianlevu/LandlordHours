@@ -124,30 +124,30 @@ struct PaywallView: View {
 /// and the real report shown inside a device frame.
 struct PaywallHero: View {
     var body: some View {
-        ZStack(alignment: .top) {
-            LinearGradient(stops: [
-                .init(color: Color(hex: 0x0B0920), location: 0),
-                .init(color: Color(hex: 0x24196B), location: 0.40),
-                .init(color: Color(hex: 0x4A3CC4), location: 0.62),
-                .init(color: LH.canvas, location: 0.86),
-            ], startPoint: .top, endPoint: .bottom)
-
-            VStack(spacing: 22) {
-                Text("The record your accountant gets")
-                    .font(.system(size: 24, weight: .bold))
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.white)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 48)
-                DeviceFrame(width: 236) {
-                    PDFScreen()
-                }
-                .shadow(color: .black.opacity(0.45), radius: 30, y: 16)
+        VStack(spacing: 22) {
+            Text("The record your accountant gets")
+                .font(.system(size: 24, weight: .bold))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 48)
+            DeviceFrame(width: 236) {
+                PDFScreen()
             }
-            .padding(.top, 104)
+            .shadow(color: .black.opacity(0.45), radius: 30, y: 16)
         }
+        .padding(.top, 104)
+        .frame(maxWidth: .infinity)
         .frame(height: 540, alignment: .top)
         .clipped()
+        .background {
+            LinearGradient(stops: [
+                .init(color: Color(hex: 0x0B0920), location: 0),
+                .init(color: Color(hex: 0x24196B), location: 0.36),
+                .init(color: Color(hex: 0x4A3CC4), location: 0.56),
+                .init(color: LH.canvas, location: 1.0),
+            ], startPoint: .top, endPoint: .bottom)
+        }
     }
 }
 

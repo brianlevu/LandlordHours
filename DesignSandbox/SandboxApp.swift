@@ -5,6 +5,7 @@ import SwiftUI
 enum SandboxScreen: String, CaseIterable, Identifiable {
     case todayBehind = "today-behind"
     case todayOnPace = "today-onpace"
+    case todayOnPaceScrolled = "today-onpace-scrolled"
     case inbox
     case detail
     case onbWelcome = "onb-welcome"
@@ -26,7 +27,7 @@ enum SandboxScreen: String, CaseIterable, Identifiable {
 
     var scenario: Scenario {
         switch self {
-        case .todayOnPace: .onPace
+        case .todayOnPace, .todayOnPaceScrolled: .onPace
         case .emptyToday: .empty
         case .emptyInbox: .emptyInbox
         default: .behind
@@ -76,6 +77,8 @@ struct ScreenHost: View {
         switch screen {
         case .todayBehind, .todayOnPace, .emptyToday:
             RootTabs(initial: .today)
+        case .todayOnPaceScrolled:
+            RootTabs(initial: .today, scrollToMetrics: true)
         case .inbox, .emptyInbox:
             RootTabs(initial: .inbox)
         case .detail:
@@ -134,7 +137,10 @@ struct RootTabs: View {
     @State private var showSettings: Bool
     let openDetail: String?
 
-    init(initial: AppTab, openDetail: String? = nil, openSettings: Bool = false) {
+    let scrollToMetrics: Bool
+
+    init(initial: AppTab, openDetail: String? = nil, openSettings: Bool = false, scrollToMetrics: Bool = false) {
+        self.scrollToMetrics = scrollToMetrics
         _tab = State(initialValue: initial)
         _showSettings = State(initialValue: openSettings)
         self.openDetail = openDetail
@@ -143,7 +149,7 @@ struct RootTabs: View {
     var body: some View {
         ZStack {
             switch tab {
-            case .today: TodayView(showSettings: $showSettings, goInbox: { tab = .inbox })
+            case .today: TodayView(showSettings: $showSettings, goInbox: { tab = .inbox }, scrollToMetrics: scrollToMetrics)
             case .inbox: InboxView(openDetail: openDetail)
             case .records: RecordsView(goInbox: { tab = .inbox })
             case .properties, .add: PropertiesView()

@@ -4,15 +4,17 @@ struct TodayView: View {
     @Environment(MockStore.self) private var store
     @Binding var showSettings: Bool
     var goInbox: () -> Void
+    var scrollToMetrics = false
 
     var body: some View {
         NavigationStack {
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 32) {
                     HeroCard()
                     if store.hasProperties {
                         if store.pendingCount > 0 { ToConfirmBlock(goInbox: goInbox) }
-                        MetricGrid()
+                        MetricGrid().id("metrics")
                     } else {
                         NoPropertiesEmpty()
                     }
@@ -22,6 +24,12 @@ struct TodayView: View {
                 .padding(.bottom, 120)
             }
             .background(LH.canvas)
+            .task {
+                guard scrollToMetrics else { return }
+                try? await Task.sleep(for: .milliseconds(400))
+                proxy.scrollTo("metrics", anchor: .center)
+            }
+            }
             .navigationTitle("Today")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

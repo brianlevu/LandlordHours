@@ -5,7 +5,7 @@ APP=/Users/brian/tmp/DerivedData/landlordhours-sandbox/Build/Products/Debug-ipho
 OUT=${SANDBOX_OUT:-$HOME/AgentScratch/landlordhours/2026-10-18/hifi-frames-r2}
 BID=com.openclaw.landlordhours.designsandbox
 AP=$1; shift
-SCREENS=${@:-today-behind today-onpace inbox detail onb-welcome onb-property onb-calendar onb-location lockscreen share records report export paywall locked settings empty-today empty-inbox}
+SCREENS=${@:-today-behind today-onpace today-onpace-scrolled inbox detail onb-welcome onb-property onb-calendar onb-location lockscreen share records report export paywall locked settings empty-today empty-inbox}
 xcrun simctl ui $U appearance $AP
 xcrun simctl status_bar $U override --time "9:41" --batteryState discharging --batteryLevel 100 --cellularMode active --cellularBars 4 --wifiMode active --wifiBars 3 --operatorName ""
 xcrun simctl install $U "$APP"
