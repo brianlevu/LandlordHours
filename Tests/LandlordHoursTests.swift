@@ -1798,3 +1798,44 @@ final class AnalyticsOptOutTests: XCTestCase {
         XCTAssertFalse(Analytics.shouldSend(configured: false, optedOut: false), "Never-configured must never send, opt-out state aside")
     }
 }
+
+// MARK: - Privacy: no network in the time entry parser
+
+final class AITimeEntryServiceNetworkTests: XCTestCase {
+
+    /// Counts any request that goes through URLSession's protocol machinery.
+    final class RecordingURLProtocol: URLProtocol {
+        static var requestCount = 0
+        override class func canInit(with request: URLRequest) -> Bool {
+            requestCount += 1
+            return false
+        }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+        override func startLoading() {}
+        override func stopLoading() {}
+    }
+
+    func testParsingMakesNoNetworkRequests() async {
+        RecordingURLProtocol.requestCount = 0
+        URLProtocol.registerClass(RecordingURLProtocol.self)
+        defer { URLProtocol.unregisterClass(RecordingURLProtocol.self) }
+
+        let properties = [RentalProperty(name: "Oak House", address: "123 Oak St", propertyType: .ltr)]
+        let result = await AITimeEntryService.shared.parseTimeEntry(
+            from: "Fixed the leaking faucet at Oak House for 2 hours", properties: properties)
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(RecordingURLProtocol.requestCount, 0)
+    }
+
+    func testServiceSourceHasNoNetworkCode() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let url = root.appendingPathComponent("Sources/Services/AITimeEntryService.swift")
+        guard let source = try? String(contentsOf: url, encoding: .utf8) else {
+            throw XCTSkip("Source not readable from this test host")
+        }
+        for banned in ["URLSession", "URLRequest", "minimax", "MINIMAX", "http://", "https://"] {
+            XCTAssertFalse(source.contains(banned), "AITimeEntryService must stay on-device: found \(banned)")
+        }
+    }
+}

@@ -53,7 +53,7 @@ struct TimeLogView: View {
     private var stoppedTimerDraftKey: String { UserScope.key("LandlordHours.stoppedTimerDraft") }
     private let minimumSavableTimerElapsed: TimeInterval = 60
 
-    // Inline AI state
+    // Inline note-reading state
     @State private var isProcessingAI: Bool = false
     @State private var aiParsedEntry: ParsedTimeEntry?
     @State private var aiAutoFilled: Bool = false
@@ -489,7 +489,7 @@ struct TimeLogView: View {
     }
 
     private var evidenceDraftStatus: String {
-        if aiAutoFilled { return "AI filled" }
+        if aiAutoFilled { return "Filled in" }
         if aiParsedEntry != nil { return "Detected" }
         if entryNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Ready" }
         return "Review"
@@ -634,10 +634,10 @@ struct TimeLogView: View {
     private func aiHint(hasStartedTyping: Bool) -> some View {
         HStack(spacing: 8) {
             // AI sparkle badge
-            LHIconTile(icon: Lucide.sparkles, color: colors.action, wash: colors.actionSurface, size: 26, isActive: true)
+            LHIconTile(icon: Lucide.penLine, color: colors.action, wash: colors.actionSurface, size: 26, isActive: true)
             Text(hasStartedTyping
-                 ? "Keep typing. AI will detect category, property, and hours."
-                 : "Describe your work and AI will fill in the details")
+                 ? "Keep typing. We'll pick out the category, property, and hours."
+                 : "We'll fill in the details from your note")
                 .font(.system(size: 12))
                 .foregroundStyle(colors.textSecondary)
         }
@@ -691,8 +691,8 @@ struct TimeLogView: View {
     private var aiProcessingIndicator: some View {
         HStack(spacing: 10) {
             // AI sparkle badge
-            LHIconTile(icon: Lucide.sparkles, color: colors.action, wash: colors.actionSurface, size: 28, isActive: true)
-            Text("Analyzing your description...")
+            LHIconTile(icon: Lucide.penLine, color: colors.action, wash: colors.actionSurface, size: 28, isActive: true)
+            Text("Reading your note…")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(colors.textPrimary)
             Spacer()
@@ -713,7 +713,7 @@ struct TimeLogView: View {
     private func aiSuggestionBar(parsed: ParsedTimeEntry) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                LHIconTile(icon: Lucide.sparkles, color: colors.action, wash: colors.actionSurface, size: 32, isActive: true)
+                LHIconTile(icon: Lucide.penLine, color: colors.action, wash: colors.actionSurface, size: 32, isActive: true)
                 Text("Detected details")
                     .font(.system(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(colors.textPrimary)
