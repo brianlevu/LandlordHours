@@ -240,13 +240,19 @@ struct TimerDraftReviewSheet: View {
                     .foregroundStyle(colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Stepper(value: $hours, in: 0.25...24, step: 0.25) {
+                HStack(spacing: 12) {
                     Text(AppFormat.hours(hours))
                         .font(.system(size: 34, weight: .black, design: .rounded))
                         .foregroundStyle(colors.textPrimary)
                         .monospacedDigit()
+                        .accessibilityIdentifier("timerDraftReview.hours")
+                    Spacer(minLength: 0)
+                    stepButton(icon: Lucide.minus, label: "Fewer hours", id: "timerDraftReview.decrement",
+                               enabled: hours > 0.25) { hours = max(hours - 0.25, 0.25) }
+                    stepButton(icon: Lucide.plus, label: "More hours", id: "timerDraftReview.increment",
+                               enabled: hours < 24) { hours = min(hours + 0.25, 24) }
                 }
-                .accessibilityIdentifier("timerDraftReview.hours")
+                .accessibilityElement(children: .contain)
 
                 confirmRow
 
@@ -280,6 +286,22 @@ struct TimerDraftReviewSheet: View {
         .presentationDetents([.medium, .large])
     }
 
+    /// 44 pt round step button (the stock Stepper's segments measured 30.7 pt).
+    private func stepButton(icon: UIImage, label: String, id: String, enabled: Bool,
+                            action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            LucideIcon(image: icon, size: 18)
+                .foregroundStyle(enabled ? colors.textPrimary : colors.textSecondary)
+                .frame(width: 44, height: 44)
+                .background(colors.backgroundTertiary)
+                .clipShape(Circle())
+        }
+        .buttonStyle(.lhPressable)
+        .disabled(!enabled)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(id)
+    }
+
     /// An explicit "these hours are right" check. A drawn box, not a stock Toggle: on
     /// iOS 27 the stock off track is close to invisible on a light card.
     private var confirmRow: some View {
@@ -297,7 +319,7 @@ struct TimerDraftReviewSheet: View {
                             .foregroundStyle(colors.onAction)
                     }
                 }
-                .frame(width: 26, height: 26)
+                .frame(width: 32, height: 32)
                 Text("These hours are right")
                     .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .foregroundStyle(colors.textPrimary)

@@ -600,7 +600,8 @@ struct ContentView: View {
 
     private func tabBarButton(index: Int, title: String, icon: UIImage) -> some View {
         let isSelected = selectedTab == index
-        let inactiveColor = colors.textSecondary.opacity(colorScheme == .dark ? 0.86 : 0.78)
+        // Full-strength secondary text: the 0.78 opacity version measured 3.46:1.
+        let inactiveColor = colors.textSecondary
 
         return Button {
             animate(AppAnimation.quick) {
@@ -609,10 +610,10 @@ struct ContentView: View {
         } label: {
             VStack(spacing: 5) {
                 LucideIcon(image: icon, size: 22)
-                    .foregroundStyle(isSelected ? AppColors.primary : inactiveColor)
+                    .foregroundStyle(isSelected ? colors.actionText : inactiveColor)
                 Text(title)
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(isSelected ? AppColors.primary : inactiveColor)
+                    .foregroundStyle(isSelected ? colors.actionText : inactiveColor)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
             }

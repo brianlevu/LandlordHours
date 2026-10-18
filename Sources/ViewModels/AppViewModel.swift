@@ -1370,38 +1370,30 @@ struct StaleTimerRecovery: Codable, Equatable, Identifiable {
         return minutes < 1 ? "under 1 min" : "\(minutes) min"
     }
 
-    static let capNote = "Set the real time before you save."
-    static let cappedHeadline = "We stopped it at 24 hours"
-
-    /// The card's headline. A capped draft leads with the figure it will save (24 hours),
-    /// never with the raw run time ("Ran 30.0h"), which isn't what goes on the record.
+    /// The card's headline. A capped draft says both facts in one line, so the run time and
+    /// the 24 h cap never read as a contradiction.
     var cardHeadline: String {
-        wasCapped ? Self.cappedHeadline : ranLabel
-    }
-
-    /// "It ran 30.0h." — the real run time, shown as supporting detail on capped drafts.
-    private var cappedRanSentence: String {
-        "It ran \(AppFormat.hours(max(elapsedHours, 0)))."
+        guard wasCapped else { return ranLabel }
+        return "\(ranLabel). We stopped counting at 24h \u{2014} check it before saving."
     }
 
     /// Copy for the Track recovery card, per draft reason. Kept here so it is unit-tested.
     func cardMessage(propertyName: String?, hasAnyProperty: Bool) -> String {
         let start = startTime.formatted(date: .abbreviated, time: .shortened)
-        let cap = wasCapped ? " \(cappedRanSentence) \(Self.capNote)" : ""
         guard let propertyName else {
             let pick = hasAnyProperty
                 ? "Choose a property below to save it to."
                 : "Add a property to save it."
-            return "Started \(start). The property for this timer was deleted.\(cap) \(pick)"
+            return "Started \(start). The property for this timer was deleted. \(pick)"
         }
         switch reason {
         case .pausedAtSwitch:
             let paused = (pausedAt ?? startTime).formatted(date: .abbreviated, time: .shortened)
-            let action = wasCapped ? "\(cappedRanSentence) \(Self.capNote)" : "Save the time it ran, or discard it."
-            return "Started \(start) for \(propertyName). We paused it when you switched profiles at \(paused). \(action)"
+            let action = wasCapped ? "" : " Save the time it ran, or discard it."
+            return "Started \(start) for \(propertyName). We paused it when you switched profiles at \(paused).\(action)"
         case .forgotten:
-            let note = wasCapped ? "\(cappedRanSentence) \(Self.capNote)" : "Review it before saving so the record stays accurate."
-            return "Started \(start) for \(propertyName). \(note)"
+            let note = wasCapped ? "" : " Review it before saving so the record stays accurate."
+            return "Started \(start) for \(propertyName).\(note)"
         }
     }
 

@@ -11,6 +11,7 @@ final class FreeUserPaywallUITests: XCTestCase {
 
     override func setUp() {
         super.setUp()
+        UITestIsolation.resetStoreKit()
         continueAfterFailure = false
         app = XCUIApplication()
         taps = 0
@@ -48,7 +49,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         let nudge = app.buttons["dashboard.unlockPro"]
         scrollTo(nudge)
         tap(nudge)
-        assertPaywall("dashboardUnlock", titleContains: "LandlordHours Pro")
+        assertPaywall("dashboardUnlock", titleContains: "every rental")
         closeThenPurchase(entryPoint: "Home > Unlock Pro card", origin: nudge, continuation: nil)
     }
 
@@ -103,6 +104,13 @@ final class FreeUserPaywallUITests: XCTestCase {
 
         launchFree(scheme: scheme)
         tapTab("Settings")
+        let exportRow = app.buttons["settings.exportReportsLocked"]
+        scrollTo(exportRow)
+        tap(exportRow)
+        capturePaywall("paywall-settingsExport", scheme: scheme)
+
+        launchFree(scheme: scheme)
+        tapTab("Settings")
         tap(app.buttons["settings.proCard"])
         capturePaywall("paywall-settingsUpgrade", scheme: scheme)
 
@@ -134,6 +142,7 @@ final class FreeUserPaywallUITests: XCTestCase {
 
     private func baseArguments(scenario: String, tab: Int, scheme: String) -> [String] {
         [
+            UITestIsolation.resetProfilesArgument,
             "-LHMockScenario", scenario,
             "-LHInitialTab", "\(tab)",
             "-LHColorScheme", scheme,

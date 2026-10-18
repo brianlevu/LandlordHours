@@ -26,7 +26,8 @@ enum PaywallContext: String, CaseIterable, Identifiable {
         switch self {
         case .export: return "Export your \(String(year)) record"
         case .secondProperty: return "Track every rental"
-        case .dashboardUnlock, .settingsUpgrade: return "Get LandlordHours Pro"
+        case .dashboardUnlock: return "Export and track every rental"
+        case .settingsUpgrade: return "Get LandlordHours Pro"
         }
     }
 
@@ -36,7 +37,9 @@ enum PaywallContext: String, CaseIterable, Identifiable {
             return "Turn the hours you logged into a PDF or CSV you can hand to your tax professional."
         case .secondProperty:
             return "The free plan covers one property. Pro lets you add every rental you own, each with its own hours."
-        case .dashboardUnlock, .settingsUpgrade:
+        case .dashboardUnlock:
+            return "Pro adds a PDF and CSV of your hours for tax time, and room for every rental you own. You pay once."
+        case .settingsUpgrade:
             return "Export your records and track every rental you own. Pay once, keep it."
         }
     }

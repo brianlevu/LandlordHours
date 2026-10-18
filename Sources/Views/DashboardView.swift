@@ -1,6 +1,29 @@
 import SwiftUI
 import LucideIcons
 
+/// State of the Home goal card. The surface follows the intent rules: sage only when the
+/// goal is met, honey when the user is behind or something still needs them, violet wash
+/// otherwise.
+enum GoalCardTone: Equatable {
+    case onTrack
+    case needsAttention
+    case met
+
+    static func resolve(isGoalMet: Bool, isOnTrack: Bool, needsOtherWorkHours: Bool) -> GoalCardTone {
+        if isGoalMet { return .met }
+        if needsOtherWorkHours || !isOnTrack { return .needsAttention }
+        return .onTrack
+    }
+
+    func surface(_ colors: AdaptiveColors) -> Color {
+        switch self {
+        case .onTrack: return colors.actionSurface
+        case .needsAttention: return colors.cautionSurface
+        case .met: return colors.positiveSurface
+        }
+    }
+}
+
 struct DashboardView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @EnvironmentObject var goalManager: GoalManager
@@ -567,7 +590,7 @@ struct DashboardView: View {
             }
         }
         .padding(24)
-        .background(isGoalMet ? AppColors.sage : colors.sageWash)
+        .background(goalCardTone.surface(colors))
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 26, style: .continuous)
@@ -577,6 +600,10 @@ struct DashboardView: View {
         .accessibilityLabel(isGoalMet
             ? "Goal met. \(AppFormat.hours(totalHours)) logged"
             : "\(AppFormat.hours(totalHours)) of \(Int(targetHours)) hours, \(Int(progress * 100)) percent complete")
+    }
+
+    private var goalCardTone: GoalCardTone {
+        GoalCardTone.resolve(isGoalMet: isGoalMet, isOnTrack: isOnTrack, needsOtherWorkHours: hoursMetButRuleUnchecked)
     }
 
     private var goalCardTitle: String {
@@ -834,7 +861,7 @@ struct DashboardView: View {
                         ZStack {
                             RoundedRectangle(cornerRadius: 10)
                                 .fill(
-                                    isToday ? AppColors.sage :
+                                    isToday ? colors.action :
                                     hours > 0 ? AppColors.sageWash :
                                     colors.backgroundTertiary
                                 )
@@ -843,11 +870,11 @@ struct DashboardView: View {
                             if hours > 0 {
                                 Text(String(format: "%.0f", hours))
                                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .foregroundStyle(isToday ? AppColors.charcoal : colors.textPrimary)
+                                    .foregroundStyle(isToday ? colors.onAction : colors.textPrimary)
                             } else {
                                 Text("\u{2013}")
                                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .foregroundStyle(isToday ? AppColors.charcoal : colors.textTertiary)
+                                    .foregroundStyle(isToday ? colors.onAction : colors.textSecondary)
                             }
                         }
                         Text(dayLabels[i])
@@ -883,9 +910,9 @@ struct DashboardView: View {
                         HStack(spacing: 2) {
                             Text("See all")
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(AppColors.primary)
+                                .foregroundStyle(colors.actionText)
                             LucideIcon(image: Lucide.chevronRight, size: 14)
-                                .foregroundStyle(AppColors.primary)
+                                .foregroundStyle(colors.actionText)
                         }
                     }
                 }

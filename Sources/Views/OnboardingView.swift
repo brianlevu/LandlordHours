@@ -500,7 +500,7 @@ struct OnboardingView: View {
         HStack(spacing: 4) {
             ForEach(0..<OnboardingStep.totalSegments, id: \.self) { i in
                 Capsule()
-                    .fill(i <= currentStep.progressIndex ? AppColors.primary : AppColors.snow)
+                    .fill(i <= currentStep.progressIndex ? colors.action : colors.backgroundTertiary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 4)
                     .lhMotion(AppAnimation.standard, value: currentStep)
@@ -585,7 +585,7 @@ struct OnboardingView: View {
 
                 Text("We'll customize your experience based on what you're tracking toward.")
                     .font(AppTypography.body)
-                    .foregroundStyle(AppColors.slate)
+                    .foregroundStyle(colors.textSecondary)
                     .lineSpacing(4)
             }
             .padding(.horizontal, 28)
@@ -706,7 +706,7 @@ struct OnboardingView: View {
 
                 Text("We'll tailor your tracking based on property type and who manages it. You can add this later from Properties.")
                     .font(.system(size: 14, weight: .regular, design: .rounded))
-                    .foregroundStyle(AppColors.slate)
+                    .foregroundStyle(colors.textSecondary)
                     .lineSpacing(3)
                 }
                 .padding(.horizontal, 28)
@@ -791,7 +791,7 @@ struct OnboardingView: View {
         } label: {
             Text(label)
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(selectedPropertyType == type ? AppColors.primary : AppColors.slate)
+                .foregroundStyle(selectedPropertyType == type ? colors.actionText : colors.textSecondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
                 .background(
@@ -801,7 +801,7 @@ struct OnboardingView: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(
-                            selectedPropertyType == type ? AppColors.primary : AppColors.snow,
+                            selectedPropertyType == type ? colors.action : colors.border,
                             lineWidth: 2
                         )
                 )
@@ -834,7 +834,7 @@ struct OnboardingView: View {
 
                     Text(option.subtitle)
                         .font(.system(size: 10, weight: .regular, design: .rounded))
-                        .foregroundStyle(AppColors.mist)
+                        .foregroundStyle(colors.textSecondary)
                 }
 
                 Spacer()
@@ -851,7 +851,7 @@ struct OnboardingView: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
                     .stroke(
-                        selectedManagement == option ? AppColors.primary : AppColors.snow,
+                        selectedManagement == option ? colors.action : colors.border,
                         lineWidth: 2
                     )
             )
@@ -883,7 +883,7 @@ struct OnboardingView: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(
-                            text.wrappedValue.isEmpty ? colors.border.opacity(0.35) : AppColors.sage,
+                            text.wrappedValue.isEmpty ? colors.border.opacity(0.35) : colors.action,
                             lineWidth: 1.5
                         )
                 )
@@ -893,7 +893,7 @@ struct OnboardingView: View {
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 12, weight: .semibold, design: .rounded))
-            .foregroundStyle(AppColors.slate)
+            .foregroundStyle(colors.textSecondary)
     }
 
     // MARK: - Address Autocomplete
@@ -920,7 +920,7 @@ struct OnboardingView: View {
                         .overlay(
                             RoundedRectangle(cornerRadius: 14)
                                 .stroke(
-                                    streetAddress.isEmpty ? colors.border.opacity(0.35) : AppColors.sage,
+                                    streetAddress.isEmpty ? colors.border.opacity(0.35) : colors.action,
                                     lineWidth: 1.5
                                 )
                         )
@@ -946,7 +946,7 @@ struct OnboardingView: View {
                                         if let addr = item.placemark.title {
                                             Text(addr)
                                                 .font(.system(size: 11, design: .rounded))
-                                                .foregroundStyle(AppColors.mist)
+                                                .foregroundStyle(colors.textSecondary)
                                                 .lineLimit(1)
                                         }
                                     }
@@ -1119,7 +1119,7 @@ struct OnboardingView: View {
 
             Text(hours)
                 .font(.system(size: 16, weight: .heavy, design: .rounded))
-                .foregroundStyle(AppColors.primary)
+                .foregroundStyle(colors.actionText)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -1242,7 +1242,7 @@ struct OnboardingView: View {
                 VStack(spacing: 2) {
                     Text("Monday, February 24")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(AppColors.slate)
+                        .foregroundStyle(colors.textSecondary)
 
                     Text("9:41")
                         .font(.system(size: 52, weight: .bold, design: .rounded))
@@ -1257,7 +1257,7 @@ struct OnboardingView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("LandlordHours")
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(AppColors.primary)
+                            .foregroundStyle(colors.actionText)
 
                         Text("Don't forget to log today!")
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
@@ -1265,7 +1265,7 @@ struct OnboardingView: View {
 
                         Text("You visited 123 Oak St earlier. Tap to log your hours.")
                             .font(.system(size: 11, weight: .regular, design: .rounded))
-                            .foregroundStyle(AppColors.slate)
+                            .foregroundStyle(colors.textSecondary)
                             .lineSpacing(2)
                     }
 
@@ -1273,7 +1273,7 @@ struct OnboardingView: View {
 
                     Text("now")
                         .font(.system(size: 10, weight: .regular, design: .rounded))
-                        .foregroundStyle(AppColors.mist)
+                        .foregroundStyle(colors.textSecondary)
                 }
                 .padding(16)
                 .background(
@@ -1315,7 +1315,7 @@ struct OnboardingView: View {
 
                         Text("You're on pace for 750 hours. Keep it up!")
                             .font(.system(size: 11, weight: .regular, design: .rounded))
-                            .foregroundStyle(AppColors.slate)
+                            .foregroundStyle(colors.textSecondary)
                             .lineSpacing(2)
                     }
 
@@ -1323,7 +1323,7 @@ struct OnboardingView: View {
 
                     Text("2h")
                         .font(.system(size: 10, weight: .regular, design: .rounded))
-                        .foregroundStyle(AppColors.mist)
+                        .foregroundStyle(colors.textSecondary)
                 }
                 .padding(16)
                 .background(
@@ -1524,16 +1524,16 @@ struct OnboardingView: View {
                 HStack(spacing: 8) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(AppColors.primary.opacity(0.15))
+                            .fill(colors.actionSurface)
                             .frame(width: 28, height: 28)
                         LucideIcon(image: Lucide.sparkles, size: 14)
-                            .foregroundStyle(AppColors.primary)
+                            .foregroundStyle(colors.actionText)
                     }
 
                     HStack(spacing: 0) {
                         Text("3 hours")
                             .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundStyle(AppColors.primary)
+                            .foregroundStyle(colors.actionText)
                         Text(" detected today")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
                             .foregroundStyle(colors.textPrimary)
@@ -1577,7 +1577,7 @@ struct OnboardingView: View {
             ForEach(Array(days.enumerated()), id: \.offset) { _, day in
                 Text(day)
                     .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundStyle(AppColors.mist)
+                    .foregroundStyle(colors.textSecondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 4)
             }
@@ -1594,21 +1594,21 @@ struct OnboardingView: View {
             ForEach(1...daysInMonth, id: \.self) { day in
                 Text("\(day)")
                     .font(.system(size: 10, weight: day == todayDay ? .bold : .regular, design: .rounded))
-                    .foregroundStyle(day == todayDay ? .white : AppColors.slate)
+                    .foregroundStyle(day == todayDay ? colors.onAction : colors.textSecondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 5)
                     .background(
                         Group {
                             if day == todayDay {
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(AppColors.primary)
+                                    .fill(colors.action)
                             }
                         }
                     )
                     .overlay(alignment: .bottom) {
                         if hoursOnDays.contains(day) && day != todayDay {
                             Circle()
-                                .fill(AppColors.primary)
+                                .fill(colors.action)
                                 .frame(width: 4, height: 4)
                                 .offset(y: -1)
                         }
@@ -1629,14 +1629,14 @@ struct OnboardingView: View {
                     .foregroundStyle(colors.textPrimary)
                 Text(time)
                     .font(.system(size: 9, weight: .regular, design: .rounded))
-                    .foregroundStyle(AppColors.mist)
+                    .foregroundStyle(colors.textSecondary)
             }
 
             Spacer()
 
             Text(hours)
                 .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(AppColors.primary)
+                .foregroundStyle(colors.actionText)
         }
         .padding(10)
         .background(
@@ -1685,7 +1685,7 @@ struct OnboardingView: View {
                         .foregroundStyle(colors.textPrimary)
                     Text("We'll scan the last 90 days for property-related events.")
                         .font(.system(size: 13))
-                        .foregroundStyle(AppColors.slate)
+                        .foregroundStyle(colors.textSecondary)
                         .multilineTextAlignment(.center)
                 }
                 .padding(.top, 12)
@@ -1695,10 +1695,10 @@ struct OnboardingView: View {
                 if availableCalendars.isEmpty {
                     VStack(spacing: 12) {
                         LucideIcon(image: Lucide.calendarX, size: 32)
-                            .foregroundStyle(AppColors.mist)
+                            .foregroundStyle(colors.textSecondary)
                         Text("No calendars found")
                             .font(.system(size: 15))
-                            .foregroundStyle(AppColors.slate)
+                            .foregroundStyle(colors.textSecondary)
                     }
                     .frame(maxHeight: .infinity)
                 } else {
@@ -1736,10 +1736,10 @@ struct OnboardingView: View {
                             } label: {
                                 Text("Continue")
                                     .font(AppTypography.buttonLarge)
-                                    .foregroundStyle(AppColors.onAction)
+                                    .foregroundStyle(colors.onAction)
                                     .frame(maxWidth: .infinity)
                                     .frame(height: 56)
-                                    .background(AppColors.charcoal)
+                                    .background(colors.action)
                                     .clipShape(Capsule())
                             }
                         }
@@ -1752,10 +1752,10 @@ struct OnboardingView: View {
                                 Text("Import \(selectedCalendarIds.count) calendar\(selectedCalendarIds.count == 1 ? "" : "s")")
                             }
                             .font(AppTypography.buttonLarge)
-                            .foregroundStyle(AppColors.onAction)
+                            .foregroundStyle(selectedCalendarIds.isEmpty ? colors.textSecondary : colors.onAction)
                             .frame(maxWidth: .infinity)
                             .frame(height: 56)
-                            .background(selectedCalendarIds.isEmpty ? AppColors.mist : AppColors.charcoal)
+                            .background(selectedCalendarIds.isEmpty ? colors.backgroundTertiary : colors.action)
                             .clipShape(Capsule())
                         }
                         .disabled(selectedCalendarIds.isEmpty)
@@ -1771,7 +1771,7 @@ struct OnboardingView: View {
                         showCalendarPicker = false
                         completeOnboarding()
                     }
-                    .foregroundStyle(AppColors.mist)
+                    .foregroundStyle(colors.textSecondary)
                 }
             }
         }
@@ -1802,7 +1802,7 @@ struct OnboardingView: View {
                         .foregroundStyle(colors.textPrimary)
                     Text(calendar.source.title)
                         .font(.system(size: 11, design: .rounded))
-                        .foregroundStyle(AppColors.mist)
+                        .foregroundStyle(colors.textSecondary)
                 }
 
                 Spacer()
@@ -1810,12 +1810,12 @@ struct OnboardingView: View {
                 // Checkmark
                 ZStack {
                     RoundedRectangle(cornerRadius: 6)
-                        .stroke(isSelected ? AppColors.primary : AppColors.cloud, lineWidth: 2)
+                        .stroke(isSelected ? colors.action : colors.border, lineWidth: 2)
                         .frame(width: 22, height: 22)
 
                     if isSelected {
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(AppColors.primary)
+                            .fill(colors.action)
                             .frame(width: 22, height: 22)
                         LucideIcon(image: Lucide.check, size: 12)
                             .foregroundStyle(AppColors.onAction)
@@ -1830,7 +1830,7 @@ struct OnboardingView: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(isSelected ? AppColors.primary : AppColors.snow, lineWidth: 2)
+                    .stroke(isSelected ? colors.action : colors.border, lineWidth: 2)
             )
         }
         .buttonStyle(.plain)
@@ -1891,7 +1891,7 @@ struct OnboardingView: View {
                 } label: {
                     Text("Skip for now")
                         .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(AppColors.mist)
+                        .foregroundStyle(colors.textSecondary)
                         .padding(.vertical, 10)
                 }
             }
@@ -1903,12 +1903,12 @@ struct OnboardingView: View {
     private func radioButton(isSelected: Bool) -> some View {
         ZStack {
             Circle()
-                .stroke(isSelected ? AppColors.primary : AppColors.cloud, lineWidth: 2)
+                .stroke(isSelected ? colors.action : colors.border, lineWidth: 2)
                 .frame(width: 22, height: 22)
 
             if isSelected {
                 Circle()
-                    .fill(AppColors.primary)
+                    .fill(colors.action)
                     .frame(width: 22, height: 22)
 
                 Circle()
@@ -1921,12 +1921,12 @@ struct OnboardingView: View {
     private func smallRadioButton(isSelected: Bool) -> some View {
         ZStack {
             Circle()
-                .stroke(isSelected ? AppColors.primary : AppColors.cloud, lineWidth: 2)
+                .stroke(isSelected ? colors.action : colors.border, lineWidth: 2)
                 .frame(width: 18, height: 18)
 
             if isSelected {
                 Circle()
-                    .fill(AppColors.primary)
+                    .fill(colors.action)
                     .frame(width: 18, height: 18)
 
                 Circle()

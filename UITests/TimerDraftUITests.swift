@@ -7,6 +7,7 @@ final class TimerDraftUITests: XCTestCase {
 
     override func setUp() {
         super.setUp()
+        UITestIsolation.resetStoreKit()
         continueAfterFailure = false
         app = XCUIApplication()
     }
@@ -19,6 +20,7 @@ final class TimerDraftUITests: XCTestCase {
     private func launch(_ scenario: String, scheme: String = "light") {
         app.terminate()
         app.launchArguments = [
+            UITestIsolation.resetProfilesArgument,
             "-LHSeedTimerDraft", scenario,
             "-LHInitialTab", "2",
             "-LHColorScheme", scheme,
@@ -87,7 +89,10 @@ final class TimerDraftUITests: XCTestCase {
         XCTAssertTrue(save.isEnabled, "Confirming the hours enables Save")
         confirm.tap()
         XCTAssertFalse(save.isEnabled, "Unchecking disables Save again")
-        app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Decrement' OR identifier CONTAINS[c] 'Decrement'")).firstMatch.tap()
+        let minus = app.buttons["timerDraftReview.decrement"]
+        XCTAssertGreaterThanOrEqual(minus.frame.width, 32, "Step button hit area")
+        XCTAssertGreaterThanOrEqual(confirm.frame.height, 32, "Checkbox row hit area")
+        minus.tap()
         XCTAssertTrue(save.isEnabled, "Changing the hours enables Save")
     }
 
@@ -95,8 +100,7 @@ final class TimerDraftUITests: XCTestCase {
         launch("forgotten24h")
         let summary = app.descendants(matching: .any)["timerDraft.summary"]
         XCTAssertTrue(summary.waitForExistence(timeout: 10))
-        XCTAssertTrue(summary.label.contains("We stopped it at 24 hours"), summary.label)
-        XCTAssertFalse(summary.label.contains("Ran 30"), summary.label)
+        XCTAssertTrue(summary.label.contains("Ran 30.0h. We stopped counting at 24h"), summary.label)
     }
 
     func testCaptureTimerDraftFramesLight() { captureAll(scheme: "light") }

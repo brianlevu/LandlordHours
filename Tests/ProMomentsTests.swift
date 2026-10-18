@@ -301,6 +301,9 @@ final class PaywallContextTests: XCTestCase {
         XCTAssertEqual(PaywallContext.export.benefits.first, .exports)
         XCTAssertEqual(PaywallContext.secondProperty.benefits.first, .properties)
         XCTAssertTrue(PaywallContext.secondProperty.body.contains("one property"))
+        XCTAssertNotEqual(PaywallContext.dashboardUnlock.title(year: 2026), PaywallContext.settingsUpgrade.title(year: 2026),
+                          "Home's Unlock card gets its own headline")
+        XCTAssertNotEqual(PaywallContext.dashboardUnlock.body, PaywallContext.settingsUpgrade.body)
     }
 
     func testCopyNeverOverclaimsTaxOutcomes() {
@@ -392,6 +395,29 @@ final class MoreThanHalfDisplayTests: XCTestCase {
     }
 }
 
+// MARK: - Home goal card surface
+
+final class GoalCardToneTests: XCTestCase {
+    func testStateResolution() {
+        XCTAssertEqual(GoalCardTone.resolve(isGoalMet: true, isOnTrack: false, needsOtherWorkHours: false), .met)
+        XCTAssertEqual(GoalCardTone.resolve(isGoalMet: false, isOnTrack: false, needsOtherWorkHours: false), .needsAttention)
+        XCTAssertEqual(GoalCardTone.resolve(isGoalMet: false, isOnTrack: true, needsOtherWorkHours: true), .needsAttention)
+        XCTAssertEqual(GoalCardTone.resolve(isGoalMet: false, isOnTrack: true, needsOtherWorkHours: false), .onTrack)
+    }
+
+    /// Sage (positive) only when the goal is met; behind is caution; on track is violet wash.
+    func testToneMapsToIntentTokens() {
+        for scheme in [ColorScheme.light, .dark] {
+            let colors = AdaptiveColors(colorScheme: scheme)
+            XCTAssertEqual(GoalCardTone.met.surface(colors), colors.positiveSurface)
+            XCTAssertEqual(GoalCardTone.needsAttention.surface(colors), colors.cautionSurface)
+            XCTAssertEqual(GoalCardTone.onTrack.surface(colors), colors.actionSurface)
+            XCTAssertNotEqual(GoalCardTone.needsAttention.surface(colors), colors.positiveSurface)
+            XCTAssertNotEqual(GoalCardTone.onTrack.surface(colors), colors.positiveSurface)
+        }
+    }
+}
+
 // MARK: - Timer draft card
 
 final class TimerDraftReviewTests: XCTestCase {
@@ -399,16 +425,17 @@ final class TimerDraftReviewTests: XCTestCase {
         StaleTimerRecovery(startTime: Date(), propertyId: UUID(), category: .repairs, elapsedHours: hours, reason: reason)
     }
 
-    func testCappedHeadlineLeadsWithTheCappedFigure() {
-        XCTAssertEqual(draft(30).cardHeadline, "We stopped it at 24 hours")
-        XCTAssertEqual(draft(26, reason: .pausedAtSwitch).cardHeadline, "We stopped it at 24 hours")
-        XCTAssertFalse(draft(30).cardHeadline.contains("30"))
+    /// One line carries both facts so the run time and the cap don't contradict each other.
+    func testCappedHeadlineSaysRunTimeAndCapInOneLine() {
+        XCTAssertEqual(draft(30).cardHeadline, "Ran 30.0h. We stopped counting at 24h \u{2014} check it before saving.")
+        XCTAssertTrue(draft(26, reason: .pausedAtSwitch).cardHeadline.hasPrefix("Ran 26.0h. We stopped counting at 24h"))
         XCTAssertEqual(draft(0.75).cardHeadline, "Ran 45 min", "Uncapped drafts still show the real run time")
     }
 
-    func testCappedMessageStillShowsRealRunTime() {
+    func testCappedMessageDoesNotRepeatTheCap() {
         let message = draft(30).cardMessage(propertyName: "Oak", hasAnyProperty: true)
-        XCTAssertTrue(message.contains("It ran 30.0h."), message)
+        XCTAssertFalse(message.contains("24"), message)
+        XCTAssertFalse(message.contains("30.0h"), message)
     }
 
     func testReviewSaveNeedsAChangeOrAConfirmation() {
@@ -438,6 +465,35 @@ final class LaneCContrastTests: XCTestCase {
     private func contrast(_ a: Color, _ b: Color, _ style: UIUserInterfaceStyle) -> Double {
         let la = luminance(a, style), lb = luminance(b, style)
         return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+    }
+
+    /// Token pairs used by onboarding, the Home goal card and the guided-setup coach mark.
+    func testOnboardingDashboardAndCoachTokenPairsPassAA() {
+        let light = AdaptiveColors(colorScheme: .light)
+        let dark = AdaptiveColors(colorScheme: .dark)
+        let cream = AppColors.background   // onboarding page background (#FAF7F2)
+        var pairs: [(String, Color, Color, UIUserInterfaceStyle)] = [
+            ("skip/secondary on cream", light.textSecondary, cream, .light),
+            ("secondary on light page", light.textSecondary, light.background, .light),
+            ("secondary on dark page", dark.textSecondary, dark.background, .dark),
+            ("coach CTA light", light.onAction, light.action, .light),
+            ("coach CTA dark", dark.onAction, dark.action, .dark),
+            ("coach skip light", light.actionText, light.actionSurface, .light),
+            ("coach skip dark", dark.actionText, dark.actionSurface, .dark),
+            ("tab inactive light", light.textSecondary, light.background, .light),
+            ("tab active light", light.actionText, light.actionSurface, .light),
+            ("tab active dark", dark.actionText, dark.actionSurface, .dark),
+        ]
+        for (scheme, colors, style) in [(ColorScheme.light, light, UIUserInterfaceStyle.light), (.dark, dark, .dark)] {
+            for tone in [GoalCardTone.onTrack, .needsAttention, .met] {
+                pairs.append(("goal card \(tone) text \(scheme)", colors.textPrimary, tone.surface(colors), style))
+                pairs.append(("goal card \(tone) secondary \(scheme)", colors.textSecondary, tone.surface(colors), style))
+            }
+        }
+        for (name, fg, bg, style) in pairs {
+            let ratio = contrast(fg, bg, style)
+            XCTAssertGreaterThanOrEqual(ratio, 4.5, "\(name) = \(ratio)")
+        }
     }
 
     func testLightDiscardOnSnowPillPassesAA() {

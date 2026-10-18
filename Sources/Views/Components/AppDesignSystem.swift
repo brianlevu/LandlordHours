@@ -305,7 +305,7 @@ struct GuidedOnboardingOverlay: View {
                     .strokeBorder(AppColors.primaryLight, lineWidth: 3)
                     .frame(width: rect.rect.width, height: rect.rect.height)
                     .position(x: rect.rect.midX, y: rect.rect.midY)
-                    .shadow(color: AppColors.primary.opacity(0.32), radius: 18, y: 6)
+                    .shadow(color: colors.action.opacity(0.32), radius: 18, y: 6)
                     .allowsHitTesting(false)
 
                 coachCard(in: proxy.size, spotlight: rect.rect)
@@ -360,10 +360,10 @@ struct GuidedOnboardingOverlay: View {
                 } label: {
                     Text(content.primary)
                         .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppColors.onAction)
+                        .foregroundStyle(colors.onAction)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(AppColors.primary)
+                        .background(colors.action)
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -375,10 +375,10 @@ struct GuidedOnboardingOverlay: View {
                     } label: {
                         Text(secondary)
                             .font(.system(size: 14, weight: .semibold, design: .rounded))
-                            .foregroundStyle(AppColors.primary)
+                            .foregroundStyle(colors.actionText)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .background(colors.primarySurface)
+                            .background(colors.actionSurface)
                             .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
