@@ -1,0 +1,10 @@
+{
+ "model": "jev-1.14.0",
+ "threshold": 0.5,
+ "n": 48,
+ "overclaims_caught": 24,
+ "overclaims_total": 24,
+ "false_alarms": 1,
+ "agreement_at_threshold": 0.979,
+ "agreement_at_0.5": 0.979
+}

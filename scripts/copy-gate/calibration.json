@@ -1,0 +1,197 @@
+{
+ "question": "overclaims tax outcome or gives tax advice",
+ "lines": [
+  {
+   "text": "Keep a dated record of every hour you spend on your rentals.",
+   "overclaim": false
+  },
+  {
+   "text": "Export a report to share with your tax professional.",
+   "overclaim": false
+  },
+  {
+   "text": "Log hours by property, category, date, and participant.",
+   "overclaim": false
+  },
+  {
+   "text": "Track your progress toward the 750-hour threshold on one dashboard.",
+   "overclaim": false
+  },
+  {
+   "text": "See how many hours remain for each test.",
+   "overclaim": false
+  },
+  {
+   "text": "Write a plain-English note and AI turns it into a structured entry.",
+   "overclaim": false
+  },
+  {
+   "text": "Attach photos, receipts, and notes to any entry.",
+   "overclaim": false
+  },
+  {
+   "text": "Run a timer while you work, or add time later.",
+   "overclaim": false
+  },
+  {
+   "text": "Import calendar events so site visits are not missed.",
+   "overclaim": false
+  },
+  {
+   "text": "Back up and sync through your own iCloud account.",
+   "overclaim": false
+  },
+  {
+   "text": "LandlordHours is a recordkeeping tool. It does not provide tax, legal, or financial advice.",
+   "overclaim": false
+  },
+  {
+   "text": "It does not determine whether you qualify for any tax status.",
+   "overclaim": false
+  },
+  {
+   "text": "Review your records and your qualification with a licensed tax professional.",
+   "overclaim": false
+  },
+  {
+   "text": "Track spouse hours separately when you file jointly.",
+   "overclaim": false
+  },
+  {
+   "text": "Works on iPhone, even offline.",
+   "overclaim": false
+  },
+  {
+   "text": "Custom activity categories for how you actually work.",
+   "overclaim": false
+  },
+  {
+   "text": "A log kept in real time is easier to rely on than one rebuilt in April.",
+   "overclaim": false
+  },
+  {
+   "text": "Export a clean PDF log you can hand to your CPA.",
+   "overclaim": false
+  },
+  {
+   "text": "Short-term rentals are kept separate from long-term rentals.",
+   "overclaim": false
+  },
+  {
+   "text": "Start a 7-day free trial, then pick a plan.",
+   "overclaim": false
+  },
+  {
+   "text": "New: anonymous usage analytics you can turn off anytime in Settings.",
+   "overclaim": false
+  },
+  {
+   "text": "Your data stays on your device and in your iCloud.",
+   "overclaim": false
+  },
+  {
+   "text": "Compare your hours against the 500-hour and 100-hour tests.",
+   "overclaim": false
+  },
+  {
+   "text": "Your CPA decides how to use your records.",
+   "overclaim": false
+  },
+  {
+   "text": "Guaranteed to pass an IRS audit.",
+   "overclaim": true
+  },
+  {
+   "text": "Qualify for REPS automatically.",
+   "overclaim": true
+  },
+  {
+   "text": "IRS-approved time tracking.",
+   "overclaim": true
+  },
+  {
+   "text": "Our reports are audit-proof.",
+   "overclaim": true
+  },
+  {
+   "text": "Never lose a deduction again.",
+   "overclaim": true
+  },
+  {
+   "text": "Save thousands in taxes with every hour you log.",
+   "overclaim": true
+  },
+  {
+   "text": "We tell you exactly which tax status you qualify for.",
+   "overclaim": true
+  },
+  {
+   "text": "This app proves you materially participated.",
+   "overclaim": true
+  },
+  {
+   "text": "Your log will hold up in any IRS audit.",
+   "overclaim": true
+  },
+  {
+   "text": "Use these hours to claim the rental loss deduction on your return.",
+   "overclaim": true
+  },
+  {
+   "text": "Certified by the IRS for real estate professionals.",
+   "overclaim": true
+  },
+  {
+   "text": "Turn your rental losses into tax-free income.",
+   "overclaim": true
+  },
+  {
+   "text": "You will qualify for Real Estate Professional Status once you reach 750 hours.",
+   "overclaim": true
+  },
+  {
+   "text": "Our AI gives you tax advice tailored to your situation.",
+   "overclaim": true
+  },
+  {
+   "text": "Replace your CPA with LandlordHours.",
+   "overclaim": true
+  },
+  {
+   "text": "Hours logged here are legally valid proof for the IRS.",
+   "overclaim": true
+  },
+  {
+   "text": "Stop worrying about audits for good.",
+   "overclaim": true
+  },
+  {
+   "text": "Guarantees your hours are accepted by the IRS.",
+   "overclaim": true
+  },
+  {
+   "text": "You should group your properties to maximize your tax savings.",
+   "overclaim": true
+  },
+  {
+   "text": "Meets all IRS requirements for material participation.",
+   "overclaim": true
+  },
+  {
+   "text": "Court-proof documentation, every time.",
+   "overclaim": true
+  },
+  {
+   "text": "Count your spouse's hours to hit REPS and wipe out your tax bill.",
+   "overclaim": true
+  },
+  {
+   "text": "Never fail an audit again.",
+   "overclaim": true
+  },
+  {
+   "text": "The only app that makes you REPS-compliant.",
+   "overclaim": true
+  }
+ ]
+}
