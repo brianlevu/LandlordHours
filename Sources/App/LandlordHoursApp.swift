@@ -50,18 +50,37 @@ enum AppColors {
     static let error = Color(hex: "F472B6")
 
     // Intent aliases. New UI should prefer these over raw accent names.
-    static let action = primary
+    //
+    // Contrast decision (sign-in visual gate, 2026-10-17): text on the action fill must
+    // reach 4.5:1 in BOTH schemes. Light: the fill deepens to #6A56E0 so white text is
+    // 5.22:1 (#7B68EE was 4.15:1). Dark: the fill stays #9D8FF5 and the label turns
+    // near-black #0D0D0D (7.11:1; white was 2.73:1). Both tokens are dynamic so every
+    // `AppColors.action` / `AppColors.onAction` pairing resolves per scheme.
+    static let actionLightHex = "6A56E0"
+    static let actionDarkHex = "9D8FF5"
+    static let onActionLightHex = "FFFFFF"
+    static let onActionDarkHex = "0D0D0D"
+    static let action = Color.lhDynamic(light: actionLightHex, dark: actionDarkHex)
     static let actionSurface = primarySurface
     static let actionPressed = primaryDark
-    static let onAction = Color.white
+    static let onAction = Color.lhDynamic(light: onActionLightHex, dark: onActionDarkHex)
     static let positive = sage
     static let positiveSurface = sageWash
     static let caution = honey
     static let cautionSurface = honeyWash
-    static let destructive = coral
+    // Destructive text/icons: #C2412D on white is 5.14:1 (coral #FF8A7A was 2.29:1).
+    // Dark keeps coral (7.79:1 on #161626). Coral stays the repair-category accent.
+    static let destructiveLightHex = "C2412D"
+    static let destructive = Color.lhDynamic(light: destructiveLightHex, dark: "FF8A7A")
     static let destructiveSurface = coralWash
     static let informational = sky
     static let informationalSurface = skyWash
+    // Informational TEXT on its wash: #1E5E9E on #E0F0FF is 5.74:1 (sky was 1.92:1).
+    static let informationalTextLightHex = "1E5E9E"
+    static let informationalText = Color.lhDynamic(light: informationalTextLightHex, dark: "6CB4EE")
+    // Caution TEXT on white/cards: #B45309 (5.0:1 on white); dark uses honey.
+    static let cautionTextLightHex = "B45309"
+    static let positiveTextLightHex = "047857"
 
     // Reports goal palettes
     static let reportsAccent = Color(hex: "8B5CF6")
@@ -139,6 +158,30 @@ enum AppColors {
     static let darkBorder = Color.white.opacity(0.08)
 }
 
+extension Color {
+    /// A color that resolves per trait collection (light/dark), so static tokens such as
+    /// `AppColors.onAction` follow the effective scheme, including `.preferredColorScheme`.
+    static func lhDynamic(light: String, dark: String) -> Color {
+        Color(UIColor { traits in
+            UIColor(lhHex: traits.userInterfaceStyle == .dark ? dark : light)
+        })
+    }
+}
+
+extension UIColor {
+    convenience init(lhHex hex: String) {
+        let cleaned = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var value: UInt64 = 0
+        Scanner(string: cleaned).scanHexInt64(&value)
+        self.init(
+            red: CGFloat((value >> 16) & 0xFF) / 255,
+            green: CGFloat((value >> 8) & 0xFF) / 255,
+            blue: CGFloat(value & 0xFF) / 255,
+            alpha: 1
+        )
+    }
+}
+
 // MARK: - Color Scheme Aware Colors
 struct AdaptiveColors {
     let colorScheme: ColorScheme
@@ -153,16 +196,23 @@ struct AdaptiveColors {
     var warning: Color { colorScheme == .dark ? AppColors.darkWarning : AppColors.warning }
     var error: Color { colorScheme == .dark ? AppColors.darkError : AppColors.error }
 
-    var action: Color { primary }
+    var action: Color { Color(hex: colorScheme == .dark ? AppColors.actionDarkHex : AppColors.actionLightHex) }
+    var onAction: Color { Color(hex: colorScheme == .dark ? AppColors.onActionDarkHex : AppColors.onActionLightHex) }
     var actionSurface: Color { primarySurface }
     var positive: Color { sage }
     var positiveSurface: Color { sageWash }
     var caution: Color { honey }
     var cautionSurface: Color { honeyWash }
-    var destructive: Color { coral }
+    var destructive: Color { colorScheme == .dark ? coral : Color(hex: AppColors.destructiveLightHex) }
     var destructiveSurface: Color { coralWash }
     var informational: Color { sky }
     var informationalSurface: Color { skyWash }
+    /// Violet TEXT on actionSurface or cards: #5B4BC9 (5.34:1 on #EDE8FF) / #9D8FF5 (4.98:1 on #2D2A4A).
+    var actionText: Color { colorScheme == .dark ? AppColors.darkPrimary : AppColors.primaryDark }
+    /// Success TEXT on positiveSurface or cards: #047857 (4.85:1 on #E4F5EC) / sage (7.31:1 on #1A2E22).
+    var positiveText: Color { colorScheme == .dark ? AppColors.sage : Color(hex: AppColors.positiveTextLightHex) }
+    var informationalText: Color { colorScheme == .dark ? sky : Color(hex: AppColors.informationalTextLightHex) }
+    var cautionText: Color { colorScheme == .dark ? honey : Color(hex: AppColors.cautionTextLightHex) }
 
     var coral: Color { AppColors.coral }
     var sage: Color { AppColors.sage }
@@ -177,7 +227,8 @@ struct AdaptiveColors {
     var roseWash: Color { colorScheme == .dark ? AppColors.darkRoseWash : AppColors.roseWash }
 
     var textPrimary: Color { colorScheme == .dark ? AppColors.darkTextPrimary : AppColors.charcoal }
-    var textSecondary: Color { colorScheme == .dark ? AppColors.darkTextSecondary : AppColors.slate }
+    /// Light #636377: 5.13:1 on input/segment fills (#F0EFF4), where slate #6E6E82 was 4.35:1.
+    var textSecondary: Color { colorScheme == .dark ? AppColors.darkTextSecondary : Color(hex: "636377") }
     var textTertiary: Color { colorScheme == .dark ? AppColors.darkTextTertiary : AppColors.mist }
 
     var border: Color { colorScheme == .dark ? AppColors.darkBorder : AppColors.cloud }

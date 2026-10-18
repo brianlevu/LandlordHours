@@ -254,65 +254,8 @@ struct TimeLogView: View {
 
     // MARK: - Stale Timer Recovery
     private func staleTimerRecoveryCard(_ recovery: StaleTimerRecovery) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                LHIconTile(icon: Lucide.timerReset, color: AppColors.honey, wash: colors.honeyWash, size: 42, isActive: true)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Finish your saved timer")
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                    Text(staleTimerRecoveryMessage(recovery))
-                        .font(AppTypography.bodySmall)
-                        .foregroundStyle(colors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            HStack(spacing: 10) {
-                Button {
-                    viewModel.saveRecoveredStaleTimer()
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-                } label: {
-                    Text("Save \(AppFormat.hours(recovery.suggestedHours))")
-                        .font(AppTypography.buttonSmall)
-                        .foregroundStyle(AppColors.onAction)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(AppColors.action)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.lhPressable)
-
-                Button {
-                    viewModel.discardRecoveredStaleTimer()
-                } label: {
-                    Text("Discard")
-                        .font(AppTypography.buttonSmall)
-                        .foregroundStyle(colors.textSecondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(colors.backgroundTertiary)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.lhPressable)
-            }
-        }
-        .padding(16)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous)
-                .strokeBorder(colors.border.opacity(0.45), lineWidth: 1)
-        )
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Forgotten timer recovery. \(staleTimerRecoveryMessage(recovery))")
-    }
-
-    private func staleTimerRecoveryMessage(_ recovery: StaleTimerRecovery) -> String {
-        let propertyName = viewModel.properties.first { $0.id == recovery.propertyId }?.name ?? "this property"
-        let start = recovery.startTime.formatted(date: .abbreviated, time: .shortened)
-        return "Started \(start) for \(propertyName). We capped the suggested entry at 24 hours so you can review it instead of losing the record."
+        TimerDraftCard(recovery: recovery)
+            .id(recovery.id)
     }
 
     // MARK: - Main Entry Card
@@ -1415,6 +1358,12 @@ struct TimeLogView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
                 headerSection
+
+                // A pending timer draft stays visible even with no properties left, so its
+                // recorded time is never hidden (the card says to add a property or discard).
+                if let recovery = viewModel.staleTimerRecovery {
+                    staleTimerRecoveryCard(recovery)
+                }
 
                 VStack(alignment: .leading, spacing: 18) {
                     HStack(alignment: .top, spacing: 12) {

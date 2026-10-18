@@ -634,6 +634,8 @@ final class AILocalParserTests: XCTestCase {
 // MARK: - UserScope Tests
 
 final class UserScopeTests: XCTestCase {
+    /// Snapshot of every unscoped auth/profile key (incl. 1.1 localProfileId).
+    private var authSnapshot: AuthStateSnapshot!
 
     /// Saved auth state to restore after tests, since this is a hosted test.
     private var savedAppleUserId: String?
@@ -641,6 +643,8 @@ final class UserScopeTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
+        authSnapshot = AuthStateSnapshot.capture()
+        AuthStateSnapshot.clearAll()
         // Save any existing auth state from the host app
         savedAppleUserId = UserDefaults.standard.string(forKey: "appleUserId")
         savedEmailUserId = UserDefaults.standard.string(forKey: "emailUserId")
@@ -663,6 +667,7 @@ final class UserScopeTests: XCTestCase {
             UserDefaults.standard.removeObject(forKey: "emailUserId")
         }
         UserDefaults.standard.synchronize()
+        authSnapshot.restore()
         super.tearDown()
     }
 
@@ -721,12 +726,16 @@ final class UserScopeTests: XCTestCase {
 
 @MainActor
 final class AppViewModelLocalResetTests: XCTestCase {
+    /// Snapshot of every unscoped auth/profile key (incl. 1.1 localProfileId).
+    private var authSnapshot: AuthStateSnapshot!
 
     private var savedAppleUserId: String?
     private var savedEmailUserId: String?
 
     override func setUp() {
         super.setUp()
+        authSnapshot = AuthStateSnapshot.capture()
+        AuthStateSnapshot.clearAll()
         savedAppleUserId = UserDefaults.standard.string(forKey: "appleUserId")
         savedEmailUserId = UserDefaults.standard.string(forKey: "emailUserId")
         UserDefaults.standard.removeObject(forKey: "appleUserId")
@@ -748,6 +757,7 @@ final class AppViewModelLocalResetTests: XCTestCase {
             UserDefaults.standard.removeObject(forKey: "emailUserId")
         }
         UserDefaults.standard.synchronize()
+        authSnapshot.restore()
         super.tearDown()
     }
 
@@ -783,6 +793,8 @@ final class AppViewModelLocalResetTests: XCTestCase {
 
 @MainActor
 final class AppViewModelFlowTests: XCTestCase {
+    /// Snapshot of every unscoped auth/profile key (incl. 1.1 localProfileId).
+    private var authSnapshot: AuthStateSnapshot!
 
     private let testUserId = "flow-test-user"
     private var savedAppleUserId: String?
@@ -790,6 +802,8 @@ final class AppViewModelFlowTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
+        authSnapshot = AuthStateSnapshot.capture()
+        AuthStateSnapshot.clearAll()
         savedAppleUserId = UserDefaults.standard.string(forKey: "appleUserId")
         savedEmailUserId = UserDefaults.standard.string(forKey: "emailUserId")
         UserDefaults.standard.removeObject(forKey: "appleUserId")
@@ -811,6 +825,7 @@ final class AppViewModelFlowTests: XCTestCase {
             UserDefaults.standard.removeObject(forKey: "emailUserId")
         }
         UserDefaults.standard.synchronize()
+        authSnapshot.restore()
         super.tearDown()
     }
 
@@ -1516,6 +1531,8 @@ final class TimeAttachmentStorageTests: XCTestCase {
 
 @MainActor
 final class PersistenceHardeningTests: XCTestCase {
+    /// Snapshot of every unscoped auth/profile key (incl. 1.1 localProfileId).
+    private var authSnapshot: AuthStateSnapshot!
 
     private let testUserId = "persistence-test-user"
     private var savedAppleUserId: String?
@@ -1525,6 +1542,8 @@ final class PersistenceHardeningTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
+        authSnapshot = AuthStateSnapshot.capture()
+        AuthStateSnapshot.clearAll()
         savedAppleUserId = UserDefaults.standard.string(forKey: "appleUserId")
         savedEmailUserId = UserDefaults.standard.string(forKey: "emailUserId")
         UserDefaults.standard.removeObject(forKey: "appleUserId")
@@ -1554,6 +1573,7 @@ final class PersistenceHardeningTests: XCTestCase {
             UserDefaults.standard.removeObject(forKey: "emailUserId")
         }
         UserDefaults.standard.synchronize()
+        authSnapshot.restore()
         super.tearDown()
     }
 

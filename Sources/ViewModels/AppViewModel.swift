@@ -9,12 +9,11 @@ import os.log
 // MARK: - Per-User Key Scoping
 
 /// Scopes UserDefaults keys to the current signed-in user.
-/// Auth keys (appleUserId, emailUserId, etc.) remain unscoped.
+/// Auth keys (appleUserId, localProfileId, legacy emailUserId, etc.) remain unscoped.
 enum UserScope {
-    /// Current userId, read directly from UserDefaults auth keys
+    /// Current userId: `appleUserId ?? localProfileId ?? emailUserId` (legacy fallback).
     static var userId: String? {
-        UserDefaults.standard.string(forKey: "appleUserId")
-        ?? UserDefaults.standard.string(forKey: "emailUserId")
+        ProfileKeys.resolveUserId(.standard)
     }
 
     /// Returns a user-scoped key. Falls back to unscoped if no user signed in.
@@ -54,15 +53,29 @@ class AppViewModel: ObservableObject {
     @Published var timerStartTime: Date?
     @Published var timerPropertyId: UUID?
     @Published var timerCategory: ActivityCategory = .repairs
-    @Published var staleTimerRecovery: StaleTimerRecovery?
+    /// Timer drafts waiting for review (forgotten >24 h timers, timers paused at a profile
+    /// switch). Oldest first; the Track card shows the first one, then the next.
+    @Published var staleTimerRecoveries: [StaleTimerRecovery] = []
+    var staleTimerRecovery: StaleTimerRecovery? {
+        get { staleTimerRecoveries.first }
+        set { staleTimerRecoveries = newValue.map { [$0] } ?? [] }
+    }
 
     // Data persistence (user-scoped)
     private var propertiesKey: String { UserScope.key("LandlordHours.properties") }
     private var entriesKey: String { UserScope.key("LandlordHours.entries") }
     private var timerKey: String { UserScope.key("LandlordHours.timer") }
+    /// Legacy single-draft key (≤1.1 builds before the list); migrated into the list on load.
     private var staleTimerRecoveryKey: String { UserScope.key("LandlordHours.staleTimerRecovery") }
+    private var staleTimerRecoveriesKey: String { UserScope.key("LandlordHours.staleTimerRecoveries") }
 
     init() {
+#if DEBUG
+        seedLegacyEmailFixtureIfNeeded()
+#endif
+        // 1.1: turn a ≤1.0.6 email "account" into a local profile with the SAME ID.
+        // Must run before anything reads auth keys or migrates unscoped legacy data.
+        ProfileMigration.migrateEmailProfile(defaults: .standard)
         checkSignInState()
 #if DEBUG
         applyLaunchMockScenarioIfNeeded()
@@ -98,13 +111,31 @@ class AppViewModel: ObservableObject {
     }
     
     func checkSignInState() {
-        if UserDefaults.standard.string(forKey: "appleUserId") != nil {
+        let defaults = UserDefaults.standard
+        if defaults.string(forKey: ProfileKeys.appleUserId) != nil {
             isSignedIn = true
-            userName = UserDefaults.standard.string(forKey: "appleUserName") ?? "User"
-        } else if UserDefaults.standard.string(forKey: "emailUserId") != nil {
+            userName = defaults.string(forKey: ProfileKeys.appleUserName) ?? "User"
+        } else if defaults.string(forKey: ProfileKeys.localProfileId) != nil {
             isSignedIn = true
-            userName = UserDefaults.standard.string(forKey: "emailUserName") ?? "User"
+            userName = defaults.string(forKey: ProfileKeys.localProfileName) ?? "User"
+        } else if defaults.string(forKey: ProfileKeys.emailUserId) != nil {
+            isSignedIn = true
+            userName = defaults.string(forKey: ProfileKeys.emailUserName) ?? "User"
         }
+    }
+
+    /// Name shown for the active profile, from whichever identity is active.
+    static func resolvedProfileName(_ defaults: UserDefaults = .standard) -> String {
+        let candidate: String?
+        if defaults.string(forKey: ProfileKeys.appleUserId) != nil {
+            candidate = defaults.string(forKey: ProfileKeys.appleUserName)
+        } else if defaults.string(forKey: ProfileKeys.localProfileId) != nil {
+            candidate = defaults.string(forKey: ProfileKeys.localProfileName)
+        } else {
+            candidate = defaults.string(forKey: ProfileKeys.emailUserName)
+        }
+        guard let candidate, !candidate.isEmpty else { return "User" }
+        return candidate
     }
 
     func signIn() {
@@ -118,6 +149,10 @@ class AppViewModel: ObservableObject {
         // Load user-scoped data (UserScope.userId is now set via auth keys)
         loadData()
         loadTimerState()
+        // Pro belongs to this device's App Store account, not to a profile: carry the
+        // cached flag from the previous profile, then reload() re-checks StoreKit
+        // (Transaction.currentEntitlements) for the new profile.
+        ProEntitlementCarryOver.carryFromPreviousProfile(defaults: .standard)
         // Reload all singleton managers for this user
         SubscriptionManager.shared.reload()
         GoalManager.shared.loadGoals()
@@ -125,16 +160,54 @@ class AppViewModel: ObservableObject {
         TaxProfileManager.shared.reload()
         MilestoneTracker.shared.reload()
 
-        if let name = UserDefaults.standard.string(forKey: "appleUserName"), !name.isEmpty {
-            userName = name
-        } else if let name = UserDefaults.standard.string(forKey: "emailUserName"), !name.isEmpty {
-            userName = name
-        } else {
-            userName = "User"
-        }
+        userName = Self.resolvedProfileName(.standard)
+        AppleSignInManager.shared.checkExistingSignIn()
 
         // Start CloudKit sync
         Task { await syncService.start() }
+    }
+
+    /// "Continue without an account": creates a `local-<UUID>` profile.
+    ///
+    /// Deliberately does NOT call `signUp()`, which would wipe unscoped legacy data.
+    /// Unscoped legacy data is migrated into the new profile instead.
+    func continueWithoutAccount() {
+        let defaults = UserDefaults.standard
+        let id = ProfileKeys.newLocalProfileId()
+        defaults.set(id, forKey: ProfileKeys.localProfileId)
+        defaults.removeObject(forKey: ProfileKeys.localProfileName)
+        defaults.removeObject(forKey: ProfileKeys.localProfileEmail)
+        defaults.set(LoginType.local.rawValue, forKey: ProfileKeys.loginType)
+        migrateUnscopedLegacyData()
+        defaults.removeObject(forKey: UserScope.key("hasCompletedOnboarding"))
+        signIn()
+    }
+
+    /// Restores an earlier profile found on this device or in iCloud and makes it active.
+    /// The currently active profile's data stays on this device.
+    func switchToProfile(_ profile: DiscoveredProfile) {
+        if isSignedIn || UserScope.userId != nil {
+            signOut()
+        }
+        ProfileRestore.activate(profile, defaults: .standard)
+        signIn()
+    }
+
+    /// Inactive earlier profiles found on this device and (when reachable) in iCloud.
+    func discoverRestorableProfiles(cloudSource: CloudProfileRecordSource? = nil) async -> [DiscoveredProfile] {
+        let activeId = UserScope.userId
+        let device = ProfileDiscovery.deviceProfiles(defaults: .standard, excluding: activeId)
+        let source: CloudProfileRecordSource = cloudSource ?? syncService
+        let cloud: [DiscoveredProfile]
+        do {
+            cloud = ProfileDiscovery.cloudProfiles(
+                from: try await source.fetchProfileRecordSummaries(),
+                excluding: activeId
+            )
+        } catch {
+            cloud = []
+        }
+        return ProfileDiscovery.merge(device: device, cloud: cloud)
     }
 
     /// Call when a new account is created (not for returning sign-in).
@@ -146,28 +219,62 @@ class AppViewModel: ObservableObject {
         signIn()
     }
 
-    func signOut() {
+    /// Signs out / switches away from the active profile. Per-profile data stays on the
+    /// device under `u.<id>.*`.
+    ///
+    /// - Parameter keepProfileState: false only when the profile's data was just deleted,
+    ///   so nothing is written back into the deleted scope.
+    func signOut(keepProfileState: Bool = true) {
         // Stop CloudKit sync
         syncService.stop()
+        let defaults = UserDefaults.standard
+        let outgoingId = UserScope.userId
+
+        // Timer: stop the visible timer and save its state to THIS profile while its ID
+        // is still set. (Before 1.1 this ran after the ID was cleared and wrote unscoped
+        // `LandlordHours.timer*` keys.) A running timer resumes — or is offered for
+        // recovery if stale — when the profile comes back.
+        if keepProfileState, let outgoingId {
+            // Pause a running timer at switch time: record the elapsed time as a recovery
+            // draft for this profile (offered when the profile comes back) instead of
+            // leaving the timer counting while another profile is active.
+            if isTimerRunning, let start = timerStartTime, let propertyId = timerPropertyId {
+                saveStaleTimerRecovery(StaleTimerRecovery(
+                    startTime: start,
+                    propertyId: propertyId,
+                    category: timerCategory,
+                    elapsedHours: max(Date().timeIntervalSince(start), 0) / 3600.0,
+                    reason: .pausedAtSwitch,
+                    pausedAt: Date()
+                ))
+                endTimerLiveActivity(propertyId: propertyId, category: timerCategory, startDate: start, needsReview: true)
+                isTimerRunning = false
+                timerStartTime = nil
+                timerPropertyId = nil
+            }
+            saveTimerState()
+            if defaults.string(forKey: ProfileKeys.localProfileId) == outgoingId,
+               let name = defaults.string(forKey: ProfileKeys.localProfileName), !name.isEmpty {
+                defaults.set(name, forKey: UserScope.key(ProfileRestore.profileNameKey, userId: outgoingId))
+            }
+            defaults.set(outgoingId, forKey: ProfileKeys.previousProfileId)
+        }
+        endTimerLiveActivity(propertyId: timerPropertyId, category: timerCategory, startDate: timerStartTime, needsReview: false)
 
         // Clear auth keys (unscoped — shared on device)
-        UserDefaults.standard.removeObject(forKey: "appleUserId")
-        UserDefaults.standard.removeObject(forKey: "appleUserName")
-        UserDefaults.standard.removeObject(forKey: "appleUserEmail")
-        UserDefaults.standard.removeObject(forKey: "emailUserId")
-        UserDefaults.standard.removeObject(forKey: "emailUserName")
-        UserDefaults.standard.removeObject(forKey: "emailUserEmail")
-        UserDefaults.standard.removeObject(forKey: "loginType")
+        for key in ProfileKeys.signOutKeys {
+            defaults.removeObject(forKey: key)
+        }
         // Clear any stale unscoped legacy data to prevent leaking to next user
         Self.clearUnscopedLegacyData()
         // Note: per-user data stays in UserDefaults under scoped keys (u.<userId>.*)
 
-        // Cancel any running timer and clear persisted timer state
-        endTimerLiveActivity(propertyId: timerPropertyId, category: timerCategory, startDate: timerStartTime, needsReview: false)
+        // Reset in-memory timer state only; never persist it after the ID is gone.
         isTimerRunning = false
         timerStartTime = nil
         timerPropertyId = nil
-        saveTimerState()
+        timerCategory = .repairs
+        staleTimerRecovery = nil
 
         // Reset in-memory state
         properties = []
@@ -184,15 +291,38 @@ class AppViewModel: ObservableObject {
         CategoryManager.shared.resetForSignOut()
         TaxProfileManager.shared.resetForSignOut()
         MilestoneTracker.shared.reload()
+        AppleSignInManager.shared.signOut()
     }
 
-    func deleteAccountAndData() async throws {
+    enum ProfileDeletionError: LocalizedError, Equatable {
+        /// iCloud is off/unreachable, so copies saved there can't be removed now.
+        case iCloudUnavailable
+
+        var errorDescription: String? {
+            switch self {
+            case .iCloudUnavailable:
+                return "iCloud is off, so copies saved there can't be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?"
+            }
+        }
+    }
+
+    /// Deletes the active profile's data (Apple: "Delete Account and Data"; local:
+    /// "Delete All Data"): iCloud records, scoped keys, attachment files and
+    /// notification keys, then signs out.
+    ///
+    /// - Parameter allowLocalOnly: when iCloud is unavailable the call throws
+    ///   `ProfileDeletionError.iCloudUnavailable` BEFORE deleting anything, unless the
+    ///   user explicitly chose "Delete from this iPhone anyway".
+    func deleteAccountAndData(allowLocalOnly: Bool = false) async throws {
         guard let userId = UserScope.userId else {
             signOut()
             return
         }
 
         syncService.stop()
+        if !syncService.accountAvailable {
+            await syncService.checkAccountStatus()
+        }
         if syncService.accountAvailable {
             try await syncService.deleteCurrentUserRecords(
                 properties: properties,
@@ -200,18 +330,12 @@ class AppViewModel: ObservableObject {
                 categories: CategoryManager.shared.customCategories,
                 userId: userId
             )
-        } else {
-            await syncService.checkAccountStatus()
-            if syncService.accountAvailable {
-                try await syncService.deleteCurrentUserRecords(
-                    properties: properties,
-                    entries: timeEntries,
-                    categories: CategoryManager.shared.customCategories,
-                    userId: userId
-                )
-            }
+        } else if !allowLocalOnly {
+            throw ProfileDeletionError.iCloudUnavailable
         }
 
+        // Photo files are not keyed by user; delete the ones this profile references.
+        deleteAttachmentFiles(for: timeEntries)
         Self.clearScopedAccountData(for: userId)
 
         properties = []
@@ -222,7 +346,11 @@ class AppViewModel: ObservableObject {
         timerStartTime = nil
         timerPropertyId = nil
 
-        signOut()
+        signOut(keepProfileState: false)
+        let defaults = UserDefaults.standard
+        if defaults.string(forKey: ProfileKeys.previousProfileId) == userId {
+            defaults.removeObject(forKey: ProfileKeys.previousProfileId)
+        }
     }
 
     func resetCurrentUserLocalData() {
@@ -252,6 +380,7 @@ class AppViewModel: ObservableObject {
             "timerPropertyId",
             "timerCategory",
             "LandlordHours.staleTimerRecovery",
+            "LandlordHours.staleTimerRecoveries",
             "LandlordHours.stoppedTimerDraft",
             "LandlordHours.celebratedMilestones",
             "hasCompletedOnboarding",
@@ -363,6 +492,7 @@ class AppViewModel: ObservableObject {
             "timerPropertyId",
             "timerCategory",
             "LandlordHours.staleTimerRecovery",
+            "LandlordHours.staleTimerRecoveries",
             "LandlordHours.stoppedTimerDraft",
             "customCategories",
             "selectedTaxYear",
@@ -374,20 +504,27 @@ class AppViewModel: ObservableObject {
             "cloudkit.subscriptionCreated",
             "cloudkit.migrationDone",
             GuidedOnboardingStore.completedKey,
-            GuidedOnboardingStore.skippedKey
+            GuidedOnboardingStore.skippedKey,
+            "LandlordHours.timer",
+            ProfileRestore.profileNameKey
         ] + taxProfileFields.map { "LandlordHours.taxProfile.\($0)" }
 
         for key in Set(baseKeys) {
             defaults.removeObject(forKey: UserScope.key(key, userId: userId))
         }
+
+        // Notification cooldown keys (`LandlordHours.notification.lastScheduled.<reason>`).
+        // Match the full `u.<id>.LandlordHours.notification.` prefix so a profile whose ID
+        // merely starts with this one (e.g. `email-a@x.com.au`) is never touched.
+        let notificationPrefix = UserScope.key("LandlordHours.notification.", userId: userId)
+        for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(notificationPrefix) {
+            defaults.removeObject(forKey: key)
+        }
     }
     
     // MARK: - Sync Now (manual trigger for Settings)
     func syncNow() {
-        Task {
-            await syncService.pushAll()
-            await syncService.pullChanges()
-        }
+        Task { await syncService.syncNow() }
     }
 
     // MARK: - Subscription Features
@@ -625,25 +762,51 @@ class AppViewModel: ObservableObject {
         saveTimerState()
     }
 
-    func saveRecoveredStaleTimer(hours: Double? = nil, notes: String = "Recovered from a timer that was left running.") {
-        guard let recovery = staleTimerRecovery else { return }
-        let cappedHours = min(max(hours ?? recovery.suggestedHours, 0.25), 24)
+    /// Saves ONE timer draft as an entry. Pass the id of the draft the user is looking at:
+    /// if it was already saved/discarded (a double tap), nothing happens — the next draft is
+    /// never saved unseen.
+    ///
+    /// - Parameter propertyId: required when the draft's property was deleted; the user
+    ///   picks where the hours go.
+    /// - Returns: true if an entry was added.
+    @discardableResult
+    func saveRecoveredStaleTimer(id: UUID? = nil, hours: Double? = nil, propertyId: UUID? = nil, notes: String? = nil) -> Bool {
+        guard let recovery = id.map({ id in staleTimerRecoveries.first { $0.id == id } }) ?? staleTimerRecovery else {
+            return false
+        }
+        let targetProperty = propertyId ?? recovery.propertyId
+        guard properties.contains(where: { $0.id == targetProperty }) else { return false }
+        // Tax honesty: a draft capped at 24 h needs reviewed hours, never a one-tap save.
+        if recovery.requiresReview && hours == nil { return false }
+        // Same rule as stopTimer: exact elapsed time, capped at 24 h, never rounded up.
+        let cappedHours = min(max(hours ?? recovery.suggestedHours, 0), 24)
         addTimeEntry(
-            propertyId: recovery.propertyId,
+            propertyId: targetProperty,
             participant: .selfParticipant,
             category: recovery.category,
             hours: cappedHours,
             date: recovery.startTime,
-            notes: notes,
+            notes: notes ?? recovery.entryNote,
             source: .timer
         )
-        staleTimerRecovery = nil
-        clearStaleTimerRecovery()
+        removeStaleTimerRecovery(id: recovery.id)
+        return true
     }
 
-    func discardRecoveredStaleTimer() {
-        staleTimerRecovery = nil
-        clearStaleTimerRecovery()
+    func discardRecoveredStaleTimer(id: UUID? = nil) {
+        guard let target = id ?? staleTimerRecovery?.id else { return }
+        removeStaleTimerRecovery(id: target)
+    }
+
+    /// True when the draft's property no longer exists (it was deleted after the timer).
+    func staleTimerRecoveryNeedsProperty(_ recovery: StaleTimerRecovery) -> Bool {
+        !properties.contains { $0.id == recovery.propertyId }
+    }
+
+    private func removeStaleTimerRecovery(id: UUID) {
+        guard staleTimerRecoveries.contains(where: { $0.id == id }) else { return }
+        staleTimerRecoveries.removeAll { $0.id == id }
+        writeStaleTimerRecoveries(staleTimerRecoveries)
     }
     
     var timerElapsedTime: TimeInterval {
@@ -974,24 +1137,50 @@ class AppViewModel: ObservableObject {
         refreshWidgetSnapshot()
     }
 
+    /// Appends a draft to this profile's list. Never replaces one awaiting review.
     private func saveStaleTimerRecovery(_ recovery: StaleTimerRecovery) {
-        if let data = try? JSONEncoder().encode(recovery) {
-            UserDefaults.standard.set(data, forKey: staleTimerRecoveryKey)
+        var list = persistedStaleTimerRecoveries()
+        if !list.contains(recovery) { list.append(recovery) }
+        writeStaleTimerRecoveries(list)
+    }
+
+    private func persistedStaleTimerRecoveries() -> [StaleTimerRecovery] {
+        let defaults = UserDefaults.standard
+        var list: [StaleTimerRecovery] = []
+        if let data = defaults.data(forKey: staleTimerRecoveriesKey),
+           let decoded = try? JSONDecoder().decode([StaleTimerRecovery].self, from: data) {
+            list = decoded
         }
+        // Migrate the legacy single-draft key into the list (never drop it).
+        if let data = defaults.data(forKey: staleTimerRecoveryKey),
+           let legacy = try? JSONDecoder().decode(StaleTimerRecovery.self, from: data),
+           !list.contains(legacy) {
+            list.insert(legacy, at: 0)
+        }
+        return list
+    }
+
+    private func writeStaleTimerRecoveries(_ list: [StaleTimerRecovery]) {
+        let defaults = UserDefaults.standard
+        if list.isEmpty {
+            defaults.removeObject(forKey: staleTimerRecoveriesKey)
+        } else if let data = try? JSONEncoder().encode(list) {
+            defaults.set(data, forKey: staleTimerRecoveriesKey)
+        }
+        defaults.removeObject(forKey: staleTimerRecoveryKey)
     }
 
     private func loadStaleTimerRecovery() {
-        guard let data = UserDefaults.standard.data(forKey: staleTimerRecoveryKey),
-              let recovery = try? JSONDecoder().decode(StaleTimerRecovery.self, from: data),
-              properties.contains(where: { $0.id == recovery.propertyId }) else {
-            clearStaleTimerRecovery()
-            return
-        }
-        staleTimerRecovery = recovery
+        // Keep every draft, including ones whose property was deleted: the card asks the
+        // user to pick a property (or discard) instead of dropping recorded time silently.
+        let list = persistedStaleTimerRecoveries()
+        staleTimerRecoveries = list
+        writeStaleTimerRecoveries(list)
     }
 
     private func clearStaleTimerRecovery() {
         UserDefaults.standard.removeObject(forKey: staleTimerRecoveryKey)
+        UserDefaults.standard.removeObject(forKey: staleTimerRecoveriesKey)
     }
 
     private func loadTimerState() {
@@ -1014,15 +1203,14 @@ class AppViewModel: ObservableObject {
             let stalePropertyId = timerPropertyId
             if let propertyId = timerPropertyId,
                properties.contains(where: { $0.id == propertyId }) {
-                staleTimerRecovery = StaleTimerRecovery(
+                let forgotten = StaleTimerRecovery(
                     startTime: start,
                     propertyId: propertyId,
                     category: timerCategory,
                     elapsedHours: Date().timeIntervalSince(start) / 3600.0
                 )
-                if let staleTimerRecovery {
-                    saveStaleTimerRecovery(staleTimerRecovery)
-                }
+                saveStaleTimerRecovery(forgotten)
+                staleTimerRecoveries = persistedStaleTimerRecoveries()
             }
             isTimerRunning = false
             timerStartTime = nil
@@ -1105,14 +1293,114 @@ class AppViewModel: ObservableObject {
     }
 }
 
-struct StaleTimerRecovery: Codable, Equatable {
+struct StaleTimerRecovery: Codable, Equatable, Identifiable {
+    enum Reason: String, Codable {
+        /// Left running for more than 24 hours.
+        case forgotten
+        /// Paused when the user switched profiles.
+        case pausedAtSwitch
+    }
+
+    var id = UUID()
     let startTime: Date
     let propertyId: UUID
     let category: ActivityCategory
     let elapsedHours: Double
+    var reason: Reason = .forgotten
+    var pausedAt: Date? = nil
 
+    init(startTime: Date, propertyId: UUID, category: ActivityCategory, elapsedHours: Double,
+         reason: Reason = .forgotten, pausedAt: Date? = nil) {
+        self.id = UUID()
+        self.startTime = startTime
+        self.propertyId = propertyId
+        self.category = category
+        self.elapsedHours = elapsedHours
+        self.reason = reason
+        self.pausedAt = pausedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, startTime, propertyId, category, elapsedHours, reason, pausedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        startTime = try c.decode(Date.self, forKey: .startTime)
+        propertyId = try c.decode(UUID.self, forKey: .propertyId)
+        category = try c.decode(ActivityCategory.self, forKey: .category)
+        elapsedHours = try c.decode(Double.self, forKey: .elapsedHours)
+        reason = try c.decodeIfPresent(Reason.self, forKey: .reason) ?? .forgotten
+        pausedAt = try c.decodeIfPresent(Date.self, forKey: .pausedAt)
+    }
+
+    /// Exact elapsed time capped at 24 h — the same rule as `stopTimer`. Never rounded
+    /// up: a 2-minute timer suggests 2 minutes, not 15, so tax hours are never inflated.
     var suggestedHours: Double {
-        min(max(elapsedHours, 0.25), 24)
+        min(max(elapsedHours, 0), 24)
+    }
+
+    var wasCapped: Bool { elapsedHours > 24 }
+
+    /// The note saved on the entry. It goes into the audit export, so it must say what
+    /// actually happened.
+    var entryNote: String {
+        switch reason {
+        case .forgotten: return "Recovered from a timer that was left running."
+        case .pausedAtSwitch: return "Timer paused when switching profiles."
+        }
+    }
+
+    /// "2 min" under an hour (a 2-minute draft must not read "0.0h"), else "1.5h".
+    var durationLabel: String {
+        let hours = suggestedHours
+        guard hours < 1 else { return AppFormat.hours(hours) }
+        let minutes = Int((hours * 60).rounded())
+        return minutes < 1 ? "under 1 min" : "\(minutes) min"
+    }
+
+    static let capNote = "We stopped it at 24 hours. Check it before you save."
+
+    /// Copy for the Track recovery card, per draft reason. Kept here so it is unit-tested.
+    func cardMessage(propertyName: String?, hasAnyProperty: Bool) -> String {
+        let start = startTime.formatted(date: .abbreviated, time: .shortened)
+        let cap = wasCapped ? " \(Self.capNote)" : ""
+        guard let propertyName else {
+            let pick = hasAnyProperty
+                ? "Choose a property below to save it to."
+                : "Add a property to save it."
+            return "Started \(start). The property for this timer was deleted.\(cap) \(pick)"
+        }
+        switch reason {
+        case .pausedAtSwitch:
+            let paused = (pausedAt ?? startTime).formatted(date: .abbreviated, time: .shortened)
+            let action = wasCapped ? Self.capNote : "Save the time it ran, or discard it."
+            return "Started \(start) for \(propertyName). We paused it when you switched profiles at \(paused). \(action)"
+        case .forgotten:
+            let note = wasCapped ? Self.capNote : "Review it before saving so the record stays accurate."
+            return "Started \(start) for \(propertyName). \(note)"
+        }
+    }
+
+    /// The real elapsed time, always shown on the card ("Ran 45 min", "Ran 30.0h").
+    var ranLabel: String {
+        let hours = max(elapsedHours, 0)
+        if hours < 1 {
+            let minutes = Int((hours * 60).rounded())
+            return minutes < 1 ? "Ran under 1 min" : "Ran \(minutes) min"
+        }
+        return "Ran \(AppFormat.hours(hours))"
+    }
+
+    /// Capped drafts (over 24 h) must be reviewed in the editor; no one-tap save.
+    var requiresReview: Bool { wasCapped }
+
+    var accessibilityTitle: String {
+        switch reason {
+        case .forgotten: return "Timer left running."
+        case .pausedAtSwitch: return "Timer paused when you switched profiles."
+        }
     }
 }
 
@@ -1250,10 +1538,13 @@ extension AppViewModel: CloudKitSyncDelegate {
         Self.clearScopedAccountData(for: userId)
 
         let defaults = UserDefaults.standard
-        defaults.set(userId, forKey: "emailUserId")
-        defaults.set(Self.launchMockEmail(defaultValue: "brianlevu@gmail.com"), forKey: "emailUserEmail")
-        defaults.set(Self.launchMockName(defaultValue: scenario.userName), forKey: "emailUserName")
-        defaults.set(LoginType.email.rawValue, forKey: "loginType")
+        defaults.removeObject(forKey: ProfileKeys.emailUserId)
+        defaults.removeObject(forKey: ProfileKeys.emailUserName)
+        defaults.removeObject(forKey: ProfileKeys.emailUserEmail)
+        defaults.set(userId, forKey: ProfileKeys.localProfileId)
+        defaults.set(Self.launchMockEmail(defaultValue: "brianlevu@gmail.com"), forKey: ProfileKeys.localProfileEmail)
+        defaults.set(Self.launchMockName(defaultValue: scenario.userName), forKey: ProfileKeys.localProfileName)
+        defaults.set(LoginType.local.rawValue, forKey: ProfileKeys.loginType)
 
         isSignedIn = true
         userName = Self.launchMockName(defaultValue: scenario.userName)
