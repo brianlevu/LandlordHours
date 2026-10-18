@@ -19,6 +19,6 @@ wait $RP
 MARK=$(grep -o "DEMO_START [0-9.]*" "/Users/brian/tmp/lh-test-$2.log" | head -1 | awk '{print $2}')
 echo "test rc=$TRC rec_start=$REC_START mark=$MARK"
 grep -E "Executed|error:|failed" "/Users/brian/tmp/lh-test-$2.log" | tail -3
-OFF=$(python3 -c "print(max(0,${MARK:-0}-$REC_START-4.5))")
-ffmpeg -y -loglevel error -ss "$OFF" -i "$RAW" -t ${SANDBOX_CLIP:-14.5} -vf "fps=30,scale=590:-2" -r 30 -c:v libx264 -pix_fmt yuv420p -movflags +faststart "$OUT/$2.mp4"
+OFF=$(python3 -c "print(max(0,${MARK:-0}-$REC_START-${SANDBOX_LEAD:-4.5}))")
+ffmpeg -y -loglevel error -ss "$OFF" -i "$RAW" -t ${SANDBOX_CLIP:-14.5} -vf "tpad=stop_mode=clone:stop_duration=1.5,fps=30,scale=590:-2" -r 30 -c:v libx264 -pix_fmt yuv420p -movflags +faststart "$OUT/$2.mp4"
 ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT/$2.mp4"

@@ -25,6 +25,7 @@ enum SandboxScreen: String, CaseIterable, Identifiable {
     case conceptToday = "concept-today"
     case conceptConfirm = "concept-confirm"
     case conceptTap = "concept-tap"
+    case conceptTap500 = "concept-tap-500"
     case conceptMilestone = "concept-milestone"
     case conceptWelcome = "concept-welcome"
     case conceptLockscreen = "concept-lockscreen"
@@ -38,6 +39,7 @@ enum SandboxScreen: String, CaseIterable, Identifiable {
         case .todayOnPace, .todayOnPaceScrolled: .onPace
         case .emptyToday, .conceptEmpty: .empty
         case .conceptConfirm, .conceptTap: .conceptConfirm
+        case .conceptTap500: .nearMilestone
         case .conceptMilestone: .milestone
         case .emptyInbox: .emptyInbox
         default: .behind
@@ -73,9 +75,14 @@ struct LHDesignSandboxApp: App {
                 }
             }
             .environment(store)
+            .overlay(alignment: .topLeading) {
+                // Screen recordings only: keep the compositor producing frames so simctl's
+                // variable-rate video keeps wall-clock time through static moments.
+                if UserDefaults.standard.bool(forKey: "recording") { FramePump() }
+            }
             .tint(LH.action)
             .environment(\.requestedScheme, scheme)
-            .preferredColorScheme(screen == .paywall ? .dark : scheme)
+            .preferredColorScheme(screen == .paywall || (LHConcept.current == .blueprint && [.conceptWelcome, .conceptMilestone, .conceptBackfill].contains(screen)) ? .dark : scheme)
         }
     }
 }
@@ -109,7 +116,7 @@ struct ScreenHost: View {
         case .paywall: PaywallView()
         case .conceptToday, .conceptEmpty: ConceptTodayView()
         case .conceptConfirm: ConceptTodayView(autoConfirm: true)
-        case .conceptTap: ConceptTodayView()
+        case .conceptTap, .conceptTap500: ConceptTodayView()
         case .conceptMilestone: BlueprintMilestone()
         case .conceptWelcome: BlueprintWelcome()
         case .conceptLockscreen: LockScreenMock()
@@ -263,5 +270,18 @@ struct FloatingTabBar: View {
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 0)
+    }
+}
+
+struct FramePump: View {
+    var body: some View {
+        TimelineView(.animation) { ctx in
+            let t = ctx.date.timeIntervalSinceReferenceDate
+            Rectangle()
+                .fill(Color.black.opacity(0.012 + 0.008 * sin(t * 40)))
+                .frame(width: 1, height: 1)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 }

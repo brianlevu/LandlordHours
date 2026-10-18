@@ -48,6 +48,50 @@ def linework(path, work=1024):
     return Image.fromarray(np.dstack([rgb, alpha]), 'RGBA')
 
 
+def register_lines(N=300):
+    """Re-register the cyan linework onto the built master: search scale + shift that best lays the
+    lines on the master's silhouette edges, then apply it at full resolution."""
+    lp, bp_ = os.path.join(DST, 'bp-house-lines.png'), os.path.join(DST, 'bp-house-built.png')
+    L = Image.open(lp).convert('RGBA')
+    lines = np.asarray(L.resize((N, N), Image.LANCZOS))[..., 3].astype(float) / 255
+    built = np.asarray(Image.open(bp_).convert('RGBA').resize((N, N), Image.LANCZOS))[..., 3].astype(float) / 255
+    gy, gx = np.gradient(built)
+    edges = np.hypot(gx, gy)
+    k = 2
+    cs = np.pad(np.pad(edges, k, mode='edge').cumsum(0).cumsum(1), ((1, 0), (1, 0)))
+    eb = (cs[2 * k + 1:, 2 * k + 1:] - cs[:-2 * k - 1, 2 * k + 1:] - cs[2 * k + 1:, :-2 * k - 1] + cs[:-2 * k - 1, :-2 * k - 1]) / (2 * k + 1) ** 2
+
+    def warp(img, s, dx, dy, n):
+        im = Image.fromarray((img * 255).astype(np.uint8)) if isinstance(img, np.ndarray) else img
+        w = int(n * s)
+        im = im.resize((w, w), Image.BILINEAR)
+        out = Image.new(im.mode, (n, n), 0)
+        out.paste(im, (int(round((n - w) / 2 + dx)), int(round((n - w) / 2 + dy))))
+        return out
+
+    def score(s, dx, dy):
+        return (np.asarray(warp(lines, s, dx, dy, N)).astype(float) / 255 * eb).sum()
+
+    best = (score(1, 0, 0), (1.0, 0, 0))
+    for s in np.arange(0.92, 1.081, 0.01):
+        for dy in range(-16, 17, 2):
+            for dx in range(-16, 17, 2):
+                sc = score(s, dx, dy)
+                if sc > best[0]:
+                    best = (sc, (s, dx, dy))
+    s0, dx0, dy0 = best[1]
+    for s in np.arange(s0 - 0.01, s0 + 0.0101, 0.0025):
+        for dy in range(dy0 - 2, dy0 + 3):
+            for dx in range(dx0 - 2, dx0 + 3):
+                sc = score(s, dx, dy)
+                if sc > best[0]:
+                    best = (sc, (s, dx, dy))
+    s, dx, dy = best[1]
+    full = L.size[0]
+    warp(L, s, dx * full / N, dy * full / N, full).save(lp, optimize=True)
+    print(f'linework registered: scale {s:.4f}, shift ({dx * full / N:.0f}, {dy * full / N:.0f}) px')
+
+
 def crop_to(im, box, size):
     out = im.crop(box)
     out.thumbnail((size, size), Image.LANCZOS)
@@ -86,6 +130,7 @@ if os.path.exists(os.path.join(bp, 'house_master.png')):
     print('house box', box, 'opaque extent y', y0, y1, 'fraction in box', (y0 - box[1]) / side, (y1 - box[1]) / side)
     for k, l in layers.items():
         crop_to(l, box, 900).save(os.path.join(DST, k + '.png'), optimize=True)
+    register_lines()
 
 objects = {
     'empty_lot_stake': 'bp-empty-lot', 'plaque_blank': 'bp-plaque-blank', 'rolled_blueprint_tools': 'bp-rolled-blueprint',
@@ -138,6 +183,14 @@ for cat, f in tool_map.items():
     p = os.path.join(tools, f + '.png')
     if os.path.exists(p):
         save_obj(p, 'bp-tool-' + cat, 320)
+        if cat == 'repairs':
+            # The wrench render came out pinkish; colour-correct to brushed steel (desaturate, cool slightly).
+            w = Image.open(os.path.join(DST, 'bp-tool-repairs.png')).convert('RGBA')
+            arr = np.asarray(w).astype(float)
+            lum = 0.299 * arr[..., 0] + 0.587 * arr[..., 1] + 0.114 * arr[..., 2]
+            steel = np.stack([lum * 0.97, lum * 1.0, lum * 1.06], axis=-1)
+            arr[..., :3] = np.clip(arr[..., :3] * 0.12 + steel * 0.88, 0, 255)
+            Image.fromarray(arr.astype(np.uint8)).save(os.path.join(DST, 'bp-tool-repairs.png'), optimize=True)
     else:
         missing.append(cat)
 print('tools missing:', missing)

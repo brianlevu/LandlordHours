@@ -25,8 +25,8 @@ for c in $CONCEPTS; do
   for ap in light dark; do
     if [ "$c" = "blueprint" ]; then
       SANDBOX_CONCEPT=$c SANDBOX_OUT="$ROOT/$c" "$HERE/capture.sh" $ap concept-today inbox concept-welcome concept-lockscreen concept-empty | sed "s#^#$c/#"
-      burst $c $ap concept-milestone milestone 0.6 1.15 1.5 3.5
-      burst $c $ap concept-backfill backfill 0.5 1.4 2.6 4.6
+      burst $c $ap concept-milestone milestone ${MILESTONE_DELAYS:-0.6 1.15 1.5 3.5}
+      burst $c $ap concept-backfill backfill ${BACKFILL_DELAYS:-0.5 1.4 2.6 4.6}
     else
       SANDBOX_CONCEPT=$c SANDBOX_OUT="$ROOT/$c" "$HERE/capture.sh" $ap concept-today | sed "s#^#$c/#"
     fi

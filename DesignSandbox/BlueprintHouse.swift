@@ -43,17 +43,18 @@ struct BlueprintHouse: View {
                     .mask(BottomMask(y: 1 - linework))
                     .opacity(hours >= 500 && roofFill >= 1 ? 0.55 : 1)
                 if hatchHours > hours {
+                    // Suggestions: hatched in drafting cyan, never solid.
+                    built.opacity(0.16).mask(FeatherMask(y: hy, feather: 0.02))
                     Hatch()
-                        .stroke(BP.drafting.opacity(0.75), lineWidth: 1.2)
+                        .stroke(BP.drafting, lineWidth: 1.6)
                         .mask(built)
-                        .mask(BottomMask(y: hy))
-                    built.opacity(0.12).mask(BottomMask(y: hy))
+                        .mask(FeatherMask(y: hy, feather: 0.015))
                 }
                 if hours > 100 && hours < 500 {
-                    frame.mask(BottomMask(y: max(BlueprintHouse.eave, by - 0.08)))
+                    frame.mask(FeatherMask(y: max(BlueprintHouse.eave, by - 0.09), feather: 0.035))
                         .mask(TopCut(y: BlueprintHouse.eave))
                 }
-                built.mask(BottomMask(y: by))
+                built.mask(FeatherMask(y: by, feather: 0.028))
                 if hours >= 500 {
                     built.mask(TopCut(y: BlueprintHouse.eave, keepAbove: true))
                         .opacity(roofFill)
@@ -140,6 +141,20 @@ struct BlueprintHouse: View {
         .aspectRatio(1, contentMode: .fit)
         .accessibilityElement()
         .accessibilityLabel("House built to \(Int(hours)) of 750 confirmed hours")
+    }
+}
+
+/// Soft construction wipe: opaque below `y`, fading to clear over `feather` above it.
+/// Applied on top of the render's own alpha, so the reveal follows the house silhouette.
+struct FeatherMask: View {
+    var y: CGFloat
+    var feather: CGFloat
+    var body: some View {
+        LinearGradient(stops: [
+            .init(color: .clear, location: max(0, y - feather)),
+            .init(color: .black.opacity(0.55), location: max(0, y - feather * 0.35)),
+            .init(color: .black, location: min(1, y + feather * 0.25)),
+        ], startPoint: .top, endPoint: .bottom)
     }
 }
 

@@ -66,7 +66,7 @@ struct RecordGroup: Identifiable {
 }
 
 enum Scenario: String {
-    case behind, onPace, empty, emptyInbox, conceptConfirm, milestone
+    case behind, onPace, empty, emptyInbox, conceptConfirm, milestone, nearMilestone
 }
 
 @MainActor
@@ -111,6 +111,10 @@ final class MockStore {
         case .milestone:
             suggestions = []
             hoursLogged = 500
+            hasProperties = true
+        case .nearMilestone:
+            suggestions = MockStore.backfill
+            hoursLogged = 498
             hasProperties = true
         }
     }

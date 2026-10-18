@@ -6,12 +6,17 @@ struct BlueprintHero: View {
     @Environment(MockStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var shownHours: Double = 0
+    @State private var count: Int = 0
     @State private var board: CGPoint? = nil
+    @State private var boardScale: CGFloat = 1
+    @State private var boardOpacity = 1.0
     @State private var boardText = ""
     @State private var boardTag = false
-    @State private var boardOpacity = 1.0
     @State private var glow = 0.0
     @State private var landTick = 0
+    var onMilestone: () -> Void = {}
+
+    private var pendingHours: Double { store.pending.reduce(0) { $0 + ($1.hours ?? 0) } }
 
     private var status: (String, Color, String) {
         if !store.hasProperties || store.hoursLogged == 0 { return ("Getting started", OnHero.secondary, "circle.dashed") }
@@ -20,21 +25,31 @@ struct BlueprintHero: View {
             : ("Behind by \(fmtDur(-store.pace))", OnHero.caution, "exclamationmark.circle.fill")
     }
 
+    /// Stage words instead of a numeric ruler (the house's stages are not linear in hours).
+    private var stage: String {
+        let h = Double(count)
+        if h < 100 { return "Foundation · \(Int(100 - h))h to go" }
+        if h < 500 { return "Frame going up · roof at 500h" }
+        if h < 750 { return "Roof on · keys at 750h" }
+        return "Keys in the door"
+    }
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             BlueprintPaper()
             GeometryReader { g in
-                let hs = min(g.size.height * 0.94, g.size.width * 0.6)
+                let hs = min(g.size.height * 0.96, g.size.width * 0.57)
                 ZStack(alignment: .topLeading) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("2026 · REPS goal")
                             .font(.footnote.weight(.semibold)).textCase(.uppercase).tracking(0.3)
                             .foregroundStyle(OnHero.secondary)
-                        Text("\(Int(store.hoursLogged))")
+                        Text("\(count)")
                             .font(.system(size: 56, weight: .bold, design: .rounded))
                             .monospacedDigit()
                             .foregroundStyle(.white)
-                            .contentTransition(.numericText(value: store.hoursLogged))
+                            // Integer steps, no per-digit roll: rolling digits flash wrong numbers (498 -> 599 -> 500).
+                            .contentTransition(.identity)
                             .padding(.top, 2)
                         Text("of 750h").font(.title3.weight(.medium)).foregroundStyle(OnHero.secondary)
                         Spacer()
@@ -43,50 +58,66 @@ struct BlueprintHero: View {
                             .foregroundStyle(status.1)
                             .lineLimit(2)
                             .frame(width: g.size.width - hs - 24, alignment: .leading)
-                        Text("\(fmtDur(max(0, 750 - store.hoursLogged))) to build")
+                        Text(stage)
                             .font(.footnote).foregroundStyle(OnHero.secondary)
-                            .contentTransition(.numericText(value: store.hoursLogged))
+                            .lineLimit(2)
+                            .frame(width: g.size.width - hs - 24, alignment: .leading)
                     }
                     .padding(20)
                     .frame(maxHeight: .infinity, alignment: .topLeading)
 
-                    BlueprintHouse(hours: shownHours, glowBand: glow)
+                    BlueprintHouse(hours: shownHours, hatchHours: shownHours + pendingHours, glowBand: glow, showScale: false)
                         .frame(width: hs, height: hs)
                         .position(x: g.size.width - hs / 2 + 2, y: g.size.height - hs / 2 + 4)
 
                     if let board {
-                    Clapboard(label: boardText, tagShown: boardTag)
-                        .frame(width: hs * 0.62, height: 13)
-                        .rotationEffect(.degrees(-6))
-                        .position(board)
-                        .opacity(boardOpacity)
+                        Clapboard(label: boardText, tagShown: boardTag)
+                            .frame(width: hs * 0.62, height: 13)
+                            .scaleEffect(x: 1, y: boardScale)
+                            .rotationEffect(.degrees(-6))
+                            .position(board)
+                            .opacity(boardOpacity)
                     }
                 }
                 .onChange(of: store.hoursLogged) { old, new in
-                    guard new > old else { shownHours = new; return }
-                    let hs2 = hs
-                    let houseCX = g.size.width - hs2 / 2 + 2
-                    let lineY = g.size.height - hs2 + hs2 * BlueprintHouse.buildY(new) + 4
+                    guard new > old else { shownHours = new; count = Int(new); return }
+                    let houseCX = g.size.width - hs / 2 + 2
+                    let lineY = g.size.height - hs + hs * BlueprintHouse.buildY(new) + 4
                     boardText = "+\(fmtDur(new - old))"
                     Task { @MainActor in
                         try? await Task.sleep(for: .milliseconds(450))     // let a sheet finish dismissing
                         if reduce {
-                            board = CGPoint(x: houseCX, y: lineY); boardTag = true
-                            withAnimation(.easeInOut(duration: 0.2)) { boardOpacity = 1; shownHours = new }
+                            withAnimation(.easeInOut(duration: 0.2)) { shownHours = new; count = Int(new) }
                             landTick += 1
+                            if old < 500 && new >= 500 { onMilestone() }
                             return
                         }
-                        boardTag = false
-                        boardOpacity = 1
-                        board = CGPoint(x: -hs2 * 0.4, y: lineY - 26)
+                        // 1. slide in and settle
+                        boardTag = false; boardOpacity = 1; boardScale = 1
+                        board = CGPoint(x: -hs * 0.4, y: lineY - 26)
                         withAnimation(.spring(response: 0.42, dampingFraction: 0.68)) { board = CGPoint(x: houseCX, y: lineY) }
-                        try? await Task.sleep(for: .milliseconds(330))
+                        try? await Task.sleep(for: .milliseconds(320))
+                        // 2. land: haptic, tag, the house takes the course, count up
                         landTick += 1
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.55)) { boardTag = true }
-                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) { shownHours = new }
-                        withAnimation(.easeOut(duration: 0.2)) { glow = 1 }
-                        try? await Task.sleep(for: .milliseconds(1400))
-                        withAnimation(.easeOut(duration: 0.6)) { glow = 0; boardTag = false }
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) { boardTag = true }
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) { shownHours = new }
+                        withAnimation(.easeOut(duration: 0.15)) { glow = 1 }
+                        let from = count, to = Int(new)
+                        let steps = max(1, to - from)
+                        for i in 1...steps {
+                            withAnimation(.snappy(duration: 0.12)) { count = from + i }
+                            try? await Task.sleep(for: .milliseconds(max(40, 300 / steps)))
+                        }
+                        // 3. absorb into the house (≤700 ms after landing) and finish
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                            boardScale = 0.15; boardOpacity = 0; boardTag = false; glow = 0
+                        }
+                        try? await Task.sleep(for: .milliseconds(330))
+                        board = nil
+                        if old < 500 && new >= 500 {
+                            try? await Task.sleep(for: .milliseconds(250))
+                            onMilestone()
+                        }
                     }
                 }
             }
@@ -95,7 +126,7 @@ struct BlueprintHero: View {
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: BP.blueprint.opacity(0.25), radius: 16, y: 8)
         .sensoryFeedback(.impact(flexibility: .rigid, intensity: 1), trigger: landTick)
-        .onAppear { shownHours = store.hoursLogged }
+        .onAppear { shownHours = store.hoursLogged; count = Int(store.hoursLogged) }
     }
 }
 
@@ -143,6 +174,7 @@ struct HouseTypeThumb: View {
 
 struct BlueprintMilestone: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.dismiss) private var dismiss
     @State private var roofDrop: CGFloat = -60
     @State private var roofFill = 0.0
     @State private var plaque = false
@@ -155,7 +187,8 @@ struct BlueprintMilestone: View {
             VStack(spacing: 0) {
                 HStack {
                     Spacer()
-                    Button("Continue") {}
+                    Button("Continue") { dismiss() }
+                        .accessibilityIdentifier("milestone-continue")
                         .font(.body.weight(.semibold))
                         .foregroundStyle(BP.blueprint)
                         .padding(.horizontal, 18).frame(height: 40)
@@ -199,8 +232,9 @@ struct BlueprintMilestone: View {
         }
         .sensoryFeedback(.impact(weight: .heavy), trigger: landed)
         .sensoryFeedback(.success, trigger: shown)
+        .preferredColorScheme(.dark)      // light status-bar content over the blueprint bleed
         .task {
-            try? await Task.sleep(for: .milliseconds(900))
+            try? await Task.sleep(for: .milliseconds(500))
             shown = true
             if reduce {
                 roofDrop = 0
@@ -256,6 +290,7 @@ struct Plaque: View {
 // MARK: - Welcome
 
 struct BlueprintWelcome: View {
+    @State private var backfill = false
     var body: some View {
         ZStack {
             BlueprintPaper().ignoresSafeArea()
@@ -287,13 +322,17 @@ struct BlueprintWelcome: View {
                 }
                 .padding(.top, 22)
                 Spacer()
-                Button("Get started") {}.buttonStyle(HeroPill())
+                Button("Get started") { backfill = true }
+                    .buttonStyle(HeroPill())
+                    .accessibilityIdentifier("welcome-start")
                 Text("Your records stay on your iPhone and in your iCloud.")
                     .font(.footnote).foregroundStyle(OnHero.secondary)
                     .frame(maxWidth: .infinity).padding(.top, 14).padding(.bottom, 8)
             }
             .padding(.horizontal, 24)
         }
+        .preferredColorScheme(.dark)
+        .fullScreenCover(isPresented: $backfill) { BlueprintBackfill() }
     }
     private func stage(_ sym: String, _ h: String, _ label: String) -> some View {
         HStack(spacing: 8) {
@@ -329,7 +368,7 @@ struct BlueprintBackfill: View {
                     .padding(.top, 8)
                 Text("from your calendar")
                     .font(.title3).foregroundStyle(OnHero.secondary)
-                BlueprintHouse(hours: 0, hatchHours: hatch, linework: lines)
+                BlueprintHouse(hours: 0, hatchHours: hatch, linework: lines, showScale: false)
                     .frame(width: 320, height: 320)
                     .padding(.top, 16)
                 Text("Nothing is saved until you confirm.")
@@ -343,16 +382,18 @@ struct BlueprintBackfill: View {
             }
         }
         .sensoryFeedback(.impact(weight: .light), trigger: tick)
+        .preferredColorScheme(.dark)
         .task {
             if reduce { lines = 1; hatch = 212; return }
-            try? await Task.sleep(for: .milliseconds(700))
-            withAnimation(.easeInOut(duration: 1.2)) { lines = 1 }
-            try? await Task.sleep(for: .milliseconds(1100))
-            for step in 1...24 {
-                let v = 212.0 * Double(step) / 24
-                withAnimation(.linear(duration: 0.1)) { hatch = v }
+            // Sketch-in 0.15–0.95 s, hatched hours 0.55–2.05 s: done inside 2.5 s.
+            try? await Task.sleep(for: .milliseconds(150))
+            withAnimation(.easeOut(duration: 0.8)) { lines = 1 }
+            try? await Task.sleep(for: .milliseconds(400))
+            for step in 1...20 {
+                let v = 212.0 * Double(step) / 20
+                withAnimation(.linear(duration: 0.075)) { hatch = v }
                 if Int(v) / 50 > tick { tick = Int(v) / 50 }
-                try? await Task.sleep(for: .milliseconds(100))
+                try? await Task.sleep(for: .milliseconds(75))
             }
         }
     }

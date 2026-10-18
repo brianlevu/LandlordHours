@@ -5,6 +5,7 @@ struct ConceptTodayView: View {
     @Environment(MockStore.self) private var store
     var autoConfirm = false
     @State private var showSettings = false
+    @State private var milestone = false
 
     var body: some View {
         NavigationStack {
@@ -12,7 +13,7 @@ struct ConceptTodayView: View {
                 VStack(alignment: .leading, spacing: 28) {
                     hero
                     if store.hasProperties {
-                        if store.pendingCount > 0 { ToConfirmBlock(goInbox: {}) }
+                        if store.pendingCount > 0 { ToConfirmBlock(goInbox: {}, maxRows: LHConcept.current == .blueprint ? 2 : 3) }
                         MetricGrid()
                     } else {
                         EmptyStateView(symbol: "house", title: "Add your first property",
@@ -22,7 +23,7 @@ struct ConceptTodayView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
-                .padding(.bottom, 120)
+                .padding(.bottom, 24)
             }
             .background(LH.canvas)
             .navigationTitle("Today")
@@ -34,9 +35,12 @@ struct ConceptTodayView: View {
                 .sharedBackgroundVisibility(.hidden)
             }
         }
-        .overlay(alignment: .bottom) {
+        // The tab bar insets the content, so nothing (like the Review pill) parks under it.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             FloatingTabBar(selection: .constant(.today), inboxBadge: store.pendingCount) {}
+                .padding(.bottom, 2)
         }
+        .fullScreenCover(isPresented: $milestone) { BlueprintMilestone() }
         .task {
             guard autoConfirm else { return }
             try? await Task.sleep(for: .milliseconds(1600))
@@ -47,7 +51,7 @@ struct ConceptTodayView: View {
     @ViewBuilder private var hero: some View {
         switch LHConcept.current {
         case .blueprint:
-            if store.hasProperties { BlueprintHero() } else { BlueprintEmptyHero() }
+            if store.hasProperties { BlueprintHero(onMilestone: { milestone = true }) } else { BlueprintEmptyHero() }
         case .porchlight: PorchlightHero()
         case .tilework: TileworkHero()
         case .none: HeroCard()

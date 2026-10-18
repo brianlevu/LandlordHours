@@ -223,9 +223,10 @@ struct ToConfirmBlock: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
     @State private var selected: Suggestion?
     var goInbox: () -> Void
+    var maxRows = 3
 
     var body: some View {
-        let top = Array(store.pending.prefix(3))
+        let top = Array(store.pending.prefix(maxRows))
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text("To confirm").sectionLabel()

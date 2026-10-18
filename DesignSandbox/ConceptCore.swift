@@ -50,19 +50,20 @@ enum BP {
     static let concrete = Color(hex: 0xA7AFBF)
 
     /// Materials list for category washes.
+    /// Materials list. Light ≥4.6:1 on white; dark ≥4.6:1 on the #141C3F card (and #1C1C1E).
     static func material(_ c: Category) -> Color {
         switch c {
-        case .repairs: Color(hex: 0xB86A3F)       // copper
-        case .renovation: Color(hex: 0xC8553D)    // terracotta
-        case .cleaning: Color(hex: 0x3B6FE0)      // cobalt
-        case .leasing: Color(hex: 0x7A4BAE)       // plum
-        case .tenant: Color(hex: 0x5A6B8C)        // slate
-        case .bookkeeping: Color(hex: 0x4E8A5C)   // moss
-        case .travel: Color(hex: 0x2E6B4F)        // pine
-        case .inspections: Color(hex: 0x4A5068)   // graphite
-        case .legal: Color(hex: 0x8C6F3F)         // sand, deepened for glyph contrast
-        case .supplies: Color(hex: 0xB97D3A)      // timber, deepened
-        case .management: Color(hex: 0x2E6B4F)
+        case .repairs: Color(light: 0xA96139, dark: 0xBF7852)       // copper
+        case .renovation: Color(light: 0xC0513A, dark: 0xCF6C58)    // terracotta
+        case .cleaning: Color(light: 0x3B6FE0, dark: 0x5A86E4)      // cobalt
+        case .leasing: Color(light: 0x7A4BAE, dark: 0x9C79C3)       // plum
+        case .tenant: Color(light: 0x5A6B8C, dark: 0x7B88A3)        // slate
+        case .bookkeeping: Color(light: 0x498156, dark: 0x5C9369)   // moss
+        case .travel: Color(light: 0x2E6B4F, dark: 0x64917C)        // pine
+        case .inspections: Color(light: 0x4A5068, dark: 0x838898)   // graphite
+        case .legal: Color(light: 0x8C6F3F, dark: 0x9E865D)         // sand
+        case .supplies: Color(light: 0x9B6930, dark: 0xB97D3A)      // timber
+        case .management: Color(light: 0x356A8A, dark: 0x6E9DBB)    // harbour blue
         }
     }
     static func tool(_ c: Category) -> String {

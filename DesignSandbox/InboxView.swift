@@ -81,6 +81,7 @@ struct InboxView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("row-\(s.id)")
+                        .listRowBackground(LHConcept.current == .none ? nil : LH.card)
                         .listRowInsets(EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 16))
                         .alignmentGuide(.listRowSeparatorLeading) { _ in 72 }
                         .swipeActions(edge: .leading, allowsFullSwipe: true) {

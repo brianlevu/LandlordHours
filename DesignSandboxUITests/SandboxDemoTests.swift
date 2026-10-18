@@ -10,7 +10,7 @@ final class SandboxDemoTests: XCTestCase {
         let appearance = ProcessInfo.processInfo.environment["SANDBOX_APPEARANCE"] ?? "light"
         let direction = ProcessInfo.processInfo.environment["SANDBOX_DIRECTION"] ?? "baseline"
         let concept = ProcessInfo.processInfo.environment["SANDBOX_CONCEPT"] ?? "none"
-        app.launchArguments = ["-screen", screen, "-appearance", appearance, "-LHDirection", direction, "-LHConcept", concept]
+        app.launchArguments = ["-screen", screen, "-appearance", appearance, "-LHDirection", direction, "-LHConcept", concept, "-recording", "YES"]
         app.launch()
         return app
     }
@@ -95,6 +95,38 @@ final class SandboxDemoTests: XCTestCase {
         XCTAssertTrue(log.waitForExistence(timeout: 5))
         sleep(1)
         log.tap()
+        sleep(4)
+    }
+
+    /// Blueprint: confirming 2h at 498h crosses 500h; the milestone lands; Continue closes it.
+    func testConceptMilestone() {
+        let app = launch("concept-tap-500")
+        let row = app.buttons["today-row-plumber"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        sleep(1)
+        mark()
+        sleep(1)
+        row.tap()
+        let log = app.buttons["confirm-log"]
+        XCTAssertTrue(log.waitForExistence(timeout: 5))
+        sleep(1)
+        log.tap()
+        let cont = app.buttons["milestone-continue"]
+        XCTAssertTrue(cont.waitForExistence(timeout: 8))
+        sleep(3)
+        cont.tap()
+        sleep(1)
+    }
+
+    /// Blueprint: Welcome -> Get started -> the day-1 backfill reveal.
+    func testConceptBackfill() {
+        let app = launch("concept-welcome")
+        let start = app.buttons["welcome-start"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        sleep(1)
+        mark()
+        sleep(1)
+        start.tap()
         sleep(4)
     }
 }
