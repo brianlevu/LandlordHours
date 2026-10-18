@@ -16,12 +16,6 @@ enum PaywallContext: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    /// Launch-argument parser for DEBUG captures (`-LHShowPaywall export`).
-    static func fromLaunchArgument(_ value: String?) -> PaywallContext {
-        guard let value, let context = PaywallContext(rawValue: value) else { return .settingsUpgrade }
-        return context
-    }
-
     func title(year: Int) -> String {
         switch self {
         case .export: return "Export your \(String(year)) record"

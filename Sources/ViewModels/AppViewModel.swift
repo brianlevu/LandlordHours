@@ -849,7 +849,7 @@ class AppViewModel: ObservableObject {
         switch goalType {
         case .reps, .both:
             let reps = repsStatus(participant: .selfParticipant, year: year)
-            status = (reps.realEstateHours, reps.isQualifiedOnEnteredHours)
+            status = (reps.realEstateHours, reps.isQualified)
         case .str:
             let material = materialParticipationOverview(year: year)
             status = (material.ownerAndSpouseHours, material.isMateriallyParticipating)

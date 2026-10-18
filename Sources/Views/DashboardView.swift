@@ -53,7 +53,7 @@ struct DashboardView: View {
     private var isGoalMet: Bool {
         switch goalManager.globalGoalType {
         case .reps, .both:
-            return repsStatus.isQualifiedOnEnteredHours
+            return repsStatus.isQualified
         case .str:
             return materialParticipationStatus.isMateriallyParticipating
         }
@@ -72,12 +72,16 @@ struct DashboardView: View {
     }
 
     private var fiftyPercentValue: String {
-        otherWorkHoursMissing ? "Not checked" : "\(Int(fiftyPercentCompliance * 100))%"
+        otherWorkHoursMissing ? TaxQualificationEngine.MoreThanHalfStatus.notEnteredValue : "\(Int(fiftyPercentCompliance * 100))%"
     }
 
     /// 750 hours reached, but the 50% rule still needs the user's other work hours.
     private var hoursMetButRuleUnchecked: Bool {
         otherWorkHoursMissing && repsStatus.meets750HourTest
+    }
+
+    private var hoursMetRuleOpen: (label: String, detail: String)? {
+        isREPS ? TaxQualificationEngine.hoursMetRuleOpenStatus(repsStatus) : nil
     }
 
     // Pace calculations
@@ -603,16 +607,16 @@ struct DashboardView: View {
     }
 
     private var goalCardTone: GoalCardTone {
-        GoalCardTone.resolve(isGoalMet: isGoalMet, isOnTrack: isOnTrack, needsOtherWorkHours: hoursMetButRuleUnchecked)
+        GoalCardTone.resolve(isGoalMet: isGoalMet, isOnTrack: isOnTrack, needsOtherWorkHours: hoursMetRuleOpen != nil)
     }
 
     private var goalCardTitle: String {
-        if hoursMetButRuleUnchecked { return "Hours target met" }
+        if let open = hoursMetRuleOpen { return open.label }
         return isGoalMet ? "Goal met" : "\(Int(targetHours)) hour target"
     }
 
     private var goalCardSubtitle: String {
-        if hoursMetButRuleUnchecked { return "Add your other work hours to check the 50% rule." }
+        if let open = hoursMetRuleOpen { return "\(open.detail)." }
         if isGoalMet { return "Your tracked work has reached the current goal." }
         return "\(Int(hoursPerWeekNeeded))h per week \(isOnTrack ? "keeps you on pace" : "gets you back on pace") for \(currentYear)."
     }

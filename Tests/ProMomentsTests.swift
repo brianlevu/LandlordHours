@@ -349,7 +349,7 @@ final class MoreThanHalfDisplayTests: XCTestCase {
                                                        year: year, nonRealEstateHours: 0)
         XCTAssertEqual(result.moreThanHalfStatus, .notEntered)
         XCTAssertTrue(result.meets750HourTest)
-        XCTAssertFalse(result.isQualifiedOnEnteredHours, "An empty field must never read as qualified")
+        XCTAssertFalse(result.isQualified, "An empty field must never read as qualified")
         XCTAssertEqual(TaxQualificationEngine.MoreThanHalfStatus.notEnteredPrompt,
                        "Add your other work hours to check this")
     }
@@ -364,12 +364,12 @@ final class MoreThanHalfDisplayTests: XCTestCase {
         let met = TaxQualificationEngine.repsStatus(entries: entries(800), participant: .selfParticipant,
                                                     year: year, nonRealEstateHours: 400)
         XCTAssertEqual(met.moreThanHalfStatus, .met)
-        XCTAssertTrue(met.isQualifiedOnEnteredHours)
+        XCTAssertTrue(met.isQualified)
 
         let notMet = TaxQualificationEngine.repsStatus(entries: entries(800), participant: .selfParticipant,
                                                        year: year, nonRealEstateHours: 900)
         XCTAssertEqual(notMet.moreThanHalfStatus, .notMet)
-        XCTAssertFalse(notMet.isQualifiedOnEnteredHours)
+        XCTAssertFalse(notMet.isQualified)
     }
 
     /// Dashboard and the audit export agree: 0 other work hours is "not entered".
@@ -383,6 +383,31 @@ final class MoreThanHalfDisplayTests: XCTestCase {
                                                           year: year, nonRealEstateHours: 0)
         XCTAssertNil(exportSays)
         XCTAssertEqual(dashboard.moreThanHalfStatus, .notEntered)
+    }
+
+    /// Home and Reports use the same words when 750 h are met but the 50% rule is open.
+    func testHoursMetRuleOpenWordingIsShared() {
+        let unset = TaxQualificationEngine.repsStatus(entries: entries(800), participant: .selfParticipant,
+                                                      year: year, nonRealEstateHours: 0)
+        XCTAssertTrue(unset.hoursMetButRuleOpen)
+        XCTAssertFalse(unset.isQualified)
+        let open = TaxQualificationEngine.hoursMetRuleOpenStatus(unset)
+        XCTAssertEqual(open?.label, "Hours target met")
+        XCTAssertEqual(open?.detail, "Add your other work hours to check the 50% rule")
+
+        let failing = TaxQualificationEngine.repsStatus(entries: entries(800), participant: .selfParticipant,
+                                                        year: year, nonRealEstateHours: 900)
+        XCTAssertEqual(TaxQualificationEngine.hoursMetRuleOpenStatus(failing)?.detail, "50% rule not met yet")
+
+        let met = TaxQualificationEngine.repsStatus(entries: entries(800), participant: .selfParticipant,
+                                                    year: year, nonRealEstateHours: 400)
+        XCTAssertNil(TaxQualificationEngine.hoursMetRuleOpenStatus(met))
+        XCTAssertTrue(met.isQualified)
+
+        let short = TaxQualificationEngine.repsStatus(entries: entries(300), participant: .selfParticipant,
+                                                      year: year, nonRealEstateHours: 0)
+        XCTAssertNil(TaxQualificationEngine.hoursMetRuleOpenStatus(short), "Below 750 h the pace text applies")
+        XCTAssertEqual(TaxQualificationEngine.MoreThanHalfStatus.notEnteredValue, "Not checked")
     }
 
     func testViewModelMeets50PercentRuleIsFalseWhenNotEntered() {

@@ -151,7 +151,7 @@ struct ReportsView: View {
     private var isGoalMet: Bool {
         switch selectedGoal {
         case .reps750:
-            return repsStatus.isQualifiedOnEnteredHours
+            return repsStatus.isQualified
         case .mp500:
             return materialParticipationStatus.meets500HourTest
         case .mp100:
@@ -176,7 +176,7 @@ struct ReportsView: View {
     private var stat3Value: String {
         switch selectedGoal {
         case .reps750:
-            if repsStatus.moreThanHalfStatus == .notEntered { return "Not set" }
+            if repsStatus.moreThanHalfStatus == .notEntered { return TaxQualificationEngine.MoreThanHalfStatus.notEnteredValue }
             return String(format: "%.0f%%", repsStatus.realEstateWorkPercentage * 100)
         case .mp500:
             let pct = (totalHours / 500.0) * 100
@@ -197,11 +197,11 @@ struct ReportsView: View {
     }
 
     private var paceStatus: (label: String, detail: String, isOnTrack: Bool) {
+        if selectedGoal == .reps750, let open = TaxQualificationEngine.hoursMetRuleOpenStatus(repsStatus) {
+            return (open.label, open.detail, false)
+        }
         if isGoalMet {
             let over = totalHours - selectedGoal.targetHours
-            if selectedGoal == .reps750 && !meets50Percent {
-                return ("Hours target met", "50% rule still needed", false)
-            }
             return (selectedGoal == .reps750 ? "Qualified" : "Goal met", "\(String(format: "%.0f", over))h over target", true)
         }
         let pace = weeklyPaceNeeded

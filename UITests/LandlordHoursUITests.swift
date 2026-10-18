@@ -362,7 +362,7 @@ final class LandlordHoursUITests: XCTestCase {
                 element.tap()
                 return
             }
-            if scrollIfNeeded && element.exists && swipes < 6 && !app.staticTexts["Home"].isHittable == false {
+            if scrollIfNeeded && element.exists && swipes < 6 && app.staticTexts["Home"].isHittable {
                 app.swipeUp()
                 swipes += 1
             } else {

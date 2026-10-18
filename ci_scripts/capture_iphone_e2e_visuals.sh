@@ -81,7 +81,6 @@ capture_onboarding_step() {
 
 ONBOARDING_GOAL="$(capture_onboarding_step goal 01-onboarding-goal)"
 ONBOARDING_PROPERTY="$(capture_onboarding_step property 02-onboarding-property)"
-ONBOARDING_PAYWALL="$(capture_onboarding_step paywall 03-onboarding-paywall)"
 ONBOARDING_NOTIFICATIONS="$(capture_onboarding_step notifications 04-onboarding-notifications)"
 ONBOARDING_CALENDAR="$(capture_onboarding_step calendar 05-onboarding-calendar)"
 
@@ -126,7 +125,6 @@ Each item must be reviewed for: no blank/stuck screen, no clipped or overlapping
 
 - [ ] 01 Onboarding goal screen: \`$ONBOARDING_GOAL\`
 - [ ] 02 Onboarding property setup screen: \`$ONBOARDING_PROPERTY\`
-- [ ] 03 Onboarding Pro/paywall screen: \`$ONBOARDING_PAYWALL\`
 - [ ] 04 Onboarding notifications screen: \`$ONBOARDING_NOTIFICATIONS\`
 - [ ] 05 Onboarding calendar screen: \`$ONBOARDING_CALENDAR\`
   - These are true onboarding screens, not main-tab empty states.
