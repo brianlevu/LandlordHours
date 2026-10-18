@@ -25,11 +25,13 @@
 		41608B6514C2E6C81B7359F2 /* AuditReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA55F7A788AAB40693166F60 /* AuditReportTests.swift */; };
 		494B71178010F1EDB70BC3A5 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 884A37AD32EE90EF18CEDAE9 /* RevenueCat */; };
 		4C04E70D3E5565A29188DAF4 /* CalendarImportReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FFC13B6D335F226D0DD7B81 /* CalendarImportReviewView.swift */; };
+		4FEB158B22F5E540112D703C /* LandlordHours.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 61925A55B4CDBDF1584A392E /* LandlordHours.storekit */; };
 		518F77E3248E5C1571182B28 /* LandlordHoursAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 965D319F27D7A4A2332D47B2 /* LandlordHoursAppIntents.swift */; };
 		5237EDB83B597E6CAE0D5272 /* SyncGateAndTimerDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDAC9A2FCA588960D010499D /* SyncGateAndTimerDraftTests.swift */; };
 		571691826C340E4E727303CA /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1552DA58D14D98D9473D352A /* SubscriptionManager.swift */; };
 		591F1F8B7870974109E9F9AC /* CategoryPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E5A94C2FA181F38E6888ADE /* CategoryPickerSheet.swift */; };
 		595644C754F5418184AC4740 /* EngagementNotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D2C2173FB64791CCAAB8FD /* EngagementNotificationScheduler.swift */; };
+		5AA0D982BB42E25BA085B2A6 /* UITestIsolation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DC428FA6B6EF8A5244CC123 /* UITestIsolation.swift */; };
 		5AFC939B91357BDE9567875F /* LegacyProfileFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C69AE5A6A99BBB20034F16BA /* LegacyProfileFixture.swift */; };
 		6145256E78B6FF599DFB3B9D /* EngagementIntelligenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D41E394791AE4ADCA1F725 /* EngagementIntelligenceService.swift */; };
 		691B932AEB4ECA321D667151 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7002A4C1E561833705DE3B43 /* PaywallView.swift */; };
@@ -116,6 +118,7 @@
 		46C2C28508D1F64A007B6BF9 /* AuditReportPDFRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditReportPDFRenderer.swift; sourceTree = "<group>"; };
 		46D2C2173FB64791CCAAB8FD /* EngagementNotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementNotificationScheduler.swift; sourceTree = "<group>"; };
 		499428642ACE937E7B98B111 /* LHLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHLogo.swift; sourceTree = "<group>"; };
+		4DC428FA6B6EF8A5244CC123 /* UITestIsolation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestIsolation.swift; sourceTree = "<group>"; };
 		4F7DEC5DC48828C8FF4C48C2 /* EngagementLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementLabView.swift; sourceTree = "<group>"; };
 		548394DDA38D7BBFDD18E815 /* FreeUserPaywallUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FreeUserPaywallUITests.swift; sourceTree = "<group>"; };
 		5490464EB91A5699EED6EFCE /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
@@ -253,6 +256,7 @@
 				8248EAB41ECD1E6CF7808498 /* LandlordHoursUITests.swift */,
 				8ABD160E56491F781779A536 /* SignInReplacementUITests.swift */,
 				27D9AE994D0696BCE6E017B9 /* TimerDraftUITests.swift */,
+				4DC428FA6B6EF8A5244CC123 /* UITestIsolation.swift */,
 			);
 			path = UITests;
 			sourceTree = "<group>";
@@ -379,6 +383,7 @@
 			buildConfigurationList = 17C331EB265A0ED884AD7962 /* Build configuration list for PBXNativeTarget "LandlordHoursUITests" */;
 			buildPhases = (
 				F734DA16F4DE8BABE568DAFD /* Sources */,
+				76E80961A152BF2B2AA3786A /* Resources */,
 			);
 			buildRules = (
 			);
@@ -448,6 +453,14 @@
 				D0FB50644A3E4250418CF25F /* Assets.xcassets in Resources */,
 				38B5E98FF26323E43143DBF3 /* LaunchScreen.storyboard in Resources */,
 				A6D2501F6D2AE42B9C7BA27E /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		76E80961A152BF2B2AA3786A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4FEB158B22F5E540112D703C /* LandlordHours.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -540,6 +553,7 @@
 				20622DC1C008655024F7676F /* LandlordHoursUITests.swift in Sources */,
 				87DDF9CFBAAE7676D8368B8F /* SignInReplacementUITests.swift in Sources */,
 				7E0B82EEBC8E67989BB1C257 /* TimerDraftUITests.swift in Sources */,
+				5AA0D982BB42E25BA085B2A6 /* UITestIsolation.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

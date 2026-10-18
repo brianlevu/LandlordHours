@@ -96,6 +96,9 @@ targets:
     platform: iOS
     sources:
       - path: UITests
+      # SKTestSession(configurationFileNamed:) resets StoreKit test purchases between UI tests.
+      - path: LandlordHours.storekit
+        buildPhase: resources
     dependencies:
       - target: LandlordHours
     settings:

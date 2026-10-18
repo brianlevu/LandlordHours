@@ -5,6 +5,7 @@ final class LandlordHoursUITests: XCTestCase {
 
     override func setUp() {
         super.setUp()
+        UITestIsolation.resetStoreKit()
         continueAfterFailure = false
         app = XCUIApplication()
     }
@@ -342,6 +343,7 @@ final class LandlordHoursUITests: XCTestCase {
     private func launch(scenario: String, tab: Int, extraArguments: [String] = []) {
         app.terminate()
         app.launchArguments = [
+            UITestIsolation.resetProfilesArgument,
             "-LHMockScenario", scenario,
             "-LHInitialTab", "\(tab)",
             "-AppleLanguages", "(en)",
