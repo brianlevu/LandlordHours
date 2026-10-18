@@ -112,29 +112,28 @@ final class TimerDraftTests: XCTestCase {
         let forgotten = StaleTimerRecovery(startTime: Date(), propertyId: UUID(), category: .repairs, elapsedHours: 30)
         XCTAssertEqual(forgotten.entryNote, "Recovered from a timer that was left running.")
         XCTAssertEqual(forgotten.accessibilityTitle, "Timer left running.")
-        let message = forgotten.cardMessage(propertyName: "Oak", hasAnyProperty: true, remainingAfterThis: 0)
+        let message = forgotten.cardMessage(propertyName: "Oak", hasAnyProperty: true)
         XCTAssertTrue(message.contains("We stopped it at 24 hours. Check it before you save."), message)
 
         let short = StaleTimerRecovery(startTime: Date(), propertyId: UUID(), category: .repairs, elapsedHours: 3)
-        XCTAssertFalse(short.cardMessage(propertyName: "Oak", hasAnyProperty: true, remainingAfterThis: 0)
+        XCTAssertFalse(short.cardMessage(propertyName: "Oak", hasAnyProperty: true)
             .contains("24 hours"))
     }
 
     func testPausedOver24hShowsCapNoteAndPausedUnderDoesNot() {
         let over = StaleTimerRecovery(startTime: Date(), propertyId: UUID(), category: .repairs,
                                       elapsedHours: 26, reason: .pausedAtSwitch)
-        let overMessage = over.cardMessage(propertyName: "Oak", hasAnyProperty: true, remainingAfterThis: 1)
+        let overMessage = over.cardMessage(propertyName: "Oak", hasAnyProperty: true)
         XCTAssertTrue(overMessage.contains("We stopped it at 24 hours. Check it before you save."), overMessage)
-        XCTAssertTrue(overMessage.contains("1 more after this one."))
         XCTAssertEqual(over.suggestedHours, 24)
 
         let under = StaleTimerRecovery(startTime: Date(), propertyId: UUID(), category: .repairs,
                                        elapsedHours: 0.5, reason: .pausedAtSwitch)
-        let underMessage = under.cardMessage(propertyName: "Oak", hasAnyProperty: true, remainingAfterThis: 0)
+        let underMessage = under.cardMessage(propertyName: "Oak", hasAnyProperty: true)
         XCTAssertFalse(underMessage.contains("24 hours"))
         XCTAssertTrue(underMessage.contains("switched profiles"))
 
-        let deleted = under.cardMessage(propertyName: nil, hasAnyProperty: false, remainingAfterThis: 0)
+        let deleted = under.cardMessage(propertyName: nil, hasAnyProperty: false)
         XCTAssertTrue(deleted.contains("Add a property to save it"))
     }
 
@@ -270,6 +269,35 @@ final class TimerDraftFlowTests: XCTestCase {
         XCTAssertTrue(viewModel.saveRecoveredStaleTimer(id: draft.id, propertyId: pine.id))
         XCTAssertEqual(viewModel.timeEntries.filter { $0.propertyId == pine.id }.count, 1)
         XCTAssertTrue(viewModel.staleTimerRecoveries.isEmpty)
+    }
+
+    func testCappedDraftCannotBeSavedWithOneTap() throws {
+        TimerDraftFixture.seed("forgotten24h")
+        let viewModel = AppViewModel()
+        let draft = try XCTUnwrap(viewModel.staleTimerRecovery)
+        defer {
+            AppViewModel.clearScopedAccountData(for: TimerDraftFixture.profileId)
+            UserDefaults.standard.removeObject(forKey: "u.\(TimerDraftFixture.profileId).LandlordHours.staleTimerRecoveries")
+        }
+        XCTAssertTrue(draft.requiresReview)
+        let before = viewModel.timeEntries.count
+
+        XCTAssertFalse(viewModel.saveRecoveredStaleTimer(id: draft.id), "One-tap save of a capped draft is refused")
+        XCTAssertEqual(viewModel.timeEntries.count, before)
+        XCTAssertEqual(viewModel.staleTimerRecoveries.count, 1)
+
+        // Saving with reviewed hours works.
+        XCTAssertTrue(viewModel.saveRecoveredStaleTimer(id: draft.id, hours: 6))
+        XCTAssertEqual(viewModel.timeEntries.last?.hours, 6)
+    }
+
+    func testRanLabelAlwaysShowsRealElapsedTime() {
+        func ran(_ h: Double) -> String {
+            StaleTimerRecovery(startTime: Date(), propertyId: UUID(), category: .repairs, elapsedHours: h).ranLabel
+        }
+        XCTAssertEqual(ran(0.75), "Ran 45 min")
+        XCTAssertEqual(ran(30), "Ran 30.0h")
+        XCTAssertEqual(ran(0.001), "Ran under 1 min")
     }
 
     func testDurationLabelShowsMinutesUnderAnHour() {

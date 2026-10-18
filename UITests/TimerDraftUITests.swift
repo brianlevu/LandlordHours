@@ -46,10 +46,37 @@ final class TimerDraftUITests: XCTestCase {
         XCTAssertTrue(save.waitForNonExistence(timeout: 5), "Draft saved and card dismissed")
     }
 
-    func testDeletedPropertyOffersPicker() {
+    func testDeletedPropertyNamesTargetAndShortSaveLabel() {
         launch("deletedProperty")
-        XCTAssertTrue(app.buttons["timerDraft.pickProperty"].waitForExistence(timeout: 10))
+        let picker = app.buttons["timerDraft.pickProperty"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 10))
+        XCTAssertTrue(picker.label.contains("Pine Lake Cabin"), picker.label)
+        let save = app.buttons["timerDraft.save"]
+        XCTAssertTrue(save.exists)
+        XCTAssertEqual(save.label, "Save 45 min")
         XCTAssertTrue(app.buttons["timerDraft.discard"].isHittable)
+    }
+
+    func testNoPropertiesShowsDurationAndAddProperty() {
+        launch("noProperties")
+        let summary = app.descendants(matching: .any)["timerDraft.summary"]
+        XCTAssertTrue(summary.waitForExistence(timeout: 10))
+        XCTAssertTrue(summary.label.contains("Ran 45 min"), summary.label)
+        XCTAssertTrue(app.buttons["timerDraft.addProperty"].isHittable)
+        XCTAssertTrue(app.buttons["timerDraft.discard"].isHittable)
+    }
+
+    func testCappedDraftOffersReviewNotOneTapSave() {
+        launch("forgotten24h")
+        let review = app.buttons["timerDraft.review"]
+        XCTAssertTrue(review.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["timerDraft.save"].exists, "No one-tap save for a capped draft")
+        Thread.sleep(forTimeInterval: 1.5)
+        review.tap()
+        if !app.buttons["timerDraftReview.save"].waitForExistence(timeout: 4) {
+            review.tap()
+        }
+        XCTAssertTrue(app.buttons["timerDraftReview.save"].waitForExistence(timeout: 5))
     }
 
     func testCaptureTimerDraftFramesLight() { captureAll(scheme: "light") }
@@ -73,5 +100,21 @@ final class TimerDraftUITests: XCTestCase {
             attachment.lifetime = .keepAlways
             add(attachment)
         }
+
+        // g. The review editor a capped draft opens.
+        launch("forgotten24h", scheme: scheme)
+        let review = app.buttons["timerDraft.review"]
+        XCTAssertTrue(review.waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 1.5)   // let the launch transition settle before tapping
+        review.tap()
+        if !app.buttons["timerDraftReview.save"].waitForExistence(timeout: 4) {
+            review.tap()
+        }
+        XCTAssertTrue(app.buttons["timerDraftReview.save"].waitForExistence(timeout: 5))
+        Thread.sleep(forTimeInterval: 1.0)
+        let sheet = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        sheet.name = "g-review-sheet-\(scheme)"
+        sheet.lifetime = .keepAlways
+        add(sheet)
     }
 }

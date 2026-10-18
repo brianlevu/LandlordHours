@@ -42,6 +42,7 @@
 		8ED697DE6FEC7270E36DAABE /* VoiceEntryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 838ADFB389C9D4AD52D16B41 /* VoiceEntryService.swift */; };
 		8EED89E8FC89005138C20B59 /* LandlordPurchases.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA1DF3BCE5385BCFDC7627DC /* LandlordPurchases.swift */; };
 		91BC16EB0083668060809989 /* AuditReportCSV.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111C91DE9EE369C07CE2F490 /* AuditReportCSV.swift */; };
+		9248093E88E7EBD05D601652 /* TimerDraftCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 172B3D3B09786621DD123327 /* TimerDraftCard.swift */; };
 		93C20D864969D6F6EC85B191 /* TimeLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11377EC6BD95D70E1AF5A9A6 /* TimeLogView.swift */; };
 		98B8F1C68BDAB98363098499 /* TrialBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6479CEE1FE815563D8292734 /* TrialBannerView.swift */; };
 		A0635C304AF19BD05633788E /* WeeklySummaryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CDD5A26F0EDE1AF0DB43F2D /* WeeklySummaryService.swift */; };
@@ -97,6 +98,7 @@
 		111C91DE9EE369C07CE2F490 /* AuditReportCSV.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditReportCSV.swift; sourceTree = "<group>"; };
 		11377EC6BD95D70E1AF5A9A6 /* TimeLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeLogView.swift; sourceTree = "<group>"; };
 		1552DA58D14D98D9473D352A /* SubscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
+		172B3D3B09786621DD123327 /* TimerDraftCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerDraftCard.swift; sourceTree = "<group>"; };
 		1AA72A2C13136E24A749E14C /* LandlordHoursUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LandlordHoursUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1AF16D81B372852B91B92405 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		1E4FDA46A18FD2D2EB716A39 /* LHIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHIcons.swift; sourceTree = "<group>"; };
@@ -305,6 +307,7 @@
 				97C0F683B6B3BF53609A1D59 /* TaxYearView.swift */,
 				61F1A37F861D056973D6EC70 /* TimeEntryDetailView.swift */,
 				11377EC6BD95D70E1AF5A9A6 /* TimeLogView.swift */,
+				172B3D3B09786621DD123327 /* TimerDraftCard.swift */,
 				6479CEE1FE815563D8292734 /* TrialBannerView.swift */,
 				D00F2E1D576C90040B5FBDA1 /* Components */,
 			);
@@ -501,6 +504,7 @@
 				B49ADDBA7AB7A7FE8A9DB496 /* TaxYearView.swift in Sources */,
 				183917104B86E5DC6FAFB97A /* TimeEntryDetailView.swift in Sources */,
 				93C20D864969D6F6EC85B191 /* TimeLogView.swift in Sources */,
+				9248093E88E7EBD05D601652 /* TimerDraftCard.swift in Sources */,
 				98B8F1C68BDAB98363098499 /* TrialBannerView.swift in Sources */,
 				8ED697DE6FEC7270E36DAABE /* VoiceEntryService.swift in Sources */,
 				A0635C304AF19BD05633788E /* WeeklySummaryService.swift in Sources */,

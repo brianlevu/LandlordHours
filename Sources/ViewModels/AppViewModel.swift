@@ -776,6 +776,8 @@ class AppViewModel: ObservableObject {
         }
         let targetProperty = propertyId ?? recovery.propertyId
         guard properties.contains(where: { $0.id == targetProperty }) else { return false }
+        // Tax honesty: a draft capped at 24 h needs reviewed hours, never a one-tap save.
+        if recovery.requiresReview && hours == nil { return false }
         // Same rule as stopTimer: exact elapsed time, capped at 24 h, never rounded up.
         let cappedHours = min(max(hours ?? recovery.suggestedHours, 0), 24)
         addTimeEntry(
@@ -1361,26 +1363,38 @@ struct StaleTimerRecovery: Codable, Equatable, Identifiable {
     static let capNote = "We stopped it at 24 hours. Check it before you save."
 
     /// Copy for the Track recovery card, per draft reason. Kept here so it is unit-tested.
-    func cardMessage(propertyName: String?, hasAnyProperty: Bool, remainingAfterThis: Int) -> String {
+    func cardMessage(propertyName: String?, hasAnyProperty: Bool) -> String {
         let start = startTime.formatted(date: .abbreviated, time: .shortened)
-        let more = remainingAfterThis > 0 ? " \(remainingAfterThis) more after this one." : ""
         let cap = wasCapped ? " \(Self.capNote)" : ""
         guard let propertyName else {
             let pick = hasAnyProperty
-                ? "Pick a property to save it to, or discard it."
-                : "Add a property to save it, or discard it."
-            return "Started \(start). The property for this timer was deleted.\(cap) \(pick)\(more)"
+                ? "Choose a property below to save it to."
+                : "Add a property to save it."
+            return "Started \(start). The property for this timer was deleted.\(cap) \(pick)"
         }
         switch reason {
         case .pausedAtSwitch:
             let paused = (pausedAt ?? startTime).formatted(date: .abbreviated, time: .shortened)
             let action = wasCapped ? Self.capNote : "Save the time it ran, or discard it."
-            return "Started \(start) for \(propertyName). We paused it when you switched profiles at \(paused). \(action)\(more)"
+            return "Started \(start) for \(propertyName). We paused it when you switched profiles at \(paused). \(action)"
         case .forgotten:
             let note = wasCapped ? Self.capNote : "Review it before saving so the record stays accurate."
-            return "Started \(start) for \(propertyName). \(note)\(more)"
+            return "Started \(start) for \(propertyName). \(note)"
         }
     }
+
+    /// The real elapsed time, always shown on the card ("Ran 45 min", "Ran 30.0h").
+    var ranLabel: String {
+        let hours = max(elapsedHours, 0)
+        if hours < 1 {
+            let minutes = Int((hours * 60).rounded())
+            return minutes < 1 ? "Ran under 1 min" : "Ran \(minutes) min"
+        }
+        return "Ran \(AppFormat.hours(hours))"
+    }
+
+    /// Capped drafts (over 24 h) must be reviewed in the editor; no one-tap save.
+    var requiresReview: Bool { wasCapped }
 
     var accessibilityTitle: String {
         switch reason {
