@@ -253,9 +253,10 @@ final class LandlordHoursUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Finish your tax-ready setup"].waitForExistence(timeout: 8))
 
+        // 2.0: the house hero leads Today, so the setup tiles sit below the fold.
         let propertyTile = app.buttons["home.activation.property"]
-        XCTAssertTrue(propertyTile.waitForExistence(timeout: 5))
-        propertyTile.tap()
+        scrollToElement(propertyTile)
+        tapWhenHittable(propertyTile, scrollIfNeeded: true)
 
         let propertyName = app.textFields["property.name"]
         XCTAssertTrue(propertyName.waitForExistence(timeout: 5))
@@ -280,8 +281,8 @@ final class LandlordHoursUITests: XCTestCase {
 
         app.buttons["tab.today"].tap()
         let firstHourTile = app.buttons["home.activation.firstHour"]
-        XCTAssertTrue(firstHourTile.waitForExistence(timeout: 5))
-        firstHourTile.tap()
+        scrollToElement(firstHourTile)
+        tapWhenHittable(firstHourTile, scrollIfNeeded: true)
 
         XCTAssertTrue(app.staticTexts["Log your time"].waitForExistence(timeout: 5))
         let noteEditor = app.textViews["track.entryNotes"]
