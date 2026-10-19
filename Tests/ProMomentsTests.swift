@@ -187,7 +187,8 @@ final class FunnelAnalyticsTests: XCTestCase {
             Analytics.entryLogged(source: source)
             XCTAssertEqual(only("entry_logged")?["source"] as? String, source.rawValue)
         }
-        XCTAssertEqual(EntrySource.allCases.map(\.rawValue).sorted(), ["calendar", "manual", "timer", "voice"])
+        XCTAssertEqual(EntrySource.allCases.map(\.rawValue).sorted(),
+                       ["calendar", "gmail", "location", "manual", "other", "receipt", "shortcut", "timer", "voice"])
     }
 
     func testExportSharedCarriesFormat() {

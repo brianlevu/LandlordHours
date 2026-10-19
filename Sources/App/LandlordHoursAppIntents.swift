@@ -90,7 +90,7 @@ struct GetLandlordHoursSummaryIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let year = taxYear ?? Calendar.current.component(.year, from: Date())
-        let context = LandlordHoursIntentStore.engagementContext(taxYear: year)
+        let context = await LandlordHoursIntentStore.engagementContext(taxYear: year)
         let snapshot = EngagementIntelligenceService.shared.snapshot(for: context)
         let recommendation = EngagementIntelligenceService.shared.recommendation(for: context)
         let summary = LandlordHoursIntentCopy.summaryDialog(
@@ -113,7 +113,7 @@ struct ReviewLandlordHoursNextActionIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let context = LandlordHoursIntentStore.engagementContext()
+        let context = await LandlordHoursIntentStore.engagementContext()
         let recommendation = EngagementIntelligenceService.shared.recommendation(for: context)
         let destination = LandlordHoursIntentCopy.intentDestination(for: recommendation)
 
@@ -173,13 +173,17 @@ struct LandlordHoursShortcuts: AppShortcutsProvider {
     }
 }
 
+/// Intents read the single model owned by `AppModelHost` (the app process, with or without a
+/// scene), never a second decode of UserDefaults that could disagree with unsaved state.
 private enum LandlordHoursIntentStore {
+    @MainActor
     static func engagementContext(taxYear: Int = Calendar.current.component(.year, from: Date())) -> EngagementContext {
-        EngagementContext(
+        let model = AppModelHost.shared.viewModel
+        return EngagementContext(
             now: Date(),
             taxYear: taxYear,
-            properties: loadProperties(),
-            timeEntries: loadTimeEntries(),
+            properties: model.properties,
+            timeEntries: model.timeEntries,
             calendarDraftCount: 0,
             isTimerRunning: UserDefaults.standard.bool(forKey: UserScope.key("LandlordHours.timer")),
             timerStartTime: UserDefaults.standard.object(forKey: UserScope.key("timerStartTime")) as? Date,
@@ -188,22 +192,6 @@ private enum LandlordHoursIntentStore {
             isProUser: SubscriptionManager.shared.isPro,
             targetHours: GoalManager.shared.globalGoalType.hoursRequired
         )
-    }
-
-    private static func loadProperties() -> [RentalProperty] {
-        guard let data = UserDefaults.standard.data(forKey: UserScope.key("LandlordHours.properties")),
-              let properties = try? JSONDecoder().decode([RentalProperty].self, from: data) else {
-            return []
-        }
-        return properties
-    }
-
-    private static func loadTimeEntries() -> [TimeEntry] {
-        guard let data = UserDefaults.standard.data(forKey: UserScope.key("LandlordHours.entries")),
-              let entries = try? JSONDecoder().decode([TimeEntry].self, from: data) else {
-            return []
-        }
-        return entries
     }
 }
 

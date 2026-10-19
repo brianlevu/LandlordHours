@@ -47,6 +47,8 @@ targets:
     entitlements:
       path: LandlordHours.entitlements
       properties:
+        # App Group: shared container for extension → app hand-off (one file per item; see
+        # Sources/Services/Capture/AppGroup.swift). No extension targets until WP6a/WP7 start.
         com.apple.security.application-groups:
           - group.com.openclaw.landlordhours
         com.apple.developer.icloud-container-identifiers:
@@ -60,6 +62,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.openclaw.landlordhours
         DEVELOPMENT_TEAM: G68NLC3DA3
+        # Info.plist is hand-maintained (GENERATE_INFOPLIST_FILE: NO). 2.0 adds
+        # BGTaskSchedulerPermittedIdentifiers there: com.openclaw.landlordhours.capture.refresh and
+        # .capture.backfill (mirrored in BackgroundTaskIdentifiers, kept in step by a unit test).
+        # The matching UIBackgroundModes (fetch/processing) are added with the scheduler (WP4).
         INFOPLIST_FILE: Sources/App/Info.plist
         SWIFT_EMIT_LOC_STRINGS: YES
         CODE_SIGN_STYLE: Automatic
