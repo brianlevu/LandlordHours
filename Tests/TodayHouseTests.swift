@@ -124,6 +124,16 @@ final class TodayHouseConfirmHookTests: CaptureTestCase {
         XCTAssertEqual(confirm?.newHours ?? -1, 5, accuracy: 0.001)
     }
 
+    func testSavesNeverShowTheOldConfettiOverlay() {
+        let (vm, property) = liveViewModel()
+        for hours in [12.0, 45, 200, 300] {   // crosses the old 10 / 50 / 250 overlay counts
+            vm.addTimeEntry(propertyId: property, participant: .selfParticipant, category: .repairs, hours: hours, date: Date(), notes: "")
+            XCTAssertNil(vm.activeCelebration)
+        }
+        XCTAssertTrue(PendingCelebrationQueue.pending().isEmpty)
+        if let next = events.nextCelebration { events.markPresented(next.celebration, year: next.year) }
+    }
+
     func testInvestorOnlyEntryDoesNotBuild() {
         let (vm, property) = liveViewModel()
         vm.addTimeEntry(propertyId: property, participant: .selfParticipant, category: .investing, hours: 5, date: Date(), notes: "")
@@ -161,7 +171,7 @@ final class TodayHouseConfirmHookTests: CaptureTestCase {
         vm.activeCelebration = nil
         vm.addTimeEntry(propertyId: property, participant: .selfParticipant, category: .repairs, hours: 4, date: Date(), notes: "")
         XCTAssertEqual(events.nextCelebration?.celebration, .stage(.foundation100))
-        XCTAssertNotEqual(vm.activeCelebration, .hoursLogged(milestone: 100), "100h is the house's moment, never two screens")
+        XCTAssertNil(vm.activeCelebration, "No 1.x confetti on a save; the house is the only reward")
         if let next = events.nextCelebration { events.markPresented(next.celebration, year: next.year) }
     }
 

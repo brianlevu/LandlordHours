@@ -521,12 +521,13 @@ final class AppModelHostTests: CaptureTestCase {
         XCTAssertEqual(Set(tasks.begun), ["LandlordHours.capture.confirm", "LandlordHours.capture.push"])
         XCTAssertEqual(tasks.ended.count, tasks.begun.count, "Every background-task assertion is ended")
 
-        // 12 h crossed the 10 h milestone with no scene: queued, not shown and not lost.
+        // 2.0: a save shows no 1.x confetti, in the background or on return; the house confirm
+        // build on Today is the reward (TodayHouseEvents).
         XCTAssertNil(viewModel.activeCelebration)
-        XCTAssertEqual(PendingCelebrationQueue.pending(), [.hoursLogged(milestone: 10)])
-        host.sceneDidChange(isActive: true)
-        XCTAssertEqual(viewModel.activeCelebration, .hoursLogged(milestone: 10))
         XCTAssertTrue(PendingCelebrationQueue.pending().isEmpty)
+        host.sceneDidChange(isActive: true)
+        XCTAssertNil(viewModel.activeCelebration)
+        XCTAssertNotNil(TodayHouseEvents.shared.takeConfirm(), "The background save queues the house build")
 
         // A repeated action (double tap / redelivered) records nothing new.
         var completed = false

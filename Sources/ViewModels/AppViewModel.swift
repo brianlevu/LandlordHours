@@ -635,7 +635,6 @@ class AppViewModel: ObservableObject {
         timeEntries.append(entry)
         saveData()
         reportHouseSave(previousHours: houseHoursBefore)
-        checkHourMilestones()
         Analytics.sessionLogged(category: category, participant: participant)
         Analytics.entryLogged(source: source)
         RatingPromptCoordinator.shared.consider(.entriesMilestone, entryCount: timeEntries.count)
@@ -701,7 +700,6 @@ class AppViewModel: ObservableObject {
         if importedCount > 0 {
             saveData()
             reportHouseSave(previousHours: houseHoursBefore)
-            checkHourMilestones()
         }
         return importedCount
     }
@@ -869,31 +867,9 @@ class AppViewModel: ObservableObject {
         }
     }
 
-    func checkHourMilestones() {
-        let year = Calendar.current.component(.year, from: Date())
-        let goalType = GoalManager.shared.globalGoalType
-        let status: (hours: Double, isMet: Bool)
-
-        switch goalType {
-        case .reps, .both:
-            let reps = repsStatus(participant: .selfParticipant, year: year)
-            status = (reps.realEstateHours, reps.isQualified)
-        case .str:
-            let material = materialParticipationOverview(year: year)
-            status = (material.ownerAndSpouseHours, material.isMateriallyParticipating)
-        }
-
-        // 2.0: the goal, 100h and 500h are the Blueprint house's milestones (TodayHouseEvents,
-        // presented once on Today as MilestoneCelebrationView), so this overlay keeps only the
-        // small in-between counts. Celebrating them here too would show two screens at once.
-        let milestones: [Int] = [250, 50, 10]
-        for milestone in milestones {
-            if status.hours >= Double(milestone) {
-                triggerCelebration(.hoursLogged(milestone: milestone))
-                return
-            }
-        }
-    }
+    // 2.0: saving hours no longer triggers the 1.x confetti overlay (hoursLogged / goalMet).
+    // The Blueprint house is the only reward on a save: the confirm build on Today and, at
+    // 100 / 500 / 750 / the goal, MilestoneCelebrationView once (TodayHouseEvents).
 
     // MARK: - REPS Calculations
     func entriesForYear(_ year: Int) -> [TimeEntry] {

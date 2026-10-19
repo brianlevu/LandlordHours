@@ -110,7 +110,6 @@ extension AppViewModel {
         saveData()
         store?.markConfirmed(key: suggestion.sourceKey, entryId: entry.id)
         reportHouseSave(previousHours: houseHoursBefore)
-        checkHourMilestones()
         Analytics.entryLogged(source: source)
         return .created(entryId: entry.id)
     }
