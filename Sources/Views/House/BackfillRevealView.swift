@@ -101,7 +101,7 @@ struct BackfillRevealView: View {
                 .resizable()
                 .scaledToFit()
                 .accessibilityHidden(true)
-            HouseHatchedView(keyframe: hatchedKeyframe)
+            HouseHatchedView(keyframe: hatchedKeyframe, subtracting: confirmedKeyframe)
                 .mask(HouseRisingMask(progress: hatch))
             HouseLineworkView(keyframe: confirmedKeyframe)
                 .mask(HouseRisingMask(progress: sketch, feather: 0.02))

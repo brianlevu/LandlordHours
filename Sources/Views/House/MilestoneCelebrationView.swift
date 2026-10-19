@@ -70,7 +70,7 @@ struct MilestoneCelebrationView: View {
                     .contentShape(Rectangle())
                     .onTapGesture { skip() }
 
-                Text("\(milestone.rawValue) confirmed hours in \(String(Calendar.current.component(.year, from: date)))")
+                Text("\(max(milestone.rawValue, Int(hours.rounded(.down)))) confirmed hours in \(String(Calendar.current.component(.year, from: date)))")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(HouseTokens.onHeroPrimary)
                     .multilineTextAlignment(.center)

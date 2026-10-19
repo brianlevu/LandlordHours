@@ -48,6 +48,9 @@ struct HouseLineworkView: View {
 /// solid ("a graphic never shows an unconfirmed hour").
 struct HouseHatchedView: View {
     let keyframe: HouseKeyframe
+    /// Already-solid keyframe whose silhouette is cut out of the hatch, so only the new storeys
+    /// (not the ground or confirmed parts) read as suggestions.
+    var subtracting: HouseKeyframe? = nil
     var canvas: HouseCanvas = .blueprintHero
     @Environment(\.colorScheme) private var colorScheme
 
@@ -57,18 +60,26 @@ struct HouseHatchedView: View {
             Image(decorative: keyframe.builtImageName)
                 .resizable()
                 .scaledToFit()
-                .opacity(0.12)
                 .saturation(0)
+                .opacity(0.12)
+                .mask(silhouette)
             HouseHatchPattern()
                 .stroke(tint, lineWidth: 1.4)
-                .mask(
-                    Image(decorative: keyframe.builtImageName)
-                        .resizable()
-                        .scaledToFit()
-                )
+                .mask(silhouette)
         }
         .aspectRatio(1, contentMode: .fit)
         .accessibilityHidden(true)
+    }
+
+    private var silhouette: some View {
+        ZStack {
+            Image(decorative: keyframe.builtImageName).resizable().scaledToFit()
+            if let subtracting, subtracting != keyframe {
+                Image(decorative: subtracting.builtImageName).resizable().scaledToFit()
+                    .blendMode(.destinationOut)
+            }
+        }
+        .compositingGroup()
     }
 }
 
