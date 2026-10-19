@@ -166,7 +166,7 @@ struct HistoryView: View {
                 }
             }
             .background(colors.background)
-            .navigationTitle("History")
+            .navigationTitle("Records")
             .alert("Delete Entry?", isPresented: $showingDeleteConfirmation) {
                 Button("Cancel", role: .cancel) { entryToDelete = nil }
                 Button("Delete", role: .destructive) {

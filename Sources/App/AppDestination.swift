@@ -58,3 +58,61 @@ enum AppDestination: String, CaseIterable {
         }
     }
 }
+
+// MARK: - Shell tab indices (WP-D)
+//
+// The shell keeps the 1.x integer `selectedTab` so `.switchToTab` posts, `-LHInitialTab` launch
+// arguments, App Intents and UI tests keep resolving. 0–4 keep their 1.x meaning; 2.0 adds Inbox
+// and Records. Reports (3) and Settings (4) are not tabs: they open from Today's header. Log time
+// (2) is the round + button.
+enum ShellTab {
+    static let todayIndex = 0
+    static let propertiesIndex = 1
+    static let logTimeIndex = 2
+    static let reportsIndex = 3
+    static let settingsIndex = 4
+    static let inboxIndex = 5
+    static let recordsIndex = 6
+    static let maxIndex = 6
+}
+
+extension AppTab {
+    var shellIndex: Int {
+        switch self {
+        case .today: return ShellTab.todayIndex
+        case .inbox: return ShellTab.inboxIndex
+        case .records: return ShellTab.recordsIndex
+        case .properties: return ShellTab.propertiesIndex
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .today: return "Today"
+        case .inbox: return "Inbox"
+        case .records: return "Records"
+        case .properties: return "Properties"
+        }
+    }
+
+    /// SF Symbol (outline); `selectedSymbol` is the filled variant.
+    var symbol: String {
+        switch self {
+        case .today: return "sun.max"
+        case .inbox: return "tray"
+        case .records: return "list.bullet.rectangle"
+        case .properties: return "house"
+        }
+    }
+
+    var selectedSymbol: String {
+        switch self {
+        case .today: return "sun.max.fill"
+        case .inbox: return "tray.fill"
+        case .records: return "list.bullet.rectangle.fill"
+        case .properties: return "house.fill"
+        }
+    }
+
+    var accessibilityIdentifier: String { "tab.\(rawValue)" }
+}

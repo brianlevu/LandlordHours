@@ -139,7 +139,7 @@ final class LandlordHoursUITests: XCTestCase {
         taxProfile.tap()
 
         XCTAssertTrue(app.staticTexts["Tax profile"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["Track"].isHittable)
+        XCTAssertFalse(app.buttons["tab.logTime"].isHittable)
     }
 
     func testAppearancePreferenceShowsSavedStateAndPersists() {
@@ -278,7 +278,7 @@ final class LandlordHoursUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Oak Street Duplex"].waitForExistence(timeout: 5))
 
-        app.buttons["Home"].tap()
+        app.buttons["tab.today"].tap()
         let firstHourTile = app.buttons["home.activation.firstHour"]
         XCTAssertTrue(firstHourTile.waitForExistence(timeout: 5))
         firstHourTile.tap()
@@ -301,7 +301,7 @@ final class LandlordHoursUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Time logged"].waitForExistence(timeout: 5))
 
-        app.buttons["Home"].tap()
+        app.buttons["tab.today"].tap()
         XCTAssertFalse(app.staticTexts["Finish your tax-ready setup"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["home.activation.firstHour"].exists)
     }
@@ -362,7 +362,7 @@ final class LandlordHoursUITests: XCTestCase {
                 element.tap()
                 return
             }
-            if scrollIfNeeded && element.exists && swipes < 6 && app.staticTexts["Home"].isHittable {
+            if scrollIfNeeded && element.exists && swipes < 6 && app.buttons["tab.today"].isHittable {
                 app.swipeUp()
                 swipes += 1
             } else {

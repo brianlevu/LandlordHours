@@ -1,7 +1,6 @@
 import SwiftUI
 import StoreKit
 import Combine
-import LucideIcons
 
 extension Notification.Name {
     static let switchToTab = Notification.Name("switchToTab")
@@ -100,7 +99,7 @@ struct ContentView: View {
               let tab = Int(args[index + 1]) else {
             return 0
         }
-        return min(max(tab, 0), 4)
+        return min(max(tab, 0), ShellTab.maxIndex)
     }
 
     private static var shouldReplayGuidedSetupFromLaunchArguments: Bool {
@@ -558,25 +557,63 @@ struct ContentView: View {
             ReportsView()
         case 4:
             SettingsView()
+        case ShellTab.inboxIndex:
+            InboxPlaceholderView()
+        case ShellTab.recordsIndex:
+            HistoryView()
         default:
             DashboardView()
         }
     }
 
+    /// 2.0 shell: four tabs in one floating glass capsule (Today, Inbox, Records, Properties) and a
+    /// separate round + (log time) beside it. docs/design/2.0-hifi-reference-spec.md §l.
     private var customTabBar: some View {
-        HStack(spacing: 0) {
-            tabBarButton(index: 0, title: "Home", icon: Lucide.house)
-            tabBarButton(index: 1, title: "Properties", icon: Lucide.building2)
-                .guidedSpotlightTarget(.propertyTab)
-            tabBarButton(index: 2, title: "Track", icon: Lucide.clock)
+        HStack(spacing: 10) {
+            HStack(spacing: 0) {
+                ForEach(AppTab.allCases, id: \.self) { tab in
+                    if tab == .properties {
+                        tabBarButton(tab).guidedSpotlightTarget(.propertyTab)
+                    } else {
+                        tabBarButton(tab)
+                    }
+                }
+            }
+            .padding(.horizontal, 5)
+            .padding(.vertical, 5)
+            .frame(height: Self.tabBarHeight)
+            .floatingGlass(in: Capsule(), colors: colors, colorScheme: colorScheme)
+
+            logTimeButton
                 .guidedSpotlightTarget(.trackTab)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
-        .frame(height: 78)
-        .floatingDockGlass(colors: colors, colorScheme: colorScheme)
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
         .padding(.bottom, 8)
+    }
+
+    private static let tabBarHeight: CGFloat = 62
+
+    private var logTimeButton: some View {
+        let isSelected = selectedTab == ShellTab.logTimeIndex
+        return Button {
+            animate(AppAnimation.quick) {
+                selectedTab = ShellTab.logTimeIndex
+            }
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(isSelected ? colors.onAction : colors.action)
+                .frame(width: Self.tabBarHeight, height: Self.tabBarHeight)
+                .background(
+                    Circle().fill(isSelected ? colors.action : Color.clear)
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.lhPressable)
+        .floatingGlass(in: Circle(), colors: colors, colorScheme: colorScheme)
+        .accessibilityLabel("Log time")
+        .accessibilityIdentifier("tab.logTime")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
     private var tabBarUnderlay: some View {
@@ -598,35 +635,37 @@ struct ContentView: View {
         .accessibilityHidden(true)
     }
 
-    private func tabBarButton(index: Int, title: String, icon: UIImage) -> some View {
-        let isSelected = selectedTab == index
-        // Full-strength secondary text: the 0.78 opacity version measured 3.46:1.
+    private func tabBarButton(_ tab: AppTab) -> some View {
+        let isSelected = selectedTab == tab.shellIndex
+        // Full-strength secondary text: lighter inactive labels measured under 4.5:1 on the glass.
         let inactiveColor = colors.textSecondary
 
         return Button {
             animate(AppAnimation.quick) {
-                selectedTab = index
+                selectedTab = tab.shellIndex
             }
         } label: {
-            VStack(spacing: 5) {
-                LucideIcon(image: icon, size: 22)
-                    .foregroundStyle(isSelected ? colors.actionText : inactiveColor)
-                Text(title)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(isSelected ? colors.actionText : inactiveColor)
+            VStack(spacing: 3) {
+                Image(systemName: isSelected ? tab.selectedSymbol : tab.symbol)
+                    .font(.system(size: 19, weight: isSelected ? .semibold : .regular))
+                    .frame(height: 24)
+                Text(tab.title)
+                    .font(.system(size: 11, weight: .medium))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.82)
+                    .minimumScaleFactor(0.8)
             }
+            .foregroundStyle(isSelected ? colors.actionText : inactiveColor)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(
                 Capsule()
-                    .fill(isSelected ? colors.primarySurface.opacity(0.82) : Color.clear)
+                    .fill(isSelected ? colors.actionSurface : Color.clear)
             )
             .contentShape(Capsule())
             .lhMotion(AppAnimation.quick, value: isSelected)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(title)
+        .accessibilityLabel(tab.title)
+        .accessibilityIdentifier(tab.accessibilityIdentifier)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
@@ -881,32 +920,29 @@ private struct LoadingDot: View {
 }
 
 private extension View {
+    /// Floating chrome only (tab capsule, + circle): Liquid Glass on iOS 26+, a solid card fill before.
     @ViewBuilder
-    func floatingDockGlass(colors: AdaptiveColors, colorScheme: ColorScheme) -> some View {
+    func floatingGlass<S: Shape>(in shape: S, colors: AdaptiveColors, colorScheme: ColorScheme) -> some View {
         if #available(iOS 26.0, *) {
             self
                 .background(
-                    Capsule()
-                        .fill(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.42 : 0.28))
+                    shape.fill(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.42 : 0.30))
                 )
                 .glassEffect(
-                    .regular.tint(colors.actionSurface.opacity(colorScheme == .dark ? 0.20 : 0.34)).interactive(),
-                    in: .capsule
+                    .regular.tint(colors.actionSurface.opacity(colorScheme == .dark ? 0.18 : 0.26)).interactive(),
+                    in: shape
                 )
                 .overlay(
-                    Capsule()
-                        .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.24), lineWidth: 1)
+                    shape.stroke(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.30), lineWidth: 1)
                 )
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.22 : 0.10), radius: 14, y: 8)
+                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.24 : 0.10), radius: 16, y: 4)
         } else {
             self
-                .background(colors.backgroundSecondary)
-                .clipShape(Capsule())
+                .background(shape.fill(colors.backgroundSecondary))
                 .overlay(
-                    Capsule()
-                        .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.58), lineWidth: 1)
+                    shape.stroke(colors.border.opacity(colorScheme == .dark ? 0.9 : 0.7), lineWidth: 1)
                 )
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.18 : 0.08), radius: 10, y: 4)
+                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.24 : 0.10), radius: 16, y: 4)
         }
     }
 }
@@ -947,8 +983,9 @@ struct FloatingTimerBanner: View {
                     .foregroundStyle(AppColors.onAction.opacity(0.8))
                     .lineLimit(1)
                 Spacer()
-                LucideIcon(image: Lucide.chevronRight, size: 14)
-                    .foregroundStyle(AppColors.onAction.opacity(0.6))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(AppColors.onAction.opacity(0.7))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
