@@ -133,7 +133,7 @@ struct TimeEntryDetailView: View {
                     .tracking(1.3)
                     .foregroundStyle(colors.draftingInk)
                     .lineLimit(2)
-                Text(isEditing ? category.inboxLabel : RecordsLogic.title(for: entry))
+                Text(isEditing ? category.inboxLabel : RecordsLogic.title(for: entry, propertyName: propertyName))
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)

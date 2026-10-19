@@ -36,6 +36,11 @@ enum GoalMode: String, CaseIterable, Identifiable {
 }
 
 struct ReportsView: View {
+    /// Loading hook (owner direction: loading never blocks). Reports' numbers are computed on the
+    /// main actor today, so this stays false; when totals or charts move off-thread, set it and
+    /// only the numbers and the month chart show `BPLoadingPlaceholder` (DraftingLoader later).
+    var isLoading: Bool = false
+
     @EnvironmentObject var viewModel: AppViewModel
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -167,9 +172,11 @@ struct ReportsView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
+            (dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                : AnyLayout(HStackLayout(alignment: .firstTextBaseline))) {
                 BPScreenTitle(text: "Reports")
-                Spacer(minLength: 12)
+                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 12) }
                 Button(action: exportAction) {
                     BPCapsuleButtonLabel(
                         title: "Export",
@@ -181,7 +188,9 @@ struct ReportsView: View {
                 .accessibilityIdentifier("reports.export")
             }
 
-            HStack(spacing: 8) {
+            (dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                : AnyLayout(HStackLayout(spacing: 8))) {
                 Menu {
                     Picker("Year", selection: $selectedYear) {
                         ForEach(RecordsLogic.availableYears(viewModel.timeEntries), id: \.self) { year in
@@ -212,7 +221,7 @@ struct ReportsView: View {
             BPSectionHeader(title: "Where you stand")
                 .padding(.horizontal, 4)
             ForEach(standings) { standing in
-                StandingCard(standing: standing, year: selectedYear)
+                StandingCard(standing: standing, year: selectedYear, isLoading: isLoading)
             }
             if showsParticipationRow {
                 participationRow
@@ -365,6 +374,10 @@ struct ReportsView: View {
                 }
             }
             .frame(height: dynamicTypeSize.isAccessibilitySize ? 200 : 150)
+            .opacity(isLoading ? 0 : 1)
+            .overlay {
+                if isLoading { BPLoadingPlaceholder(kind: .chart, width: nil, height: 150) }
+            }
             .padding(16)
             .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
             .accessibilityLabel("Hours by month, \(String(selectedYear))")
@@ -424,6 +437,7 @@ struct ReportsView: View {
 private struct StandingCard: View {
     let standing: ReportStanding
     let year: Int
+    var isLoading: Bool = false
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -457,9 +471,13 @@ private struct StandingCard: View {
                 .textCase(.uppercase)
                 .tracking(1.3)
                 .foregroundStyle(colors.draftingInk)
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) { number; ofTarget }
-                VStack(alignment: .leading, spacing: 0) { number; ofTarget }
+            if isLoading {
+                BPLoadingPlaceholder(kind: .number, width: 120, height: 34)
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) { number; ofTarget }
+                    VStack(alignment: .leading, spacing: 0) { number; ofTarget }
+                }
             }
             progressBar
             HStack(alignment: .firstTextBaseline, spacing: 6) {

@@ -26,6 +26,7 @@ private struct RecordsScreen: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var filter = RecordsFilter(year: Calendar.current.component(.year, from: Date()))
@@ -147,9 +148,12 @@ private struct RecordsScreen: View {
     // MARK: Header
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+        return layout {
             BPScreenTitle(text: "Records")
-            Spacer(minLength: 12)
+            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 12) }
             Button {
                 if viewModel.canExportPDF() { showExport = true } else { showPaywall = true }
             } label: {
@@ -264,7 +268,9 @@ private struct RecordsScreen: View {
 
     private var totalCard: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+            (dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))) {
                 Text(BPHours.short(totalHours))
                     .font(.system(.largeTitle, design: .rounded, weight: .bold))
                     .monospacedDigit()
@@ -370,7 +376,7 @@ struct RecordRowView: View {
 
     private var details: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(RecordsLogic.title(for: entry))
+            Text(RecordsLogic.title(for: entry, propertyName: propertyName))
                 .font(.body)
                 .foregroundStyle(colors.textPrimary)
                 .lineLimit(2)
@@ -425,7 +431,7 @@ struct RecordRowView: View {
 
     static func accessibilityLabel(entry: TimeEntry, propertyName: String) -> String {
         var parts = [
-            RecordsLogic.title(for: entry),
+            RecordsLogic.title(for: entry, propertyName: propertyName),
             propertyName,
             BPHours.spoken(entry.hours),
             entry.date.formatted(.dateTime.month(.wide).day()),

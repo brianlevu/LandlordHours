@@ -33,8 +33,7 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         launch(tab: 6)
         let row = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "records.row.")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 20))
-        row.tap()
-        XCTAssertTrue(app.buttons["entry.edit"].waitForExistence(timeout: 5))
+        tapRetrying(row, until: app.buttons["entry.edit"])
         XCTAssertFalse(app.buttons["tab.logTime"].isHittable, "The record hides the tab bar")
         app.buttons["entry.edit"].tap()
         XCTAssertTrue(app.buttons["Fifteen minutes more"].waitForExistence(timeout: 5))
@@ -45,11 +44,11 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         launch(tab: 6)
         let source = app.buttons["records.filter.source"].firstMatch
         XCTAssertTrue(source.waitForExistence(timeout: 20))
-        source.tap()
-        let manual = app.buttons["Manual"].firstMatch
-        XCTAssertTrue(manual.waitForExistence(timeout: 5))
+        let manual = app.buttons.matching(NSPredicate(format: "label == %@", "Manual")).firstMatch
+        tapRetrying(source, until: manual)
         manual.tap()
-        XCTAssertTrue(source.label.contains("Manual"), source.label)
+        let narrowed = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "records.filter.source", "Manual")).firstMatch
+        XCTAssertTrue(narrowed.waitForExistence(timeout: 5), "The Source chip shows the chosen source")
     }
 
     func testReportsLeadWithEachPersonsStanding() {
@@ -102,8 +101,7 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         app.swipeDown()
         app.swipeDown()
         XCTAssertTrue(row.waitForExistence(timeout: 5))
-        row.tap()
-        XCTAssertTrue(app.buttons["entry.edit"].waitForExistence(timeout: 5))
+        tapRetrying(row, until: app.buttons["entry.edit"])
         settleAndCapture("record-detail-\(scheme)")
         app.buttons["entry.edit"].tap()
         settleAndCapture("record-edit-\(scheme)")
@@ -112,8 +110,7 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         launch(tab: 6, scheme: scheme)
         let export = app.buttons["records.export"]
         XCTAssertTrue(export.waitForExistence(timeout: 20))
-        export.tap()
-        XCTAssertTrue(element("export.preview").waitForExistence(timeout: 8))
+        tapRetrying(export, until: element("export.preview"))
         settleAndCapture("export-\(scheme)", wait: 2.5)
 
         // Reports.
@@ -142,12 +139,10 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         launch(tab: 4, scheme: scheme)
         XCTAssertTrue(element("settings.proCard").waitForExistence(timeout: 20))
         settleAndCapture("settings-\(scheme)")
-        _ = scrollTo(element("settings.capture.muted"))
-        settleAndCapture("settings-\(scheme)-autocapture")
-        _ = scrollTo(element("settings.contactSupport"))
-        settleAndCapture("settings-\(scheme)-support")
-        _ = scrollTo(element("settings.notTaxAdvice"), maxSwipes: 12)
-        settleAndCapture("settings-\(scheme)-account")
+        for page in 1...4 {
+            app.swipeUp()
+            settleAndCapture("settings-\(scheme)-page\(page + 1)")
+        }
 
         launch(tab: 4, scheme: scheme)
         tapWhenReady(element("settings.taxProfile"))
@@ -206,6 +201,16 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         ]
         app.launchArguments = args + extra
         app.launch()
+    }
+
+    /// The launch splash fades over ~1s while the tree already exists, so a first tap can land on
+    /// it. Tap until the expected result appears.
+    private func tapRetrying(_ element: XCUIElement, until result: XCUIElement, attempts: Int = 5) {
+        for _ in 0..<attempts where !result.exists {
+            if element.exists, element.isHittable { element.tap() }
+            if result.waitForExistence(timeout: 3) { return }
+        }
+        XCTAssertTrue(result.exists, "Tapping \(element) never showed \(result)")
     }
 
     private func element(_ identifier: String) -> XCUIElement {

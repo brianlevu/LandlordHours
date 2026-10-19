@@ -124,8 +124,19 @@ struct ExportPDFView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                     .transition(.opacity)
             } else {
-                ProgressView()
-                    .tint(Color(hex: AppColors.Hex.textSecondary))
+                // isLoading hook: the page renders off the main thread; only the page shows a
+                // placeholder (title and table lines), the rest of the sheet stays usable.
+                VStack(alignment: .leading, spacing: 10) {
+                    BPLoadingPlaceholder(kind: .number, width: 140, height: 12)
+                    BPLoadingPlaceholder(kind: .number, width: 90, height: 8)
+                    BPLoadingPlaceholder(kind: .chart, width: nil, height: 36)
+                    ForEach(0..<4, id: \.self) { _ in
+                        BPLoadingPlaceholder(kind: .number, width: nil, height: 6)
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .environment(\.colorScheme, .light)
             }
         }
         .aspectRatio(11 / 8.5, contentMode: .fit)
@@ -205,12 +216,7 @@ struct ExportPDFView: View {
                 Button {
                     generateExports()
                 } label: {
-                    HStack(spacing: 8) {
-                        if isGenerating {
-                            ProgressView().tint(colors.onAction)
-                        }
-                        Text(generateButtonTitle)
-                    }
+                    Text(generateButtonTitle)
                 }
                 .buttonStyle(InboxPrimaryButtonStyle())
                 .disabled(!canExport || isGenerating)

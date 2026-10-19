@@ -96,12 +96,18 @@ enum RecordsLogic {
     }
 
     /// Row title: the note's first line, or the category when there is no note.
-    static func title(for entry: TimeEntry) -> String {
-        let firstLine = entry.notes
+    /// A leading "Property name:" is dropped, since the property has its own line.
+    static func title(for entry: TimeEntry, propertyName: String? = nil) -> String {
+        var firstLine = entry.notes
             .split(whereSeparator: \.isNewline)
             .first
             .map { String($0).trimmingCharacters(in: .whitespaces) } ?? ""
-        return firstLine.isEmpty ? entry.category.inboxLabel : firstLine
+        if let propertyName, !propertyName.isEmpty,
+           firstLine.lowercased().hasPrefix(propertyName.lowercased() + ":") {
+            firstLine = String(firstLine.dropFirst(propertyName.count + 1)).trimmingCharacters(in: .whitespaces)
+        }
+        guard !firstLine.isEmpty else { return entry.category.inboxLabel }
+        return firstLine.prefix(1).uppercased() + firstLine.dropFirst()
     }
 
     static func filtered(

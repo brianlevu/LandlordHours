@@ -238,6 +238,11 @@ final class RecordsLogicTests: XCTestCase {
         let day = date(2026, 10, 1)
         XCTAssertEqual(RecordsLogic.title(for: entry(1, day, notes: "Fixed faucet\nand the drain")), "Fixed faucet")
         XCTAssertEqual(RecordsLogic.title(for: entry(1, day, notes: "  ", category: .leasing)), "Leasing")
+        XCTAssertEqual(
+            RecordsLogic.title(for: entry(1, day, notes: "Oak Street Duplex: tenant messages"), propertyName: "Oak Street Duplex"),
+            "Tenant messages",
+            "The property has its own line, so a leading property name is dropped"
+        )
     }
 
     func testHoursFormatting() {

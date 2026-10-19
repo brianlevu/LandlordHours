@@ -28,17 +28,21 @@ struct BPSectionHeader: View {
     var trailing: String? = nil
     var trailingAccessibility: String? = nil
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
-        HStack(alignment: .firstTextBaseline) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+        layout {
             Text(title)
                 .font(.footnote.weight(.semibold))
                 .textCase(.uppercase)
                 .tracking(0.3)
                 .foregroundStyle(colors.textSecondary)
                 .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 8)
+            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
             if let trailing {
                 Text(trailing)
                     .font(.system(.footnote, design: .rounded, weight: .semibold))
@@ -330,6 +334,33 @@ struct BPBarRow: View {
             }
         }
         .frame(height: 10)
+    }
+}
+
+// MARK: - Loading placeholder (integration hook)
+
+/// Stand-in for a value that is still loading: a soft rounded bar, never a spinner, and only
+/// where the number or chart will appear. The rest of the screen stays interactive.
+/// INTEGRATION: wp-l-loading ships `PlaceholderBar` (numbers) and `DraftingLoader` (charts);
+/// swap them in here so every `isLoading` hook in Records/Reports/Export picks them up.
+struct BPLoadingPlaceholder: View {
+    enum Kind { case number, chart }
+    var kind: Kind = .number
+    var width: CGFloat? = 96
+    var height: CGFloat = 28
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        RoundedRectangle(cornerRadius: kind == .number ? height / 2 : 8, style: .continuous)
+            .fill(colors.backgroundTertiary)
+            .overlay(
+                RoundedRectangle(cornerRadius: kind == .number ? height / 2 : 8, style: .continuous)
+                    .strokeBorder(colors.border.opacity(0.6), lineWidth: 0.5)
+            )
+            .frame(width: width, height: height)
+            .accessibilityElement()
+            .accessibilityLabel("Loading")
     }
 }
 
