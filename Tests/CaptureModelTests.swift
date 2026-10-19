@@ -200,7 +200,7 @@ final class CloudKitCaptureMappingTests: XCTestCase {
         let detected = Date(timeIntervalSince1970: 1_780_000_000)
         let confirmed = Date(timeIntervalSince1970: 1_780_000_600)
         let entry = TimeEntry(
-            id: CaptureIdentity.entryId(forSourceKey: "cal:E:2026-05-28T10:00:00Z"),
+            id: CaptureIdentity.entryId(profileId: "local-x", sourceKey: "cal:E:2026-05-28T10:00:00Z"),
             propertyId: UUID(), participant: .selfParticipant, category: .leasing, hours: 1.5,
             importSource: "calendar", importExternalId: "E", importCalendarId: "C",
             detectedAt: detected, confirmedAt: confirmed, sourceDetail: "backfill",
@@ -237,8 +237,8 @@ final class CloudKitCaptureMappingTests: XCTestCase {
 
     func testSameSourceKeyGivesSameRecordNameOnTwoDevices() {
         let key = SuggestionKey.calendar(externalId: "EXT-9", occurrence: Date(timeIntervalSince1970: 1_780_000_000))
-        let a = TimeEntry(id: CaptureIdentity.entryId(forSourceKey: key), propertyId: UUID(), participant: .selfParticipant, category: .repairs, hours: 1)
-        let b = TimeEntry(id: CaptureIdentity.entryId(forSourceKey: key), propertyId: UUID(), participant: .selfParticipant, category: .repairs, hours: 2)
+        let a = TimeEntry(id: CaptureIdentity.entryId(profileId: "u", sourceKey: key), propertyId: UUID(), participant: .selfParticipant, category: .repairs, hours: 1)
+        let b = TimeEntry(id: CaptureIdentity.entryId(profileId: "u", sourceKey: key), propertyId: UUID(), participant: .selfParticipant, category: .repairs, hours: 2)
         XCTAssertEqual(CloudKitSyncService.record(for: a, zoneID: zone, appUserId: "u").recordID,
                        CloudKitSyncService.record(for: b, zoneID: zone, appUserId: "u").recordID)
     }
@@ -248,11 +248,11 @@ final class CloudKitCaptureMappingTests: XCTestCase {
 
 final class CaptureIdentityTests: XCTestCase {
     func testEntryIdIsRFC4122Version5AndStable() {
-        // Cross-checked with Python: uuid.uuid5(UUID('6C1B6E2A-...'), 'cal:ABC-123:2026-03-02T15:00:00Z')
-        let id = CaptureIdentity.entryId(forSourceKey: "cal:ABC-123:2026-03-02T15:00:00Z")
-        XCTAssertEqual(id.uuidString, "85A08703-3E8B-5E78-928A-2B9114DB91D8")
-        XCTAssertEqual(CaptureIdentity.entryId(forSourceKey: "cal:ABC-123:2026-03-02T15:00:00Z"), id)
-        XCTAssertNotEqual(CaptureIdentity.entryId(forSourceKey: "cal:ABC-123:2026-03-09T15:00:00Z"), id,
+        // Cross-checked with Python: uuid.uuid5(UUID('6C1B6E2A-...'), 'local-abc|cal:ABC-123:2026-03-02T15:00:00Z')
+        let id = CaptureIdentity.entryId(profileId: "local-abc", sourceKey: "cal:ABC-123:2026-03-02T15:00:00Z")
+        XCTAssertEqual(id.uuidString, "150B5B6F-D9BE-53F2-8941-6B73C541DA43")
+        XCTAssertEqual(CaptureIdentity.entryId(profileId: "local-abc", sourceKey: "cal:ABC-123:2026-03-02T15:00:00Z"), id)
+        XCTAssertNotEqual(CaptureIdentity.entryId(profileId: "local-abc", sourceKey: "cal:ABC-123:2026-03-09T15:00:00Z"), id,
                           "Each occurrence of a recurring event is its own record")
     }
 

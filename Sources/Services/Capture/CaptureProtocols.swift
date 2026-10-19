@@ -15,6 +15,8 @@ struct CaptureCandidate: Equatable {
     /// Local only (calendar title, receipt merchant). Never synced.
     var title: String
     var externalId: String?
+    /// Calendar `eventIdentifier` (device-local); kept for 1.1 import dedupe.
+    var legacyEventIdentifier: String?
     var containerId: String?
     var location: String?
     var isBackfill: Bool
@@ -28,6 +30,7 @@ struct CaptureCandidate: Equatable {
         end: Date? = nil,
         title: String,
         externalId: String? = nil,
+        legacyEventIdentifier: String? = nil,
         containerId: String? = nil,
         location: String? = nil,
         isBackfill: Bool = false,
@@ -39,6 +42,7 @@ struct CaptureCandidate: Equatable {
         self.end = end
         self.title = title
         self.externalId = externalId
+        self.legacyEventIdentifier = legacyEventIdentifier
         self.containerId = containerId
         self.location = location
         self.isBackfill = isBackfill
@@ -92,6 +96,7 @@ extension Suggestion {
             end: candidate.end,
             title: candidate.title,
             externalId: candidate.externalId,
+            legacyEventIdentifier: candidate.legacyEventIdentifier,
             containerId: candidate.containerId,
             proposedPropertyId: classification.propertyId,
             proposedCategory: classification.category,

@@ -315,11 +315,11 @@ final class CaptureReconciliationTests: CaptureTestCase {
         let s = calendarSuggestion(start: date(2026, 3, 2), propertyId: propertyId)
         let store = makeStore()
         store.ingest([s], existingEntries: [], calendar: calendar)
-        let fromOtherDevice = TimeEntry(id: s.entryId, propertyId: propertyId, participant: .selfParticipant,
+        let fromOtherDevice = TimeEntry(id: s.entryId(profileId: profileId), propertyId: propertyId, participant: .selfParticipant,
                                         category: .leasing, hours: 1.5, date: s.start, importSource: "calendar",
                                         confirmedAt: Date(), sourceKey: s.sourceKey)
         store.reconcile(with: [fromOtherDevice], calendar: calendar)
-        XCTAssertEqual(store.suggestion(forKey: s.sourceKey)?.state, .confirmed(entryId: s.entryId))
+        XCTAssertEqual(store.suggestion(forKey: s.sourceKey)?.state, .confirmed(entryId: s.entryId(profileId: profileId)))
     }
 }
 
@@ -335,8 +335,8 @@ final class CaptureConfirmTests: CaptureTestCase {
         let now = date(2026, 3, 5)
 
         let result = viewModel.confirm(s, store: store, now: now)
-        XCTAssertEqual(result, .created(entryId: s.entryId))
-        let entry = try XCTUnwrap(viewModel.timeEntries.first { $0.id == s.entryId })
+        XCTAssertEqual(result, .created(entryId: s.entryId(profileId: profileId)))
+        let entry = try XCTUnwrap(viewModel.timeEntries.first { $0.id == s.entryId(profileId: profileId) })
         XCTAssertEqual(entry.importSource, "calendar")
         XCTAssertEqual(entry.source.displayName, "Calendar import")
         XCTAssertEqual(entry.confirmedAt, now)
@@ -344,13 +344,14 @@ final class CaptureConfirmTests: CaptureTestCase {
         XCTAssertEqual(entry.sourceKey, s.sourceKey)
         XCTAssertEqual(entry.sourceDetail, "backfill")
         XCTAssertEqual(entry.importExternalId, "EVT-1")
-        XCTAssertEqual(entry.notes, "", "Event titles are not copied into synced notes by default")
-        XCTAssertEqual(store.suggestion(forKey: s.sourceKey)?.state, .confirmed(entryId: s.entryId))
+        XCTAssertNil(entry.importCalendarId, "Device-local calendar ids would defeat 1.1's title check")
+        XCTAssertEqual(entry.notes, "Showing - Oak St", "Title kept so a 1.1 import recognises the event")
+        XCTAssertEqual(store.suggestion(forKey: s.sourceKey)?.state, .confirmed(entryId: s.entryId(profileId: profileId)))
 
         // Persisted to the profile's store.
         let data = try XCTUnwrap(UserDefaults.standard.data(forKey: UserScope.key("LandlordHours.entries", userId: profileId)))
         let saved = try JSONDecoder().decode([TimeEntry].self, from: data)
-        XCTAssertEqual(saved.filter { $0.id == s.entryId }.count, 1)
+        XCTAssertEqual(saved.filter { $0.id == s.entryId(profileId: profileId) }.count, 1)
     }
 
     func testDoubleConfirmIsIdempotent() {
@@ -358,11 +359,11 @@ final class CaptureConfirmTests: CaptureTestCase {
         let store = makeStore()
         let s = calendarSuggestion(start: date(2026, 3, 2), propertyId: propertyId)
         store.ingest([s], existingEntries: [], calendar: calendar)
-        XCTAssertEqual(viewModel.confirm(s, store: store), .created(entryId: s.entryId))
-        XCTAssertEqual(viewModel.confirm(s, store: store), .alreadyRecorded(entryId: s.entryId))
-        XCTAssertEqual(viewModel.confirm(s, edits: SuggestionEdits(hours: 9), store: store), .alreadyRecorded(entryId: s.entryId))
+        XCTAssertEqual(viewModel.confirm(s, store: store), .created(entryId: s.entryId(profileId: profileId)))
+        XCTAssertEqual(viewModel.confirm(s, store: store), .alreadyRecorded(entryId: s.entryId(profileId: profileId)))
+        XCTAssertEqual(viewModel.confirm(s, edits: SuggestionEdits(hours: 9), store: store), .alreadyRecorded(entryId: s.entryId(profileId: profileId)))
         XCTAssertEqual(viewModel.timeEntries.filter { $0.sourceKey == s.sourceKey }.count, 1)
-        XCTAssertEqual(viewModel.timeEntries.first { $0.id == s.entryId }?.hours, 1.5)
+        XCTAssertEqual(viewModel.timeEntries.first { $0.id == s.entryId(profileId: profileId) }?.hours, 1.5)
     }
 
     func testInterruptedConfirmRepairsSuggestionWithoutSecondEntry() {
@@ -372,8 +373,8 @@ final class CaptureConfirmTests: CaptureTestCase {
         store.ingest([s], existingEntries: [], calendar: calendar)
         viewModel.confirm(s, store: nil) // entry saved, suggestion never marked (crash between writes)
         XCTAssertTrue(store.suggestion(forKey: s.sourceKey)!.isPending)
-        XCTAssertEqual(viewModel.confirm(s, store: store), .alreadyRecorded(entryId: s.entryId))
-        XCTAssertEqual(store.suggestion(forKey: s.sourceKey)?.state, .confirmed(entryId: s.entryId))
+        XCTAssertEqual(viewModel.confirm(s, store: store), .alreadyRecorded(entryId: s.entryId(profileId: profileId)))
+        XCTAssertEqual(store.suggestion(forKey: s.sourceKey)?.state, .confirmed(entryId: s.entryId(profileId: profileId)))
         XCTAssertEqual(viewModel.timeEntries.count, 1)
     }
 
@@ -383,7 +384,7 @@ final class CaptureConfirmTests: CaptureTestCase {
         deviceA.confirm(s, now: date(2026, 3, 2, 12))
 
         // Device B: same event, same iCloud calendar, confirmed independently (different edits).
-        var entryOnB = TimeEntry(id: s.entryId, propertyId: propertyId, participant: .selfParticipant,
+        var entryOnB = TimeEntry(id: s.entryId(profileId: profileId), propertyId: propertyId, participant: .selfParticipant,
                                  category: .leasing, hours: 2, date: s.start, importSource: "calendar",
                                  detectedAt: s.detectedAt, confirmedAt: date(2026, 3, 2, 13), sourceKey: s.sourceKey)
         entryOnB.modifiedAt = Date().addingTimeInterval(60)
@@ -392,7 +393,7 @@ final class CaptureConfirmTests: CaptureTestCase {
         deviceA.syncDidReceiveEntries([entryOnB])
         XCTAssertEqual(deviceA.timeEntries.filter { $0.sourceKey == s.sourceKey }.count, 1, "Merged, not double-counted")
         XCTAssertEqual(deviceA.timeEntries.count, 1)
-        XCTAssertEqual(deviceA.confirm(s), .alreadyRecorded(entryId: s.entryId))
+        XCTAssertEqual(deviceA.confirm(s), .alreadyRecorded(entryId: s.entryId(profileId: profileId)))
     }
 
     func testConfirmCoveredByLegacyImportDoesNotDoubleCount() {
@@ -416,8 +417,50 @@ final class CaptureConfirmTests: CaptureTestCase {
         XCTAssertEqual(viewModel.confirm(unknownProperty), .needsInput(missing: [.property]))
         XCTAssertTrue(viewModel.timeEntries.isEmpty)
 
-        XCTAssertEqual(viewModel.confirm(receipt, edits: SuggestionEdits(hours: 1)), .created(entryId: receipt.entryId))
+        XCTAssertEqual(viewModel.confirm(receipt, edits: SuggestionEdits(hours: 1)), .created(entryId: receipt.entryId(profileId: profileId)))
         XCTAssertEqual(viewModel.timeEntries.first?.importSource, "receipt")
+    }
+
+    /// Runs the real 1.x calendar import (`importCalendarEntries`, unchanged in 2.0) over the
+    /// same event after a 2.0 confirm: a 1.1 iPad with every row pre-selected must import nothing.
+    func test11CalendarImportSkipsA20ConfirmedEvent() {
+        let (viewModel, propertyId) = makeViewModel()
+        var s = calendarSuggestion(start: date(2026, 3, 2), propertyId: propertyId)
+        s.legacyEventIdentifier = "IPHONE-LOCAL-EVENT-ID"
+        XCTAssertEqual(viewModel.confirm(s), .created(entryId: s.entryId(profileId: profileId)))
+
+        // Same device: 1.x matches on eventIdentifier (importExternalId), title differs on purpose.
+        let sameDevice = DetectedCalendarEntry(sourceExternalId: "IPHONE-LOCAL-EVENT-ID", sourceCalendarId: "IPHONE-CAL",
+                                               eventTitle: "Renamed later", eventDate: s.start,
+                                               propertyId: propertyId, category: .repairs, hours: 7)
+        XCTAssertEqual(viewModel.importCalendarEntries([sameDevice]), 0, "already imported (eventIdentifier)")
+
+        // Another device: different device-local ids, so 1.x falls back to property/category/
+        // hours/start/title — which the 2.0 entry carries.
+        let otherDevice = DetectedCalendarEntry(sourceExternalId: "IPAD-LOCAL-EVENT-ID", sourceCalendarId: "IPAD-CAL",
+                                                eventTitle: "showing - oak st", eventDate: s.start,
+                                                propertyId: propertyId, category: .leasing, hours: 1.5)
+        XCTAssertEqual(viewModel.importCalendarEntries([otherDevice]), 0, "already imported (title match)")
+        XCTAssertEqual(viewModel.timeEntries.count, 1)
+    }
+
+    func testRecordIdsArePerProfileAndStableAcrossDevices() {
+        let key = SuggestionKey.calendar(externalId: "SHARED", occurrence: date(2026, 3, 2))
+        let profileA = CaptureIdentity.entryId(profileId: "local-a", sourceKey: key)
+        let profileB = CaptureIdentity.entryId(profileId: "local-b", sourceKey: key)
+        XCTAssertNotEqual(profileA, profileB, "Two profiles in one iCloud zone never share a record")
+        // Same profile, two devices: computed independently, identical.
+        XCTAssertEqual(CaptureIdentity.entryId(profileId: "local-a", sourceKey: key), profileA)
+
+        // End to end: profile B confirming the same event does not collide with profile A's entry.
+        let (viewModel, propertyId) = makeViewModel()
+        let s = calendarSuggestion(externalId: "SHARED", start: date(2026, 3, 2), propertyId: propertyId)
+        let entryOfOtherProfile = TimeEntry(id: s.entryId(profileId: "local-other"), propertyId: propertyId,
+                                            participant: .selfParticipant, category: .leasing, hours: 1.5,
+                                            date: date(2026, 4, 1), importSource: "calendar",
+                                            confirmedAt: Date())
+        XCTAssertNotEqual(entryOfOtherProfile.id, s.entryId(profileId: profileId))
+        XCTAssertEqual(viewModel.confirm(s), .created(entryId: s.entryId(profileId: profileId)))
     }
 
     func testDismissNeverTouchesEntries() {
@@ -467,14 +510,14 @@ final class AppModelHostTests: CaptureTestCase {
             order.append("completion")
             let data = UserDefaults.standard.data(forKey: entriesKey) ?? Data()
             let saved = (try? JSONDecoder().decode([TimeEntry].self, from: data)) ?? []
-            savedAtCompletion = saved.contains { $0.id == s.entryId }
+            savedAtCompletion = saved.contains { $0.id == s.entryId(profileId: self.profileId) }
         }
 
-        XCTAssertEqual(outcome, .confirmed(entryId: s.entryId))
+        XCTAssertEqual(outcome, .confirmed(entryId: s.entryId(profileId: profileId)))
         XCTAssertEqual(order, ["write", "completion"])
         XCTAssertTrue(savedAtCompletion, "The completion handler runs only after the entry is on disk")
-        XCTAssertEqual(viewModel.timeEntries.filter { $0.id == s.entryId }.count, 1)
-        XCTAssertEqual(host.suggestionStore?.suggestion(forKey: s.sourceKey)?.state, .confirmed(entryId: s.entryId))
+        XCTAssertEqual(viewModel.timeEntries.filter { $0.id == s.entryId(profileId: profileId) }.count, 1)
+        XCTAssertEqual(host.suggestionStore?.suggestion(forKey: s.sourceKey)?.state, .confirmed(entryId: s.entryId(profileId: profileId)))
         XCTAssertEqual(Set(tasks.begun), ["LandlordHours.capture.confirm", "LandlordHours.capture.push"])
         XCTAssertEqual(tasks.ended.count, tasks.begun.count, "Every background-task assertion is ended")
 
@@ -488,9 +531,9 @@ final class AppModelHostTests: CaptureTestCase {
         // A repeated action (double tap / redelivered) records nothing new.
         var completed = false
         let again = await router.handle(logItRequest(s, profileId: profileId)) { completed = true }
-        XCTAssertEqual(again, .alreadyRecorded(entryId: s.entryId))
+        XCTAssertEqual(again, .alreadyRecorded(entryId: s.entryId(profileId: profileId)))
         XCTAssertTrue(completed)
-        XCTAssertEqual(viewModel.timeEntries.filter { $0.id == s.entryId }.count, 1)
+        XCTAssertEqual(viewModel.timeEntries.filter { $0.id == s.entryId(profileId: profileId) }.count, 1)
     }
 
     func testActionForAnotherProfileIsRejected() async {

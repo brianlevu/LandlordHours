@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Confirm-first capture
 //
 // The ONLY path from a suggestion to a tax record. Idempotent on the suggestion's sourceKey:
-// the entry id is derived from the key (`CaptureIdentity`), so a double tap, a repeated
+// the entry id is derived from the profile id + key (`CaptureIdentity`), so a double tap, a repeated
 // notification action, or the same event confirmed on iPhone and iPad all produce one entry
 // (and one CloudKit record).
 
@@ -26,6 +26,8 @@ enum CaptureConfirmResult: Equatable {
 }
 
 enum CaptureConfirmField: String, Hashable, CaseIterable {
+    /// No active profile to record into.
+    case profile
     case property
     case category
     case hours
@@ -42,11 +44,15 @@ extension AppViewModel {
         _ suggestion: Suggestion,
         edits: SuggestionEdits = SuggestionEdits(),
         store: SuggestionStore? = nil,
+        profileId: String? = nil,
         now: Date = Date()
     ) -> CaptureConfirmResult {
-        let entryId = suggestion.entryId
+        guard let profileId = profileId ?? store?.userId ?? UserScope.userId else {
+            return .needsInput(missing: [.profile])
+        }
+        let entryId = suggestion.entryId(profileId: profileId)
 
-        if let existing = CaptureReconciler.confirmedEntry(for: suggestion, in: timeEntries)
+        if let existing = CaptureReconciler.confirmedEntry(for: suggestion, profileId: profileId, in: timeEntries)
             ?? CaptureReconciler.legacyImportMatch(for: suggestion, in: timeEntries) {
             store?.markConfirmed(key: suggestion.sourceKey, entryId: existing.id)
             return .alreadyRecorded(entryId: existing.id)
@@ -65,6 +71,7 @@ extension AppViewModel {
         }
 
         let source = suggestion.kind.entrySource
+        let isCalendar = suggestion.kind == .calendar
         let entry = TimeEntry(
             id: entryId,
             propertyId: propertyId,
@@ -72,13 +79,18 @@ extension AppViewModel {
             category: category,
             hours: hours,
             date: edits.date ?? suggestion.start,
-            // Titles are not copied into notes here: notes sync and print. The confirm sheet
-            // decides what the user keeps.
-            notes: edits.notes ?? "",
+            // 1.1 compatibility: a 1.1 device's calendar import skips an event when an entry
+            // with importSource "calendar" has importExternalId == the event's eventIdentifier,
+            // OR has the same property, category, hours (±0.01), start (±60 s) and notes equal
+            // to the event title (case-insensitive), with no conflicting importCalendarId
+            // (AppViewModel.importCalendarEntries / isDuplicateCalendarEntry). So calendar
+            // confirms keep the title in notes unless the user edits it, store the
+            // eventIdentifier in importExternalId, and leave importCalendarId nil (calendar ids
+            // are device-local and a mismatch would defeat the title check on another device).
+            notes: edits.notes ?? (isCalendar ? suggestion.title : ""),
             importSource: source.storedValue,
-            // Lets 1.1 devices' own calendar dedupe recognise the event.
-            importExternalId: suggestion.kind == .calendar ? suggestion.externalId : nil,
-            importCalendarId: suggestion.kind == .calendar ? suggestion.containerId : nil,
+            importExternalId: isCalendar ? (suggestion.legacyEventIdentifier ?? suggestion.externalId) : nil,
+            importCalendarId: nil,
             detectedAt: suggestion.detectedAt,
             confirmedAt: now,
             sourceDetail: suggestion.isBackfill ? "backfill" : nil,

@@ -12,9 +12,10 @@ enum CaptureReconciler {
     static let hoursTolerance = 0.01
 
     /// The entry that already records this exact suggestion (confirmed here or on another
-    /// device): same `sourceKey`, or the deterministic id derived from it.
-    static func confirmedEntry(for suggestion: Suggestion, in entries: [TimeEntry]) -> TimeEntry? {
-        let derivedId = suggestion.entryId
+    /// device): same `sourceKey`, or the deterministic id derived from it for `profileId`.
+    /// `entries` are the profile's own entries.
+    static func confirmedEntry(for suggestion: Suggestion, profileId: String, in entries: [TimeEntry]) -> TimeEntry? {
+        let derivedId = suggestion.entryId(profileId: profileId)
         return entries.first { $0.id == derivedId || ($0.sourceKey != nil && $0.sourceKey == suggestion.sourceKey) }
     }
 
@@ -206,7 +207,7 @@ final class SuggestionStore {
 
     private func resolved(_ suggestion: Suggestion, entries: [TimeEntry], calendar: Calendar) -> Suggestion {
         var result = suggestion
-        if let existing = CaptureReconciler.confirmedEntry(for: suggestion, in: entries) {
+        if let existing = CaptureReconciler.confirmedEntry(for: suggestion, profileId: userId, in: entries) {
             result.state = .confirmed(entryId: existing.id)
             result.mightAlreadyBeLogged = false
         } else if let legacy = CaptureReconciler.legacyImportMatch(for: suggestion, in: entries, calendar: calendar) {

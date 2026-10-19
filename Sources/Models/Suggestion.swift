@@ -5,18 +5,21 @@ import CryptoKit
 //
 // The same real-world event can be confirmed on two devices (iPhone and iPad read the same
 // iCloud calendar). Deriving the TimeEntry id — which is also the CloudKit record name — from
-// the suggestion's dedupe key makes both confirms land on ONE CloudKit record, so iCloud
-// merges them instead of double-counting tax hours.
+// the profile id plus the suggestion's dedupe key makes both confirms land on ONE CloudKit
+// record, so iCloud merges them instead of double-counting tax hours.
+// The profile id is part of the name because every profile on an iCloud account shares one
+// sync zone: two profiles confirming the same event must get DIFFERENT records, or one
+// profile's edit/delete would hit the other's tax record.
 enum CaptureIdentity {
     /// Fixed namespace for LandlordHours capture ids. Never change it: changing it would give
     /// already-confirmed events new ids and break cross-device dedupe.
     static let namespace = UUID(uuidString: "6C1B6E2A-4F0D-5B8E-9C3A-2D7E1F4A8B60")!
 
-    /// RFC 4122 version-5 (SHA-1, name-based) UUID of `sourceKey` in `namespace`.
-    static func entryId(forSourceKey sourceKey: String) -> UUID {
+    /// RFC 4122 version-5 (SHA-1, name-based) UUID of `"<profileId>|<sourceKey>"` in `namespace`.
+    static func entryId(profileId: String, sourceKey: String) -> UUID {
         var bytes = [UInt8]()
         withUnsafeBytes(of: namespace.uuid) { bytes.append(contentsOf: $0) }
-        bytes.append(contentsOf: Array(sourceKey.utf8))
+        bytes.append(contentsOf: Array("\(profileId)|\(sourceKey)".utf8))
         var digest = Array(Insecure.SHA1.hash(data: bytes)).prefix(16).map { $0 }
         digest[6] = (digest[6] & 0x0F) | 0x50   // version 5
         digest[8] = (digest[8] & 0x3F) | 0x80   // RFC 4122 variant
@@ -121,6 +124,9 @@ struct Suggestion: Identifiable, Codable, Equatable {
     var title: String
     /// Device-shared identifier of the source item (calendar external id), if any.
     var externalId: String?
+    /// The calendar event's device-local `eventIdentifier`. Written to `importExternalId` on
+    /// confirm, because that is the field 1.x's calendar import dedupes on.
+    var legacyEventIdentifier: String?
     /// Container of the source item (calendar id), used by mute rules.
     var containerId: String?
     var proposedPropertyId: UUID?
@@ -145,6 +151,7 @@ struct Suggestion: Identifiable, Codable, Equatable {
         end: Date? = nil,
         title: String,
         externalId: String? = nil,
+        legacyEventIdentifier: String? = nil,
         containerId: String? = nil,
         proposedPropertyId: UUID? = nil,
         proposedCategory: ActivityCategory? = nil,
@@ -165,6 +172,7 @@ struct Suggestion: Identifiable, Codable, Equatable {
         self.end = end
         self.title = title
         self.externalId = externalId
+        self.legacyEventIdentifier = legacyEventIdentifier
         self.containerId = containerId
         self.proposedPropertyId = proposedPropertyId
         self.proposedCategory = proposedCategory
@@ -187,8 +195,10 @@ struct Suggestion: Identifiable, Codable, Equatable {
         isPending && !mightAlreadyBeLogged && proposedPropertyId != nil && (proposedHours ?? 0) > 0
     }
 
-    /// The TimeEntry id a confirm of this suggestion produces, on every device.
-    var entryId: UUID { CaptureIdentity.entryId(forSourceKey: sourceKey) }
+    /// The TimeEntry id a confirm of this suggestion produces for `profileId`, on every device.
+    func entryId(profileId: String) -> UUID {
+        CaptureIdentity.entryId(profileId: profileId, sourceKey: sourceKey)
+    }
 }
 
 /// The user's edits on the confirm sheet. Nil fields fall back to the suggestion's proposal.
