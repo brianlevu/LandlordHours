@@ -358,7 +358,11 @@ final class LandlordHoursUITests: XCTestCase {
         let deadline = Date().addingTimeInterval(timeout)
         var swipes = 0
         while Date() < deadline {
-            if element.exists && element.isHittable {
+            // The floating tab bar overlays scroll content; XCUI can report a row under it as
+            // hittable, and the tap then lands on a tab. Require the row to clear the bar.
+            let tabBar = app.buttons["tab.today"]
+            let clearsTabBar = !tabBar.exists || element.frame.maxY < tabBar.frame.minY - 8
+            if element.exists && element.isHittable && clearsTabBar {
                 element.tap()
                 return
             }
