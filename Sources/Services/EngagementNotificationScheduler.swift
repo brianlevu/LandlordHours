@@ -63,10 +63,15 @@ final class EngagementNotificationScheduler {
         content.sound = plan.playsSound ? .default : nil
         content.threadIdentifier = "landlordhours.engagement"
         content.categoryIdentifier = categoryIdentifier(for: plan.destination)
-        content.userInfo = [
+        var userInfo: [String: Any] = [
             "reason": plan.reason.rawValue,
-            "destination": plan.destination.rawValue
+            NotificationPayload.destinationKey: plan.destination.rawValue
         ]
+        // Every notification carries the profile it was made for (see NotificationPayload).
+        if let profileId = UserScope.userId {
+            userInfo[NotificationPayload.profileIdKey] = profileId
+        }
+        content.userInfo = userInfo
 
         if #available(iOS 15.0, *) {
             content.interruptionLevel = interruptionLevel(for: plan.reason)
