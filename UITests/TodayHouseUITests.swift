@@ -39,10 +39,15 @@ final class TodayHouseUITests: XCTestCase {
     }
 
     private func attach(_ name: String) {
-        let shot = XCTAttachment(screenshot: app.screenshot())
+        let screenshot = app.screenshot()
+        let shot = XCTAttachment(screenshot: screenshot)
         shot.name = name
         shot.lifetime = .keepAlways
         add(shot)
+        // Captures: `TEST_RUNNER_LH_CAPTURE_DIR=<dir> xcodebuild test ...` also writes the PNG there.
+        if let dir = ProcessInfo.processInfo.environment["LH_CAPTURE_DIR"], !dir.isEmpty {
+            try? screenshot.pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).png"))
+        }
     }
 
     func testTodayAtZeroHoursShowsEmptyLotAndUncheckedRule() {
