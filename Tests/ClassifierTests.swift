@@ -493,7 +493,7 @@ final class ClassifierTests: XCTestCase {
         // "slow" titles take 3 s; the budget is 50 ms, so they keep the rules result.
         let backend = SlowFakeBackend(delay: 0.001, slowDelay: 3, answer: answer(true, 0.95, category: .legal))
         let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
-        let items = backfill(4, prefix: "slow receipts upload") + backfill(4, prefix: "Upload receipts to Stessa")
+        let items = backfill(4, prefix: "slow mold check") + backfill(4, prefix: "Upload receipts to Stessa")
         let started = Date()
         let results = try await chain.classifyBatch(items, properties: properties, maxConcurrent: 2, perItemBudget: 0.05)
         XCTAssertLessThan(Date().timeIntervalSince(started), 2, "budget not enforced")
