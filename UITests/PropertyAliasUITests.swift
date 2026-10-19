@@ -21,8 +21,11 @@ final class PropertyAliasUITests: XCTestCase {
 
     func testAliasesAndLivesHereLight() { run(scheme: "light") }
     func testAliasesAndLivesHereDark() { run(scheme: "dark") }
+    /// Accessibility Dynamic Type AX3 (UICTContentSizeCategoryAccessibilityXL) with 3 aliases.
+    func testAliasesAtAccessibilitySizeLight() { runLargeType(scheme: "light") }
+    func testAliasesAtAccessibilitySizeDark() { runLargeType(scheme: "dark") }
 
-    private func run(scheme: String) {
+    private func launch(scheme: String, extra: [String] = []) {
         app.launchArguments = [
             UITestIsolation.resetProfilesArgument,
             "-LHMockScenario", "occasional",
@@ -31,41 +34,50 @@ final class PropertyAliasUITests: XCTestCase {
             "-LHColorScheme", scheme,
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US",
-        ]
+        ] + extra
         app.launch()
+    }
+
+    private func run(scheme: String) {
+        launch(scheme: scheme)
 
         let field = app.textFields["property.alias.field"]
         let toggle = app.switches["property.ownerOccupied"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 15), "Property detail should open")
-        bringIntoView(toggle)
-        XCTAssertEqual(toggle.value as? String, "0", "I live here starts off")
-        capture("\(scheme)-1-livehere-off")
-
         bringIntoView(field)
+        XCTAssertTrue(toggle.isHittable, "toggle and alias card share the frame")
+        XCTAssertEqual(toggle.value as? String, "0", "I live here starts off")
         XCTAssertFalse(app.buttons["Remove Lake House"].exists)
-        capture("\(scheme)-2-aliases-empty")
+        capture("\(scheme)-1-livehere-off-aliases-empty")
 
         // Under 3 characters: explained, and Add stays off.
-        bringIntoView(field)
         field.tap()
         field.typeText("ab")
         XCTAssertTrue(app.staticTexts["property.alias.hint"].waitForExistence(timeout: 3), "short-name hint")
         XCTAssertFalse(app.buttons["property.alias.add"].isEnabled)
-        capture("\(scheme)-2b-alias-too-short")
+        capture("\(scheme)-2-alias-too-short")
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 2))
         XCTAssertFalse(app.staticTexts["property.alias.hint"].exists)
 
-        for alias in ["Lake House", "Sunny Loft listing", "Ridgeline Plumbing"] { add(alias, field: field) }
+        // A valid name: Add turns on.
+        field.typeText("Lake House")
+        XCTAssertTrue(app.buttons["property.alias.add"].isEnabled, "Add is enabled for a valid name")
+        XCTAssertFalse(app.staticTexts["property.alias.hint"].exists)
+        capture("\(scheme)-3-add-enabled")
+        field.typeText("\n")
+        if app.keyboards.count > 0 { app.staticTexts["Other names for this property"].tap() }
+
+        for alias in ["Sunny Loft listing", "Ridgeline Plumbing"] { add(alias, field: field) }
         for alias in ["Lake House", "Sunny Loft listing", "Ridgeline Plumbing"] {
             XCTAssertTrue(app.buttons["Remove \(alias)"].waitForExistence(timeout: 3), "chip for \(alias)")
         }
         bringIntoView(field)
-        capture("\(scheme)-3-aliases-three")
+        capture("\(scheme)-4-aliases-three")
 
         add(longAlias, field: field)
         XCTAssertTrue(app.buttons["Remove \(longAlias)"].waitForExistence(timeout: 3))
         bringIntoView(field)
-        capture("\(scheme)-4-aliases-long")
+        capture("\(scheme)-5-aliases-long")
 
         // Duplicates (any case) are not added twice.
         add("lake house", field: field)
@@ -77,12 +89,31 @@ final class PropertyAliasUITests: XCTestCase {
             toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
         }
         XCTAssertEqual(toggle.value as? String, "1", "I live here turns on")
-        capture("\(scheme)-5-livehere-on")
+        capture("\(scheme)-6-livehere-on")
 
         let save = app.buttons["Save changes"]
         bringIntoView(save)
         save.tap()
         XCTAssertTrue(save.waitForNonExistence(timeout: 5), "Saved")
+    }
+
+    private func runLargeType(scheme: String) {
+        launch(scheme: scheme, extra: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL"])
+        let field = app.textFields["property.alias.field"]
+        let toggle = app.switches["property.ownerOccupied"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 15), "Property detail should open")
+        bringIntoView(toggle)
+        capture("\(scheme)-7-ax3-livehere-off")
+        let names = ["Lake House", "Sunny Loft listing", "Ridgeline Plumbing"]
+        for alias in names { add(alias, field: field) }
+        for alias in names {
+            XCTAssertTrue(app.buttons["Remove \(alias)"].waitForExistence(timeout: 3), "chip for \(alias)")
+        }
+        let chip = app.buttons["Remove Lake House"]
+        bringIntoView(chip)
+        capture("\(scheme)-8-ax3-aliases-three")
+        bringIntoView(field)
+        capture("\(scheme)-9-ax3-alias-field")
     }
 
     private func add(_ alias: String, field: XCUIElement) {

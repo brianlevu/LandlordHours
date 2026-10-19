@@ -1024,16 +1024,16 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     /// `.changedKeys`. Add each to the DEVELOPMENT schema, then deploy to Production before any
     /// 2.0 build reaches users.
     enum PropertyField {
-        static let aliases = "aliases"                  // String (list); only when non-empty
-        static let aliasCount = "aliasCount"            // Int64; only when non-empty
-        static let isOwnerOccupied = "isOwnerOccupied"  // Int64 1; only when true
+        static let aliases = "aliases"                  // String (list); always written, may be empty
+        static let aliasCount = "aliasCount"            // Int64; always written (0 = cleared)
+        static let isOwnerOccupied = "isOwnerOccupied"  // Int64 0/1; always written
         static let all = [aliases, aliasCount, isOwnerOccupied]
     }
 
-    /// RentalProperty → CKRecord. The 2.0 fields are written only when they differ from the
-    /// default (aliases non-empty, owner-occupied true), so a save for a user who never set
-    /// them touches no new field. Trade-off: clearing every alias, or turning "I live here"
-    /// off, is not pushed (the server keeps the last non-default value).
+    /// RentalProperty → CKRecord. The 2.0 fields are ALWAYS written (never nil), so clearing
+    /// every alias or turning "I live here" off syncs to other devices. An empty list may come
+    /// back from the server as missing; `aliasCount` 0 is what marks it cleared. Requires the
+    /// Production schema deploy (a release gate) before any 2.0 build ships.
     nonisolated static func record(for property: RentalProperty, zoneID: CKRecordZone.ID, appUserId: String?) -> CKRecord {
         let recordID = CKRecord.ID(recordName: property.id.uuidString, zoneID: zoneID)
         let record = CKRecord(recordType: "Property", recordID: recordID)
@@ -1043,11 +1043,9 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         record["createdAt"] = property.createdAt
         record["modifiedAt"] = property.modifiedAt
         let aliases = RentalProperty.cleanedAliases(property.aliases)
-        if !aliases.isEmpty {
-            record[PropertyField.aliases] = aliases
-            record[PropertyField.aliasCount] = Int64(aliases.count)
-        }
-        if property.isOwnerOccupied { record[PropertyField.isOwnerOccupied] = Int64(1) }
+        record[PropertyField.aliases] = aliases
+        record[PropertyField.aliasCount] = Int64(aliases.count)
+        record[PropertyField.isOwnerOccupied] = Int64(property.isOwnerOccupied ? 1 : 0)
         if let appUserId { record["appUserId"] = appUserId }
         return record
     }

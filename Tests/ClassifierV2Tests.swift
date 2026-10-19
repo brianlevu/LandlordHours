@@ -341,25 +341,41 @@ final class ClassifierV2Tests: XCTestCase {
         XCTAssertEqual(back.propertyType, .str)
     }
 
-    func testDefaultFieldsAreNeverWritten() throws {
-        // A user who never set aliases or "I live here": a 2.0 save touches no new field.
+    func testPropertyFieldsAreAlwaysWrittenAndNeverNil() throws {
         let record = CloudKitSyncService.record(for: oak, zoneID: zone, appUserId: nil)
         let keys = Set(record.allKeys())
         for field in CloudKitSyncService.PropertyField.all {
-            XCTAssertFalse(keys.contains(field), "\(field) must not be sent at its default")
+            XCTAssertTrue(keys.contains(field), "\(field) is always sent")
         }
         XCTAssertNil(record["appUserId"])
         for key in record.allKeys() { XCTAssertNotNil(record[key], "\(key) written as nil") }
-        XCTAssertEqual(Set(record.changedKeys()), keys)
-        // Only the non-default one is sent.
-        var occupiedOnly = oak
-        occupiedOnly.isOwnerOccupied = true
-        let r2 = CloudKitSyncService.record(for: occupiedOnly, zoneID: zone, appUserId: nil)
-        XCTAssertEqual(r2[CloudKitSyncService.PropertyField.isOwnerOccupied] as? Int64, 1)
-        XCTAssertNil(r2[CloudKitSyncService.PropertyField.aliases])
-        XCTAssertNil(r2[CloudKitSyncService.PropertyField.aliasCount])
-        XCTAssertEqual(CloudKitSyncService.property(from: r2)?.isOwnerOccupied, true)
-        XCTAssertEqual(CloudKitSyncService.property(from: r2)?.aliases, [])
+        for key in record.changedKeys() { XCTAssertNotNil(record[key], "\(key) changed to nil") }
+    }
+
+    /// Clearing must sync: set an alias and "I live here", then clear both.
+    func testClearingAliasesAndLivesHereIsPushed() throws {
+        var p = oak
+        p.aliases = ["Ridgeline Plumbing"]
+        p.isOwnerOccupied = true
+        let set = CloudKitSyncService.record(for: p, zoneID: zone, appUserId: nil)
+        XCTAssertEqual(set[CloudKitSyncService.PropertyField.aliases] as? [String], ["Ridgeline Plumbing"])
+        XCTAssertEqual(set[CloudKitSyncService.PropertyField.isOwnerOccupied] as? Int64, 1)
+
+        p.aliases = []
+        p.isOwnerOccupied = false
+        let cleared = CloudKitSyncService.record(for: p, zoneID: zone, appUserId: nil)
+        XCTAssertEqual(cleared[CloudKitSyncService.PropertyField.aliases] as? [String], [])
+        XCTAssertEqual(cleared[CloudKitSyncService.PropertyField.aliasCount] as? Int64, 0)
+        XCTAssertEqual(cleared[CloudKitSyncService.PropertyField.isOwnerOccupied] as? Int64, 0)
+        XCTAssertTrue(cleared.changedKeys().contains(CloudKitSyncService.PropertyField.aliasCount))
+        XCTAssertTrue(cleared.changedKeys().contains(CloudKitSyncService.PropertyField.isOwnerOccupied))
+        let back = try XCTUnwrap(CloudKitSyncService.property(from: cleared))
+        XCTAssertEqual(back.aliases, [])
+        XCTAssertFalse(back.isOwnerOccupied)
+
+        // The server may drop an empty list; a stale list with aliasCount 0 still reads as cleared.
+        cleared[CloudKitSyncService.PropertyField.aliases] = ["Stale"]
+        XCTAssertEqual(CloudKitSyncService.property(from: cleared)?.aliases, [])
     }
 
     func testPropertyRecordWrittenBy11DecodesWithDefaults() throws {
