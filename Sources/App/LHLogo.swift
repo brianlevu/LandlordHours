@@ -1,9 +1,128 @@
 import SwiftUI
 
-// MARK: - LandlordHours Logo
-// Wave-house icon — house silhouette filled with flowing violet gradient waves
-// Matches the app icon (Variant A) from figma-redesign/app-icons.html
+// MARK: - LandlordHours 2.0 logo — mark B "half drawn, half built"
+//
+// Source: design/brand/logo/mark-b.svg (1024 grid, translate(10 -11.5) for optical centring) and
+// design/brand/icon/icon-b-1024.png (the approved app icon). A house elevation on blueprint blue:
+// foundation, left wall, left roof slope and door are built (plaster / terracotta / timber); the
+// right slope, upper right wall and window are still drafting-cyan linework.
+// Brand rules: docs/design/2.0-brand-system.md §5.
 
+/// The mark's geometry in the 1024 design grid (already optically centred).
+enum LHMarkGeometry {
+    static let grid: CGFloat = 1024
+    static let offset = CGSize(width: 10, height: -11.5)
+    static let draftWidth: CGFloat = 26
+    static let roofWidth: CGFloat = 66
+
+    static func point(_ x: CGFloat, _ y: CGFloat, scale: CGFloat) -> CGPoint {
+        CGPoint(x: (x + offset.width) * scale, y: (y + offset.height) * scale)
+    }
+
+    static func rect(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, scale: CGFloat) -> CGRect {
+        CGRect(origin: point(x, y, scale: scale), size: CGSize(width: w * scale, height: h * scale))
+    }
+
+    /// Drawn (cyan) linework: right roof slope, right wall edge, window. Stroke these.
+    static func draftPath(scale s: CGFloat) -> Path {
+        var p = Path()
+        p.move(to: point(512, 232, scale: s)); p.addLine(to: point(836, 486, scale: s))
+        p.move(to: point(770, 436, scale: s)); p.addLine(to: point(770, 700, scale: s))
+        p.addRoundedRect(in: rect(588, 540, 120, 96, scale: s), cornerSize: CGSize(width: 12 * s, height: 12 * s))
+        return p
+    }
+
+    /// Built plaster: slab, left wall, right wall to the course. Fill.
+    static func plasterPath(scale s: CGFloat) -> Path {
+        var p = Path()
+        p.addRoundedRect(in: rect(222, 808, 580, 40, scale: s), cornerSize: CGSize(width: 10 * s, height: 10 * s))
+        p.addRect(rect(250, 470, 262, 342, scale: s))
+        p.addRect(rect(512, 690, 258, 122, scale: s))
+        return p
+    }
+
+    /// Built terracotta roof slope (left). Stroke with `roofWidth`.
+    static func roofPath(scale s: CGFloat) -> Path {
+        var p = Path()
+        p.move(to: point(512, 232, scale: s)); p.addLine(to: point(188, 486, scale: s))
+        return p
+    }
+
+    /// Timber door. Fill.
+    static func doorPath(scale s: CGFloat) -> Path {
+        var p = Path()
+        p.move(to: point(382, 683, scale: s))
+        p.addArc(center: point(429, 683, scale: s), radius: 47 * s,
+                 startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
+        p.addLine(to: point(476, 812, scale: s))
+        p.addLine(to: point(382, 812, scale: s))
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// Single-colour mark (template): tint with `.foregroundStyle`. For widgets, the Dynamic Island
+/// and anywhere the mark sits on a system surface. Mirrors logo/mark-b-mono.svg.
+struct LHMarkShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let side = min(rect.width, rect.height)
+        let s = side / LHMarkGeometry.grid
+        var p = Path()
+        let round = StrokeStyle(lineWidth: LHMarkGeometry.draftWidth * s, lineCap: .round, lineJoin: .round)
+        p.addPath(LHMarkGeometry.draftPath(scale: s).strokedPath(round))
+        p.addPath(LHMarkGeometry.plasterPath(scale: s))
+        p.addPath(LHMarkGeometry.roofPath(scale: s)
+            .strokedPath(StrokeStyle(lineWidth: LHMarkGeometry.roofWidth * s, lineCap: .round)))
+        p.addPath(LHMarkGeometry.doorPath(scale: s))
+        let dx = rect.minX + (rect.width - side) / 2
+        let dy = rect.minY + (rect.height - side) / 2
+        return p.applying(CGAffineTransform(translationX: dx, y: dy))
+    }
+}
+
+/// The full-colour mark on a transparent background (for blueprint surfaces such as the hero).
+struct LHMark: View {
+    var size: CGFloat = 80
+
+    var body: some View {
+        Canvas { context, canvasSize in
+            let s = canvasSize.width / LHMarkGeometry.grid
+            context.stroke(
+                LHMarkGeometry.draftPath(scale: s),
+                with: .color(Color(hex: AppColors.Hex.drafting)),
+                style: StrokeStyle(lineWidth: LHMarkGeometry.draftWidth * s, lineCap: .round, lineJoin: .round)
+            )
+            context.fill(LHMarkGeometry.plasterPath(scale: s), with: .color(AppColors.plaster))
+            context.stroke(
+                LHMarkGeometry.roofPath(scale: s),
+                with: .color(AppColors.terracotta),
+                style: StrokeStyle(lineWidth: LHMarkGeometry.roofWidth * s, lineCap: .round)
+            )
+            context.fill(LHMarkGeometry.doorPath(scale: s), with: .color(AppColors.timber))
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - App-icon tile (self-contained, any size)
+/// The mark on its blueprint tile — the in-app twin of the app icon. The name is kept from 1.x so
+/// existing call sites (splash, sign-in, onboarding) pick up the new mark.
+struct WaveHouseIcon: View {
+    var size: CGFloat = 80
+
+    var body: some View {
+        ZStack {
+            AppColors.brand
+            LHMark(size: size)
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.2237, style: .continuous))
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Logo (mark + wordmark)
 struct LHLogo: View {
     var size: CGFloat = 80
     var showText: Bool = true
@@ -14,9 +133,14 @@ struct LHLogo: View {
 
     var body: some View {
         VStack(spacing: size * 0.2) {
-            logoMark
+            WaveHouseIcon(size: size)
+                .shadow(color: AppColors.brand.opacity(0.22), radius: size * 0.12, y: size * 0.05)
+                .scaleEffect(appeared ? 1 : 0.3)
+                .opacity(appeared ? 1 : 0)
             if showText {
-                logoText
+                LHWordmark(fontSize: max(size * 0.28, 17))
+                    .opacity(appeared ? 1 : 0)
+                    .offset(y: appeared ? 0 : 10)
             }
         }
         .onAppear {
@@ -29,116 +153,6 @@ struct LHLogo: View {
             }
         }
     }
-
-    // MARK: - Logo Mark (Wave House Icon)
-    private var logoMark: some View {
-        WaveHouseIcon(size: size)
-            .shadow(color: AppColors.primary.opacity(0.3), radius: size * 0.15, y: size * 0.06)
-            .scaleEffect(appeared ? 1 : 0.3)
-            .opacity(appeared ? 1 : 0)
-    }
-
-    // MARK: - Logo Text
-    private var logoText: some View {
-        VStack(spacing: size * 0.04) {
-            (
-                Text("Landlord")
-                    .foregroundColor(AppColors.charcoal)
-                +
-                Text("Hours")
-                    .foregroundColor(AppColors.primary)
-            )
-            .font(.system(size: size * 0.28, weight: .bold, design: .rounded))
-        }
-        .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 10)
-    }
-}
-
-// MARK: - Wave House Icon (self-contained, any size)
-/// The primary brand mark — a house silhouette clipped with flowing violet gradient waves
-struct WaveHouseIcon: View {
-    var size: CGFloat = 80
-
-    var body: some View {
-        Canvas { context, canvasSize in
-            let s = canvasSize.width
-            let scale = s / 1024
-
-            // Helper to scale points from 1024 coordinate space
-            func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-                CGPoint(x: x * scale, y: y * scale)
-            }
-
-            // 1. Background fill
-            let bgRect = CGRect(origin: .zero, size: canvasSize)
-            context.fill(Path(bgRect), with: .color(AppColors.logoCanvas))
-
-            // 2. House clip path
-            var housePath = Path()
-            housePath.move(to: p(512, 140))
-            housePath.addLine(to: p(168, 390))
-            housePath.addLine(to: p(168, 880))
-            housePath.addQuadCurve(to: p(198, 910), control: p(168, 910))
-            housePath.addLine(to: p(826, 910))
-            housePath.addQuadCurve(to: p(856, 880), control: p(856, 910))
-            housePath.addLine(to: p(856, 390))
-            housePath.closeSubpath()
-            // Chimney
-            housePath.move(to: p(700, 180))
-            housePath.addLine(to: p(700, 280))
-            housePath.addLine(to: p(780, 280))
-            housePath.addLine(to: p(780, 250))
-            housePath.addQuadCurve(to: p(740, 180), control: p(780, 180))
-            housePath.closeSubpath()
-
-            context.clipToLayer { ctx in
-                ctx.fill(housePath, with: .color(.white))
-            }
-
-            // 3. Base gradient (lightest violet)
-            let bgGradient = Gradient(colors: [AppColors.logoWaveLightStart, AppColors.primaryLight])
-            context.fill(Path(bgRect), with: .linearGradient(bgGradient, startPoint: .zero, endPoint: CGPoint(x: 0, y: s)))
-
-            // 4. Wave 1 — light violet
-            var wave1 = Path()
-            wave1.move(to: p(0, 380))
-            wave1.addQuadCurve(to: p(400, 370), control: p(200, 310))
-            wave1.addQuadCurve(to: p(800, 360), control: p(600, 430))
-            wave1.addQuadCurve(to: p(1024, 350), control: p(900, 330))
-            wave1.addLine(to: p(1024, 1024))
-            wave1.addLine(to: p(0, 1024))
-            wave1.closeSubpath()
-            let w1Gradient = Gradient(colors: [AppColors.logoWaveMidStart, AppColors.logoWaveMidEnd])
-            context.fill(wave1, with: .linearGradient(w1Gradient, startPoint: .zero, endPoint: CGPoint(x: s, y: s)))
-
-            // 5. Wave 2 — mid violet
-            var wave2 = Path()
-            wave2.move(to: p(0, 520))
-            wave2.addQuadCurve(to: p(480, 510), control: p(250, 440))
-            wave2.addQuadCurve(to: p(900, 480), control: p(700, 580))
-            wave2.addQuadCurve(to: p(1024, 470), control: p(980, 450))
-            wave2.addLine(to: p(1024, 1024))
-            wave2.addLine(to: p(0, 1024))
-            wave2.closeSubpath()
-            let w2Gradient = Gradient(colors: [AppColors.logoWaveStrongStart, AppColors.primary])
-            context.fill(wave2, with: .linearGradient(w2Gradient, startPoint: .zero, endPoint: CGPoint(x: s, y: s)))
-
-            // 6. Wave 3 — deep violet
-            var wave3 = Path()
-            wave3.move(to: p(0, 660))
-            wave3.addQuadCurve(to: p(420, 650), control: p(220, 590))
-            wave3.addQuadCurve(to: p(850, 620), control: p(650, 720))
-            wave3.addQuadCurve(to: p(1024, 610), control: p(950, 580))
-            wave3.addLine(to: p(1024, 1024))
-            wave3.addLine(to: p(0, 1024))
-            wave3.closeSubpath()
-            let w3Gradient = Gradient(colors: [AppColors.logoWaveDeepStart, AppColors.logoWaveDeepEnd])
-            context.fill(wave3, with: .linearGradient(w3Gradient, startPoint: .zero, endPoint: CGPoint(x: s * 0.5, y: s)))
-        }
-        .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
-    }
 }
 
 // MARK: - Compact Logo (for headers, nav bars)
@@ -147,23 +161,32 @@ struct LHCompactLogo: View {
 
     var body: some View {
         WaveHouseIcon(size: size)
-            .shadow(color: AppColors.primary.opacity(0.25), radius: size * 0.12, y: size * 0.05)
+            .shadow(color: AppColors.brand.opacity(0.18), radius: size * 0.1, y: size * 0.04)
     }
 }
 
 // MARK: - Wordmark (text-only logo)
+/// "Landlord" in ink + "Hours" in the action colour (blueprint in light, cyan in dark), per
+/// logo/wordmark.svg. Fraunces 600 at 28pt and up; below that SF Pro semibold (the brand rule
+/// keeps Fraunces off small text).
 struct LHWordmark: View {
     var fontSize: CGFloat = 28
 
-    var body: some View {
-        HStack(spacing: 0) {
-            Text("Landlord")
-                .font(.system(size: fontSize, weight: .bold, design: .rounded))
-                .foregroundColor(AppColors.charcoal)
-            Text("Hours")
-                .font(.system(size: fontSize, weight: .bold, design: .rounded))
-                .foregroundColor(AppColors.primary)
+    @Environment(\.colorScheme) private var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    private var font: Font {
+        if fontSize >= LHFont.frauncesMinimumSize && LHFont.isFrauncesAvailable {
+            return Font.custom(LHFont.frauncesFamily, size: fontSize).weight(.semibold)
         }
+        return Font.system(size: fontSize, weight: .semibold, design: .default)
+    }
+
+    var body: some View {
+        (Text("Landlord").foregroundColor(colors.textPrimary)
+         + Text("Hours").foregroundColor(colors.action))
+            .font(font)
+            .accessibilityLabel("LandlordHours")
     }
 }
 
@@ -176,9 +199,10 @@ struct LHWordmark: View {
             WaveHouseIcon(size: 64)
             WaveHouseIcon(size: 48)
             LHCompactLogo(size: 32)
+            LHMarkShape().fill(AppColors.brand).frame(width: 48, height: 48)
         }
 
-        LHWordmark(fontSize: 28)
+        LHWordmark(fontSize: 34)
     }
     .padding()
     .background(AppColors.background)

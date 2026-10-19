@@ -231,10 +231,10 @@ struct TimeLogView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Log your time")
-                        .font(.system(size: 34, weight: .black, design: .rounded))
+                        .lhDisplayFont(.largeTitle)
                         .foregroundStyle(colors.textPrimary)
                         .lineSpacing(-1)
-                        .minimumScaleFactor(0.82)
+                        .minimumScaleFactor(0.83)
                     Text(trackMode == .log ? "Describe the work and review the filled details." : "Start a timer for work in progress.")
                         .font(.system(size: 15, weight: .medium, design: .rounded))
                         .foregroundStyle(colors.textSecondary)
@@ -318,7 +318,7 @@ struct TimeLogView: View {
         ZStack(alignment: .topLeading) {
             if entryNotes.isEmpty {
                 Text("Called plumber about the Oak Street leak for 1 hour")
-                    .foregroundStyle(colors.textSecondary.opacity(0.72))
+                    .foregroundStyle(colors.textTertiary)
                     .font(.system(size: 16, weight: .medium, design: .rounded))
                     .padding(.top, 20)
                     .padding(.leading, 20)

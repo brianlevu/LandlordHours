@@ -321,9 +321,9 @@ struct PropertiesView: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Properties")
-                    .font(.system(size: 34, weight: .black, design: .rounded))
+                    .lhDisplayFont(.largeTitle)
                     .foregroundStyle(colors.textPrimary)
-                    .minimumScaleFactor(0.82)
+                    .minimumScaleFactor(0.83)
                 Text(propertyHeaderSubtitle)
                     .font(.system(size: 15, weight: .medium, design: .rounded))
                     .foregroundStyle(colors.textSecondary)
@@ -332,11 +332,14 @@ struct PropertiesView: View {
             Button {
                 openAddProperty()
             } label: {
-                    LucideIcon(image: Lucide.circlePlus, size: 22)
-                    .foregroundStyle(colors.textPrimary)
-                    .frame(width: 48, height: 48)
-                    .background(colors.backgroundTertiary)
-                    .clipShape(Circle())
+                Label("Add property", systemImage: "house")
+                    .font(AppTypography.buttonSmall)
+                    .foregroundStyle(colors.action)
+                    .padding(.horizontal, 14)
+                    .frame(height: 40)
+                    .background(colors.actionSurface)
+                    .clipShape(Capsule())
+                    .padding(.top, 4)
             }
             .guidedSpotlightTarget(.addProperty)
             .accessibilityLabel("Add property")

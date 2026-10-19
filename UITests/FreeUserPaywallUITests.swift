@@ -156,11 +156,11 @@ final class FreeUserPaywallUITests: XCTestCase {
         app.launchArguments = baseArguments(scenario: "occasional", tab: 0, scheme: scheme)
         app.launch()
         taps = 0
-        XCTAssertTrue(app.buttons["Home"].waitForExistence(timeout: 12), "Home tab bar should load")
+        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 12), "Home tab bar should load")
     }
 
-    /// Home, Properties and Track live in the tab bar; Reports and Settings are reached
-    /// from the Home header buttons. Each is one tap from Home.
+    /// Today, Inbox, Records and Properties live in the tab bar (Log time is the round +);
+    /// Reports and Settings are reached from Today's header buttons. Each is one tap from Today.
     private func tapTab(_ title: String) {
         let label: String
         switch title {
@@ -296,9 +296,9 @@ final class FreeUserPaywallUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Connect Calendar"].waitForExistence(timeout: 6))
         settleAndCapture("onboarding-last-step", scheme: scheme, waitFor: app.buttons["Connect Calendar"])
         tap(app.buttons["Skip for now"])
-        XCTAssertTrue(app.buttons["Home"].waitForExistence(timeout: 10), "Onboarding lands on the app, not a paywall")
+        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 10), "Onboarding lands on the app, not a paywall")
         XCTAssertFalse(app.descendants(matching: .any)["paywall.title"].exists)
-        settleAndCapture("onboarding-finished-home", scheme: scheme, waitFor: app.buttons["Home"])
+        settleAndCapture("onboarding-finished-home", scheme: scheme, waitFor: app.buttons["tab.today"])
     }
 
     private func capturePaywall(_ name: String, scheme: String) {

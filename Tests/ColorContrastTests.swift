@@ -87,4 +87,98 @@ final class ColorContrastTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(contrast(colors.cautionText, colors.backgroundSecondary, style), 4.5)
         }
     }
+    // MARK: - 2.0 Blueprint brand pairs (design/brand/contrast.txt)
+
+    /// Every text pair the brand system defines, both schemes, at WCAG AA (4.5:1).
+    func testBlueprintTextPairsPassAA() {
+        for (scheme, style) in [(ColorScheme.light, UIUserInterfaceStyle.light), (.dark, .dark)] {
+            let c = AdaptiveColors(colorScheme: scheme)
+            let surfaces: [(String, Color)] = [("card", c.backgroundSecondary), ("canvas", c.background)]
+            let inks: [(String, Color)] = [
+                ("textPrimary", c.textPrimary),
+                ("textSecondary", c.textSecondary),
+                ("textTertiary", c.textTertiary),
+                ("action", c.action),
+                ("positive", c.positive),
+                ("caution", c.caution),
+                ("destructive", c.destructive),
+                ("informational", c.informational),
+                ("timberInk", c.timberInk),
+                ("draftingInk", c.draftingInk),
+                ("rose", c.rose),
+            ]
+            for (surfaceName, surface) in surfaces {
+                for (inkName, ink) in inks {
+                    let r = contrast(ink, surface, style)
+                    XCTAssertGreaterThanOrEqual(r, 4.5, "\(scheme) \(inkName) on \(surfaceName) = \(String(format: "%.2f", r))")
+                }
+            }
+            let onSurfaces: [(String, Color, Color)] = [
+                ("onAction/action", c.onAction, c.action),
+                ("action/actionSurface", c.action, c.actionSurface),
+                ("positive/positiveSurface", c.positive, c.positiveSurface),
+                ("caution/cautionSurface", c.caution, c.cautionSurface),
+                ("destructive/destructiveSurface", c.destructive, c.destructiveSurface),
+                ("informational/informationalSurface", c.informational, c.informationalSurface),
+                ("textSecondary/tertiary", c.textSecondary, c.backgroundTertiary),
+                ("textTertiary/tertiary (placeholders on inputs)", c.textTertiary, c.backgroundTertiary),
+                ("legacy mist/card", AppColors.mist, c.backgroundSecondary),
+                ("legacy slate/card", AppColors.slate, c.backgroundSecondary),
+            ]
+            for (name, fg, bg) in onSurfaces {
+                let r = contrast(fg, bg, style)
+                XCTAssertGreaterThanOrEqual(r, 4.5, "\(scheme) \(name) = \(String(format: "%.2f", r))")
+            }
+        }
+    }
+
+    /// White on the theme-fixed blueprint (hero, brand fills): 9.06:1.
+    func testWhiteOnBlueprintBrand() {
+        XCTAssertGreaterThanOrEqual(contrast(.white, AppColors.brand, .light), 4.5)
+        XCTAssertGreaterThanOrEqual(contrast(.white, AppColors.brand, .dark), 4.5)
+    }
+
+    /// The locked hexes from docs/design/2.0-brand-system.md: blueprint light action, cyan dark action.
+    func testLockedBrandHexes() {
+        XCTAssertEqual(hex(AppColors.brand, .light), "1E3FA6")
+        XCTAssertEqual(hex(AppColors.brand, .dark), "1E3FA6")
+        XCTAssertEqual(hex(AppColors.action, .light), "1E3FA6")
+        XCTAssertEqual(hex(AppColors.action, .dark), "8FD3FF")
+        XCTAssertEqual(hex(AppColors.drafting, .dark), "60A8E6")
+        XCTAssertEqual(hex(AppColors.timber, .light), "E0A458")
+        XCTAssertEqual(hex(AdaptiveColors(colorScheme: .dark).action, .dark), "8FD3FF")
+        XCTAssertEqual(hex(AdaptiveColors(colorScheme: .light).action, .light), "1E3FA6")
+    }
+
+    /// Dark linework must never share a hex with the dark action colour.
+    func testDarkDraftingIsDistinctFromDarkAction() {
+        let c = AdaptiveColors(colorScheme: .dark)
+        XCTAssertNotEqual(hex(c.drafting, .dark), hex(c.action, .dark))
+    }
+
+    /// Violet is retired: no legacy violet-named token may resolve to a purple hue.
+    func testVioletIsRetired() {
+        let tokens: [(String, Color)] = [
+            ("primary", AppColors.primary), ("primaryLight", AppColors.primaryLight),
+            ("primarySurface", AppColors.primarySurface), ("primaryDark", AppColors.primaryDark),
+            ("reportsAccent", AppColors.reportsAccent), ("reportsAccentSoft", AppColors.reportsAccentSoft),
+            ("mpAccent", AppColors.mpAccent), ("mpAccentSoft", AppColors.mpAccentSoft),
+            ("celebrationPurple", AppColors.celebrationPurple), ("lavenderSoft", AppColors.lavenderSoft),
+            ("logoCanvas", AppColors.logoCanvas), ("darkPrimary", AppColors.darkPrimary),
+        ]
+        for style in [UIUserInterfaceStyle.light, .dark] {
+            for (name, color) in tokens {
+                let resolved = UIColor(color).resolvedColor(with: UITraitCollection(userInterfaceStyle: style))
+                var h: CGFloat = 0, sat: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+                resolved.getHue(&h, saturation: &sat, brightness: &b, alpha: &a)
+                let degrees = h * 360
+                XCTAssertFalse(sat > 0.15 && degrees > 240 && degrees < 330, "\(name) is violet/purple (\(Int(degrees))°)")
+            }
+        }
+    }
+
+    private func hex(_ color: Color, _ style: UIUserInterfaceStyle) -> String {
+        let (r, g, b) = rgb(color, style)
+        return String(format: "%02X%02X%02X", Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
+    }
 }

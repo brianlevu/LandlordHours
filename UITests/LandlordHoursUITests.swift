@@ -139,7 +139,7 @@ final class LandlordHoursUITests: XCTestCase {
         taxProfile.tap()
 
         XCTAssertTrue(app.staticTexts["Tax profile"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["Track"].isHittable)
+        XCTAssertFalse(app.buttons["tab.logTime"].isHittable)
     }
 
     func testAppearancePreferenceShowsSavedStateAndPersists() {
@@ -170,7 +170,7 @@ final class LandlordHoursUITests: XCTestCase {
             ("emptyMainTabs", 2, "Add a property first", "empty-track"),
             ("emptyMainTabs", 3, "Reports", "empty-reports"),
             ("emptyMainTabs", 4, "Upgrade to Pro", "empty-settings"),
-            ("occasional", 0, "Today's work", "occasional-home"),
+            ("occasional", 0, "Today’s work", "occasional-home"),
             ("occasional", 1, "Portfolio evidence", "occasional-properties"),
             ("occasional", 2, "Log your time", "occasional-track"),
             ("occasional", 3, "Reports", "occasional-reports"),
@@ -278,7 +278,7 @@ final class LandlordHoursUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Oak Street Duplex"].waitForExistence(timeout: 5))
 
-        app.buttons["Home"].tap()
+        app.buttons["tab.today"].tap()
         let firstHourTile = app.buttons["home.activation.firstHour"]
         XCTAssertTrue(firstHourTile.waitForExistence(timeout: 5))
         firstHourTile.tap()
@@ -301,7 +301,7 @@ final class LandlordHoursUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Time logged"].waitForExistence(timeout: 5))
 
-        app.buttons["Home"].tap()
+        app.buttons["tab.today"].tap()
         XCTAssertFalse(app.staticTexts["Finish your tax-ready setup"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["home.activation.firstHour"].exists)
     }
@@ -358,11 +358,15 @@ final class LandlordHoursUITests: XCTestCase {
         let deadline = Date().addingTimeInterval(timeout)
         var swipes = 0
         while Date() < deadline {
-            if element.exists && element.isHittable {
+            // The floating tab bar overlays scroll content; XCUI can report a row under it as
+            // hittable, and the tap then lands on a tab. Require the row to clear the bar.
+            let tabBar = app.buttons["tab.today"]
+            let clearsTabBar = !tabBar.exists || element.frame.maxY < tabBar.frame.minY - 8
+            if element.exists && element.isHittable && clearsTabBar {
                 element.tap()
                 return
             }
-            if scrollIfNeeded && element.exists && swipes < 6 && app.staticTexts["Home"].isHittable {
+            if scrollIfNeeded && element.exists && swipes < 6 && app.buttons["tab.today"].isHittable {
                 app.swipeUp()
                 swipes += 1
             } else {

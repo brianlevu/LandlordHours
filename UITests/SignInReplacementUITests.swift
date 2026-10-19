@@ -56,7 +56,7 @@ final class SignInReplacementUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["old.profile@example.com"].waitForExistence(timeout: 5))
         settle()
 
-        let propertiesTab = app.buttons["Properties"].firstMatch
+        let propertiesTab = app.buttons["tab.properties"].firstMatch
         propertiesTab.tap()
         if !app.staticTexts["Elm Court"].waitForExistence(timeout: 4) {
             propertiesTab.tap()
@@ -79,7 +79,7 @@ final class SignInReplacementUITests: XCTestCase {
         XCTAssertTrue(profileA.waitForExistence(timeout: 5))
         profileA.tap()
 
-        app.buttons["Properties"].firstMatch.tap()
+        app.buttons["tab.properties"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Oak Street Duplex"].waitForExistence(timeout: 8))
     }
 

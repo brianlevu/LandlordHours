@@ -57,16 +57,18 @@ extension View {
 
 /// Soft app canvas inspired by high-polish mobile wellness apps, tuned for tax-product trust.
 struct LHMobileCanvas: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         ZStack {
             AuroraBackground()
 
+            // Light: a soft white lift. Dark: a blueprint-card tint capped at #141C3F, so the top of
+            // the canvas never turns grey and secondary text on it stays above 4.5:1.
             LinearGradient(
-                colors: [
-                    Color.white.opacity(0.34),
-                    Color.clear,
-                    AppColors.skyWash.opacity(0.18)
-                ],
+                colors: colorScheme == .dark
+                    ? [AppColors.darkBackgroundSecondary.opacity(0.7), Color.clear, Color.clear]
+                    : [Color.white.opacity(0.34), Color.clear, AppColors.skyWash.opacity(0.18)],
                 startPoint: .top,
                 endPoint: .bottom
             )
