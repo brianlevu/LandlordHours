@@ -842,7 +842,6 @@ struct SettingsView: View {
     @State private var userEmail = ""
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var profileImage: Data?
-    @State private var showingIconPicker = false
     @State private var restoreStatusMessage: String?
     @State private var showDeveloperTools = false
     /// Backs the "Share Anonymous Usage Data" toggle. Stores whether the user opted OUT (default
@@ -1059,22 +1058,6 @@ struct SettingsView: View {
                         Divider().background(colors.border.opacity(0.35))
 
                         Button {
-                            showingIconPicker = true
-                        } label: {
-                            SettingRow(
-                                icon: Lucide.layoutGrid,
-                                iconColor: AppColors.action,
-                                iconWash: colors.actionSurface,
-                                title: "App Icon",
-                                value: AppIconOption.current.displayName
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("settings.appIcon")
-
-                        Divider().background(colors.border.opacity(0.35))
-
-                        Button {
                             NotificationCenter.default.post(name: .restartGuidedOnboarding, object: nil)
                         } label: {
                             SettingRow(
@@ -1208,9 +1191,6 @@ struct SettingsView: View {
             }
             .navigationDestination(isPresented: $showExportAfterUnlock) {
                 ExportPDFView(year: Calendar.current.component(.year, from: Date()))
-            }
-            .sheet(isPresented: $showingIconPicker) {
-                AppIconPickerView()
             }
             #if DEBUG
             .navigationDestination(isPresented: $showEngagementLab) {
@@ -2168,179 +2148,6 @@ struct ProfileEditView: View {
                 }
             }
         }
-    }
-}
-
-// MARK: - App Icon Option
-
-enum AppIconOption: String, CaseIterable {
-    case `default` = "AppIcon"
-    case violet = "AppIcon-Violet"
-    case sunset = "AppIcon-Sunset"
-    case clock = "AppIcon-Clock"
-    case aurora = "AppIcon-Aurora"
-
-    var displayName: String {
-        switch self {
-        case .default: return "Default"
-        case .violet: return "Violet Waves"
-        case .sunset: return "Warm Sunset"
-        case .clock: return "House + Clock"
-        case .aurora: return "Full Spectrum"
-        }
-    }
-
-    var subtitle: String {
-        switch self {
-        case .default: return "Blueprint house"
-        case .violet: return "Violet Soft to Violet Deep"
-        case .sunset: return "Coral through Rose to Violet"
-        case .clock: return "Sage-to-Violet with clock face"
-        case .aurora: return "Honey through Coral to Violet"
-        }
-    }
-
-    var previewImageName: String {
-        switch self {
-        case .default: return "AppIconPreview-Default"
-        case .violet: return "AppIconPreview-Violet"
-        case .sunset: return "AppIconPreview-Sunset"
-        case .clock: return "AppIconPreview-Clock"
-        case .aurora: return "AppIconPreview-Aurora"
-        }
-    }
-
-    var alternateIconName: String? {
-        self == .default ? nil : rawValue
-    }
-
-    static var current: AppIconOption {
-        guard let name = UIApplication.shared.alternateIconName else { return .default }
-        return AppIconOption(rawValue: name) ?? .default
-    }
-}
-
-// MARK: - App Icon Picker View
-
-struct AppIconPickerView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    @State private var selectedIcon: AppIconOption = AppIconOption.current
-    @State private var iconError: String?
-
-    var body: some View {
-        NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 16) {
-                    Text("Choose an icon that fits your style.")
-                        .font(AppTypography.body)
-                        .foregroundStyle(colors.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.bottom, 4)
-
-                    ForEach(AppIconOption.allCases, id: \.rawValue) { option in
-                        AppIconRow(
-                            option: option,
-                            isSelected: selectedIcon == option,
-                            colors: colors
-                        ) {
-                            let actualCurrent = AppIconOption.current
-                            guard actualCurrent != option else {
-                                selectedIcon = option
-                                return
-                            }
-                            selectedIcon = option
-                            UIApplication.shared.setAlternateIconName(option.alternateIconName) { error in
-                                DispatchQueue.main.async {
-                                    if let error {
-                                        iconError = error.localizedDescription
-                                        selectedIcon = AppIconOption.current
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 40)
-            }
-            .background(colors.background)
-            .navigationTitle("App Icon")
-            .navigationBarTitleDisplayMode(.inline)
-            .hidesAppTabBar()
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .fontWeight(.semibold)
-                        .foregroundStyle(AppColors.primary)
-                }
-            }
-            .onAppear {
-                selectedIcon = AppIconOption.current
-            }
-            .alert("Could not change icon", isPresented: Binding(
-                get: { iconError != nil },
-                set: { if !$0 { iconError = nil } }
-            )) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(iconError ?? "Try again later.")
-            }
-        }
-    }
-}
-
-private struct AppIconRow: View {
-    let option: AppIconOption
-    let isSelected: Bool
-    let colors: AdaptiveColors
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 16) {
-                // Icon preview
-                Image(option.previewImageName)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 60, height: 60)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(isSelected ? AppColors.primary : colors.border.opacity(0.5), lineWidth: isSelected ? 2.5 : 0.5)
-                    )
-
-                // Text
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(option.displayName)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(colors.textPrimary)
-                    Text(option.subtitle)
-                        .font(AppTypography.caption)
-                        .foregroundStyle(colors.textSecondary)
-                }
-
-                Spacer()
-
-                // Checkmark
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(AppColors.primary)
-                }
-            }
-            .padding(14)
-            .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
-            .overlay(
-                RoundedRectangle(cornerRadius: AppCornerRadius.medium)
-                    .stroke(isSelected ? AppColors.primary.opacity(0.3) : Color.clear, lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
     }
 }
 

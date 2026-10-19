@@ -34,7 +34,7 @@ LHMarkShape().fill(...)                               // mono template (widgets,
 LHWordmark(fontSize: 34)                              // "Landlord" ink + "Hours" action colour; Fraunces 600 at ≥28pt
 ```
 
-App icon: `Assets.xcassets/AppIcon.appiconset` = icon B (1024 full-bleed, no baked corners) with dark (transparent background) and tinted (grayscale) appearances. Regenerate variants with `python3 design/brand/scripts/make_icon_variants.py design/brand/icon`. The four 1.x alternate icons (Violet, Sunset, Clock, Aurora) are still in the catalog and the Settings picker; they are off-brand and should go when Settings is reskinned.
+App icon: `Assets.xcassets/AppIcon.appiconset` = icon B (1024 full-bleed, no baked corners) with dark (transparent background) and tinted (grayscale) appearances. Regenerate variants with `python3 design/brand/scripts/make_icon_variants.py design/brand/icon`. The 1.x alternate icons (Violet, Sunset, Clock, Aurora) and the Settings "App Icon" picker were removed in WP-D: there is one app icon, and iOS handles the dark and tinted looks.
 
 ---
 
@@ -84,7 +84,7 @@ Legacy names map onto these: `sage`→positive, `honey`→caution, `coral`→ter
 Defined in `Sources/App/LandlordHoursApp.swift` → `AppTypography`, `LHDisplayStyle`, `LHFont`.
 
 - **SF Pro** for body and UI. Tokens use text styles, so they follow Dynamic Type.
-- **SF Pro Rounded, tabular digits** for numbers: `heroNumber` (56/700, fixed inside the hero geometry), `ringNumber` (46), `metric` (title2 rounded bold), `number` (body rounded semibold).
+- **SF Pro Rounded, tabular digits** for numbers: `heroNumber` (56/700; use `.lhHeroNumberFont()`, which scales relative to .largeTitle and caps at 80pt), `ringNumber` (46), `metric` (title2 rounded bold), `number` (body rounded semibold).
 - **SF Mono** for drafting labels: `AppTypography.drafting` (= `label`), 11pt, uppercase, `.tracking(1.3)` at the call site.
 - **Fraunces** (Undercase Type, SIL OFL 1.1; `Sources/Resources/Fonts/Fraunces.ttf` + `Fraunces-OFL.txt`, registered in `Info.plist` `UIAppFonts`) for **display at 28pt and up only**: tab titles, Welcome, milestones, Today's header. **Never** in lists, never on numbers or tax lines, never in the PDF. If it fails to register, the code falls back to New York (`design: .serif`).
 

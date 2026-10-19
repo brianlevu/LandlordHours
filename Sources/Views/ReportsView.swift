@@ -500,7 +500,7 @@ struct ReportsView: View {
         } else {
             VStack(spacing: 4) {
                 Text(String(format: "%.0f", totalHours))
-                    .font(AppTypography.heroNumber)
+                    .lhHeroNumberFont()
                     .foregroundStyle(isGoalMet ? AppColors.successGreen : colors.textPrimary)
 
                 Text("of \(Int(selectedGoal.targetHours)) hours")

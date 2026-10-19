@@ -448,9 +448,11 @@ enum AppTypography {
     static let drafting = Font.system(.caption2, design: .monospaced, weight: .medium)
     static let label = drafting
 
-    // SF Pro Rounded numbers, tabular. Hero numerals are fixed-size by design (they live inside a
-    // fixed-geometry ring/hero; pair them with .minimumScaleFactor); metrics scale.
-    static let heroNumber = Font.system(size: 56, weight: .bold, design: .rounded).monospacedDigit()
+    // SF Pro Rounded numbers, tabular. The hero numeral scales via `.lhHeroNumberFont()` (capped so
+    // it stays inside the ring); `ringNumber` is decorative and fixed; metrics scale.
+    /// Default-size hero numeral. Views use `.lhHeroNumberFont()`, which scales it with
+    /// Dynamic Type relative to .largeTitle (capped at `LHFont.heroNumberMaxSize`).
+    static let heroNumber = Font.system(size: LHFont.heroNumberBaseSize, weight: .bold, design: .rounded).monospacedDigit()
     static let ringNumber = Font.system(size: 46, weight: .bold, design: .rounded).monospacedDigit()
     static let metric = Font.system(.title2, design: .rounded, weight: .bold).monospacedDigit()
     static let number = Font.system(.body, design: .rounded, weight: .semibold).monospacedDigit()
@@ -558,6 +560,16 @@ enum LHFont {
         return scaled.pointSize < frauncesMinimumSize ? scaled.withSize(frauncesMinimumSize) : scaled
     }
 
+    /// Hero hours numeral: 56pt at the default size, scaled like .largeTitle, never above 80pt.
+    static let heroNumberBaseSize: CGFloat = 56
+    static let heroNumberMaxSize: CGFloat = 80
+
+    static func heroNumberSize(contentSize: UIContentSizeCategory) -> CGFloat {
+        let traits = UITraitCollection(preferredContentSizeCategory: contentSize)
+        let scaled = UIFontMetrics(forTextStyle: .largeTitle).scaledValue(for: heroNumberBaseSize, compatibleWith: traits)
+        return min(scaled, heroNumberMaxSize)
+    }
+
     static func axisTag(_ tag: String) -> UInt32 {
         tag.unicodeScalars.reduce(UInt32(0)) { ($0 << 8) | UInt32($1.value & 0xFF) }
     }
@@ -572,7 +584,24 @@ private struct LHDisplayFontModifier: ViewModifier {
     }
 }
 
+private struct LHHeroNumberFontModifier: ViewModifier {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    func body(content: Content) -> some View {
+        content
+            .font(.system(size: LHFont.heroNumberSize(contentSize: dynamicTypeSize.lhContentSizeCategory),
+                          weight: .bold, design: .rounded).monospacedDigit())
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+    }
+}
+
 extension View {
+    /// SF Pro Rounded tabular hero numeral that follows Dynamic Type (relative to .largeTitle, capped).
+    func lhHeroNumberFont() -> some View {
+        modifier(LHHeroNumberFontModifier())
+    }
+
     /// Fraunces display text (≥28pt) with optical size + SOFT axes, following Dynamic Type.
     func lhDisplayFont(_ style: LHDisplayStyle = .largeTitle) -> some View {
         modifier(LHDisplayFontModifier(style: style))

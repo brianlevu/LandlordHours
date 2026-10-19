@@ -48,3 +48,16 @@ extension BrandTypographyTests {
         }
     }
 }
+
+extension BrandTypographyTests {
+    func testHeroNumberScalesWithDynamicTypeAndIsCapped() {
+        XCTAssertEqual(LHFont.heroNumberSize(contentSize: .large), LHFont.heroNumberBaseSize, accuracy: 0.5)
+        XCTAssertGreaterThan(LHFont.heroNumberSize(contentSize: .extraExtraExtraLarge), LHFont.heroNumberBaseSize)
+        XCTAssertLessThan(LHFont.heroNumberSize(contentSize: .extraSmall), LHFont.heroNumberBaseSize)
+        for size in [UIContentSizeCategory.accessibilityMedium, .accessibilityLarge, .accessibilityExtraLarge,
+                     .accessibilityExtraExtraLarge, .accessibilityExtraExtraExtraLarge] {
+            XCTAssertLessThanOrEqual(LHFont.heroNumberSize(contentSize: size), LHFont.heroNumberMaxSize, "\(size.rawValue)")
+        }
+        XCTAssertEqual(LHFont.heroNumberSize(contentSize: .accessibilityExtraExtraExtraLarge), LHFont.heroNumberMaxSize, accuracy: 0.5)
+    }
+}
