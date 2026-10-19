@@ -337,9 +337,10 @@ struct ReportsView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top) {
                 Text("Reports")
-                    .font(.system(size: 34, weight: .black, design: .rounded))
+                    .lhDisplayFont(.largeTitle)
                     .foregroundStyle(colors.textPrimary)
-                    .minimumScaleFactor(0.82)
+                    .minimumScaleFactor(0.83)
+                    .accessibilityAddTraits(.isHeader)
 
                 Spacer()
 
@@ -505,7 +506,7 @@ struct ReportsView: View {
 
                 Text("of \(Int(selectedGoal.targetHours)) hours")
                     .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(AppColors.mist)
+                    .foregroundStyle(colors.textSecondary)
             }
             .transition(.opacity)
         }
@@ -664,7 +665,7 @@ struct ReportsView: View {
             // Detail text
             Text(pace.detail)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(AppColors.mist)
+                .foregroundStyle(colors.textSecondary)
         }
         .lhMotion(AppAnimation.standard, value: selectedGoal)
     }
@@ -790,7 +791,7 @@ struct StatChip: View {
                 .minimumScaleFactor(0.7)
 
             Text(label)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(colors.textSecondary)
         }
         .frame(maxWidth: .infinity)

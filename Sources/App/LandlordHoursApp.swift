@@ -65,7 +65,7 @@ enum AppColors {
         static let darkTimberInk = "F0BE7A"
         static let darkTextPrimary = "F2F4FA"
         static let darkTextSecondary = "B4BCD2"
-        static let darkTextTertiary = "7E88A6"
+        static let darkTextTertiary = "8A94B2"  // brand doc 7E88A6 lifted: 4.18:1 on the dark input fill
         static let darkBorder = "2A3560"
         static let darkPositive = "4ED48A"
         static let darkPositiveSurface = "123A2A"
@@ -103,7 +103,7 @@ enum AppColors {
 
     // MARK: - Primary (legacy name for the action/brand blue)
     static let primary = Color.lhDynamic(light: Hex.brand, dark: Hex.darkAction)
-    static let primaryLight = Color.lhDynamic(light: "5C7FD6", dark: Hex.darkDrafting)
+    static let primaryLight = Color.lhDynamic(light: Hex.draftingInk, dark: Hex.darkDrafting)
     static let primarySurface = Color.lhDynamic(light: Hex.actionSurface, dark: Hex.darkActionSurface)
     static let primaryDark = Color.lhDynamic(light: Hex.actionPressed, dark: Hex.darkActionPressed)
 
@@ -165,14 +165,14 @@ enum AppColors {
 
     // MARK: - Reports goal palettes (legacy names, blueprint values)
     static let reportsAccent = primary
-    static let reportsAccentSoft = Color.lhDynamic(light: "5C7FD6", dark: Hex.darkDrafting)
+    static let reportsAccentSoft = Color.lhDynamic(light: Hex.draftingInk, dark: Hex.darkDrafting)
     static let reportsAccentWash = primarySurface
     static let mpAccent = draftingInk
     static let mpAccentSoft = Color(hex: Hex.drafting)
     static let mpAccentWash = Color.lhDynamic(light: "E6F2FC", dark: "16304F")
     static let successGreen = sage
-    static let successGreenLight = Color.lhDynamic(light: "2FA866", dark: Hex.darkPositive)
-    static let successGreenSoft = Color(hex: "7FDDA6")
+    static let successGreenLight = sage
+    static let successGreenSoft = sage
     static let successGreenWash = sageWash
     static let cautionText = Color.lhDynamic(light: Hex.caution, dark: Hex.darkCaution)
     static let repairOrange = Color(hex: Hex.terracotta)
@@ -201,8 +201,8 @@ enum AppColors {
     // MARK: - Neutrals (light)
     static let charcoal = Color(hex: Hex.textPrimary)    // headlines, primary text
     static let ink = Color(hex: "2B3450")                // secondary text
-    static let slate = Color(hex: Hex.textSecondary)     // captions, inactive labels
-    static let mist = Color(hex: Hex.textTertiary)       // placeholders, tertiary
+    static let slate = Color.lhDynamic(light: Hex.textSecondary, dark: Hex.darkTextSecondary) // captions, inactive labels
+    static let mist = Color.lhDynamic(light: Hex.textTertiary, dark: Hex.darkTextTertiary) // placeholders, tertiary
     static let cloud = Color(hex: Hex.border)            // borders, dividers
     static let snow = Color(hex: Hex.tertiary)           // inputs, subtle surfaces
 

@@ -170,7 +170,7 @@ final class LandlordHoursUITests: XCTestCase {
             ("emptyMainTabs", 2, "Add a property first", "empty-track"),
             ("emptyMainTabs", 3, "Reports", "empty-reports"),
             ("emptyMainTabs", 4, "Upgrade to Pro", "empty-settings"),
-            ("occasional", 0, "Today's work", "occasional-home"),
+            ("occasional", 0, "Today’s work", "occasional-home"),
             ("occasional", 1, "Portfolio evidence", "occasional-properties"),
             ("occasional", 2, "Log your time", "occasional-track"),
             ("occasional", 3, "Reports", "occasional-reports"),

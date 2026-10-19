@@ -15,6 +15,21 @@ enum GoalCardTone: Equatable {
         return .onTrack
     }
 
+    /// Intent accent for the card's edge and pace value.
+    func accent(_ colors: AdaptiveColors) -> Color {
+        switch self {
+        case .onTrack: return colors.action
+        case .needsAttention: return colors.caution
+        case .met: return colors.positive
+        }
+    }
+
+    /// What the card is filled with: the intent wash in light; in dark, the blueprint card (a
+    /// full-bleed dark wash reads muddy), with the intent carried by `accent`.
+    func cardFill(_ colors: AdaptiveColors) -> Color {
+        colors.colorScheme == .dark ? colors.backgroundSecondary : surface(colors)
+    }
+
     func surface(_ colors: AdaptiveColors) -> Color {
         switch self {
         case .onTrack: return colors.actionSurface
@@ -384,7 +399,7 @@ struct DashboardView: View {
         if viewModel.timeEntries.isEmpty {
             return "Log your first hour"
         }
-        return "Today's work"
+        return "Today’s work"
     }
 
     private var dashboardSubtitle: String {
@@ -592,11 +607,14 @@ struct DashboardView: View {
             }
         }
         .padding(24)
-        .background(goalCardTone.surface(colors))
+        .background(goalCardTone.cardFill(colors))
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .stroke(colors.border.opacity(0.35), lineWidth: 1)
+                .stroke(
+                    colorScheme == .dark ? goalCardTone.accent(colors).opacity(0.7) : colors.border.opacity(0.35),
+                    lineWidth: colorScheme == .dark ? 1.5 : 1
+                )
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(isGoalMet

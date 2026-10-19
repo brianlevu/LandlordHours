@@ -92,9 +92,9 @@ struct HistoryView: View {
 
                 // Summary strip
                 HStack(spacing: 12) {
-                    summaryChip(label: "REPS Hours", value: String(format: "%.1fh", totalREPSHours), color: AppColors.sage)
-                    summaryChip(label: "Non-REPS", value: String(format: "%.1fh", totalNonREPSHours), color: AppColors.honey)
-                    summaryChip(label: "Entries", value: "\(filteredEntries.count)", color: AppColors.primary)
+                    summaryChip(label: "REPS Hours", value: String(format: "%.1fh", totalREPSHours), color: colors.positive, surface: colors.positiveSurface)
+                    summaryChip(label: "Non-REPS", value: String(format: "%.1fh", totalNonREPSHours), color: colors.caution, surface: colors.cautionSurface)
+                    summaryChip(label: "Entries", value: "\(filteredEntries.count)", color: colors.action, surface: colors.actionSurface)
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)
@@ -202,7 +202,7 @@ struct HistoryView: View {
         }
     }
 
-    private func summaryChip(label: String, value: String, color: Color) -> some View {
+    private func summaryChip(label: String, value: String, color: Color, surface: Color) -> some View {
         VStack(spacing: 4) {
             Text(value)
                 .font(.system(size: 16, weight: .bold, design: .rounded))
@@ -213,7 +213,7 @@ struct HistoryView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(color.opacity(0.08))
+        .background(surface)
         .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
     }
 }

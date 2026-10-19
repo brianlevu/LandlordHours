@@ -23,11 +23,15 @@ struct LandlordHoursApp: App {
         UITabBar.appearance().scrollEdgeAppearance = tabBar
         UITabBar.appearance().tintColor = UIColor(AppColors.primary)
 
-        // Navigation bar — transparent with rounded font
+        // Navigation bar — transparent; inline titles SF Pro, large titles Fraunces (2.0 brand,
+        // 34pt ≥ the 28pt floor) so system large titles such as Records match the custom roots.
         let navBar = UINavigationBarAppearance()
         navBar.configureWithTransparentBackground()
         navBar.titleTextAttributes = [
-            .font: UIFont.systemFont(ofSize: 17, weight: .semibold).rounded()
+            .font: UIFont.systemFont(ofSize: 17, weight: .semibold)
+        ]
+        navBar.largeTitleTextAttributes = [
+            .font: LHFont.frauncesUIFont(.largeTitle, contentSize: UITraitCollection.current.preferredContentSizeCategory)
         ]
         UINavigationBar.appearance().standardAppearance = navBar
         UINavigationBar.appearance().scrollEdgeAppearance = navBar

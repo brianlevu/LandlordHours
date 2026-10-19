@@ -628,15 +628,26 @@ struct ContentView: View {
             startPoint: .top,
             endPoint: .bottom
         )
-        .frame(height: AppSpacing.floatingTabBarReservedHeight + 72)
+        // Starts at the bar's top edge (bar + its 8pt bottom padding), not above it.
+        .frame(height: Self.tabBarHeight + 8)
         .frame(maxWidth: .infinity)
         .ignoresSafeArea(edges: .bottom)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 
+    /// The tab that shows as current. Reports and Settings open from Today's header, so Today stays
+    /// highlighted there; Log time highlights the + instead of a tab.
+    private var highlightedTab: AppTab? {
+        switch selectedTab {
+        case ShellTab.reportsIndex, ShellTab.settingsIndex: return .today
+        case ShellTab.logTimeIndex: return nil
+        default: return AppTab.allCases.first { $0.shellIndex == selectedTab } ?? .today
+        }
+    }
+
     private func tabBarButton(_ tab: AppTab) -> some View {
-        let isSelected = selectedTab == tab.shellIndex
+        let isSelected = highlightedTab == tab
         // Full-strength secondary text: lighter inactive labels measured under 4.5:1 on the glass.
         let inactiveColor = colors.textSecondary
 

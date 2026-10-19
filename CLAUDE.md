@@ -57,7 +57,7 @@ All tokens live in `Sources/App/LandlordHoursApp.swift`: hex sources in `AppColo
 | `draftingInk` (new) | `#2369B5` | `#60A8E6` | SF Mono drafting labels |
 | `timber` / `timberInk` (new) | `#E0A458` / `#8A5A1B` | `#E0A458` / `#F0BE7A` | Warm material accent / its text form |
 | `brass`, `terracotta`, `plaster` (new) | `#D9B45A`, `#C8553D`, `#F4EFE6` | same | Illustration only |
-| `textPrimary` / `Secondary` / `Tertiary` | `#121B33` / `#4A5068` / `#5F6983` | `#F2F4FA` / `#B4BCD2` / `#7E88A6` | Text levels |
+| `textPrimary` / `Secondary` / `Tertiary` | `#121B33` / `#4A5068` / `#5F6983` | `#F2F4FA` / `#B4BCD2` / `#8A94B2` (lifted from the doc's #7E88A6 to pass on the dark input fill) | Text levels |
 | `border` | `#D5DBEA` | `#2A3560` | Decorative hairline (cards separate by fill) |
 | `positive` (+Surface) | `#137A42` / `#E4F7EB` | `#4ED48A` / `#123A2A` | Met, confirmed, on pace |
 | `caution` (+Surface) | `#9A560C` / `#FCF0DC` | `#FFB454` / `#3D2A10` | Behind pace, incomplete setup |

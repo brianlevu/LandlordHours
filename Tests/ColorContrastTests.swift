@@ -121,6 +121,9 @@ final class ColorContrastTests: XCTestCase {
                 ("destructive/destructiveSurface", c.destructive, c.destructiveSurface),
                 ("informational/informationalSurface", c.informational, c.informationalSurface),
                 ("textSecondary/tertiary", c.textSecondary, c.backgroundTertiary),
+                ("textTertiary/tertiary (placeholders on inputs)", c.textTertiary, c.backgroundTertiary),
+                ("legacy mist/card", AppColors.mist, c.backgroundSecondary),
+                ("legacy slate/card", AppColors.slate, c.backgroundSecondary),
             ]
             for (name, fg, bg) in onSurfaces {
                 let r = contrast(fg, bg, style)
