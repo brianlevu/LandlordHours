@@ -1,0 +1,255 @@
+"""Render passes for the Blueprint house.
+
+usage: .venv/bin/python scripts/render.py --states frame40,roof --variants light,dark --passes built,lines
+       [--samples 128] [--res 2048] [--out renders] [--anim] [--save-blend path] [--quick]
+"""
+import argparse, math, os, sys, time, json
+sys.path.insert(0, os.path.dirname(__file__))
+import bpy
+from mathutils import Vector, Matrix
+import house as H
+
+STATES = {
+    'stage0_lot':      dict(stage=0),
+    'stage1_slab':     dict(stage=1),
+    'stage2_frame25':  dict(stage=2, p=0.25),
+    'stage2_frame40':  dict(stage=2, p=0.40),
+    'stage2_frame50':  dict(stage=2, p=0.50),
+    'stage2_frame75':  dict(stage=2, p=0.75),
+    'stage3_trusses':  dict(stage=3, p=0.40),
+    'stage3_roof':     dict(stage=3, p=1.0),
+    'stage4_siding30': dict(stage=4, p=0.30),
+    'stage4_siding60': dict(stage=4, p=0.60),
+    'stage5_finished': dict(stage=5),
+}
+
+CYAN = '#8FD3FF'
+
+def setup_render(res, samples):
+    sc = bpy.context.scene
+    sc.render.engine = 'CYCLES'
+    prefs = bpy.context.preferences.addons['cycles'].preferences
+    prefs.compute_device_type = 'METAL'
+    prefs.get_devices()
+    for d in prefs.devices:
+        d.use = (d.type == 'METAL')
+    sc.cycles.device = 'GPU'
+    sc.cycles.samples = samples
+    sc.cycles.use_adaptive_sampling = True
+    sc.cycles.adaptive_threshold = 0.01
+    sc.cycles.use_denoising = True
+    sc.cycles.denoiser = 'OPENIMAGEDENOISE'
+    sc.cycles.max_bounces = 6
+    sc.cycles.transparent_max_bounces = 8
+    sc.render.resolution_x = sc.render.resolution_y = res
+    sc.render.resolution_percentage = 100
+    sc.render.film_transparent = True
+    sc.render.image_settings.file_format = 'PNG'
+    sc.render.image_settings.color_mode = 'RGBA'
+    sc.render.image_settings.color_depth = '8'
+    sc.view_settings.view_transform = 'Khronos PBR Neutral'
+    sc.view_settings.look = 'None'
+    sc.view_settings.exposure = 0.0
+
+def setup_camera():
+    sc = bpy.context.scene
+    cam = bpy.data.cameras.new('cam'); cam.type = 'ORTHO'
+    co = bpy.data.objects.new('cam', cam); sc.collection.objects.link(co); sc.camera = co
+    rot = Matrix.Rotation(math.radians(-45), 4, 'Z') @ Matrix.Rotation(math.radians(62), 4, 'X')
+    fwd = (rot.to_3x3() @ Vector((0, 0, -1))); right = rot.to_3x3() @ Vector((1, 0, 0)); up = rot.to_3x3() @ Vector((0, 1, 0))
+    pts = []
+    dg = bpy.context.evaluated_depsgraph_get()
+    for ob in H.OBJS:
+        for c in ob.bound_box:
+            pts.append(ob.matrix_world @ Vector(c))
+    xs = [p.dot(right) for p in pts]; ys = [p.dot(up) for p in pts]
+    cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+    ext = max(max(xs) - min(xs), max(ys) - min(ys))
+    cam.ortho_scale = ext / 0.88
+    center = right * cx + up * cy
+    co.matrix_world = Matrix.Translation(center - fwd * 40) @ rot
+    cam.clip_start = 1; cam.clip_end = 100
+    return co
+
+def setup_lights(variant):
+    sc = bpy.context.scene
+    w = bpy.data.worlds.new('w'); sc.world = w; w.use_nodes = True
+    bg = w.node_tree.nodes['Background']
+    bg.inputs['Color'].default_value = H.lin('#DCE3F0'); bg.inputs['Strength'].default_value = 0.55 if variant == 'light' else 0.45
+    def sun(name, rot, strength, angle, col):
+        L = bpy.data.lights.new(name, 'SUN'); L.energy = strength; L.angle = math.radians(angle); L.color = col
+        o = bpy.data.objects.new(name, L); sc.collection.objects.link(o)
+        o.rotation_euler = [math.radians(a) for a in rot]
+        return o
+    # key: from front-right-above (image upper-left-ish warm), soft
+    sun('key', (36, 0, -28), 3.2, 16, (1.0, 0.95, 0.88))
+    # fill: from the left, cool, weak
+    sun('fill', (65, 0, -107), 0.55, 30, (0.86, 0.91, 1.0))
+    rim_s = 2.2 if variant == 'light' else 4.6
+    rim = sun('rim', (62, 0, 135), rim_s, 6, (1.0, 0.97, 0.92) if variant == 'light' else (0.9, 0.95, 1.0))
+    # rim lights the model only: it must not throw a shadow onto the catcher toward the viewer
+    rc = bpy.data.collections.get('rim_receivers') or bpy.data.collections.new('rim_receivers')
+    for o in H.OBJS:
+        if o.name not in rc.objects:
+            rc.objects.link(o)
+    rim.light_linking.receiver_collection = rc
+    # shadow catcher
+    me = bpy.data.meshes.new('catcher')
+    s = 40
+    me.from_pydata([(-s, -s, -0.452), (s, -s, -0.452), (s, s, -0.452), (-s, s, -0.452)], [], [(0, 1, 2, 3)])
+    co = bpy.data.objects.new('shadow_catcher', me); sc.collection.objects.link(co)
+    co.is_shadow_catcher = True
+    return co
+
+def apply_state(st, mode, catcher):
+    """mode: 'built' or 'lines'"""
+    sc = bpy.context.scene
+    lit = st['stage'] >= 5
+    for ob in H.OBJS:
+        b = H.is_built(ob, st)
+        ob.is_holdout = False
+        names = ob['mats'].split(',')
+        for i, slot in enumerate(ob.material_slots):
+            slot.material = H.MATS[names[i]]
+        if 'glass_slot' in ob:
+            ob.material_slots[ob['glass_slot']].material = H.MATS['glass_lit' if lit else 'glass']
+        if mode == 'built':
+            ob.hide_render = not b
+            for m in ob.modifiers: m.show_render = True
+        else:
+            for m in ob.modifiers: m.show_render = False
+            if b:
+                ob.hide_render = False
+                for slot in ob.material_slots: slot.material = H.MATS['holdout']
+            elif ob['role']:
+                ob.hide_render = False
+                for slot in ob.material_slots: slot.material = H.MATS['wash']
+            else:
+                ob.hide_render = True
+    catcher.hide_render = (mode != 'built')
+    for L in [o for o in sc.objects if o.type == 'LIGHT']:
+        L.hide_render = (mode != 'built')
+    # freestyle
+    sc.render.use_freestyle = (mode == 'lines')
+    for c in list(bpy.data.collections):
+        if c.name.startswith('LINES_'):
+            bpy.data.collections.remove(c)
+    if mode == 'lines':
+        sc.view_settings.view_transform = 'Standard'
+        cols = {}
+        for r in ('major', 'detail', 'all'):
+            c = bpy.data.collections.new('LINES_' + r); cols[r] = c
+            sc.collection.children.link(c)
+            c.hide_render = False
+        for ob in H.OBJS:
+            if not H.is_built(ob, st) and ob['role']:
+                cols[ob['role']].objects.link(ob)
+                cols['all'].objects.link(ob)
+        vl = sc.view_layers[0]; vl.use_freestyle = True
+        fs = vl.freestyle_settings
+        fs.crease_angle = math.radians(125)
+        fs.use_culling = False
+        for ls in list(fs.linesets): fs.linesets.remove(ls)
+        sc.render.line_thickness_mode = 'ABSOLUTE'
+        for r, thick in (('major', 3.0), ('detail', 1.7)):
+            ls = fs.linesets.new(r)
+            ls.select_by_visibility = True; ls.visibility = 'VISIBLE'
+            ls.select_by_edge_types = True
+            ls.select_silhouette = True; ls.select_border = True; ls.select_crease = True
+            ls.select_by_collection = True; ls.collection = cols[r]
+            lsty = ls.linestyle
+            lsty.color = H.lin(CYAN)[:3]; lsty.thickness = thick; lsty.caps = 'ROUND'
+            lsty.alpha = 1.0
+        # contour of everything future, heavier
+        ls = fs.linesets.new('contour')
+        ls.select_by_visibility = True; ls.visibility = 'VISIBLE'
+        ls.select_by_edge_types = True; ls.select_silhouette = False; ls.select_border = False; ls.select_crease = False
+        ls.select_external_contour = True
+        ls.select_by_collection = True; ls.collection = cols['all']
+        ls.linestyle.color = H.lin(CYAN)[:3]; ls.linestyle.thickness = 3.4; ls.linestyle.caps = 'ROUND'
+    else:
+        sc.view_settings.view_transform = 'Khronos PBR Neutral'
+
+def render_to(path):
+    bpy.context.scene.render.filepath = path
+    t0 = time.time()
+    bpy.ops.render.render(write_still=True)
+    return time.time() - t0
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--states', default='stage2_frame40')
+    ap.add_argument('--variants', default='light')
+    ap.add_argument('--passes', default='built,lines')
+    ap.add_argument('--samples', type=int, default=128)
+    ap.add_argument('--res', type=int, default=2048)
+    ap.add_argument('--out', default=os.path.join(os.path.dirname(__file__), '..', 'renders'))
+    ap.add_argument('--anim', action='store_true')
+    ap.add_argument('--save-blend', default='')
+    a = ap.parse_args()
+    out = os.path.abspath(a.out); os.makedirs(out, exist_ok=True)
+    walls, rows = H.build_all()
+    setup_render(a.res, a.samples)
+    cam = setup_camera()
+    log = []
+    catchers = {}
+    for v in a.variants.split(','):
+        # rebuild lights per variant
+        for o in [o for o in bpy.context.scene.objects if o.type == 'LIGHT' or o.name.startswith('shadow_catcher')]:
+            bpy.data.objects.remove(o)
+        catcher = setup_lights(v)
+        if a.anim:
+            render_anim(out, v, a.samples, log, catcher)
+            continue
+        for s in a.states.split(','):
+            st = STATES[s]
+            for p in a.passes.split(','):
+                if p == 'lines' and v != a.variants.split(',')[0]:
+                    continue   # linework is lighting-independent; render once
+                apply_state(st, p, catcher)
+                sc = bpy.context.scene
+                sc.cycles.samples = a.samples if p == 'built' else 16
+                fn = os.path.join(out, f'{s}__{p}' + (f'__{v}' if p == 'built' else '') + '.png')
+                dt = render_to(fn)
+                log.append(dict(file=os.path.basename(fn), seconds=round(dt, 1)))
+                print('RENDERED', fn, round(dt, 1), flush=True)
+    if a.save_blend:
+        st = STATES.get(a.states.split(',')[0], STATES['stage2_frame40'])
+        apply_state(st, 'built', catcher)
+        txt = bpy.data.texts.new('house.py'); txt.from_string(open(H.__file__).read())
+        txt2 = bpy.data.texts.new('render.py'); txt2.from_string(open(__file__).read())
+        bpy.context.scene['blueprint_state'] = json.dumps(st)
+        bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(a.save_blend))
+        print('SAVED', a.save_blend)
+    with open(os.path.join(out, 'render-log.jsonl'), 'a') as f:
+        for r in log:
+            f.write(json.dumps(r) + '\n')
+
+def render_anim(out, v, samples, log, catcher):
+    """One clapboard row (the next row after 60%) slides in from outside/above and settles."""
+    st = dict(STATES['stage4_siding60'])
+    siding = sorted([o for o in H.OBJS if o['kind'] == 'siding'], key=lambda o: o['t'])
+    nxt = [o for o in siding if o['t'] > st['p']][0]
+    st2 = dict(st); st2['p'] = nxt['t']
+    apply_state(st2, 'built', catcher)
+    d = os.path.join(out, f'anim_confirm_row__{v}'); os.makedirs(d, exist_ok=True)
+    base = nxt.matrix_world.copy()
+    def ease_out_cubic(x): return 1 - (1 - x) ** 3
+    for f in range(24):
+        x = min(f / 15.0, 1.0)
+        e = ease_out_cubic(x)
+        out_off = 0.55 * (1 - e)            # metres outward (diagonal toward camera)
+        drop = 0.45 * (1 - e)               # metres above
+        bounce = 0.0
+        if 15 <= f <= 21:
+            bounce = 0.03 * math.sin(math.pi * (f - 15) / 6) * (1 - (f - 15) / 8)
+        off = Vector((-0.7071 * out_off, -0.7071 * out_off, drop + bounce))
+        nxt.matrix_world = Matrix.Translation(off) @ base
+        fn = os.path.join(d, f'frame_{f:02d}.png')
+        dt = render_to(fn)
+        log.append(dict(file=f'anim_confirm_row__{v}/frame_{f:02d}.png', seconds=round(dt, 1)))
+        print('RENDERED', fn, round(dt, 1), flush=True)
+    nxt.matrix_world = base
+
+if __name__ == '__main__':
+    main()
