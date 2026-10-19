@@ -54,6 +54,7 @@ struct LHDesignSandboxApp: App {
     @State private var store: MockStore
 
     init() {
+        ProdFont.register()
         let d = UserDefaults.standard
         let s = d.string(forKey: "screen").flatMap(SandboxScreen.init(rawValue:))
         screen = s
@@ -67,6 +68,13 @@ struct LHDesignSandboxApp: App {
 
     var body: some Scene {
         WindowGroup {
+            if let onb = UserDefaults.standard.string(forKey: "LHOnboardingStep") {
+                // 2.0 onboarding (DesignSandbox/Onboarding2). Owns its own colour-scheme handling.
+                OnbHost(arg: onb, scheme: scheme ?? .light)
+                    .overlay(alignment: .topLeading) {
+                        if UserDefaults.standard.bool(forKey: "recording") { FramePump() }
+                    }
+            } else {
             Group {
                 if let screen {
                     ScreenHost(screen: screen)
@@ -83,6 +91,7 @@ struct LHDesignSandboxApp: App {
             .tint(LH.action)
             .environment(\.requestedScheme, scheme)
             .preferredColorScheme(screen == .paywall || (LHConcept.current == .blueprint && [.conceptWelcome, .conceptMilestone, .conceptBackfill].contains(screen)) ? .dark : scheme)
+            }
         }
     }
 }
