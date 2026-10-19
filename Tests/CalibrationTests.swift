@@ -146,6 +146,10 @@ final class CalibrationTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(holdout.accuracy, ClassifierThresholds.targetAccuracyAtLikely)
         XCTAssertGreaterThanOrEqual(holdout.precision, ClassifierThresholds.targetPrecisionAtLikely)
         XCTAssertGreaterThanOrEqual(all.propertyAccuracy, 0.9)
+        // Category floors (asserted, not just printed).
+        let tuning = await score(fixture, split: "tuning", classify: classify)
+        XCTAssertGreaterThanOrEqual(tuning.categoryAccuracy, ClassifierThresholds.targetRulesCategoryTuning, "rules category, tuning")
+        XCTAssertGreaterThanOrEqual(holdout.categoryAccuracy, ClassifierThresholds.targetRulesCategoryHoldout, "rules category, held-out")
         // The committed value must sit within 0.02 of the best accuracy on the sweep.
         XCTAssertGreaterThanOrEqual(all.accuracy, best.accuracy - 0.02)
         XCTAssertLessThan(ClassifierThresholds.notSure, ClassifierThresholds.likely)
@@ -188,5 +192,15 @@ final class CalibrationTests: XCTestCase {
             print("CALIBRATION on-device skipped: model reported available but every call failed (rules fallback used)")
             throw XCTSkip("Model reported available but no call succeeded here; chain fell back to rules")
         }
+        // The model carries non-calendar category quality: assert its held-out floor.
+        var heldLandlord = 0, heldCategory = 0
+        for item in fixture.items where item.split == "holdout" && item.landlord {
+            heldLandlord += 1
+            if let r = await classifier.classify(candidate(item.title, kind: .gmail), properties: list),
+               r.category == CalibrationFixture.category(named: item.category) { heldCategory += 1 }
+        }
+        let heldAccuracy = Double(heldCategory) / Double(max(heldLandlord, 1))
+        print(String(format: "CALIBRATION model-only holdout category=%.3f", heldAccuracy))
+        XCTAssertGreaterThanOrEqual(heldAccuracy, ClassifierThresholds.targetModelCategoryHoldout)
     }
 }

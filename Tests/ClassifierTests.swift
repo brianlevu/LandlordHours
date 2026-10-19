@@ -31,6 +31,52 @@ struct FakePCCStatus: PCCSystemStatusProviding {
     func status() -> ModelAvailability { value }
 }
 
+/// Thread-safe slow model for batch tests. Honours cancellation like the real one.
+final class SlowFakeBackend: OnDeviceModelBackend, @unchecked Sendable {
+    let availability: ModelAvailability = .available
+    let delay: TimeInterval
+    let slowDelay: TimeInterval
+    let fixed: OnDeviceAnswer
+    let startedAt = Date()
+    private let lock = NSLock()
+    private var _calls = 0
+    private var _inFlight = 0
+    private var _maxInFlight = 0
+    private var _mainThreadCalls = 0
+
+    init(delay: TimeInterval, slowDelay: TimeInterval? = nil, answer: OnDeviceAnswer) {
+        self.delay = delay
+        self.slowDelay = slowDelay ?? delay
+        self.fixed = answer
+    }
+
+    var calls: Int { lock.lock(); defer { lock.unlock() }; return _calls }
+    var maxInFlight: Int { lock.lock(); defer { lock.unlock() }; return _maxInFlight }
+    var mainThreadCalls: Int { lock.lock(); defer { lock.unlock() }; return _mainThreadCalls }
+
+    func answer(_ request: OnDeviceRequest) async throws -> OnDeviceAnswer {
+        let onMain = Thread.isMainThread
+        lock.lock()
+        _calls += 1
+        _inFlight += 1
+        _maxInFlight = max(_maxInFlight, _inFlight)
+        if onMain { _mainThreadCalls += 1 }
+        lock.unlock()
+        defer { lock.lock(); _inFlight -= 1; lock.unlock() }
+        let wait = request.title.hasPrefix("slow") ? slowDelay : delay
+        try await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
+        return fixed
+    }
+}
+
+final class ProgressRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _values: [ClassifierBatchProgress] = []
+    func record(_ p: ClassifierBatchProgress) { lock.lock(); _values.append(p); lock.unlock() }
+    var values: [ClassifierBatchProgress] { lock.lock(); defer { lock.unlock() }; return _values }
+    var latest: ClassifierBatchProgress? { values.last }
+}
+
 private struct ModelBoom: Error {}
 
 final class ClassifierTests: XCTestCase {
@@ -222,7 +268,7 @@ final class ClassifierTests: XCTestCase {
     func testModelRescuesAnUnknownTitleIntoNotSure() async {
         let backend = FakeOnDeviceBackend(answer: answer(true, 0.85, category: .investing))
         let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
-        let result = await chain.classify(candidate("Prep 1031 exchange docs"), properties: properties)
+        let result = await chain.classify(candidate("Prep paperwork for Friday"), properties: properties)
         XCTAssertEqual(result.tier, .onDevice)
         XCTAssertEqual(result.band, .notSure)
         XCTAssertFalse(result.isLandlordWork)
@@ -296,25 +342,67 @@ final class ClassifierTests: XCTestCase {
 
     func testLowConfidenceStaysVisibleAsNotSure() async {
         let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: UnavailableOnDeviceBackend(reason: .deviceNotEligible)))
-        let outcome = await chain.evaluate(candidate("Upload receipts to Stessa"), properties: properties, muteRules: [])
+        let outcome = await chain.evaluate(candidate("Upload receipts to Stessa"), properties: properties)
         guard case .suggest(let c) = outcome else { return XCTFail("expected suggest, got \(outcome)") }
         XCTAssertEqual(c.band, .notSure)
         XCTAssertEqual(ConfidenceBand.notSureLabel, "Not sure this is landlord work")
 
-        let noise = await chain.evaluate(candidate("Kids soccer practice"), properties: properties, muteRules: [])
+        let noise = await chain.evaluate(candidate("Kids soccer practice"), properties: properties)
         guard case .skip = noise else { return XCTFail("expected skip, got \(noise)") }
     }
 
-    func testMuteRulesStopClassificationBeforeAnyModel() async {
-        let backend = FakeOnDeviceBackend(answer: answer(true, 0.9))
+    /// Review fix 1: a landlord keyword is never hidden, not by a weak score and not by a
+    /// model "no". Only items with no landlord signal (or noise that outweighs it) drop.
+    func testKeywordItemsAreNeverHiddenEvenWhenTheModelSaysNo() async {
+        let backend = FakeOnDeviceBackend(answer: answer(false, 0.0))
         let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
+        let weak = ["Upload receipts to Stessa", "Supplies", "Window", "Estimate", "Renew", "Tour", "Clean up notes", "Fix calendar"]
+        for title in weak {
+            let outcome = await chain.evaluate(candidate(title), properties: properties)
+            guard case .suggest(let c) = outcome else { XCTFail("\(title) was hidden: \(outcome)"); continue }
+            XCTAssertEqual(c.band, .notSure, title)
+            XCTAssertGreaterThanOrEqual(c.confidence, ClassifierThresholds.notSure, title)
+        }
+        XCTAssertFalse(backend.requests.isEmpty, "the model's no must have been consulted")
+        // Same without the model.
+        let rulesOnly = ClassifierChain(onDevice: OnDeviceClassifier(backend: UnavailableOnDeviceBackend(reason: .osTooOld)))
+        for title in weak {
+            let c = await rulesOnly.classify(candidate(title), properties: properties)
+            XCTAssertNotEqual(c.band, .unlikely, title)
+        }
+        // No landlord signal, or noise that outweighs the keyword → dropped.
+        for title in ["Haircut", "Rent tux for wedding", "Dentist - cleaning"] {
+            let outcome = await rulesOnly.evaluate(candidate(title), properties: properties)
+            guard case .skip = outcome else { XCTFail("\(title) should drop: \(outcome)"); continue }
+        }
+    }
+
+    /// Review fix 3: mutes apply through classify() too, so integrators can't bypass them.
+    func testMuteRulesApplyOnEveryEntryPoint() async throws {
+        let backend = FakeOnDeviceBackend(answer: answer(true, 0.9))
         let byTitle = CaptureMuteRule(match: .titleContains, value: "stessa")
         let byCalendar = CaptureMuteRule(match: .containerId, value: "cal-work")
-        let a = await chain.evaluate(candidate("Upload receipts to Stessa"), properties: properties, muteRules: [byTitle])
-        let b = await chain.evaluate(candidate("Tenant call", containerId: "cal-work"), properties: properties, muteRules: [byCalendar])
+        let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend), muteRules: { [byTitle, byCalendar] })
+
+        let a = await chain.evaluate(candidate("Upload receipts to Stessa"), properties: properties)
+        let b = await chain.evaluate(candidate("Tenant call", containerId: "cal-work"), properties: properties)
         XCTAssertEqual(a, .muted)
         XCTAssertEqual(b, .muted)
-        XCTAssertTrue(backend.requests.isEmpty)
+
+        let direct = await chain.classify(candidate("Plumber for Stessa unit"), properties: properties)
+        XCTAssertFalse(direct.isLandlordWork)
+        XCTAssertEqual(direct.evidence, ["muted"])
+        XCTAssertEqual(direct.band, .unlikely)
+
+        // Through the CaptureClassifier protocol, as an integrator would hold it.
+        let asProtocol: CaptureClassifier = chain
+        let viaProtocol = await asProtocol.classify(candidate("Tenant call", containerId: "cal-work"), properties: properties)
+        XCTAssertEqual(viaProtocol.evidence, ["muted"])
+
+        let batch = try await chain.classifyBatch([candidate("Stessa export"), candidate("Plumber at Oak")], properties: properties)
+        XCTAssertEqual(batch.first, .muted)
+        XCTAssertNotEqual(batch.last, .muted)
+        XCTAssertTrue(backend.requests.isEmpty, "a muted item must never reach the model")
     }
 
     @MainActor
@@ -323,9 +411,99 @@ final class ClassifierTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: dir) }
         let store = SuggestionStore(userId: "u1", baseDirectory: dir)
         store.addMuteRule(CaptureMuteRule(match: .titleContains, value: "HOA"))
-        let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: UnavailableOnDeviceBackend(reason: .osTooOld)))
-        let outcome = await chain.evaluate(candidate("Lakeview HOA board meeting"), properties: properties, store: store)
+        let chain = ClassifierChain.forStore(store, onDevice: OnDeviceClassifier(backend: UnavailableOnDeviceBackend(reason: .osTooOld)))
+        let outcome = await chain.evaluate(candidate("Lakeview HOA board meeting"), properties: properties)
         XCTAssertEqual(outcome, .muted)
+        let direct = await chain.classify(candidate("Lakeview HOA board meeting"), properties: properties)
+        XCTAssertEqual(direct.evidence, ["muted"])
+    }
+
+    // MARK: Batch (review fix 2)
+
+    private func backfill(_ count: Int, prefix: String = "Upload receipts to Stessa") -> [CaptureCandidate] {
+        (0..<count).map { i in
+            var c = candidate("\(prefix) #\(i)")
+            c.sourceKey = "cal:batch:\(i)"
+            return c
+        }
+    }
+
+    @MainActor
+    func testBatchOf300RunsOffTheMainThreadWithBoundedConcurrency() async throws {
+        let backend = SlowFakeBackend(delay: 0.005, answer: answer(true, 0.9, category: .bookkeeping))
+        let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
+        let progress = ProgressRecorder()
+        let items = backfill(300)
+
+        // Started from the main actor on purpose: the work must still run elsewhere.
+        let task = Task { @MainActor in
+            try await chain.classifyBatch(items, properties: self.properties, maxConcurrent: 2, perItemBudget: 2) { progress.record($0) }
+        }
+
+        // Main-thread heartbeat while the batch runs.
+        var maxGap: TimeInterval = 0
+        var last = Date()
+        while progress.latest?.completed != 300 {
+            try await Task.sleep(nanoseconds: 2_000_000)
+            let now = Date()
+            maxGap = max(maxGap, now.timeIntervalSince(last))
+            last = now
+            if now.timeIntervalSince(backend.startedAt) > 30 { break }
+        }
+        let results = try await task.value
+
+        XCTAssertEqual(results.count, 300)
+        XCTAssertEqual(backend.calls, 300)
+        XCTAssertEqual(backend.mainThreadCalls, 0, "the model ran on the main thread")
+        XCTAssertLessThanOrEqual(backend.maxInFlight, 2)
+        XCTAssertGreaterThanOrEqual(backend.maxInFlight, 2, "expected two calls in flight")
+        XCTAssertLessThan(maxGap, 0.25, "main thread stalled for \(maxGap)s")
+        XCTAssertEqual(progress.values.map(\.completed), Array(1...300))
+        XCTAssertTrue(progress.values.allSatisfy { $0.total == 300 })
+        for case .suggest(let c) in results { XCTAssertEqual(c.tier, .onDevice) }
+    }
+
+    func testBatchCancellationStopsTheWork() async throws {
+        let backend = SlowFakeBackend(delay: 0.02, answer: answer(true, 0.9))
+        let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
+        let progress = ProgressRecorder()
+        let items = backfill(300)
+        let task = Task.detached {
+            try await chain.classifyBatch(items, properties: self.properties, maxConcurrent: 2, perItemBudget: 2) { progress.record($0) }
+        }
+        while (progress.latest?.completed ?? 0) < 10 { try await Task.sleep(nanoseconds: 2_000_000) }
+        task.cancel()
+        do {
+            _ = try await task.value
+            XCTFail("a cancelled batch must throw")
+        } catch is CancellationError {
+        } catch {
+            XCTFail("unexpected error \(error)")
+        }
+        let callsAtCancel = backend.calls
+        try await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertEqual(backend.calls, callsAtCancel, "model calls continued after cancel")
+        XCTAssertLessThan(callsAtCancel, 40)
+        XCTAssertLessThan(progress.latest?.completed ?? 300, 300)
+    }
+
+    func testBatchPerItemBudgetFallsBackToRules() async throws {
+        // "slow" titles take 3 s; the budget is 50 ms, so they keep the rules result.
+        let backend = SlowFakeBackend(delay: 0.001, slowDelay: 3, answer: answer(true, 0.95, category: .legal))
+        let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
+        let items = backfill(4, prefix: "slow receipts upload") + backfill(4, prefix: "Upload receipts to Stessa")
+        let started = Date()
+        let results = try await chain.classifyBatch(items, properties: properties, maxConcurrent: 2, perItemBudget: 0.05)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 2, "budget not enforced")
+        let rules = RulesClassifier()
+        for (i, outcome) in results.enumerated() {
+            guard case .suggest(let c) = outcome else { XCTFail("item \(i) hidden: \(outcome)"); continue }
+            if i < 4 {
+                XCTAssertEqual(c, rules.classifySync(items[i], properties: properties), "slow item \(i) should keep rules")
+            } else {
+                XCTAssertEqual(c.tier, .onDevice)
+            }
+        }
     }
 
     // MARK: PCC receipt reader

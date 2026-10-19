@@ -28,6 +28,12 @@ struct RulesClassifier: CaptureClassifier {
         let isLandlordWork = verdict.confidence >= ClassifierThresholds.likely
 
         var evidence = verdict.evidence
+        var confidence = verdict.confidence
+        if verdict.hasLandlordSignal {
+            // Landlord-signal items are never hidden: at worst they are "Not sure".
+            evidence.append(ClassifierThresholds.landlordSignalEvidence)
+            confidence = max(confidence, ClassifierThresholds.notSure)
+        }
         var propertyId = verdict.propertyId
         if propertyId == nil, options.defaultToOnlyProperty, isLandlordWork, properties.count == 1 {
             propertyId = properties[0].id
@@ -44,7 +50,7 @@ struct RulesClassifier: CaptureClassifier {
         let (hours, basis) = Self.hours(for: candidate)
         return CaptureClassification(
             isLandlordWork: isLandlordWork,
-            confidence: verdict.confidence,
+            confidence: confidence,
             propertyId: propertyId,
             category: category,
             hours: hours,

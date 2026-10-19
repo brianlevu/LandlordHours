@@ -16,7 +16,7 @@ struct RulesVerdict: Equatable {
     var propertyId: UUID?
     /// Short human-readable reasons, e.g. "keyword: plumber". Local only.
     var evidence: [String]
-    /// True when at least one positive (landlord) signal or a property matched.
+    /// True when a landlord keyword or a property matched and noise words don't outweigh it.
     var hasLandlordSignal: Bool
 }
 
@@ -76,7 +76,9 @@ enum RulesEngine {
             category: category,
             propertyId: propertyMatch?.property.id,
             evidence: evidence,
-            hasLandlordSignal: hasPositive
+            // A landlord keyword or property that noise words don't outweigh ("Rent tux for
+            // wedding" and "Dentist - cleaning" carry a keyword but net out negative).
+            hasLandlordSignal: hasPositive && score > 0
         )
     }
 
