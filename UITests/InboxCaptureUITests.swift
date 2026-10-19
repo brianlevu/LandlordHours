@@ -104,10 +104,10 @@ final class InboxCaptureUITests: XCTestCase {
         app.descendants(matching: .any)["capture.toggle.eventPrompts"].tap()
         shoot("whatsnew-prompts-on", scheme)
 
-        // 5. Backfill intro: scanning (held halfway), then results.
+        // 5. Backfill: streaming in the Inbox (held halfway), then the reveal and the list.
         app.buttons["capture.priming.continue"].tap()
-        XCTAssertTrue(app.descendants(matching: .any)["backfill.progress"].waitForExistence(timeout: 10))
-        Thread.sleep(forTimeInterval: 1.0)
+        XCTAssertTrue(app.descendants(matching: .any)["inbox.backfill.header"].waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 1.5)
         shoot("backfill-scanning", scheme)
         launch(seed: "backfill", scheme: scheme, extra: ["-LHFakeCalendar", "granted"])
         let setup = app.buttons["inbox.empty.setup"]
@@ -124,13 +124,8 @@ final class InboxCaptureUITests: XCTestCase {
             shoot("backfill-reveal", scheme)
             review.tap()
         }
-        XCTAssertTrue(app.staticTexts["backfill.headline"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.descendants(matching: .any)["inbox.backfillBanner"].waitForExistence(timeout: 20))
         shoot("backfill-results", scheme)
-        app.swipeUp()
-        app.swipeUp()
-        app.swipeUp()
-        XCTAssertTrue(app.buttons["backfill.showMore"].waitForExistence(timeout: 5))
-        shoot("backfill-results-showmore", scheme)
 
         // 6. Onboarding priming (new users).
         app.terminate()

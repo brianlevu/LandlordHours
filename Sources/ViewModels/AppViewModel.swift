@@ -35,7 +35,13 @@ class AppViewModel: ObservableObject {
     @Published var properties: [RentalProperty] = []
     @Published var timeEntries: [TimeEntry] = []
     @Published var selectedYear: Int = Calendar.current.component(.year, from: Date())
-    @Published var isInitializing = true
+    /// WP-L: the active profile's first iCloud pull of this launch is still running, so the hours
+    /// on Today may not be final. Today shows the drafting loader in the house slot and a
+    /// placeholder for the number; everything else is usable. Never blocks: it ends when the
+    /// initial sync ends (any outcome) or after `initialPullPlaceholderTimeout`.
+    @Published private(set) var isAwaitingInitialPull = false
+    static let initialPullPlaceholderTimeout: TimeInterval = 6
+    private var initialPullWaitToken = UUID()
     @Published var isSignedIn = false
     @Published var userName: String = ""
 
@@ -100,19 +106,73 @@ class AppViewModel: ObservableObject {
             self?.refreshWidgetSnapshot()
             self?.syncService.schedulePush()
         }
-        // Show branded splash screen for 1.5s, then animate into the app
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation(.easeOut(duration: 0.4)) {
-                self.isInitializing = false
+        // WP-L: no launch splash. Today renders at once from local data; the first pull runs
+        // behind it and only the hours wait on it.
+        if Self.isUnitTestHost {
+            // Unit tests build many view models; keep their sync start where it always was
+            // (after 2 s, no placeholder) so no test races a pull it didn't ask for.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                if self.isSignedIn { Task { await self.syncService.start() } }
             }
+        } else if isSignedIn {
+            startInitialSync(showsPlaceholder: !Self.isMockLaunch)
         }
-        // Start CloudKit sync after splash if signed in
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            if self.isSignedIn {
-                Task { await self.syncService.start() }
-            }
+#if DEBUG
+        applySimulatedPendingPullIfNeeded()
+#endif
+    }
+
+    /// Starts the profile's initial iCloud sync. With `showsPlaceholder`, Today treats the hours
+    /// as not final until the first pull ends (any outcome) or the timeout passes.
+    func startInitialSync(showsPlaceholder: Bool = true) {
+        let token = showsPlaceholder && syncService.isCloudKitAvailable ? beginAwaitingInitialPull() : nil
+        Task { [weak self] in
+            guard let self else { return }
+            await self.syncService.start()
+            // Ends only the wait this sync began (a newer wait belongs to a newer start).
+            if let token { self.endAwaitingInitialPull(token: token) }
         }
     }
+
+    @discardableResult
+    func beginAwaitingInitialPull(timeout: TimeInterval = AppViewModel.initialPullPlaceholderTimeout) -> UUID {
+        let token = UUID()
+        initialPullWaitToken = token
+        isAwaitingInitialPull = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in
+            self?.endAwaitingInitialPull(token: token)
+        }
+        return token
+    }
+
+    /// Ends the wait `token` started; nil ends any wait (sign-out).
+    func endAwaitingInitialPull(token: UUID? = nil) {
+        if let token, token != initialPullWaitToken { return }
+        initialPullWaitToken = UUID()
+        isAwaitingInitialPull = false
+    }
+
+    /// Running inside the unit-test host (XCTest injects this variable).
+    static var isUnitTestHost: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
+    /// UI tests, captures and screenshot runs drive the app from DEBUG fixtures, not iCloud.
+    static var isMockLaunch: Bool {
+        ProcessInfo.processInfo.arguments.contains("-LHMockScenario")
+    }
+
+#if DEBUG
+    /// `-LHSimulatePendingPull <seconds>`: Today shows the first-pull loading state for that long,
+    /// then settles (captures and the "Today stays usable while loading" UI test).
+    private func applySimulatedPendingPullIfNeeded() {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "-LHSimulatePendingPull"),
+              args.indices.contains(index + 1),
+              let seconds = Double(args[index + 1]) else { return }
+        beginAwaitingInitialPull(timeout: seconds)
+    }
+#endif
     
     func checkSignInState() {
         let defaults = UserDefaults.standard
@@ -167,8 +227,9 @@ class AppViewModel: ObservableObject {
         userName = Self.resolvedProfileName(.standard)
         AppleSignInManager.shared.checkExistingSignIn()
 
-        // Start CloudKit sync
-        Task { await syncService.start() }
+        // Start CloudKit sync; a restored profile's hours settle in when the pull lands.
+        BackfillJob.shared.reset()
+        startInitialSync()
     }
 
     /// "Continue without an account": creates a `local-<UUID>` profile.
@@ -234,6 +295,10 @@ class AppViewModel: ObservableObject {
     func signOut(keepProfileState: Bool = true) {
         // Stop CloudKit sync
         syncService.stop()
+        endAwaitingInitialPull()
+        // Background work belongs to the outgoing profile: stop it, never finish it into the next.
+        BackfillJob.shared.reset()
+        ExportJob.shared.reset()
         let defaults = UserDefaults.standard
         let outgoingId = UserScope.userId
 

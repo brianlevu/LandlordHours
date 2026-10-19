@@ -72,7 +72,6 @@ struct ContentView: View {
     @StateObject private var goalManager = GoalManager.shared
     @State private var selectedTab = Self.initialTabFromLaunchArguments()
     @State private var showOnboarding = false
-    @State private var showSplashAfterSignOut = false
     @State private var guidedOnboardingRefresh = false
     @State private var isReplayingGuidedOnboarding = false
     @State private var isGuidedOnboardingSuspended = false
@@ -80,9 +79,11 @@ struct ContentView: View {
     @State private var hasAcknowledgedFirstActivityCoach = false
     @State private var didApplyGuidedReplayLaunchArgument = false
     @State private var isCustomTabBarHidden = false
-    @State private var isSplashAnimating = true
-    @State private var isShowingInitialLaunchBridge = true
-    @State private var didScheduleInitialLaunchBridgeDismiss = false
+    /// WP-L: background work the shell surfaces (look-back reveal, export ready banner).
+    @ObservedObject private var houseEvents = TodayHouseEvents.shared
+    @ObservedObject private var exportJob = ExportJob.shared
+    @State private var shellBackfillReveal: HouseBackfillReveal?
+    @State private var exportShare: ExportShareItem?
     /// WP3: the suggestion inbox (tab content + badge).
     @StateObject private var inboxModel = InboxViewModel.live(app: AppModelHost.shared.viewModel)
     /// WP3: one-time "What's new" auto-capture opt-in for people updating from 1.x.
@@ -116,9 +117,9 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if viewModel.isInitializing || showSplashAfterSignOut || isShowingInitialLaunchBridge {
-                splashScreen
-            } else if !viewModel.isSignedIn {
+            // WP-L: no launch splash or loading screen in any path. Today renders at once from
+            // local data; only the hours wait on the first iCloud pull (DashboardView).
+            if !viewModel.isSignedIn {
                 LoginView()
             } else if showOnboarding {
                 OnboardingView(showOnboarding: $showOnboarding)
@@ -154,7 +155,6 @@ struct ContentView: View {
         .onAppear {
             viewModel.checkSignInState()
             checkPostSignInFlow()
-            scheduleInitialLaunchBridgeDismissIfReady()
             applyPendingAppIntentNavigationIfNeeded()
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -164,9 +164,6 @@ struct ContentView: View {
         }
         .onOpenURL { url in
             applyDeepLink(url)
-        }
-        .onChange(of: viewModel.isInitializing) { _, _ in
-            scheduleInitialLaunchBridgeDismissIfReady()
         }
         .onChange(of: showOnboarding) { _, isShowing in
             if !isShowing, CaptureSetupHandoff.openInboxAfterOnboarding {
@@ -178,14 +175,8 @@ struct ContentView: View {
             if newValue {
                 checkPostSignInFlow()
             } else {
-                // User signed out — show splash briefly, then login
+                // Signed out: straight to sign-in (no splash).
                 showOnboarding = false
-                showSplashAfterSignOut = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                    animate(AppAnimation.standard) {
-                        showSplashAfterSignOut = false
-                    }
-                }
             }
         }
         .onChange(of: viewModel.timeEntries.count) { _, newValue in
@@ -230,213 +221,6 @@ struct ContentView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 requestReview()
                 ratingPrompt.pendingRequest = nil
-            }
-        }
-    }
-
-    // MARK: - Splash / Loading Screen
-    private var splashScreen: some View {
-        ZStack {
-            splashBackground
-
-            VStack(spacing: 20) {
-                Spacer()
-
-                WaveHouseIcon(size: 84)
-                    .shadow(color: colors.primary.opacity(colorScheme == .dark ? 0.26 : 0.20), radius: 18, y: 10)
-                    .scaleEffect(isSplashAnimating ? 1 : 0.96)
-                    .opacity(isSplashAnimating ? 1 : 0)
-
-                launchWordmark
-                    .font(.system(size: 31, weight: .bold, design: .rounded))
-                    .opacity(isSplashAnimating ? 1 : 0)
-
-                HStack(spacing: 8) {
-                    LoadingDot(delay: 0.0, color: colors.primary)
-                    LoadingDot(delay: 0.12, color: colors.informational)
-                    LoadingDot(delay: 0.24, color: colors.positive)
-                }
-                .opacity(isSplashAnimating ? 1 : 0)
-
-                Spacer()
-            }
-            .padding(.horizontal, 24)
-        }
-        .onAppear {
-            guard !reduceMotion else {
-                isSplashAnimating = true
-                return
-            }
-
-            withAnimation(AppAnimation.flow.delay(0.08)) {
-                isSplashAnimating = true
-            }
-        }
-    }
-
-    private var launchWordmark: Text {
-        Text("Landlord")
-            .foregroundColor(colors.textPrimary)
-        +
-        Text("Hours")
-            .foregroundColor(colors.primary)
-    }
-
-    private var splashBackground: some View {
-        ZStack {
-            LinearGradient(
-                colors: colorScheme == .dark
-                    ? [AppColors.darkBackground, AppColors.darkPlum, AppColors.darkInk]
-                    : [AppColors.lavenderPale, AppColors.background, AppColors.reportsAccentWash.opacity(0.8), Color.white],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            LinearGradient(
-                colors: [
-                    colors.primary.opacity(colorScheme == .dark ? 0.22 : 0.12),
-                    Color.clear,
-                    colors.positive.opacity(colorScheme == .dark ? 0.12 : 0.08)
-                ],
-                startPoint: .topTrailing,
-                endPoint: .bottomLeading
-            )
-
-            VStack(spacing: 0) {
-                Rectangle()
-                    .fill(colors.primary.opacity(colorScheme == .dark ? 0.13 : 0.08))
-                    .frame(height: 1)
-                    .offset(y: isSplashAnimating && !reduceMotion ? 46 : 22)
-                Spacer()
-                Rectangle()
-                    .fill(colors.primary.opacity(colorScheme == .dark ? 0.10 : 0.06))
-                    .frame(height: 1)
-                    .offset(y: isSplashAnimating && !reduceMotion ? -58 : -28)
-            }
-            .rotationEffect(.degrees(-16))
-            .opacity(0.9)
-        }
-        .ignoresSafeArea()
-    }
-
-    private var launchHeader: some View {
-        VStack(spacing: 14) {
-            HStack(spacing: 12) {
-                WaveHouseIcon(size: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .shadow(color: colors.primary.opacity(0.16), radius: 12, y: 6)
-
-                launchWordmark
-                    .font(.system(size: 27, weight: .bold, design: .rounded))
-            }
-
-            Text("Preparing your tax-year command center")
-                .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(colors.textSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .opacity(isSplashAnimating ? 1 : 0)
-        .offset(y: isSplashAnimating ? 0 : 10)
-    }
-
-    private var qualificationMap: some View {
-        VStack(spacing: 22) {
-            HStack(alignment: .center, spacing: 22) {
-                SplashProgressRings(isAnimating: isSplashAnimating)
-                    .frame(width: 134, height: 134)
-
-                VStack(alignment: .leading, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("2026")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(colors.primary)
-
-                        Text("Qualification map")
-                            .font(.system(size: 24, weight: .bold, design: .rounded))
-                            .foregroundStyle(colors.textPrimary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Text("Hours, properties, and reports are being organized into review-ready records.")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                        .lineSpacing(2)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            VStack(spacing: 10) {
-                SplashEvidenceRow(
-                    icon: "clock",
-                    title: "Hour ledger",
-                    detail: "Syncing recent entries",
-                    tint: colors.primary,
-                    isActive: isSplashAnimating
-                )
-
-                SplashEvidenceRow(
-                    icon: "building-2",
-                    title: "Property records",
-                    detail: "Checking portfolio status",
-                    tint: colors.informational,
-                    isActive: isSplashAnimating
-                )
-
-                SplashEvidenceRow(
-                    icon: "file-text",
-                    title: "Report package",
-                    detail: "Preparing export data",
-                    tint: colors.positive,
-                    isActive: isSplashAnimating
-                )
-            }
-        }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous)
-                .fill(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.82 : 0.72))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous)
-                .strokeBorder(colors.border.opacity(colorScheme == .dark ? 0.55 : 0.42), lineWidth: 1)
-        )
-        .shadow(color: colors.primary.opacity(colorScheme == .dark ? 0.12 : 0.10), radius: 18, x: 0, y: 12)
-        .scaleEffect(isSplashAnimating ? 1 : 0.98)
-        .opacity(isSplashAnimating ? 1 : 0)
-    }
-
-    private var splashStatusRail: some View {
-        HStack(spacing: 10) {
-            LoadingDot(delay: 0.0, color: colors.primary)
-            LoadingDot(delay: 0.12, color: colors.informational)
-            LoadingDot(delay: 0.24, color: colors.positive)
-
-            Text("Building audit trail")
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(colors.textSecondary)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 11)
-        .background(
-            Capsule()
-                .fill(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.70 : 0.64))
-        )
-        .overlay(
-            Capsule()
-                .strokeBorder(colors.border.opacity(0.42), lineWidth: 1)
-        )
-        .opacity(isSplashAnimating ? 1 : 0)
-    }
-
-    private func scheduleInitialLaunchBridgeDismissIfReady() {
-        guard !viewModel.isInitializing,
-              isShowingInitialLaunchBridge,
-              !didScheduleInitialLaunchBridgeDismiss else { return }
-
-        didScheduleInitialLaunchBridgeDismiss = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
-            animate(AppAnimation.standard) {
-                isShowingInitialLaunchBridge = false
             }
         }
     }
@@ -535,6 +319,19 @@ struct ContentView: View {
                     .zIndex(5)
             }
 
+            // WP-L: the export finished in the background while its sheet was closed.
+            if let banner = exportJob.banner {
+                ExportReadyBanner(
+                    kind: banner,
+                    onOpen: { exportShare = exportJob.takeReadyForSharing() },
+                    onDismiss: { exportJob.dismissBanner() }
+                )
+                .padding(.horizontal, 16)
+                .padding(.bottom, isCustomTabBarHidden ? 16 : Self.tabBarHeight + 8 + 12)
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                .zIndex(6)
+            }
+
             // Floating timer banner (visible on all tabs except Track)
             if viewModel.isTimerRunning && selectedTab != 2 && !isCustomTabBarHidden {
                 FloatingTimerBanner(viewModel: viewModel) {
@@ -560,7 +357,34 @@ struct ContentView: View {
             if phase == .active { inboxModel.reload() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .captureSuggestionsDidChange)) { _ in
-            inboxModel.reload()
+            inboxModel.reload(animated: true)
+        }
+        .lhMotion(AppAnimation.reveal, value: exportJob.banner)
+        // WP-L: the look-back finished in the background. Today plays the house reveal itself;
+        // on any other tab the shell plays it once, when no sheet is in the way.
+        .onChange(of: houseEvents.pendingBackfill) { _, _ in scheduleShellBackfillReveal() }
+        .onChange(of: selectedTab) { _, _ in scheduleShellBackfillReveal() }
+        .onChange(of: inboxModel.sheetSuggestion) { _, _ in scheduleShellBackfillReveal() }
+        .fullScreenCover(item: $shellBackfillReveal) { reveal in
+            BackfillRevealView(
+                foundHours: reveal.foundHours,
+                suggestionCount: reveal.suggestionCount,
+                confirmedHours: 0,
+                artScheme: colorScheme,
+                onReview: {
+                    shellBackfillReveal = nil
+                    selectedTab = ShellTab.inboxIndex
+                },
+                onSkip: { shellBackfillReveal = nil }
+            )
+        }
+        .sheet(item: $exportShare) { item in
+            ActivityShareSheet(items: [item.pdfURL]) { completed in
+                exportShare = nil
+                if completed { viewModel.exportShared(format: .pdf) }
+            }
+            .presentationDetents([.medium, .large])
+            .ignoresSafeArea()
         }
         .sheet(isPresented: $showCaptureWhatsNew, onDismiss: {
             // Swiping the intro away is an answer too: it never shows again, and nothing turns on.
@@ -601,6 +425,20 @@ struct ContentView: View {
                     .zIndex(20)
                 }
             }
+        }
+    }
+
+    /// Plays the look-back reveal from the shell when Today isn't on screen to play it.
+    private func scheduleShellBackfillReveal() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            guard selectedTab != ShellTab.todayIndex,
+                  shellBackfillReveal == nil,
+                  inboxModel.sheetSuggestion == nil,
+                  !showCaptureWhatsNew,
+                  exportShare == nil,
+                  let reveal = houseEvents.pendingBackfill else { return }
+            houseEvents.markBackfillShown()
+            shellBackfillReveal = reveal
         }
     }
 
@@ -857,160 +695,6 @@ struct ContentView: View {
         hasAcknowledgedFirstActivityCoach = false
         selectedTab = Self.shouldForceGuidedSetupHomeFromLaunchArguments ? 0 : 1
         guidedOnboardingRefresh.toggle()
-    }
-}
-
-// MARK: - Launch Loading Components
-
-private struct SplashProgressRings: View {
-    let isAnimating: Bool
-
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isRotating = false
-
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(
-                    colors.primarySurface.opacity(colorScheme == .dark ? 0.32 : 0.70),
-                    style: StrokeStyle(lineWidth: 13, lineCap: .round, dash: [3, 7])
-                )
-                .rotationEffect(.degrees(isRotating ? 360 : 0))
-
-            Circle()
-                .trim(from: 0, to: isAnimating ? 0.34 : 0.06)
-                .stroke(
-                    LinearGradient(
-                        colors: [colors.primary, AppColors.reportsAccentSoft],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    style: StrokeStyle(lineWidth: 13, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-92))
-                .animation(AppAnimation.flow.delay(0.14), value: isAnimating)
-
-            Circle()
-                .stroke(
-                    colors.positiveSurface.opacity(colorScheme == .dark ? 0.34 : 0.78),
-                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                )
-                .padding(25)
-
-            Circle()
-                .trim(from: 0, to: isAnimating ? 0.22 : 0.04)
-                .stroke(
-                    LinearGradient(
-                        colors: [colors.positive, AppColors.successGreenSoft],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-92))
-                .padding(25)
-                .animation(AppAnimation.flow.delay(0.24), value: isAnimating)
-
-            VStack(spacing: 1) {
-                Text("21%")
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                Text("pace")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(colors.textTertiary)
-            }
-        }
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.linear(duration: 7.5).repeatForever(autoreverses: false)) {
-                isRotating = true
-            }
-        }
-    }
-}
-
-private struct SplashEvidenceRow: View {
-    let icon: String
-    let title: String
-    let detail: String
-    let tint: Color
-    let isActive: Bool
-
-    @Environment(\.colorScheme) private var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            JellyBadge(systemName: icon, color: tint, size: 34)
-                .shadow(color: tint.opacity(0.14), radius: 8, y: 4)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                Text(detail)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(colors.textSecondary)
-            }
-
-            Spacer(minLength: 10)
-
-            ZStack {
-                Circle()
-                    .fill(tint.opacity(colorScheme == .dark ? 0.22 : 0.16))
-                    .frame(width: 24, height: 24)
-
-                Circle()
-                    .trim(from: 0, to: isActive ? 0.76 : 0.18)
-                    .stroke(tint, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                    .frame(width: 24, height: 24)
-                    .rotationEffect(.degrees(-90))
-                    .animation(AppAnimation.flow, value: isActive)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: AppCornerRadius.medium, style: .continuous)
-                .fill(colors.backgroundTertiary.opacity(colorScheme == .dark ? 0.58 : 0.62))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: AppCornerRadius.medium, style: .continuous)
-                .strokeBorder(colors.border.opacity(0.28), lineWidth: 1)
-        )
-    }
-}
-
-private struct LoadingDot: View {
-    let delay: Double
-    let color: Color
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isActive = false
-
-    var body: some View {
-        Circle()
-            .fill(color)
-            .frame(width: 7, height: 7)
-            .scaleEffect(isActive && !reduceMotion ? 1.0 : 0.62)
-            .opacity(isActive && !reduceMotion ? 1 : 0.45)
-            .onAppear {
-                guard !reduceMotion else {
-                    isActive = true
-                    return
-                }
-
-                withAnimation(
-                    .easeInOut(duration: 0.72)
-                    .delay(delay)
-                    .repeatForever(autoreverses: true)
-                ) {
-                    isActive = true
-                }
-            }
     }
 }
 

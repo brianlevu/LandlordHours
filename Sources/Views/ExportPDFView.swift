@@ -8,10 +8,13 @@ struct ExportPDFView: View {
     @Environment(\.colorScheme) var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     let year: Int
-    @State private var shareItem: ExportShareItem?
-    @State private var exportError: String?
-    @State private var isGenerating = false
+    /// WP-L: the report is made in the background; this sheet can close while it runs.
+    @ObservedObject private var job = ExportJob.shared
     @State private var sharing: ShareRequest?
+
+    private var shareItem: ExportShareItem? { job.readyFiles(for: year) }
+    private var exportError: String? { job.failureMessage(for: year) }
+    private var isGenerating: Bool { job.isGenerating }
 
     var body: some View {
         NavigationStack {
@@ -30,13 +33,25 @@ struct ExportPDFView: View {
 
                     // Export action card
                     VStack(spacing: 16) {
-                        Circle()
-                            .fill(colors.backgroundTertiary)
-                            .frame(width: 64, height: 64)
-                            .overlay {
-                                LucideIcon(image: Lucide.fileText, size: 28)
-                                    .foregroundStyle(AppColors.charcoal)
+                        // Preview area: the drafting line sketches the report page while it's made.
+                        ZStack {
+                            Circle()
+                                .fill(colors.backgroundTertiary)
+                                .frame(width: 64, height: 64)
+                                .overlay {
+                                    LucideIcon(image: Lucide.fileText, size: 28)
+                                        .foregroundStyle(AppColors.charcoal)
+                                }
+                                .opacity(isGenerating ? 0 : 1)
+                                .scaleEffect(isGenerating ? 0.9 : 1)
+                            if isGenerating {
+                                DraftingLoader(sketch: .document, surface: .adaptive, subject: "your report", lineWidth: 2.2)
+                                    .frame(height: 112)
                             }
+                        }
+                        .frame(height: isGenerating ? 112 : 64)
+                        .animation(.easeOut(duration: 0.24), value: isGenerating)
+                        .accessibilityIdentifier("export.preview")
 
                         Text("Export \(String(year)) report")
                             .font(.system(size: 22, weight: .black, design: .rounded))
@@ -97,10 +112,7 @@ struct ExportPDFView: View {
                                 generateExports()
                             } label: {
                                 HStack(spacing: 8) {
-                                    if isGenerating {
-                                        ProgressView()
-                                            .tint(AppColors.onAction)
-                                    } else {
+                                    if !isGenerating {
                                         LucideIcon(image: Lucide.fileDown, size: 16)
                                     }
                                     Text(generateButtonTitle)
@@ -115,6 +127,14 @@ struct ExportPDFView: View {
                             .buttonStyle(.lhPressable)
                             .disabled(!canExport || isGenerating)
                             .accessibilityIdentifier("export.generatePDF")
+
+                            if isGenerating {
+                                Text("You can close this. We'll let you know when it's ready.")
+                                    .font(AppTypography.caption)
+                                    .foregroundStyle(colors.textSecondary)
+                                    .multilineTextAlignment(.center)
+                                    .accessibilityIdentifier("export.backgroundHint")
+                            }
                         }
 
                         if let exportError {
@@ -175,6 +195,8 @@ struct ExportPDFView: View {
             }
         }
         .hidesAppTabBar()
+        .onAppear { job.isSheetVisible = true }
+        .onDisappear { job.isSheetVisible = false }
         .sheet(item: $sharing) { request in
             ActivityShareSheet(items: [request.url]) { completed in
                 sharing = nil
@@ -247,23 +269,7 @@ struct ExportPDFView: View {
 
     private func generateExports() {
         guard !isGenerating else { return }
-        isGenerating = true
-        exportError = nil
-        let report = makeReport()
-        let year = year
-        Task.detached(priority: .userInitiated) {
-            let result = AuditExportFiles.write(report: report, year: year)
-            await MainActor.run {
-                isGenerating = false
-                switch result {
-                case .success(let files):
-                    shareItem = files
-                case .failure:
-                    exportError = "Could not create the report. Please try again."
-                    RatingPromptCoordinator.shared.noteError()
-                }
-            }
-        }
+        job.start(report: makeReport(), year: year)
     }
 }
 
@@ -285,7 +291,7 @@ enum AuditExportFiles {
     }
 }
 
-struct ExportShareItem: Identifiable {
+struct ExportShareItem: Identifiable, Equatable {
     let id = UUID()
     let pdfURL: URL
     let csvURL: URL

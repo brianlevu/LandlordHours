@@ -18,7 +18,7 @@ enum InboxDebugSeed {
 
     static var scenario: String? { value(after: seedArgument) }
 
-    private static func value(after flag: String) -> String? {
+    static func value(after flag: String) -> String? {
         let args = ProcessInfo.processInfo.arguments
         guard let index = args.firstIndex(of: flag), args.indices.contains(index + 1) else { return nil }
         return args[index + 1]
@@ -180,26 +180,38 @@ enum InboxDebugSeed {
     }
 }
 
-/// Feeds the fixture backfill through the real store with visible progress (~1.5 s).
+/// Feeds the fixture backfill through the real store one item at a time, with visible progress
+/// (~1.3 s; `-LHBackfillStepMs <ms>` slows it for captures). `-LHHoldBackfillScan` holds it
+/// halfway for a minute, with half the items already in the inbox.
 struct DebugBackfillScanner: BackfillScanning {
     let app: AppViewModel
     let store: SuggestionStore
 
-    @MainActor func scan(progress: @escaping @Sendable (ClassifierBatchProgress) -> Void) async -> BackfillScanOutcome {
+    @MainActor func scan(
+        progress: @escaping @MainActor (ClassifierBatchProgress) -> Void,
+        found: @escaping @MainActor ([Suggestion]) -> Void
+    ) async -> BackfillScanOutcome {
         let items = InboxDebugSeed.backfillItems(app: app, now: InboxClock.now())
         let holdAtHalf = ProcessInfo.processInfo.arguments.contains("-LHHoldBackfillScan")
+        let stepMs = InboxDebugSeed.value(after: "-LHBackfillStepMs").flatMap(UInt64.init) ?? 60
+        var addedCount = 0
         for step in 1...items.count {
+            try? await Task.sleep(nanoseconds: stepMs * 1_000_000)
+            if Task.isCancelled {
+                return BackfillScanOutcome(access: .fullAccess, foundCount: addedCount, cancelled: true)
+            }
+            let added = store.ingest([items[step - 1]], existingEntries: app.timeEntries)
+            addedCount += added.count
+            if !added.isEmpty { found(added) }
             progress(ClassifierBatchProgress(completed: step, total: items.count))
-            try? await Task.sleep(nanoseconds: 60_000_000)
             if holdAtHalf, step == items.count / 2 {
                 try? await Task.sleep(nanoseconds: 60_000_000_000)
             }
             if Task.isCancelled {
-                return BackfillScanOutcome(access: .fullAccess, foundCount: 0, cancelled: true)
+                return BackfillScanOutcome(access: .fullAccess, foundCount: addedCount, cancelled: true)
             }
         }
-        let added = store.ingest(items, existingEntries: app.timeEntries)
-        return BackfillScanOutcome(access: .fullAccess, foundCount: added.count)
+        return BackfillScanOutcome(access: .fullAccess, foundCount: addedCount)
     }
 }
 #endif

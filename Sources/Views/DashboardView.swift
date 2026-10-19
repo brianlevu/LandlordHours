@@ -30,6 +30,10 @@ struct DashboardView: View {
         HouseProgress(hours: heroHoursOverride ?? totalHours, goal: houseGoal)
     }
 
+    /// WP-L: the first iCloud pull of this launch hasn't landed, so the hours may not be final.
+    /// Only the hours wait (placeholder bar + drafting loader); the rest of Today is usable.
+    private var hoursPending: Bool { viewModel.isAwaitingInitialPull }
+
     private var isREPS: Bool { goalManager.globalGoalType == .reps || goalManager.globalGoalType == .both }
 
     // 50% rule compliance: ratio of RE hours to total working hours (incl. non-RE employment)
@@ -157,6 +161,8 @@ struct DashboardView: View {
                     .padding(.horizontal, 24)
                     .padding(.top, 8)
                     .padding(.bottom, AppSpacing.tabContentBottomInset)
+                    // WP-L: the hours settle in with a crossfade when the first pull lands.
+                    .lhMotion(AppAnimation.standard, value: hoursPending)
                 }
                 .coordinateSpace(name: "dashboardScroll")
                 .onPreferenceChange(DashboardScrollOffsetPreferenceKey.self) { value in
@@ -456,11 +462,13 @@ struct DashboardView: View {
         if viewModel.timeEntries.isEmpty {
             return "\(viewModel.properties.count) property ready. Capture the first activity while details are fresh."
         }
+        if hoursPending { return "Bringing in your latest hours from iCloud." }
         return "\(AppFormat.hours(headerHours)) counted toward \(Int(targetHours)) hours this year."
     }
 
     private var compactHeaderTitle: String {
         if shouldShowActivationCard { return "Finish setup" }
+        if hoursPending { return "Getting your hours" }
         return "\(AppFormat.hours(headerHours)) logged"
     }
 
@@ -606,7 +614,8 @@ struct DashboardView: View {
                 year: currentYear,
                 status: pace.text,
                 statusTone: heroStatusTone,
-                onCelebration: { _ in presentNextCelebration() }
+                onCelebration: { _ in presentNextCelebration() },
+                isLoading: hoursPending
             )
             // The art has a fixed frame; past AX2 the words would wrap into it, so cap there.
             // VoiceOver reads the whole hero as one element with the full words.
@@ -621,18 +630,20 @@ struct DashboardView: View {
                     dashboardMiniMetric(
                         title: "50% rule",
                         value: fiftyPercentValue,
-                        detail: fiftyPercentDetail
+                        detail: hoursPending ? nil : fiftyPercentDetail,
+                        isPending: hoursPending
                     )
                     .accessibilityIdentifier("dashboard.fiftyPercent")
                 } else {
                     dashboardMiniMetric(title: "Days left", value: "\(daysLeftInYear)")
                 }
-                if isGoalMet {
+                if isGoalMet && !hoursPending {
                     dashboardMiniMetric(title: "Goal hours", value: "Reached")
                 } else {
                     dashboardMiniMetric(
                         title: "To finish on time",
-                        value: "\(Int(hoursPerWeekNeeded.rounded(.up)))h a week"
+                        value: "\(Int(hoursPerWeekNeeded.rounded(.up)))h a week",
+                        isPending: hoursPending
                     )
                 }
             }
@@ -649,11 +660,12 @@ struct DashboardView: View {
 
     /// The WP-H words (hours, goal, stage, next step) plus the pace line, for the live hours.
     private var heroAccessibilityLabel: String {
+        if hoursPending { return "\(currentYear). Loading your hours from iCloud." }
         let live = HouseProgress(hours: totalHours, goal: houseGoal)
         return "\(currentYear). \(live.accessibilityLabel) \(pace.text)."
     }
 
-    private func dashboardMiniMetric(title: String, value: String, detail: String? = nil) -> some View {
+    private func dashboardMiniMetric(title: String, value: String, detail: String? = nil, isPending: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
                 .font(.system(.caption, design: .rounded, weight: .bold))
@@ -662,6 +674,14 @@ struct DashboardView: View {
                 .font(.system(.callout, design: .rounded, weight: .black))
                 .monospacedDigit()
                 .foregroundStyle(colors.textPrimary)
+                .opacity(isPending ? 0 : 1)
+                .overlay(alignment: .leading) {
+                    if isPending {
+                        PlaceholderBar(width: 72, height: 14)
+                            .transition(.opacity)
+                    }
+                }
+                .accessibilityLabel(isPending ? "Loading" : value)
             if let detail {
                 Text(detail)
                     .font(.system(.caption, design: .rounded, weight: .medium))

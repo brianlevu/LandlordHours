@@ -46,7 +46,7 @@ struct CaptureSetupEnvironment {
 /// The opt-in for auto-capture. `.whatsNew` is the one-time intro for people updating from 1.x;
 /// `.onboarding` is the same choice as a new user's onboarding step. Nothing turns on without a
 /// tap here: calendar suggestions and end-of-event prompts default to off.
-/// Ends with the day-1 backfill intro when calendar access was granted.
+/// Ends by starting the day-1 backfill in the background when calendar access was granted.
 struct CaptureSetupFlow: View {
     enum Mode { case onboarding, whatsNew }
     enum Phase: Equatable { case priming, calendarDenied, backfill }
@@ -76,16 +76,16 @@ struct CaptureSetupFlow: View {
             case .calendarDenied:
                 calendarDenied
             case .backfill:
-                if let store = AppModelHost.shared.suggestionStore {
-                    BackfillIntroView(
-                        scanner: environment.makeScanner(viewModel, store),
-                        inbox: InboxViewModel(app: viewModel, storeProvider: { AppModelHost.shared.suggestionStore })
-                    ) { openInbox in
-                        NotificationCenter.default.post(name: .captureSuggestionsDidChange, object: nil)
-                        onFinish(openInbox)
+                // WP-L: the look-back runs in the background. Start it and go straight to the
+                // Inbox, where suggestions stream in under a compact progress header.
+                Color.clear.onAppear {
+                    guard let store = AppModelHost.shared.suggestionStore else {
+                        onFinish(false)
+                        return
                     }
-                } else {
-                    Color.clear.onAppear { onFinish(false) }
+                    BackfillJob.shared.start(environment.makeScanner(viewModel, store))
+                    NotificationCenter.default.post(name: .captureSuggestionsDidChange, object: nil)
+                    onFinish(true)
                 }
             }
         }
