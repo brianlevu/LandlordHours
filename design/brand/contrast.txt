@@ -1,0 +1,81 @@
+pair                                                                               fg       bg       ratio  grade
+light · textPrimary on card                                                        #121B33  #FFFFFF  17.07  AAA
+light · textPrimary on canvas                                                      #121B33  #EEF2FA  15.21  AAA
+light · textSecondary on card                                                      #4A5068  #FFFFFF   7.96  AAA
+light · textSecondary on canvas                                                    #4A5068  #EEF2FA   7.09  AAA
+light · textTertiary on card                                                       #5F6983  #FFFFFF   5.48  AA
+light · textTertiary on canvas                                                     #5F6983  #EEF2FA   4.88  AA
+light · action on card                                                             #1E3FA6  #FFFFFF   9.06  AAA
+light · action on canvas                                                           #1E3FA6  #EEF2FA   8.08  AAA
+light · positive on card                                                           #137A42  #FFFFFF    5.4  AA
+light · positive on canvas                                                         #137A42  #EEF2FA   4.81  AA
+light · caution on card                                                            #9A560C  #FFFFFF   5.66  AA
+light · caution on canvas                                                          #9A560C  #EEF2FA   5.04  AA
+light · destructive on card                                                        #C1303A  #FFFFFF    5.6  AA
+light · destructive on canvas                                                      #C1303A  #EEF2FA   4.99  AA
+light · informational on card                                                      #4A6392  #FFFFFF   6.02  AA
+light · informational on canvas                                                    #4A6392  #EEF2FA   5.36  AA
+light · timberInk on card                                                          #8A5A1B  #FFFFFF    5.9  AA
+light · timberInk on canvas                                                        #8A5A1B  #EEF2FA   5.26  AA
+light · draftingInk on card                                                        #2369B5  #FFFFFF   5.59  AA
+light · draftingInk on canvas                                                      #2369B5  #EEF2FA   4.98  AA
+light · onAction on action                                                         #FFFFFF  #1E3FA6   9.06  AAA
+light · action on actionSurface                                                    #1E3FA6  #E3E9FA   7.47  AAA
+light · positive on positiveSurface                                                #137A42  #E4F7EB   4.83  AA
+light · caution on cautionSurface                                                  #9A560C  #FCF0DC   5.02  AA
+light · destructive on destructiveSurface                                          #C1303A  #FCE4E5   4.63  AA
+light · informational on informationalSurface                                      #4A6392  #E6ECF6   5.07  AA
+light · border on card (decorative hairline, WCAG-exempt; cards separate by fill)  #D5DBEA  #FFFFFF   1.39  FAIL
+dark · textPrimary on card                                                         #F2F4FA  #141C3F  15.06  AAA
+dark · textPrimary on canvas                                                       #F2F4FA  #0B1230   16.7  AAA
+dark · textSecondary on card                                                       #B4BCD2  #141C3F   8.73  AAA
+dark · textSecondary on canvas                                                     #B4BCD2  #0B1230   9.68  AAA
+dark · textTertiary on card                                                        #7E88A6  #141C3F    4.7  AA
+dark · textTertiary on canvas                                                      #7E88A6  #0B1230   5.21  AA
+dark · action on card                                                              #8FD3FF  #141C3F   10.2  AAA
+dark · action on canvas                                                            #8FD3FF  #0B1230  11.31  AAA
+dark · positive on card                                                            #4ED48A  #141C3F   8.76  AAA
+dark · positive on canvas                                                          #4ED48A  #0B1230   9.71  AAA
+dark · caution on card                                                             #FFB454  #141C3F   9.39  AAA
+dark · caution on canvas                                                           #FFB454  #0B1230  10.41  AAA
+dark · destructive on card                                                         #FF7A7A  #141C3F   6.56  AA
+dark · destructive on canvas                                                       #FF7A7A  #0B1230   7.27  AAA
+dark · informational on card                                                       #9BB0D0  #141C3F   7.51  AAA
+dark · informational on canvas                                                     #9BB0D0  #0B1230   8.32  AAA
+dark · timberInk on card                                                           #F0BE7A  #141C3F   9.74  AAA
+dark · timberInk on canvas                                                         #F0BE7A  #0B1230   10.8  AAA
+dark · draftingInk on card                                                         #60A8E6  #141C3F    6.5  AA
+dark · draftingInk on canvas                                                       #60A8E6  #0B1230   7.21  AAA
+dark · onAction on action                                                          #0B1230  #8FD3FF  11.31  AAA
+dark · action on actionSurface                                                     #8FD3FF  #182A5C   8.48  AAA
+dark · positive on positiveSurface                                                 #4ED48A  #123A2A   6.67  AA
+dark · caution on cautionSurface                                                   #FFB454  #3D2A10   7.75  AAA
+dark · destructive on destructiveSurface                                           #FF7A7A  #44181C   5.97  AA
+dark · informational on informationalSurface                                       #9BB0D0  #1E2A4A   6.41  AA
+dark · border on card (decorative hairline, WCAG-exempt; cards separate by fill)   #2A3560  #141C3F    1.4  FAIL
+blueprint · white text                                                             #FFFFFF  #1E3FA6   9.06  AAA
+blueprint · drafting cyan linework (light mode)                                    #8FD3FF  #1E3FA6   5.58  AA
+blueprint · drafting linework, dark mode #60A8E6 (non-text 3:1)                    #60A8E6  #1E3FA6   3.56  AA-large
+dark · drafting #60A8E6 vs action #8FD3FF (separation, not a text pair)            #60A8E6  #8FD3FF   1.57  FAIL
+blueprint · timber                                                                 #E0A458  #1E3FA6   4.15  AA-large
+blueprint · brass                                                                  #D9B45A  #1E3FA6   4.59  AA
+blueprint · plaster                                                                #F4EFE6  #1E3FA6   7.91  AAA
+blueprint · positive (dark variant) text                                           #4ED48A  #1E3FA6   4.79  AA
+blueprint · caution (dark variant) text                                            #FFB454  #1E3FA6   5.14  AA
+blueprint · blueprint text on white pill                                           #1E3FA6  #FFFFFF   9.06  AAA
+blueprint · white pill on blueprint (non-text)                                     #FFFFFF  #1E3FA6   9.06  AAA
+record · violet #5B4CDB next to blueprint (hue clash check, not a text pair)       #5B4CDB  #1E3FA6   1.51  FAIL
+record · drafting cyan as text on white (why it is not the light action)           #8FD3FF  #FFFFFF   1.62  FAIL
+
+67 pairs, 5 FAIL
+
+Addendum (rose/spouse, the dark-action alternative for taste call 2, wordmark dark variants)
+rose light on card (final #B04266)                                 #B04266  #FFFFFF    5.5  AA
+rose light on canvas (final #B04266)                               #B04266  #EEF2FA    4.9  AA
+rose dark on card                                                  #F08BAA  #141C3F   7.08  AAA
+rose dark on canvas                                                #F08BAA  #0B1230   7.85  AAA
+dark action alt: lifted blue #7F9DFF on canvas                     #7F9DFF  #0B1230   7.14  AAA
+dark action alt: onAction ink on lifted blue                       #0B1230  #7F9DFF   7.14  AAA
+lockup dimension rule draftingInk #2369B5 on white (non-text)      #2369B5  #FFFFFF   5.59  AA
+dark wordmark ink #F2F4FA on card                                  #F2F4FA  #141C3F  15.06  AAA
+dark wordmark Hours #8FD3FF on card                                #8FD3FF  #141C3F   10.2  AAA

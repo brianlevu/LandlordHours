@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 220" width="1200" height="220">
+  <title>LandlordHours wordmark, dark: ink #F2F4FA (15.1:1 on #141C3F), "Hours" in cyan action #8FD3FF (10.2:1), dimension in dark drafting #60A8E6.</title>
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,600,50&amp;display=swap');
+      .w { font-family: 'Fraunces', 'New York', 'Iowan Old Style', Georgia, serif; font-weight: 600; font-size: 150px; font-variation-settings: 'opsz' 144, 'SOFT' 50; letter-spacing: -0.015em; }
+      .dim { stroke: #60A8E6; stroke-width: 4; fill: none; }
+      .lab { font-family: 'SF Mono', ui-monospace, Menlo, monospace; font-size: 20px; letter-spacing: 0.08em; fill: #60A8E6; }
+    </style>
+  </defs>
+  <text class="w" x="40" y="150" fill="#F2F4FA">Landlord<tspan fill="#8FD3FF">Hours</tspan></text>
+  <g class="dim">
+    <path d="M746 190 L1118 190" />
+    <path d="M746 178 L746 202 M1118 178 L1118 202" />
+  </g>
+  <text class="lab" x="932" y="214" text-anchor="middle">750 h</text>
+</svg>

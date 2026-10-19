@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>LandlordHours mark B: half drawn, half built (geometry offset translate(10 -11.5) so the bbox centre sits on the canvas centre)</title>
+  <!-- Same geometry as scripts/make_icons.py draw_b(). Colours are the brand tokens; swap the three fills + one stroke for the mono version. -->
+  <defs>
+    <style>
+      .plaster { fill: #F4EFE6; }
+      .terra   { stroke: #C8553D; stroke-width: 66; stroke-linecap: round; fill: none; }
+      .timber  { fill: #E0A458; }
+      .draft   { stroke: #8FD3FF; stroke-width: 26; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+    </style>
+  </defs>
+  <g transform="translate(10 -11.5)">
+  <!-- drawn (cyan linework) -->
+  <path class="draft" d="M512 232 L836 486" />
+  <path class="draft" d="M770 436 L770 700" />
+  <rect class="draft" x="588" y="540" width="120" height="96" rx="12" />
+  <!-- built -->
+  <rect class="plaster" x="222" y="808" width="580" height="40" rx="10" />
+  <rect class="plaster" x="250" y="470" width="262" height="342" />
+  <rect class="plaster" x="512" y="690" width="258" height="122" />
+  <path class="terra" d="M512 232 L188 486" />
+  <path class="timber" d="M382 683 a47 47 0 0 1 94 0 V812 H382 Z" />
+  </g>
+</svg>
