@@ -93,11 +93,8 @@
 		CB4A4FF6CB46CB23A628AA19 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD25AA91ABB5FB4C307E491 /* DashboardView.swift */; };
 		CC3AD4AEC85263A4DB7CC2EE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7987DD5DAFB64A0DD0B89D /* SettingsView.swift */; };
 		D0FB50644A3E4250418CF25F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8F16B919639EBDE7C821FEC2 /* Assets.xcassets */; };
-<<<<<<< HEAD
-		D6F01A1BCC4C63937DFC7BB8 /* CalendarDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEA07735A91C141EB38666AE /* CalendarDetector.swift */; };
-=======
 		D22873F8F007BD7B0F0897C2 /* RulesClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66F916D5F37122A02CA6ADF4 /* RulesClassifier.swift */; };
->>>>>>> origin/wp2-classifier
+		D6F01A1BCC4C63937DFC7BB8 /* CalendarDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEA07735A91C141EB38666AE /* CalendarDetector.swift */; };
 		D944AA90DB2DCE59079C61F9 /* AuditReportPDFRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46C2C28508D1F64A007B6BF9 /* AuditReportPDFRenderer.swift */; };
 		E57066D892140F0329FFD63C /* CalendarDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4B3AC0F459D7FC09BE5961 /* CalendarDetectorTests.swift */; };
 		E64013AB37CFBCDFB9E4001D /* LandlordHours.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 61925A55B4CDBDF1584A392E /* LandlordHours.storekit */; };
@@ -208,12 +205,9 @@
 		C9291FAFB4986AA2BF4F05D4 /* Analytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Analytics.swift; sourceTree = "<group>"; };
 		CA2074D17A6358EF6451A083 /* CaptureFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFlowTests.swift; sourceTree = "<group>"; };
 		CBF39EBE443D66C2EA654096 /* ProMoments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProMoments.swift; sourceTree = "<group>"; };
-<<<<<<< HEAD
 		CCE30070327091F72B0D4F65 /* CalendarCaptureCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarCaptureCoordinator.swift; sourceTree = "<group>"; };
-=======
 		CD4B4980260EB2F39906C0E9 /* ClassifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassifierTests.swift; sourceTree = "<group>"; };
 		CEFECEF0A9C611949E9E4A0A /* RulesEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesEngine.swift; sourceTree = "<group>"; };
->>>>>>> origin/wp2-classifier
 		CF68DBFF1FFD763363015B42 /* CelebrationOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CelebrationOverlayView.swift; sourceTree = "<group>"; };
 		CFBF76FD610DF2D0CDA40C0A /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
 		D05C18E16E505EEE666FF7CC /* AppViewModel+Capture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppViewModel+Capture.swift"; sourceTree = "<group>"; };
@@ -324,11 +318,8 @@
 			isa = PBXGroup;
 			children = (
 				DA55F7A788AAB40693166F60 /* AuditReportTests.swift */,
-<<<<<<< HEAD
 				7B4B3AC0F459D7FC09BE5961 /* CalendarDetectorTests.swift */,
-=======
 				09FEE56F85496C99FB9A3F46 /* CalibrationTests.swift */,
->>>>>>> origin/wp2-classifier
 				CA2074D17A6358EF6451A083 /* CaptureFlowTests.swift */,
 				BB3ABA94307D665EF31EC294 /* CaptureModelTests.swift */,
 				CD4B4980260EB2F39906C0E9 /* ClassifierTests.swift */,
@@ -351,11 +342,8 @@
 				593E2F107A195788B317254C /* CaptureFlags.swift */,
 				C8CC8529E297F31048301CC2 /* CaptureProtocols.swift */,
 				C656628C13179C2DDFDF9762 /* SuggestionStore.swift */,
-<<<<<<< HEAD
-				5A1F5433EE6A0CBE4D440059 /* Detectors */,
-=======
 				815F2D2B6F5048580C2D860D /* Classifier */,
->>>>>>> origin/wp2-classifier
+				5A1F5433EE6A0CBE4D440059 /* Detectors */,
 			);
 			path = Capture;
 			sourceTree = "<group>";
@@ -690,11 +678,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				41608B6514C2E6C81B7359F2 /* AuditReportTests.swift in Sources */,
-<<<<<<< HEAD
 				E57066D892140F0329FFD63C /* CalendarDetectorTests.swift in Sources */,
-=======
 				94F4848B3304A1FFD709DAFD /* CalibrationTests.swift in Sources */,
->>>>>>> origin/wp2-classifier
 				5939EC4545165CD6A01A9D52 /* CaptureFlowTests.swift in Sources */,
 				9C56CFF4C0A527580463AA1D /* CaptureModelTests.swift in Sources */,
 				14BA0EDED0F47074CB5C1684 /* ClassifierTests.swift in Sources */,
