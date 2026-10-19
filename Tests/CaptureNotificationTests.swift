@@ -540,6 +540,20 @@ final class CaptureActionRouterTests: CaptureTestCase {
         XCTAssertTrue(CaptureActionQueue.all(defaults: defaults).isEmpty)
     }
 
+    func testNoICloudDiscoveredDuringWaitConfirmsRightAway() async {
+        let (host, viewModel, propertyId) = makeHost()
+        let s = calendarSuggestion(start: date(2026, 3, 2), propertyId: propertyId)
+        host.suggestionStore!.ingest([s], existingEntries: [], calendar: calendar)
+        let gate = FakePullGate()
+        gate.stateValue = .pending
+        gate.onWait = { g in g.stateValue = .notApplicable; return false }
+        let router = NotificationActionRouter(host: host, environment: .testing(gate: gate, defaults: defaults))
+        let outcome = await router.handle(request(CaptureNotificationAction.logIt, s)) {}
+        XCTAssertEqual(outcome, .confirmed(entryId: s.entryId(profileId: profileId)))
+        XCTAssertEqual(entryCount(viewModel, s), 1)
+        XCTAssertTrue(CaptureActionQueue.all(defaults: defaults).isEmpty)
+    }
+
     func testCompletionRunsAfterTheSave() async {
         let (host, viewModel, propertyId) = makeHost()
         let s = calendarSuggestion(start: date(2026, 3, 2), propertyId: propertyId)

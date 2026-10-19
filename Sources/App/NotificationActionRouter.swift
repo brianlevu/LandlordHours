@@ -204,7 +204,10 @@ final class NotificationActionRouter {
         }
         // Queue first, so a suspension during the wait can't lose the tap.
         enqueue(.confirm, key: suggestion.sourceKey, profileId: profileId)
-        guard await gate.waitForInitialPull(profileId: profileId, timeout: environment.pullWaitTimeout) else {
+        let pulled = await gate.waitForInitialPull(profileId: profileId, timeout: environment.pullWaitTimeout)
+        // Still pending (slow or failed pull): stays queued. Turned out to have no iCloud
+        // (checked during the wait): nothing to wait for, go ahead.
+        guard pulled || gate.state(for: profileId) != .pending else {
             return (.queued, false)
         }
         CaptureActionQueue.remove(profileId: profileId, sourceKey: suggestion.sourceKey, defaults: environment.defaults)
