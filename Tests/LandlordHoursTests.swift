@@ -1166,6 +1166,120 @@ final class EngagementIntelligenceServiceTests: XCTestCase {
         XCTAssertNotNil(scheduler.plan(for: context, respectingCooldown: false))
     }
 
+    // MARK: - Spouse hours: REPS never combines, material participation does
+
+    private func spouseHeavyContext(goal: HourGoalType, target: Double) -> (EngagementContext, RentalProperty) {
+        let property = makeProperty()
+        return (spouseHeavyContext(goal: goal, target: target, property: property), property)
+    }
+
+    private func spouseHeavyContext(goal: HourGoalType, target: Double, property: RentalProperty) -> EngagementContext {
+        let day = date(year: 2026, month: 9, day: 28)
+        let entries = [
+            TimeEntry(propertyId: property.id, participant: .selfParticipant, category: .management, hours: 300, date: day, notes: "self"),
+            TimeEntry(propertyId: property.id, participant: .spouse, category: .management, hours: 600, date: day, notes: "spouse")
+        ]
+        var context = makeContext(now: date(year: 2026, month: 10, day: 1), properties: [property], entries: entries)
+        context.goalType = goal
+        context.targetHours = target
+        return context
+    }
+
+    func testRepsPaceCountsOnlySelfHoursNotCombinedSpouse() {
+        let (context, _) = spouseHeavyContext(goal: .reps, target: 750)
+        let snapshot = service.snapshot(for: context, calendar: calendar)
+
+        XCTAssertEqual(snapshot.yearHours, 300, accuracy: 0.001)
+        // Combined 900 would be ahead of pace; 300 by October is behind.
+        XCTAssertTrue(snapshot.isBehindPace)
+        XCTAssertEqual(service.recommendation(for: context).reason, .behindPace)
+    }
+
+    func testMaterialParticipationPaceCombinesSpouseHours() {
+        let (context, _) = spouseHeavyContext(goal: .str, target: 100)
+        let snapshot = service.snapshot(for: context, calendar: calendar)
+
+        XCTAssertEqual(snapshot.yearHours, 900, accuracy: 0.001)
+        XCTAssertFalse(snapshot.isBehindPace)
+    }
+
+    func testBothGoalCountsOnlySelfHours() {
+        let (context, _) = spouseHeavyContext(goal: .both, target: 750)
+        XCTAssertEqual(service.snapshot(for: context, calendar: calendar).yearHours, 300, accuracy: 0.001)
+    }
+
+    func testStrHoursMatchDashboardForGroupedAndUngrouped() {
+        // Property A: self 300 + spouse 225 = 525. Property B: self 100 = 100. Total 625 grouped.
+        let a = makeProperty()
+        let b = RentalProperty(name: "Elm", address: "9 Elm", propertyType: .str)
+        let day = date(year: 2026, month: 9, day: 28)
+        func e(_ p: RentalProperty, _ who: Participant, _ h: Double) -> TimeEntry {
+            TimeEntry(propertyId: p.id, participant: who, category: .management, hours: h, date: day, notes: "x")
+        }
+        let entries = [e(a, .selfParticipant, 300), e(a, .spouse, 225), e(b, .selfParticipant, 100)]
+        var context = makeContext(now: date(year: 2026, month: 10, day: 1), properties: [a, b], entries: entries)
+        context.goalType = .str
+        context.targetHours = 100
+
+        context.groupingElection = false
+        XCTAssertEqual(service.snapshot(for: context, calendar: calendar).yearHours, 525, accuracy: 0.001)
+        context.groupingElection = true
+        XCTAssertEqual(service.snapshot(for: context, calendar: calendar).yearHours, 625, accuracy: 0.001)
+    }
+
+    func testIntentSummaryShowsSelfHoursTowardRepsTarget() {
+        let (context, _) = spouseHeavyContext(goal: .reps, target: 750)
+        let snapshot = service.snapshot(for: context, calendar: calendar)
+        let text = LandlordHoursIntentCopy.summaryDialog(
+            year: 2026,
+            context: context,
+            snapshot: snapshot,
+            recommendation: service.recommendation(for: context)
+        )
+
+        XCTAssertTrue(text.contains("You have 300.0 hours toward 750 this year"), text)
+        XCTAssertFalse(text.contains("900"), text)
+    }
+
+    func testIntentSummaryShowsCombinedHoursForMaterialParticipation() {
+        let (context, _) = spouseHeavyContext(goal: .str, target: 100)
+        let snapshot = service.snapshot(for: context, calendar: calendar)
+        let text = LandlordHoursIntentCopy.summaryDialog(
+            year: 2026,
+            context: context,
+            snapshot: snapshot,
+            recommendation: service.recommendation(for: context)
+        )
+
+        XCTAssertTrue(text.contains("You have 900.0 hours toward 100 this year"), text)
+    }
+
+    func testWidgetSnapshotProgressUsesSelfHoursForReps() {
+        let (context, _) = spouseHeavyContext(goal: .reps, target: 750)
+        let snapshot = service.snapshot(for: context, calendar: calendar)
+        let widget = EngagementWidgetSnapshot(
+            updatedAt: Date(),
+            taxYear: 2026,
+            propertyCount: 1,
+            yearHours: snapshot.yearHours,
+            targetHours: 750,
+            targetLabel: "750h REPS",
+            targetShortLabel: "750h",
+            requiredHoursToDate: snapshot.requiredHoursToDate,
+            daysRemainingInYear: snapshot.daysRemainingInYear,
+            lastLogDate: snapshot.lastLogDate,
+            isTimerRunning: false,
+            timerStartTime: nil,
+            recommendationSurface: .none,
+            recommendationReason: .noActionNeeded,
+            recommendationDestination: .none,
+            recommendationTitle: "",
+            recommendationMessage: ""
+        )
+
+        XCTAssertEqual(widget.progress, 300.0 / 750.0, accuracy: 0.001)
+    }
+
     func testWidgetSnapshotKeepsSetupStateActionable() {
         let snapshot = EngagementWidgetSnapshot.empty
 

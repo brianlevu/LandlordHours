@@ -938,14 +938,13 @@ class AppViewModel: ObservableObject {
     }
 
     func materialParticipationOverview(year: Int) -> TaxQualificationEngine.MaterialParticipationResult {
-        if TaxProfileManager.shared.groupingElection {
-            return materialParticipationStatus(year: year)
-        }
-
-        return properties
-            .map { materialParticipationStatus(year: year, propertyId: $0.id) }
-            .max { $0.ownerAndSpouseHours < $1.ownerAndSpouseHours }
-            ?? materialParticipationStatus(year: year, propertyId: nil)
+        TaxQualificationEngine.materialParticipationOverview(
+            entries: timeEntries,
+            properties: properties,
+            year: year,
+            groupingElection: TaxProfileManager.shared.groupingElection,
+            noOneParticipatedMore: TaxProfileManager.shared.noOneParticipatedMore(forYear: year)
+        )
     }
     
     // MARK: - Persistence
@@ -1079,7 +1078,9 @@ class AppViewModel: ObservableObject {
             notificationPermission: .notDetermined,
             recentDismissals: [],
             isProUser: SubscriptionManager.shared.isPro,
-            targetHours: widgetGoal.targetHours
+            targetHours: widgetGoal.targetHours,
+            goalType: GoalManager.shared.globalGoalType,
+            groupingElection: TaxProfileManager.shared.groupingElection
         )
         let snapshot = EngagementIntelligenceService.shared.snapshot(for: context)
         let recommendation = EngagementIntelligenceService.shared.recommendation(for: context)
@@ -1108,13 +1109,13 @@ class AppViewModel: ObservableObject {
     }
 
     private func widgetGoalContext() -> (targetHours: Double, label: String, shortLabel: String) {
-        switch GoalManager.shared.globalGoalType {
-        case .reps:
-            return (750, "750h REPS", "750h")
-        case .str:
-            return (100, "100h STR", "100h")
-        case .both:
-            return (750, "750h REPS + STR", "750h")
+        let goal = GoalManager.shared.globalGoalType
+        let hours = goal.hoursRequired
+        let short = "\(Int(hours))h"
+        switch goal {
+        case .reps: return (hours, "\(short) REPS", short)
+        case .str: return (hours, "\(short) STR", short)
+        case .both: return (hours, "\(short) REPS + STR", short)
         }
     }
     
