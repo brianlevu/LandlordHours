@@ -421,7 +421,7 @@ Sources/
 - **Material Participation Tests:** Test 1 = 500h, Test 3 = 100h. Different from REPS — no 50% rule required
 - **50% Rule:** Working time must be ≥50% in real estate to qualify. Only applies to REPS, not Material Participation
 - **LTR/STR:** Long-Term Rental / Short-Term Rental property types. STR (avg stay <7 days) is automatically non-passive — different tax treatment
-- **Participants:** Self and Spouse — tracked separately for 50% rule compliance. Spouse hours can count toward REPS if filing jointly
+- **Participants:** Self and Spouse — tracked separately. For REPS (750h + more-than-half test), ONE spouse must meet both tests individually; spouse hours never combine (IRC 469(c)(7)(B)). For material participation, spouse hours DO count together when filing jointly.
 - **Grouping Election:** IRS allows grouping multiple properties as single activity for material participation. Important for multi-property landlords
 
 ---
