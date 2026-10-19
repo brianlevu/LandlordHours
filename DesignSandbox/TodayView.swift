@@ -309,7 +309,7 @@ struct CompactSuggestionRow: View {
                 } else if let m = s.capMinutes {
                     Text("≤" + fmtDur(Double(m) / 60))
                 } else {
-                    Text("Add hours").foregroundStyle(LH.caution)
+                    Text("Add hours").foregroundStyle(LH.action).fontWeight(.semibold)
                 }
             }
             .font(.body)

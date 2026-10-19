@@ -213,7 +213,7 @@ struct BlueprintMilestone: View {
                         .scaleEffect(plaque ? 1 : 0.6, anchor: .bottom)
                         .opacity(plaque ? 1 : 0)
                         .shadow(color: .black.opacity(0.35), radius: 4, y: 3)
-                        .position(x: 290 * 0.80, y: 290 * 0.80)     // standing on the plinth's front-right edge
+                        .position(x: 290 * 0.74, y: 290 * 0.68)     // base rests on the path along the plinth.s right edge
                 }
                 .frame(width: 290, height: 290)
                 .padding(.top, 8)
