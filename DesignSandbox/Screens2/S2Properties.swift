@@ -42,6 +42,7 @@ struct S2PropertiesList: View {
                 }
                 .scrollIndicators(.hidden)
                 .background(LHB.canvas.ignoresSafeArea())
+                .overlay(alignment: .top) { TopEdgeFade() }
                 .onAppear {
                     if state == .twelveBottom { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { proxy.scrollTo("bottom", anchor: .bottom) } }
                     if let openDetail { DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { path = [openDetail] } }
@@ -364,7 +365,7 @@ struct S2PropertyEdit: View {
         .safeAreaInset(edge: .bottom) {
             Button(isEdit ? "Save" : "Add property") {}.buttonStyle(S2Primary()).disabled(name.isEmpty)
                 .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 8)
-                .background(LinearGradient(stops: [.init(color: LHB.canvas.opacity(0), location: 0), .init(color: LHB.canvas, location: 0.3)], startPoint: .top, endPoint: .bottom).ignoresSafeArea())
+                .background(LinearGradient(stops: [.init(color: LHB.canvas.opacity(0), location: 0), .init(color: LHB.canvas, location: 0.14)], startPoint: .top, endPoint: .bottom).ignoresSafeArea())
         }
         .confirmationDialog("Delete Pine Cabin and its 41 entries?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete property and entries", role: .destructive) {}

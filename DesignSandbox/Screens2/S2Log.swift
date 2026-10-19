@@ -277,7 +277,7 @@ struct LogTimeSheet: View {
                 .disabled(!valid)
                 .accessibilityIdentifier("log.save")
                 if focused {
-                    Button("Done") { focused = false }.font(.body.weight(.semibold)).foregroundStyle(LHB.action).frame(minHeight: 44)
+                    Button("Done") { focused = false }.font(.body.weight(.semibold)).foregroundStyle(LHB.action).frame(minHeight: 44).fixedSize()
                 }
             }
             if isReview {
@@ -286,10 +286,11 @@ struct LogTimeSheet: View {
                 Button("Start a timer instead") {}.font(.body).foregroundStyle(LHB.action).frame(minHeight: 36)
             }
         }
-        .padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 8)
-        .background {
-            LinearGradient(stops: [.init(color: LHB.canvas.opacity(0), location: 0), .init(color: LHB.canvas, location: 0.3)], startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
+        .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 8)
+        .background(LHB.canvas.ignoresSafeArea())
+        .overlay(alignment: .top) {
+            LinearGradient(colors: [LHB.canvas.opacity(0), LHB.canvas], startPoint: .top, endPoint: .bottom)
+                .frame(height: 20).offset(y: -20).allowsHitTesting(false)
         }
     }
 }

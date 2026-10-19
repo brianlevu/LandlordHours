@@ -96,8 +96,8 @@ struct S2Paywall: View {
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
-                    .minimumScaleFactor(0.8)
-                    .padding(.horizontal, 56)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 60)
                     .accessibilityAddTraits(.isHeader)
                 phone(width: width * 0.62)
                     .opacity(shown ? 1 : 0)
@@ -105,7 +105,7 @@ struct S2Paywall: View {
             }
             .padding(.top, top + 20)
         }
-        .frame(height: height)
+        .frame(height: height, alignment: .top)
         .clipped()
     }
 

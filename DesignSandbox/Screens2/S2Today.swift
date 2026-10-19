@@ -36,7 +36,7 @@ struct S2Today: View {
                             yourRecord.padding(.top, 32).id("record")
                         }
                     } else {
-                        noProperty.padding(.top, 24)
+                        noProperty.padding(.top, 24).id("noprop")
                     }
                     Color.clear.frame(height: 40 + 76)
                 }
@@ -45,16 +45,18 @@ struct S2Today: View {
             }
             .scrollIndicators(.hidden)
             .background(LHB.canvas.ignoresSafeArea())
+            .overlay(alignment: .top) { TopEdgeFade() }
             .onAppear {
                 items = Array(S2Data.pending.prefix(state == .confirmMore ? 8 : 3))
                 let target: String? = switch state {
                 case .week, .weekMid: "week"
                 case .freeRecord: "record"
                 case .confirm3, .confirmMore, .caughtUp, .caughtUpOff, .loading: "confirm"
+                case .noProperty: "noprop"
                 default: nil
                 }
                 if let target {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { proxy.scrollTo(target, anchor: target == "confirm" ? .center : .top) }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { proxy.scrollTo(target, anchor: target == "confirm" || target == "noprop" ? .center : .top) }
                 }
             }
         }
@@ -220,7 +222,7 @@ struct S2Today: View {
     private var yourRecord: some View {
         VStack(alignment: .leading, spacing: 10) {
             S2Header("Your record")
-            LockedPreview(size: .card, line: "Your 212 hours, ready to export.", fold: 92, surface: LHB.card) {
+            LockedPreview(size: .card, line: "Your 212 hours, ready to export.", fold: 170, surface: LHB.card) {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 12) {
                         Image(systemName: "doc.richtext").font(.system(size: 20)).foregroundStyle(LHB.action)

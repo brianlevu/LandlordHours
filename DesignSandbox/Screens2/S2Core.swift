@@ -579,6 +579,7 @@ struct DraftingLoader: View {
             let t = ctx.date.timeIntervalSinceReferenceDate
             let p = reduce ? 1 : min(1, CGFloat(t.truncatingRemainder(dividingBy: 2.0)) / 1.5)
             ZStack {
+                outline.stroke(color.opacity(0.18), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
                 outline.trim(from: 0, to: p).stroke(color, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
                 details.trim(from: 0, to: max(0, p * 1.3 - 0.3)).stroke(color.opacity(0.6), style: StrokeStyle(lineWidth: 1, lineCap: .round))
             }
@@ -674,6 +675,7 @@ struct LockedPreview<Content: View>: View {
     var onUnlock: () -> Void = {}
     @ViewBuilder var content: () -> Content
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.dynamicTypeSize) private var dts
 
     private var radius: CGFloat { unlocked ? 0 : (size == .row ? 4 : 10) }
 
@@ -707,7 +709,7 @@ struct LockedPreview<Content: View>: View {
                         surface.opacity(0.85)
                     }
                     .overlay(alignment: .top) {
-                        cta.frame(width: g.size.width).padding(.top, fold + max(24, (g.size.height - fold - 110) / 2))
+                        cta.frame(width: g.size.width).padding(.top, fold + min(150, max(24, (g.size.height - fold - 110) / 2)))
                     }
                 }
                 .allowsHitTesting(true)
@@ -733,21 +735,16 @@ struct LockedPreview<Content: View>: View {
 
     private var row: some View {
         ZStack {
-            content().blur(radius: unlocked ? 0 : 4).opacity(unlocked ? 1 : 0.55).accessibilityHidden(true)
+            content().blur(radius: unlocked ? 0 : 4).opacity(unlocked ? 1 : 0.35).accessibilityHidden(true)
             if !unlocked {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 12) {
-                        Text(line).font(.subheadline.weight(.semibold)).foregroundStyle(LHB.textPrimary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Button(action: onUnlock) { Label("Unlock Pro", systemImage: "lock.fill") }
-                            .buttonStyle(S2PrimaryCompact()).fixedSize()
-                            .accessibilityIdentifier("lock.unlock")
-                    }
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(line).font(.subheadline.weight(.semibold)).foregroundStyle(LHB.textPrimary)
-                        Button(action: onUnlock) { Label("Unlock Pro", systemImage: "lock.fill") }
-                            .buttonStyle(S2PrimaryCompact())
-                    }
+                let layout = dts.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))
+                layout {
+                    Text(line).font(.subheadline.weight(.semibold)).foregroundStyle(LHB.textPrimary)
+                        .lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button(action: onUnlock) { Label("Unlock Pro", systemImage: "lock.fill") }
+                        .buttonStyle(S2PrimaryCompact()).fixedSize()
+                        .accessibilityIdentifier("lock.unlock")
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -755,6 +752,7 @@ struct LockedPreview<Content: View>: View {
         }
         .animation(reduce ? .easeOut(duration: 0.2) : .easeOut(duration: 0.3), value: unlocked)
     }
+
 }
 
 // MARK: - Undo toast
@@ -791,4 +789,21 @@ func hm(_ h: Double) -> String {
     if mm == 0 { return "\(hh)h" }
     if hh == 0 { return "\(mm)m" }
     return "\(hh)h \(mm)m"
+}
+
+/// Scroll edge under the status bar: content fades into the canvas instead of colliding with the clock.
+struct TopEdgeFade: View {
+    var body: some View {
+        // A zero-height anchor on the safe-area line; the gradient hangs above it (over the
+        // status bar) and 18pt below it. Overlays aren't clipped, so it reaches the screen top.
+        Color.clear.frame(maxWidth: .infinity).frame(height: 0)
+            .overlay(alignment: .bottom) {
+                LinearGradient(stops: [.init(color: LHB.canvas, location: 0), .init(color: LHB.canvas, location: 0.78), .init(color: LHB.canvas.opacity(0), location: 1)],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(height: 96)
+                    .offset(y: 18)
+            }
+            .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
 }
