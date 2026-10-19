@@ -43,6 +43,8 @@ struct CalendarEventSnapshot: Equatable {
     /// EventKit `isDetached`: an occurrence of a series that was edited on its own. It keeps
     /// the series' ids and has no recurrence rules of its own.
     var isDetached: Bool
+    /// EventKit `timeZone == nil`: floating time, the same wall-clock time in every time zone.
+    var isFloating: Bool
 
     /// Part of a series, so `occurrenceDate` (the ORIGINAL start) identifies it. For a one-off
     /// event EventKit sets `occurrenceDate` to the current start, which moves with it.
@@ -61,7 +63,8 @@ struct CalendarEventSnapshot: Equatable {
         isDeclined: Bool = false,
         isCanceled: Bool = false,
         hasRecurrenceRules: Bool = false,
-        isDetached: Bool = false
+        isDetached: Bool = false,
+        isFloating: Bool = false
     ) {
         self.externalId = externalId
         self.eventIdentifier = eventIdentifier
@@ -76,6 +79,7 @@ struct CalendarEventSnapshot: Equatable {
         self.isCanceled = isCanceled
         self.hasRecurrenceRules = hasRecurrenceRules
         self.isDetached = isDetached
+        self.isFloating = isFloating
     }
 }
 
@@ -144,7 +148,8 @@ final class EventKitCalendarSource: CalendarEventSource {
                 isDeclined: declined,
                 isCanceled: event.status == .canceled,
                 hasRecurrenceRules: event.hasRecurrenceRules,
-                isDetached: event.isDetached
+                isDetached: event.isDetached,
+                isFloating: event.timeZone == nil
             )
         }
     }

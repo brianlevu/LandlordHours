@@ -46,6 +46,15 @@ enum SuggestionKey {
         "cal:\(externalId):\(iso.string(from: occurrence))"
     }
 
+    /// Occurrence of a floating-time (no time zone) recurring event. The same wall-clock time
+    /// is a different instant in each device time zone, so the key uses the local date and time
+    /// components (`yyyy-MM-ddTHH:mm`), identical on every device.
+    static func calendar(externalId: String, floatingOccurrence: Date, in calendar: Calendar) -> String {
+        let c = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: floatingOccurrence)
+        let stamp = String(format: "%04d-%02d-%02dT%02d:%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0, c.hour ?? 0, c.minute ?? 0)
+        return "cal:\(externalId):f\(stamp)"
+    }
+
     /// One-off (non-recurring) event: `cal:<calendarItemExternalIdentifier>`. No date, so
     /// rescheduling the event keeps its key (and its confirmed entry).
     static func calendar(externalId: String) -> String { "cal:\(externalId)" }

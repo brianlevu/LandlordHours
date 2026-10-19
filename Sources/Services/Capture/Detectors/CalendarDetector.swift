@@ -1,4 +1,7 @@
 import Foundation
+import os.log
+
+private let detectorLogger = Logger(subsystem: "com.openclaw.landlordhours", category: "CalendarDetector")
 
 enum CalendarCaptureError: Error, Equatable {
     /// Calendar can't be read: not asked yet, denied, restricted, or "add events only".
@@ -12,6 +15,9 @@ struct CalendarSkipCounts: Equatable {
     var invalidDuration = 0
     var declined = 0
     var canceled = 0
+    /// Recurring events EventKit gave no original occurrence date for. Keying on the current
+    /// start would change the key whenever the series is edited, so they are left out.
+    var missingOccurrence = 0
 }
 
 // MARK: - Detector
@@ -32,14 +38,17 @@ final class CalendarDetector: CaptureDetector {
     let kind: Suggestion.Kind = .calendar
     private let source: CalendarEventSource
     private let clock: () -> Date
+    private let calendar: Calendar
     private let calendarIds: () -> Set<String>?
     private(set) var lastSkipCounts = CalendarSkipCounts()
 
     init(
         source: CalendarEventSource,
         calendarIds: @escaping () -> Set<String>? = { nil },
-        clock: @escaping () -> Date = Date.init
+        clock: @escaping () -> Date = Date.init,
+        calendar: Calendar = .current
     ) {
+        self.calendar = calendar
         self.source = source
         self.calendarIds = calendarIds
         self.clock = clock
@@ -83,11 +92,24 @@ final class CalendarDetector: CaptureDetector {
 
             // One-off events are keyed on the id alone so rescheduling keeps the key. Series
             // occurrences also carry their ORIGINAL start, which survives moving one repeat.
-            let occurrence: Date? = event.isRecurring ? (event.occurrenceDate ?? event.start) : nil
+            var occurrence: Date?
+            if event.isRecurring {
+                guard let original = event.occurrenceDate else {
+                    counts.missingOccurrence += 1
+                    detectorLogger.error("Recurring event without occurrenceDate skipped")
+                    continue
+                }
+                occurrence = original
+            }
             let key: String
             if let externalId = event.externalId {
-                key = occurrence.map { SuggestionKey.calendar(externalId: externalId, occurrence: $0) }
-                    ?? SuggestionKey.calendar(externalId: externalId)
+                if let occurrence {
+                    key = event.isFloating
+                        ? SuggestionKey.calendar(externalId: externalId, floatingOccurrence: occurrence, in: calendar)
+                        : SuggestionKey.calendar(externalId: externalId, occurrence: occurrence)
+                } else {
+                    key = SuggestionKey.calendar(externalId: externalId)
+                }
             } else if let local = event.eventIdentifier {
                 key = SuggestionKey.calendarDeviceLocal(eventIdentifier: local, occurrence: occurrence)
             } else {

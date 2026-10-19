@@ -52,6 +52,7 @@ class CalendarCaptureTestCase: CaptureTestCase {
         _ externalId: String? = "EVT-1",
         recurring: Bool = false,
         detached: Bool = false,
+        floating: Bool = false,
         localId: String? = nil,
         start: Date,
         hours: Double = 1.5,
@@ -68,12 +69,12 @@ class CalendarCaptureTestCase: CaptureTestCase {
             // is simply its current start and moves with it.
             occurrenceDate: (recurring || detached) ? (occurrence ?? start) : start,
             isAllDay: allDay, isDeclined: declined, isCanceled: canceled,
-            hasRecurrenceRules: recurring, isDetached: detached
+            hasRecurrenceRules: recurring, isDetached: detached, isFloating: floating
         )
     }
 
     func makeDetector(_ source: FakeCalendarSource) -> CalendarDetector {
-        CalendarDetector(source: source, clock: { [now] in now! })
+        CalendarDetector(source: source, clock: { [now] in now! }, calendar: calendar)
     }
 
     func makeCoordinator(
@@ -135,6 +136,40 @@ final class CalendarDetectorTests: CalendarCaptureTestCase {
         let found = try await makeDetector(FakeCalendarSource(events: [detached]))
             .detect(in: DateInterval(start: date(2026, 5, 1), end: now))
         XCTAssertEqual(found.first?.sourceKey, SuggestionKey.calendar(externalId: "SERIES", occurrence: original))
+    }
+
+    func testRecurringEventWithoutOccurrenceDateIsSkippedNotKeyedOnMovingStart() async throws {
+        var broken = event("SERIES", recurring: true, start: date(2026, 5, 4, 10))
+        broken.occurrenceDate = nil
+        let detector = makeDetector(FakeCalendarSource(events: [broken, event("OK", start: date(2026, 5, 5, 10))]))
+        let found = try await detector.detect(in: DateInterval(start: date(2026, 5, 1), end: now))
+        XCTAssertEqual(found.compactMap(\.externalId), ["OK"])
+        XCTAssertEqual(detector.lastSkipCounts.missingOccurrence, 1)
+    }
+
+    func testFloatingRecurringEventKeysIdenticallyInEveryTimeZone() async throws {
+        // 10:00 wall-clock on 4 May: a different instant on each device.
+        func wallClock(_ tz: String) -> (Calendar, Date) {
+            var cal = Calendar(identifier: .gregorian)
+            cal.timeZone = TimeZone(identifier: tz)!
+            return (cal, cal.date(from: DateComponents(year: 2026, month: 5, day: 4, hour: 10))!)
+        }
+        var keys: [String] = []
+        for tz in ["America/Los_Angeles", "America/New_York", "Asia/Tokyo"] {
+            let (cal, start) = wallClock(tz)
+            let floating = event("FLOAT", recurring: true, floating: true, start: start)
+            let detector = CalendarDetector(source: FakeCalendarSource(events: [floating]), clock: { [now] in now! }, calendar: cal)
+            let found = try await detector.detect(in: DateInterval(start: start.addingTimeInterval(-86_400), end: start.addingTimeInterval(86_400)))
+            keys.append(try XCTUnwrap(found.first?.sourceKey))
+        }
+        XCTAssertEqual(Set(keys).count, 1, "\(keys)")
+        XCTAssertEqual(keys[0], "cal:FLOAT:f2026-05-04T10:00")
+
+        // A fixed-zone event still keys on the absolute instant.
+        let (_, start) = wallClock("America/Los_Angeles")
+        let fixed = try await makeDetector(FakeCalendarSource(events: [event("FIXED", recurring: true, start: start)]))
+            .detect(in: DateInterval(start: start.addingTimeInterval(-86_400), end: start.addingTimeInterval(86_400)))
+        XCTAssertEqual(fixed.first?.sourceKey, SuggestionKey.calendar(externalId: "FIXED", occurrence: start))
     }
 
     func testMissingSharedIdUsesMarkedDeviceLocalKey() async throws {
@@ -563,6 +598,39 @@ final class CalendarCaptureCoordinatorTests: CalendarCaptureTestCase {
         XCTAssertEqual(store.suggestions.count, 1)
         XCTAssertEqual(store.suggestions[0].id, first.added[0].id)
         XCTAssertEqual(store.suggestions[0].start, date(2026, 5, 6, 15))
+    }
+
+    func testSeriesTimeEditedForAllEventsDoesNotResurrectConfirmedOccurrence() async throws {
+        let (viewModel, _) = makeViewModel()
+        let store = makeStore()
+        let before = (0..<2).map { event("SERIES", recurring: true, start: date(2026, 5, 4 + 7 * $0, 10)) }
+        let first = await makeCoordinator(FakeCalendarSource(events: before), store: store)
+            .scanBackfill(properties: viewModel.properties, entries: [])
+        // The user confirms the first occurrence.
+        XCTAssertNotNil(viewModel.confirm(first.added[0], store: store, profileId: profileId).entryId)
+
+        // "All events" edit: 10:00 becomes 14:00, so every original occurrence date shifts.
+        let after = (0..<2).map { event("SERIES", recurring: true, start: date(2026, 5, 4 + 7 * $0, 14)) }
+        _ = await makeCoordinator(FakeCalendarSource(events: after), store: store)
+            .scanBackfill(properties: viewModel.properties, entries: viewModel.timeEntries)
+        let reappeared = try XCTUnwrap(store.suggestions.first { $0.start == date(2026, 5, 4, 14) })
+        XCTAssertTrue(reappeared.isPending)
+        XCTAssertTrue(reappeared.mightAlreadyBeLogged)
+        XCTAssertFalse(reappeared.isPreselectable)
+        let nextWeek = try XCTUnwrap(store.suggestions.first { $0.start == date(2026, 5, 11, 14) })
+        XCTAssertFalse(nextWeek.mightAlreadyBeLogged, "Different day: a genuinely new occurrence")
+    }
+
+    func testSameSeriesFlagIsExactOnExternalId() {
+        let propertyId = UUID()
+        let s = calendarSuggestion(externalId: "SERIES", start: date(2026, 5, 4, 14), propertyId: propertyId)
+        func confirmed(_ key: String) -> TimeEntry {
+            TimeEntry(propertyId: UUID(), participant: .selfParticipant, category: .leasing, hours: 9, date: date(2026, 5, 4, 10),
+                      importSource: "calendar", confirmedAt: now, sourceKey: key)
+        }
+        XCTAssertTrue(CaptureReconciler.mightAlreadyBeLogged(s, in: [confirmed("cal:SERIES:2026-05-04T17:00:00Z")], calendar: calendar))
+        XCTAssertFalse(CaptureReconciler.mightAlreadyBeLogged(s, in: [confirmed("cal:SERIES2:2026-05-04T17:00:00Z")], calendar: calendar))
+        XCTAssertFalse(CaptureReconciler.mightAlreadyBeLogged(s, in: [confirmed("cal:OTHER")], calendar: calendar))
     }
 
     // MARK: Might already be logged, v2

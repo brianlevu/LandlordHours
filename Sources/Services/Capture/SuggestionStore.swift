@@ -84,6 +84,15 @@ enum CaptureReconciler {
                normalizedTitle(entry.notes) == title {
                 return true
             }
+            // Editing a series for "all events" moves every occurrence's original start, so its
+            // keys change. An entry confirmed from the same series on a day this occurrence
+            // touches is the same work under the old key.
+            if let externalId = suggestion.externalId, let key = entry.sourceKey,
+               key != suggestion.sourceKey,
+               key == "cal:\(externalId)" || key.hasPrefix("cal:\(externalId):"),
+               entry.date >= firstDay, entry.date < daysEnd {
+                return true
+            }
             // Records of other confirmed suggestions are separate detected events.
             guard entry.sourceKey == nil else { return false }
             let entryEnd = entry.date.addingTimeInterval(entry.hours * 3600)
