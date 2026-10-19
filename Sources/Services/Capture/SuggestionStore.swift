@@ -53,22 +53,46 @@ enum CaptureReconciler {
         }
     }
 
-    /// True when hours logged another way (by hand, timer, voice, or a different import) on the
-    /// same day look like this item. The item is still shown, marked "might already be logged",
-    /// and never pre-selected — the user decides.
+    /// True when hours already recorded look like this item. The item is still shown, marked
+    /// "might already be logged", and never pre-selected: the user decides.
+    ///
+    /// Two signals, both in absolute time:
+    /// - A calendar-sourced entry (a 1.x import) with the same title and a start within 60 s,
+    ///   whatever its property: the property may have been edited or derived differently.
+    /// - A hand-logged entry (no `sourceKey`) on the same property whose own window
+    ///   (`date` ... `date + hours`) overlaps the item's window, or whose `date` falls on a
+    ///   calendar day the item touches (people log "2 h on Tuesday" without a time). Events
+    ///   crossing midnight touch both days. Without a proposed property, only when hours line up.
     static func mightAlreadyBeLogged(
         _ suggestion: Suggestion,
         in entries: [TimeEntry],
         calendar: Calendar = .current
     ) -> Bool {
-        entries.contains { entry in
+        let title = normalizedTitle(suggestion.title)
+        let windowStart = suggestion.start
+        let windowEnd = max(
+            suggestion.end ?? windowStart.addingTimeInterval((suggestion.proposedHours ?? 0) * 3600),
+            windowStart
+        )
+        let firstDay = calendar.startOfDay(for: windowStart)
+        let lastDay = calendar.startOfDay(for: max(windowStart, windowEnd.addingTimeInterval(-1)))
+        let daysEnd = calendar.date(byAdding: .day, value: 1, to: lastDay) ?? lastDay.addingTimeInterval(86_400)
+
+        return entries.contains { entry in
+            if entry.source == .calendar, entry.sourceKey != suggestion.sourceKey, !title.isEmpty,
+               abs(entry.date.timeIntervalSince(suggestion.start)) <= legacyStartTolerance,
+               normalizedTitle(entry.notes) == title {
+                return true
+            }
             // Records of other confirmed suggestions are separate detected events.
             guard entry.sourceKey == nil else { return false }
-            guard calendar.isDate(entry.date, inSameDayAs: suggestion.start) else { return false }
+            let entryEnd = entry.date.addingTimeInterval(entry.hours * 3600)
+            let overlaps = entry.date < windowEnd && entryEnd > windowStart
+            let onTouchedDay = entry.date >= firstDay && entry.date < daysEnd
+            guard overlaps || onTouchedDay else { return false }
             if let propertyId = suggestion.proposedPropertyId {
                 return entry.propertyId == propertyId
             }
-            // No property proposed: only flag when the hours line up.
             guard let hours = suggestion.proposedHours else { return false }
             return abs(entry.hours - hours) <= 0.25
         }

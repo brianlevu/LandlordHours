@@ -24,7 +24,8 @@ enum CalendarAccess: Equatable {
 /// One calendar event (one occurrence, for a recurring series) as the detector needs it.
 struct CalendarEventSnapshot: Equatable {
     /// `calendarItemExternalIdentifier`: shared across devices, and across repeats of a series.
-    var externalId: String
+    /// Nil when the calendar did not provide one (then only the device-local id exists).
+    var externalId: String?
     /// Device-local `eventIdentifier`; what 1.x stored as `importExternalId`.
     var eventIdentifier: String?
     var calendarId: String
@@ -37,9 +38,18 @@ struct CalendarEventSnapshot: Equatable {
     var isAllDay: Bool
     var isDeclined: Bool
     var isCanceled: Bool
+    /// EventKit `hasRecurrenceRules`: this is an occurrence of a repeating series.
+    var hasRecurrenceRules: Bool
+    /// EventKit `isDetached`: an occurrence of a series that was edited on its own. It keeps
+    /// the series' ids and has no recurrence rules of its own.
+    var isDetached: Bool
+
+    /// Part of a series, so `occurrenceDate` (the ORIGINAL start) identifies it. For a one-off
+    /// event EventKit sets `occurrenceDate` to the current start, which moves with it.
+    var isRecurring: Bool { hasRecurrenceRules || isDetached }
 
     init(
-        externalId: String,
+        externalId: String?,
         eventIdentifier: String? = nil,
         calendarId: String = "CAL-1",
         title: String? = nil,
@@ -49,7 +59,9 @@ struct CalendarEventSnapshot: Equatable {
         occurrenceDate: Date? = nil,
         isAllDay: Bool = false,
         isDeclined: Bool = false,
-        isCanceled: Bool = false
+        isCanceled: Bool = false,
+        hasRecurrenceRules: Bool = false,
+        isDetached: Bool = false
     ) {
         self.externalId = externalId
         self.eventIdentifier = eventIdentifier
@@ -62,6 +74,8 @@ struct CalendarEventSnapshot: Equatable {
         self.isAllDay = isAllDay
         self.isDeclined = isDeclined
         self.isCanceled = isCanceled
+        self.hasRecurrenceRules = hasRecurrenceRules
+        self.isDetached = isDetached
     }
 }
 
@@ -112,11 +126,13 @@ final class EventKitCalendarSource: CalendarEventSource {
         return store.events(matching: predicate).compactMap { event in
             guard let start = event.startDate, let end = event.endDate else { return nil }
             let externalId = event.calendarItemExternalIdentifier ?? ""
-            let id = externalId.isEmpty ? (event.eventIdentifier ?? "") : externalId
-            guard !id.isEmpty else { return nil }
+            // Only the cross-device id counts; a missing one stays nil (never substituted by
+            // the device-local eventIdentifier, which another device won't share).
+            let sharedId = externalId.isEmpty ? nil : externalId
+            guard sharedId != nil || !(event.eventIdentifier ?? "").isEmpty else { return nil }
             let declined = event.attendees?.contains { $0.isCurrentUser && $0.participantStatus == .declined } ?? false
             return CalendarEventSnapshot(
-                externalId: id,
+                externalId: sharedId,
                 eventIdentifier: event.eventIdentifier,
                 calendarId: event.calendar.calendarIdentifier,
                 title: event.title,
@@ -126,7 +142,9 @@ final class EventKitCalendarSource: CalendarEventSource {
                 occurrenceDate: event.occurrenceDate,
                 isAllDay: event.isAllDay,
                 isDeclined: declined,
-                isCanceled: event.status == .canceled
+                isCanceled: event.status == .canceled,
+                hasRecurrenceRules: event.hasRecurrenceRules,
+                isDetached: event.isDetached
             )
         }
     }

@@ -49,7 +49,10 @@ class CalendarCaptureTestCase: CaptureTestCase {
     }
 
     func event(
-        _ externalId: String = "EVT-1",
+        _ externalId: String? = "EVT-1",
+        recurring: Bool = false,
+        detached: Bool = false,
+        localId: String? = nil,
         start: Date,
         hours: Double = 1.5,
         title: String? = "Showing - Oak St",
@@ -59,9 +62,13 @@ class CalendarCaptureTestCase: CaptureTestCase {
         canceled: Bool = false
     ) -> CalendarEventSnapshot {
         CalendarEventSnapshot(
-            externalId: externalId, eventIdentifier: "LOCAL-\(externalId)", title: title,
-            start: start, end: start.addingTimeInterval(hours * 3600), occurrenceDate: occurrence,
-            isAllDay: allDay, isDeclined: declined, isCanceled: canceled
+            externalId: externalId, eventIdentifier: localId ?? "LOCAL-\(externalId ?? "NONE")", title: title,
+            start: start, end: start.addingTimeInterval(hours * 3600),
+            // EventKit: a series occurrence keeps its ORIGINAL start; a one-off's occurrenceDate
+            // is simply its current start and moves with it.
+            occurrenceDate: (recurring || detached) ? (occurrence ?? start) : start,
+            isAllDay: allDay, isDeclined: declined, isCanceled: canceled,
+            hasRecurrenceRules: recurring, isDetached: detached
         )
     }
 
@@ -93,7 +100,7 @@ class CalendarCaptureTestCase: CaptureTestCase {
 
 final class CalendarDetectorTests: CalendarCaptureTestCase {
     func testRecurringEventProducesOneKeyPerOccurrence() async throws {
-        let weekly = (0..<3).map { event("SERIES", start: date(2026, 5, 4 + 7 * $0, 10)) }
+        let weekly = (0..<3).map { event("SERIES", recurring: true, start: date(2026, 5, 4 + 7 * $0, 10)) }
         let candidates = try await makeDetector(FakeCalendarSource(events: weekly))
             .detect(in: DateInterval(start: date(2026, 5, 1), end: now))
         XCTAssertEqual(candidates.count, 3)
@@ -107,11 +114,41 @@ final class CalendarDetectorTests: CalendarCaptureTestCase {
 
     func testMovedOccurrenceKeepsKeyOfOriginalOccurrence() async throws {
         let original = date(2026, 5, 4, 10)
-        let moved = event("SERIES", start: date(2026, 5, 5, 15), occurrence: original)
+        let moved = event("SERIES", recurring: true, start: date(2026, 5, 5, 15), occurrence: original)
         let candidates = try await makeDetector(FakeCalendarSource(events: [moved]))
             .detect(in: DateInterval(start: date(2026, 5, 1), end: now))
         XCTAssertEqual(candidates.first?.sourceKey, SuggestionKey.calendar(externalId: "SERIES", occurrence: original))
         XCTAssertEqual(candidates.first?.start, date(2026, 5, 5, 15))
+    }
+
+    func testOneOffKeyIgnoresStartSoRescheduleKeepsKey() async throws {
+        let window = DateInterval(start: date(2026, 5, 1), end: now)
+        let before = try await makeDetector(FakeCalendarSource(events: [event("ONE", start: date(2026, 5, 4, 10))])).detect(in: window)
+        let after = try await makeDetector(FakeCalendarSource(events: [event("ONE", start: date(2026, 5, 6, 15))])).detect(in: window)
+        XCTAssertEqual(before[0].sourceKey, "cal:ONE")
+        XCTAssertEqual(before[0].sourceKey, after[0].sourceKey)
+    }
+
+    func testDetachedOccurrenceKeysOnOriginalOccurrenceDate() async throws {
+        let original = date(2026, 5, 4, 10)
+        let detached = event("SERIES", detached: true, start: date(2026, 5, 7, 16), occurrence: original)
+        let found = try await makeDetector(FakeCalendarSource(events: [detached]))
+            .detect(in: DateInterval(start: date(2026, 5, 1), end: now))
+        XCTAssertEqual(found.first?.sourceKey, SuggestionKey.calendar(externalId: "SERIES", occurrence: original))
+    }
+
+    func testMissingSharedIdUsesMarkedDeviceLocalKey() async throws {
+        let local = event(nil, localId: "LOCAL-ONLY", start: date(2026, 5, 4, 10))
+        let found = try await makeDetector(FakeCalendarSource(events: [local]))
+            .detect(in: DateInterval(start: date(2026, 5, 1), end: now))
+        XCTAssertEqual(found.first?.sourceKey, "cal-local:LOCAL-ONLY")
+        XCTAssertNil(found.first?.externalId)
+        XCTAssertEqual(found.first?.legacyEventIdentifier, "LOCAL-ONLY")
+
+        let tenant = event(nil, localId: "LOCAL-2", start: date(2026, 5, 5, 10), title: "Tenant call")
+        let result = await makeCoordinator(FakeCalendarSource(events: [tenant]), store: makeStore())
+            .scanBackfill(properties: [], entries: [])
+        XCTAssertTrue(result.added[0].evidence.contains { $0.contains("shared event id") })
     }
 
     func testSkipsAllDayLongDeclinedCanceledAndEmptyEvents() async throws {
@@ -312,7 +349,7 @@ final class CalendarCaptureCoordinatorTests: CalendarCaptureTestCase {
     }
 
     func testOneRecurringOccurrenceDismissedOthersStay() async {
-        let weekly = (0..<3).map { event("SERIES", start: date(2026, 5, 4 + 7 * $0, 10), title: "Tenant call") }
+        let weekly = (0..<3).map { event("SERIES", recurring: true, start: date(2026, 5, 4 + 7 * $0, 10), title: "Tenant call") }
         let store = makeStore()
         let coordinator = makeCoordinator(FakeCalendarSource(events: weekly), store: store)
         let first = await coordinator.scanBackfill(properties: [], entries: [])
@@ -353,7 +390,7 @@ final class CalendarCaptureCoordinatorTests: CalendarCaptureTestCase {
     func testLegacyImportCoversExactlyThatOccurrence() async {
         let (_, propertyId) = makeViewModel()
         let properties = [RentalProperty(id: propertyId, name: "Oak", address: "1 Oak St", propertyType: .ltr)]
-        let weekly = (0..<2).map { event("SERIES", start: date(2026, 5, 4 + 7 * $0, 10)) }
+        let weekly = (0..<2).map { event("SERIES", recurring: true, start: date(2026, 5, 4 + 7 * $0, 10)) }
         let legacy = legacyImport(propertyId: propertyId, start: date(2026, 5, 4, 10))
         let store = makeStore()
         let result = await makeCoordinator(FakeCalendarSource(events: weekly), store: store)
@@ -499,7 +536,90 @@ final class CalendarCaptureCoordinatorTests: CalendarCaptureTestCase {
         XCTAssertTrue(CaptureReconciler.mightAlreadyBeLogged(s, in: [legacy], calendar: calendar))
     }
 
+    func testRescheduledConfirmedOneOffDoesNotReturn() async throws {
+        let (viewModel, _) = makeViewModel()
+        let store = makeStore()
+        let original = FakeCalendarSource(events: [event("ONE", start: date(2026, 5, 4, 10))])
+        let first = await makeCoordinator(original, store: store)
+            .scanBackfill(properties: viewModel.properties, entries: viewModel.timeEntries)
+        let s = try XCTUnwrap(first.added.first)
+        XCTAssertNotNil(viewModel.confirm(s, store: store, profileId: profileId).entryId)
+
+        // The organizer moves the showing to another day.
+        let moved = FakeCalendarSource(events: [event("ONE", start: date(2026, 5, 6, 15))])
+        let again = await makeCoordinator(moved, store: store)
+            .scanBackfill(properties: viewModel.properties, entries: viewModel.timeEntries)
+        XCTAssertTrue(again.added.isEmpty)
+        XCTAssertEqual(store.suggestions.count, 1)
+        XCTAssertTrue(store.pending.isEmpty)
+    }
+
+    func testRescheduledPendingOneOffUpdatesInPlace() async throws {
+        let store = makeStore()
+        let first = await makeCoordinator(FakeCalendarSource(events: [event("ONE", start: date(2026, 5, 4, 10), title: "Tenant call")]), store: store)
+            .scanBackfill(properties: [], entries: [])
+        _ = await makeCoordinator(FakeCalendarSource(events: [event("ONE", start: date(2026, 5, 6, 15), title: "Tenant call")]), store: store)
+            .scanBackfill(properties: [], entries: [])
+        XCTAssertEqual(store.suggestions.count, 1)
+        XCTAssertEqual(store.suggestions[0].id, first.added[0].id)
+        XCTAssertEqual(store.suggestions[0].start, date(2026, 5, 6, 15))
+    }
+
+    // MARK: Might already be logged, v2
+
+    func testLegacyImportWithDifferentPropertyStillFlagsOnTitleAndStart() async {
+        let (_, propertyId) = makeViewModel()
+        let properties = [RentalProperty(id: propertyId, name: "Oak", address: "1 Oak St", propertyType: .ltr)]
+        // 1.x derived another property (e.g. from notes) or the user edited it later.
+        let legacy = legacyImport(propertyId: UUID(), start: date(2026, 5, 4, 10).addingTimeInterval(45))
+        let store = makeStore()
+        let result = await makeCoordinator(FakeCalendarSource(events: [event(start: date(2026, 5, 4, 10))]), store: store)
+            .scanBackfill(properties: properties, entries: [legacy])
+        XCTAssertEqual(result.added.first?.mightAlreadyBeLogged, true)
+        XCTAssertEqual(result.added.first?.isPreselectable, false)
+
+        let otherTitle = legacyImport(propertyId: UUID(), start: date(2026, 5, 4, 10), title: "Different")
+        let s = calendarSuggestion(externalId: "X", start: date(2026, 5, 20, 10), propertyId: propertyId)
+        let sameStartOtherTitle = calendarSuggestion(externalId: "Y", start: date(2026, 5, 4, 10), propertyId: nil, hours: 4)
+        XCTAssertFalse(CaptureReconciler.mightAlreadyBeLogged(sameStartOtherTitle, in: [otherTitle], calendar: calendar))
+        XCTAssertFalse(CaptureReconciler.mightAlreadyBeLogged(s, in: [legacy], calendar: calendar))
+    }
+
+    func testEventCrossingMidnightFlagsEntriesOnEitherDayAndByWindow() {
+        let propertyId = UUID()
+        // 23:00 on 4 May to 01:00 on 5 May (device timezone).
+        let s = calendarSuggestion(start: date(2026, 5, 4, 23), propertyId: propertyId, hours: 2)
+        func manual(_ date: Date, hours: Double = 1) -> TimeEntry {
+            TimeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs, hours: hours, date: date)
+        }
+        XCTAssertTrue(CaptureReconciler.mightAlreadyBeLogged(s, in: [manual(date(2026, 5, 4, 8))], calendar: calendar), "Same first day")
+        XCTAssertTrue(CaptureReconciler.mightAlreadyBeLogged(s, in: [manual(date(2026, 5, 5, 9))], calendar: calendar), "Second day the event touches")
+        XCTAssertTrue(CaptureReconciler.mightAlreadyBeLogged(s, in: [manual(date(2026, 5, 4, 22).addingTimeInterval(1800), hours: 2)], calendar: calendar),
+                      "Entry window runs into the event window")
+        XCTAssertFalse(CaptureReconciler.mightAlreadyBeLogged(s, in: [manual(date(2026, 5, 6, 9))], calendar: calendar))
+        XCTAssertFalse(CaptureReconciler.mightAlreadyBeLogged(s, in: [manual(date(2026, 5, 3, 9))], calendar: calendar))
+    }
+
+    func testEventEndingExactlyAtMidnightDoesNotTouchNextDay() {
+        let propertyId = UUID()
+        let s = calendarSuggestion(start: date(2026, 5, 4, 22), propertyId: propertyId, hours: 2)
+        let nextDay = TimeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs, hours: 1, date: date(2026, 5, 5, 9))
+        XCTAssertFalse(CaptureReconciler.mightAlreadyBeLogged(s, in: [nextDay], calendar: calendar))
+    }
+
     // MARK: 1.1 compatibility
+
+    func testConfirmStoresSeriesWideEventIdentifierLike1x() async throws {
+        let (viewModel, _) = makeViewModel()
+        let store = makeStore()
+        let weekly = (0..<2).map { event("SERIES", recurring: true, start: date(2026, 5, 4 + 7 * $0, 10)) }
+        let result = await makeCoordinator(FakeCalendarSource(events: weekly), store: store)
+            .scanBackfill(properties: viewModel.properties, entries: [])
+        let entryId = try XCTUnwrap(viewModel.confirm(result.added[0], store: store, profileId: profileId).entryId)
+        let entry = try XCTUnwrap(viewModel.timeEntries.first { $0.id == entryId })
+        XCTAssertEqual(entry.importExternalId, "LOCAL-SERIES", "Same value 1.x writes; see the trade-off note in confirm()")
+        XCTAssertNil(entry.importCalendarId)
+    }
 
     func testConfirmedCalendarSuggestionIsSkippedBy1xImport() async throws {
         let (viewModel, propertyId) = makeViewModel()

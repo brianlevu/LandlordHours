@@ -81,9 +81,20 @@ final class CalendarDetector: CaptureDetector {
             if duration <= 0 { counts.invalidDuration += 1; continue }
             if duration >= Self.maxEventDuration { counts.tooLong += 1; continue }
 
-            let occurrence = event.occurrenceDate ?? event.start
+            // One-off events are keyed on the id alone so rescheduling keeps the key. Series
+            // occurrences also carry their ORIGINAL start, which survives moving one repeat.
+            let occurrence: Date? = event.isRecurring ? (event.occurrenceDate ?? event.start) : nil
+            let key: String
+            if let externalId = event.externalId {
+                key = occurrence.map { SuggestionKey.calendar(externalId: externalId, occurrence: $0) }
+                    ?? SuggestionKey.calendar(externalId: externalId)
+            } else if let local = event.eventIdentifier {
+                key = SuggestionKey.calendarDeviceLocal(eventIdentifier: local, occurrence: occurrence)
+            } else {
+                continue
+            }
             candidates.append(CaptureCandidate(
-                sourceKey: SuggestionKey.calendar(externalId: event.externalId, occurrence: occurrence),
+                sourceKey: key,
                 kind: .calendar,
                 start: event.start,
                 end: event.end,

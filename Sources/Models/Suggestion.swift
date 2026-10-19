@@ -46,6 +46,18 @@ enum SuggestionKey {
         "cal:\(externalId):\(iso.string(from: occurrence))"
     }
 
+    /// One-off (non-recurring) event: `cal:<calendarItemExternalIdentifier>`. No date, so
+    /// rescheduling the event keeps its key (and its confirmed entry).
+    static func calendar(externalId: String) -> String { "cal:\(externalId)" }
+
+    /// Fallback when the calendar gives no cross-device id: the device-local `eventIdentifier`.
+    /// The `cal-local:` prefix marks the suggestion as device-local; another device will not
+    /// produce the same key. `occurrence` is the original occurrence of a recurring event.
+    static func calendarDeviceLocal(eventIdentifier: String, occurrence: Date?) -> String {
+        guard let occurrence else { return "cal-local:\(eventIdentifier)" }
+        return "cal-local:\(eventIdentifier):\(iso.string(from: occurrence))"
+    }
+
     /// `rcpt:<sha256 of the file bytes>`.
     static func receipt(sha256: String) -> String { "rcpt:\(sha256.lowercased())" }
 

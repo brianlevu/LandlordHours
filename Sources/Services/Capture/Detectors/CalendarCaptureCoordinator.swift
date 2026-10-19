@@ -116,6 +116,9 @@ final class CalendarCaptureCoordinator {
             if let id = suggestion.proposedPropertyId, !properties.contains(where: { $0.id == id }) {
                 suggestion.proposedPropertyId = nil
             }
+            if suggestion.sourceKey.hasPrefix("cal-local:") {
+                suggestion.evidence.append("This calendar gave no shared event id, so the same event may show up again on another device")
+            }
             suggestions.append(suggestion)
         }
         let added = store.ingest(suggestions, existingEntries: entries, calendar: calendar)
