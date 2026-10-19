@@ -65,6 +65,11 @@ struct EngagementContext {
     var recentDismissals: [EngagementDismissal]
     var isProUser: Bool
     var targetHours: Double = REPSRequirements.annualHourThreshold
+    /// Decides whose hours count. REPS (and REPS + STR) is one spouse alone;
+    /// STR material participation combines owner and spouse.
+    var goalType: HourGoalType = .reps
+    /// Same flag the Dashboard uses to decide grouped vs best-single-property hours.
+    var groupingElection: Bool = false
 
     enum NotificationPermissionState: Equatable {
         case notDetermined
@@ -98,7 +103,23 @@ final class EngagementIntelligenceService {
         let yearEntries = context.timeEntries.filter {
             calendar.component(.year, from: $0.date) == context.taxYear && $0.category.countsForREPS
         }
-        let yearHours = yearEntries.reduce(0) { $0 + $1.hours }
+        let yearHours: Double
+        switch context.goalType {
+        case .reps, .both:
+            // IRC 469(c)(7)(B): one spouse must meet 750h alone, so never combine.
+            yearHours = TaxQualificationEngine.qualifyingRealEstateHours(
+                entries: context.timeEntries,
+                participant: .selfParticipant,
+                year: context.taxYear
+            )
+        case .str:
+            yearHours = TaxQualificationEngine.materialParticipationOverview(
+                entries: context.timeEntries,
+                properties: context.properties,
+                year: context.taxYear,
+                groupingElection: context.groupingElection
+            ).ownerAndSpouseHours
+        }
         let lastLogDate = yearEntries.map(\.date).max()
         let daysSinceLastLog = lastLogDate.map {
             max(0, calendar.dateComponents([.day], from: calendar.startOfDay(for: $0), to: calendar.startOfDay(for: context.now)).day ?? 0)
@@ -144,7 +165,7 @@ final class EngagementIntelligenceService {
         } else if shouldSuggestInactivity(snapshot: snapshot) {
             candidate = inactivityRecommendation(days: snapshot.daysSinceLastLog ?? inactivityThresholdDays)
         } else if shouldSuggestBehindPace(snapshot: snapshot, calendar: calendar, now: context.now) {
-            candidate = behindPaceRecommendation(snapshot: snapshot)
+            candidate = behindPaceRecommendation(snapshot: snapshot, targetHours: context.targetHours)
         } else if context.isProUser && context.properties.count > 1 && snapshot.yearHours > 0 {
             candidate = portfolioSummaryRecommendation(propertyCount: context.properties.count, hours: snapshot.yearHours)
         } else {
@@ -201,14 +222,14 @@ final class EngagementIntelligenceService {
         )
     }
 
-    private func behindPaceRecommendation(snapshot: EngagementSnapshot) -> EngagementRecommendation {
+    private func behindPaceRecommendation(snapshot: EngagementSnapshot, targetHours: Double) -> EngagementRecommendation {
         let gap = max(0, snapshot.requiredHoursToDate - snapshot.yearHours)
         return EngagementRecommendation(
             surface: .widget,
             reason: .behindPace,
             destination: .reports,
-            title: "Behind REPS pace",
-            message: "\(String(format: "%.0f", gap))h behind today's 750h pace.",
+            title: targetHours >= REPSRequirements.annualHourThreshold ? "Behind REPS pace" : "Behind pace",
+            message: "\(String(format: "%.0f", gap))h behind today's \(String(format: "%.0f", targetHours))h pace.",
             cooldownDays: 7
         )
     }

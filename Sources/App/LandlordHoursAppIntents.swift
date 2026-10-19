@@ -190,12 +190,14 @@ private enum LandlordHoursIntentStore {
             notificationPermission: .notDetermined,
             recentDismissals: [],
             isProUser: SubscriptionManager.shared.isPro,
-            targetHours: GoalManager.shared.globalGoalType.hoursRequired
+            targetHours: GoalManager.shared.globalGoalType.hoursRequired,
+            goalType: GoalManager.shared.globalGoalType,
+            groupingElection: TaxProfileManager.shared.groupingElection
         )
     }
 }
 
-private enum LandlordHoursIntentCopy {
+enum LandlordHoursIntentCopy {
     static func summaryDialog(
         year: Int,
         context: EngagementContext,
@@ -210,11 +212,14 @@ private enum LandlordHoursIntentCopy {
         let daysLeft = snapshot.daysRemainingInYear
         let pace = snapshot.isBehindPace ? "behind pace" : "on pace"
 
+        let target = String(format: "%.0f", context.targetHours)
+        let lead = "\(year): You have \(hours) hours toward \(target) this year, \(daysLeft) days left, and you are \(pace)."
+
         if recommendation.surface == .none {
-            return "\(year): \(hours) qualifying hours logged, \(daysLeft) days left, and you are \(pace). No urgent action right now."
+            return "\(lead) No urgent action right now."
         }
 
-        return "\(year): \(hours) qualifying hours logged, \(daysLeft) days left, and you are \(pace). \(recommendation.title): \(recommendation.message)"
+        return "\(lead) \(recommendation.title): \(recommendation.message)"
     }
 
     static func intentDestination(for recommendation: EngagementRecommendation) -> LandlordHoursIntentDestination {

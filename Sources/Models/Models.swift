@@ -555,6 +555,32 @@ struct TaxQualificationEngine {
         )
     }
 
+    /// Single source of truth for the material participation figure shown on
+    /// Dashboard, Reports, widget and Siri. With a grouping election all properties
+    /// count as one activity; without it, the best single property counts.
+    static func materialParticipationOverview(
+        entries: [TimeEntry],
+        properties: [RentalProperty],
+        year: Int,
+        groupingElection: Bool,
+        noOneParticipatedMore: Bool? = nil
+    ) -> MaterialParticipationResult {
+        func status(_ id: UUID?) -> MaterialParticipationResult {
+            materialParticipationStatus(
+                entries: entries,
+                year: year,
+                propertyId: id,
+                groupingElection: groupingElection,
+                noOneParticipatedMore: noOneParticipatedMore
+            )
+        }
+        if groupingElection { return status(nil) }
+        return properties
+            .map { status($0.id) }
+            .max { $0.ownerAndSpouseHours < $1.ownerAndSpouseHours }
+            ?? status(nil)
+    }
+
     private static func entriesForYear(_ entries: [TimeEntry], year: Int) -> [TimeEntry] {
         let calendar = Calendar.current
         return entries.filter { calendar.component(.year, from: $0.date) == year }
