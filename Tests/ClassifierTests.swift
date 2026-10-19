@@ -112,7 +112,7 @@ final class ClassifierTests: XCTestCase {
         // City and state never match ("Austin" is in every address).
         XCTAssertNil(RulesEngine.evaluate(text: "Flight to Austin", properties: properties).propertyId)
         // Two properties tie → propose none.
-        let twin = RentalProperty(name: "Maple Duplex", address: "9 Elm St", propertyType: .ltr)
+        let twin = RentalProperty(name: "Maple Duplex", address: "5 Maple Ave", propertyType: .ltr)
         XCTAssertNil(RulesEngine.evaluate(text: "Maple repair", properties: [maple, twin]).propertyId)
     }
 
