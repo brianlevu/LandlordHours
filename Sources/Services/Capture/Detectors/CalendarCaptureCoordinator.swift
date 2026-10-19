@@ -36,6 +36,9 @@ struct CalendarScanResult: Equatable {
     /// Newly added pending suggestions (what a notifier may announce).
     var added: [Suggestion]
     var skipped: CalendarSkipCounts
+    /// The scan stopped before finishing (the user cancelled the backfill, or the task was
+    /// cancelled). Nothing from it was ingested; the backfill is NOT complete.
+    var cancelled = false
 
     static func blocked(_ access: CalendarAccess) -> CalendarScanResult {
         CalendarScanResult(access: access, added: [], skipped: CalendarSkipCounts())
@@ -92,6 +95,56 @@ final class CalendarCaptureCoordinator {
     /// Scan of the next 7 days.
     func scanUpcoming(properties: [RentalProperty], entries: [TimeEntry]) async -> CalendarScanResult {
         await scan(detector.upcomingInterval(now: clock(), calendar: calendar), properties: properties, entries: entries)
+    }
+
+    /// Day-1 backfill through the WP2 chain's batch API, with progress (the backfill intro).
+    /// Likely and "Not sure" items are both kept (low confidence is shown, never hidden); muted
+    /// and no-signal items are dropped. Hours and start stay 1.x's (see type comment).
+    func scanBackfillBatched(
+        chain: ClassifierChain,
+        properties: [RentalProperty],
+        entries: [TimeEntry],
+        progress: @escaping @Sendable (ClassifierBatchProgress) -> Void = { _ in }
+    ) async -> CalendarScanResult {
+        let interval = detector.backfillInterval(now: clock(), calendar: calendar)
+        let candidates: [CaptureCandidate]
+        do {
+            candidates = try await detector.detect(in: interval)
+        } catch CalendarCaptureError.noAccess(let access) {
+            return .blocked(access)
+        } catch {
+            return .blocked(detector.access)
+        }
+        let outcomes: [ClassifierOutcome]
+        do {
+            outcomes = try await chain.classifyBatch(candidates, properties: properties, progress: progress)
+        } catch {
+            // classifyBatch throws only on cancellation.
+            return CalendarScanResult(access: .fullAccess, added: [], skipped: detector.lastSkipCounts, cancelled: true)
+        }
+        guard !Task.isCancelled else {
+            return CalendarScanResult(access: .fullAccess, added: [], skipped: detector.lastSkipCounts, cancelled: true)
+        }
+        var suggestions: [Suggestion] = []
+        for (candidate, outcome) in zip(candidates, outcomes) {
+            guard case .suggest(let classification) = outcome else { continue }
+            suggestions.append(prepared(Suggestion(candidate: candidate, classification: classification), candidate: candidate, properties: properties))
+        }
+        let added = store.ingest(suggestions, existingEntries: entries, calendar: calendar)
+        return CalendarScanResult(access: .fullAccess, added: added, skipped: detector.lastSkipCounts)
+    }
+
+    private func prepared(_ suggestion: Suggestion, candidate: CaptureCandidate, properties: [RentalProperty]) -> Suggestion {
+        var suggestion = suggestion
+        suggestion.proposedHours = candidate.scheduledHours
+        suggestion.hoursBasis = .scheduled
+        if let id = suggestion.proposedPropertyId, !properties.contains(where: { $0.id == id }) {
+            suggestion.proposedPropertyId = nil
+        }
+        if suggestion.sourceKey.hasPrefix("cal-local:") {
+            suggestion.evidence.append("This calendar gave no shared event id, so the same event may show up again on another device")
+        }
+        return suggestion
     }
 
     private func scan(_ interval: DateInterval, properties: [RentalProperty], entries: [TimeEntry]) async -> CalendarScanResult {

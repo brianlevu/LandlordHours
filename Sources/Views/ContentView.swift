@@ -83,6 +83,10 @@ struct ContentView: View {
     @State private var isSplashAnimating = true
     @State private var isShowingInitialLaunchBridge = true
     @State private var didScheduleInitialLaunchBridgeDismiss = false
+    /// WP3: the suggestion inbox (tab content + badge).
+    @StateObject private var inboxModel = InboxViewModel.live(app: AppModelHost.shared.viewModel)
+    /// WP3: one-time "What's new" auto-capture opt-in for people updating from 1.x.
+    @State private var showCaptureWhatsNew = false
 
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
@@ -163,6 +167,12 @@ struct ContentView: View {
         }
         .onChange(of: viewModel.isInitializing) { _, _ in
             scheduleInitialLaunchBridgeDismissIfReady()
+        }
+        .onChange(of: showOnboarding) { _, isShowing in
+            if !isShowing, CaptureSetupHandoff.openInboxAfterOnboarding {
+                CaptureSetupHandoff.openInboxAfterOnboarding = false
+                selectedTab = ShellTab.inboxIndex
+            }
         }
         .onChange(of: viewModel.isSignedIn) { _, newValue in
             if newValue {
@@ -441,6 +451,17 @@ struct ContentView: View {
         }
     }
 
+    /// Shows the 2.0 auto-capture intro once to people who finished 1.x onboarding. Never on
+    /// top of onboarding or the guided setup overlay.
+    private func presentCaptureWhatsNewIfNeeded() {
+        guard !showOnboarding, guidedOnboardingStep == nil else { return }
+        let completed = UserDefaults.standard.bool(forKey: UserScope.key("hasCompletedOnboarding"))
+        guard CaptureOptIn.shouldShowWhatsNew(hasCompletedOnboarding: completed) else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            showCaptureWhatsNew = true
+        }
+    }
+
     private func applyPendingAppIntentNavigationIfNeeded() {
         guard let rawDestination = UserDefaults.standard.string(forKey: AppIntentNavigationRequest.pendingDestinationKey),
               let destination = LandlordHoursIntentDestination(rawValue: rawDestination) else {
@@ -504,6 +525,16 @@ struct ContentView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
+            // WP3: Undo for the last inbox action, just above the tab bar.
+            if let toast = inboxModel.toast, !isCustomTabBarHidden {
+                InboxUndoToast(toast: toast) { inboxModel.undo() }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, Self.tabBarHeight + 8 + 12)
+                    // Slides only: an opacity fade would let row text show through mid-transition.
+                    .transition(reduceMotion ? .identity : .move(edge: .bottom))
+                    .zIndex(5)
+            }
+
             // Floating timer banner (visible on all tabs except Track)
             if viewModel.isTimerRunning && selectedTab != 2 && !isCustomTabBarHidden {
                 FloatingTimerBanner(viewModel: viewModel) {
@@ -513,6 +544,35 @@ struct ContentView: View {
                 .padding(.bottom, 52) // above tab bar
             }
 
+        }
+        .onAppear {
+            #if DEBUG
+            InboxDebugSeed.applyIfNeeded(app: viewModel)
+            #endif
+            inboxModel.reload()
+            presentCaptureWhatsNewIfNeeded()
+        }
+        .onChange(of: selectedTab) { _, _ in
+            inboxModel.dismissToast()
+            inboxModel.reload()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { inboxModel.reload() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .captureSuggestionsDidChange)) { _ in
+            inboxModel.reload()
+        }
+        .sheet(isPresented: $showCaptureWhatsNew, onDismiss: {
+            // Swiping the intro away is an answer too: it never shows again, and nothing turns on.
+            CaptureOptIn.markWhatsNewSeen()
+            inboxModel.reload()
+        }) {
+            CaptureSetupFlow(mode: .whatsNew, environment: .current) { openInbox in
+                showCaptureWhatsNew = false
+                if openInbox { selectedTab = ShellTab.inboxIndex }
+            }
+            .environmentObject(viewModel)
+            .presentationDragIndicator(.visible)
         }
         .onPreferenceChange(AppTabBarHiddenPreferenceKey.self) { hidden in
             animate(AppAnimation.quick) {
@@ -558,7 +618,7 @@ struct ContentView: View {
         case 4:
             SettingsView()
         case ShellTab.inboxIndex:
-            InboxPlaceholderView()
+            InboxView(model: inboxModel)
         case ShellTab.recordsIndex:
             HistoryView()
         default:
@@ -660,6 +720,12 @@ struct ContentView: View {
                 Image(systemName: isSelected ? tab.selectedSymbol : tab.symbol)
                     .font(.system(size: 19, weight: isSelected ? .semibold : .regular))
                     .frame(height: 24)
+                    .overlay(alignment: .topTrailing) {
+                        if tab == .inbox, inboxModel.badgeCount > 0 {
+                            tabBadge(inboxModel.badgeCount)
+                                .offset(x: 14, y: -6)
+                        }
+                    }
                 Text(tab.title)
                     .font(.system(size: 11, weight: .medium))
                     .lineLimit(1)
@@ -676,8 +742,26 @@ struct ContentView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(tab.title)
+        .accessibilityValue(tab == .inbox && inboxModel.badgeCount > 0
+                            ? "\(inboxModel.badgeCount) to confirm" : "")
         .accessibilityIdentifier(tab.accessibilityIdentifier)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+
+    /// Inbox count on the tab. Destructive red is wrong here (nothing is broken), so it uses the
+    /// action colour.
+    private func tabBadge(_ count: Int) -> some View {
+        Text(count > 99 ? "99+" : "\(count)")
+            .font(.system(size: 11, weight: .bold, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(colors.onAction)
+            .padding(.horizontal, 5)
+            .frame(minWidth: 18, minHeight: 18)
+            .background(Capsule().fill(colors.action))
+            .overlay(Capsule().strokeBorder(colors.backgroundSecondary, lineWidth: 1.5))
+            .fixedSize()
+            .accessibilityHidden(true)
+            .accessibilityIdentifier("tab.inbox.badge")
     }
 
     private var guidedOnboardingStep: GuidedOnboardingStep? {

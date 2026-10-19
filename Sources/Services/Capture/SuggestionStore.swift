@@ -294,6 +294,17 @@ final class SuggestionStore {
         save()
     }
 
+    /// Undo: puts these suggestions back in the inbox as pending and forgets their dismissed
+    /// keys. The caller removes any entry or mute rule the undone action created.
+    func restorePending(keys: Set<String>) {
+        guard !keys.isEmpty else { return }
+        for index in contents.suggestions.indices where keys.contains(contents.suggestions[index].sourceKey) {
+            contents.suggestions[index].state = .pending
+        }
+        for key in keys { contents.dismissedKeys[key] = nil }
+        save()
+    }
+
     func addMuteRule(_ rule: CaptureMuteRule) {
         guard !contents.muteRules.contains(where: { $0.match == rule.match && $0.value == rule.value }) else { return }
         contents.muteRules.append(rule)

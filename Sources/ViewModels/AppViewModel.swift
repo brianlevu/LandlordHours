@@ -412,7 +412,7 @@ class AppViewModel: ObservableObject {
             "LandlordHours.taxProfile.nonREWorkHours"
         ]
 
-        for key in Set(localDataKeys) {
+        for key in Set(localDataKeys + CaptureOptIn.allBaseKeys) {
             defaults.removeObject(forKey: UserScope.key(key))
         }
 
@@ -519,7 +519,7 @@ class AppViewModel: ObservableObject {
             HouseCelebrationLedger.backfillShownBaseKey,
             ProfileRestore.profileNameKey,
             CapturePromptConsent.baseKey
-        ] + taxProfileFields.map { "LandlordHours.taxProfile.\($0)" }
+        ] + taxProfileFields.map { "LandlordHours.taxProfile.\($0)" } + CaptureOptIn.allBaseKeys
 
         for key in Set(baseKeys) {
             defaults.removeObject(forKey: UserScope.key(key, userId: userId))
@@ -688,7 +688,11 @@ class AppViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Calendar Import
+    // MARK: - Calendar Import (1.x)
+    /// The 1.x bulk calendar import, unchanged. 2.0 has no UI that calls it (calendar work is
+    /// confirmed one suggestion at a time in the Inbox); it stays because 1.1 devices still run
+    /// this exact code, and the 1.1-compatibility tests (CaptureFlowTests, CalendarDetectorTests)
+    /// replay it to prove a 2.0 confirm is skipped by a 1.1 import.
     func importCalendarEntries(_ detectedEntries: [DetectedCalendarEntry]) -> Int {
         guard !properties.isEmpty else { return 0 }
         let validPropertyIds = Set(properties.map(\.id))
