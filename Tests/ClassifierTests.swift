@@ -190,7 +190,8 @@ final class ClassifierTests: XCTestCase {
         let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
         let c = candidate("Upload receipts to Stessa")
         let result = await chain.classify(c, properties: properties)
-        XCTAssertEqual(result, await RulesClassifier().classify(c, properties: properties))
+        let rulesOnly = await RulesClassifier().classify(c, properties: properties)
+        XCTAssertEqual(result, rulesOnly)
         XCTAssertEqual(backend.requests.count, 1)
     }
 
