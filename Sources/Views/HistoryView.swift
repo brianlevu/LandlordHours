@@ -88,7 +88,7 @@ struct HistoryView: View {
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
                 }
-                .background(colors.background)
+                .background(Color.clear)
 
                 // Summary strip
                 HStack(spacing: 12) {
@@ -98,7 +98,7 @@ struct HistoryView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)
-                .background(colors.background)
+                .background(Color.clear)
 
                 Rectangle()
                     .fill(colors.border.opacity(0.4))
@@ -116,7 +116,7 @@ struct HistoryView: View {
                             .foregroundStyle(colors.textSecondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(colors.background)
+                    .background(Color.clear)
                 } else {
                     ScrollView(showsIndicators: false) {
                         LazyVStack(spacing: 0) {
@@ -162,10 +162,10 @@ struct HistoryView: View {
                         .padding(.vertical, 16)
                         .padding(.bottom, 20)
                     }
-                    .background(colors.background)
+                    .background(Color.clear)
                 }
             }
-            .background(colors.background)
+            .background { LHMobileCanvas() }
             .navigationTitle("Records")
             .alert("Delete Entry?", isPresented: $showingDeleteConfirmation) {
                 Button("Cancel", role: .cancel) { entryToDelete = nil }

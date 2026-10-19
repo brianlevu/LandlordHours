@@ -655,7 +655,8 @@ struct DashboardView: View {
         .accessibilityElement(children: .combine)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.62 : 0.72))
+        // Dark: the goal card is itself a card, so the chips step up to the tertiary fill to stay visible.
+        .background(colorScheme == .dark ? colors.backgroundTertiary : colors.backgroundSecondary.opacity(0.72))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 

@@ -27,11 +27,17 @@ struct LandlordHoursApp: App {
         // 34pt ≥ the 28pt floor) so system large titles such as Records match the custom roots.
         let navBar = UINavigationBarAppearance()
         navBar.configureWithTransparentBackground()
+        // Title colour is the textPrimary token (not system black/white).
+        let titleInk = UIColor { traits in
+            UIColor(lhHex: traits.userInterfaceStyle == .dark ? AppColors.Hex.darkTextPrimary : AppColors.Hex.textPrimary)
+        }
         navBar.titleTextAttributes = [
-            .font: UIFont.systemFont(ofSize: 17, weight: .semibold)
+            .font: UIFont.systemFont(ofSize: 17, weight: .semibold),
+            .foregroundColor: titleInk
         ]
         navBar.largeTitleTextAttributes = [
-            .font: LHFont.frauncesUIFont(.largeTitle, contentSize: UITraitCollection.current.preferredContentSizeCategory)
+            .font: LHFont.frauncesUIFont(.largeTitle, contentSize: UITraitCollection.current.preferredContentSizeCategory),
+            .foregroundColor: titleInk
         ]
         UINavigationBar.appearance().standardAppearance = navBar
         UINavigationBar.appearance().scrollEdgeAppearance = navBar

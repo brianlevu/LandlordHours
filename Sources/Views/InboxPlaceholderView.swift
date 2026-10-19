@@ -68,7 +68,7 @@ struct InboxPlaceholderView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 40)
             }
-            .background(colors.background)
+            .background { LHMobileCanvas() }
             .navigationBarHidden(true)
         }
     }
