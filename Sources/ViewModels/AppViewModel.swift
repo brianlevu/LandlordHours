@@ -514,7 +514,8 @@ class AppViewModel: ObservableObject {
             GuidedOnboardingStore.skippedKey,
             "LandlordHours.timer",
             PendingCelebrationQueue.baseKey,
-            ProfileRestore.profileNameKey
+            ProfileRestore.profileNameKey,
+            CapturePromptConsent.baseKey
         ] + taxProfileFields.map { "LandlordHours.taxProfile.\($0)" } + CaptureOptIn.allBaseKeys
 
         for key in Set(baseKeys) {
@@ -531,8 +532,30 @@ class AppViewModel: ObservableObject {
 
         // 2.0 capture inbox (local only): the profile's suggestions, dismissed keys, mute rules.
         SuggestionStore.removeAll(forUserId: userId)
+        // Sync push baselines and delete tombstones (local-only and iCloud deletes alike).
+        SyncChangeTracker.removeAll(forUserId: userId)
     }
-    
+
+    // MARK: - Event-ended prompts (opt-in, per profile)
+
+    /// Whether this profile opted in to end-of-event notifications. Off by default, including
+    /// for profiles upgraded from 1.x. The inbox opt-in screens set it; changing it rebuilds
+    /// (or clears) the schedule right away.
+    var eventPromptsEnabled: Bool {
+        get {
+            guard let userId = UserScope.userId else { return false }
+            return CapturePromptConsent.isEnabled(profileId: userId)
+        }
+        set {
+            guard let userId = UserScope.userId else { return }
+            CapturePromptConsent.set(newValue, profileId: userId)
+            objectWillChange.send()
+            Task { @MainActor in
+                await CaptureNotificationRefresher.shared.refresh(reason: newValue ? "opt-in" : "opt-out")
+            }
+        }
+    }
+
     // MARK: - Sync Now (manual trigger for Settings)
     func syncNow() {
         Task { await syncService.syncNow() }
@@ -604,7 +627,8 @@ class AppViewModel: ObservableObject {
         deleteAttachmentFiles(for: removedEntries)
         timeEntries.removeAll { $0.propertyId == property.id }
         saveData()
-        Task { await syncService.deletePropertyFromCloud(property) }
+        // Tombstones the property AND its entries; the next push sends the deletes.
+        syncService.deletePropertyFromCloud(property, cascadedEntryIds: removedEntries.map(\.id))
     }
     
     // MARK: - Time Entry Management
@@ -647,7 +671,7 @@ class AppViewModel: ObservableObject {
         deleteAttachmentFiles(for: [entry])
         timeEntries.removeAll { $0.id == entry.id }
         saveData()
-        Task { await syncService.deleteEntryFromCloud(entry) }
+        syncService.deleteEntryFromCloud(entry)
     }
 
     /// Remove the on-disk attachment files backing the given entries. Safe to call

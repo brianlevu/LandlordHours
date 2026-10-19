@@ -99,6 +99,12 @@ final class InboxCaptureUITests: XCTestCase {
         XCTAssertTrue(app.buttons["capture.priming.continue"].waitForExistence(timeout: 5))
         Thread.sleep(forTimeInterval: 1.0)
         app.buttons["capture.priming.continue"].tap()
+        let review = app.buttons["backfill-review"]
+        if review.waitForExistence(timeout: 15) {
+            Thread.sleep(forTimeInterval: 2.8)
+            shoot("backfill-reveal", scheme)
+            review.tap()
+        }
         XCTAssertTrue(app.staticTexts["backfill.headline"].waitForExistence(timeout: 20))
         shoot("backfill-results", scheme)
 

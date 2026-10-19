@@ -990,7 +990,8 @@ final class EngagementIntelligenceServiceTests: XCTestCase {
 
         let recommendation = service.recommendation(for: context, calendar: calendar)
 
-        XCTAssertEqual(recommendation.surface, .notification)
+        // 2.0: an in-app nudge only; end-of-event notifications replace the digest.
+        XCTAssertEqual(recommendation.surface, .homeNudge)
         XCTAssertEqual(recommendation.reason, .calendarDraftsReady)
         XCTAssertEqual(recommendation.destination, .calendarReview)
     }
@@ -1064,7 +1065,7 @@ final class EngagementIntelligenceServiceTests: XCTestCase {
         XCTAssertEqual(recommendation, .doNothing)
     }
 
-    func testNotificationPlannerCreatesCalendarReviewPlan() {
+    func testNotificationPlannerNeverSchedulesCalendarDigest() {
         let property = makeProperty()
         let context = makeContext(
             now: date(year: 2026, month: 6, day: 15),
@@ -1077,12 +1078,8 @@ final class EngagementIntelligenceServiceTests: XCTestCase {
 
         let plan = EngagementNotificationScheduler(service: service).plan(for: context)
 
-        XCTAssertEqual(plan?.identifier, "engagement.calendarDraftsReady")
-        XCTAssertEqual(plan?.reason, .calendarDraftsReady)
-        XCTAssertEqual(plan?.destination, .calendarReview)
-        XCTAssertEqual(plan?.delay, 60)
-        XCTAssertEqual(plan?.playsSound, false)
-        XCTAssertTrue(plan?.body.contains("2 calendar items may be landlord work") == true)
+        // Retired in 2.0 (EndOfEventScheduler announces each event instead).
+        XCTAssertNil(plan)
     }
 
     func testNotificationPlannerDoesNotScheduleWhenPermissionDenied() {

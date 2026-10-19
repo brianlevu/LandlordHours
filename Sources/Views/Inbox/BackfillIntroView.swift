@@ -34,11 +34,13 @@ struct CalendarBackfillScanner: BackfillScanning {
     }
 }
 
-/// WP-H's `BackfillRevealView` (the house building in hatched hours) plugs in here when that lane
-/// merges: set `BackfillRevealHook.makeView` at launch. Until then the intro skips the reveal.
-/// Arguments: found hours, suggestion count, and the action that continues to the list.
+/// WP-H's `BackfillRevealView` (the house building in hatched hours) shows before the list when
+/// anything was found. Set `makeView` to nil to skip it. Arguments: found hours, suggestion
+/// count, and the action that continues to the list.
 enum BackfillRevealHook {
-    @MainActor static var makeView: ((Double, Int, @escaping () -> Void) -> AnyView)?
+    @MainActor static var makeView: ((Double, Int, @escaping () -> Void) -> AnyView)? = { hours, count, next in
+        AnyView(BackfillRevealView(foundHours: hours, suggestionCount: count, onReview: next, onSkip: next))
+    }
 }
 
 // MARK: - Model

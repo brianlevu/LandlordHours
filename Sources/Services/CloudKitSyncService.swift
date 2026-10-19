@@ -39,6 +39,10 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     @Published var accountAvailable = false
 
     weak var delegate: CloudKitSyncDelegate?
+    /// Called with the profile id once its initial pull has finished and the push gate opened.
+    var onInitialSyncCompleted: ((String) -> Void)?
+    /// False when this build has no CloudKit (simulator, missing entitlement).
+    var isCloudKitAvailable: Bool { container != nil }
 
     // MARK: Private
     private let container: CKContainer?
@@ -89,7 +93,7 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         accountChangeObserver = NotificationCenter.default.addObserver(
             forName: .CKAccountChanged, object: nil, queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in await self?.checkAccountStatus() }
+            Task { @MainActor in await self?.handleAccountChanged() }
         }
     }
 
@@ -108,6 +112,8 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     @Published private(set) var isRunningInitialSync = false
     /// Instrumentation for tests: how many times the iCloud account status was checked.
     private(set) var accountStatusCheckCount = 0
+    /// The last account check couldn't tell (network error, temporarily unavailable).
+    private(set) var accountStatusUnknown = false
     private var accountChangeObserver: NSObjectProtocol?
     /// Instrumentation for tests: held pushes flushed after a successful initial pull.
     private(set) var flushedHeldPushCount = 0
@@ -134,6 +140,9 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     /// push. Safe to call again (Sync Now, iCloud becoming available): a failed pull keeps
     /// the gate closed and says so instead of holding silently.
     func start() async {
+        // A new initial sync (sign-in, profile switch) may push again, unless an account
+        // delete is still running.
+        if !isDeletingAccount { pushesBlocked = false }
         // One initial sync at a time; a request that arrives meanwhile (profile switch,
         // iCloud coming back, Sync Now) re-runs it afterwards instead of being dropped.
         if isRunningInitialSync {
@@ -188,7 +197,12 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
             hasHeldPush = false
             flushedHeldPushCount += 1
             await ops.push()
+        } else if !(changeTracker?.pendingDeletes.isEmpty ?? true) {
+            // Deletes made offline on an earlier launch.
+            await ops.push()
         }
+        // Queued notification confirms were waiting for this pull.
+        if let startingFor { onInitialSyncCompleted?(startingFor) }
     }
 
     /// Manual "Sync Now": runs the initial sync first when the gate isn't open yet, then
@@ -273,6 +287,8 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
             let status = try await container.accountStatus()
             let wasAvailable = accountAvailable
             accountAvailable = (status == .available)
+            // "Can't tell right now" is not "no iCloud".
+            accountStatusUnknown = status == .couldNotDetermine || status == .temporarilyUnavailable
             // iCloud came back (it was off at launch, or signed in later): run the initial
             // pull for the active profile so the push gate can open.
             if accountAvailable, !wasAvailable, !isRunningInitialSync,
@@ -281,6 +297,8 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
             }
         } catch {
             accountAvailable = false
+            // A network error while asking: unknown, so notification confirms keep waiting.
+            accountStatusUnknown = true
             logger.error("Account status error: \(error.localizedDescription)")
         }
     }
@@ -333,6 +351,7 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     func schedulePush() {
         pushRequestCount += 1
         guard remoteUpdateDepth == 0 else { return }
+        guard !pushesBlocked else { return }
         guard isPushAllowed else {
             // Hold, don't drop: the edit is pushed once the initial pull has finished.
             heldPushRequestCount += 1
@@ -364,42 +383,216 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         syncError = nil
 
         do {
-            // Gather all records to push
-            var records: [CKRecord] = []
-
-            // Properties
-            let viewModel = getViewModel()
-            for property in viewModel?.properties ?? [] {
-                records.append(propertyToRecord(property))
-            }
-
-            // Time entries (without attachments — those are too large for inline push)
-            for entry in viewModel?.timeEntries ?? [] {
-                records.append(entryToRecord(entry))
-            }
-
-            // Custom categories
-            for category in CategoryManager.shared.customCategories {
-                records.append(customCategoryToRecord(category))
-            }
-
-            // Goal settings (single record)
-            records.append(goalSettingsToRecord())
-
-            // Tax profile (single record)
-            records.append(taxProfileToRecord())
-
-            // Batch save with retry for transient errors
-            try await withRetry { [records] in
-                try await self.batchSave(records)
-            }
+            // 2.0: only records that changed since the server last matched them (see
+            // SyncChangeTracker). A stale copy of an unchanged record is never re-sent.
+            try await pushChangedRecords(
+                save: { records in
+                    try await self.withRetry { [records] in
+                        try await self.batchSave(records)
+                    }
+                },
+                delete: { ids in
+                    try await self.withRetry { [ids] in
+                        try await self.batchDelete(ids)
+                    }
+                }
+            )
             lastSyncDate = Date()
         } catch {
             syncError = error.localizedDescription
             logger.error("Push error: \(error.localizedDescription)")
+            if Self.isZoneGone(error) { await handleZoneGone() }
         }
 
         isSyncing = false
+    }
+
+    // MARK: - Push changed records only
+
+    /// Test seam: where the per-profile push baselines live.
+    var changeTrackerBaseDirectory: URL = SyncChangeTracker.defaultBaseDirectory
+    private var cachedChangeTracker: SyncChangeTracker?
+
+    /// The active profile's push baselines.
+    var changeTracker: SyncChangeTracker? {
+        guard let appUserId else { return nil }
+        if let cachedChangeTracker, cachedChangeTracker.userId == appUserId,
+           cachedChangeTracker.fileURL.path.hasPrefix(changeTrackerBaseDirectory.path) {
+            return cachedChangeTracker
+        }
+        let tracker = SyncChangeTracker(userId: appUserId, baseDirectory: changeTrackerBaseDirectory)
+        cachedChangeTracker = tracker
+        return tracker
+    }
+
+    /// Every local record (what 1.x pushed every time).
+    func allLocalRecords() -> [CKRecord] {
+        var records: [CKRecord] = []
+        let viewModel = getViewModel()
+        for property in viewModel?.properties ?? [] {
+            records.append(propertyToRecord(property))
+        }
+        // Time entries (without attachments — those are too large for inline push)
+        for entry in viewModel?.timeEntries ?? [] {
+            records.append(entryToRecord(entry))
+        }
+        for category in CategoryManager.shared.customCategories {
+            records.append(customCategoryToRecord(category))
+        }
+        records.append(goalSettingsToRecord())
+        records.append(taxProfileToRecord())
+        return records
+    }
+
+    /// Sends pending deletes (tombstones) through `delete`, then only the records that differ
+    /// from the server baseline through `save`, making what was sent the new baseline. Returns
+    /// the records saved (empty: nothing changed). A failure leaves everything pending.
+    ///
+    /// Pushes run one at a time (each waits for the previous), so a delete in flight can never
+    /// overtake a save of the same id from another push.
+    @discardableResult
+    func pushChangedRecords(
+        save: @escaping ([CKRecord]) async throws -> Void,
+        delete: @escaping ([CKRecord.ID]) async throws -> Void
+    ) async throws -> [CKRecord] {
+        let previous = pushChain
+        let task = Task { @MainActor () throws -> [CKRecord] in
+            await previous?.value
+            // Account deletion started while this push waited: send nothing.
+            guard !self.pushesBlocked else { return [] }
+            return try await self.pushChangedRecordsNow(save: save, delete: delete)
+        }
+        pushChain = Task { _ = try? await task.value }
+        return try await task.value
+    }
+
+    private var pushChain: Task<Void, Never>?
+    /// Set while the account's iCloud data is being deleted: no push may run or start.
+    private(set) var pushesBlocked = false
+    private var isDeletingAccount = false
+
+    /// Stops all pushing before "Delete Account and Data": cancels the debounce, blocks new
+    /// pushes, and waits for any push already in flight, so nothing can be saved back to
+    /// iCloud after the delete. Pushing resumes on the next `start()`.
+    func quiescePushes() async {
+        pushesBlocked = true
+        pushDebounceTask?.cancel()
+        pushDebounceTask = nil
+        initialSyncCompletedFor = nil
+        hasHeldPush = false
+        await pushChain?.value
+    }
+
+    private func pushChangedRecordsNow(
+        save: ([CKRecord]) async throws -> Void,
+        delete: ([CKRecord.ID]) async throws -> Void
+    ) async throws -> [CKRecord] {
+        let tracker = changeTracker
+        // Deleted and then re-created locally (a re-confirmed suggestion keeps its derived id):
+        // no longer a delete.
+        tracker?.cancelTombstones(for: Set(allLocalRecords().map(\.recordID.recordName)))
+        if let tombstones = tracker?.pendingDeletes, !tombstones.isEmpty {
+            try await delete(tombstones.map { CKRecord.ID(recordName: $0, zoneID: zoneID) })
+            tracker?.clearTombstones(tombstones)
+        }
+        // Built AFTER the deletes: anything re-created while they were in flight has no
+        // baseline and is saved now, after its delete.
+        let all = allLocalRecords()
+        let changed = tracker?.changedRecords(all) ?? all
+        guard !changed.isEmpty else { return [] }
+        try await save(changed)
+        tracker?.recordServerState(changed)
+        return changed
+    }
+
+    private func batchDelete(_ ids: [CKRecord.ID]) async throws {
+        guard let database else { throw CloudKitSyncUnavailableError() }
+        let batchSize = 400
+        for offset in stride(from: 0, to: ids.count, by: batchSize) {
+            let batch = Array(ids[offset..<min(offset + batchSize, ids.count)])
+            let op = CKModifyRecordsOperation(recordsToSave: nil, recordIDsToDelete: batch)
+            op.qualityOfService = .userInitiated
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                op.modifyRecordsResultBlock = { result in
+                    switch result {
+                    case .success:
+                        continuation.resume()
+                    case .failure(let error):
+                        // Already gone on the server counts as done.
+                        if Self.isDeleteMissingRecordsOnly(error) {
+                            continuation.resume()
+                            return
+                        }
+                        continuation.resume(throwing: error)
+                    }
+                }
+                database.add(op)
+            }
+        }
+    }
+
+    /// The zone was deleted ("Delete iCloud data", a reset) or never existed.
+    nonisolated static func isZoneGone(_ error: Error) -> Bool {
+        guard let ckError = error as? CKError else { return false }
+        let gone: (CKError.Code) -> Bool = { $0 == .zoneNotFound || $0 == .userDeletedZone }
+        if gone(ckError.code) { return true }
+        if ckError.code == .partialFailure {
+            let codes = ckError.partialErrorsByItemID?.values.compactMap { ($0 as? CKError)?.code } ?? []
+            return !codes.isEmpty && codes.allSatisfy(gone)
+        }
+        return false
+    }
+
+    /// Forgets what this device believed the server holds, so the next push re-uploads every
+    /// local record (pending deletes stay pending).
+    func resetSyncBaselines() {
+        changeTracker?.resetBaselines()
+    }
+
+    /// The zone is gone: forget baselines and the zone token, recreate the zone, push again.
+    private func handleZoneGone() async {
+        logger.warning("iCloud zone missing; re-uploading local records")
+        resetSyncBaselines()
+        UserDefaults.standard.removeObject(forKey: zoneTokenKey)
+        UserDefaults.standard.removeObject(forKey: zoneCreatedKey)
+        await ensureZoneExists()
+        schedulePush()
+    }
+
+    /// A different (or no) iCloud account: nothing the server held can be assumed. Close the
+    /// push gate, drop the change token and baselines, then pull everything before pushing.
+    func handleAccountChanged() async {
+        resetSyncBaselines()
+        UserDefaults.standard.removeObject(forKey: zoneTokenKey)
+        UserDefaults.standard.removeObject(forKey: zoneCreatedKey)
+        UserDefaults.standard.removeObject(forKey: subscriptionCreatedKey)
+        initialSyncCompletedFor = nil
+        await checkAccountStatus()
+        if accountAvailable, !isRunningInitialSync, appUserId != nil {
+            await start()
+        }
+    }
+
+    /// After a pull: the server's copy becomes the baseline. Remote items are mapped back to
+    /// records exactly as a push would build them, so an unchanged item compares equal; a local
+    /// copy the merge kept (because it is newer) still differs and is pushed.
+    func recordPulledBaselines(
+        properties: [RentalProperty],
+        entries: [TimeEntry],
+        categories: [CustomCategory],
+        deletedRecordNames: [String],
+        goalSettingsPulled: Bool,
+        taxProfilePulled: Bool
+    ) {
+        guard let tracker = changeTracker else { return }
+        var records = properties.map(propertyToRecord)
+        records += entries.map(entryToRecord)
+        records += categories.map(customCategoryToRecord)
+        // Settings records are applied whole, so the local copy now equals the server's.
+        if goalSettingsPulled { records.append(goalSettingsToRecord()) }
+        if taxProfilePulled { records.append(taxProfileToRecord()) }
+        tracker.recordServerState(records)
+        tracker.forget(recordNames: deletedRecordNames)
     }
 
     private func batchSave(_ records: [CKRecord]) async throws {
@@ -447,6 +640,7 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         } catch {
             syncError = error.localizedDescription
             logger.error("Pull error: \(error.localizedDescription)")
+            if Self.isZoneGone(error) { await handleZoneGone() }
             return false
         }
     }
@@ -566,6 +760,12 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         remoteUpdateDepth += 1
         defer { remoteUpdateDepth -= 1 }
 
+        // Records deleted here but not yet deleted in iCloud must not come back.
+        let tombstoned = Set(changeTracker?.pendingDeletes ?? [])
+        if !tombstoned.isEmpty {
+            updatedProperties.removeAll { tombstoned.contains($0.id.uuidString) }
+            updatedEntries.removeAll { tombstoned.contains($0.id.uuidString) }
+        }
         if !updatedProperties.isEmpty {
             delegate?.syncDidReceiveProperties(updatedProperties)
         }
@@ -608,6 +808,14 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
             )
             delegate?.syncDidReceiveTaxProfile(fields)
         }
+        recordPulledBaselines(
+            properties: updatedProperties,
+            entries: updatedEntries,
+            categories: updatedCategories,
+            deletedRecordNames: (deletedPropertyIDs.union(deletedEntryIDs)).map(\.uuidString),
+            goalSettingsPulled: goalRecord != nil,
+            taxProfilePulled: taxProfileRecord != nil
+        )
     }
 
     // MARK: - Profile Discovery (iCloud)
@@ -662,29 +870,55 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
 
     // MARK: - Delete from Cloud
 
-    func deletePropertyFromCloud(_ property: RentalProperty) async {
-        guard accountAvailable else { return }
-        guard let database else { return }
-        let recordID = CKRecord.ID(recordName: property.id.uuidString, zoneID: zoneID)
-        do {
-            try await database.deleteRecord(withID: recordID)
-        } catch {
-            logger.error("Delete property error: \(error.localizedDescription)")
-        }
+    /// Records a local property delete. Its entries (removed locally with it) are deleted too,
+    /// so a full re-pull can't bring them back as orphans. Nothing is sent from here: every
+    /// delete goes through the serialized push (tombstone → push → clear), so a delete can never
+    /// land after a re-created record with the same id was saved.
+    func deletePropertyFromCloud(_ property: RentalProperty, cascadedEntryIds: [UUID] = []) {
+        recordLocalDeletes([property.id.uuidString] + cascadedEntryIds.map(\.uuidString))
     }
 
-    func deleteEntryFromCloud(_ entry: TimeEntry) async {
-        guard accountAvailable else { return }
-        guard let database else { return }
-        let recordID = CKRecord.ID(recordName: entry.id.uuidString, zoneID: zoneID)
-        do {
-            try await database.deleteRecord(withID: recordID)
-        } catch {
-            logger.error("Delete entry error: \(error.localizedDescription)")
+    /// Records a local entry delete (see `deletePropertyFromCloud`). A tax record deleted
+    /// offline still reaches iCloud on the next push and never comes back.
+    func deleteEntryFromCloud(_ entry: TimeEntry) {
+        recordLocalDeletes([entry.id.uuidString])
+    }
+
+    private func recordLocalDeletes(_ names: [String]) {
+        guard let tracker = changeTracker else {
+            // No active profile: there is nothing scoped to tombstone. Say so, never drop silently.
+            logger.error("Delete of \(names.count) record(s) not queued for iCloud: no active profile")
+            return
         }
+        // No baseline: if the same id comes back (a re-confirmed suggestion keeps its derived
+        // id), it must be pushed again.
+        tracker.forget(recordNames: names)
+        tracker.addTombstones(names)
+        schedulePush()
     }
 
     func deleteCurrentUserRecords(
+        properties: [RentalProperty],
+        entries: [TimeEntry],
+        categories: [CustomCategory],
+        userId: String
+    ) async throws {
+        // Nothing may be pushed during or after the delete (a late save would bring the
+        // user's data back).
+        isDeletingAccount = true
+        defer { isDeletingAccount = false }
+        await quiescePushes()
+        do {
+            try await deleteCurrentUserRecordsQuiesced(
+                properties: properties, entries: entries, categories: categories, userId: userId)
+        } catch {
+            // The data stays (iCloud and this device); syncing may resume on the next start().
+            pushesBlocked = false
+            throw error
+        }
+    }
+
+    private func deleteCurrentUserRecordsQuiesced(
         properties: [RentalProperty],
         entries: [TimeEntry],
         categories: [CustomCategory],
@@ -731,6 +965,8 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
 
         UserDefaults.standard.removeObject(forKey: changeTokenKey)
         UserDefaults.standard.removeObject(forKey: zoneTokenKey)
+        SyncChangeTracker(userId: userId, baseDirectory: changeTrackerBaseDirectory).reset()
+        cachedChangeTracker = nil
         lastSyncDate = Date()
     }
 

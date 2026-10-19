@@ -65,7 +65,8 @@ targets:
         # Info.plist is hand-maintained (GENERATE_INFOPLIST_FILE: NO). 2.0 adds
         # BGTaskSchedulerPermittedIdentifiers there: com.openclaw.landlordhours.capture.refresh and
         # .capture.backfill (mirrored in BackgroundTaskIdentifiers, kept in step by a unit test).
-        # The matching UIBackgroundModes (fetch/processing) are added with the scheduler (WP4).
+        # UIBackgroundModes fetch/processing are declared (WP4); only .capture.refresh is registered
+        # (CaptureNotificationRefresher), .capture.backfill is registered by the backfill work.
         INFOPLIST_FILE: Sources/App/Info.plist
         SWIFT_EMIT_LOC_STRINGS: YES
         CODE_SIGN_STYLE: Automatic

@@ -43,13 +43,26 @@ struct LandlordHoursApp: App {
         UINavigationBar.appearance().scrollEdgeAppearance = navBar
     }
 
+    private var appRoot: some View {
+        ContentView()
+            .environmentObject(viewModel)
+            .environmentObject(categoryManager)
+            .environmentObject(appearanceManager)
+            .preferredColorScheme(AppearanceManager.forcedColorSchemeFromLaunchArguments ?? appearanceManager.preferredColorScheme)
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(viewModel)
-                .environmentObject(categoryManager)
-                .environmentObject(appearanceManager)
-                .preferredColorScheme(AppearanceManager.forcedColorSchemeFromLaunchArguments ?? appearanceManager.preferredColorScheme)
+            #if DEBUG
+            // House capture hook (-LHHousePreview <hours> <goal> <scheme>); see HousePreviewLaunchHook.swift.
+            if let housePreview = HousePreviewLaunch.current {
+                HousePreviewRoot(config: housePreview)
+            } else {
+                appRoot
+            }
+            #else
+            appRoot
+            #endif
         }
         .onChange(of: scenePhase, initial: true) { _, phase in
             AppModelHost.shared.sceneDidChange(isActive: phase == .active)

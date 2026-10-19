@@ -90,6 +90,15 @@ final class InboxUITests: XCTestCase {
         return (tab.value as? String) == value
     }
 
+    /// WP-H's house reveal shows first when the backfill found anything; continue to the list.
+    private func passReveal() {
+        let review = app.buttons["backfill-review"]
+        if review.waitForExistence(timeout: 15) {
+            Thread.sleep(forTimeInterval: 0.5)
+            review.tap()
+        }
+    }
+
     private func swipeLog(_ element: XCUIElement) {
         fullSwipe(element, right: true)
         if !undo.waitForExistence(timeout: 2), !app.buttons["confirm.log"].exists {
@@ -232,6 +241,7 @@ final class InboxUITests: XCTestCase {
         app.descendants(matching: .any)["capture.toggle.eventPrompts"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["capture.notificationPreview"].waitForExistence(timeout: 3))
         app.buttons["capture.priming.continue"].tap()
+        passReveal()
         let headline = app.staticTexts["backfill.headline"]
         XCTAssertTrue(settle(headline))
         XCTAssertEqual(headline.label, "We found 22 visits that look like landlord work")
@@ -253,6 +263,7 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(settle(setup))
         setup.tap()
         app.buttons["capture.priming.continue"].tap()
+        passReveal()
         let first = app.buttons["backfill.row.0"]
         XCTAssertTrue(settle(first))
         first.tap()

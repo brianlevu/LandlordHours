@@ -1,38 +1,19 @@
 import Foundation
 
-// MARK: - Event prompts consent (integration seam)
+// MARK: - Event prompts consent
 //
-// WP4 (wp4-notify) OWNS the per-profile `eventPromptsEnabled` flag and its storage
-// (CaptureFlags / AppViewModel), and its scheduler checks it. The inbox only writes the user's
-// answer through this wrapper. At integration, point `backend` at WP4's flag, e.g.
-// `EventPromptsConsent.backend = .init(isEnabled: { _ in <WP4 getter> }, set: { on, _ in <WP4 setter> })`,
-// and delete `interim`. Until then `interim` keeps the answer per profile so the flow and its
-// tests work on their own; nothing schedules from it.
+// WP4 owns the per-profile flag (`CapturePromptConsent`, read by the notification refresher).
+// The inbox opt-in screens only write the user's answer through this thin forwarder.
 enum EventPromptsConsent {
-    struct Backend {
-        var isEnabled: (_ userId: String?) -> Bool
-        var set: (_ enabled: Bool, _ userId: String?) -> Void
+    static func isEnabled(userId: String? = UserScope.userId) -> Bool {
+        guard let userId else { return false }
+        return CapturePromptConsent.isEnabled(profileId: userId)
     }
 
-    /// Interim per-profile store, replaced by WP4's flag at integration.
-    static let interimBaseKey = "LandlordHours.capture.eventPromptsConsent.interim"
-
-    static let interim = Backend(
-        isEnabled: { userId in
-            guard let userId else { return false }
-            return UserDefaults.standard.bool(forKey: UserScope.key(interimBaseKey, userId: userId))
-        },
-        set: { enabled, userId in
-            guard let userId else { return }
-            UserDefaults.standard.set(enabled, forKey: UserScope.key(interimBaseKey, userId: userId))
-        }
-    )
-
-    nonisolated(unsafe) static var backend: Backend = interim
-
-    static func isEnabled(userId: String? = UserScope.userId) -> Bool { backend.isEnabled(userId) }
-
-    static func set(_ enabled: Bool, userId: String? = UserScope.userId) { backend.set(enabled, userId) }
+    static func set(_ enabled: Bool, userId: String? = UserScope.userId) {
+        guard let userId else { return }
+        CapturePromptConsent.set(enabled, profileId: userId)
+    }
 }
 
 // MARK: - Capture opt-in (per profile)
@@ -40,7 +21,7 @@ enum EventPromptsConsent {
 // 2.0 must not start sending end-of-event notifications to people who simply updated the app.
 // Everything here defaults to OFF and only an explicit choice on the "What's new" intro
 // (upgraders) or the onboarding capture step (new users) turns it on. The prompts answer goes
-// to WP4's flag through `EventPromptsConsent`.
+// to WP4's `CapturePromptConsent` flag.
 enum CaptureOptIn {
     /// "Find rental work in my calendar" — calendar suggestions in the inbox.
     static let calendarSuggestionsBaseKey = "LandlordHours.capture.calendarSuggestionsEnabled"
@@ -50,8 +31,7 @@ enum CaptureOptIn {
     static let backfillCompletedBaseKey = "LandlordHours.capture.backfillCompleted"
 
     /// Every per-profile key, for profile reset / delete.
-    static let allBaseKeys = [calendarSuggestionsBaseKey, whatsNewSeenBaseKey, backfillCompletedBaseKey,
-                              EventPromptsConsent.interimBaseKey]
+    static let allBaseKeys = [calendarSuggestionsBaseKey, whatsNewSeenBaseKey, backfillCompletedBaseKey]
 
     private static func key(_ base: String, userId: String?) -> String? {
         guard let userId else { return nil }

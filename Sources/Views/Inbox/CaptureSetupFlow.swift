@@ -309,6 +309,8 @@ struct CaptureSetupFlow: View {
         }
         CaptureOptIn.recordChoice(calendar: granted, eventPrompts: prompts)
         viewModel.objectWillChange.send()
+        // WP4: rebuild end-of-event prompts now that the answer changed.
+        Task { await CaptureNotificationRefresher.shared.refresh(reason: "capture-opt-in") }
         guard granted else {
             phase = .calendarDenied
             return

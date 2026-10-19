@@ -305,14 +305,14 @@ final class CaptureOptInTests: CaptureTestCase {
         XCTAssertFalse(EventPromptsConsent.isEnabled(), "Turning calendar off turns prompts off")
     }
 
-    func testPromptsAnswerGoesThroughTheWP4Seam() {
-        var written: [Bool] = []
-        let saved = EventPromptsConsent.backend
-        defer { EventPromptsConsent.backend = saved }
-        EventPromptsConsent.backend = .init(isEnabled: { _ in written.last ?? false }, set: { on, _ in written.append(on) })
+    func testOptInWritesWP4sConsentFlag() {
+        XCTAssertFalse(CapturePromptConsent.isEnabled(profileId: profileId))
         CaptureOptIn.recordChoice(calendar: true, eventPrompts: true)
+        XCTAssertTrue(CapturePromptConsent.isEnabled(profileId: profileId), "WP4's scheduler reads this flag")
+        let (app, _) = makeViewModel()
+        XCTAssertTrue(app.eventPromptsEnabled)
         CaptureOptIn.recordChoice(calendar: true, eventPrompts: false)
-        XCTAssertEqual(written, [true, false], "The opt-in UI only writes through EventPromptsConsent")
+        XCTAssertFalse(app.eventPromptsEnabled)
     }
 
     func testOptInIsPerProfile() {
