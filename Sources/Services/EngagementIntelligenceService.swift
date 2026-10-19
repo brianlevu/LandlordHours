@@ -68,6 +68,8 @@ struct EngagementContext {
     /// Decides whose hours count. REPS (and REPS + STR) is one spouse alone;
     /// STR material participation combines owner and spouse.
     var goalType: HourGoalType = .reps
+    /// Same flag the Dashboard uses to decide grouped vs best-single-property hours.
+    var groupingElection: Bool = false
 
     enum NotificationPermissionState: Equatable {
         case notDetermined
@@ -111,11 +113,11 @@ final class EngagementIntelligenceService {
                 year: context.taxYear
             )
         case .str:
-            yearHours = TaxQualificationEngine.materialParticipationStatus(
+            yearHours = TaxQualificationEngine.materialParticipationOverview(
                 entries: context.timeEntries,
+                properties: context.properties,
                 year: context.taxYear,
-                propertyId: nil,
-                groupingElection: true
+                groupingElection: context.groupingElection
             ).ownerAndSpouseHours
         }
         let lastLogDate = yearEntries.map(\.date).max()

@@ -187,7 +187,8 @@ private enum LandlordHoursIntentStore {
             recentDismissals: [],
             isProUser: SubscriptionManager.shared.isPro,
             targetHours: GoalManager.shared.globalGoalType.hoursRequired,
-            goalType: GoalManager.shared.globalGoalType
+            goalType: GoalManager.shared.globalGoalType,
+            groupingElection: TaxProfileManager.shared.groupingElection
         )
     }
 

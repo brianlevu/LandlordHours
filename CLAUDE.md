@@ -360,7 +360,6 @@ Sources/
 │   ├── SettingsView.swift        ← Settings tab
 │   ├── OnboardingView.swift      ← Onboarding flow
 │   ├── PaywallView.swift         ← Subscription paywall
-│   ├── TaxYearView.swift         ← Annual tax year view
 │   ├── TasksView.swift           ← Task management
 │   ├── CategoryPickerSheet.swift ← Category selection
 │   ├── CategoryManagementView.swift ← Custom category CRUD
@@ -372,7 +371,6 @@ Sources/
 └── Services/
     ├── SubscriptionManager.swift ← In-app purchases
     ├── AppleSignIn.swift         ← Authentication
-    ├── WeeklySummaryService.swift ← Weekly digest
     └── AITimeEntryService.swift  ← AI-assisted time logging
 ```
 
