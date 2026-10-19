@@ -865,7 +865,7 @@ final class SyncPushChangedOnlyTests: CaptureTestCase {
         _ = try await push(service)
         let entry = viewModel.timeEntries[0]
         viewModel.deleteTimeEntry(entry)
-        await service.deleteEntryFromCloud(entry)   // offline in tests: the delete can't reach iCloud
+        service.deleteEntryFromCloud(entry)   // offline in tests: the delete can't reach iCloud
         XCTAssertEqual(service.changeTracker!.pendingDeletes, [entry.id.uuidString], "Tombstone kept")
 
         // A failed delete keeps the tombstone.
@@ -892,13 +892,107 @@ final class SyncPushChangedOnlyTests: CaptureTestCase {
         let (viewModel, service, _) = makeModel()
         _ = try await push(service)
         let entry = viewModel.timeEntries[0]
-        await service.deleteEntryFromCloud(entry)
+        service.deleteEntryFromCloud(entry)
         // Same id is still (or again) local, e.g. a re-confirmed suggestion.
         deleted = []
         let saved = try await push(service)
         XCTAssertTrue(deleted.isEmpty, "Never delete a record that exists locally")
         XCTAssertEqual(saved.map(\.recordID.recordName), [entry.id.uuidString])
         XCTAssertTrue(service.changeTracker!.pendingDeletes.isEmpty)
+    }
+
+    /// A minimal server: record names it holds.
+    private final class FakeServer {
+        var names = Set<String>()
+        func save(_ records: [CKRecord]) { names.formUnion(records.map(\.recordID.recordName)) }
+        func delete(_ ids: [CKRecord.ID]) { names.subtract(ids.map(\.recordName)) }
+    }
+
+    func testDeleteInFlightNeverRemovesARecordReConfirmedMeanwhile() async throws {
+        let (viewModel, service, _) = makeModel()
+        let server = FakeServer()
+        _ = try await service.pushChangedRecords(save: { server.save($0) }, delete: { server.delete($0) })
+        let entry = viewModel.timeEntries[0]
+        let name = entry.id.uuidString
+        XCTAssertTrue(server.names.contains(name))
+
+        // Delete (tombstone only: nothing is sent outside the push).
+        viewModel.deleteTimeEntry(entry)
+        XCTAssertTrue(server.names.contains(name), "Deletes are not fired immediately")
+        XCTAssertEqual(service.changeTracker!.pendingDeletes, [name])
+
+        // Push A sends the delete and is held mid-flight...
+        var release = false
+        var deleteStarted = false
+        let pushA = Task { @MainActor in
+            try await service.pushChangedRecords(
+                save: { server.save($0) },
+                delete: { ids in
+                    deleteStarted = true
+                    while !release { await Task.yield() }
+                    server.delete(ids)
+                })
+        }
+        while !deleteStarted { await Task.yield() }
+        // ...while the same suggestion is re-confirmed (same derived id) and push B starts.
+        viewModel.timeEntries.append(entry)
+        let pushB = Task { @MainActor in
+            try await service.pushChangedRecords(save: { server.save($0) }, delete: { server.delete($0) })
+        }
+        for _ in 0..<20 { await Task.yield() }
+        XCTAssertTrue(server.names.contains(name), "B waits for A: it can't save before A's delete lands")
+
+        release = true
+        _ = try await pushA.value
+        _ = try await pushB.value
+        XCTAssertTrue(server.names.contains(name), "The re-confirmed record is on the server after the late delete")
+        XCTAssertTrue(service.changeTracker!.hasBaseline(for: name))
+        XCTAssertTrue(service.changeTracker!.pendingDeletes.isEmpty)
+
+        // And a later push changes nothing (no lost or duplicate work).
+        let again = try await service.pushChangedRecords(save: { server.save($0) }, delete: { server.delete($0) })
+        XCTAssertTrue(again.isEmpty)
+    }
+
+    func testRecordDeletedWhileItsSaveIsInFlightIsDeletedNextPush() async throws {
+        let (viewModel, service, _) = makeModel()
+        let server = FakeServer()
+        _ = try await service.pushChangedRecords(save: { server.save($0) }, delete: { server.delete($0) })
+        var edited = viewModel.timeEntries[1]
+        edited.hours = 7
+        edited.modifiedAt = Date()
+        viewModel.updateTimeEntry(edited)
+        // The save is in flight when the user deletes the entry.
+        _ = try await service.pushChangedRecords(save: { records in
+            viewModel.deleteTimeEntry(edited)
+            server.save(records)
+        }, delete: { server.delete($0) })
+        XCTAssertFalse(service.changeTracker!.hasBaseline(for: edited.id.uuidString), "No baseline for a tombstoned record")
+        _ = try await service.pushChangedRecords(save: { server.save($0) }, delete: { server.delete($0) })
+        XCTAssertFalse(server.names.contains(edited.id.uuidString))
+
+        // Re-created later with identical content: still uploaded.
+        viewModel.timeEntries.append(edited)
+        let saved = try await service.pushChangedRecords(save: { server.save($0) }, delete: { server.delete($0) })
+        XCTAssertEqual(saved.map(\.recordID.recordName), [edited.id.uuidString])
+        XCTAssertTrue(server.names.contains(edited.id.uuidString))
+    }
+
+    func testDeletingAPropertyAlsoDeletesItsEntriesInICloud() async throws {
+        let (viewModel, service, propertyId) = makeModel()
+        let server = FakeServer()
+        _ = try await service.pushChangedRecords(save: { server.save($0) }, delete: { server.delete($0) })
+        let entryNames = viewModel.timeEntries.filter { $0.propertyId == propertyId }.map(\.id.uuidString)
+        XCTAssertEqual(entryNames.count, 2)
+        let property = viewModel.properties.first { $0.id == propertyId }!
+
+        viewModel.deleteProperty(property)
+        XCTAssertEqual(Set(service.changeTracker!.pendingDeletes), Set([propertyId.uuidString] + entryNames))
+        _ = try await service.pushChangedRecords(save: { server.save($0) }, delete: { server.delete($0) })
+        XCTAssertFalse(server.names.contains(propertyId.uuidString))
+        for name in entryNames {
+            XCTAssertFalse(server.names.contains(name), "No orphaned entries left to come back on a re-pull")
+        }
     }
 
     func testResetBaselinesReuploadsEverythingButKeepsTombstones() async throws {
@@ -1002,7 +1096,7 @@ final class SyncPushChangedOnlyTests: CaptureTestCase {
         let (viewModel, service, _) = makeModel()
         _ = try await push(service)
         let entry = viewModel.timeEntries[0]
-        await service.deleteEntryFromCloud(entry)   // iCloud unavailable in tests: forgets, then returns
+        service.deleteEntryFromCloud(entry)   // iCloud unavailable in tests: forgets, then returns
         XCTAssertFalse(service.changeTracker!.hasBaseline(for: entry.id.uuidString))
         let sent = try await push(service)
         XCTAssertEqual(sent.map(\.recordID.recordName), [entry.id.uuidString])

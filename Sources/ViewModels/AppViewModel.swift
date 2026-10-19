@@ -627,7 +627,8 @@ class AppViewModel: ObservableObject {
         deleteAttachmentFiles(for: removedEntries)
         timeEntries.removeAll { $0.propertyId == property.id }
         saveData()
-        Task { await syncService.deletePropertyFromCloud(property) }
+        // Tombstones the property AND its entries; the next push sends the deletes.
+        syncService.deletePropertyFromCloud(property, cascadedEntryIds: removedEntries.map(\.id))
     }
     
     // MARK: - Time Entry Management
@@ -670,7 +671,7 @@ class AppViewModel: ObservableObject {
         deleteAttachmentFiles(for: [entry])
         timeEntries.removeAll { $0.id == entry.id }
         saveData()
-        Task { await syncService.deleteEntryFromCloud(entry) }
+        syncService.deleteEntryFromCloud(entry)
     }
 
     /// Remove the on-disk attachment files backing the given entries. Safe to call

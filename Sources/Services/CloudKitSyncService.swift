@@ -443,20 +443,40 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     /// Sends pending deletes (tombstones) through `delete`, then only the records that differ
     /// from the server baseline through `save`, making what was sent the new baseline. Returns
     /// the records saved (empty: nothing changed). A failure leaves everything pending.
+    ///
+    /// Pushes run one at a time (each waits for the previous), so a delete in flight can never
+    /// overtake a save of the same id from another push.
     @discardableResult
     func pushChangedRecords(
+        save: @escaping ([CKRecord]) async throws -> Void,
+        delete: @escaping ([CKRecord.ID]) async throws -> Void
+    ) async throws -> [CKRecord] {
+        let previous = pushChain
+        let task = Task { @MainActor () throws -> [CKRecord] in
+            await previous?.value
+            return try await self.pushChangedRecordsNow(save: save, delete: delete)
+        }
+        pushChain = Task { _ = try? await task.value }
+        return try await task.value
+    }
+
+    private var pushChain: Task<Void, Never>?
+
+    private func pushChangedRecordsNow(
         save: ([CKRecord]) async throws -> Void,
         delete: ([CKRecord.ID]) async throws -> Void
     ) async throws -> [CKRecord] {
-        let all = allLocalRecords()
         let tracker = changeTracker
         // Deleted and then re-created locally (a re-confirmed suggestion keeps its derived id):
         // no longer a delete.
-        tracker?.cancelTombstones(for: Set(all.map(\.recordID.recordName)))
+        tracker?.cancelTombstones(for: Set(allLocalRecords().map(\.recordID.recordName)))
         if let tombstones = tracker?.pendingDeletes, !tombstones.isEmpty {
             try await delete(tombstones.map { CKRecord.ID(recordName: $0, zoneID: zoneID) })
             tracker?.clearTombstones(tombstones)
         }
+        // Built AFTER the deletes: anything re-created while they were in flight has no
+        // baseline and is saved now, after its delete.
+        let all = allLocalRecords()
         let changed = tracker?.changedRecords(all) ?? all
         guard !changed.isEmpty else { return [] }
         try await save(changed)
@@ -829,44 +849,26 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
 
     // MARK: - Delete from Cloud
 
-    func deletePropertyFromCloud(_ property: RentalProperty) async {
-        // No baseline: if the same id comes back (re-added), it must be pushed again. A
-        // tombstone keeps the delete until iCloud confirms it (offline deletes used to be lost
-        // and the record came back on the next pull).
-        let name = property.id.uuidString
-        changeTracker?.forget(recordNames: [name])
-        changeTracker?.addTombstones([name])
-        guard accountAvailable else { return }
-        guard let database else { return }
-        let recordID = CKRecord.ID(recordName: name, zoneID: zoneID)
-        do {
-            try await database.deleteRecord(withID: recordID)
-            changeTracker?.clearTombstones([name])
-        } catch let error as CKError where error.code == .unknownItem {
-            changeTracker?.clearTombstones([name])
-        } catch {
-            logger.error("Delete property error: \(error.localizedDescription)")
-        }
+    /// Records a local property delete. Its entries (removed locally with it) are deleted too,
+    /// so a full re-pull can't bring them back as orphans. Nothing is sent from here: every
+    /// delete goes through the serialized push (tombstone → push → clear), so a delete can never
+    /// land after a re-created record with the same id was saved.
+    func deletePropertyFromCloud(_ property: RentalProperty, cascadedEntryIds: [UUID] = []) {
+        recordLocalDeletes([property.id.uuidString] + cascadedEntryIds.map(\.uuidString))
     }
 
-    func deleteEntryFromCloud(_ entry: TimeEntry) async {
-        // No baseline: a re-confirmed suggestion reuses its derived id and must be pushed again.
-        // A tombstone keeps the delete until iCloud confirms it (a tax record deleted offline
-        // must not come back).
-        let name = entry.id.uuidString
-        changeTracker?.forget(recordNames: [name])
-        changeTracker?.addTombstones([name])
-        guard accountAvailable else { return }
-        guard let database else { return }
-        let recordID = CKRecord.ID(recordName: name, zoneID: zoneID)
-        do {
-            try await database.deleteRecord(withID: recordID)
-            changeTracker?.clearTombstones([name])
-        } catch let error as CKError where error.code == .unknownItem {
-            changeTracker?.clearTombstones([name])
-        } catch {
-            logger.error("Delete entry error: \(error.localizedDescription)")
-        }
+    /// Records a local entry delete (see `deletePropertyFromCloud`). A tax record deleted
+    /// offline still reaches iCloud on the next push and never comes back.
+    func deleteEntryFromCloud(_ entry: TimeEntry) {
+        recordLocalDeletes([entry.id.uuidString])
+    }
+
+    private func recordLocalDeletes(_ names: [String]) {
+        // No baseline: if the same id comes back (a re-confirmed suggestion keeps its derived
+        // id), it must be pushed again.
+        changeTracker?.forget(recordNames: names)
+        changeTracker?.addTombstones(names)
+        schedulePush()
     }
 
     func deleteCurrentUserRecords(

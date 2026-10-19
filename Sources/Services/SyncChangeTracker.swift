@@ -104,7 +104,9 @@ final class SyncChangeTracker {
     /// The server now holds exactly these records (after a successful push, or as pulled).
     func recordServerState(_ records: [CKRecord]) {
         guard !records.isEmpty else { return }
-        for record in records {
+        // A record deleted locally meanwhile keeps no baseline; its tombstone is pushed next.
+        let tombstoned = Set(pendingDeletes)
+        for record in records where !tombstoned.contains(record.recordID.recordName) {
             contents.fingerprints[record.recordID.recordName] = Self.fingerprint(record)
         }
         save()
@@ -142,6 +144,8 @@ final class SyncChangeTracker {
         let remaining = pendingDeletes.filter { !remove.contains($0) }
         guard remaining.count != pendingDeletes.count else { return }
         contents.pendingDeletes = remaining.isEmpty ? nil : remaining
+        // The server no longer holds them: a record re-created with the same id is new.
+        for name in remove { contents.fingerprints[name] = nil }
         save()
     }
 
