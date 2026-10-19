@@ -427,7 +427,7 @@ enum AuditReportBuilder {
 enum AuditReportFormat {
     static let disclaimer = "LandlordHours is a record-keeping tool, not tax advice. Review your qualification with a tax professional."
 
-    static let suggestionExplanation = "Suggested entries were proposed by the app from your calendar and added to your record only when you confirmed them."
+    static let suggestionExplanation = "Suggested entries were proposed by the app (for example, from your calendar or a receipt) and added to your record only when you confirmed them."
 
     static let calendarSuggestionLabel = "Calendar suggestion"
 
