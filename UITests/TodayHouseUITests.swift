@@ -119,6 +119,10 @@ final class TodayHouseUITests: XCTestCase {
 
         app.buttons["tab.today"].tap()
         XCTAssertTrue(waitForHeroLabel(containing: "214 of 750 hours"), hero.label)
+        // Let the confirm build (beam, count-up, crossfade) play out before the frame, so the
+        // attachment (and any screen recording of this test) shows the settled 214.
+        _ = XCTWaiter.wait(for: [XCTestExpectation(description: "settle")], timeout: 5)
+        XCTAssertFalse(app.buttons["milestone-continue"].exists, "214h crosses no milestone")
         attach("today-after-log")
     }
 }

@@ -141,11 +141,12 @@ struct DashboardView: View {
 
                         VStack(spacing: 22) {
                             headerSection
+                            // The house leads Today in every state (approved r6 concept); a new
+                            // owner's setup steps sit right under the empty lot.
+                            houseHero
                             if shouldShowActivationCard {
                                 homeActivationCard
-                                houseHero
                             } else {
-                                houseHero
                                 learningShortcutCard
                             }
                             recentEntriesSection

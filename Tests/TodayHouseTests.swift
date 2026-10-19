@@ -318,8 +318,8 @@ final class TodayPaceTests: XCTestCase {
     func testZeroAndMet() {
         XCTAssertEqual(TodayPace.resolve(hours: 0, goal: .reps750, date: day(7, 2), calendar: calendar).tone, .neutral)
         XCTAssertEqual(TodayPace.resolve(hours: 751, goal: .reps750, date: day(7, 2), calendar: calendar),
-                       TodayPace(text: "Goal hours reached", tone: .positive))
+                       TodayPace(text: "Goal hours met", tone: .positive))
         XCTAssertNotEqual(TodayPace.resolve(hours: 750, goal: .reps750, date: day(12, 31), calendar: calendar).text,
-                          "Goal hours reached", "Exactly 750 is not more than 750")
+                          "Goal hours met", "Exactly 750 is not more than 750")
     }
 }

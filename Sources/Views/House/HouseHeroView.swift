@@ -253,8 +253,9 @@ struct HouseHeroCard: View {
             HouseBlueprintPaper()
             GeometryReader { g in
                 // The art has ~6% side and ~8% bottom margins inside its 320 pt camera; size it so
-                // the house fills the right two-thirds and rises to about a third of the card.
-                let houseSize = min(g.size.height * 0.84, g.size.width * 0.74)
+                // the house fills the right half or so (the approved r6 concept proportion) and
+                // the words keep a ~130 pt column for real pace copy ("Behind by 388h").
+                let houseSize = min(g.size.height * 0.84, g.size.width * 0.62)
                 let houseCenter = CGPoint(x: g.size.width - 4 - houseSize * 0.44, y: g.size.height - 6 - houseSize * 0.417)
                 let houseOrigin = CGPoint(x: houseCenter.x - houseSize / 2, y: houseCenter.y - houseSize / 2)
                 // Bottom lines stay clear of the lot's left tip (~6% into the camera at ~74% height).
@@ -296,15 +297,13 @@ struct HouseHeroCard: View {
                         Spacer(minLength: 8)
                         Group {
                             if let status {
-                                HStack(alignment: .firstTextBaseline, spacing: 5) {
-                                    if let statusSymbol {
-                                        Image(systemName: statusSymbol)
-                                            .font(.subheadline.weight(.semibold))
-                                            .accessibilityHidden(true)
-                                    }
-                                    Text(status)
-                                        .font(.subheadline.weight(.semibold))
-                                        .lineLimit(2)
+                                // Glyph inline with the words so the line wraps as one sentence;
+                                // one line at subheadline, else one line at footnote, else wrapped.
+                                let line = statusSymbol.map { Text(Image(systemName: $0)) + Text(" ") + Text(status) } ?? Text(status)
+                                ViewThatFits(in: .horizontal) {
+                                    line.font(.subheadline.weight(.semibold)).lineLimit(1)
+                                    line.font(.footnote.weight(.semibold)).lineLimit(1)
+                                    line.font(.subheadline.weight(.semibold)).lineLimit(3)
                                 }
                                 .foregroundStyle(statusColor)
                                 .accessibilityIdentifier("today.hero.status")

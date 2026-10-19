@@ -65,7 +65,7 @@ struct TodayPace: Equatable {
 
     static func resolve(hours: Double, goal: HouseGoal, date: Date = Date(), calendar: Calendar = .current) -> TodayPace {
         if HouseProgress(hours: hours, goal: goal).isGoalMet {
-            return TodayPace(text: "Goal hours reached", tone: .positive)
+            return TodayPace(text: "Goal hours met", tone: .positive)
         }
         if hours <= 0 {
             return TodayPace(text: "No hours logged yet", tone: .neutral)
