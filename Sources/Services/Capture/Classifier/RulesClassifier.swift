@@ -5,11 +5,13 @@ import Foundation
 // Always available, every OS the app supports (iOS 17+), no model, no network. The main path
 // for most users: Apple's model covers only Apple Intelligence devices.
 struct RulesClassifier: CaptureClassifier {
+    /// Calendar suggestions ALWAYS keep the category 1.x's calendar import computes
+    /// (`CalendarImportService.categorizeEvent`), so a 1.1 device recognises a 2.0-confirmed
+    /// event as already imported (AppViewModel.isDuplicateCalendarEntry compares category, hours
+    /// and start). Not configurable: only non-calendar sources get the table/model category.
+    static func usesLegacyCategory(_ kind: Suggestion.Kind) -> Bool { kind == .calendar }
+
     struct Options: Equatable {
-        /// Calendar suggestions keep the category 1.x's calendar import computes, so a 1.1
-        /// device recognises a 2.0-confirmed event as already imported
-        /// (AppViewModel.isDuplicateCalendarEntry compares category, hours and start).
-        var legacyCalendarCategory = true
         /// With exactly one property, a likely landlord item is proposed for it.
         var defaultToOnlyProperty = true
     }
@@ -33,7 +35,7 @@ struct RulesClassifier: CaptureClassifier {
         }
 
         let category: ActivityCategory?
-        if candidate.kind == .calendar, options.legacyCalendarCategory {
+        if Self.usesLegacyCategory(candidate.kind) {
             category = LegacyCalendarCategory.category(forTitle: candidate.title)
         } else {
             category = verdict.category ?? (verdict.hasLandlordSignal ? .management : nil)

@@ -135,10 +135,27 @@ final class ClassifierTests: XCTestCase {
         XCTAssertEqual(result.hours ?? 0, 1.5, accuracy: 0.0001)
         XCTAssertEqual(result.hoursBasis, .scheduled)
 
-        var opts = RulesClassifier.Options()
-        opts.legacyCalendarCategory = false
-        let rich = await RulesClassifier(options: opts).classify(c, properties: properties)
+        // A non-calendar source gets the table category.
+        let rich = await RulesClassifier().classify(candidate(c.title, kind: .gmail), properties: properties)
         XCTAssertEqual(rich.category, .bookkeeping)
+    }
+
+    /// WP1 constraint: for calendar sources the chain never changes the 1.x category, even when
+    /// the on-device model proposes another one, for every calibration title.
+    func testCalendarCategoryEquals1xThroughTheChainForEveryCalibrationTitle() async throws {
+        let fixture = try CalibrationFixture.load()
+        let service = CalendarImportService.shared
+        let backend = FakeOnDeviceBackend(answer: answer(true, 0.9, category: .contractNegotiation, ref: "P1"))
+        let withModel = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
+        let rulesOnly = ClassifierChain(onDevice: OnDeviceClassifier(backend: UnavailableOnDeviceBackend(reason: .osTooOld)))
+        for item in fixture.items {
+            let expected = service.categorizeEvent(title: item.title.lowercased())
+            let a = await withModel.classify(candidate(item.title), properties: properties)
+            let b = await rulesOnly.classify(candidate(item.title), properties: properties)
+            XCTAssertEqual(a.category, expected, "chain+model: \(item.title)")
+            XCTAssertEqual(b.category, expected, "rules: \(item.title)")
+        }
+        XCTAssertFalse(backend.requests.isEmpty, "the model must have run on some titles")
     }
 
     func testLegacyCategoryMatches1xForEveryCalibrationTitle() throws {

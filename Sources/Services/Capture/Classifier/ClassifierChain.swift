@@ -86,8 +86,7 @@ struct ClassifierChain: CaptureClassifier {
     }
 
     /// Rules and model each get half the vote on confidence. A property the rules matched by
-    /// name or address wins over the model's pick. Calendar categories stay on the 1.x value
-    /// when the rules classifier is set to keep them.
+    /// name or address wins over the model's pick. Calendar categories always stay on the 1.x value.
     func merge(
         rules base: CaptureClassification,
         model: OnDeviceClassifier.OnDeviceResult,
@@ -111,8 +110,9 @@ struct ClassifierChain: CaptureClassifier {
             result.propertyId = properties[0].id
         }
 
-        let keepLegacy = candidate.kind == .calendar && rules.options.legacyCalendarCategory
-        if !keepLegacy, let category = model.category {
+        // Calendar: the 1.x category is never overridden (1.1 dedupe). The model's category is
+        // used only for non-calendar sources.
+        if !RulesClassifier.usesLegacyCategory(candidate.kind), let category = model.category {
             result.category = category
         }
 
