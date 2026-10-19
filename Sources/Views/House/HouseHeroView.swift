@@ -202,20 +202,49 @@ struct HouseBeam: View {
     }
 }
 
+/// How the hero's status line reads: met/on pace, behind, or nothing to judge yet. Colour is
+/// never the only signal; positive and caution also carry a glyph.
+enum HouseStatusTone: Equatable, Sendable {
+    case positive, caution, neutral
+}
+
 /// The Today hero card on blueprint paper, ported from the approved sandbox/concept layout: the
-/// number top-left, the house filling the right two-thirds and bottom. Integration into
-/// DashboardView happens after WP-D merges.
+/// number top-left, the house filling the right two-thirds and bottom. DashboardView (Today)
+/// feeds it the goal's countable hours and the pace line.
 struct HouseHeroCard: View {
     let progress: HouseProgress
     var year: Int = Calendar.current.component(.year, from: Date())
     /// Pace words from the caller ("On pace, 18h ahead"); nil hides the line.
     var status: String? = nil
+    var statusTone: HouseStatusTone = .positive
     var onCelebration: (HouseCelebration) -> Void = { _ in }
     var debugConfirmStill: Int? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shownHours: Double?
     @State private var pop = false
+    // Dynamic Type: the number, eyebrow and card grow with the text size (the house art keeps
+    // its share of the card; the card is capped so the art never dominates the screen).
+    @ScaledMetric(relativeTo: .largeTitle) private var numberSize: CGFloat = 56
+    @ScaledMetric(relativeTo: .caption2) private var eyebrowSize: CGFloat = 11
+    @ScaledMetric(relativeTo: .body) private var scaledCardHeight: CGFloat = 320
+    private var cardHeight: CGFloat { min(max(scaledCardHeight, 320), 460) }
+
+    private var statusColor: Color {
+        switch statusTone {
+        case .positive: return HouseTokens.positiveOnHero
+        case .caution: return HouseTokens.cautionOnHero
+        case .neutral: return HouseTokens.onHeroSecondary
+        }
+    }
+
+    private var statusSymbol: String? {
+        switch statusTone {
+        case .positive: return "checkmark.circle.fill"
+        case .caution: return "exclamationmark.circle.fill"
+        case .neutral: return nil
+        }
+    }
 
     private var displayHours: Int { Int((shownHours ?? progress.hours).rounded(.down)) }
 
@@ -224,8 +253,9 @@ struct HouseHeroCard: View {
             HouseBlueprintPaper()
             GeometryReader { g in
                 // The art has ~6% side and ~8% bottom margins inside its 320 pt camera; size it so
-                // the house fills the right two-thirds and rises to about a third of the card.
-                let houseSize = min(g.size.height * 0.84, g.size.width * 0.74)
+                // the house fills the right half or so (the approved r6 concept proportion) and
+                // the words keep a ~130 pt column for real pace copy ("Behind by 388h").
+                let houseSize = min(g.size.height * 0.84, g.size.width * 0.62)
                 let houseCenter = CGPoint(x: g.size.width - 4 - houseSize * 0.44, y: g.size.height - 6 - houseSize * 0.417)
                 let houseOrigin = CGPoint(x: houseCenter.x - houseSize / 2, y: houseCenter.y - houseSize / 2)
                 // Bottom lines stay clear of the lot's left tip (~6% into the camera at ~74% height).
@@ -244,7 +274,7 @@ struct HouseHeroCard: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(String(year)) · \(progress.goal.eyebrow)")
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .font(.system(size: eyebrowSize, weight: .medium, design: .monospaced))
                             .textCase(.uppercase)
                             .tracking(1.3)
                             .foregroundStyle(HouseTokens.drafting)
@@ -252,7 +282,7 @@ struct HouseHeroCard: View {
                             .minimumScaleFactor(0.8)
                             .fixedSize(horizontal: true, vertical: false)
                         Text("\(displayHours)")
-                            .font(.system(size: 56, weight: .bold, design: .rounded))
+                            .font(.system(size: numberSize, weight: .bold, design: .rounded))
                             .monospacedDigit()
                             .foregroundStyle(HouseTokens.onHeroPrimary)
                             .contentTransition(.identity)
@@ -267,10 +297,16 @@ struct HouseHeroCard: View {
                         Spacer(minLength: 8)
                         Group {
                             if let status {
-                                Text(status)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(HouseTokens.positiveOnHero)
-                                    .lineLimit(2)
+                                // Glyph inline with the words so the line wraps as one sentence;
+                                // one line at subheadline, else one line at footnote, else wrapped.
+                                let line = statusSymbol.map { Text(Image(systemName: $0)) + Text(" ") + Text(status) } ?? Text(status)
+                                ViewThatFits(in: .horizontal) {
+                                    line.font(.subheadline.weight(.semibold)).lineLimit(1)
+                                    line.font(.footnote.weight(.semibold)).lineLimit(1)
+                                    line.font(.subheadline.weight(.semibold)).lineLimit(3)
+                                }
+                                .foregroundStyle(statusColor)
+                                .accessibilityIdentifier("today.hero.status")
                             }
                             Text(progress.stage.spokenName)
                                 .font(.subheadline.weight(.semibold))
@@ -291,7 +327,7 @@ struct HouseHeroCard: View {
                 }
             }
         }
-        .frame(height: 320)
+        .frame(height: cardHeight)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: HouseTokens.blueprint.opacity(0.25), radius: 16, y: 8)
         .onAppear { if shownHours == nil { shownHours = progress.hours } }

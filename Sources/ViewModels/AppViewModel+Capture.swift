@@ -73,6 +73,7 @@ extension AppViewModel {
             return .needsInput(missing: missing)
         }
 
+        let houseHoursBefore = houseCountableHours()
         let source = suggestion.kind.entrySource
         let isCalendar = suggestion.kind == .calendar
         let entry = TimeEntry(
@@ -108,7 +109,7 @@ extension AppViewModel {
         timeEntries.append(entry)
         saveData()
         store?.markConfirmed(key: suggestion.sourceKey, entryId: entry.id)
-        checkHourMilestones()
+        reportHouseSave(previousHours: houseHoursBefore)
         Analytics.entryLogged(source: source)
         return .created(entryId: entry.id)
     }
