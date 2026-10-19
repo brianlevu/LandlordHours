@@ -22,6 +22,43 @@ struct BPScreenTitle: View {
     }
 }
 
+/// Reports and Settings open from Today's header, so the shell keeps Today highlighted (WP-D's
+/// tab rule). This back control makes that relationship explicit: the screen belongs to Today,
+/// and "‹ Today" is the way back, the same as tapping the highlighted tab.
+struct BPBackToTodayButton: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        Button {
+            NotificationCenter.default.post(name: .switchToTab, object: ShellTab.todayIndex)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "chevron.left")
+                    .font(.body.weight(.semibold))
+                Text("Today")
+                    .font(.body)
+            }
+            .foregroundStyle(colors.action)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.lhPressable)
+        .accessibilityLabel("Back to Today")
+        .accessibilityIdentifier("shell.backToToday")
+    }
+}
+
+enum AppVersionInfo {
+    /// "Version 1.0.6 (202608260402)", read from the bundle at runtime.
+    static func display(bundle: Bundle = .main) -> String {
+        let marketing = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let build = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        guard let build, !build.isEmpty, build != marketing else { return "Version \(marketing)" }
+        return "Version \(marketing) (\(build))"
+    }
+}
+
 /// Uppercase footnote section label with an optional trailing value ("OCTOBER 2026 … 41h").
 struct BPSectionHeader: View {
     let title: String

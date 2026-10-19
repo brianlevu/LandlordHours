@@ -254,6 +254,21 @@ final class RecordsLogicTests: XCTestCase {
     }
 }
 
+// MARK: - Settings version line
+
+final class AppVersionInfoTests: XCTestCase {
+    func testVersionLineComesFromTheBundleAtRuntime() {
+        let marketing = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+        let line = AppVersionInfo.display()
+        XCTAssertFalse(marketing.isEmpty)
+        XCTAssertTrue(line.hasPrefix("Version \(marketing)"), line)
+        if !build.isEmpty, build != marketing {
+            XCTAssertTrue(line.hasSuffix("(\(build))"), line)
+        }
+    }
+}
+
 // MARK: - Reports logic
 
 final class ReportsLogicTests: XCTestCase {

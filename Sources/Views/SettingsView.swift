@@ -27,6 +27,7 @@ struct SettingsView: View {
     @State private var restoreStatusMessage: String?
     @State private var restorableProfiles: [DiscoveredProfile] = []
     @State private var showRestoreSheet = false
+    @State private var route: SettingsRoute?
     /// Backs the "Share anonymous usage data" toggle. Stores whether the user opted OUT (default
     /// `false`, i.e. shared/opted-in by default) directly against `Analytics.optOutKey` so this
     /// view and `Analytics` always read the same UserDefaults value.
@@ -56,15 +57,18 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section {
-                    BPScreenTitle(text: "Settings")
-                        .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 4, trailing: 20))
+                    VStack(alignment: .leading, spacing: 4) {
+                        BPBackToTodayButton()
+                        BPScreenTitle(text: "Settings")
+                    }
+                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 4, trailing: 20))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 }
 
                 profileSection
                 planSection
-                AutoCaptureSettingsSection()
+                AutoCaptureSettingsSection(onOpenMuted: { route = .muted })
                 taxSection
                 recordsSection
                 appSection
@@ -75,9 +79,11 @@ struct SettingsView: View {
                 Section {
                     VStack(alignment: .leading, spacing: 12) {
                         NotTaxAdviceNote()
-                        Text("LandlordHours v\(Self.appVersion)")
+                        Text("LandlordHours · \(AppVersionInfo.display())")
                             .font(.footnote)
+                            .monospacedDigit()
                             .foregroundStyle(colors.textSecondary)
+                            .accessibilityIdentifier("settings.version")
                     }
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
@@ -95,6 +101,14 @@ struct SettingsView: View {
             .contentMargins(.bottom, 104, for: .scrollContent)
             .background { LHMobileCanvas() }
             .navigationBarHidden(true)
+            .navigationDestination(item: $route) { route in
+                switch route {
+                case .taxProfile: TaxProfileView()
+                case .learningCenter: LearningCenterView()
+                case .contactSupport: ContactSupportView()
+                case .muted: MutedSuggestionsView()
+                }
+            }
             .alert("Restore Purchase", isPresented: Binding(
                 get: { restoreStatusMessage != nil },
                 set: { if !$0 { restoreStatusMessage = nil } }
@@ -262,18 +276,20 @@ struct SettingsView: View {
 
     private var taxSection: some View {
         Section {
-            NavigationLink {
-                TaxProfileView()
+            Button {
+                route = .taxProfile
             } label: {
-                SettingRow(symbol: "doc.text", title: "Tax profile", subtitle: "Filing, goal, spouse hours, the 50% rule")
+                SettingRow(symbol: "doc.text", title: "Tax profile", subtitle: "Filing, goal, spouse hours, the 50% rule", showsChevron: true)
             }
+            .buttonStyle(.plain)
             .accessibilityIdentifier("settings.taxProfile")
 
-            NavigationLink {
-                LearningCenterView()
+            Button {
+                route = .learningCenter
             } label: {
-                SettingRow(symbol: "book", title: "Learning center", subtitle: "REPS, rentals and records, in plain words")
+                SettingRow(symbol: "book", title: "Learning center", subtitle: "REPS, rentals and records, in plain words", showsChevron: true)
             }
+            .buttonStyle(.plain)
             .accessibilityIdentifier("settings.learningCenter")
         } header: {
             BPSectionHeader(title: "Tax setup")
@@ -404,11 +420,12 @@ struct SettingsView: View {
 
     private var supportSection: some View {
         Section {
-            NavigationLink {
-                ContactSupportView()
+            Button {
+                route = .contactSupport
             } label: {
-                SettingRow(symbol: "envelope", title: "Contact support", subtitle: "Questions about tracking, exports or setup")
+                SettingRow(symbol: "envelope", title: "Contact support", subtitle: "Questions about tracking, exports or setup", showsChevron: true)
             }
+            .buttonStyle(.plain)
             .accessibilityIdentifier("settings.contactSupport")
         } header: {
             BPSectionHeader(title: "Support")
@@ -417,10 +434,6 @@ struct SettingsView: View {
     }
 
     // MARK: Helpers
-
-    private static var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
-    }
 
     private var syncNeedsAttention: Bool {
         !viewModel.syncService.isSyncing && !viewModel.syncService.isRunningInitialSync
@@ -525,7 +538,14 @@ struct ProfileAvatar: View {
 
 /// What the app may read and when it may ask. Both switches start off; turning the calendar on
 /// asks for access, turning prompts on asks for notification permission. Mutes live one level in.
+/// Settings' pushed screens. Buttons + one destination (not NavigationLinks in the List), so
+/// each row is a plain button for VoiceOver and UI tests, with its own chevron.
+enum SettingsRoute: Hashable {
+    case taxProfile, learningCenter, contactSupport, muted
+}
+
 private struct AutoCaptureSettingsSection: View {
+    var onOpenMuted: () -> Void = {}
     @EnvironmentObject private var viewModel: AppViewModel
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
@@ -559,16 +579,16 @@ private struct AutoCaptureSettingsSection: View {
             .disabled(!calendarOn || isAsking)
             .accessibilityIdentifier("settings.capture.prompts")
 
-            NavigationLink {
-                MutedSuggestionsView()
-            } label: {
+            Button(action: onOpenMuted) {
                 SettingRow(
                     symbol: "speaker.slash",
                     title: "Muted",
                     subtitle: "Things you asked us to stop suggesting",
-                    value: muteCount == 0 ? "None" : "\(muteCount)"
+                    value: muteCount == 0 ? "None" : "\(muteCount)",
+                    showsChevron: true
                 )
             }
+            .buttonStyle(.plain)
             .accessibilityIdentifier("settings.capture.muted")
 
             if let blockedMessage {

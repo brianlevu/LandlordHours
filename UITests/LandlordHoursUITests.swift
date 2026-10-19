@@ -141,8 +141,12 @@ final class LandlordHoursUITests: XCTestCase {
         launch(scenario: "frequent", tab: 4)
 
         assertVisibleText("Settings", timeout: 12)
+        // Settings is a lazy List: rows below the fold exist only once scrolled to.
         let taxProfile = app.buttons["settings.taxProfile"]
-        XCTAssertTrue(taxProfile.waitForExistence(timeout: 5))
+        _ = app.buttons["settings.proCard"].waitForExistence(timeout: 5)
+        scrollToElement(taxProfile)
+        let tabBar = app.buttons["tab.today"]
+        if tabBar.exists, taxProfile.frame.maxY > tabBar.frame.minY - 8 { app.swipeUp() }
         taxProfile.tap()
 
         XCTAssertTrue(app.staticTexts["Tax profile"].waitForExistence(timeout: 5))

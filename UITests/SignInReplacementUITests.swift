@@ -41,9 +41,12 @@ final class SignInReplacementUITests: XCTestCase {
 
         let restoreRow = app.buttons["settings.restoreOtherData"]
         XCTAssertTrue(restoreRow.waitForExistence(timeout: 8))
-        restoreRow.tap()
-
         let profileB = app.buttons["restore.profile.email-old.profile@example.com"]
+        // The launch splash fades over ~1s and can swallow the first tap.
+        for _ in 0..<5 where !profileB.exists {
+            if restoreRow.isHittable { restoreRow.tap() }
+            _ = profileB.waitForExistence(timeout: 3)
+        }
         XCTAssertTrue(profileB.waitForExistence(timeout: 5))
         profileB.tap()
 
@@ -53,7 +56,9 @@ final class SignInReplacementUITests: XCTestCase {
 
         // The sheet closes and Settings now shows profile B's identity.
         XCTAssertTrue(profileB.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["old.profile@example.com"].waitForExistence(timeout: 5))
+        // Settings' profile row is one button; its label carries the email.
+        let identity = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "old.profile@example.com")).firstMatch
+        XCTAssertTrue(identity.waitForExistence(timeout: 5))
         settle()
 
         let propertiesTab = app.buttons["tab.properties"].firstMatch

@@ -71,6 +71,16 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         XCTAssertTrue(element("settings.muted.screen").waitForExistence(timeout: 5))
     }
 
+    func testReportsAndSettingsLeadBackToToday() {
+        for tab in [3, 4] {
+            launch(tab: tab)
+            let back = app.buttons["shell.backToToday"].firstMatch
+            XCTAssertTrue(back.waitForExistence(timeout: 20))
+            XCTAssertTrue(app.buttons["tab.today"].isSelected, "Reports and Settings sit under Today")
+            tapRetrying(back, until: element("today.hero"))
+        }
+    }
+
     // MARK: Frames
 
     func testCaptureWPRFramesLight() { captureAll(scheme: "light") }

@@ -172,6 +172,8 @@ struct ReportsView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 14) {
+            BPBackToTodayButton()
+                .padding(.bottom, -10)
             (dynamicTypeSize.isAccessibilitySize
                 ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
                 : AnyLayout(HStackLayout(alignment: .firstTextBaseline))) {

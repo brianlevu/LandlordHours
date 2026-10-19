@@ -184,6 +184,34 @@ struct TimeEntryDetailView: View {
 
     @ViewBuilder
     private var readSections: some View {
+        // Photos first: they are the evidence, and the List only builds rows on screen.
+        if !entry.attachments.isEmpty {
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Attachments (\(entry.attachments.count))")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(colors.textSecondary)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(entry.attachments) { attachment in
+                                if let bytes = attachment.data, let uiImage = UIImage(data: bytes) {
+                                    Image(uiImage: uiImage)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 72, height: 72)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                        .accessibilityLabel("Attached photo")
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 6)
+                .accessibilityIdentifier("entry.attachments")
+            }
+            .listRowBackground(colors.backgroundSecondary)
+        }
+
         Section {
             factRow("Property", value: propertyName)
             factRow("Who", value: participant == .spouse ? "Spouse" : "Me")
@@ -205,33 +233,6 @@ struct TimeEntryDetailView: View {
                     .textSelection(.enabled)
             } header: {
                 BPSectionHeader(title: "Notes")
-            }
-            .listRowBackground(colors.backgroundSecondary)
-        }
-
-        if !entry.attachments.isEmpty {
-            Section {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(entry.attachments) { attachment in
-                            if let bytes = attachment.data, let uiImage = UIImage(data: bytes) {
-                                Image(uiImage: uiImage)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 72, height: 72)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                    .accessibilityLabel("Attached photo")
-                            }
-                        }
-                    }
-                    .padding(.vertical, 6)
-                }
-            } header: {
-                Text("Attachments (\(entry.attachments.count))")
-                    .font(.footnote.weight(.semibold))
-                    .textCase(.uppercase)
-                    .tracking(0.3)
-                    .foregroundStyle(colors.textSecondary)
             }
             .listRowBackground(colors.backgroundSecondary)
         }
