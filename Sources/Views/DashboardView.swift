@@ -103,7 +103,9 @@ struct DashboardView: View {
     }
 
     @State private var showPaywall = false
-    @State private var isReady = false
+    // The header line follows the hero: it keeps the pre-save total until the count-up lands.
+    @State private var subtitleHoursOverride: Double?
+    private var headerHours: Double { subtitleHoursOverride ?? totalHours }
     @State private var showLearningCenter = Self.shouldOpenLearningCenterFromLaunchArguments
     @State private var showHistory = false
     @State private var scrollOffset: CGFloat = 0
@@ -128,53 +130,45 @@ struct DashboardView: View {
             ZStack {
                 LHMobileCanvas()
 
-                if isReady {
-                    ScrollView(showsIndicators: false) {
-                        GeometryReader { proxy in
-                            Color.clear
-                                .preference(
-                                    key: DashboardScrollOffsetPreferenceKey.self,
-                                    value: proxy.frame(in: .named("dashboardScroll")).minY
-                                )
-                        }
-                        .frame(height: 0)
+                ScrollView(showsIndicators: false) {
+                    GeometryReader { proxy in
+                        Color.clear
+                            .preference(
+                                key: DashboardScrollOffsetPreferenceKey.self,
+                                value: proxy.frame(in: .named("dashboardScroll")).minY
+                            )
+                    }
+                    .frame(height: 0)
 
-                        VStack(spacing: 22) {
-                            headerSection
-                            // The house leads Today in every state (approved r6 concept); a new
-                            // owner's setup steps sit right under the empty lot.
-                            houseHero
-                            if shouldShowActivationCard {
-                                homeActivationCard
-                            } else {
-                                learningShortcutCard
-                            }
-                            recentEntriesSection
-                            thisWeekCard
-                            trialStatusNudge
+                    VStack(spacing: 22) {
+                        headerSection
+                        // The house leads Today in every state (approved r6 concept); a new
+                        // owner's setup steps sit right under the empty lot.
+                        houseHero
+                        if shouldShowActivationCard {
+                            homeActivationCard
+                        } else {
+                            learningShortcutCard
                         }
-                        .padding(.horizontal, 24)
-                        .padding(.top, 8)
-                        .padding(.bottom, AppSpacing.tabContentBottomInset)
+                        recentEntriesSection
+                        thisWeekCard
+                        trialStatusNudge
                     }
-                    .coordinateSpace(name: "dashboardScroll")
-                    .onPreferenceChange(DashboardScrollOffsetPreferenceKey.self) { value in
-                        scrollOffset = value
+                    .padding(.horizontal, 24)
+                    .padding(.top, 8)
+                    .padding(.bottom, AppSpacing.tabContentBottomInset)
+                }
+                .coordinateSpace(name: "dashboardScroll")
+                .onPreferenceChange(DashboardScrollOffsetPreferenceKey.self) { value in
+                    scrollOffset = value
+                }
+                .overlay(alignment: .top) {
+                    if isCompactHeaderVisible {
+                        compactDashboardBar
+                            .padding(.horizontal, 24)
+                            .padding(.top, 8)
+                            .transition(.move(edge: .top).combined(with: .opacity))
                     }
-                    .overlay(alignment: .top) {
-                        if isCompactHeaderVisible {
-                            compactDashboardBar
-                                .padding(.horizontal, 24)
-                                .padding(.top, 8)
-                                .transition(.move(edge: .top).combined(with: .opacity))
-                        }
-                    }
-                    .transition(.opacity)
-                } else {
-                    ScrollView(showsIndicators: false) {
-                        DashboardSkeleton()
-                    }
-                    .transition(.opacity)
                 }
             }
             .navigationBarHidden(true)
@@ -193,18 +187,11 @@ struct DashboardView: View {
                 // house at the pre-save height, then build up to the new one once it is on screen.
                 if let confirm = houseEvents.pendingConfirm {
                     heroHoursOverride = confirm.oldHours
+                    subtitleHoursOverride = confirm.oldHours
                 }
-                // Brief skeleton then reveal — lets SwiftUI layout settle
-                if !isReady {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                        animate(.easeOut(duration: 0.35)) {
-                            isReady = true
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + Self.confirmStartDelay) {
-                            playPendingHouseWork()
-                        }
-                    }
-                } else {
+                // Today renders its real content at once (records are local), so there is no
+                // loading skeleton; the build starts once the card has been seen.
+                DispatchQueue.main.asyncAfter(deadline: .now() + Self.confirmStartDelay) {
                     playPendingHouseWork()
                 }
             }
@@ -212,15 +199,15 @@ struct DashboardView: View {
             // Live: a save while Today is on screen. The hero builds from the live hours change
             // itself; consume the event so it does not replay on the next appear.
             .onChange(of: houseEvents.pendingConfirm) { _, confirm in
-                guard confirm != nil, isVisible, isReady, heroHoursOverride == nil else { return }
+                guard confirm != nil, isVisible, heroHoursOverride == nil else { return }
                 houseEvents.takeConfirm()
             }
             .onChange(of: houseEvents.celebrationTick) { _, _ in
-                guard isVisible, isReady else { return }
+                guard isVisible else { return }
                 schedulePendingCelebration()
             }
             .onChange(of: houseEvents.pendingBackfill) { _, reveal in
-                guard reveal != nil, isVisible, isReady else { return }
+                guard reveal != nil, isVisible else { return }
                 presentBackfillIfNeeded()
             }
             .fullScreenCover(item: $shownCelebration, onDismiss: {
@@ -252,10 +239,12 @@ struct DashboardView: View {
 
     // MARK: - House events
 
-    /// Wait after the skeleton reveal before the beam flies, so the eye is on the card.
+    /// Wait after Today appears before the beam flies, so the eye is on the card.
     private static let confirmStartDelay: Double = 0.45
     /// The confirm build (beam, board, crossfade) settles within this; celebrations follow it.
     private static let confirmSettle: Double = 2.2
+    /// When the hero's count-up has landed: beam flight, then the whole-hour steps.
+    private static var countUpLands: Double { HouseMotion.beamFlight + 0.04 + HouseMotion.countUpMax + 0.05 }
 
     private func playPendingHouseWork() {
         guard isVisible else { return }
@@ -263,6 +252,12 @@ struct DashboardView: View {
         // The hero sees its hours change from the pre-save value and plays the build; it reports
         // the celebration when the build settles (at once under Reduce Motion).
         heroHoursOverride = nil
+        // The header total changes when the hero's number lands, not before it.
+        if subtitleHoursOverride != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + (reduceMotion ? 0 : Self.countUpLands)) {
+                subtitleHoursOverride = nil
+            }
+        }
         if hadConfirm {
             schedulePendingCelebration()
         } else {
@@ -461,12 +456,12 @@ struct DashboardView: View {
         if viewModel.timeEntries.isEmpty {
             return "\(viewModel.properties.count) property ready. Capture the first activity while details are fresh."
         }
-        return "\(AppFormat.hours(totalHours)) counted toward \(Int(targetHours)) hours this year."
+        return "\(AppFormat.hours(headerHours)) counted toward \(Int(targetHours)) hours this year."
     }
 
     private var compactHeaderTitle: String {
         if shouldShowActivationCard { return "Finish setup" }
-        return "\(AppFormat.hours(totalHours)) logged"
+        return "\(AppFormat.hours(headerHours)) logged"
     }
 
     private var compactHeaderSubtitle: String {

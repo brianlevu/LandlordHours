@@ -97,6 +97,21 @@ final class TodayHouseUITests: XCTestCase {
         attach("today-751h")
     }
 
+    func testScrolledToBottomTheLastCardClearsTheTabBar() {
+        for scheme in ["light", "dark"] {
+            launch(hours: "212", extra: ["-LHColorScheme", scheme])
+            XCTAssertTrue(hero.waitForExistence(timeout: 20))
+            for _ in 0..<6 { app.swipeUp() }
+            let lastCard = app.buttons["dashboard.unlockPro"]
+            XCTAssertTrue(lastCard.waitForExistence(timeout: 5))
+            let bar = app.buttons["tab.logTime"]
+            XCTAssertTrue(bar.exists)
+            XCTAssertLessThanOrEqual(lastCard.frame.maxY, bar.frame.minY - 8,
+                                     "The last card rests fully above the floating tab bar (\(scheme))")
+            attach("today-scrolled-bottom-\(scheme)")
+        }
+    }
+
     func testLoggingTwoHoursViaPlusBuildsTheHouseOnReturn() {
         launch(hours: "212")
         XCTAssertTrue(hero.waitForExistence(timeout: 20))
@@ -118,6 +133,8 @@ final class TodayHouseUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Time logged"].waitForExistence(timeout: 6))
 
         app.buttons["tab.today"].tap()
+        // No loading skeleton: the real hero is there at once, building from 212.
+        XCTAssertTrue(hero.waitForExistence(timeout: 1.5), "Today renders its hero without a skeleton")
         XCTAssertTrue(waitForHeroLabel(containing: "214 of 750 hours"), hero.label)
         // Let the confirm build (beam, count-up, crossfade) play out before the frame, so the
         // attachment (and any screen recording of this test) shows the settled 214.
