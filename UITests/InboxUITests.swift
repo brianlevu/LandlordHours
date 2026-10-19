@@ -219,8 +219,15 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(settle(sam))
         sam.tap()
         XCTAssertTrue(app.descendants(matching: .any)["confirm.notSure"].waitForExistence(timeout: 5))
+        // The mute link scrolls under the pinned Log / Not landlord work bar: bring it clear first.
         let mute = app.buttons["confirm.mute"]
-        if !mute.isHittable { app.swipeUp() }
+        let pinnedTop = app.buttons["confirm.log"].frame.minY
+        var swipes = 0
+        while (!mute.exists || mute.frame.maxY > pinnedTop - 8), swipes < 4 {
+            app.descendants(matching: .any)["confirm.sheet"].swipeUp()
+            swipes += 1
+        }
+        XCTAssertLessThan(mute.frame.maxY, pinnedTop, "Mute link is above the pinned actions")
         mute.tap()
         let option = app.buttons["Events named \u{201C}Call with Sam\u{201D}"]
         XCTAssertTrue(option.waitForExistence(timeout: 3))
