@@ -646,13 +646,12 @@ struct LearningCenterView: View {
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Learn")
-                .font(.system(size: 42, weight: .black, design: .rounded))
+                .lhDisplayFont(.largeTitle)
                 .foregroundStyle(colors.textPrimary)
-                .lineSpacing(-2)
-                .minimumScaleFactor(0.82)
+                .accessibilityAddTraits(.isHeader)
 
             Text("Plain-English tax guidance, recordkeeping tips, and property management playbooks.")
-                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .font(.subheadline)
                 .foregroundStyle(colors.textSecondary)
                 .lineLimit(3)
         }
@@ -663,10 +662,10 @@ struct LearningCenterView: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Start with the core path")
-                    .font(.system(size: 19, weight: .bold, design: .rounded))
+                    .font(.title3.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
                 Text("Three reads that explain what to track, why it matters, and where STR/LTR rules differ.")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(.caption)
                     .foregroundStyle(colors.textSecondary)
                     .lineLimit(2)
             }
@@ -690,7 +689,7 @@ struct LearningCenterView: View {
                     HStack(spacing: 7) {
                         LucideIcon(image: Lucide.fileText, size: 14)
                         Text("Build audit-ready records")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(.caption.weight(.semibold))
                     }
                     .foregroundStyle(AppColors.onAction)
                     .padding(.horizontal, 10)
@@ -768,7 +767,7 @@ struct LearningCenterView: View {
                         }
 
                     Text("\(number)")
-                        .font(.system(size: 9, weight: .black, design: .rounded))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(AppColors.onAction)
                         .frame(width: 17, height: 17)
                         .background(color)
@@ -778,10 +777,10 @@ struct LearningCenterView: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(colors.textPrimary)
                         Text(subtitle)
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .font(.caption)
                             .foregroundStyle(colors.textSecondary)
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
@@ -808,7 +807,7 @@ struct LearningCenterView: View {
                         animate(AppAnimation.quick) { selectedFilter = filter }
                     } label: {
                         Text(filter)
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .font(.footnote.weight(.semibold))
                             .foregroundStyle(selectedFilter == filter ? AppColors.charcoal : colors.textSecondary)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 9)
@@ -843,10 +842,10 @@ struct LearningCenterView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(section.name)
-                        .font(.system(size: 19, weight: .bold, design: .rounded))
+                        .font(.title3.weight(.semibold))
                         .foregroundStyle(colors.textPrimary)
                     Text(articleSectionSubtitle(section.name))
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(.caption)
                         .foregroundStyle(colors.textSecondary)
                         .lineLimit(2)
                 }
@@ -876,18 +875,18 @@ struct LearningCenterView: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(article.category)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(article.categoryColor)
 
                 Text(article.title)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
                     .lineSpacing(2)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
                 Text(article.description)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(.caption)
                     .foregroundStyle(colors.textSecondary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
@@ -896,7 +895,7 @@ struct LearningCenterView: View {
                     LucideIcon(image: Lucide.clock, size: 10)
                         .foregroundStyle(colors.textTertiary)
                     Text(article.readTime)
-                        .font(.system(size: 11, design: .rounded))
+                        .font(.caption2)
                         .foregroundStyle(colors.textTertiary)
                 }
             }
@@ -948,10 +947,10 @@ struct LearningCenterView: View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Guided courses")
-                    .font(.system(size: 19, weight: .bold, design: .rounded))
+                    .font(.title3.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
                 Text("Longer walkthroughs when you want a complete plan.")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(.caption)
                     .foregroundStyle(colors.textSecondary)
             }
 
@@ -986,19 +985,19 @@ struct LearningCenterView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(guide.title)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
                 Text(guide.description)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(.caption)
                     .foregroundStyle(colors.textSecondary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
                 Text("\(guide.lessons.count) lessons · \(guide.totalTime)")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(.caption2)
                     .foregroundStyle(colors.textTertiary)
             }
 
@@ -1021,10 +1020,10 @@ struct LearningCenterView: View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Quick answers")
-                    .font(.system(size: 19, weight: .bold, design: .rounded))
+                    .font(.title3.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
                 Text("Short reference notes for common recordkeeping questions.")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(.caption)
                     .foregroundStyle(colors.textSecondary)
             }
 
@@ -1051,10 +1050,10 @@ struct LearningCenterView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
                 Text(item.readTime + " read")
-                    .font(.system(size: 11))
+                    .font(.caption2)
                     .foregroundStyle(colors.textTertiary)
             }
 
@@ -1100,7 +1099,7 @@ struct ArticleDetailView: View {
                 // Header
                 VStack(alignment: .leading, spacing: 10) {
                     Text(article.category)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(article.categoryColor)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
@@ -1108,7 +1107,7 @@ struct ArticleDetailView: View {
                         .clipShape(Capsule())
 
                     Text(article.title)
-                        .font(.system(size: 26, weight: .regular, design: .serif))
+                        .font(.title2.weight(.semibold))
                         .foregroundStyle(colors.textPrimary)
                         .lineSpacing(2)
 
@@ -1116,7 +1115,7 @@ struct ArticleDetailView: View {
                         LucideIcon(image: Lucide.clock, size: 12)
                             .foregroundStyle(colors.textTertiary)
                         Text(article.readTime + " read")
-                            .font(.system(size: 12))
+                            .font(.caption)
                             .foregroundStyle(colors.textTertiary)
                     }
                 }
@@ -1140,7 +1139,7 @@ struct ArticleDetailView: View {
                         HStack(spacing: 7) {
                             LucideIcon(image: article.iconImage, size: 15)
                             Text(article.section)
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .font(.caption.weight(.semibold))
                         }
                         .foregroundStyle(AppColors.onAction)
                         .padding(.horizontal, 10)
@@ -1158,18 +1157,18 @@ struct ArticleDetailView: View {
                     ForEach(article.content) { section in
                         VStack(alignment: .leading, spacing: 10) {
                             Text(section.heading)
-                                .font(.system(size: 17, weight: .bold, design: .rounded))
+                                .font(.headline.weight(.semibold))
                                 .foregroundStyle(colors.textPrimary)
 
                             Text(section.body)
-                                .font(.system(size: 14, weight: .regular, design: .rounded))
+                                .font(.subheadline)
                                 .foregroundStyle(colors.textSecondary)
                                 .lineSpacing(6)
 
                             if let callout = section.callout {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(callout)
-                                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                                        .font(.footnote)
                                         .foregroundStyle(colors.textPrimary)
                                         .lineSpacing(4)
                                 }
@@ -1198,14 +1197,14 @@ struct ArticleDetailView: View {
     private var articleQuickMapCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Quick map")
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(colors.textPrimary)
 
             VStack(spacing: 10) {
                 ForEach(Array(articleQuickMap(article).enumerated()), id: \.offset) { index, item in
                     HStack(spacing: 12) {
                         Text("\(index + 1)")
-                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(article.categoryColor)
                             .frame(width: 26, height: 26)
                             .background(article.categoryWash.opacity(colorScheme == .dark ? 0.22 : 1))
@@ -1219,10 +1218,10 @@ struct ArticleDetailView: View {
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.1)
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .font(.footnote.weight(.semibold))
                                 .foregroundStyle(colors.textPrimary)
                             Text(item.2)
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .font(.caption)
                                 .foregroundStyle(colors.textSecondary)
                                 .lineLimit(2)
                         }
@@ -1244,7 +1243,7 @@ struct ArticleDetailView: View {
     private var relatedArticlesSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Related Articles")
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(colors.textPrimary)
 
             ForEach(article.relatedIds, id: \.self) { relatedId in
@@ -1254,11 +1253,11 @@ struct ArticleDetailView: View {
                     } label: {
                         HStack {
                             Text(related.title)
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.footnote.weight(.semibold))
                                 .foregroundStyle(colors.textPrimary)
                             Spacer()
                             Text(related.readTime)
-                                .font(.system(size: 11))
+                                .font(.caption2)
                                 .foregroundStyle(colors.textTertiary)
                         }
                         .padding(.horizontal, 16)
@@ -1300,7 +1299,7 @@ struct GuideDetailView: View {
                     guide.gradient.first?.opacity(0.16) ?? colors.primarySurface
 
                     Text("\(guide.lessons.count) lessons · \(guide.totalTime)")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(.footnote.weight(.semibold))
                         .foregroundStyle(colors.textSecondary)
                         .padding(20)
                 }
@@ -1309,12 +1308,12 @@ struct GuideDetailView: View {
                 // Body
                 VStack(alignment: .leading, spacing: 0) {
                     Text(guide.title)
-                        .font(.system(size: 26, weight: .regular, design: .serif))
+                        .font(.title2.weight(.semibold))
                         .foregroundStyle(colors.textPrimary)
                         .lineSpacing(2)
 
                     Text(guide.category)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(guide.gradient.first ?? AppColors.primary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
@@ -1323,7 +1322,7 @@ struct GuideDetailView: View {
                         .padding(.top, 8)
 
                     Text(guide.description)
-                        .font(.system(size: 13))
+                        .font(.footnote)
                         .foregroundStyle(colors.textSecondary)
                         .lineSpacing(4)
                         .padding(.top, 12)
@@ -1335,7 +1334,7 @@ struct GuideDetailView: View {
                         }
                     } label: {
                         Text("Start Guide")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.callout.weight(.semibold))
                             .foregroundStyle(AppColors.onAction)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
@@ -1347,7 +1346,7 @@ struct GuideDetailView: View {
 
                     // Lessons list
                     Text("Lessons")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(colors.textPrimary)
                         .padding(.top, 28)
 
@@ -1363,10 +1362,10 @@ struct GuideDetailView: View {
                     // Source card
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Created with IRS guidance")
-                            .font(.system(size: 12))
+                            .font(.caption)
                             .foregroundStyle(colors.textSecondary)
                         Text(guide.source)
-                            .font(.system(size: 10))
+                            .font(.caption2)
                             .foregroundStyle(colors.textTertiary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1416,7 +1415,7 @@ struct GuideDetailView: View {
                         .frame(width: 30, height: 30)
                         .overlay(
                             Text("\(lesson.id)")
-                                .font(.system(size: 12, weight: .bold))
+                                .font(.caption.weight(.semibold))
                                 .foregroundStyle(AppColors.onAction)
                         )
                 } else {
@@ -1425,7 +1424,7 @@ struct GuideDetailView: View {
                         .frame(width: 30, height: 30)
                         .overlay(
                             Text("\(lesson.id)")
-                                .font(.system(size: 12, weight: .bold))
+                                .font(.caption.weight(.semibold))
                                 .foregroundStyle(colors.textTertiary)
                         )
                 }
@@ -1433,12 +1432,12 @@ struct GuideDetailView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(lesson.title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 Text(lesson.duration)
-                    .font(.system(size: 11))
+                    .font(.caption2)
                     .foregroundStyle(colors.textTertiary)
             }
 
@@ -1474,7 +1473,7 @@ struct LessonDetailView: View {
                 // Header
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Lesson \(lesson.id) of \(guide.lessons.count)")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle((guide.gradient.first ?? AppColors.primary))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
@@ -1482,7 +1481,7 @@ struct LessonDetailView: View {
                         .clipShape(Capsule())
 
                     Text(lesson.title)
-                        .font(.system(size: 26, weight: .regular, design: .serif))
+                        .font(.title2.weight(.semibold))
                         .foregroundStyle(colors.textPrimary)
                         .lineSpacing(2)
 
@@ -1490,7 +1489,7 @@ struct LessonDetailView: View {
                         LucideIcon(image: Lucide.clock, size: 12)
                             .foregroundStyle(colors.textTertiary)
                         Text(lesson.duration + " read")
-                            .font(.system(size: 12))
+                            .font(.caption)
                             .foregroundStyle(colors.textTertiary)
                     }
                 }
@@ -1513,19 +1512,19 @@ struct LessonDetailView: View {
                                     .fill(guide.gradient.first ?? AppColors.primary)
                                     .frame(width: 3, height: 20)
                                 Text(section.heading)
-                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .font(.callout.weight(.semibold))
                                     .foregroundStyle(colors.textPrimary)
                             }
 
                             Text(section.body)
-                                .font(.system(size: 13))
+                                .font(.footnote)
                                 .foregroundStyle(colors.textSecondary)
                                 .lineSpacing(6)
 
                             if let callout = section.callout {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(callout)
-                                        .font(.system(size: 12))
+                                        .font(.caption)
                                         .foregroundStyle(colors.textPrimary)
                                         .lineSpacing(4)
                                 }
@@ -1547,7 +1546,7 @@ struct LessonDetailView: View {
                                 LucideIcon(image: Lucide.circleCheck, size: 18)
                                 Text("Mark as Complete")
                             }
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.callout.weight(.semibold))
                             .foregroundStyle(AppColors.onAction)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
@@ -1589,14 +1588,14 @@ struct QuickReadDetailView: View {
                         )
 
                     Text(quickRead.title)
-                        .font(.system(size: 26, weight: .regular, design: .serif))
+                        .font(.title2.weight(.semibold))
                         .foregroundStyle(colors.textPrimary)
 
                     HStack(spacing: 8) {
                         LucideIcon(image: Lucide.clock, size: 12)
                             .foregroundStyle(colors.textTertiary)
                         Text(quickRead.readTime + " read")
-                            .font(.system(size: 12))
+                            .font(.caption)
                             .foregroundStyle(colors.textTertiary)
                     }
                 }
@@ -1618,19 +1617,19 @@ struct QuickReadDetailView: View {
                                     .fill(quickRead.iconColor)
                                     .frame(width: 3, height: 20)
                                 Text(section.heading)
-                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .font(.callout.weight(.semibold))
                                     .foregroundStyle(colors.textPrimary)
                             }
 
                             Text(section.body)
-                                .font(.system(size: 13))
+                                .font(.footnote)
                                 .foregroundStyle(colors.textSecondary)
                                 .lineSpacing(6)
 
                             if let callout = section.callout {
                                 VStack(alignment: .leading) {
                                     Text(callout)
-                                        .font(.system(size: 12))
+                                        .font(.caption)
                                         .foregroundStyle(colors.textPrimary)
                                         .lineSpacing(4)
                                 }

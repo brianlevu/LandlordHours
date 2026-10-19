@@ -1,220 +1,456 @@
 import SwiftUI
-import LucideIcons
 
+/// Records: every confirmed hour, newest first, grouped by month (Mercury's restraint, Remote's
+/// rows). The tab root, and also pushed from Today's "See all". docs/design/2.0-hifi-reference-spec.md §g.
 struct HistoryView: View {
-    @EnvironmentObject var viewModel: AppViewModel
-    @Environment(\.colorScheme) var colorScheme
+    /// True when pushed onto another NavigationStack (Today's "See all"); the tab root owns its own.
+    @Environment(\.isPresented) private var isPushed
+
+    var body: some View {
+        if isPushed {
+            RecordsScreen(showsBackButton: true)
+        } else {
+            NavigationStack {
+                RecordsScreen(showsBackButton: false)
+            }
+        }
+    }
+}
+
+private struct RecordsScreen: View {
+    let showsBackButton: Bool
+
+    @EnvironmentObject private var viewModel: AppViewModel
+    @ObservedObject private var taxProfile = TaxProfileManager.shared
+    @ObservedObject private var goalManager = GoalManager.shared
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dismiss) private var dismiss
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
-    @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
-    @State private var selectedParticipant: Participant?
-    @State private var selectedProperty: RentalProperty?
+    @State private var filter = RecordsFilter(year: Calendar.current.component(.year, from: Date()))
     @State private var entryToDelete: TimeEntry?
-    @State private var showingDeleteConfirmation = false
-    @State private var filterImportedOnly = false
+    @State private var showExport = false
+    @State private var showPaywall = false
+    @FocusState private var searchFocused: Bool
 
-    var filteredEntries: [TimeEntry] {
-        var entries = viewModel.entriesForYear(selectedYear)
-        if let participant = selectedParticipant {
-            entries = entries.filter { $0.participant == participant }
-        }
-        if let property = selectedProperty {
-            entries = entries.filter { $0.propertyId == property.id }
-        }
-        if filterImportedOnly {
-            entries = entries.filter { $0.isCalendarImport }
-        }
-        return entries.sorted { $0.date > $1.date }
+    private var propertyNames: [UUID: String] {
+        Dictionary(viewModel.properties.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
     }
 
-    var totalREPSHours: Double {
-        filteredEntries.filter { $0.countsForREPS }.reduce(0) { $0 + $1.hours }
+    private var entries: [TimeEntry] {
+        let names = propertyNames
+        return RecordsLogic.filtered(viewModel.timeEntries, filter: filter, propertyName: { names[$0] })
     }
 
-    var totalNonREPSHours: Double {
-        filteredEntries.filter { !$0.countsForREPS }.reduce(0) { $0 + $1.hours }
+    private var sections: [RecordsMonthSection] { RecordsLogic.monthSections(entries) }
+    private var totalHours: Double { entries.reduce(0) { $0 + $1.hours } }
+
+    private var showsWhoFilter: Bool {
+        taxProfile.spouseTracking || viewModel.timeEntries.contains { $0.participant == .spouse }
+    }
+
+    private var yearHasEntries: Bool {
+        viewModel.timeEntries.contains { Calendar.current.component(.year, from: $0.date) == filter.year }
     }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Filter chips
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        Menu {
-                            ForEach((2020...2030), id: \.self) { year in
-                                Button(String(year)) { selectedYear = year }
-                            }
-                        } label: {
-                            filterChip(text: String(selectedYear), icon: Lucide.calendar, isActive: true)
-                        }
+        List {
+            Section {
+                header
+                    .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 0, trailing: 20))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                searchField
+                    .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 0, trailing: 16))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                chips
+                    .listRowInsets(EdgeInsets(top: 10, leading: 0, bottom: 4, trailing: 0))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+            }
 
-                        Menu {
-                            Button("All People") { selectedParticipant = nil }
-                            ForEach(Participant.allCases, id: \.self) { p in
-                                Button(p.rawValue) { selectedParticipant = p }
-                            }
-                        } label: {
-                            filterChip(
-                                text: selectedParticipant?.rawValue ?? "All People",
-                                icon: Lucide.user,
-                                isActive: selectedParticipant != nil
-                            )
-                        }
-
-                        Menu {
-                            Button("All Properties") { selectedProperty = nil }
-                            ForEach(viewModel.properties) { property in
-                                Button(property.name) { selectedProperty = property }
-                            }
-                        } label: {
-                            filterChip(
-                                text: selectedProperty?.name ?? "All Properties",
-                                icon: Lucide.house,
-                                isActive: selectedProperty != nil
-                            )
-                        }
-
-                        Button {
-                            filterImportedOnly.toggle()
-                        } label: {
-                            filterChip(
-                                text: "Imported",
-                                icon: Lucide.calendar,
-                                isActive: filterImportedOnly
-                            )
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
+            if sections.isEmpty {
+                Section {
+                    BPEmptyState(
+                        symbol: yearHasEntries ? "line.3.horizontal.decrease.circle" : "list.bullet.rectangle",
+                        title: yearHasEntries ? "Nothing matches" : "No records for \(String(filter.year))",
+                        message: yearHasEntries
+                            ? "Try another property, source or person."
+                            : "Hours you log or confirm show up here, by month."
+                    )
+                    .padding(.vertical, 40)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .accessibilityIdentifier("records.empty")
                 }
-                .background(Color.clear)
-
-                // Summary strip
-                HStack(spacing: 12) {
-                    summaryChip(label: "REPS Hours", value: String(format: "%.1fh", totalREPSHours), color: colors.positive, surface: colors.positiveSurface)
-                    summaryChip(label: "Non-REPS", value: String(format: "%.1fh", totalNonREPSHours), color: colors.caution, surface: colors.cautionSurface)
-                    summaryChip(label: "Entries", value: "\(filteredEntries.count)", color: colors.action, surface: colors.actionSurface)
+            } else {
+                Section {
+                    totalCard
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 12)
-                .background(Color.clear)
 
-                Rectangle()
-                    .fill(colors.border.opacity(0.4))
-                    .frame(height: 1)
-
-                // Entries
-                if filteredEntries.isEmpty {
-                    VStack(spacing: 16) {
-                        JellyBadge(systemName: "clock", color: AppColors.primary, wash: colors.primarySurface, size: 64)
-                        Text("No Entries")
-                            .font(AppTypography.subheadline)
-                            .foregroundStyle(colors.textPrimary)
-                        Text("No time entries match your filters")
-                            .font(AppTypography.bodySmall)
-                            .foregroundStyle(colors.textSecondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.clear)
-                } else {
-                    ScrollView(showsIndicators: false) {
-                        LazyVStack(spacing: 0) {
-                            ForEach(Array(filteredEntries.enumerated()), id: \.element.id) { index, entry in
-                                NavigationLink {
-                                    TimeEntryDetailView(entry: entry)
-                                } label: {
-                                    EntryListRow(
-                                        entry: entry,
-                                        propertyName: viewModel.properties.first { $0.id == entry.propertyId }?.name ?? "Unknown"
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                    Button(role: .destructive) {
-                                        entryToDelete = entry
-                                        showingDeleteConfirmation = true
-                                    } label: {
-                                        Label("Delete", image: "trash")
-                                    }
-                                }
-                                .contextMenu {
-                                    Button(role: .destructive) {
-                                        entryToDelete = entry
-                                        showingDeleteConfirmation = true
-                                    } label: {
-                                        Label { Text("Delete") } icon: { lucideImage(Lucide.trash2) }
-                                    }
-                                }
-                                if index < filteredEntries.count - 1 {
-                                    Divider()
-                                        .padding(.leading, 72)
-                                }
-                            }
+                ForEach(sections) { section in
+                    Section {
+                        ForEach(section.entries) { entry in
+                            row(entry)
                         }
-                        .background(colors.backgroundSecondary)
-                        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: AppCornerRadius.xl)
-                                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 16)
-                        .padding(.bottom, 20)
+                    } header: {
+                        BPSectionHeader(
+                            title: section.month.formatted(.dateTime.month(.wide).year()),
+                            trailing: BPHours.short(section.totalHours),
+                            trailingAccessibility: "\(BPHours.spoken(section.totalHours)) logged"
+                        )
+                        .accessibilityIdentifier("records.month.\(section.month.formatted(.dateTime.year().month(.twoDigits)))")
                     }
-                    .background(Color.clear)
                 }
             }
-            .background { LHMobileCanvas() }
-            .navigationTitle("Records")
-            .alert("Delete Entry?", isPresented: $showingDeleteConfirmation) {
-                Button("Cancel", role: .cancel) { entryToDelete = nil }
-                Button("Delete", role: .destructive) {
-                    if let entry = entryToDelete {
-                        viewModel.deleteTimeEntry(entry)
-                    }
-                    entryToDelete = nil
-                }
-            } message: {
-                Text("This time entry will be permanently deleted.")
+        }
+        .listStyle(.insetGrouped)
+        .listSectionSpacing(16)
+        .scrollContentBackground(.hidden)
+        .scrollDismissesKeyboard(.immediately)
+        .contentMargins(.bottom, 104, for: .scrollContent)
+        .background { LHMobileCanvas() }
+        .navigationBarHidden(!showsBackButton)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(showsBackButton ? .visible : .hidden, for: .navigationBar)
+        .alert("Delete this record?", isPresented: Binding(
+            get: { entryToDelete != nil },
+            set: { if !$0 { entryToDelete = nil } }
+        )) {
+            Button("Cancel", role: .cancel) { entryToDelete = nil }
+            Button("Delete", role: .destructive) {
+                if let entry = entryToDelete { viewModel.deleteTimeEntry(entry) }
+                entryToDelete = nil
             }
+        } message: {
+            Text("It comes off your hours and your export. This can't be undone.")
+        }
+        .sheet(isPresented: $showExport) {
+            ExportPDFView(year: filter.year)
+        }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView(
+                context: .export,
+                year: filter.year,
+                onUnlocked: { showExport = true },
+                onClose: { showPaywall = false }
+            )
+        }
+        .accessibilityIdentifier("records.screen")
+    }
+
+    // MARK: Header
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline) {
+            BPScreenTitle(text: "Records")
+            Spacer(minLength: 12)
+            Button {
+                if viewModel.canExportPDF() { showExport = true } else { showPaywall = true }
+            } label: {
+                BPCapsuleButtonLabel(title: "Export", symbol: viewModel.canExportPDF() ? nil : "lock.fill")
+            }
+            .buttonStyle(.lhPressable)
+            .accessibilityLabel(viewModel.canExportPDF() ? "Export records" : "Export records, needs Pro")
+            .accessibilityIdentifier("records.export")
         }
     }
 
-    private func filterChip(text: String, icon: UIImage, isActive: Bool) -> some View {
-        HStack(spacing: 5) {
-            LucideIcon(image: icon, size: 11)
-                .foregroundStyle(isActive ? AppColors.primary : colors.textSecondary)
-            Text(text)
-                .font(AppTypography.caption)
-                .lineLimit(1)
-            LucideIcon(image: Lucide.chevronDown, size: 10)
-                .foregroundStyle(isActive ? AppColors.primary : colors.textSecondary)
-        }
-        .foregroundStyle(isActive ? AppColors.primary : colors.textSecondary)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(isActive ? colors.primarySurface : colors.backgroundSecondary)
-        .clipShape(Capsule())
-        .overlay {
-            Capsule()
-                .strokeBorder(isActive ? colors.primary.opacity(0.35) : colors.border.opacity(0.35), lineWidth: 1)
-        }
-    }
-
-    private func summaryChip(label: String, value: String, color: Color, surface: Color) -> some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(color)
-            Text(label)
-                .font(AppTypography.label)
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
                 .foregroundStyle(colors.textSecondary)
+                .accessibilityHidden(true)
+            TextField("Search records", text: $filter.searchText)
+                .font(.body)
+                .foregroundStyle(colors.textPrimary)
+                .focused($searchFocused)
+                .submitLabel(.search)
+                .accessibilityIdentifier("records.search")
+            if !filter.searchText.isEmpty {
+                Button {
+                    filter.searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(colors.textTertiary)
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
-        .background(surface)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
+        .padding(.horizontal, 12)
+        .frame(minHeight: 40)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(colors.backgroundSecondary))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(colors.border, lineWidth: 1))
+    }
+
+    private var chips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                Menu {
+                    Picker("Year", selection: $filter.year) {
+                        ForEach(RecordsLogic.availableYears(viewModel.timeEntries), id: \.self) { year in
+                            Text(String(year)).tag(year)
+                        }
+                    }
+                } label: {
+                    BPFilterChip(title: String(filter.year), isActive: true)
+                }
+                .accessibilityLabel("Year, \(String(filter.year))")
+                .accessibilityIdentifier("records.filter.year")
+
+                Menu {
+                    Picker("Property", selection: $filter.propertyId) {
+                        Text("All properties").tag(UUID?.none)
+                        ForEach(viewModel.properties) { property in
+                            Text(property.name).tag(UUID?.some(property.id))
+                        }
+                    }
+                } label: {
+                    BPFilterChip(
+                        title: filter.propertyId.flatMap { propertyNames[$0] } ?? "Property",
+                        isActive: filter.propertyId != nil
+                    )
+                }
+                .accessibilityLabel("Property filter, \(filter.propertyId.flatMap { propertyNames[$0] } ?? "all properties")")
+                .accessibilityIdentifier("records.filter.property")
+
+                Menu {
+                    Picker("Source", selection: $filter.source) {
+                        Text("All sources").tag(RecordSourceBadge?.none)
+                        ForEach(RecordSourceBadge.filterOrder, id: \.self) { source in
+                            Label(source.title, systemImage: source.symbol).tag(RecordSourceBadge?.some(source))
+                        }
+                    }
+                } label: {
+                    BPFilterChip(title: filter.source?.title ?? "Source", isActive: filter.source != nil)
+                }
+                .accessibilityLabel("Source filter, \(filter.source?.title ?? "all sources")")
+                .accessibilityIdentifier("records.filter.source")
+
+                if showsWhoFilter {
+                    Menu {
+                        Picker("Who", selection: $filter.participant) {
+                            Text("Everyone").tag(Participant?.none)
+                            Text("Me").tag(Participant?.some(.selfParticipant))
+                            Text("Spouse").tag(Participant?.some(.spouse))
+                        }
+                    } label: {
+                        BPFilterChip(title: whoTitle, isActive: filter.participant != nil)
+                    }
+                    .accessibilityLabel("Who filter, \(filter.participant == nil ? "everyone" : whoTitle)")
+                    .accessibilityIdentifier("records.filter.who")
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+
+    private var whoTitle: String {
+        switch filter.participant {
+        case .none: return "Who"
+        case .some(.selfParticipant): return "Me"
+        case .some(.spouse): return "Spouse"
+        }
+    }
+
+    // MARK: Total
+
+    private var totalCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(BPHours.short(totalHours))
+                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(colors.textPrimary)
+                    .contentTransition(.numericText())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(entries.count == 1 ? "in 1 record" : "in \(entries.count) records")
+                    .font(.subheadline)
+                    .foregroundStyle(colors.textSecondary)
+                Spacer(minLength: 0)
+            }
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: "info.circle")
+                    .font(.footnote)
+                    .foregroundStyle(colors.draftingInk)
+                    .accessibilityHidden(true)
+                Text(RecordsLogic.totalLabel(goal: HouseGoal(goalManager.globalGoalType), tracksSpouseJointly: taxProfile.spouseTracking))
+                    .font(.footnote)
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("records.totalLabel")
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
+        .lhMotion(AppAnimation.standard, value: totalHours)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(BPHours.spoken(totalHours)) in \(entries.count) records. \(RecordsLogic.totalLabel(goal: HouseGoal(goalManager.globalGoalType), tracksSpouseJointly: taxProfile.spouseTracking))")
+        .accessibilityIdentifier("records.total")
+    }
+
+    // MARK: Row
+
+    private func row(_ entry: TimeEntry) -> some View {
+        let propertyName = propertyNames[entry.propertyId] ?? "No property"
+        return ZStack {
+            NavigationLink {
+                TimeEntryDetailView(entry: entry)
+            } label: {
+                EmptyView()
+            }
+            .opacity(0)
+            RecordRowView(entry: entry, propertyName: propertyName)
+        }
+        .listRowBackground(colors.backgroundSecondary)
+        .listRowInsets(EdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 16))
+        .alignmentGuide(.listRowSeparatorLeading) { _ in 64 }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                entryToDelete = entry
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .contextMenu {
+            Button(role: .destructive) {
+                entryToDelete = entry
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(RecordRowView.accessibilityLabel(entry: entry, propertyName: propertyName))
+        .accessibilityHint("Opens the record")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: "Delete") { entryToDelete = entry }
+        .accessibilityIdentifier("records.row.\(entry.id.uuidString)")
+    }
+}
+
+/// One record: the category's tool, what was done, the property on its own line, where it came
+/// from, and the hours right-aligned in SF Pro Rounded tabular figures.
+struct RecordRowView: View {
+    let entry: TimeEntry
+    let propertyName: String
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    private var badge: RecordSourceBadge { RecordSourceBadge(entry: entry) }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            CategoryToolTile(category: entry.category, size: 36)
+                .padding(.top, 2)
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 4) {
+                    details
+                    trailing(alignment: .leading)
+                }
+            } else {
+                details
+                Spacer(minLength: 8)
+                trailing(alignment: .trailing)
+            }
+        }
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+    }
+
+    private var details: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(RecordsLogic.title(for: entry))
+                .font(.body)
+                .foregroundStyle(colors.textPrimary)
+                .lineLimit(2)
+            Text(propertyName)
+                .font(.subheadline)
+                .foregroundStyle(colors.textSecondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            HStack(spacing: 10) {
+                Label(badge.title, systemImage: badge.symbol)
+                    .labelStyle(RecordBadgeLabelStyle(tint: badgeTint))
+                    .fixedSize()
+                if entry.participant == .spouse {
+                    Label("Spouse", systemImage: "person.2")
+                        .labelStyle(RecordBadgeLabelStyle(tint: colors.rose))
+                        .fixedSize()
+                }
+                if !entry.countsForREPS {
+                    Label("Investor task", systemImage: "minus.circle")
+                        .labelStyle(RecordBadgeLabelStyle(tint: colors.textSecondary))
+                        .fixedSize()
+                }
+            }
+            .padding(.top, 2)
+        }
+    }
+
+    private func trailing(alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 2) {
+            Text(BPHours.short(entry.hours))
+                .font(.system(.body, design: .rounded, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(colors.textPrimary)
+                .lineLimit(1)
+            Text(entry.date.formatted(.dateTime.month(.abbreviated).day()))
+                .font(.subheadline)
+                .monospacedDigit()
+                .foregroundStyle(colors.textSecondary)
+                .lineLimit(1)
+        }
+        .fixedSize()
+    }
+
+    private var badgeTint: Color {
+        switch badge {
+        case .calendarImport: return colors.informational
+        case .suggested: return colors.draftingInk
+        case .timer, .voice: return colors.timberInk
+        case .manual, .other: return colors.textSecondary
+        }
+    }
+
+    static func accessibilityLabel(entry: TimeEntry, propertyName: String) -> String {
+        var parts = [
+            RecordsLogic.title(for: entry),
+            propertyName,
+            BPHours.spoken(entry.hours),
+            entry.date.formatted(.dateTime.month(.wide).day()),
+            RecordSourceBadge(entry: entry).title
+        ]
+        if entry.participant == .spouse { parts.append("Spouse") }
+        if !entry.countsForREPS { parts.append("Investor task, not counted") }
+        return parts.joined(separator: ", ")
+    }
+}
+
+/// Footnote badge: tinted glyph, secondary words (colour is never the only cue).
+private struct RecordBadgeLabelStyle: LabelStyle {
+    let tint: Color
+    @Environment(\.colorScheme) private var colorScheme
+
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 4) {
+            configuration.icon
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tint)
+            configuration.title
+                .font(.footnote)
+                .foregroundStyle(AdaptiveColors(colorScheme: colorScheme).textSecondary)
+        }
     }
 }
 

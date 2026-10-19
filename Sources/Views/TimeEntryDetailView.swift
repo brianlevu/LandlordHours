@@ -1,10 +1,13 @@
 import SwiftUI
-import LucideIcons
 
+/// One record, read and edited in place. Same grammar as the Inbox confirm sheet: the tool and
+/// what it was on top, the hours large, then the facts as a plain grouped list, then where it came
+/// from. Records are tax evidence, so edits are explicit (Edit → Save) and delete asks first.
 struct TimeEntryDetailView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.dismiss) var dismiss
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
@@ -21,6 +24,7 @@ struct TimeEntryDetailView: View {
     @State private var isEditing = false
     @State private var showingDeleteConfirmation = false
     @State private var showingDiscardAlert = false
+    @State private var savedTick = 0
     @FocusState private var isNotesFocused: Bool
 
     init(entry: TimeEntry) {
@@ -34,8 +38,10 @@ struct TimeEntryDetailView: View {
     }
 
     private var propertyName: String {
-        viewModel.properties.first { $0.id == propertyId }?.name ?? "Unknown"
+        viewModel.properties.first { $0.id == propertyId }?.name ?? "No property"
     }
+
+    private var badge: RecordSourceBadge { RecordSourceBadge(entry: entry) }
 
     private var hasChanges: Bool {
         notes != entry.notes ||
@@ -47,528 +53,299 @@ struct TimeEntryDetailView: View {
     }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 20) {
-                // Header card with icon + category + hours
-                headerCard
-
-                // Details sections
-                if isEditing {
-                    editForm
-                } else {
-                    readOnlyDetails
-                }
+        List {
+            Section {
+                header
+                    .listRowInsets(EdgeInsets(top: 8, leading: 4, bottom: 4, trailing: 4))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                hoursCard
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 40)
+
+            if isEditing {
+                editSections
+            } else {
+                readSections
+            }
         }
-        .background(colors.background)
-        .navigationTitle("Entry Details")
+        .listStyle(.insetGrouped)
+        .listSectionSpacing(20)
+        .scrollContentBackground(.hidden)
+        .background(colors.background.ignoresSafeArea())
+        .navigationTitle(isEditing ? "Edit record" : "")
         .navigationBarTitleDisplayMode(.inline)
+        .hidesAppTabBar()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if isEditing {
                     Button("Save") { saveChanges() }
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(hasChanges ? AppColors.primary : colors.textTertiary)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(hasChanges ? colors.action : colors.textTertiary)
                         .disabled(!hasChanges)
+                        .accessibilityIdentifier("entry.save")
                 } else {
-                    Button {
-                        animate(AppAnimation.standard) { isEditing = true }
-                    } label: {
-                        HStack(spacing: 4) {
-                            LucideIcon(image: Lucide.pencil, size: 14)
-                            Text("Edit")
-                        }
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(AppColors.primary)
+                    Button("Edit") {
+                        animate { isEditing = true }
                     }
+                    .foregroundStyle(colors.action)
+                    .accessibilityIdentifier("entry.edit")
                 }
             }
-
             if isEditing {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { cancelEditing() }
-                        .font(.system(size: 15))
-                        .foregroundStyle(colors.textSecondary)
+                        .foregroundStyle(colors.action)
                 }
             }
         }
-        .alert("Delete Entry?", isPresented: $showingDeleteConfirmation) {
+        .alert("Delete this record?", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
                 viewModel.deleteTimeEntry(entry)
                 dismiss()
             }
         } message: {
-            Text("This time entry will be permanently deleted.")
+            Text("It comes off your hours and your export. This can't be undone.")
         }
-        .alert("Discard Changes?", isPresented: $showingDiscardAlert) {
+        .alert("Discard changes?", isPresented: $showingDiscardAlert) {
             Button("Keep Editing", role: .cancel) {}
             Button("Discard", role: .destructive) { discardChanges() }
         } message: {
-            Text("You have unsaved changes that will be lost.")
+            Text("Your edits to this record will be lost.")
         }
-        .navigationBarBackButtonHidden(isEditing && hasChanges)
-        .onTapGesture { isNotesFocused = false }
+        .sensoryFeedback(.success, trigger: savedTick)
+        .navigationBarBackButtonHidden(isEditing)
+        .accessibilityIdentifier("entry.detail")
     }
 
-    // MARK: - Header Card
+    // MARK: Header
 
-    private var headerCard: some View {
-        VStack(spacing: 16) {
-            // Category badge
-            JellyBadge(
-                systemName: categoryIconName,
-                color: categoryColor,
-                wash: categoryWash,
-                size: 56
-            )
-
-            // Category name
-            Text(category.rawValue)
-                .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundStyle(colors.textPrimary)
-
-            // Hours + date
-            HStack(spacing: 16) {
-                HStack(spacing: 4) {
-                    LucideIcon(image: Lucide.clock, size: 14)
-                        .foregroundStyle(categoryColor)
-                    Text(String(format: "%.1fh", hours))
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                }
-
-                Circle()
-                    .fill(colors.border)
-                    .frame(width: 4, height: 4)
-
-                HStack(spacing: 4) {
-                    LucideIcon(image: Lucide.calendar, size: 14)
-                        .foregroundStyle(colors.textSecondary)
-                    Text(date, style: .date)
-                        .font(.system(size: 13))
-                        .foregroundStyle(colors.textSecondary)
-                }
+    private var header: some View {
+        HStack(alignment: .center, spacing: 14) {
+            CategoryToolTile(category: category, size: 56)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(badge.title) · \(date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))")
+                    .font(AppTypography.drafting)
+                    .textCase(.uppercase)
+                    .tracking(1.3)
+                    .foregroundStyle(colors.draftingInk)
+                    .lineLimit(2)
+                Text(isEditing ? category.inboxLabel : RecordsLogic.title(for: entry))
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(colors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
             }
-
-            // REPS badge
-            if !entry.countsForREPS {
-                Text("Not REPS")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(AppColors.coral)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(AppColors.coralWash)
-                    .clipShape(Capsule())
-            }
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppCornerRadius.xl)
-                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
-        }
+        .accessibilityElement(children: .combine)
     }
 
-    // MARK: - Read-Only Details
+    private var hoursCard: some View {
+        HStack(spacing: 16) {
+            if isEditing {
+                stepButton(symbol: "minus", label: "Fifteen minutes less", enabled: hours > 0.25) {
+                    animate(AppAnimation.quick) { hours = max(0.25, hours - 0.25) }
+                }
+            }
+            Spacer(minLength: 0)
+            HoursReadout(hours: hours)
+            Spacer(minLength: 0)
+            if isEditing {
+                stepButton(symbol: "plus", label: "Fifteen minutes more", enabled: hours < 24) {
+                    animate(AppAnimation.quick) { hours = min(24, hours + 0.25) }
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 18)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
+        .accessibilityElement(children: .contain)
+    }
+
+    private func stepButton(symbol: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(enabled ? colors.textPrimary : colors.textTertiary)
+                .frame(width: 48, height: 48)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(colors.backgroundTertiary))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(colors.border, lineWidth: 1))
+        }
+        .buttonStyle(.lhPressable)
+        .disabled(!enabled)
+        .accessibilityLabel(label)
+    }
+
+    // MARK: Read
 
     @ViewBuilder
-    private var readOnlyDetails: some View {
-        VStack(spacing: 0) {
-            detailRow(icon: Lucide.house, label: "Property", value: propertyName)
-            divider
-            detailRow(icon: Lucide.user, label: "Participant", value: participant.rawValue)
-            divider
-            detailRow(icon: Lucide.clock, label: "Hours", value: String(format: "%.1fh", hours))
-            divider
-            detailRow(icon: Lucide.calendar, label: "Date", value: entry.formattedDate)
-
-            if !notes.isEmpty {
-                divider
-                notesSection
-            }
-
-            if !entry.attachments.isEmpty {
-                divider
-                attachmentsSection
-            }
-
-            if entry.isCalendarImport {
-                divider
-                detailRow(icon: Lucide.calendar, label: "Source", value: "Calendar Import")
+    private var readSections: some View {
+        Section {
+            factRow("Property", value: propertyName)
+            factRow("Who", value: participant == .spouse ? "Spouse" : "Me")
+            factRow("Category", value: category.inboxLabel)
+            factRow("Date", value: entry.formattedDate)
+            if !entry.countsForREPS {
+                factRow("Counts toward", value: "Not real estate hours", valueColor: colors.caution)
             }
         }
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppCornerRadius.xl)
-                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
-        }
+        .listRowBackground(colors.backgroundSecondary)
 
-        // Delete button
-        Button {
-            showingDeleteConfirmation = true
-        } label: {
-            HStack(spacing: 6) {
-                LucideIcon(image: Lucide.trash2, size: 14)
-                Text("Delete Entry")
-                    .font(.system(size: 14, weight: .medium))
+        if !notes.isEmpty {
+            Section {
+                Text(notes)
+                    .font(.body)
+                    .foregroundStyle(colors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.vertical, 4)
+                    .textSelection(.enabled)
+            } header: {
+                BPSectionHeader(title: "Notes")
             }
-            .foregroundStyle(AppColors.error)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(AppColors.error.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
+            .listRowBackground(colors.backgroundSecondary)
         }
-        .buttonStyle(.plain)
-        .padding(.top, 8)
 
-        // Metadata
-        VStack(spacing: 4) {
-            Text("Created \(entry.createdAt.formatted(date: .abbreviated, time: .shortened))")
-                .font(AppTypography.caption)
-                .foregroundStyle(colors.textTertiary)
-            if entry.modifiedAt != entry.createdAt {
-                Text("Modified \(entry.modifiedAt.formatted(date: .abbreviated, time: .shortened))")
-                    .font(AppTypography.caption)
-                    .foregroundStyle(colors.textTertiary)
-            }
-        }
-        .padding(.top, 4)
-    }
-
-    private func detailRow(icon: UIImage, label: String, value: String) -> some View {
-        HStack(spacing: 12) {
-            LucideIcon(image: icon, size: 16)
-                .foregroundStyle(colors.textSecondary)
-                .frame(width: 20)
-            Text(label)
-                .font(.system(size: 14))
-                .foregroundStyle(colors.textSecondary)
-            Spacer()
-            Text(value)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(colors.textPrimary)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-    }
-
-    private var notesSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                LucideIcon(image: Lucide.fileText, size: 16)
-                    .foregroundStyle(colors.textSecondary)
-                Text("Notes")
-                    .font(.system(size: 14))
-                    .foregroundStyle(colors.textSecondary)
-            }
-            Text(notes)
-                .font(.system(size: 14))
-                .foregroundStyle(colors.textPrimary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-    }
-
-    private var attachmentsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                LucideIcon(image: Lucide.paperclip, size: 16)
-                    .foregroundStyle(colors.textSecondary)
+        if !entry.attachments.isEmpty {
+            Section {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(entry.attachments) { attachment in
+                            if let bytes = attachment.data, let uiImage = UIImage(data: bytes) {
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 72, height: 72)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    .accessibilityLabel("Attached photo")
+                            }
+                        }
+                    }
+                    .padding(.vertical, 6)
+                }
+            } header: {
                 Text("Attachments (\(entry.attachments.count))")
-                    .font(.system(size: 14))
+                    .font(.footnote.weight(.semibold))
+                    .textCase(.uppercase)
+                    .tracking(0.3)
                     .foregroundStyle(colors.textSecondary)
             }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(entry.attachments) { attachment in
-                        if let bytes = attachment.data, let uiImage = UIImage(data: bytes) {
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 64, height: 64)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                    }
+            .listRowBackground(colors.backgroundSecondary)
+        }
+
+        Section {
+            factRow("Source", value: badge.title)
+            if let detected = entry.detectedAt {
+                factRow("Detected", value: detected.formatted(date: .abbreviated, time: .shortened))
+            }
+            if let confirmed = entry.confirmedAt {
+                factRow("Confirmed by you", value: confirmed.formatted(date: .abbreviated, time: .shortened))
+            }
+            factRow("Added", value: entry.createdAt.formatted(date: .abbreviated, time: .shortened))
+            if entry.modifiedAt.timeIntervalSince(entry.createdAt) > 1 {
+                factRow("Last changed", value: entry.modifiedAt.formatted(date: .abbreviated, time: .shortened))
+            }
+        } header: {
+            BPSectionHeader(title: "Where it came from")
+        } footer: {
+            Text("Your export shows the same source and dates for every entry.")
+                .font(.footnote)
+                .foregroundStyle(colors.textSecondary)
+        }
+        .listRowBackground(colors.backgroundSecondary)
+
+        Section {
+            Button(role: .destructive) {
+                showingDeleteConfirmation = true
+            } label: {
+                Label("Delete record", systemImage: "trash")
+                    .foregroundStyle(colors.destructive)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .accessibilityIdentifier("entry.delete")
+        }
+        .listRowBackground(colors.backgroundSecondary)
+    }
+
+    private func factRow(_ label: String, value: String, valueColor: Color? = nil) -> some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label).font(.subheadline).foregroundStyle(colors.textSecondary)
+                    Text(value).font(.body).foregroundStyle(valueColor ?? colors.textPrimary)
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(label)
+                        .font(.body)
+                        .foregroundStyle(colors.textSecondary)
+                    Spacer(minLength: 12)
+                    Text(value)
+                        .font(.body)
+                        .foregroundStyle(valueColor ?? colors.textPrimary)
+                        .multilineTextAlignment(.trailing)
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .frame(minHeight: 36)
+        .accessibilityElement(children: .combine)
     }
 
-    private var divider: some View {
-        Divider()
-            .padding(.leading, 48)
-    }
+    // MARK: Edit
 
-    // MARK: - Edit Form
+    @ViewBuilder
+    private var editSections: some View {
+        Section {
+            Picker("Property", selection: $propertyId) {
+                ForEach(viewModel.properties) { property in
+                    Text(property.name).tag(property.id)
+                }
+            }
+            .tint(colors.action)
 
-    private var editForm: some View {
-        VStack(spacing: 16) {
-            // Notes
-            VStack(alignment: .leading, spacing: 8) {
-                sectionLabel("Notes")
-                TextEditor(text: $notes)
-                    .font(.system(size: 15))
+            HStack {
+                Text("Who")
                     .foregroundStyle(colors.textPrimary)
-                    .focused($isNotesFocused)
-                    .frame(minHeight: 80)
-                    .padding(12)
-                    .scrollContentBackground(.hidden)
-                    .background(colors.background)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(isNotesFocused ? AppColors.primary.opacity(0.4) : AppColors.snow, lineWidth: 1.5)
-                    )
-            }
-
-            // Category
-            VStack(alignment: .leading, spacing: 8) {
-                sectionLabel("Category")
-                categoryChips
-            }
-
-            // Property
-            if viewModel.properties.count > 1 {
-                VStack(alignment: .leading, spacing: 8) {
-                    sectionLabel("Property")
-                    propertyPicker
+                Spacer(minLength: 12)
+                Picker("Who", selection: $participant) {
+                    Text("Me").tag(Participant.selfParticipant)
+                    Text("Spouse").tag(Participant.spouse)
                 }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 200)
             }
 
-            // Hours
-            VStack(alignment: .leading, spacing: 8) {
-                sectionLabel("Hours")
-                hoursStepper
-            }
-
-            // Date
-            VStack(alignment: .leading, spacing: 8) {
-                sectionLabel("Date")
-                datePicker
-            }
-
-            // Participant
-            VStack(alignment: .leading, spacing: 8) {
-                sectionLabel("Participant")
-                participantSegment
-            }
-
-            // Save button
-            Button { saveChanges() } label: {
-                Text("Save Changes")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(AppColors.onAction)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(hasChanges ? AppColors.primary : AppColors.mist)
-                    .clipShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .disabled(!hasChanges)
-            .padding(.top, 8)
-        }
-        .padding(16)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppCornerRadius.xl)
-                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
-        }
-    }
-
-    private func sectionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 13, weight: .semibold, design: .rounded))
-            .foregroundStyle(colors.textSecondary)
-    }
-
-    // MARK: - Edit Form Components
-
-    private var categoryChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            Picker("Category", selection: $category) {
                 ForEach(ActivityCategory.allCases, id: \.self) { cat in
-                    Button {
-                        animate(AppAnimation.quick) { category = cat }
-                    } label: {
-                        HStack(spacing: 7) {
-                            Circle()
-                                .fill(category == cat
-                                      ? Color.white.opacity(0.5)
-                                      : categoryDotColor(for: cat))
-                                .frame(width: 8, height: 8)
-                            Text(categoryChipLabel(for: cat))
-                                .font(.system(size: 13, weight: .medium))
-                                .lineLimit(1)
-                        }
-                        .foregroundStyle(category == cat ? .white : AppColors.slate)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(category == cat ? AppColors.primary : AppColors.snow)
-                        .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
+                    Text(cat.inboxLabel).tag(cat)
                 }
             }
+            .tint(colors.action)
+
+            DatePicker("Date", selection: $date, in: ...Date.distantFuture, displayedComponents: .date)
+                .tint(colors.action)
         }
+        .listRowBackground(colors.backgroundSecondary)
+
+        Section {
+            TextField("What did you do?", text: $notes, axis: .vertical)
+                .lineLimit(3...8)
+                .focused($isNotesFocused)
+                .foregroundStyle(colors.textPrimary)
+        } header: {
+            BPSectionHeader(title: "Notes")
+        } footer: {
+            Text("A short note makes the record stronger if anyone asks later.")
+                .font(.footnote)
+                .foregroundStyle(colors.textSecondary)
+        }
+        .listRowBackground(colors.backgroundSecondary)
     }
 
-    private var propertyPicker: some View {
-        Menu {
-            ForEach(viewModel.properties) { property in
-                Button {
-                    propertyId = property.id
-                } label: {
-                    HStack {
-                        Text(property.name)
-                        if propertyId == property.id {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(colors.primarySurface)
-                    .frame(width: 28, height: 28)
-                    .overlay(
-                        LucideIcon(image: Lucide.house, size: 14)
-                            .foregroundStyle(AppColors.primary)
-                    )
-                Text(propertyName)
-                    .font(.system(size: 15))
-                    .foregroundStyle(colors.textPrimary)
-                Spacer()
-                LucideIcon(image: Lucide.chevronRight, size: 18)
-                    .foregroundStyle(AppColors.cloud)
-            }
-            .padding(14)
-            .padding(.horizontal, 2)
-            .background(colors.background.opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(AppColors.snow, lineWidth: 1.5)
-            )
-        }
-    }
-
-    private var hoursStepper: some View {
-        HStack(spacing: 24) {
-            Spacer()
-
-            Button {
-                if hours > 0.25 {
-                    animate(AppAnimation.quick) { hours -= 0.25 }
-                }
-            } label: {
-                LucideIcon(image: Lucide.minus, size: 16)
-                    .foregroundStyle(colors.textPrimary)
-                    .frame(width: 44, height: 44)
-                    .background(colors.background)
-                    .clipShape(Circle())
-                    .overlay(Circle().strokeBorder(AppColors.snow, lineWidth: 1.5))
-            }
-            .buttonStyle(.plain)
-
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(hours.formatted(.number.precision(.fractionLength(0...2))))
-                    .font(.system(size: 40, weight: .regular, design: .serif))
-                    .foregroundStyle(colors.textPrimary)
-                    .contentTransition(.numericText())
-                Text("h")
-                    .font(.system(size: 16))
-                    .foregroundStyle(AppColors.mist)
-            }
-            .frame(minWidth: 80, alignment: .center)
-
-            Button {
-                if hours < 24 {
-                    animate(AppAnimation.quick) { hours += 0.25 }
-                }
-            } label: {
-                LucideIcon(image: Lucide.plus, size: 16)
-                    .foregroundStyle(colors.textPrimary)
-                    .frame(width: 44, height: 44)
-                    .background(colors.background)
-                    .clipShape(Circle())
-                    .overlay(Circle().strokeBorder(AppColors.snow, lineWidth: 1.5))
-            }
-            .buttonStyle(.plain)
-
-            Spacer()
-        }
-    }
-
-    private var datePicker: some View {
-        HStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(colors.primarySurface)
-                .frame(width: 28, height: 28)
-                .overlay(
-                    LucideIcon(image: Lucide.calendar, size: 14)
-                        .foregroundStyle(AppColors.primary)
-                )
-            DatePicker("", selection: $date, displayedComponents: .date)
-                .labelsHidden()
-                .tint(AppColors.primary)
-            Spacer()
-        }
-        .padding(14)
-        .padding(.horizontal, 2)
-        .background(colors.background.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(AppColors.snow, lineWidth: 1.5)
-        )
-    }
-
-    private var participantSegment: some View {
-        HStack(spacing: 0) {
-            segmentButton("Self", isSelected: participant == .selfParticipant) {
-                animate(AppAnimation.quick) { participant = .selfParticipant }
-            }
-            segmentButton("Spouse", isSelected: participant == .spouse) {
-                animate(AppAnimation.quick) { participant = .spouse }
-            }
-        }
-        .padding(3)
-        .background(AppColors.snow)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-
-    private func segmentButton(_ title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 14, weight: isSelected ? .semibold : .medium))
-                .foregroundStyle(isSelected ? colors.textPrimary : AppColors.slate)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(isSelected ? colors.backgroundSecondary : Color.clear)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(isSelected ? colors.border.opacity(0.35) : Color.clear, lineWidth: 1)
-                }
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Actions
+    // MARK: Actions
 
     private func saveChanges() {
         var updated = entry
@@ -580,14 +357,16 @@ struct TimeEntryDetailView: View {
         updated.participant = participant
         updated.modifiedAt = Date()
         viewModel.updateTimeEntry(updated)
-        animate(AppAnimation.standard) { isEditing = false }
+        savedTick += 1
+        isNotesFocused = false
+        animate { isEditing = false }
     }
 
     private func cancelEditing() {
         if hasChanges {
             showingDiscardAlert = true
         } else {
-            animate(AppAnimation.standard) { isEditing = false }
+            animate { isEditing = false }
         }
     }
 
@@ -598,56 +377,44 @@ struct TimeEntryDetailView: View {
         hours = entry.hours
         date = entry.date
         participant = entry.participant
-        animate(AppAnimation.standard) { isEditing = false }
+        animate { isEditing = false }
     }
 
-    private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
+    private func animate(_ animation: Animation = AppAnimation.standard, _ updates: () -> Void) {
         if reduceMotion {
             updates()
         } else {
             withAnimation(animation, updates)
         }
     }
+}
 
-    // MARK: - Helpers
+/// "2h 30m" with small unit letters, SF Pro Rounded tabular (the Inbox sheet's readout).
+private struct HoursReadout: View {
+    let hours: Double
+    @Environment(\.colorScheme) private var colorScheme
 
-    private var categoryIconName: String {
-        switch category {
-        case .repairs: return "wrench"
-        case .management: return "folder"
-        case .leasing: return "key"
-        case .bookkeeping: return "file-text"
-        case .legal: return "landmark"
-        case .insurance: return "shield"
-        case .travel: return "car"
-        case .renovations: return "hammer"
-        case .investing: return "trending-up"
-        case .financing: return "dollar-sign"
-        case .contractNegotiation: return "file-cog"
+    var body: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        let total = Int((hours * 60).rounded())
+        HStack(alignment: .firstTextBaseline, spacing: 2) {
+            Text("\(total / 60)")
+                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .contentTransition(.numericText())
+            Text("h").font(.title3).foregroundStyle(colors.textSecondary)
+            Text(String(format: "%02d", total % 60))
+                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .contentTransition(.numericText())
+                .padding(.leading, 6)
+            Text("m").font(.title3).foregroundStyle(colors.textSecondary)
         }
-    }
-
-    private var categoryColor: Color {
-        category.color
-    }
-
-    private var categoryWash: Color {
-        switch category {
-        case .repairs, .renovations: return colors.coralWash
-        case .management, .investing: return colors.sageWash
-        case .leasing, .travel: return colors.skyWash
-        case .bookkeeping, .financing: return colors.honeyWash
-        case .legal: return colors.roseWash
-        case .insurance, .contractNegotiation: return colors.primarySurface
-        }
-    }
-
-    private func categoryChipLabel(for cat: ActivityCategory) -> String {
-        cat.chipLabel
-    }
-
-    private func categoryDotColor(for cat: ActivityCategory) -> Color {
-        cat.color
+        .monospacedDigit()
+        .foregroundStyle(colors.textPrimary)
+        .lineLimit(1)
+        .minimumScaleFactor(0.6)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Hours")
+        .accessibilityValue(BPHours.spoken(hours))
     }
 }
 

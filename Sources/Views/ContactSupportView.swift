@@ -1,7 +1,7 @@
 import SwiftUI
 import MessageUI
-import LucideIcons
 
+/// Contact support: a plain grouped form, one action, and what helps us answer fast.
 struct ContactSupportView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
@@ -12,117 +12,67 @@ struct ContactSupportView: View {
 
     let supportEmail = "brian.landlordhours@gmail.com"
 
+    private var canSend: Bool {
+        !subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 20) {
-                header
-                supportForm
-                tipsCard
+        List {
+            Section {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Get help")
+                        .lhDisplayFont(.largeTitle)
+                        .foregroundStyle(colors.textPrimary)
+                        .accessibilityAddTraits(.isHeader)
+                    Text("Questions about tracking, exports or setup? Write to Brian, who builds LandlordHours. You'll hear back by email.")
+                        .font(.subheadline)
+                        .foregroundStyle(colors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 18)
-            .padding(.bottom, 40)
+
+            Section {
+                TextField("Subject", text: $subject)
+                    .foregroundStyle(colors.textPrimary)
+                    .accessibilityIdentifier("support.subject")
+                TextField("What happened, and what did you expect?", text: $message, axis: .vertical)
+                    .lineLimit(5...12)
+                    .foregroundStyle(colors.textPrimary)
+                    .accessibilityIdentifier("support.message")
+            } header: {
+                BPSectionHeader(title: "Your message")
+            }
+            .listRowBackground(colors.backgroundSecondary)
+
+            Section {
+                Button(action: sendSupportEmail) {
+                    Label("Send email", systemImage: "paperplane")
+                }
+                .buttonStyle(InboxPrimaryButtonStyle())
+                .disabled(!canSend)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
+                .accessibilityIdentifier("support.send")
+            } footer: {
+                Text("It helps to include what you tapped, a screenshot, and your iOS version.")
+                    .font(.footnote)
+                    .foregroundStyle(colors.textSecondary)
+                    .padding(.top, 8)
+            }
         }
-        .background {
-            LHMobileCanvas()
-        }
-        .navigationTitle("Contact Support")
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .scrollDismissesKeyboard(.interactively)
+        .background(colors.background.ignoresSafeArea())
+        .navigationBarTitleDisplayMode(.inline)
         .hidesAppTabBar()
         .sheet(isPresented: $showingMailComposer) {
             MailComposeView(subject: subject, body: message, to: supportEmail)
         }
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Circle()
-                .fill(colors.backgroundTertiary)
-                .frame(width: 54, height: 54)
-                .overlay {
-                    LucideIcon(image: Lucide.lifeBuoy, size: 24)
-                        .foregroundStyle(AppColors.charcoal)
-                }
-
-            Text("Get help")
-                .font(.system(size: 42, weight: .black, design: .rounded))
-                .foregroundStyle(colors.textPrimary)
-                .minimumScaleFactor(0.82)
-
-            Text("Have questions about REPS tracking or need help? Reach out and Brian will get back to you.")
-                .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(colors.textSecondary)
-                .lineSpacing(3)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var supportForm: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Subject")
-                    .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                TextField("What can we help you with?", text: $subject)
-                    .font(AppTypography.body)
-                    .padding(12)
-                    .background(colors.backgroundTertiary)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Message")
-                    .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                TextEditor(text: $message)
-                    .font(AppTypography.body)
-                    .frame(minHeight: 150)
-                    .padding(8)
-                    .scrollContentBackground(.hidden)
-                    .background(colors.backgroundTertiary)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            }
-
-            Button(action: sendSupportEmail) {
-                HStack(spacing: 8) {
-                    LucideIcon(image: Lucide.mail, size: 16)
-                    Text("Send Email")
-                }
-                .font(AppTypography.button)
-                .foregroundStyle(subject.isEmpty || message.isEmpty ? .white : AppColors.charcoal)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(subject.isEmpty || message.isEmpty ? AppColors.mist : AppColors.sage)
-                .clipShape(Capsule())
-            }
-            .disabled(subject.isEmpty || message.isEmpty)
-        }
-        .padding(20)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .stroke(colors.border.opacity(0.28), lineWidth: 1)
-        }
-    }
-
-    private var tipsCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Tips for better help")
-                .font(.system(size: 19, weight: .black, design: .rounded))
-                .foregroundStyle(colors.textPrimary)
-
-            tipRow(number: "1", text: "Be specific about your issue")
-            tipRow(number: "2", text: "Include screenshots if possible")
-            tipRow(number: "3", text: "Mention your iOS version")
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(colors.border.opacity(0.28), lineWidth: 1)
-        }
+        .accessibilityIdentifier("support.screen")
     }
 
     private func sendSupportEmail() {
@@ -134,20 +84,6 @@ struct ContactSupportView: View {
             if let url = URL(string: "mailto:\(supportEmail)?subject=\(mailtoSubject)&body=\(mailtoBody)") {
                 UIApplication.shared.open(url)
             }
-        }
-    }
-
-    private func tipRow(number: String, text: String) -> some View {
-        HStack(spacing: 10) {
-            Text(number)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(AppColors.onAction)
-                .frame(width: 22, height: 22)
-                .background(colors.action)
-                .clipShape(Circle())
-            Text(text)
-                .font(AppTypography.bodySmall)
-                .foregroundStyle(colors.textSecondary)
         }
     }
 }

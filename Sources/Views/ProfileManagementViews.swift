@@ -1,5 +1,4 @@
 import SwiftUI
-import LucideIcons
 
 // MARK: - Restore sheet (welcome screen + Settings)
 
@@ -22,20 +21,25 @@ struct ProfileRestoreSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 16) {
+            List {
+                Section {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(context == .welcome ? "Restore earlier data" : "Restore other data")
-                            .font(.system(size: 26, weight: .black, design: .rounded))
+                            .font(.title2.weight(.bold))
                             .foregroundStyle(colors.textPrimary)
+                            .accessibilityAddTraits(.isHeader)
                         Text(context == .welcome
                              ? "Pick a profile to open its records. Nothing is merged or deleted."
                              : "Open another profile's records. Your current data stays on this iPhone, and you can switch back anytime.")
-                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .font(.subheadline)
                             .foregroundStyle(colors.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 4, trailing: 4))
+                }
 
+                Section {
                     ForEach(profiles) { profile in
                         Button {
                             if context == .settings {
@@ -44,29 +48,23 @@ struct ProfileRestoreSheet: View {
                                 onRestore(profile)
                             }
                         } label: {
-                            ProfileCandidateCard(profile: profile)
+                            ProfileCandidateRow(profile: profile)
                         }
-                        .buttonStyle(.lhPressable)
+                        .buttonStyle(.plain)
                         .accessibilityIdentifier("restore.profile.\(profile.id)")
                     }
-
+                } footer: {
                     if profiles.contains(where: \.isICloudOnly) {
-                        HStack(alignment: .top, spacing: 8) {
-                            LucideIcon(image: Lucide.info, size: 14)
-                                .foregroundStyle(colors.informational)
-                                .padding(.top, 2)
-                            Text("Photos weren't saved to iCloud, so profiles restored from iCloud come back without them. Hours, properties and settings come back in full.")
-                                .font(.system(size: 13, weight: .medium, design: .rounded))
-                                .foregroundStyle(colors.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .accessibilityIdentifier("restore.photosNote")
+                        Label("Photos weren't saved to iCloud, so profiles restored from iCloud come back without them. Hours, properties and settings come back in full.", systemImage: "info.circle")
+                            .font(.footnote)
+                            .foregroundStyle(colors.textSecondary)
+                            .accessibilityIdentifier("restore.photosNote")
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 32)
+                .listRowBackground(colors.backgroundSecondary)
             }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
             .background(colors.background.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -90,7 +88,7 @@ struct ProfileRestoreSheet: View {
     }
 }
 
-private struct ProfileCandidateCard: View {
+private struct ProfileCandidateRow: View {
     let profile: DiscoveredProfile
 
     @Environment(\.colorScheme) private var colorScheme
@@ -98,46 +96,34 @@ private struct ProfileCandidateCard: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            LucideIcon(image: Lucide.userRound, size: 20)
-                .foregroundStyle(colors.action)
-                .frame(width: 42, height: 42)
-                .background(colors.actionSurface)
-                .clipShape(Circle())
+            Image(systemName: "person.crop.circle")
+                .font(.system(size: 26))
+                .foregroundStyle(colors.textSecondary)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(profile.displayLabel)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(countsLine)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
                     .monospacedDigit()
-                Text(sourceLine)
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(0.6)
-                    .textCase(.uppercase)
-                    .foregroundStyle(colors.informationalText)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(colors.informationalSurface)
-                    .clipShape(Capsule())
-                    .padding(.top, 2)
+                Label(sourceLine, systemImage: profile.sources.contains(.iCloud) ? "icloud" : "iphone")
+                    .font(.footnote)
+                    .foregroundStyle(colors.informational)
             }
 
             Spacer(minLength: 0)
 
-            LucideIcon(image: Lucide.chevronRight, size: 14)
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(colors.textTertiary)
+                .accessibilityHidden(true)
         }
-        .padding(16)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppCornerRadius.xl, style: .continuous)
-                .strokeBorder(colors.border.opacity(colorScheme == .dark ? 0.42 : 0.28), lineWidth: 1)
-        }
+        .padding(.vertical, 6)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
@@ -156,68 +142,16 @@ private struct ProfileCandidateCard: View {
 
     private var sourceLine: String {
         switch (profile.sources.contains(.device), profile.sources.contains(.iCloud)) {
-        case (true, true): return "On this iPhone + iCloud"
+        case (true, true): return "On this iPhone and in iCloud"
         case (true, false): return "On this iPhone"
         default: return "In iCloud"
         }
     }
 }
 
-// MARK: - Settings › Account › Restore other data
+// MARK: - Settings › Account (switch profile / sign out / delete)
 
-/// Visible whenever discovery finds an inactive earlier profile — for local and
-/// Apple-ID profiles alike. Picking one switches to it (no merge in 1.1).
-struct SettingsProfileRestoreRow: View {
-    @EnvironmentObject var viewModel: AppViewModel
-    @Environment(\.colorScheme) private var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    @State private var profiles: [DiscoveredProfile] = []
-    @State private var showSheet = false
-
-    var body: some View {
-        VStack(spacing: 0) {
-            if !profiles.isEmpty {
-                Divider().background(colors.border.opacity(0.35))
-
-                Button {
-                    showSheet = true
-                } label: {
-                    SettingRow(
-                        icon: Lucide.history,
-                        iconColor: AppColors.action,
-                        iconWash: colors.actionSurface,
-                        title: "Restore other data",
-                        subtitle: profiles.count == 1
-                            ? "1 earlier profile on this iPhone or in iCloud"
-                            : "\(profiles.count) earlier profiles on this iPhone or in iCloud"
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("settings.restoreOtherData")
-            }
-        }
-        .task(id: viewModel.isSignedIn) {
-            profiles = await viewModel.discoverRestorableProfiles()
-            #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("-LHOpenRestoreSheet"), !profiles.isEmpty {
-                showSheet = true
-            }
-            #endif
-        }
-        .sheet(isPresented: $showSheet) {
-            ProfileRestoreSheet(profiles: profiles, context: .settings) { profile in
-                showSheet = false
-                viewModel.switchToProfile(profile)
-                Task { profiles = await viewModel.discoverRestorableProfiles() }
-            }
-        }
-    }
-}
-
-// MARK: - Settings › Support & Legal › Switch profile / Sign out / Delete
-
-struct SettingsProfileExitRows: View {
+struct SettingsAccountSection: View {
     @EnvironmentObject var viewModel: AppViewModel
     @ObservedObject private var signInManager = AppleSignInManager.shared
     @Environment(\.colorScheme) private var colorScheme
@@ -233,21 +167,12 @@ struct SettingsProfileExitRows: View {
     private var deleteTitle: String { isAppleProfile ? "Delete Account and Data" : "Delete All Data" }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Divider().background(colors.border.opacity(0.35))
-
+        Section {
             if isAppleProfile {
                 Button {
                     viewModel.signOut()
                 } label: {
-                    SettingRow(
-                        icon: Lucide.logOut,
-                        iconColor: AppColors.coral,
-                        iconWash: colors.destructiveSurface,
-                        title: "Sign Out",
-                        showChevron: false,
-                        isDanger: true
-                    )
+                    SettingRow(symbol: "rectangle.portrait.and.arrow.right", title: "Sign Out")
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("settings.signOut")
@@ -255,71 +180,62 @@ struct SettingsProfileExitRows: View {
                 Button {
                     showSwitchConfirm = true
                 } label: {
-                    SettingRow(
-                        icon: Lucide.arrowLeftRight,
-                        iconColor: AppColors.action,
-                        iconWash: colors.actionSurface,
-                        title: "Switch Profile",
-                        subtitle: "Open other data or start fresh",
-                        showChevron: false
-                    )
+                    SettingRow(symbol: "arrow.left.arrow.right", title: "Switch Profile", subtitle: "Open other data or start fresh")
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("settings.switchProfile")
+                .sheet(isPresented: $showSwitchConfirm) {
+                    ProfileSwitchConfirmSheet(
+                        title: "Switch profile?",
+                        message: "Your data stays on this iPhone. Open it again anytime with Restore earlier data.",
+                        onConfirm: {
+                            showSwitchConfirm = false
+                            viewModel.signOut()
+                        },
+                        onCancel: { showSwitchConfirm = false }
+                    )
+                }
             }
-
-            Divider().background(colors.border.opacity(0.35))
 
             Button {
                 showDeleteConfirm = true
             } label: {
                 SettingRow(
-                    icon: Lucide.trash2,
-                    iconColor: AppColors.coral,
-                    iconWash: colors.destructiveSurface,
-                    title: isDeleting ? "Deleting..." : deleteTitle,
+                    symbol: "trash",
+                    title: isDeleting ? "Deleting…" : deleteTitle,
                     subtitle: isAppleProfile
-                        ? "Permanently remove this account and records"
+                        ? "Permanently remove this account and its records"
                         : "Permanently remove this profile's records",
-                    showChevron: false,
-                    isDanger: true
+                    isDestructive: true
                 )
             }
             .buttonStyle(.plain)
             .disabled(isDeleting)
             .accessibilityIdentifier("settings.deleteData")
+            .alert("\(deleteTitle)?", isPresented: $showDeleteConfirm) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) { runDelete(allowLocalOnly: false) }
+            } message: {
+                Text("This permanently deletes this profile's properties, time entries, photos, categories, goals and tax profile from this iPhone and from iCloud. This cannot be undone.")
+            }
+            .alert("iCloud is off", isPresented: $showICloudOffPrompt) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete from This iPhone", role: .destructive) { runDelete(allowLocalOnly: true) }
+            } message: {
+                Text("Copies saved in iCloud can't be removed right now. Delete from this iPhone anyway, or turn on iCloud and try again.")
+            }
+            .alert("Couldn't Delete", isPresented: Binding(
+                get: { deleteError != nil },
+                set: { if !$0 { deleteError = nil } }
+            )) {
+                Button("OK", role: .cancel) { deleteError = nil }
+            } message: {
+                Text(deleteError ?? "")
+            }
+        } header: {
+            BPSectionHeader(title: "Account")
         }
-        .sheet(isPresented: $showSwitchConfirm) {
-            ProfileSwitchConfirmSheet(
-                title: "Switch profile?",
-                message: "Your data stays on this iPhone. Open it again anytime with Restore earlier data.",
-                onConfirm: {
-                    showSwitchConfirm = false
-                    viewModel.signOut()
-                },
-                onCancel: { showSwitchConfirm = false }
-            )
-        }
-        .alert("\(deleteTitle)?", isPresented: $showDeleteConfirm) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) { runDelete(allowLocalOnly: false) }
-        } message: {
-            Text("This permanently deletes this profile's properties, time entries, photos, categories, goals and tax profile from this iPhone and from iCloud. This cannot be undone.")
-        }
-        .alert("iCloud is off", isPresented: $showICloudOffPrompt) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete from This iPhone", role: .destructive) { runDelete(allowLocalOnly: true) }
-        } message: {
-            Text("Copies saved in iCloud can't be removed right now. Delete from this iPhone anyway, or turn on iCloud and try again.")
-        }
-        .alert("Couldn't Delete", isPresented: Binding(
-            get: { deleteError != nil },
-            set: { if !$0 { deleteError = nil } }
-        )) {
-            Button("OK", role: .cancel) { deleteError = nil }
-        } message: {
-            Text(deleteError ?? "")
-        }
+        .listRowBackground(colors.backgroundSecondary)
     }
 
     private func runDelete(allowLocalOnly: Bool) {
@@ -340,7 +256,7 @@ struct SettingsProfileExitRows: View {
 // MARK: - Switch confirmation (custom so the primary action uses the action tokens)
 
 /// A system alert tints its default button with system blue under white text (2.50:1 in
-/// dark mode), so the switch confirmation is a small sheet with a violet primary button.
+/// dark mode), so the switch confirmation is a small sheet with the brand's primary button.
 struct ProfileSwitchConfirmSheet: View {
     let title: String
     let message: String
@@ -352,43 +268,35 @@ struct ProfileSwitchConfirmSheet: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            LucideIcon(image: Lucide.arrowLeftRight, size: 22)
-                .foregroundStyle(colors.actionText)
-                .frame(width: 48, height: 48)
-                .background(colors.actionSurface)
-                .clipShape(Circle())
+            Image(systemName: "arrow.left.arrow.right")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(colors.action)
+                .frame(width: 52, height: 52)
+                .background(Circle().fill(colors.actionSurface))
                 .padding(.top, 22)
+                .accessibilityHidden(true)
 
             Text(title)
-                .font(.system(size: 20, weight: .black, design: .rounded))
+                .font(.title3.weight(.semibold))
                 .foregroundStyle(colors.textPrimary)
                 .multilineTextAlignment(.center)
 
             Text(message)
-                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .font(.subheadline)
                 .foregroundStyle(colors.textSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Button(action: onConfirm) {
-                Text("Switch")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background(colors.action)
-                    .foregroundStyle(colors.onAction)
-                    .clipShape(Capsule())
-            }
-            .buttonStyle(.lhPressable)
-            .padding(.top, 6)
-            .accessibilityIdentifier("switchConfirm.switch")
+            Button("Switch", action: onConfirm)
+                .buttonStyle(InboxPrimaryButtonStyle())
+                .padding(.top, 6)
+                .accessibilityIdentifier("switchConfirm.switch")
 
             Button(action: onCancel) {
                 Text("Cancel")
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(colors.action)
+                    .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.lhPressable)
             .accessibilityIdentifier("switchConfirm.cancel")
@@ -397,7 +305,7 @@ struct ProfileSwitchConfirmSheet: View {
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity)
         .presentationBackground(colors.backgroundSecondary)
-        .presentationDetents([.height(340)])
+        .presentationDetents([.height(360), .large])
         .presentationDragIndicator(.visible)
     }
 }
