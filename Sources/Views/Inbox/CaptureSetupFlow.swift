@@ -53,6 +53,8 @@ struct CaptureSetupFlow: View {
 
     let mode: Mode
     let environment: CaptureSetupEnvironment
+    /// Skip the choice and run the 90-day look-back (calendar already on, e.g. after a cancel).
+    var startAtBackfill = false
     /// `true` when the user should land on the Inbox.
     var onFinish: (_ openInbox: Bool) -> Void
 
@@ -60,7 +62,8 @@ struct CaptureSetupFlow: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var phase: Phase = .priming
-    @State private var findInCalendar = true
+    // Both start OFF: turning on capture is an explicit choice, never a default.
+    @State private var findInCalendar = false
     @State private var askWhenVisitEnds = false
     @State private var isWorking = false
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
@@ -86,6 +89,7 @@ struct CaptureSetupFlow: View {
                 }
             }
         }
+        .onAppear { if startAtBackfill { phase = .backfill } }
         .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
         .animation(reduceMotion ? .easeInOut(duration: 0.2) : AppAnimation.smooth, value: phase)
         .background(colors.background.ignoresSafeArea())
@@ -122,6 +126,9 @@ struct CaptureSetupFlow: View {
 
                     preview
                         .padding(.top, 28)
+
+                    CapturePrivacyFooter()
+                        .padding(.top, 20)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, mode == .whatsNew ? 32 : 16)
@@ -130,18 +137,17 @@ struct CaptureSetupFlow: View {
             .scrollBounceBehavior(.basedOnSize)
 
             VStack(spacing: 10) {
-                CapturePrivacyFooter()
                 Button {
                     Task { await continueTapped() }
                 } label: {
                     if isWorking {
                         ProgressView().tint(colors.onAction)
                     } else {
-                        Text(findInCalendar ? "Turn on" : "Continue")
+                        Text("Turn on")
                     }
                 }
                 .buttonStyle(InboxPrimaryButtonStyle())
-                .disabled(isWorking)
+                .disabled(isWorking || !findInCalendar)
                 .accessibilityIdentifier("capture.priming.continue")
                 Button("Not now") { notNow() }
                     .font(.body)
@@ -151,8 +157,13 @@ struct CaptureSetupFlow: View {
                     .accessibilityIdentifier("capture.priming.notNow")
             }
             .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 8)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
+            .background(
+                colors.background
+                    .overlay(alignment: .top) { Rectangle().fill(colors.border).frame(height: 0.5) }
+                    .ignoresSafeArea(edges: .bottom)
+            )
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(mode == .whatsNew ? "capture.whatsNew" : "capture.onboarding")
@@ -230,6 +241,7 @@ struct CaptureSetupFlow: View {
                 now: Self.sampleNow
             )
             .padding(.horizontal, 12)
+            .fixedSize(horizontal: false, vertical: true)
             .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Example suggestion: 2 hours, Plumber at Pine Cabin, from your calendar")
@@ -324,6 +336,8 @@ struct CaptureSetupFlow: View {
 
     private func notNow() {
         CaptureOptIn.recordChoice(calendar: false, eventPrompts: false)
+        // WP4: clear any prompts already scheduled for this profile.
+        Task { await CaptureNotificationRefresher.shared.refresh(reason: "capture-opt-out") }
         onFinish(false)
     }
 

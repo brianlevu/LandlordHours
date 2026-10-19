@@ -6,7 +6,7 @@ struct SuggestionRowView: View {
     let suggestion: Suggestion
     let propertyName: String?
     let badges: SuggestionBadges
-    var now: Date = Date()
+    var now: Date = InboxClock.now()
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize

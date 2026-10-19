@@ -7,38 +7,42 @@ extension Notification.Name {
     static let captureSuggestionsDidChange = Notification.Name("LandlordHours.captureSuggestionsDidChange")
 }
 
-/// What a row action is waiting to do. Actions are held for a few seconds so Undo is a true undo:
-/// nothing is written (no entry, no dismissed key, no mute rule) until the window closes.
-enum InboxPendingAction: Equatable {
-    case log(Suggestion, SuggestionEdits)
-    case dismiss(Suggestion)
-    case mute(Suggestion, CaptureMuteRule)
+/// A row action that has ALREADY been saved and can still be undone for a few seconds.
+/// Saving first means a crash, a watchdog kill or a force-quit inside the Undo window loses
+/// nothing; Undo reverses the write through the normal delete path.
+enum InboxUndoableAction: Equatable {
+    /// A new entry was saved for this suggestion.
+    case logged(Suggestion, entryId: UUID, hours: Double)
+    case dismissed(Suggestion)
+    /// The rule and every suggestion key it hid.
+    case muted(Suggestion, CaptureMuteRule, hiddenKeys: Set<String>)
 
     var suggestion: Suggestion {
         switch self {
-        case .log(let s, _), .dismiss(let s), .mute(let s, _): return s
-        }
-    }
-
-    /// Toast text: "Logged 2h", "Marked not landlord work", "We won't suggest these".
-    func message(defaultHours: Double?) -> String {
-        switch self {
-        case .log(let s, let edits):
-            let hours = edits.hours ?? s.proposedHours ?? defaultHours ?? 0
-            return "Logged \(InboxFormat.hours(hours))"
-        case .dismiss:
-            return "Marked not landlord work"
-        case .mute:
-            return "We won't suggest events like this"
+        case .logged(let s, _, _), .dismissed(let s), .muted(let s, _, _): return s
         }
     }
 }
 
+/// The toast under the inbox: a confirmation with Undo, or a plain message when an action could
+/// not be completed.
+struct InboxToast: Equatable, Identifiable {
+    enum Kind: Equatable { case success, neutral, problem }
+    var id = UUID()
+    var message: String
+    var kind: Kind
+    var undo: InboxUndoableAction?
+
+    var isLog: Bool { kind == .success }
+}
+
 enum InboxSwipeOutcome: Equatable {
-    /// Logged (held for Undo).
+    /// Saved (Undo available).
     case logged
     /// The item needs a decision: the confirm sheet opens.
     case needsSheet
+    /// Nothing was saved; the toast says why and the item stays in the inbox.
+    case failed
 }
 
 // MARK: - Inbox view model
@@ -48,8 +52,8 @@ enum InboxSwipeOutcome: Equatable {
 @MainActor
 final class InboxViewModel: ObservableObject {
     @Published private(set) var suggestions: [Suggestion] = []
-    /// The action waiting behind the Undo toast, if any.
-    @Published private(set) var pendingAction: InboxPendingAction?
+    /// The toast on screen, if any.
+    @Published private(set) var toast: InboxToast?
     /// The suggestion the confirm sheet shows.
     @Published var sheetSuggestion: Suggestion?
 
@@ -58,9 +62,9 @@ final class InboxViewModel: ObservableObject {
     private let now: () -> Date
     private let calendar: Calendar
     private let spouseTracking: () -> Bool
-    /// Seconds the Undo toast stays before the action is written.
+    /// Seconds the toast (and its Undo) stays.
     var undoWindow: TimeInterval
-    private var commitTask: Task<Void, Never>?
+    private var toastTask: Task<Void, Never>?
 
     init(
         app: AppViewModel?,
@@ -80,23 +84,16 @@ final class InboxViewModel: ObservableObject {
 
     /// The app's inbox: the single model's store.
     static func live(app: AppViewModel) -> InboxViewModel {
-        InboxViewModel(app: app, storeProvider: { AppModelHost.shared.suggestionStore })
+        InboxViewModel(app: app, storeProvider: { AppModelHost.shared.suggestionStore }, now: { InboxClock.now() })
     }
 
     var store: SuggestionStore? { storeProvider() }
 
     // MARK: Reads
 
-    /// Pending, visible items minus the one held behind Undo.
-    var visible: [Suggestion] {
-        let hiddenKeys = hiddenByPendingAction
-        return InboxLogic.visible(suggestions, now: now()).filter { !hiddenKeys.contains($0.sourceKey) }
-    }
+    var visible: [Suggestion] { InboxLogic.visible(suggestions, now: now()) }
 
-    var sections: [InboxSection] {
-        let hiddenKeys = hiddenByPendingAction
-        return InboxLogic.sections(suggestions.filter { !hiddenKeys.contains($0.sourceKey) }, now: now(), calendar: calendar)
-    }
+    var sections: [InboxSection] { InboxLogic.sections(suggestions, now: now(), calendar: calendar) }
 
     /// Tab badge: what still needs the user.
     var badgeCount: Int { visible.count }
@@ -119,18 +116,6 @@ final class InboxViewModel: ObservableObject {
         InboxLogic.canQuickLog(suggestion, propertyIds: Set(properties.map(\.id)))
     }
 
-    private var hiddenByPendingAction: Set<String> {
-        guard let pendingAction else { return [] }
-        switch pendingAction {
-        case .log(let s, _), .dismiss(let s):
-            return [s.sourceKey]
-        case .mute(let s, let rule):
-            var keys = Set(suggestions.filter { $0.isPending && rule.mutes($0) }.map(\.sourceKey))
-            keys.insert(s.sourceKey)
-            return keys
-        }
-    }
-
     // MARK: Lifecycle
 
     /// Re-reads the store. Re-checks pending items against current entries first, so a manual
@@ -146,10 +131,10 @@ final class InboxViewModel: ObservableObject {
         suggestions = store.suggestions
     }
 
-    // MARK: Row actions
+    // MARK: Row actions (all save immediately)
 
-    /// Swipe right. Logs (held for Undo) only when `canQuickLog`; otherwise opens the sheet.
-    /// Re-checks "might already be logged" at tap time against current entries.
+    /// Swipe right. Logs only when `canQuickLog`; otherwise opens the sheet. Re-checks
+    /// "might already be logged" at tap time against current entries.
     @discardableResult
     func swipeLog(_ suggestion: Suggestion) -> InboxSwipeOutcome {
         var current = latest(suggestion)
@@ -160,56 +145,68 @@ final class InboxViewModel: ObservableObject {
             sheetSuggestion = current
             return .needsSheet
         }
-        hold(.log(current, SuggestionEdits()))
-        return .logged
+        return save(current, edits: SuggestionEdits()) ? .logged : .failed
     }
 
-    /// Swipe left / "Not landlord work". Held for Undo.
-    func dismiss(_ suggestion: Suggestion) {
-        hold(.dismiss(latest(suggestion)))
-    }
-
-    /// The confirm sheet's "Log Xh". Missing values come back as `.needsInput` and nothing is held.
+    /// The confirm sheet's "Log Xh". Missing values come back as `.needsInput` and nothing is
+    /// saved; nil means saved (or already recorded).
     @discardableResult
     func log(_ suggestion: Suggestion, edits: SuggestionEdits) -> CaptureConfirmResult? {
         let missing = missingFields(suggestion, edits: edits)
         guard missing.isEmpty else { return .needsInput(missing: missing) }
-        hold(.log(latest(suggestion), edits))
+        if sheetSuggestion?.sourceKey == suggestion.sourceKey { sheetSuggestion = nil }
+        _ = save(latest(suggestion), edits: edits)
         return nil
     }
 
-    /// "Don't suggest events like this". Held for Undo; hides every matching pending item.
+    /// Swipe left / "Not landlord work".
+    func dismiss(_ suggestion: Suggestion) {
+        let current = latest(suggestion)
+        if sheetSuggestion?.sourceKey == current.sourceKey { sheetSuggestion = nil }
+        guard let store else { return showProblem(Self.noProfileMessage) }
+        store.dismiss(key: current.sourceKey, reason: .notLandlordWork)
+        finish(InboxToast(message: "Marked not landlord work", kind: .neutral, undo: .dismissed(current)))
+    }
+
+    /// "Don't suggest events like this": hides every matching pending item.
     func mute(_ suggestion: Suggestion, rule: CaptureMuteRule) {
-        hold(.mute(latest(suggestion), rule))
+        let current = latest(suggestion)
+        if sheetSuggestion?.sourceKey == current.sourceKey { sheetSuggestion = nil }
+        guard let store else { return showProblem(Self.noProfileMessage) }
+        var hidden = Set(store.pending.filter { rule.mutes($0) }.map(\.sourceKey))
+        hidden.insert(current.sourceKey)
+        store.addMuteRule(rule)
+        store.dismiss(key: current.sourceKey, reason: .muted)
+        finish(InboxToast(message: "We won't suggest events like this", kind: .neutral,
+                          undo: .muted(current, rule, hiddenKeys: hidden)))
     }
 
+    /// Reverses the toast's action: deletes the saved entry through the normal delete path
+    /// (iCloud tombstone), removes a mute rule, and puts the items back in the inbox.
     func undo() {
-        commitTask?.cancel()
-        commitTask = nil
-        animateChange { pendingAction = nil }
-    }
-
-    /// Writes the held action now (the toast timed out, another action started, the inbox
-    /// closed, or the app went to the background).
-    func commitPending() {
-        commitTask?.cancel()
-        commitTask = nil
-        guard let action = pendingAction else { return }
-        pendingAction = nil
+        guard let action = toast?.undo else { return }
+        dismissToast()
         guard let store else { return }
         switch action {
-        case .log(let suggestion, let edits):
-            if let app {
-                _ = app.confirm(suggestion, edits: edits, store: store)
+        case .logged(let suggestion, let entryId, _):
+            if let app, let entry = app.timeEntries.first(where: { $0.id == entryId }) {
+                app.deleteTimeEntry(entry)
             }
-        case .dismiss(let suggestion):
-            store.dismiss(key: suggestion.sourceKey, reason: .notLandlordWork)
-        case .mute(let suggestion, let rule):
-            store.addMuteRule(rule)
-            store.dismiss(key: suggestion.sourceKey, reason: .muted)
+            store.restorePending(keys: [suggestion.sourceKey])
+        case .dismissed(let suggestion):
+            store.restorePending(keys: [suggestion.sourceKey])
+        case .muted(_, let rule, let hiddenKeys):
+            store.removeMuteRule(id: rule.id)
+            store.restorePending(keys: hiddenKeys)
         }
-        reload()
-        NotificationCenter.default.post(name: .captureSuggestionsDidChange, object: nil)
+        changed()
+    }
+
+    /// Hides the toast. Nothing is pending: every action was saved when it happened.
+    func dismissToast() {
+        toastTask?.cancel()
+        toastTask = nil
+        animateChange { toast = nil }
     }
 
     func missingFields(_ suggestion: Suggestion, edits: SuggestionEdits) -> Set<CaptureConfirmField> {
@@ -221,23 +218,71 @@ final class InboxViewModel: ObservableObject {
         return missing
     }
 
+    static let noProfileMessage = "Couldn't save. Sign in to a profile and try again."
+
     // MARK: Private
+
+    /// Saves through `confirm()` and checks the result. Anything but created/already recorded
+    /// leaves the item in the inbox and says why.
+    private func save(_ suggestion: Suggestion, edits: SuggestionEdits) -> Bool {
+        guard let store, let app else {
+            showProblem(Self.noProfileMessage)
+            return false
+        }
+        let result = app.confirm(suggestion, edits: edits, store: store)
+        switch result {
+        case .created(let entryId):
+            let hours = edits.hours ?? suggestion.proposedHours ?? 0
+            finish(InboxToast(message: "Logged \(InboxFormat.hours(hours))", kind: .success,
+                              undo: .logged(suggestion, entryId: entryId, hours: hours)))
+            return true
+        case .alreadyRecorded:
+            finish(InboxToast(message: "Already in your records", kind: .neutral, undo: nil))
+            return true
+        case .needsInput(let missing):
+            reload()
+            showProblem(Self.message(for: missing))
+            sheetSuggestion = latest(suggestion)
+            return false
+        }
+    }
+
+    static func message(for missing: Set<CaptureConfirmField>) -> String {
+        if missing.contains(.profile) { return noProfileMessage }
+        if missing.contains(.plan) { return "Not saved. Your plan has reached its limit." }
+        if missing.contains(.property) { return "Not saved. Pick a property for this one." }
+        if missing.contains(.hours) { return "Not saved. Add the hours for this one." }
+        return "Not saved. Add a category for this one."
+    }
 
     private func latest(_ suggestion: Suggestion) -> Suggestion {
         suggestions.first { $0.sourceKey == suggestion.sourceKey } ?? suggestion
     }
 
-    private func hold(_ action: InboxPendingAction) {
-        // One action behind Undo at a time: the previous one is written first.
-        if pendingAction != nil { commitPending() }
-        if sheetSuggestion?.sourceKey == action.suggestion.sourceKey { sheetSuggestion = nil }
-        animateChange { pendingAction = action }
+    private func showProblem(_ message: String) {
+        present(InboxToast(message: message, kind: .problem, undo: nil))
+    }
+
+    private func finish(_ toast: InboxToast) {
+        changed()
+        present(toast)
+    }
+
+    private func changed() {
+        reload()
+        NotificationCenter.default.post(name: .captureSuggestionsDidChange, object: nil)
+    }
+
+    private func present(_ newToast: InboxToast) {
+        toastTask?.cancel()
+        animateChange { toast = newToast }
         guard undoWindow.isFinite, undoWindow > 0 else { return }
         let window = undoWindow
-        commitTask = Task { [weak self] in
+        let id = newToast.id
+        toastTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(window * 1_000_000_000))
-            guard !Task.isCancelled else { return }
-            self?.commitPending()
+            guard !Task.isCancelled, let self, self.toast?.id == id else { return }
+            self.dismissToast()
         }
     }
 

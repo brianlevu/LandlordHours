@@ -67,13 +67,18 @@ struct SuggestionConfirmSheet: View {
                 notesField
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
-                footer
+                secondaryActions
                     .padding(.horizontal, 20)
-                    .padding(.top, 24)
+                    .padding(.top, 16)
                     .padding(.bottom, 16)
             }
         }
         .scrollBounceBehavior(.basedOnSize)
+        // Log and "Not landlord work" stay pinned above the home indicator, so the decline is
+        // always visible, however long the sheet is (not-sure items carry an extra band).
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            pinnedActions
+        }
         .background(colors.background)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -152,7 +157,7 @@ struct SuggestionConfirmSheet: View {
                 )
             } else if let scheduled = suggestion.proposedHours {
                 band(
-                    title: Text("Scheduled \(Text(InboxFormat.hours(scheduled)).foregroundStyle(colors.positive))"),
+                    title: Text("Scheduled \(Text(InboxFormat.hours(scheduled)).fontWeight(.bold))"),
                     body: scheduleSentence,
                     wash: colors.backgroundTertiary
                 )
@@ -283,13 +288,8 @@ struct SuggestionConfirmSheet: View {
             if model.showsSpousePicker {
                 divider
                 valueRow("Who") {
-                    Picker("Who", selection: $participant) {
-                        Text("Me").tag(Participant.selfParticipant)
-                        Text("Spouse").tag(Participant.spouse)
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 180)
-                    .accessibilityIdentifier("confirm.who")
+                    whoPicker
+                        .accessibilityIdentifier("confirm.who")
                 }
             }
             divider
@@ -317,6 +317,32 @@ struct SuggestionConfirmSheet: View {
             }
         }
         .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    /// Me / Spouse on brand tokens (the system segmented control renders grey on iOS 27).
+    private var whoPicker: some View {
+        HStack(spacing: 2) {
+            ForEach([Participant.selfParticipant, .spouse], id: \.self) { option in
+                let selected = participant == option
+                Button {
+                    if reduceMotion { participant = option } else { withAnimation(AppAnimation.quick) { participant = option } }
+                } label: {
+                    Text(option == .spouse ? "Spouse" : "Me")
+                        .font(.subheadline.weight(selected ? .semibold : .regular))
+                        .foregroundStyle(selected ? colors.onAction : colors.textPrimary)
+                        .frame(minWidth: 72, minHeight: 32)
+                        .background(Capsule().fill(selected ? colors.action : Color.clear))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(option == .spouse ? "Spouse" : "Me")
+                .accessibilityAddTraits(selected ? [.isSelected] : [])
+            }
+        }
+        .padding(3)
+        .background(Capsule().fill(colors.backgroundTertiary))
+        .overlay(Capsule().strokeBorder(colors.border, lineWidth: 1))
+        .accessibilityElement(children: .contain)
     }
 
     private var divider: some View {
@@ -359,15 +385,15 @@ struct SuggestionConfirmSheet: View {
 
     // MARK: Footer
 
-    private var footer: some View {
-        VStack(spacing: 6) {
+    private var pinnedActions: some View {
+        VStack(spacing: 4) {
             if let reason = missingReason {
                 Text(reason)
                     .font(.footnote)
                     .foregroundStyle(colors.textSecondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
-                    .padding(.bottom, 6)
+                    .padding(.bottom, 4)
                     .accessibilityIdentifier("confirm.missing")
             }
             Button {
@@ -386,21 +412,33 @@ struct SuggestionConfirmSheet: View {
             }
             .font(.body)
             .foregroundStyle(colors.destructive)
-            .frame(minHeight: 44)
+            .frame(maxWidth: .infinity, minHeight: 44)
             .accessibilityIdentifier("confirm.dismiss")
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .background(
+            colors.background
+                .overlay(alignment: .top) { Rectangle().fill(colors.border).frame(height: 0.5) }
+                .ignoresSafeArea(edges: .bottom)
+        )
+    }
 
+    private var secondaryActions: some View {
+        VStack(spacing: 4) {
             if InboxLogic.muteRule(forTitleOf: suggestion) != nil || InboxLogic.muteRule(forCalendarOf: suggestion) != nil {
                 Button("Don't suggest events like this") { showMuteOptions = true }
                     .font(.subheadline)
-                    .foregroundStyle(colors.textSecondary)
+                    .foregroundStyle(colors.action)
                     .frame(minHeight: 44)
                     .accessibilityIdentifier("confirm.mute")
             }
             Text("Nothing counts until you log it.")
                 .font(.footnote)
                 .foregroundStyle(colors.textSecondary)
-                .padding(.top, 4)
         }
+        .frame(maxWidth: .infinity)
     }
 
     private var missingReason: String? {

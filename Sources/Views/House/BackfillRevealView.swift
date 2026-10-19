@@ -98,14 +98,19 @@ struct BackfillRevealView: View {
     @ViewBuilder
     private var house: some View {
         ZStack {
-            // Ground and anything already confirmed stay solid; the linework sketches in over it.
-            Image(decorative: confirmedKeyframe.builtImageName)
-                .resizable()
-                .scaledToFit()
-                .accessibilityHidden(true)
-            HouseHatchedView(keyframe: hatchedKeyframe, subtracting: confirmedKeyframe)
+            // Only hours already confirmed are drawn solid. On day 1 nothing is, so the solid
+            // empty-lot render (lawn, survey stake) is left out: it would sit over the hatched
+            // ground storey. The found hours are hatch in brand drafting ink, with the full
+            // house linework sketched over them (house above the lot, as in the hero).
+            if confirmedHours > 0 {
+                Image(decorative: confirmedKeyframe.builtImageName)
+                    .resizable()
+                    .scaledToFit()
+                    .accessibilityHidden(true)
+            }
+            HouseHatchedView(keyframe: hatchedKeyframe, subtracting: confirmedHours > 0 ? confirmedKeyframe : nil)
                 .mask(HouseRisingMask(progress: hatch))
-            HouseLineworkView(keyframe: confirmedKeyframe)
+            HouseLineworkView(keyframe: hatchedKeyframe)
                 .mask(HouseRisingMask(progress: sketch, feather: 0.02))
         }
         .environment(\.colorScheme, artScheme ?? environmentScheme)

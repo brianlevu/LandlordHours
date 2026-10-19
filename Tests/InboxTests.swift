@@ -113,6 +113,11 @@ final class InboxLogicTests: CaptureTestCase {
 
 // MARK: - Inbox view model (swipe, undo, mute)
 
+/// A plan that allows no more entries (stands in for WP-P's free-tier rules).
+private final class LimitedAppViewModel: AppViewModel {
+    override func canAddTimeEntry() -> Bool { false }
+}
+
 @MainActor
 final class InboxViewModelTests: CaptureTestCase {
     private var app: AppViewModel!
@@ -127,10 +132,10 @@ final class InboxViewModelTests: CaptureTestCase {
         now = Date()
     }
 
-    private func model(spouse: Bool = false) -> InboxViewModel {
-        let store = self.store!
-        let model = InboxViewModel(app: app, storeProvider: { store }, now: { [now] in now! }, calendar: calendar,
-                                   spouseTracking: { spouse }, undoWindow: .infinity)
+    private func model(spouse: Bool = false, app: AppViewModel? = nil, store: SuggestionStore?? = nil) -> InboxViewModel {
+        let resolvedStore: SuggestionStore? = store ?? self.store
+        let model = InboxViewModel(app: app ?? self.app, storeProvider: { resolvedStore }, now: { [now] in now! },
+                                   calendar: calendar, spouseTracking: { spouse }, undoWindow: .infinity)
         model.reload()
         return model
     }
@@ -145,65 +150,112 @@ final class InboxViewModelTests: CaptureTestCase {
                                   propertyId: property ?? propertyId, hours: hours, category: .repairs)
     }
 
-    func testSwipeLogHoldsForUndoThenCommitsOneEntry() {
+    func testSwipeLogSavesImmediatelyWithUndo() {
         let a = item("A"), b = item("B", daysAgo: 2)
         seed([a, b])
         let model = model()
         XCTAssertEqual(model.badgeCount, 2)
 
         XCTAssertEqual(model.swipeLog(a), .logged)
-        XCTAssertEqual(model.badgeCount, 1, "Row leaves the inbox right away")
-        XCTAssertFalse(app.timeEntries.contains { $0.sourceKey == a.sourceKey }, "Nothing written before the Undo window closes")
-        XCTAssertTrue(store.suggestion(forKey: a.sourceKey)!.isPending)
-
-        model.commitPending()
         let entries = app.timeEntries.filter { $0.sourceKey == a.sourceKey }
-        XCTAssertEqual(entries.count, 1)
+        XCTAssertEqual(entries.count, 1, "Saved at once: nothing is lost if the app dies inside the Undo window")
         XCTAssertEqual(entries[0].id, a.entryId(profileId: profileId))
         XCTAssertEqual(entries[0].hours, 2)
         XCTAssertNotNil(entries[0].confirmedAt)
         XCTAssertEqual(store.suggestion(forKey: a.sourceKey)!.state, .confirmed(entryId: entries[0].id))
         XCTAssertEqual(model.badgeCount, 1)
-        XCTAssertNil(model.pendingAction)
+        XCTAssertEqual(model.toast?.message, "Logged 2h")
+        if case .logged(_, let entryId, let hours)? = model.toast?.undo {
+            XCTAssertEqual(entryId, entries[0].id)
+            XCTAssertEqual(hours, 2)
+        } else {
+            XCTFail("Undo offered for the saved log")
+        }
     }
 
-    func testUndoLogLeavesNoEntryAndRestoresRow() {
+    func testUndoLogDeletesTheEntryAndRestoresTheRow() {
         let a = item("A")
         seed([a])
         let model = model()
         model.swipeLog(a)
         XCTAssertEqual(model.badgeCount, 0)
         model.undo()
-        XCTAssertEqual(model.badgeCount, 1)
-        model.commitPending()
-        XCTAssertTrue(app.timeEntries.filter { $0.sourceKey != nil }.isEmpty)
+        XCTAssertTrue(app.timeEntries.filter { $0.sourceKey != nil }.isEmpty, "Undo deletes through deleteTimeEntry")
         XCTAssertTrue(store.suggestion(forKey: a.sourceKey)!.isPending)
+        XCTAssertEqual(model.badgeCount, 1)
+        XCTAssertNil(model.toast)
+        // Logging again after Undo works and keeps the same derived id.
+        XCTAssertEqual(model.swipeLog(a), .logged)
+        XCTAssertEqual(app.timeEntries.filter { $0.sourceKey == a.sourceKey }.map(\.id), [a.entryId(profileId: profileId)])
     }
 
-    func testDismissAndUndoDismiss() {
+    func testDismissSavesAndUndoRestores() {
         let a = item("A"), b = item("B", daysAgo: 3)
         seed([a, b])
         let model = model()
         model.dismiss(a)
+        XCTAssertTrue(store.isDismissed(a.sourceKey), "Saved at once")
         model.undo()
-        model.commitPending()
         XCTAssertFalse(store.isDismissed(a.sourceKey))
+        XCTAssertTrue(store.suggestion(forKey: a.sourceKey)!.isPending)
         model.dismiss(b)
-        model.commitPending()
-        XCTAssertTrue(store.isDismissed(b.sourceKey))
         XCTAssertEqual(store.suggestion(forKey: b.sourceKey)!.state, .dismissed(reason: .notLandlordWork))
         XCTAssertTrue(app.timeEntries.filter { $0.sourceKey != nil }.isEmpty, "Dismiss never writes entries")
     }
 
-    func testNextActionCommitsThePreviousOne() {
+    func testUndoOnlyReversesTheLatestAction() {
         let a = item("A"), b = item("B", daysAgo: 2)
         seed([a, b])
         let model = model()
         model.swipeLog(a)
         model.dismiss(b)
-        XCTAssertEqual(app.timeEntries.filter { $0.sourceKey == a.sourceKey }.count, 1, "First action written when the second starts")
         model.undo()
         XCTAssertFalse(store.isDismissed(b.sourceKey))
+        XCTAssertEqual(app.timeEntries.filter { $0.sourceKey == a.sourceKey }.count, 1, "The earlier log stays")
+    }
+
+    func testFailedConfirmKeepsTheItemAndSaysWhy() {
+        let limited = LimitedAppViewModel()
+        limited.suppressCelebrations = true
+        let a = item("A")
+        seed([a])
+        let model = model(app: limited)
+        XCTAssertEqual(model.swipeLog(a), .failed)
+        XCTAssertTrue(limited.timeEntries.filter { $0.sourceKey != nil }.isEmpty)
+        XCTAssertTrue(store.suggestion(forKey: a.sourceKey)!.isPending, "Still in the inbox")
+        XCTAssertEqual(model.badgeCount, 1)
+        XCTAssertEqual(model.toast?.kind, .problem)
+        XCTAssertNil(model.toast?.undo)
+        XCTAssertEqual(model.toast?.message, "Not saved. Your plan has reached its limit.")
+    }
+
+    func testNoStoreNeverClaimsLogged() {
+        let a = item("A")
+        let model = model(store: .some(nil))
+        XCTAssertEqual(model.swipeLog(a), .failed, "No profile: nothing saved, and it says so")
+        XCTAssertNil(model.log(a, edits: SuggestionEdits()))
+        XCTAssertEqual(model.toast?.kind, .problem)
+        XCTAssertEqual(model.toast?.message, InboxViewModel.noProfileMessage)
+        XCTAssertTrue(app.timeEntries.filter { $0.sourceKey != nil }.isEmpty)
+    }
+
+    func testPropertyDeletedAfterLoadingOpensSheetNotSilentLoss() {
+        let a = item("A")
+        seed([a])
+        let model = model()
+        app.deleteProperty(app.properties[0])
+        XCTAssertEqual(model.swipeLog(a), .needsSheet)
+        XCTAssertEqual(model.log(a, edits: SuggestionEdits()), .needsInput(missing: [.property]))
+        XCTAssertTrue(app.timeEntries.isEmpty)
+        XCTAssertTrue(store.suggestion(forKey: a.sourceKey)!.isPending)
+    }
+
+    func testConfirmRespectsCanAddTimeEntry() {
+        let limited = LimitedAppViewModel()
+        limited.suppressCelebrations = true
+        limited.addProperty(name: "Oak", address: "1 Oak St", type: .ltr)
+        let a = item("A", property: .some(limited.properties[0].id))
+        XCTAssertEqual(limited.confirm(a, store: store), .needsInput(missing: [.plan]))
     }
 
     func testSwipeOnIncompleteOrFlaggedItemOpensSheet() {
@@ -212,7 +264,7 @@ final class InboxViewModelTests: CaptureTestCase {
         let model = model()
         XCTAssertEqual(model.swipeLog(noProperty), .needsSheet)
         XCTAssertEqual(model.sheetSuggestion?.sourceKey, noProperty.sourceKey)
-        XCTAssertNil(model.pendingAction)
+        XCTAssertNil(model.toast)
     }
 
     func testSwipeRechecksAlreadyLoggedAtTapTime() {
@@ -220,7 +272,6 @@ final class InboxViewModelTests: CaptureTestCase {
         seed([a])
         let model = model()
         XCTAssertTrue(model.canQuickLog(model.visible[0]))
-        // A hand-logged entry appears after the inbox loaded (another device, a manual log).
         app.timeEntries.append(TimeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs,
                                          hours: 2, date: a.start))
         XCTAssertEqual(model.swipeLog(a), .needsSheet, "Flagged at tap time, so the sheet asks")
@@ -233,15 +284,15 @@ final class InboxViewModelTests: CaptureTestCase {
         seed([receiptLike])
         let model = model()
         XCTAssertEqual(model.log(receiptLike, edits: SuggestionEdits()), .needsInput(missing: [.hours]))
-        XCTAssertNil(model.pendingAction)
+        XCTAssertNil(model.toast)
         XCTAssertNil(model.log(receiptLike, edits: SuggestionEdits(hours: 1.25, participant: .spouse)))
-        model.commitPending()
         let entry = app.timeEntries.first { $0.sourceKey == receiptLike.sourceKey }
         XCTAssertEqual(entry?.hours, 1.25)
         XCTAssertEqual(entry?.participant, .spouse)
+        XCTAssertEqual(model.toast?.message, "Logged 1h 15m")
     }
 
-    func testMuteHidesMatchingItemsAndCommitsRule() {
+    func testMuteHidesMatchingItemsAndUndoRestoresThem() {
         let a = item("A"), b = calendarSuggestion(externalId: "B", start: item("x", daysAgo: 4).start,
                                                    title: "Plumber A follow-up", propertyId: propertyId)
         let other = calendarSuggestion(externalId: "C", start: item("y", daysAgo: 5).start, title: "Showing", propertyId: propertyId)
@@ -250,11 +301,12 @@ final class InboxViewModelTests: CaptureTestCase {
         let rule = InboxLogic.muteRule(forTitleOf: a)!
         model.mute(a, rule: rule)
         XCTAssertEqual(model.visible.map(\.sourceKey), [other.sourceKey], "Everything the rule covers leaves together")
+        XCTAssertEqual(store.muteRules.map(\.value), ["Plumber A"], "Saved at once")
         model.undo()
+        XCTAssertTrue(store.muteRules.isEmpty)
         XCTAssertEqual(model.badgeCount, 3)
+        XCTAssertFalse(store.isDismissed(a.sourceKey))
         model.mute(a, rule: rule)
-        model.commitPending()
-        XCTAssertEqual(store.muteRules.map(\.value), ["Plumber A"])
         XCTAssertEqual(store.pending.map(\.sourceKey), [other.sourceKey])
         XCTAssertTrue(store.isDismissed(a.sourceKey))
     }
@@ -330,9 +382,21 @@ final class CaptureOptInTests: CaptureTestCase {
 private struct FakeBackfillScanner: BackfillScanning {
     var access: CalendarAccess = .fullAccess
     var found = 3
+    var cancelled = false
     func scan(progress: @escaping @Sendable (ClassifierBatchProgress) -> Void) async -> BackfillScanOutcome {
         for i in 1...4 { progress(ClassifierBatchProgress(completed: i, total: 4)) }
-        return BackfillScanOutcome(access: access, foundCount: found)
+        return BackfillScanOutcome(access: access, foundCount: found, cancelled: cancelled)
+    }
+}
+
+/// Runs until cancelled (like a long 90-day scan).
+private struct SlowBackfillScanner: BackfillScanning {
+    func scan(progress: @escaping @Sendable (ClassifierBatchProgress) -> Void) async -> BackfillScanOutcome {
+        for _ in 0..<200 {
+            if Task.isCancelled { return BackfillScanOutcome(access: .fullAccess, foundCount: 0, cancelled: true) }
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        return BackfillScanOutcome(access: .fullAccess, foundCount: 5)
     }
 }
 
@@ -355,6 +419,41 @@ final class BackfillIntroTests: CalendarCaptureTestCase {
         let empty = BackfillIntroModel()
         await empty.run(FakeBackfillScanner(found: 0), revealAvailable: true)
         XCTAssertEqual(empty.phase, .results, "Nothing found: no reveal")
+    }
+
+    func testCancelledScanIsNotMarkedComplete() async {
+        let model = BackfillIntroModel()
+        await model.run(FakeBackfillScanner(cancelled: true), revealAvailable: false)
+        XCTAssertEqual(model.phase, .cancelled)
+        XCTAssertFalse(CaptureOptIn.backfillCompleted(), "A cancelled look-back can run again")
+    }
+
+    func testCancelButtonStopsAScanInFlight() async {
+        let model = BackfillIntroModel()
+        let finished = expectation(description: "scan task ended")
+        model.start(SlowBackfillScanner(), revealAvailable: false) { finished.fulfill() }
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        model.cancel()
+        await fulfillment(of: [finished], timeout: 5)
+        XCTAssertEqual(model.phase, .cancelled)
+        XCTAssertFalse(CaptureOptIn.backfillCompleted())
+    }
+
+    func testCoordinatorReportsCancelledAndIngestsNothing() async {
+        let (app, _) = makeViewModel()
+        let store = makeStore()
+        let source = FakeCalendarSource(events: [
+            event("PLUMB", start: date(2026, 5, 10, 9), hours: 2, title: "Plumber at Oak"),
+        ])
+        let coordinator = makeCoordinator(source, store: store)
+        let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: UnavailableOnDeviceBackend(reason: .osTooOld)))
+        let properties = app.properties, entries = app.timeEntries
+        let task = Task { await coordinator.scanBackfillBatched(chain: chain, properties: properties, entries: entries) }
+        task.cancel()
+        let result = await task.value
+        XCTAssertTrue(result.cancelled)
+        XCTAssertTrue(result.added.isEmpty)
+        XCTAssertTrue(store.suggestions.isEmpty, "Nothing ingested from a cancelled scan")
     }
 
     func testDeniedCalendarIsBlocked() async {

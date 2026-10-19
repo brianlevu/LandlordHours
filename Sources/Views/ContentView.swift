@@ -526,11 +526,12 @@ struct ContentView: View {
             }
 
             // WP3: Undo for the last inbox action, just above the tab bar.
-            if let action = inboxModel.pendingAction, !isCustomTabBarHidden {
-                InboxUndoToast(action: action) { inboxModel.undo() }
+            if let toast = inboxModel.toast, !isCustomTabBarHidden {
+                InboxUndoToast(toast: toast) { inboxModel.undo() }
                     .padding(.horizontal, 16)
                     .padding(.bottom, Self.tabBarHeight + 8 + 12)
-                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                    // Slides only: an opacity fade would let row text show through mid-transition.
+                    .transition(reduceMotion ? .identity : .move(edge: .bottom))
                     .zIndex(5)
             }
 
@@ -552,14 +553,14 @@ struct ContentView: View {
             presentCaptureWhatsNewIfNeeded()
         }
         .onChange(of: selectedTab) { _, _ in
-            inboxModel.commitPending()
+            inboxModel.dismissToast()
             inboxModel.reload()
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { inboxModel.reload() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .captureSuggestionsDidChange)) { _ in
-            if inboxModel.pendingAction == nil { inboxModel.reload() }
+            inboxModel.reload()
         }
         .sheet(isPresented: $showCaptureWhatsNew, onDismiss: {
             // Swiping the intro away is an answer too: it never shows again, and nothing turns on.

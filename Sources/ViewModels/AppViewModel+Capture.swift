@@ -31,6 +31,8 @@ enum CaptureConfirmField: String, Hashable, CaseIterable {
     case property
     case category
     case hours
+    /// The plan does not allow another entry (`canAddTimeEntry()`; WP-P owns the free-tier rules).
+    case plan
 }
 
 extension AppViewModel {
@@ -60,6 +62,9 @@ extension AppViewModel {
             store?.markConfirmed(key: suggestion.sourceKey, entryId: existing.id)
             return .alreadyRecorded(entryId: existing.id)
         }
+
+        // Free-tier limits hook in here (WP-P writes the rules in canAddTimeEntry()).
+        guard canAddTimeEntry() else { return .needsInput(missing: [.plan]) }
 
         let propertyId = edits.propertyId ?? suggestion.proposedPropertyId
         let category = edits.category ?? suggestion.proposedCategory

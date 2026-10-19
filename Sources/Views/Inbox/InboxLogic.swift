@@ -1,5 +1,11 @@
 import Foundation
 
+/// The inbox's notion of "now". DEBUG captures pin it (`-LHFixedNow`) so frames do not depend
+/// on the time of day they were taken.
+enum InboxClock {
+    nonisolated(unsafe) static var now: () -> Date = { Date() }
+}
+
 // MARK: - Inbox rules (pure, unit-tested)
 //
 // Everything that decides WHAT the inbox shows lives here, so grouping, ranking, badges and the

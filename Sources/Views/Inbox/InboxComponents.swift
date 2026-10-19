@@ -185,14 +185,17 @@ struct InboxSwitchStyle: ToggleStyle {
                 configuration.label
                     .frame(maxWidth: .infinity, alignment: .leading)
                 ZStack(alignment: configuration.isOn ? .trailing : .leading) {
+                    // System polarity: a white knob on a grey track when off, on the action
+                    // colour when on. The off track is darker than iOS 27's (which measures
+                    // ~1.05:1 on a white card) so the off state stays visible.
                     Capsule()
-                        .fill(configuration.isOn ? colors.action : colors.backgroundTertiary)
-                        .overlay(Capsule().strokeBorder(configuration.isOn ? Color.clear : colors.textTertiary, lineWidth: 1.5))
+                        .fill(configuration.isOn ? colors.action : (colorScheme == .dark ? Color(hex: "39446E") : Color(hex: "C7CEDD")))
                         .frame(width: 51, height: 31)
                     Circle()
-                        .fill(configuration.isOn ? colors.onAction : colors.textSecondary)
-                        .frame(width: 25, height: 25)
-                        .padding(3)
+                        .fill(configuration.isOn ? colors.onAction : Color.white)
+                        .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
+                        .frame(width: 27, height: 27)
+                        .padding(2)
                 }
                 .animation(reduceMotion ? nil : AppAnimation.quick, value: configuration.isOn)
                 .accessibilityHidden(true)
@@ -261,7 +264,7 @@ struct InboxBadge: View {
 struct InboxEmptyArt: View {
     var body: some View {
         ZStack {
-            Image("bp_tool_bookkeeping_56").resizable().scaledToFit()
+            Image("bp_tool_showing_56").resizable().scaledToFit()
                 .frame(width: 76, height: 76)
                 .rotationEffect(.degrees(-8))
                 .offset(x: -48, y: 10)

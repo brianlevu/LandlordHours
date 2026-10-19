@@ -36,6 +36,9 @@ struct CalendarScanResult: Equatable {
     /// Newly added pending suggestions (what a notifier may announce).
     var added: [Suggestion]
     var skipped: CalendarSkipCounts
+    /// The scan stopped before finishing (the user cancelled the backfill, or the task was
+    /// cancelled). Nothing from it was ingested; the backfill is NOT complete.
+    var cancelled = false
 
     static func blocked(_ access: CalendarAccess) -> CalendarScanResult {
         CalendarScanResult(access: access, added: [], skipped: CalendarSkipCounts())
@@ -116,7 +119,11 @@ final class CalendarCaptureCoordinator {
         do {
             outcomes = try await chain.classifyBatch(candidates, properties: properties, progress: progress)
         } catch {
-            return CalendarScanResult(access: .fullAccess, added: [], skipped: detector.lastSkipCounts)
+            // classifyBatch throws only on cancellation.
+            return CalendarScanResult(access: .fullAccess, added: [], skipped: detector.lastSkipCounts, cancelled: true)
+        }
+        guard !Task.isCancelled else {
+            return CalendarScanResult(access: .fullAccess, added: [], skipped: detector.lastSkipCounts, cancelled: true)
         }
         var suggestions: [Suggestion] = []
         for (candidate, outcome) in zip(candidates, outcomes) {

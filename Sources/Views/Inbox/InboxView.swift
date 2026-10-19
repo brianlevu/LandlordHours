@@ -9,6 +9,7 @@ struct InboxView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showSetup = false
+    @State private var setupStartsAtBackfill = false
     @State private var logTick = 0
     @State private var dismissTick = 0
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
@@ -29,7 +30,7 @@ struct InboxView: View {
             SuggestionConfirmSheet(suggestion: suggestion, model: model)
         }
         .sheet(isPresented: $showSetup, onDismiss: { model.reload() }) {
-            CaptureSetupFlow(mode: .whatsNew, environment: .current) { _ in
+            CaptureSetupFlow(mode: .whatsNew, environment: .current, startAtBackfill: setupStartsAtBackfill) { _ in
                 showSetup = false
             }
             .environmentObject(viewModel)
@@ -37,13 +38,12 @@ struct InboxView: View {
         .sensoryFeedback(.success, trigger: logTick)
         .sensoryFeedback(.impact(weight: .light), trigger: dismissTick)
         .onAppear { model.reload() }
-        .onDisappear { model.commitPending() }
+        .onDisappear { model.dismissToast() }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { model.commitPending() }
             if phase == .active { model.reload() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .captureSuggestionsDidChange)) { _ in
-            if model.pendingAction == nil { model.reload() }
+            model.reload()
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("inbox.screen")
@@ -113,6 +113,7 @@ struct InboxView: View {
                 swipeLog(suggestion)
             } label: {
                 Label(quick ? "Log" : "Review", systemImage: quick ? "checkmark" : "square.and.pencil")
+                    .labelStyle(.iconOnly)
             }
             .tint(Color(hex: AppColors.Hex.positive))
             .accessibilityIdentifier("inbox.swipe.log")
@@ -122,12 +123,13 @@ struct InboxView: View {
                 dismiss(suggestion)
             } label: {
                 Label("Not work", systemImage: "xmark")
+                    .labelStyle(.iconOnly)
             }
             .tint(Color(hex: AppColors.Hex.textSecondary))
             .accessibilityIdentifier("inbox.swipe.dismiss")
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(SuggestionRowView.accessibilityLabel(for: suggestion, propertyName: propertyName, badges: badges, now: Date()))
+        .accessibilityLabel(SuggestionRowView.accessibilityLabel(for: suggestion, propertyName: propertyName, badges: badges, now: InboxClock.now()))
         .accessibilityHint("Opens the details to confirm")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(named: quick ? "Log \(InboxFormat.hours(suggestion.proposedHours ?? 0))" : "Review and log") {
@@ -153,7 +155,8 @@ struct InboxView: View {
     // MARK: Banner
 
     private var backfillBanner: some View {
-        let count = model.backfillCount
+        let total = model.badgeCount
+        let fromBackfill = model.backfillCount
         return HStack(alignment: .center, spacing: 14) {
             ZStack {
                 CategoryToolTile(category: .repairs, size: 44)
@@ -165,10 +168,10 @@ struct InboxView: View {
             }
             .frame(width: 76, height: 76)
             VStack(alignment: .leading, spacing: 4) {
-                Text(count == 1 ? "1 thing from the last 90 days" : "\(count) things from the last 90 days")
+                Text(total == 1 ? "1 thing to confirm" : "\(total) things to confirm")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(OnBlueprint.primary)
-                Text("Confirm the ones that were work and they go up on the house.")
+                Text("\(fromBackfill) from the last 90 days. Confirm the ones that were work and they go up on the house.")
                     .font(.subheadline)
                     .foregroundStyle(OnBlueprint.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -184,11 +187,13 @@ struct InboxView: View {
     // MARK: Empty
 
     private var emptyState: some View {
+        GeometryReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 titleRow
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
+                Spacer(minLength: 24)
                 VStack(spacing: 12) {
                     InboxEmptyArt()
                         .padding(.bottom, 8)
@@ -203,17 +208,31 @@ struct InboxView: View {
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                     if !viewModel.calendarSuggestionsEnabled {
-                        Button("Find rental work in my calendar") { showSetup = true }
-                            .buttonStyle(InboxPrimaryButtonStyle())
-                            .padding(.top, 12)
-                            .accessibilityIdentifier("inbox.empty.setup")
+                        Button("Find rental work in my calendar") {
+                            setupStartsAtBackfill = false
+                            showSetup = true
+                        }
+                        .buttonStyle(InboxPrimaryButtonStyle())
+                        .padding(.top, 12)
+                        .accessibilityIdentifier("inbox.empty.setup")
+                    } else if !CaptureOptIn.backfillCompleted() {
+                        // A cancelled or unfinished look-back can run again.
+                        Button("Look back 90 days") {
+                            setupStartsAtBackfill = true
+                            showSetup = true
+                        }
+                        .buttonStyle(InboxPrimaryButtonStyle())
+                        .padding(.top, 12)
+                        .accessibilityIdentifier("inbox.empty.backfill")
                     }
                 }
                 .padding(.horizontal, 32)
-                .padding(.top, 72)
                 .frame(maxWidth: .infinity)
+                Spacer(minLength: 24)
             }
-            .padding(.bottom, 96)
+            .frame(minHeight: proxy.size.height - 72)
+            .padding(.bottom, 72)
+        }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("inbox.empty")
@@ -223,27 +242,45 @@ struct InboxView: View {
 /// "Logged 2h · Undo". Shown by the shell just above the floating tab bar (the tab bar draws
 /// over tab content, so the toast can't live inside the Inbox's own safe area).
 struct InboxUndoToast: View {
-    let action: InboxPendingAction
+    let toast: InboxToast
     var onUndo: () -> Void
     @Environment(\.colorScheme) private var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
+    private var symbol: String {
+        switch toast.kind {
+        case .success: return "checkmark.circle.fill"
+        case .neutral: return "xmark.circle.fill"
+        case .problem: return "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var tint: Color {
+        switch toast.kind {
+        case .success: return colors.positive
+        case .neutral: return colors.textSecondary
+        case .problem: return colors.caution
+        }
+    }
+
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: action.isLog ? "checkmark.circle.fill" : "xmark.circle.fill")
+            Image(systemName: symbol)
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(action.isLog ? colors.positive : colors.textSecondary)
+                .foregroundStyle(tint)
                 .accessibilityHidden(true)
-            Text(action.message(defaultHours: nil))
+            Text(toast.message)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(colors.textPrimary)
                 .lineLimit(2)
             Spacer(minLength: 8)
-            Button("Undo", action: onUndo)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(colors.action)
-                .frame(minWidth: 44, minHeight: 44)
-                .accessibilityIdentifier("inbox.undo")
+            if toast.undo != nil {
+                Button("Undo", action: onUndo)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(colors.action)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityIdentifier("inbox.undo")
+            }
         }
         .padding(.leading, 16)
         .padding(.trailing, 8)
@@ -253,15 +290,9 @@ struct InboxUndoToast: View {
                 .fill(colors.backgroundSecondary)
                 .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.12), radius: 16, y: 4)
         )
-        .overlay(Capsule().strokeBorder(colors.border.opacity(0.6), lineWidth: 0.5))
+        .overlay(Capsule().strokeBorder(colors.border, lineWidth: 1))
+        .compositingGroup()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("inbox.toast")
-    }
-}
-
-extension InboxPendingAction {
-    var isLog: Bool {
-        if case .log = self { return true }
-        return false
     }
 }

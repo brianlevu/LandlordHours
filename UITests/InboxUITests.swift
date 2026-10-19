@@ -26,6 +26,8 @@ final class InboxUITests: XCTestCase {
             "-LHColorScheme", scheme,
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US",
+            // Pin the inbox clock so times and groups don't depend on when tests run.
+            "-LHFixedNow", "2026-10-16T15:00",
         ] + extra
     }
 
@@ -88,6 +90,14 @@ final class InboxUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 0.25)
         }
         return (tab.value as? String) == value
+    }
+
+    /// Both opt-in switches start off; turning calendar on is the explicit choice.
+    private func turnOnCalendar() {
+        let calendarSwitch = app.descendants(matching: .any)["capture.toggle.calendar"]
+        XCTAssertTrue(calendarSwitch.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["capture.priming.continue"].isEnabled, "Turn on waits for a choice")
+        calendarSwitch.tap()
     }
 
     /// WP-H's house reveal shows first when the backfill found anything; continue to the list.
@@ -238,6 +248,7 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(settle(setup))
         setup.tap()
         XCTAssertTrue(app.descendants(matching: .any)["capture.privacyFooter"].waitForExistence(timeout: 5))
+        turnOnCalendar()
         app.descendants(matching: .any)["capture.toggle.eventPrompts"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["capture.notificationPreview"].waitForExistence(timeout: 3))
         app.buttons["capture.priming.continue"].tap()
@@ -262,6 +273,7 @@ final class InboxUITests: XCTestCase {
         let setup = app.buttons["inbox.empty.setup"]
         XCTAssertTrue(settle(setup))
         setup.tap()
+        turnOnCalendar()
         app.buttons["capture.priming.continue"].tap()
         passReveal()
         let first = app.buttons["backfill.row.0"]
@@ -273,6 +285,22 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["We found 22 visits that look like landlord work"].waitForNonExistence(timeout: 5),
                       "Count drops to 21 after a confirm")
         XCTAssertTrue(app.staticTexts["We found 21 visits that look like landlord work"].exists)
+    }
+
+    func testCancelledBackfillCanRunAgain() {
+        launch("backfill", extra: ["-LHFakeCalendar", "granted", "-LHHoldBackfillScan"])
+        let setup = app.buttons["inbox.empty.setup"]
+        XCTAssertTrue(settle(setup))
+        setup.tap()
+        turnOnCalendar()
+        app.buttons["capture.priming.continue"].tap()
+        let cancel = app.buttons["backfill.cancel"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10), "Cancel is visible while scanning")
+        cancel.tap()
+        XCTAssertTrue(cancel.waitForNonExistence(timeout: 5))
+        let again = app.buttons["inbox.empty.backfill"]
+        XCTAssertTrue(again.waitForExistence(timeout: 5), "Not marked done: the look-back can run again")
+        XCTAssertFalse(app.descendants(matching: .any)["inbox.backfillBanner"].exists, "Nothing ingested")
     }
 
     func testWhatsNewNotNowKeepsEverythingOff() {
@@ -288,6 +316,7 @@ final class InboxUITests: XCTestCase {
     func testWhatsNewDeniedCalendarShowsSettingsPath() {
         launch("backfill", extra: ["-LHShowWhatsNew", "-LHFakeCalendar", "denied"])
         XCTAssertTrue(settle(app.descendants(matching: .any)["capture.whatsNew"]))
+        turnOnCalendar()
         app.buttons["capture.priming.continue"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["capture.denied"].waitForExistence(timeout: 5))
         app.buttons["capture.denied.continue"].tap()
@@ -306,6 +335,8 @@ final class InboxUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(settle(app.descendants(matching: .any)["capture.onboarding"]))
         XCTAssertTrue(app.descendants(matching: .any)["capture.privacyFooter"].exists)
+        let calendarSwitch = app.descendants(matching: .any)["capture.toggle.calendar"]
+        XCTAssertTrue(["0", "Off"].contains(calendarSwitch.value as? String ?? ""), "Calendar starts off")
         let prompts = app.descendants(matching: .any)["capture.toggle.eventPrompts"]
         XCTAssertTrue(["0", "Off"].contains(prompts.value as? String ?? ""), "End-of-event prompts start off")
         app.buttons["capture.priming.notNow"].tap()

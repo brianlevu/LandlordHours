@@ -6,6 +6,8 @@ struct BackfillScanOutcome: Equatable {
     var access: CalendarAccess
     /// Newly found pending items (for the count; the list reads the store).
     var foundCount: Int
+    /// Stopped before finishing: nothing counts as done, the backfill can run again.
+    var cancelled = false
 }
 
 /// Runs the day-1 90-day scan. Production: WP1's coordinator + WP2's `classifyBatch`.
@@ -30,7 +32,7 @@ struct CalendarBackfillScanner: BackfillScanning {
             entries: entries,
             progress: progress
         )
-        return BackfillScanOutcome(access: result.access, foundCount: result.added.count)
+        return BackfillScanOutcome(access: result.access, foundCount: result.added.count, cancelled: result.cancelled)
     }
 }
 
@@ -52,11 +54,29 @@ final class BackfillIntroModel: ObservableObject {
         case reveal
         case results
         case blocked(CalendarAccess)
+        /// The user cancelled; the backfill stays not-done so it can run again.
+        case cancelled
     }
 
     @Published private(set) var phase: Phase = .scanning(completed: 0, total: 0)
     @Published var showAll = false
     @Published private(set) var foundCount = 0
+    private var scanTask: Task<Void, Never>?
+
+    /// Starts the scan (once).
+    func start(_ scanner: BackfillScanning, revealAvailable: Bool? = nil, completion: @escaping () -> Void = {}) {
+        guard scanTask == nil else { return }
+        scanTask = Task { [weak self] in
+            await self?.run(scanner, revealAvailable: revealAvailable)
+            completion()
+        }
+    }
+
+    /// Cancel on the scanning screen. Marks nothing done.
+    func cancel() {
+        scanTask?.cancel()
+        phase = .cancelled
+    }
 
     /// The ranked list the intro shows: top 15 until "Show more".
     func items(from pending: [Suggestion]) -> [Suggestion] {
@@ -78,11 +98,16 @@ final class BackfillIntroModel: ObservableObject {
                 self.phase = .scanning(completed: progress.completed, total: progress.total)
             }
         }
+        if outcome.cancelled || Task.isCancelled || phase == .cancelled {
+            phase = .cancelled
+            return
+        }
         guard outcome.access == .fullAccess else {
             phase = .blocked(outcome.access)
             return
         }
         foundCount = outcome.foundCount
+        // Only a finished scan counts as the day-1 backfill.
         CaptureOptIn.markBackfillCompleted()
         phase = revealAvailable && outcome.foundCount > 0 ? .reveal : .results
     }
@@ -129,19 +154,26 @@ struct BackfillIntroView: View {
                     .preferredColorScheme(hostScheme)
             case .blocked:
                 blocked
+            case .cancelled:
+                Color.clear.onAppear { onDone(false) }
             }
         }
         .animation(reduceMotion ? .easeInOut(duration: 0.2) : AppAnimation.smooth, value: model.phase)
-        .task {
+        .onAppear {
             if hostScheme == nil { hostScheme = colorScheme }
-            inbox.undoWindow = 0
-            await model.run(scanner)
-            inbox.reload()
+            model.start(scanner) { inbox.reload() }
         }
-        .sheet(item: $inbox.sheetSuggestion, onDismiss: { inbox.commitPending() }) { suggestion in
+        .overlay(alignment: .bottom) {
+            if let toast = inbox.toast {
+                InboxUndoToast(toast: toast) { inbox.undo() }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 84)
+            }
+        }
+        .sheet(item: $inbox.sheetSuggestion, onDismiss: { inbox.reload() }) { suggestion in
             SuggestionConfirmSheet(suggestion: suggestion, model: inbox)
         }
-        .onDisappear { inbox.commitPending() }
+        .onDisappear { inbox.dismissToast() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("backfill.intro")
     }
@@ -155,15 +187,8 @@ struct BackfillIntroView: View {
     private func scanning(completed: Int, total: Int) -> some View {
         VStack(spacing: 20) {
             Spacer()
-            ZStack {
-                InboxBlueprintPaper(cornerRadius: 28)
-                    .frame(width: 168, height: 168)
-                Image("bp_house_k18_finished_lines")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 150, height: 150)
-                    .accessibilityHidden(true)
-            }
+            LHCompactLogo(size: 132)
+                .accessibilityHidden(true)
             Text("Looking back 90 days")
                 .font(AppTypography.drafting)
                 .tracking(1.3)
@@ -184,6 +209,12 @@ struct BackfillIntroView: View {
                 .monospacedDigit()
                 .foregroundStyle(colors.textSecondary)
             Spacer()
+            Button("Cancel") { model.cancel() }
+                .font(.body.weight(.semibold))
+                .foregroundStyle(colors.action)
+                .frame(minWidth: 88, minHeight: 44)
+                .accessibilityHint("Stops looking back. You can run it again from the Inbox.")
+                .accessibilityIdentifier("backfill.cancel")
             Spacer()
         }
         .padding(.horizontal, 32)
@@ -237,7 +268,7 @@ struct BackfillIntroView: View {
                             .accessibilityElement(children: .ignore)
                             .accessibilityLabel(SuggestionRowView.accessibilityLabel(
                                 for: suggestion, propertyName: inbox.propertyName(for: suggestion),
-                                badges: inbox.badges(for: suggestion), now: Date()))
+                                badges: inbox.badges(for: suggestion), now: InboxClock.now()))
                             .accessibilityAddTraits(.isButton)
                             .accessibilityIdentifier("backfill.row.\(index)")
                             if index < items.count - 1 {
@@ -267,7 +298,6 @@ struct BackfillIntroView: View {
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 4) {
                 Button(total == 0 ? "Done" : "Review in Inbox") {
-                    inbox.commitPending()
                     onDone(total > 0)
                 }
                 .buttonStyle(InboxPrimaryButtonStyle())
@@ -275,7 +305,7 @@ struct BackfillIntroView: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)
-            .padding(.bottom, 8)
+            .padding(.bottom, 16)
             .background(colors.background)
         }
         .background(colors.background)

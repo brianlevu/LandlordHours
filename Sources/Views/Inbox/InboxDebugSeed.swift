@@ -24,7 +24,18 @@ enum InboxDebugSeed {
         return args[index + 1]
     }
 
+    /// `-LHFixedNow 2026-10-16T15:00` pins the inbox clock (local time) for repeatable frames.
+    static func pinClockIfRequested() {
+        guard let raw = value(after: "-LHFixedNow") else { return }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        guard let fixed = formatter.date(from: raw) else { return }
+        InboxClock.now = { fixed }
+    }
+
     static func applyIfNeeded(app: AppViewModel) {
+        pinClockIfRequested()
         guard !didApply, let scenario, let userId = UserScope.userId else { return }
         didApply = true
         app.suppressCelebrations = true
@@ -45,7 +56,7 @@ enum InboxDebugSeed {
         case "inbox":
             CaptureOptIn.recordChoice(calendar: true, eventPrompts: false, userId: userId)
             CaptureOptIn.markBackfillCompleted(userId: userId)
-            let items = inboxItems(app: app, now: Date())
+            let items = inboxItems(app: app, now: InboxClock.now())
             store.ingest(items, existingEntries: app.timeEntries)
         case "empty":
             CaptureOptIn.recordChoice(calendar: true, eventPrompts: false, userId: userId)
@@ -175,13 +186,16 @@ struct DebugBackfillScanner: BackfillScanning {
     let store: SuggestionStore
 
     @MainActor func scan(progress: @escaping @Sendable (ClassifierBatchProgress) -> Void) async -> BackfillScanOutcome {
-        let items = InboxDebugSeed.backfillItems(app: app, now: Date())
+        let items = InboxDebugSeed.backfillItems(app: app, now: InboxClock.now())
         let holdAtHalf = ProcessInfo.processInfo.arguments.contains("-LHHoldBackfillScan")
         for step in 1...items.count {
             progress(ClassifierBatchProgress(completed: step, total: items.count))
             try? await Task.sleep(nanoseconds: 60_000_000)
             if holdAtHalf, step == items.count / 2 {
                 try? await Task.sleep(nanoseconds: 60_000_000_000)
+            }
+            if Task.isCancelled {
+                return BackfillScanOutcome(access: .fullAccess, foundCount: 0, cancelled: true)
             }
         }
         let added = store.ingest(items, existingEntries: app.timeEntries)

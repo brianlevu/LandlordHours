@@ -1010,20 +1010,21 @@ struct SettingsView: View {
 
                         Divider().background(colors.border.opacity(0.35))
 
-                        NavigationLink {
-                            CalendarImportView()
-                                .environmentObject(viewModel)
+                        // 2.0: calendar work arrives as suggestions in the Inbox and is saved only
+                        // when confirmed one by one (the 1.x bulk import is retired).
+                        Button {
+                            NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex)
                         } label: {
                             SettingRow(
                                 icon: Lucide.calendar,
                                 iconColor: AppColors.informational,
                                 iconWash: colors.informationalSurface,
-                                title: "Import from Calendar",
-                                subtitle: "Detect property events and draft time entries"
+                                title: "Calendar suggestions",
+                                subtitle: "Review rental work found in your calendar"
                             )
                         }
                         .buttonStyle(.plain)
-                        .accessibilityIdentifier("settings.importCalendar")
+                        .accessibilityIdentifier("settings.calendarSuggestions")
                     }
 
                     Text("Photos attached to time entries are stored on this device only and aren't included in iCloud sync.")
