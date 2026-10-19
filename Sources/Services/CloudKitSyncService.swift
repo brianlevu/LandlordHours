@@ -39,6 +39,10 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     @Published var accountAvailable = false
 
     weak var delegate: CloudKitSyncDelegate?
+    /// Called with the profile id once its initial pull has finished and the push gate opened.
+    var onInitialSyncCompleted: ((String) -> Void)?
+    /// False when this build has no CloudKit (simulator, missing entitlement).
+    var isCloudKitAvailable: Bool { container != nil }
 
     // MARK: Private
     private let container: CKContainer?
@@ -189,6 +193,8 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
             flushedHeldPushCount += 1
             await ops.push()
         }
+        // Queued notification confirms were waiting for this pull.
+        if let startingFor { onInitialSyncCompleted?(startingFor) }
     }
 
     /// Manual "Sync Now": runs the initial sync first when the gate isn't open yet, then
@@ -364,34 +370,12 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         syncError = nil
 
         do {
-            // Gather all records to push
-            var records: [CKRecord] = []
-
-            // Properties
-            let viewModel = getViewModel()
-            for property in viewModel?.properties ?? [] {
-                records.append(propertyToRecord(property))
-            }
-
-            // Time entries (without attachments — those are too large for inline push)
-            for entry in viewModel?.timeEntries ?? [] {
-                records.append(entryToRecord(entry))
-            }
-
-            // Custom categories
-            for category in CategoryManager.shared.customCategories {
-                records.append(customCategoryToRecord(category))
-            }
-
-            // Goal settings (single record)
-            records.append(goalSettingsToRecord())
-
-            // Tax profile (single record)
-            records.append(taxProfileToRecord())
-
-            // Batch save with retry for transient errors
-            try await withRetry { [records] in
-                try await self.batchSave(records)
+            // 2.0: only records that changed since the server last matched them (see
+            // SyncChangeTracker). A stale copy of an unchanged record is never re-sent.
+            try await pushChangedRecords { records in
+                try await self.withRetry { [records] in
+                    try await self.batchSave(records)
+                }
             }
             lastSyncDate = Date()
         } catch {
@@ -400,6 +384,77 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         }
 
         isSyncing = false
+    }
+
+    // MARK: - Push changed records only
+
+    /// Test seam: where the per-profile push baselines live.
+    var changeTrackerBaseDirectory: URL = SyncChangeTracker.defaultBaseDirectory
+    private var cachedChangeTracker: SyncChangeTracker?
+
+    /// The active profile's push baselines.
+    var changeTracker: SyncChangeTracker? {
+        guard let appUserId else { return nil }
+        if let cachedChangeTracker, cachedChangeTracker.userId == appUserId,
+           cachedChangeTracker.fileURL.path.hasPrefix(changeTrackerBaseDirectory.path) {
+            return cachedChangeTracker
+        }
+        let tracker = SyncChangeTracker(userId: appUserId, baseDirectory: changeTrackerBaseDirectory)
+        cachedChangeTracker = tracker
+        return tracker
+    }
+
+    /// Every local record (what 1.x pushed every time).
+    func allLocalRecords() -> [CKRecord] {
+        var records: [CKRecord] = []
+        let viewModel = getViewModel()
+        for property in viewModel?.properties ?? [] {
+            records.append(propertyToRecord(property))
+        }
+        // Time entries (without attachments — those are too large for inline push)
+        for entry in viewModel?.timeEntries ?? [] {
+            records.append(entryToRecord(entry))
+        }
+        for category in CategoryManager.shared.customCategories {
+            records.append(customCategoryToRecord(category))
+        }
+        records.append(goalSettingsToRecord())
+        records.append(taxProfileToRecord())
+        return records
+    }
+
+    /// Sends only the records that differ from the server baseline through `save`, then makes
+    /// what was sent the new baseline. Returns the records sent (empty: nothing changed).
+    @discardableResult
+    func pushChangedRecords(using save: ([CKRecord]) async throws -> Void) async throws -> [CKRecord] {
+        let all = allLocalRecords()
+        let changed = changeTracker?.changedRecords(all) ?? all
+        guard !changed.isEmpty else { return [] }
+        try await save(changed)
+        changeTracker?.recordServerState(changed)
+        return changed
+    }
+
+    /// After a pull: the server's copy becomes the baseline. Remote items are mapped back to
+    /// records exactly as a push would build them, so an unchanged item compares equal; a local
+    /// copy the merge kept (because it is newer) still differs and is pushed.
+    func recordPulledBaselines(
+        properties: [RentalProperty],
+        entries: [TimeEntry],
+        categories: [CustomCategory],
+        deletedRecordNames: [String],
+        goalSettingsPulled: Bool,
+        taxProfilePulled: Bool
+    ) {
+        guard let tracker = changeTracker else { return }
+        var records = properties.map(propertyToRecord)
+        records += entries.map(entryToRecord)
+        records += categories.map(customCategoryToRecord)
+        // Settings records are applied whole, so the local copy now equals the server's.
+        if goalSettingsPulled { records.append(goalSettingsToRecord()) }
+        if taxProfilePulled { records.append(taxProfileToRecord()) }
+        tracker.recordServerState(records)
+        tracker.forget(recordNames: deletedRecordNames)
     }
 
     private func batchSave(_ records: [CKRecord]) async throws {
@@ -608,6 +663,14 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
             )
             delegate?.syncDidReceiveTaxProfile(fields)
         }
+        recordPulledBaselines(
+            properties: updatedProperties,
+            entries: updatedEntries,
+            categories: updatedCategories,
+            deletedRecordNames: (deletedPropertyIDs.union(deletedEntryIDs)).map(\.uuidString),
+            goalSettingsPulled: goalRecord != nil,
+            taxProfilePulled: taxProfileRecord != nil
+        )
     }
 
     // MARK: - Profile Discovery (iCloud)
@@ -663,6 +726,8 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     // MARK: - Delete from Cloud
 
     func deletePropertyFromCloud(_ property: RentalProperty) async {
+        // No baseline: if the same id comes back (re-added), it must be pushed again.
+        changeTracker?.forget(recordNames: [property.id.uuidString])
         guard accountAvailable else { return }
         guard let database else { return }
         let recordID = CKRecord.ID(recordName: property.id.uuidString, zoneID: zoneID)
@@ -674,6 +739,8 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     }
 
     func deleteEntryFromCloud(_ entry: TimeEntry) async {
+        // No baseline: a re-confirmed suggestion reuses its derived id and must be pushed again.
+        changeTracker?.forget(recordNames: [entry.id.uuidString])
         guard accountAvailable else { return }
         guard let database else { return }
         let recordID = CKRecord.ID(recordName: entry.id.uuidString, zoneID: zoneID)
@@ -731,6 +798,8 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
 
         UserDefaults.standard.removeObject(forKey: changeTokenKey)
         UserDefaults.standard.removeObject(forKey: zoneTokenKey)
+        SyncChangeTracker(userId: userId, baseDirectory: changeTrackerBaseDirectory).reset()
+        cachedChangeTracker = nil
         lastSyncDate = Date()
     }
 

@@ -15,7 +15,42 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         LandlordPurchases.configure()
         // The single model exists before any scene, notification response or intent.
         _ = AppModelHost.shared
+        startCaptureNotifications()
         return true
+    }
+
+    // MARK: End-of-event notifications (2.0)
+
+    private var foregroundObserver: NSObjectProtocol?
+
+    /// Registers the BGAppRefresh handler (must happen during launch), then rebuilds the
+    /// end-of-event schedule now, on every foreground, and in background refreshes. Queued
+    /// "Log it" taps are replayed when the initial iCloud pull finishes or the app comes back.
+    private func startCaptureNotifications() {
+        CaptureNotificationRefresher.registerBackgroundRefresh()
+        // Unit tests drive these pieces directly; the test host stays quiet.
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+
+        let host = AppModelHost.shared
+        host.viewModel.syncService.onInitialSyncCompleted = { _ in
+            Task { @MainActor in
+                await NotificationActionRouter(host: AppModelHost.shared).drainQueuedActions()
+                await CaptureNotificationRefresher.shared.refresh(reason: "initial-pull")
+            }
+        }
+        foregroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { _ in
+            Task { @MainActor in
+                await NotificationActionRouter(host: AppModelHost.shared).drainQueuedActions()
+                await CaptureNotificationRefresher.shared.refresh(reason: "foreground")
+                CaptureNotificationRefresher.scheduleBackgroundRefresh()
+            }
+        }
+        Task { @MainActor in
+            await CaptureNotificationRefresher.shared.refresh(reason: "launch")
+            CaptureNotificationRefresher.scheduleBackgroundRefresh()
+        }
     }
 
     func application(
@@ -108,7 +143,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             )
         ]
 
-        center.setNotificationCategories(categories)
+        // 2.0 end-of-event capture categories (Log it / Edit… / Not landlord work, follow-ups).
+        center.setNotificationCategories(categories.union(CaptureNotificationCategories.all))
     }
 
 }
