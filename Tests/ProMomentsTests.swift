@@ -421,29 +421,6 @@ final class MoreThanHalfDisplayTests: XCTestCase {
     }
 }
 
-// MARK: - Home goal card surface
-
-final class GoalCardToneTests: XCTestCase {
-    func testStateResolution() {
-        XCTAssertEqual(GoalCardTone.resolve(isGoalMet: true, isOnTrack: false, needsOtherWorkHours: false), .met)
-        XCTAssertEqual(GoalCardTone.resolve(isGoalMet: false, isOnTrack: false, needsOtherWorkHours: false), .needsAttention)
-        XCTAssertEqual(GoalCardTone.resolve(isGoalMet: false, isOnTrack: true, needsOtherWorkHours: true), .needsAttention)
-        XCTAssertEqual(GoalCardTone.resolve(isGoalMet: false, isOnTrack: true, needsOtherWorkHours: false), .onTrack)
-    }
-
-    /// Sage (positive) only when the goal is met; behind is caution; on track is violet wash.
-    func testToneMapsToIntentTokens() {
-        for scheme in [ColorScheme.light, .dark] {
-            let colors = AdaptiveColors(colorScheme: scheme)
-            XCTAssertEqual(GoalCardTone.met.surface(colors), colors.positiveSurface)
-            XCTAssertEqual(GoalCardTone.needsAttention.surface(colors), colors.cautionSurface)
-            XCTAssertEqual(GoalCardTone.onTrack.surface(colors), colors.actionSurface)
-            XCTAssertNotEqual(GoalCardTone.needsAttention.surface(colors), colors.positiveSurface)
-            XCTAssertNotEqual(GoalCardTone.onTrack.surface(colors), colors.positiveSurface)
-        }
-    }
-}
-
 // MARK: - Timer draft card
 
 final class TimerDraftReviewTests: XCTestCase {
@@ -511,10 +488,9 @@ final class LaneCContrastTests: XCTestCase {
             ("tab active dark", dark.actionText, dark.actionSurface, .dark),
         ]
         for (scheme, colors, style) in [(ColorScheme.light, light, UIUserInterfaceStyle.light), (.dark, dark, .dark)] {
-            for tone in [GoalCardTone.onTrack, .needsAttention, .met] {
-                pairs.append(("goal card \(tone) text \(scheme)", colors.textPrimary, tone.surface(colors), style))
-                pairs.append(("goal card \(tone) secondary \(scheme)", colors.textSecondary, tone.surface(colors), style))
-            }
+            // Today's metric tiles under the house hero (50% rule, pace) sit on the card fill.
+            pairs.append(("today metric text \(scheme)", colors.textPrimary, colors.backgroundSecondary, style))
+            pairs.append(("today metric secondary \(scheme)", colors.textSecondary, colors.backgroundSecondary, style))
         }
         for (name, fg, bg, style) in pairs {
             let ratio = contrast(fg, bg, style)

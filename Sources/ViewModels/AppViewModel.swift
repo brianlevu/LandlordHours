@@ -514,6 +514,9 @@ class AppViewModel: ObservableObject {
             GuidedOnboardingStore.skippedKey,
             "LandlordHours.timer",
             PendingCelebrationQueue.baseKey,
+            HouseCelebrationLedger.celebratedBaseKey,
+            HouseCelebrationLedger.pendingBaseKey,
+            HouseCelebrationLedger.backfillShownBaseKey,
             ProfileRestore.profileNameKey
         ] + taxProfileFields.map { "LandlordHours.taxProfile.\($0)" }
 
@@ -618,6 +621,7 @@ class AppViewModel: ObservableObject {
         attachments: [TimeAttachment] = [],
         source: EntrySource = .manual
     ) {
+        let houseHoursBefore = houseCountableHours()
         let entry = TimeEntry(
             propertyId: propertyId,
             participant: participant,
@@ -630,6 +634,7 @@ class AppViewModel: ObservableObject {
         )
         timeEntries.append(entry)
         saveData()
+        reportHouseSave(previousHours: houseHoursBefore)
         checkHourMilestones()
         Analytics.sessionLogged(category: category, participant: participant)
         Analytics.entryLogged(source: source)
@@ -665,6 +670,7 @@ class AppViewModel: ObservableObject {
         guard !properties.isEmpty else { return 0 }
         let validPropertyIds = Set(properties.map(\.id))
         let selected = detectedEntries.filter { $0.isSelected }
+        let houseHoursBefore = houseCountableHours()
         var importedCount = 0
         for detected in selected {
             guard let propertyId = detected.propertyId,
@@ -694,6 +700,7 @@ class AppViewModel: ObservableObject {
         }
         if importedCount > 0 {
             saveData()
+            reportHouseSave(previousHours: houseHoursBefore)
             checkHourMilestones()
         }
         return importedCount
@@ -876,14 +883,10 @@ class AppViewModel: ObservableObject {
             status = (material.ownerAndSpouseHours, material.isMateriallyParticipating)
         }
 
-        // Check goal met first (highest priority)
-        if status.isMet {
-            triggerCelebration(.goalMet)
-            return
-        }
-
-        // Check hour milestones: 10, 50, 100, 250, 500
-        let milestones: [Int] = [500, 250, 100, 50, 10]
+        // 2.0: the goal, 100h and 500h are the Blueprint house's milestones (TodayHouseEvents,
+        // presented once on Today as MilestoneCelebrationView), so this overlay keeps only the
+        // small in-between counts. Celebrating them here too would show two screens at once.
+        let milestones: [Int] = [250, 50, 10]
         for milestone in milestones {
             if status.hours >= Double(milestone) {
                 triggerCelebration(.hoursLogged(milestone: milestone))
@@ -947,10 +950,11 @@ class AppViewModel: ObservableObject {
 
     func materialParticipationStatus(
         year: Int,
-        propertyId: UUID? = nil
+        propertyId: UUID? = nil,
+        includeSpouse: Bool = true
     ) -> TaxQualificationEngine.MaterialParticipationResult {
         TaxQualificationEngine.materialParticipationStatus(
-            entries: timeEntries,
+            entries: includeSpouse ? timeEntries : timeEntries.filter { $0.participant == .selfParticipant },
             year: year,
             propertyId: propertyId,
             groupingElection: TaxProfileManager.shared.groupingElection,
@@ -958,15 +962,17 @@ class AppViewModel: ObservableObject {
         )
     }
 
-    func materialParticipationOverview(year: Int) -> TaxQualificationEngine.MaterialParticipationResult {
+    /// `includeSpouse: false` leaves spouse entries out (the house when spouse hours are not
+    /// tracked jointly); every other caller keeps the owner + spouse total.
+    func materialParticipationOverview(year: Int, includeSpouse: Bool = true) -> TaxQualificationEngine.MaterialParticipationResult {
         if TaxProfileManager.shared.groupingElection {
-            return materialParticipationStatus(year: year)
+            return materialParticipationStatus(year: year, includeSpouse: includeSpouse)
         }
 
         return properties
-            .map { materialParticipationStatus(year: year, propertyId: $0.id) }
+            .map { materialParticipationStatus(year: year, propertyId: $0.id, includeSpouse: includeSpouse) }
             .max { $0.ownerAndSpouseHours < $1.ownerAndSpouseHours }
-            ?? materialParticipationStatus(year: year, propertyId: nil)
+            ?? materialParticipationStatus(year: year, propertyId: nil, includeSpouse: includeSpouse)
     }
     
     // MARK: - Persistence
@@ -1668,6 +1674,10 @@ extension AppViewModel: CloudKitSyncDelegate {
         defaults.synchronize()
 
         suppressCelebrations = false
+        TodayHouseEvents.shared.resetInMemoryState()
+        #if DEBUG
+        applyTodayHoursSeedIfNeeded()
+        #endif
     }
 
     /// A small solid image used only by the `-LHSeedAttachment` journey hook.

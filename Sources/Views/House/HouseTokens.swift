@@ -29,6 +29,7 @@ enum HouseTokens {
         static let cardLight = "FFFFFF"
         static let cardDark = "141C3F"
         static let positiveOnHero = "7FE3A8"
+        static let cautionOnHero = "FFB454"     // behind-pace words on blueprint (5.2:1 on #1E3FA6)
     }
 
     static let blueprint = Color(hex: Hex.blueprint)
@@ -46,6 +47,7 @@ enum HouseTokens {
     static let onHeroPrimary = Color.white
     static let onHeroSecondary = Color(hex: Hex.onHeroSecondary)
     static let positiveOnHero = Color(hex: Hex.positiveOnHero)
+    static let cautionOnHero = Color(hex: Hex.cautionOnHero)
 
     static func canvas(_ scheme: ColorScheme) -> Color {
         Color(hex: scheme == .dark ? Hex.canvasDark : Hex.canvasLight)

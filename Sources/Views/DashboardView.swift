@@ -1,44 +1,6 @@
 import SwiftUI
 import LucideIcons
 
-/// State of the Home goal card. The surface follows the intent rules: sage only when the
-/// goal is met, honey when the user is behind or something still needs them, violet wash
-/// otherwise.
-enum GoalCardTone: Equatable {
-    case onTrack
-    case needsAttention
-    case met
-
-    static func resolve(isGoalMet: Bool, isOnTrack: Bool, needsOtherWorkHours: Bool) -> GoalCardTone {
-        if isGoalMet { return .met }
-        if needsOtherWorkHours || !isOnTrack { return .needsAttention }
-        return .onTrack
-    }
-
-    /// Intent accent for the card's edge and pace value.
-    func accent(_ colors: AdaptiveColors) -> Color {
-        switch self {
-        case .onTrack: return colors.action
-        case .needsAttention: return colors.caution
-        case .met: return colors.positive
-        }
-    }
-
-    /// What the card is filled with: the intent wash in light; in dark, the blueprint card (a
-    /// full-bleed dark wash reads muddy), with the intent carried by `accent`.
-    func cardFill(_ colors: AdaptiveColors) -> Color {
-        colors.colorScheme == .dark ? colors.backgroundSecondary : surface(colors)
-    }
-
-    func surface(_ colors: AdaptiveColors) -> Color {
-        switch self {
-        case .onTrack: return colors.actionSurface
-        case .needsAttention: return colors.cautionSurface
-        case .met: return colors.positiveSurface
-        }
-    }
-}
-
 struct DashboardView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @EnvironmentObject var goalManager: GoalManager
@@ -51,27 +13,21 @@ struct DashboardView: View {
     private var repsStatus: TaxQualificationEngine.REPSResult {
         viewModel.repsStatus(participant: .selfParticipant, year: currentYear)
     }
-    private var materialParticipationStatus: TaxQualificationEngine.MaterialParticipationResult {
-        viewModel.materialParticipationOverview(year: currentYear)
-    }
-    private var totalHours: Double {
-        switch goalManager.globalGoalType {
-        case .reps, .both:
-            return repsStatus.realEstateHours
-        case .str:
-            return materialParticipationStatus.ownerAndSpouseHours
-        }
-    }
-    private var targetHours: Double { goalManager.globalGoalType.hoursRequired }
-    private var progress: Double { min(totalHours / targetHours, 1.0) }
-    private var remainingHours: Double { max(targetHours - totalHours, 0) }
-    private var isGoalMet: Bool {
-        switch goalManager.globalGoalType {
-        case .reps, .both:
-            return repsStatus.isQualified
-        case .str:
-            return materialParticipationStatus.isMateriallyParticipating
-        }
+
+    // MARK: House inputs
+    // The hero counts the goal's countable hours only (TodayHouse.swift): REPS = your own
+    // real-estate hours; MP = owner (+ spouse when tracked jointly). Investor-only tasks never count.
+    private var houseGoal: HouseGoal { HouseGoal(goalManager.globalGoalType) }
+    private var totalHours: Double { viewModel.houseCountableHours(goal: houseGoal, year: currentYear) }
+    private var targetHours: Double { houseGoal.targetHours }
+    private var isGoalMet: Bool { HouseProgress(hours: totalHours, goal: houseGoal).isGoalMet }
+    /// Hours still to log. The tests are "more than" the target, so exactly 750 still needs a bit.
+    private var remainingHours: Double { isGoalMet ? 0 : max(targetHours - totalHours, 0.01) }
+    private var pace: TodayPace { TodayPace.resolve(hours: totalHours, goal: houseGoal) }
+
+    /// What the hero draws: the live hours, or the pre-save hours while a confirm build waits to play.
+    private var heroProgress: HouseProgress {
+        HouseProgress(hours: heroHoursOverride ?? totalHours, goal: houseGoal)
     }
 
     private var isREPS: Bool { goalManager.globalGoalType == .reps || goalManager.globalGoalType == .both }
@@ -90,13 +46,12 @@ struct DashboardView: View {
         otherWorkHoursMissing ? TaxQualificationEngine.MoreThanHalfStatus.notEnteredValue : "\(Int(fiftyPercentCompliance * 100))%"
     }
 
-    /// 750 hours reached, but the 50% rule still needs the user's other work hours.
-    private var hoursMetButRuleUnchecked: Bool {
-        otherWorkHoursMissing && repsStatus.meets750HourTest
-    }
-
-    private var hoursMetRuleOpen: (label: String, detail: String)? {
-        isREPS ? TaxQualificationEngine.hoursMetRuleOpenStatus(repsStatus) : nil
+    private var fiftyPercentDetail: String? {
+        switch repsStatus.moreThanHalfStatus {
+        case .notEntered: return TaxQualificationEngine.MoreThanHalfStatus.notEnteredPrompt
+        case .notMet: return "Not met yet: under half your work hours"
+        case .met: return nil
+        }
     }
 
     // Pace calculations
@@ -113,13 +68,6 @@ struct DashboardView: View {
 
     private var hoursPerWeekNeeded: Double {
         remainingHours / weeksLeftInYear
-    }
-
-    private var isOnTrack: Bool {
-        let cal = Calendar.current
-        let dayOfYear = cal.ordinality(of: .day, in: .year, for: Date()) ?? 1
-        let expectedProgress = Double(dayOfYear) / 365.0
-        return progress >= expectedProgress * 0.85
     }
 
     // This week hours by day
@@ -160,6 +108,13 @@ struct DashboardView: View {
     @State private var showHistory = false
     @State private var scrollOffset: CGFloat = 0
 
+    // House: confirm build, milestone celebrations, Day-1 backfill reveal.
+    @ObservedObject private var houseEvents = TodayHouseEvents.shared
+    @State private var heroHoursOverride: Double?
+    @State private var shownCelebration: TodayCelebration?
+    @State private var shownBackfill: HouseBackfillReveal?
+    @State private var isVisible = false
+
     private static var shouldOpenLearningCenterFromLaunchArguments: Bool {
         ProcessInfo.processInfo.arguments.contains("-LHOpenLearningCenter")
     }
@@ -188,9 +143,9 @@ struct DashboardView: View {
                             headerSection
                             if shouldShowActivationCard {
                                 homeActivationCard
-                                progressRingCard
+                                houseHero
                             } else {
-                                progressRingCard
+                                houseHero
                                 learningShortcutCard
                             }
                             recentEntriesSection
@@ -232,16 +187,112 @@ struct DashboardView: View {
                 HistoryView()
             }
             .onAppear {
+                isVisible = true
+                // A save while Today was away (log via +, timer stop, inbox confirm): mount the
+                // house at the pre-save height, then build up to the new one once it is on screen.
+                if let confirm = houseEvents.pendingConfirm {
+                    heroHoursOverride = confirm.oldHours
+                }
                 // Brief skeleton then reveal — lets SwiftUI layout settle
                 if !isReady {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                         animate(.easeOut(duration: 0.35)) {
                             isReady = true
                         }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + Self.confirmStartDelay) {
+                            playPendingHouseWork()
+                        }
                     }
+                } else {
+                    playPendingHouseWork()
                 }
             }
+            .onDisappear { isVisible = false }
+            // Live: a save while Today is on screen. The hero builds from the live hours change
+            // itself; consume the event so it does not replay on the next appear.
+            .onChange(of: houseEvents.pendingConfirm) { _, confirm in
+                guard confirm != nil, isVisible, isReady, heroHoursOverride == nil else { return }
+                houseEvents.takeConfirm()
+            }
+            .onChange(of: houseEvents.celebrationTick) { _, _ in
+                guard isVisible, isReady else { return }
+                schedulePendingCelebration()
+            }
+            .onChange(of: houseEvents.pendingBackfill) { _, reveal in
+                guard reveal != nil, isVisible, isReady else { return }
+                presentBackfillIfNeeded()
+            }
+            .fullScreenCover(item: $shownCelebration, onDismiss: {
+                presentBackfillIfNeeded()
+                presentNextCelebration()
+            }) { item in
+                MilestoneCelebrationView(
+                    celebration: item.celebration,
+                    hours: totalHours,
+                    artScheme: colorScheme,
+                    onContinue: { shownCelebration = nil }
+                )
+            }
         }
+        .fullScreenCover(item: $shownBackfill, onDismiss: { presentNextCelebration() }) { reveal in
+            BackfillRevealView(
+                foundHours: reveal.foundHours,
+                suggestionCount: reveal.suggestionCount,
+                confirmedHours: totalHours,
+                artScheme: colorScheme,
+                onReview: {
+                    shownBackfill = nil
+                    NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex)
+                },
+                onSkip: { shownBackfill = nil }
+            )
+        }
+    }
+
+    // MARK: - House events
+
+    /// Wait after the skeleton reveal before the beam flies, so the eye is on the card.
+    private static let confirmStartDelay: Double = 0.45
+    /// The confirm build (beam, board, crossfade) settles within this; celebrations follow it.
+    private static let confirmSettle: Double = 2.2
+
+    private func playPendingHouseWork() {
+        guard isVisible else { return }
+        let hadConfirm = houseEvents.takeConfirm() != nil && heroHoursOverride != nil
+        // The hero sees its hours change from the pre-save value and plays the build; it reports
+        // the celebration when the build settles (at once under Reduce Motion).
+        heroHoursOverride = nil
+        if hadConfirm {
+            schedulePendingCelebration()
+        } else {
+            presentBackfillIfNeeded()
+            presentNextCelebration()
+        }
+    }
+
+    /// Fallback for when the hero's own callback does not fire (e.g. a build interrupted by a
+    /// tab switch, or a milestone queued in the background).
+    private func schedulePendingCelebration() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + (reduceMotion ? 0.3 : Self.confirmSettle)) {
+            presentNextCelebration()
+        }
+    }
+
+    /// Presents the highest queued milestone once. The ledger marks it (and any lower one it
+    /// replaces) celebrated at presentation, so it never repeats.
+    private func presentNextCelebration() {
+        guard isVisible, shownCelebration == nil, shownBackfill == nil,
+              let next = houseEvents.nextCelebration else { return }
+        houseEvents.markPresented(next.celebration, year: next.year)
+        shownCelebration = TodayCelebration(celebration: next.celebration, year: next.year)
+    }
+
+    /// The Day-1 reveal, once per profile.
+    private func presentBackfillIfNeeded() {
+        guard isVisible, shownCelebration == nil, shownBackfill == nil,
+              let reveal = houseEvents.pendingBackfill else { return }
+        houseEvents.markBackfillShown()
+        shownBackfill = reveal
     }
 
     private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
@@ -409,7 +460,7 @@ struct DashboardView: View {
         if viewModel.timeEntries.isEmpty {
             return "\(viewModel.properties.count) property ready. Capture the first activity while details are fresh."
         }
-        return "\(AppFormat.hours(totalHours)) logged toward \(Int(targetHours)) hours. \(isOnTrack ? "You're on pace." : "\(Int(hoursPerWeekNeeded))h per week gets you back on pace.")"
+        return "\(AppFormat.hours(totalHours)) counted toward \(Int(targetHours)) hours this year."
     }
 
     private var compactHeaderTitle: String {
@@ -421,7 +472,7 @@ struct DashboardView: View {
         if shouldShowActivationCard {
             return "\(completedActivationSteps)/2 essentials complete"
         }
-        return "\(Int(progress * 100))% of \(Int(targetHours))h target"
+        return pace.text
     }
 
     private var userInitials: String {
@@ -551,103 +602,73 @@ struct DashboardView: View {
         (!viewModel.timeEntries.isEmpty || GuidedOnboardingStore.isCompleted || GuidedOnboardingStore.isSkipped)
     }
 
-    // MARK: - Progress Ring Card
-    private var progressRingCard: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(goalCardTitle)
-                        .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                    Text(goalCardSubtitle)
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                        .lineSpacing(2)
-                }
-                Spacer(minLength: 16)
-                Text("\(Int(progress * 100))%")
-                    .font(.system(size: 36, weight: .black, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-            }
+    // MARK: - House hero
+    private var houseHero: some View {
+        VStack(spacing: 12) {
+            HouseHeroCard(
+                progress: heroProgress,
+                year: currentYear,
+                status: pace.text,
+                statusTone: heroStatusTone,
+                onCelebration: { _ in presentNextCelebration() }
+            )
+            // The art has a fixed frame; past AX2 the words would wrap into it, so cap there.
+            // VoiceOver reads the whole hero as one element with the full words.
+            .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(heroAccessibilityLabel)
+            .accessibilityAddTraits(.isImage)
+            .accessibilityIdentifier("today.hero")
 
-            VStack(alignment: .leading, spacing: 9) {
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(colors.textPrimary.opacity(colorScheme == .dark ? 0.16 : 0.08))
-                            .frame(height: 10)
-                        Capsule()
-                            .fill(colors.textPrimary)
-                            .frame(width: proxy.size.width * progress, height: 10)
-                    }
-                }
-                .frame(height: 10)
-
-                HStack {
-                    Text("\(AppFormat.hours(totalHours)) logged")
-                    Spacer()
-                    Text("\(Int(remainingHours))h left")
-                }
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(colors.textSecondary)
-            }
-
-            HStack(spacing: 12) {
-                dashboardMiniMetric(title: "Pace", value: isOnTrack ? "On track" : "Behind")
+            HStack(alignment: .top, spacing: 12) {
                 if isREPS {
                     dashboardMiniMetric(
                         title: "50% rule",
                         value: fiftyPercentValue,
-                        detail: otherWorkHoursMissing ? TaxQualificationEngine.MoreThanHalfStatus.notEnteredPrompt : nil
+                        detail: fiftyPercentDetail
                     )
                     .accessibilityIdentifier("dashboard.fiftyPercent")
                 } else {
                     dashboardMiniMetric(title: "Days left", value: "\(daysLeftInYear)")
                 }
+                if isGoalMet {
+                    dashboardMiniMetric(title: "Goal hours", value: "Reached")
+                } else {
+                    dashboardMiniMetric(
+                        title: "To finish on time",
+                        value: "\(Int(hoursPerWeekNeeded.rounded(.up)))h a week"
+                    )
+                }
             }
         }
-        .padding(24)
-        .background(goalCardTone.cardFill(colors))
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .stroke(
-                    colorScheme == .dark ? goalCardTone.accent(colors).opacity(0.7) : colors.border.opacity(0.35),
-                    lineWidth: colorScheme == .dark ? 1.5 : 1
-                )
+    }
+
+    private var heroStatusTone: HouseStatusTone {
+        switch pace.tone {
+        case .positive: return .positive
+        case .caution: return .caution
+        case .neutral: return .neutral
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(isGoalMet
-            ? "Goal met. \(AppFormat.hours(totalHours)) logged"
-            : "\(AppFormat.hours(totalHours)) of \(Int(targetHours)) hours, \(Int(progress * 100)) percent complete")
     }
 
-    private var goalCardTone: GoalCardTone {
-        GoalCardTone.resolve(isGoalMet: isGoalMet, isOnTrack: isOnTrack, needsOtherWorkHours: hoursMetRuleOpen != nil)
-    }
-
-    private var goalCardTitle: String {
-        if let open = hoursMetRuleOpen { return open.label }
-        return isGoalMet ? "Goal met" : "\(Int(targetHours)) hour target"
-    }
-
-    private var goalCardSubtitle: String {
-        if let open = hoursMetRuleOpen { return "\(open.detail)." }
-        if isGoalMet { return "Your tracked work has reached the current goal." }
-        return "\(Int(hoursPerWeekNeeded))h per week \(isOnTrack ? "keeps you on pace" : "gets you back on pace") for \(currentYear)."
+    /// The WP-H words (hours, goal, stage, next step) plus the pace line, for the live hours.
+    private var heroAccessibilityLabel: String {
+        let live = HouseProgress(hours: totalHours, goal: houseGoal)
+        return "\(currentYear). \(live.accessibilityLabel) \(pace.text)."
     }
 
     private func dashboardMiniMetric(title: String, value: String, detail: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(.system(.caption, design: .rounded, weight: .bold))
                 .foregroundStyle(colors.textSecondary)
             Text(value)
-                .font(.system(size: 16, weight: .black, design: .rounded))
+                .font(.system(.callout, design: .rounded, weight: .black))
+                .monospacedDigit()
                 .foregroundStyle(colors.textPrimary)
             if let detail {
                 Text(detail)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(.system(.caption, design: .rounded, weight: .medium))
                     .foregroundStyle(colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -655,9 +676,12 @@ struct DashboardView: View {
         .accessibilityElement(children: .combine)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        // Dark: the goal card is itself a card, so the chips step up to the tertiary fill to stay visible.
-        .background(colorScheme == .dark ? colors.backgroundTertiary : colors.backgroundSecondary.opacity(0.72))
+        .background(colors.backgroundSecondary)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(colors.border.opacity(0.28), lineWidth: 1)
+        }
     }
 
     // MARK: - Activation
@@ -807,55 +831,6 @@ struct DashboardView: View {
         .buttonStyle(.plain)
         .accessibilityLabel("\(title). \(subtitle)")
         .accessibilityIdentifier(accessibilityIdentifier)
-    }
-
-    // MARK: - Pace Chips
-    private var paceChipsRow: some View {
-        HStack(spacing: 12) {
-            // Pace chip
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(AppColors.sage)
-                    .frame(width: 6, height: 6)
-                Text("Pace")
-                    .font(.system(size: 11, weight: .regular, design: .rounded))
-                    .foregroundStyle(colors.textSecondary)
-                Spacer()
-                Text(isOnTrack ? "On track" : "Behind")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(AppColors.sage)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(colors.backgroundTertiary.opacity(colorScheme == .dark ? 0.82 : 1))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(colors.border.opacity(colorScheme == .dark ? 0.8 : 0.55), lineWidth: 1)
-            )
-
-            // 50% Rule chip
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(AppColors.primary)
-                    .frame(width: 6, height: 6)
-                Text("50% Rule")
-                    .font(.system(size: 11, weight: .regular, design: .rounded))
-                    .foregroundStyle(colors.textSecondary)
-                Spacer()
-                Text(fiftyPercentValue)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(AppColors.primary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(colors.backgroundTertiary.opacity(colorScheme == .dark ? 0.82 : 1))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(colors.border.opacity(colorScheme == .dark ? 0.8 : 0.55), lineWidth: 1)
-            )
-        }
     }
 
     // MARK: - This Week Card
@@ -1117,6 +1092,13 @@ struct EntryListRow: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 13)
     }
+}
+
+/// A milestone Today is presenting (the celebration and the tax year it belongs to).
+struct TodayCelebration: Identifiable, Equatable {
+    let celebration: HouseCelebration
+    let year: Int
+    var id: String { HouseCelebrationLedger.token(celebration, year: year) }
 }
 
 private struct DashboardScrollOffsetPreferenceKey: PreferenceKey {
