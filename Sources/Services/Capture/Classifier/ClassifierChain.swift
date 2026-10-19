@@ -195,9 +195,13 @@ struct ClassifierChain: CaptureClassifier {
         }
     }
 
+    /// Sources the on-device model may see. Receipts are PCC's job (2.1). Gmail stays
+    /// rules-only until the v2 prompt and property aliases are validated on real email: on the
+    /// 2026-10-19 owner calibration the shipped model made the chain worse on email.
+    static let modelKinds: Set<Suggestion.Kind> = [.calendar, .location]
+
     func shouldAskModel(_ candidate: CaptureCandidate, rulesResult: CaptureClassification) -> Bool {
-        // Receipts are PCC's job (2.1); calendar, location and Gmail stay on device.
-        guard candidate.kind != .receipt else { return false }
+        guard Self.modelKinds.contains(candidate.kind) else { return false }
         guard onDevice.availability.isAvailable else { return false }
         if rulesResult.confidence >= ClassifierThresholds.skipModelAbove { return false }
         if rulesResult.confidence <= ClassifierThresholds.skipModelBelow { return false }
@@ -239,8 +243,15 @@ struct ClassifierChain: CaptureClassifier {
             result.category = category
         }
 
+        // Only a confident model "yes" (>= modelYesNotSure) can keep an item visible on its own.
         let reason = model.reason.isEmpty ? "" : " – \(model.reason)"
-        result.evidence.append("model: \(model.isRentalWork ? "yes" : "no")\(reason)")
+        let vote: String
+        if model.isRentalWork {
+            vote = model.confidence >= ClassifierThresholds.modelYesNotSure ? "yes" : "weak yes"
+        } else {
+            vote = "no"
+        }
+        result.evidence.append("model: \(vote)\(reason)")
         return result
     }
 }

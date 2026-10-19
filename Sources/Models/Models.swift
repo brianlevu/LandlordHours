@@ -32,14 +32,23 @@ struct RentalProperty: Identifiable, Codable, Hashable {
     var propertyType: PropertyType
     var createdAt: Date
     var modifiedAt: Date
+    /// Other names for this property (2.0, additive): listing titles on rental platforms,
+    /// nicknames, and contractor or vendor names tied to it. The classifier matches each as a
+    /// full phrase. Older data decodes as empty.
+    var aliases: [String] = []
+    /// "I live here" (2.0, additive): an address match on a home the owner lives in is weak
+    /// evidence and needs a work keyword. Older data decodes as false.
+    var isOwnerOccupied: Bool = false
 
-    init(id: UUID = UUID(), name: String, address: String, propertyType: PropertyType) {
+    init(id: UUID = UUID(), name: String, address: String, propertyType: PropertyType, aliases: [String] = [], isOwnerOccupied: Bool = false) {
         self.id = id
         self.name = name
         self.address = address
         self.propertyType = propertyType
         self.createdAt = Date()
         self.modifiedAt = Date()
+        self.aliases = aliases
+        self.isOwnerOccupied = isOwnerOccupied
     }
 
     init(from decoder: Decoder) throws {
@@ -50,6 +59,20 @@ struct RentalProperty: Identifiable, Codable, Hashable {
         propertyType = try c.decode(PropertyType.self, forKey: .propertyType)
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         modifiedAt = try c.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? createdAt
+        aliases = try c.decodeIfPresent([String].self, forKey: .aliases) ?? []
+        isOwnerOccupied = try c.decodeIfPresent(Bool.self, forKey: .isOwnerOccupied) ?? false
+    }
+
+    /// Trimmed, non-empty, case-insensitively unique aliases (order kept).
+    static func cleanedAliases(_ raw: [String]) -> [String] {
+        var seen = Set<String>()
+        var out: [String] = []
+        for alias in raw {
+            let trimmed = alias.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, seen.insert(trimmed.lowercased()).inserted else { continue }
+            out.append(trimmed)
+        }
+        return out
     }
     
     var shortAddress: String {

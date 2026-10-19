@@ -1012,6 +1012,27 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     // MARK: - Record Mapping: Property
 
     private func propertyToRecord(_ property: RentalProperty) -> CKRecord {
+        Self.record(for: property, zoneID: zoneID, appUserId: appUserId)
+    }
+
+    private func recordToProperty(_ record: CKRecord) -> RentalProperty? {
+        Self.property(from: record)
+    }
+
+    /// 2.0 classifier fields on the Property record type. Additive and never written as nil,
+    /// so pushes from 1.1 (which never set them) leave the server values alone under
+    /// `.changedKeys`. Add each to the DEVELOPMENT schema, then deploy to Production before any
+    /// 2.0 build reaches users.
+    enum PropertyField {
+        static let aliases = "aliases"                  // String (list); only when non-empty
+        static let aliasCount = "aliasCount"            // Int64; lets a 2.0 device clear aliases
+        static let isOwnerOccupied = "isOwnerOccupied"  // Int64 0/1
+        static let all = [aliases, aliasCount, isOwnerOccupied]
+    }
+
+    /// RentalProperty → CKRecord. `aliases` is written only when non-empty; `aliasCount` (0
+    /// when empty) is what tells another 2.0 device the list was cleared, without a nil write.
+    nonisolated static func record(for property: RentalProperty, zoneID: CKRecordZone.ID, appUserId: String?) -> CKRecord {
         let recordID = CKRecord.ID(recordName: property.id.uuidString, zoneID: zoneID)
         let record = CKRecord(recordType: "Property", recordID: recordID)
         record["name"] = property.name
@@ -1019,11 +1040,17 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         record["propertyType"] = property.propertyType.rawValue
         record["createdAt"] = property.createdAt
         record["modifiedAt"] = property.modifiedAt
-        record["appUserId"] = appUserId
+        let aliases = RentalProperty.cleanedAliases(property.aliases)
+        if !aliases.isEmpty { record[PropertyField.aliases] = aliases }
+        record[PropertyField.aliasCount] = Int64(aliases.count)
+        record[PropertyField.isOwnerOccupied] = Int64(property.isOwnerOccupied ? 1 : 0)
+        if let appUserId { record["appUserId"] = appUserId }
         return record
     }
 
-    private func recordToProperty(_ record: CKRecord) -> RentalProperty? {
+    /// CKRecord → RentalProperty. Records written by 1.1 lack the 2.0 fields: no aliases,
+    /// not owner-occupied.
+    nonisolated static func property(from record: CKRecord) -> RentalProperty? {
         guard let name = record["name"] as? String,
               let address = record["address"] as? String,
               let typeRaw = record["propertyType"] as? String,
@@ -1033,6 +1060,14 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         var property = RentalProperty(id: id, name: name, address: address, propertyType: type)
         property.createdAt = record["createdAt"] as? Date ?? Date()
         property.modifiedAt = record["modifiedAt"] as? Date ?? property.createdAt
+        let count = (record[PropertyField.aliasCount] as? Int64) ?? (record[PropertyField.aliasCount] as? NSNumber)?.int64Value
+        if count == 0 {
+            property.aliases = []
+        } else {
+            property.aliases = RentalProperty.cleanedAliases(record[PropertyField.aliases] as? [String] ?? [])
+        }
+        let occupied = (record[PropertyField.isOwnerOccupied] as? Int64) ?? (record[PropertyField.isOwnerOccupied] as? NSNumber)?.int64Value
+        property.isOwnerOccupied = (occupied ?? 0) != 0
         return property
     }
 

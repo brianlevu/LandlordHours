@@ -21,13 +21,28 @@ struct ClassifierSignal: Equatable {
     let category: ActivityCategory?
     let categoryWeight: Double
     let wholeWord: Bool
+    let role: Role
 
-    init(_ phrase: String, _ landlord: Double, _ category: ActivityCategory? = nil, categoryWeight: Double? = nil, wholeWord: Bool = false) {
+    /// How a signal combines with others (classifier v2).
+    enum Role: Equatable, Hashable {
+        case general
+        /// A rental platform name (airbnb, vrbo): weak alone, scores next to a host action.
+        case platform
+        /// A host action (reservation request, guest, payout): pairs with a platform.
+        case hostAction
+        /// A hardware store: weak alone, scores next to a purchase word.
+        case store
+        /// A purchase word (order, receipt, invoice): pairs with a store.
+        case purchase
+    }
+
+    init(_ phrase: String, _ landlord: Double, _ category: ActivityCategory? = nil, categoryWeight: Double? = nil, wholeWord: Bool = false, role: Role = .general) {
         self.phrase = phrase
         self.landlord = landlord
         self.category = category
         self.categoryWeight = categoryWeight ?? max(landlord, 0)
         self.wholeWord = wholeWord
+        self.role = role
     }
 }
 
@@ -63,11 +78,32 @@ enum ClassifierKeywords {
         .init("deposit",            1.5, .leasing),
         .init("renew",              0.8, .leasing),
         .init("addendum",           1.5, .leasing),
-        .init("inquir",             0.5, .leasing),
+        .init("inquir",             0.5, .leasing, role: .hostAction),
         .init("mailbox key",        1.0, .leasing),
         .init("complaint",          0.8, .leasing),
-        .init("vrbo",               2.5, .leasing, categoryWeight: 1),
-        .init("airbnb",             2.5, .management, categoryWeight: 0.5),
+        // Platforms are weak alone (their marketing and account mail outnumber host work);
+        // they score next to a host action. Guest bookings, requests, inquiries and messages
+        // are leasing (guest relations = tenant relations); reviews and listing admin are
+        // management; payouts and tax forms are bookkeeping.
+        .init("vrbo",               1.2, .leasing, categoryWeight: 0.5, role: .platform),
+        .init("airbnb",             1.2, .leasing, categoryWeight: 0.5, role: .platform),
+        .init("homeaway",           1.2, .leasing, categoryWeight: 0.5, role: .platform),
+        .init("reservation request", 3.0, .leasing, categoryWeight: 3, role: .hostAction),
+        .init("booking request",    2.0, .leasing, categoryWeight: 3, role: .hostAction),
+        .init("reservation confirmed", 2.0, .leasing, categoryWeight: 3, role: .hostAction),
+        .init("reservation for",    1.5, .leasing, categoryWeight: 3, role: .hostAction),
+        .init("reservation at",     1.5, .leasing, categoryWeight: 3, role: .hostAction),
+        .init("inquiry for",        1.0, .leasing, categoryWeight: 3, role: .hostAction),
+        .init("guest",              0.8, .leasing, categoryWeight: 1, role: .hostAction),
+        .init("check in",           0.5, .leasing, role: .hostAction),
+        .init("review for",         1.5, .management, categoryWeight: 3, role: .hostAction),
+        .init("to review",          1.0, .management, categoryWeight: 3, role: .hostAction),
+        .init("review from guest",  1.5, .management, categoryWeight: 3, role: .hostAction),
+        .init("payout",             1.5, .bookkeeping, categoryWeight: 3, role: .hostAction),
+        .init("hosting",            1.0, .management, categoryWeight: 2, role: .hostAction),
+        .init("co host",            1.5, .management, categoryWeight: 2, role: .hostAction),
+        .init("property is live",   1.5, .leasing, categoryWeight: 3, role: .hostAction),
+        .init("tax form",           1.5, .bookkeeping, categoryWeight: 3, role: .hostAction),
         .init("str",                1.5, .management, wholeWord: true),
         .init("guest checkout",     1.5, .management, categoryWeight: 3),
         .init("section 8",          2.5, .legal, categoryWeight: 3),
@@ -75,6 +111,7 @@ enum ClassifierKeywords {
         // Property management
         .init("collect rent",       0.5, .management, categoryWeight: 6),
         .init("rent collection",    0.5, .management, categoryWeight: 6),
+        .init("rent payment",       0.5, .management, categoryWeight: 6),
         .init("property manager",   2.5, .management, categoryWeight: 3),
         .init("property management", 2.5, .management, categoryWeight: 3),
         .init("manage",             1.0, .management),
@@ -85,7 +122,7 @@ enum ClassifierKeywords {
         .init("lawn",               0.8, .repairs),
         .init("mow",                0.8, .repairs),
         .init("snow removal",       1.2, .repairs),
-        .init("turnover",           2.0, .repairs, categoryWeight: 2.5),
+        .init("turnover",           2.0, .repairs, categoryWeight: 2.5, role: .hostAction),
         .init("clean",              0.6, .repairs, categoryWeight: 1.5),
         .init("rekey",              2.0, .repairs),
         .init("locksmith",          1.5, .repairs),
@@ -156,19 +193,27 @@ enum ClassifierKeywords {
         .init("reconcile",          1.5, .bookkeeping),
         .init("expense",            1.2, .bookkeeping),
         .init("schedule e",         2.5, .bookkeeping, wholeWord: true),
-        .init("cpa",                1.5, .bookkeeping, wholeWord: true),
+        // Rental tax work (cost segregation, depreciation): bookkeeping.
+        .init("cost seg",           2.5, .bookkeeping, categoryWeight: 4),
+        .init("segregation",        2.0, .bookkeeping, categoryWeight: 4),
+        .init("depreciation",       2.0, .bookkeeping, categoryWeight: 4),
+        .init("1098",               1.5, .bookkeeping),
+        .init("cpa",               1.5, .bookkeeping, wholeWord: true),
         .init("accountant",         1.5, .bookkeeping),
         .init("1099",               2.0, .bookkeeping),
         .init("property tax",       2.0, .bookkeeping, categoryWeight: 4),
         .init("tax",                0.6, .bookkeeping),
-        .init("receipt",            1.0, .bookkeeping),
-        .init("invoice",            1.0, .bookkeeping),
+        .init("receipt",            1.0, .bookkeeping, role: .purchase),
+        .init("invoice",            1.0, .bookkeeping, role: .purchase),
+        .init("order",              0.0, wholeWord: true, role: .purchase),
+        .init("purchase",           0.0, role: .purchase),
         .init("dues",               0.8, .bookkeeping),
         .init("statements",         1.0, .bookkeeping, categoryWeight: 2),
         .init("year end",           1.0, .bookkeeping),
         .init("bill",               0.5, .bookkeeping, categoryWeight: 2, wholeWord: true),
         .init("assessment",         0.6, .bookkeeping),
         .init("buildium",           2.5, .bookkeeping, categoryWeight: 0.5),
+        .init("stessa",             2.5, .bookkeeping),
         .init("appfolio",           2.5, .management, categoryWeight: 0.5),
 
         // Legal & compliance
@@ -186,14 +231,18 @@ enum ClassifierKeywords {
 
         // Insurance & claims
         .init("insurance",          1.2, .insurance, categoryWeight: 2),
+        .init("landlord insurance", 1.0, .insurance, categoryWeight: 4),
+        .init("non renew",          1.0, .insurance, categoryWeight: 2),
         .init("adjuster",           2.0, .insurance),
         .init("claim",              0.8, .insurance, categoryWeight: 2),
         .init("water damage",       1.5, .insurance),
 
         // Travel to property
         .init("drive to",           0.8, .travel, categoryWeight: 3),
-        .init("home depot",         1.2, .travel, categoryWeight: 3),
-        .init("lowes",              1.2, .travel, categoryWeight: 3),
+        // Stores are weak alone and vote repairs; they score next to a purchase word.
+        .init("home depot",         0.6, .repairs, categoryWeight: 2, role: .store),
+        .init("lowes",              0.6, .repairs, categoryWeight: 2, role: .store),
+        .init("lowe s",             0.6, .repairs, categoryWeight: 2, role: .store),
         .init("hardware store",     1.2, .travel, categoryWeight: 3),
         .init("supplies",           0.8),
 
@@ -215,7 +264,7 @@ enum ClassifierKeywords {
         // Contract negotiation (investor-level)
         .init("negotiat",           1.0, .contractNegotiation, categoryWeight: 2),
         .init("purchase contract",  2.0, .contractNegotiation, categoryWeight: 3),
-        .init("contract",           0.6, .contractNegotiation),
+        .init("contract",           0.6, .contractNegotiation, wholeWord: true),
         .init("offer",              0.6, .contractNegotiation),
 
         // Generic property words (no category vote)
@@ -297,6 +346,47 @@ enum ClassifierKeywords {
         .init("work",              -1.5, wholeWord: true),
         .init("conference",        -1.0),
         .init("reservation",       -1.0),
+        // Social events (often at a home the owner lives in).
+        .init("bbq",               -3.0, wholeWord: true),
+        .init("barbecue",          -3.0),
+        .init("party",             -2.5),
+        .init("celebration",       -2.5),
+        .init("housewarming",      -3.0),
+        .init("get together",      -2.5),
+        .init("festival",          -2.5),
+        // Marketing, newsletters and account mail (rental platforms, stores, tax vendors).
+        .init("discount",          -2.5),
+        .init("promotion",         -2.5),
+        .init("promo",             -2.5, wholeWord: true),
+        .init("deals",             -2.0, wholeWord: true),
+        .init("sale",              -2.0, wholeWord: true),
+        .init("savings",           -2.0),
+        .init("stays",             -2.0, wholeWord: true),
+        .init("you should see",    -2.5),
+        .init("password",          -4.0),
+        .init("secure code",       -4.0),
+        .init("security code",     -4.0),
+        .init("verification code", -4.0),
+        .init("verify your",       -3.0),
+        .init("sign in",           -2.0),
+        .init("webinar",           -3.0),
+        .init("newsletter",        -3.0),
+        .init("unsubscribe",       -3.0),
+        .init("digest",            -3.0),
+        .init("tips",              -2.0, wholeWord: true),
+        .init("feedback",          -2.0),
+        .init("rewards",           -2.0),
+        .init("your cart",         -3.0),
+        .init("more updates",      -3.0),
+        .init("other updates",     -3.0),
+        .init("host updates",      -3.0),
+        .init("bookings",          -1.5, wholeWord: true),
+        .init("car rental",        -4.0),
+        .init("industry",          -2.0, wholeWord: true),
+        .init("expert call",       -3.0),
+        .init("rental car",        -4.0),
+        .init("alert",             -1.5, wholeWord: true),
+        .init("alerts",            -1.5, wholeWord: true),
         .init("mom",               -1.5, wholeWord: true),
         .init("family",            -1.5),
     ]
@@ -309,6 +399,14 @@ enum ClassifierKeywords {
         "street", "st", "avenue", "ave", "road", "rd", "drive", "dr", "lane", "ln", "court", "ct",
         "place", "pl", "blvd", "boulevard", "way", "hwy", "highway", "suite", "ste", "apt",
         "north", "south", "east", "west", "n", "s", "e", "w",
+    ]
+
+    /// Place-name words that never identify a street on their own ("San", "Lake"): a street
+    /// made only of these needs the house number too.
+    static let placeWords: Set<String> = [
+        "san", "santa", "santo", "los", "las", "del", "el", "la", "lake", "mount", "mt",
+        "port", "fort", "saint", "park", "bay", "hill", "hills", "valley", "beach", "river",
+        "spring", "springs", "creek", "view", "new", "old", "great", "little", "upper", "lower",
     ]
 }
 
