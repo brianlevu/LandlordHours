@@ -4,137 +4,103 @@
 > **Tagline:** *"Track your path to tax qualification"*
 > **Platform:** iOS 17.0+ (SwiftUI)
 > **Architecture:** MVVM
-> **Design Style:** Tiimo-inspired — soft, rounded, friendly, modern
+> **Design Style:** 2.0 "Blueprint" — honest, crafted, earned (docs/design/2.0-brand-system.md). Violet and Lucide are retired.
 
 For full-screen-by-screen design audits, use `docs/design-audit-playbook.md` before changing UI.
 
 ---
 
-## Brand Identity
+## Brand Identity (2.0 "Blueprint", locked by Brian 2026-10-19)
 
-### Logo
+Where the brand lives:
+- **`docs/design/2.0-brand-system.md`** — personality, colour tokens, type, icon language, logo and app icon. The source of truth.
+- **`design/brand/`** — `contrast.txt` (every pair, WCAG ratios), `logo/` (mark-b, mark-b-mono, wordmark, lockups as SVG), `icon/` (`icon-b-1024.png` = the approved app icon, plus `-dark` / `-tinted` variants), `scripts/` (`make_icons.py`, `make_icon_variants.py`, `contrast.py`, `verify_icon.py`).
+- **`docs/design/2.0-hifi-reference-spec.md`** — per-surface layout (tab bar, Inbox, sheets, Settings).
 
-- **Primary Logo:** `LHLogo` — House + clock composite icon inside a purple gradient circle
-- **Compact Logo:** `LHCompactLogo` — Same mark at smaller sizes (32pt default) for nav bars/headers
-- **Wordmark:** `LHWordmark` — "Landlord" (dark) + "Hours" (purple accent)
-- **Logo gradient:** `#8B5CF6` → `#6D28D9` (top-leading → bottom-trailing)
-- File: `Sources/App/LHLogo.swift`
+Personality: **Honest. Crafted. Earned.** Say what was done, in short sentences; never "qualified" (that is the CPA's word).
 
-### Logo Usage
+**Retired in 2.0: violet (every shade) and Lucide icons.** Violet-named tokens still exist so old screens compile, but they resolve to blueprint values; never pick a violet hex again. Lucide is being removed (see Icon System).
+
+### Logo — mark B, "half drawn, half built"
+
+A house elevation on blueprint blue: foundation, left wall, left roof slope and door are built (plaster, terracotta, timber); the right slope, upper right wall and window are still drafting-cyan linework. File: `Sources/App/LHLogo.swift` (vector paths from `design/brand/logo/mark-b.svg`).
 
 ```swift
-LHLogo(size: 80, showText: true, animated: false)   // Full logo with text
-LHCompactLogo(size: 32)                               // Nav bar / header
-LHWordmark(fontSize: 28)                               // Text-only
+LHLogo(size: 80, showText: true, animated: false)   // tile + wordmark
+LHCompactLogo(size: 32)                               // nav bar / header
+WaveHouseIcon(size: 44)                               // the mark on its blueprint tile (in-app twin of the app icon)
+LHMark(size: 120)                                     // colour mark, transparent (on blueprint surfaces)
+LHMarkShape().fill(...)                               // mono template (widgets, Island, accented modes)
+LHWordmark(fontSize: 34)                              // "Landlord" ink + "Hours" action colour; Fraunces 600 at ≥28pt
 ```
+
+App icon: `Assets.xcassets/AppIcon.appiconset` = icon B (1024 full-bleed, no baked corners) with dark (transparent background) and tinted (grayscale) appearances. Regenerate variants with `python3 design/brand/scripts/make_icon_variants.py design/brand/icon`. The four 1.x alternate icons (Violet, Sunset, Clock, Aurora) are still in the catalog and the Settings picker; they are off-brand and should go when Settings is reskinned.
 
 ---
 
 ## Color System
 
-All colors defined in `Sources/App/LandlordHoursApp.swift` → `AppColors` enum.
+All tokens live in `Sources/App/LandlordHoursApp.swift`: hex sources in `AppColors.Hex`, `AppColors` statics, and `AdaptiveColors` (resolves per scheme). Values and contrast: `docs/design/2.0-brand-system.md` §2 and `design/brand/contrast.txt`; `Tests/ColorContrastTests.swift` asserts every text pair ≥ 4.5:1 in both schemes, the locked hexes, and that no token is violet.
 
-### Light Theme
+**Blueprint blue `#1E3FA6` is the brand and the light-mode action colour. Dark mode's action is drafting cyan `#8FD3FF`** ("the action colour is always the ink on the paper"). Dark linework and drafting labels step down to `#60A8E6` so linework never shares a hex with the dark action.
 
-| Token                   | Hex       | Usage                               |
-|-------------------------|-----------|--------------------------------------|
-| `background`            | `#F5F5F5` | Page backgrounds                     |
-| `backgroundSecondary`   | `#FFFFFF` | Cards, sheets                        |
-| `backgroundTertiary`    | `#EBEBEB` | Inputs, tags, subtle surfaces        |
-| `primary`               | `#7C6FF7` | Buttons, accents, tab tint           |
-| `primaryLight`          | `#A78BFA` | Gradients, secondary accents         |
-| `primarySurface`        | `#EDE9FE` | Lavender tint for badge backgrounds  |
-| `primaryDark`           | `#6355E8` | Pressed states                       |
-| `success`               | `#34D399` | Progress met, qualified indicators   |
-| `warning`               | `#FBBF24` | Near-goal alerts                     |
-| `error`                 | `#F472B6` | Errors, delete actions               |
-| `info`                  | `#60A5FA` | Informational badges                 |
-| `textPrimary`           | `#0D0D0D` | Headlines, body text                 |
-| `textSecondary`         | `#6B7280` | Captions, labels                     |
-| `textTertiary`          | `#9CA3AF` | Placeholders, disabled text          |
-| `border`                | `#D1D5DB` | Card borders, dividers               |
-| `borderLight`           | `#E5E7EB` | Subtle separators                    |
+| Intent token | Light | Dark | Use |
+|---|---|---|---|
+| `background` (canvas) | `#EEF2FA` | `#0B1230` | Page |
+| `backgroundSecondary` (card) | `#FFFFFF` | `#141C3F` | Cards, sheets |
+| `backgroundTertiary` | `#F6F8FD` | `#1B2550` | Inputs, segments |
+| `brand` (new) | `#1E3FA6` | `#1E3FA6` | Hero, icon, brand fills (theme-fixed) |
+| `action` / `primary` | `#1E3FA6` | `#8FD3FF` | Primary CTAs, selection, links |
+| `onAction` | `#FFFFFF` | `#0B1230` | Text/glyphs on `action` |
+| `actionSurface` / `primarySurface` | `#E3E9FA` | `#182A5C` | Selected tab, action wash |
+| `drafting` (new) | `#8FD3FF` | `#60A8E6` | Decorative linework only, never text on white |
+| `draftingInk` (new) | `#2369B5` | `#60A8E6` | SF Mono drafting labels |
+| `timber` / `timberInk` (new) | `#E0A458` / `#8A5A1B` | `#E0A458` / `#F0BE7A` | Warm material accent / its text form |
+| `brass`, `terracotta`, `plaster` (new) | `#D9B45A`, `#C8553D`, `#F4EFE6` | same | Illustration only |
+| `textPrimary` / `Secondary` / `Tertiary` | `#121B33` / `#4A5068` / `#5F6983` | `#F2F4FA` / `#B4BCD2` / `#7E88A6` | Text levels |
+| `border` | `#D5DBEA` | `#2A3560` | Decorative hairline (cards separate by fill) |
+| `positive` (+Surface) | `#137A42` / `#E4F7EB` | `#4ED48A` / `#123A2A` | Met, confirmed, on pace |
+| `caution` (+Surface) | `#9A560C` / `#FCF0DC` | `#FFB454` / `#3D2A10` | Behind pace, incomplete setup |
+| `destructive` (+Surface) | `#C1303A` / `#FCE4E5` | `#FF7A7A` / `#44181C` | Delete, errors |
+| `informational` (+Surface) | `#4A6392` / `#E6ECF6` | `#9BB0D0` / `#1E2A4A` | Imports, sync, neutral info (slate, never mistaken for action) |
+| `rose` (+Wash) | `#B04266` | `#F08BAA` | Spouse / people |
 
-### Dark Theme
-
-| Token                      | Hex/Value          | Usage                          |
-|----------------------------|--------------------|--------------------------------|
-| `darkBackground`           | `#0D0D0D`          | Page backgrounds               |
-| `darkBackgroundSecondary`  | `#1C1C1C`          | Cards, sheets                  |
-| `darkBackgroundTertiary`   | `#2A2A2A`          | Inputs, tags                   |
-| `darkPrimarySurface`       | `#2D2A4A`          | Lavender tint for dark mode    |
-| `darkPrimary`              | `#9D8FF5`          | Primary actions in dark mode   |
-| `darkTextPrimary`          | `Color.white`      | Headlines                      |
-| `darkTextSecondary`        | `rgb(0.68,0.70,0.74)` | Captions                    |
-| `darkTextTertiary`         | `rgb(0.48,0.50,0.54)` | Placeholders                |
-| `darkBorder`               | `rgb(0.28,0.28,0.30)` | Card borders                |
-
-### Adaptive Colors (Color-Scheme Aware)
-
-Use `AdaptiveColors` in views to automatically resolve light/dark:
-
-```swift
-@Environment(\.colorScheme) var colorScheme
-private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-// Usage:
-.foregroundStyle(colors.textPrimary)
-.background(colors.background)
-```
-
-### Intent-Based Color Framework
-
-Use semantic intent first, raw hue names second. New UI should prefer the intent aliases in `AppColors` / `AdaptiveColors`:
-
-| Intent role | Token(s) | Meaning | Use for | Do not use for |
-|-------------|----------|---------|---------|----------------|
-| Primary action | `AppColors.action`, `colors.action`, `colors.actionSurface`, `AppColors.onAction` | The thing the user should do next | Primary CTAs, selected navigation, focus, links, AI assistance before completion | Success, healthy progress, decorative badges |
-| Positive | `AppColors.positive`, `colors.positive`, `colors.positiveSurface` | Success, qualified, complete, healthy | Saved states, Pro active, qualified badges, goal met, completed lessons | Primary CTAs before the user has completed anything |
-| Caution | `AppColors.caution`, `colors.caution`, `colors.cautionSurface` | Warning or needs attention | Behind pace, near-deadline, incomplete setup, risky audit conditions | Generic emphasis |
-| Destructive | `AppColors.destructive`, `colors.destructive`, `colors.destructiveSurface` | Delete, error-adjacent, repair/maintenance emphasis | Delete actions, destructive confirmations, repair category accent | Primary actions or success |
-| Informational | `AppColors.informational`, `colors.informational`, `colors.informationalSurface` | Informational/system context | Calendar import, sync, external data, neutral explainers | Warning or success states |
-| Human/spouse | `AppColors.rose`, `colors.rose`, `colors.roseWash` | People and household participation | Spouse, participant, shared-management emphasis | Error/destructive actions |
+Legacy names map onto these: `sage`→positive, `honey`→caution, `coral`→terracotta/destructive, `sky`→informational, `success`/`warning`/`error` → the intents, `reportsAccent*`/`mpAccent*`/`lavender*`/`celebration*`/`logo*` → blueprint-family values. Intent statics in `AppColors` are dynamic (`Color.lhDynamic`), so a bare `AppColors.action` follows the scheme; light-named neutrals (`charcoal`, `slate`, `snow`…) stay light-only.
 
 ### IMPORTANT Color Rules
 
-- IMPORTANT: Violet/action is the primary brand/action color. A screen's main CTA should use `colors.action` and `AppColors.onAction` unless it is explicitly destructive.
-- IMPORTANT: Sage/positive is reserved for success, qualified, complete, healthy progress, and active Pro/member states. Do not use green for ordinary "continue", "add", "save", "review", or "upgrade" buttons.
-- IMPORTANT: Honey/caution means warning or needs attention. Coral/destructive means delete/error-adjacent or repair/maintenance. Sky/informational means imports, calendar, sync, or neutral information.
-- IMPORTANT: Never hardcode hex values inline in views. Add a token in `AppColors` or use `AdaptiveColors`.
-- IMPORTANT: Every view must support dark mode via `AdaptiveColors`.
-- IMPORTANT: Avoid assigning color by aesthetics alone. Every non-neutral color must answer: action, positive, caution, destructive, informational, category, or human/spouse.
-- Category-specific colors are allowed for user-customizable categories, but category color must not override action/state semantics.
+- IMPORTANT: One blue, owned completely. A screen's main CTA uses `colors.action` + `colors.onAction` (or `AppColors.action` / `AppColors.onAction`) unless it is destructive. On the blueprint hero the primary button is a white pill with blueprint text.
+- IMPORTANT: Positive only for met/confirmed/on-pace; caution for behind-pace and incomplete setup; destructive for delete; informational is slate. Never green for ordinary "continue/add/save" buttons.
+- IMPORTANT: Drafting cyan is linework, not text on light surfaces (1.6:1 on white). Text in drafting style uses `draftingInk`.
+- IMPORTANT: Never hardcode hex values in views. Add a token to `AppColors.Hex` + `AppColors`/`AdaptiveColors`, and a contrast assertion if it carries text.
+- IMPORTANT: Every view supports dark mode via `AdaptiveColors`.
+- IMPORTANT: No violet. `testVioletIsRetired` fails if a token drifts back to a purple hue.
+- Category colours stay as materials, at 12% washes behind row icons; they never override intent colours.
 
 ---
 
 ## Typography
 
-Defined in `Sources/App/LandlordHoursApp.swift` → `AppTypography` enum.
+Defined in `Sources/App/LandlordHoursApp.swift` → `AppTypography`, `LHDisplayStyle`, `LHFont`.
 
-| Token           | Size | Weight    | Usage                        |
-|-----------------|------|-----------|------------------------------|
-| `largeTitle`    | 34   | Bold      | Main screen titles           |
-| `title1`        | 28   | Bold      | Section headers (dashboard)  |
-| `title2`        | 22   | Bold      | Card titles                  |
-| `title3`        | 20   | Semibold  | Sub-section headers          |
-| `headline`      | 17   | Semibold  | Emphasized body text         |
-| `bodyLarge`     | 17   | Regular   | Primary body text            |
-| `body`          | 15   | Regular   | Standard body text           |
-| `bodySmall`     | 13   | Regular   | Compact body text            |
-| `subheadline`   | 15   | Regular   | Secondary descriptions       |
-| `footnote`      | 13   | Regular   | Fine print                   |
-| `caption`       | 12   | Regular   | Timestamps, metadata         |
-| `buttonLarge`   | 17   | Semibold  | Primary buttons              |
-| `button`        | 15   | Semibold  | Standard buttons             |
-| `buttonSmall`   | 13   | Semibold  | Compact/inline buttons       |
+- **SF Pro** for body and UI. Tokens use text styles, so they follow Dynamic Type.
+- **SF Pro Rounded, tabular digits** for numbers: `heroNumber` (56/700, fixed inside the hero geometry), `ringNumber` (46), `metric` (title2 rounded bold), `number` (body rounded semibold).
+- **SF Mono** for drafting labels: `AppTypography.drafting` (= `label`), 11pt, uppercase, `.tracking(1.3)` at the call site.
+- **Fraunces** (Undercase Type, SIL OFL 1.1; `Sources/Resources/Fonts/Fraunces.ttf` + `Fraunces-OFL.txt`, registered in `Info.plist` `UIAppFonts`) for **display at 28pt and up only**: tab titles, Welcome, milestones, Today's header. **Never** in lists, never on numbers or tax lines, never in the PDF. If it fails to register, the code falls back to New York (`design: .serif`).
 
-### Typography Patterns
+| Token | Font | Size / weight | Notes |
+|---|---|---|---|
+| `.lhDisplayFont(.display)` / `AppTypography.display` | Fraunces | 34 / 500, opsz 144, SOFT 50 | Welcome, milestones |
+| `.lhDisplayFont(.largeTitle)` / `largeTitle` | Fraunces | 34 / 500, opsz 96 | Tab titles, Today header |
+| `.lhDisplayFont(.title)` / `headline`, `title1` | Fraunces | 28 / 500, opsz 72 | Section display |
+| `title2` / `title3` | SF Pro | 22 / 20 semibold | Card titles |
+| `subheadline` / `buttonLarge` | SF Pro | 17 semibold | |
+| `bodyLarge` / `body` / `bodySmall` | SF Pro | 17 / 15 / 13 | |
+| `caption` | SF Pro | 12 medium | |
+| `button` / `buttonSmall` | SF Pro | 16 / 13 semibold | |
 
-- **Dashboard headers:** `.system(size: 28, weight: .bold, design: .serif)`
-- **Progress numbers:** `.system(size: 46, weight: .bold, design: .rounded)`
-- **Logo/brand text:** `.system(weight: .bold, design: .rounded)`
-- **Status labels:** `.system(size: 10, weight: .bold)` with `.tracking(0.6)` uppercase
-- IMPORTANT: Use `AppTypography.*` tokens for consistency
+- Prefer `.lhDisplayFont(_:)`: it sets the wght/opsz/SOFT axes, follows Dynamic Type and never drops under 28pt. The `Font` tokens are the simple fallback for `Text` concatenation.
+- IMPORTANT: Use `AppTypography.*` tokens; no new `.system(size:...design: .rounded)` for body text.
 
 ---
 
@@ -201,51 +167,21 @@ Defined in `Sources/App/LandlordHoursApp.swift` → `AppAnimation` enum.
 
 ---
 
-## Icon System
+## Icon System (2.0)
 
-Three icon systems are used, each with a specific role. All defined in `Sources/App/LHIcons.swift`.
+Two tiers, nothing else (`docs/design/2.0-brand-system.md` §4):
 
-### 1. LHIcon (Custom SwiftUI Shapes) — Tab Bar Only
+1. **SF Symbols for everything functional** — tab bar, toolbars, buttons, badges, Settings, widgets, Live Activity, the Dynamic Island. They tint, carry weight, follow Dynamic Type and render in accented/tinted modes. Weights: `.regular` in lists at 17–22pt, `.semibold` inline with semibold text; filled circle variants for status; filled variants for the selected tab.
+2. **3D tool renders on a plaster tile (36–48pt)** for category rows, Inbox, the category picker and the milestone share (to be re-made from the Blender material set; WP-R).
 
-Hand-drawn SwiftUI `Shape` paths in a 24×24 grid. **Used exclusively for the tab bar.**
+**Lucide is retired.** Do not add new `Lucide.*`, `LucideIcon(...)` or Lucide string names. As of WP-D (2026-10-19) 361 `Lucide.*` references remain across 24 files (plus `JellyBadge` string lookups and `LHIcons.swift`); they map one-to-one to SF Symbols and go screen by screen in the WP-R reskin, after which the `LucideIcons` package is dropped from `project.yml`. `LHIcon` tab glyphs are retired too (the shell uses SF Symbols).
 
-```swift
-// Tab bar image (for .tabItem)
-LHIcon.home.tabItemImage
-```
+- `JellyBadge(systemName:)` still resolves a Lucide name first, then an SF Symbol; pass SF Symbol names in new code.
+- SF Symbols remain the category-picker icons (`availableCategoryIcons`).
 
-Tab icons: `home`, `properties`, `track`, `reports`, `settings`
+### Navigation shell (2.0)
 
-### 2. Lucide Icons (Primary Icon Library) — All UI
-
-Imported via SPM: `lucide-icons-swift` v0.575.0. Used for all in-app icons.
-
-```swift
-import LucideIcons
-
-// Type-safe usage (preferred — compile-time checked):
-LucideIcon(image: Lucide.clock, size: 20)
-
-// Inside JellyBadge (string-based, kebab-case):
-JellyBadge(systemName: "clock", color: AppColors.primary)
-```
-
-**JellyBadge** (`LandlordHoursApp.swift`) resolves icons with a two-step fallback:
-1. Try `UIImage(lucideId: systemName)` — Lucide lookup by kebab-case asset name
-2. Fall back to `Image(systemName:)` — SF Symbol
-
-IMPORTANT: When passing string icon names to JellyBadge, use **Lucide kebab-case asset names** (e.g., `"file-text"`, `"building-2"`, `"badge-check"`), NOT SF Symbol names.
-
-### 3. SF Symbols — Category Picker Only
-
-SF Symbols are used **only** for user-customizable category icons in `availableCategoryIcons` array and `CategoryManagementView`/`CategoryPickerSheet` (via `Image(systemName:)`).
-
-### IMPORTANT Icon Rules
-
-- IMPORTANT: Use **Lucide icons** for all new UI. Use type-safe `Lucide.*` properties when possible (compile-time checked). Use string-based kebab-case names only when dynamic lookup is needed (e.g., JellyBadge).
-- IMPORTANT: Use **LHIcon** only for tab bar icons via `.tabItemImage`.
-- IMPORTANT: Use **SF Symbols** only in `availableCategoryIcons` for user-customizable category icons.
-- IMPORTANT: When adding a new string-based icon reference, verify the kebab-case name exists in the Lucide package (`Lucide+iOS.swift`).
+`Sources/Views/ContentView.swift`: a floating glass capsule with four tabs — **Today** (Dashboard), **Inbox** (placeholder until WP3), **Records** (History), **Properties** — and a separate round **+** (log time / Track). Liquid Glass (`.glassEffect`) on iOS 26+, solid card fill before. Reports and Settings open from Today's header. Integer tab indices keep their 1.x meaning (`ShellTab` in `Sources/App/AppDestination.swift`: 0 Today, 1 Properties, 2 Log time, 3 Reports, 4 Settings, 5 Inbox, 6 Records) so `.switchToTab`, `-LHInitialTab`, intents and deep links resolve. UI tests address tabs by identifier: `tab.today`, `tab.inbox`, `tab.records`, `tab.properties`, `tab.logTime`.
 
 ---
 
@@ -427,6 +363,8 @@ Sources/
 ---
 
 ## Figma Redesign — Implementation Specs
+
+> **Superseded for colour, type and icons by the 2.0 brand system** (see Brand Identity above). The violet palettes, DM Serif/DM Sans and the Lucide/LHIcon tab glyphs below describe 1.x; keep the layout notes only where 2.0 docs say nothing.
 
 > **Figma File:** `Mikfhrs0aGwyzgYQd3Utpu`
 > **HTML Mockups:** `figma-redesign/` directory — these are the **source of truth** for implementation, not the Figma captures
