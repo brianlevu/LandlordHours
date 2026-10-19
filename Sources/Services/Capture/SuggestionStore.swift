@@ -19,45 +19,89 @@ enum CaptureReconciler {
         return entries.first { $0.id == derivedId || ($0.sourceKey != nil && $0.sourceKey == suggestion.sourceKey) }
     }
 
+    /// How far a 1.x import's start may differ from the suggestion's start. Matches 1.x's own
+    /// duplicate check (`isDuplicateCalendarEntry`, < 60 s).
+    static let legacyStartTolerance: TimeInterval = 60
+
     /// A 1.x calendar bulk import covering this calendar suggestion.
     ///
     /// 1.x stored the device-local `eventIdentifier`, which is shared by every repeat of a
     /// recurring event, so its keys can never equal a 2.0 `cal:` key. Matching is therefore
-    /// fuzzy: same property (when the suggestion proposes one), same calendar day, same hours,
-    /// same title (1.x wrote the event title into `notes`).
+    /// fuzzy, and strict so real hours are never hidden: same start time (within 60 s), same
+    /// hours, same title (1.x wrote the event title into `notes`), and the same property
+    /// whenever the suggestion proposes one. Each old import covers at most one suggestion:
+    /// entries in `claimed` already cover another suggestion and are skipped; when several
+    /// imports qualify the one closest in start time wins.
     static func legacyImportMatch(
         for suggestion: Suggestion,
         in entries: [TimeEntry],
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        excluding claimed: Set<UUID> = []
     ) -> TimeEntry? {
         guard suggestion.kind == .calendar, let hours = suggestion.proposedHours else { return nil }
         let title = normalizedTitle(suggestion.title)
         guard !title.isEmpty else { return nil }
-        return entries.first { entry in
-            guard entry.isLegacyCalendarImport else { return false }
+        let matches = entries.filter { entry in
+            guard entry.isLegacyCalendarImport, !claimed.contains(entry.id) else { return false }
             if let propertyId = suggestion.proposedPropertyId, entry.propertyId != propertyId { return false }
-            guard calendar.isDate(entry.date, inSameDayAs: suggestion.start) else { return false }
+            guard abs(entry.date.timeIntervalSince(suggestion.start)) <= legacyStartTolerance else { return false }
             guard abs(entry.hours - hours) < hoursTolerance else { return false }
             return normalizedTitle(entry.notes) == title
         }
+        return matches.min {
+            abs($0.date.timeIntervalSince(suggestion.start)) < abs($1.date.timeIntervalSince(suggestion.start))
+        }
     }
 
-    /// True when hours logged another way (by hand, timer, voice, or a different import) on the
-    /// same day look like this item. The item is still shown, marked "might already be logged",
-    /// and never pre-selected — the user decides.
+    /// True when hours already recorded look like this item. The item is still shown, marked
+    /// "might already be logged", and never pre-selected: the user decides.
+    ///
+    /// Two signals, both in absolute time:
+    /// - A calendar-sourced entry (a 1.x import) with the same title and a start within 60 s,
+    ///   whatever its property: the property may have been edited or derived differently.
+    /// - A hand-logged entry (no `sourceKey`) on the same property whose own window
+    ///   (`date` ... `date + hours`) overlaps the item's window, or whose `date` falls on a
+    ///   calendar day the item touches (people log "2 h on Tuesday" without a time). Events
+    ///   crossing midnight touch both days. Without a proposed property, only when hours line up.
     static func mightAlreadyBeLogged(
         _ suggestion: Suggestion,
         in entries: [TimeEntry],
         calendar: Calendar = .current
     ) -> Bool {
-        entries.contains { entry in
+        let title = normalizedTitle(suggestion.title)
+        let windowStart = suggestion.start
+        let windowEnd = max(
+            suggestion.end ?? windowStart.addingTimeInterval((suggestion.proposedHours ?? 0) * 3600),
+            windowStart
+        )
+        let firstDay = calendar.startOfDay(for: windowStart)
+        let lastDay = calendar.startOfDay(for: max(windowStart, windowEnd.addingTimeInterval(-1)))
+        let daysEnd = calendar.date(byAdding: .day, value: 1, to: lastDay) ?? lastDay.addingTimeInterval(86_400)
+
+        return entries.contains { entry in
+            if entry.source == .calendar, entry.sourceKey != suggestion.sourceKey, !title.isEmpty,
+               abs(entry.date.timeIntervalSince(suggestion.start)) <= legacyStartTolerance,
+               normalizedTitle(entry.notes) == title {
+                return true
+            }
+            // Editing a series for "all events" moves every occurrence's original start, so its
+            // keys change. An entry confirmed from the same series on a day this occurrence
+            // touches is the same work under the old key.
+            if let externalId = suggestion.externalId, let key = entry.sourceKey,
+               key != suggestion.sourceKey,
+               key == "cal:\(externalId)" || key.hasPrefix("cal:\(externalId):"),
+               entry.date >= firstDay, entry.date < daysEnd {
+                return true
+            }
             // Records of other confirmed suggestions are separate detected events.
             guard entry.sourceKey == nil else { return false }
-            guard calendar.isDate(entry.date, inSameDayAs: suggestion.start) else { return false }
+            let entryEnd = entry.date.addingTimeInterval(entry.hours * 3600)
+            let overlaps = entry.date < windowEnd && entryEnd > windowStart
+            let onTouchedDay = entry.date >= firstDay && entry.date < daysEnd
+            guard overlaps || onTouchedDay else { return false }
             if let propertyId = suggestion.proposedPropertyId {
                 return entry.propertyId == propertyId
             }
-            // No property proposed: only flag when the hours line up.
             guard let hours = suggestion.proposedHours else { return false }
             return abs(entry.hours - hours) <= 0.25
         }
@@ -149,6 +193,15 @@ final class SuggestionStore {
         contents.suggestions.first { $0.sourceKey == key }
     }
 
+    /// Entry ids that already cover a stored suggestion other than `key`. A 1.x import may
+    /// cover only one suggestion.
+    func claimedEntryIds(excludingKey key: String) -> Set<UUID> {
+        Set(contents.suggestions.compactMap { suggestion -> UUID? in
+            guard suggestion.sourceKey != key, case .confirmed(let id) = suggestion.state else { return nil }
+            return id
+        })
+    }
+
     func isDismissed(_ key: String) -> Bool { contents.dismissedKeys[key] != nil }
 
     func isMuted(_ suggestion: Suggestion) -> Bool {
@@ -210,7 +263,10 @@ final class SuggestionStore {
         if let existing = CaptureReconciler.confirmedEntry(for: suggestion, profileId: userId, in: entries) {
             result.state = .confirmed(entryId: existing.id)
             result.mightAlreadyBeLogged = false
-        } else if let legacy = CaptureReconciler.legacyImportMatch(for: suggestion, in: entries, calendar: calendar) {
+        } else if let legacy = CaptureReconciler.legacyImportMatch(
+            for: suggestion, in: entries, calendar: calendar,
+            excluding: claimedEntryIds(excludingKey: suggestion.sourceKey)
+        ) {
             result.state = .confirmed(entryId: legacy.id)
             result.mightAlreadyBeLogged = false
         } else {

@@ -53,7 +53,10 @@ extension AppViewModel {
         let entryId = suggestion.entryId(profileId: profileId)
 
         if let existing = CaptureReconciler.confirmedEntry(for: suggestion, profileId: profileId, in: timeEntries)
-            ?? CaptureReconciler.legacyImportMatch(for: suggestion, in: timeEntries) {
+            ?? CaptureReconciler.legacyImportMatch(
+                for: suggestion, in: timeEntries,
+                excluding: store?.claimedEntryIds(excludingKey: suggestion.sourceKey) ?? []
+            ) {
             store?.markConfirmed(key: suggestion.sourceKey, entryId: existing.id)
             return .alreadyRecorded(entryId: existing.id)
         }
@@ -84,7 +87,13 @@ extension AppViewModel {
             // OR has the same property, category, hours (±0.01), start (±60 s) and notes equal
             // to the event title (case-insensitive), with no conflicting importCalendarId
             // (AppViewModel.importCalendarEntries / isDuplicateCalendarEntry). So calendar
-            // confirms keep the title in notes unless the user edits it, store the
+            // importExternalId trade-off: 1.x only knows the series-wide eventIdentifier (no
+            // per-occurrence id exists), so after one occurrence of a series is confirmed a 1.1
+            // device skips the rest of that series. We keep writing it, exactly as 1.x would,
+            // because the safe error for tax hours is a missed suggestion (the user can log it
+            // by hand), not a double count. Dropping it would leave only the fuzzy match, which
+            // a differing category or property on the 1.1 device defeats.
+            // Calendar confirms keep the title in notes unless the user edits it, store the
             // eventIdentifier in importExternalId, and leave importCalendarId nil (calendar ids
             // are device-local and a mismatch would defeat the title check on another device).
             notes: edits.notes ?? (isCalendar ? suggestion.title : ""),

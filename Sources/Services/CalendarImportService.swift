@@ -20,9 +20,9 @@ class CalendarImportService {
     static let shared = CalendarImportService()
 
     /// Single retained store — authorization is tied to the instance.
-    private let store = EKEventStore()
+    let store = EKEventStore()
 
-    private let propertyKeywords = [
+    let propertyKeywords = [
         "property", "tenant", "landlord", "repair", "maintenance",
         "plumber", "electrician", "inspection", "lease", "rent",
         "showing", "walkthrough", "contractor", "hvac", "cleaning",
@@ -116,7 +116,7 @@ class CalendarImportService {
 
     // MARK: - Private
 
-    private func matchProperty(from text: String, properties: [RentalProperty]) -> RentalProperty? {
+    func matchProperty(from text: String, properties: [RentalProperty]) -> RentalProperty? {
         // Try name match first
         for property in properties {
             if text.contains(property.name.lowercased()) {
