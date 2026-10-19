@@ -31,6 +31,7 @@
 		2B843690B8A92B72AA874888 /* EngagementLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F7DEC5DC48828C8FF4C48C2 /* EngagementLabView.swift */; };
 		3401F93DEDF4ACC4A7DB7346 /* CalendarEventSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57E4F093C05AA801DBFA57AE /* CalendarEventSource.swift */; };
 		3736EF25A1251F900A2E6B8B /* HouseArtView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12683538DF1ED2391553A149 /* HouseArtView.swift */; };
+		37D64D0788DE8C34351A264C /* PropertyAliasUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65CD50959762385E221A6599 /* PropertyAliasUITests.swift */; };
 		38B5E98FF26323E43143DBF3 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 1AF16D81B372852B91B92405 /* LaunchScreen.storyboard */; };
 		3B3DCEF447585EB5C06E7B68 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = 160AF93CAE65FC3E3A8033B2 /* PostHog */; };
 		3B7CC2060463C21BC9ECAD07 /* TasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 368AC8C360A71EB0FAFB1D52 /* TasksView.swift */; };
@@ -198,6 +199,7 @@
 		6252BC3F79F79B6164763816 /* ProMomentsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProMomentsTests.swift; sourceTree = "<group>"; };
 		64B545F329C15FB9C02AE25C /* HouseHeroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseHeroView.swift; sourceTree = "<group>"; };
 		652D1B354C44F0935B0F2E4F /* ModelAvailability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelAvailability.swift; sourceTree = "<group>"; };
+		65CD50959762385E221A6599 /* PropertyAliasUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyAliasUITests.swift; sourceTree = "<group>"; };
 		66F916D5F37122A02CA6ADF4 /* RulesClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesClassifier.swift; sourceTree = "<group>"; };
 		6D7987DD5DAFB64A0DD0B89D /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		7002A4C1E561833705DE3B43 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
@@ -464,6 +466,7 @@
 				548394DDA38D7BBFDD18E815 /* FreeUserPaywallUITests.swift */,
 				016D2C699C6EA42FF25E0767 /* HousePreviewUITests.swift */,
 				8248EAB41ECD1E6CF7808498 /* LandlordHoursUITests.swift */,
+				65CD50959762385E221A6599 /* PropertyAliasUITests.swift */,
 				8ABD160E56491F781779A536 /* SignInReplacementUITests.swift */,
 				27D9AE994D0696BCE6E017B9 /* TimerDraftUITests.swift */,
 				4DC428FA6B6EF8A5244CC123 /* UITestIsolation.swift */,
@@ -823,6 +826,7 @@
 				FA95A196F8212B3525A97088 /* FreeUserPaywallUITests.swift in Sources */,
 				9ED242B446E98033F81CEF73 /* HousePreviewUITests.swift in Sources */,
 				20622DC1C008655024F7676F /* LandlordHoursUITests.swift in Sources */,
+				37D64D0788DE8C34351A264C /* PropertyAliasUITests.swift in Sources */,
 				87DDF9CFBAAE7676D8368B8F /* SignInReplacementUITests.swift in Sources */,
 				7E0B82EEBC8E67989BB1C257 /* TimerDraftUITests.swift in Sources */,
 				5AA0D982BB42E25BA085B2A6 /* UITestIsolation.swift in Sources */,
