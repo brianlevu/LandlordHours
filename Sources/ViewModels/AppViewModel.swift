@@ -47,6 +47,10 @@ class AppViewModel: ObservableObject {
     // Celebration state
     @Published var activeCelebration: CelebrationType?
     var suppressCelebrations = false
+    /// True while no scene is on screen (a notification action or intent running in the
+    /// background). Milestones crossed then are queued, not lost; `AppModelHost` turns this
+    /// off and presents the queue when a scene becomes active.
+    var queuesCelebrations = false
 
     // Timer state
     @Published var isTimerRunning = false
@@ -509,6 +513,7 @@ class AppViewModel: ObservableObject {
             GuidedOnboardingStore.completedKey,
             GuidedOnboardingStore.skippedKey,
             "LandlordHours.timer",
+            PendingCelebrationQueue.baseKey,
             ProfileRestore.profileNameKey
         ] + taxProfileFields.map { "LandlordHours.taxProfile.\($0)" }
 
@@ -523,6 +528,9 @@ class AppViewModel: ObservableObject {
         for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(notificationPrefix) {
             defaults.removeObject(forKey: key)
         }
+
+        // 2.0 capture inbox (local only): the profile's suggestions, dismissed keys, mute rules.
+        SuggestionStore.removeAll(forUserId: userId)
     }
     
     // MARK: - Sync Now (manual trigger for Settings)
@@ -838,10 +846,23 @@ class AppViewModel: ObservableObject {
         let tracker = MilestoneTracker.shared
         guard tracker.shouldCelebrate(type, year: year) else { return }
         tracker.markCelebrated(type, year: year)
-        activeCelebration = type
+        if queuesCelebrations {
+            PendingCelebrationQueue.enqueue(type)
+        } else {
+            activeCelebration = type
+        }
     }
 
-    private func checkHourMilestones() {
+    /// Shows the oldest queued celebration (crossed while in the background), if nothing else
+    /// is showing. Called when a scene becomes active.
+    func presentPendingCelebrationIfAny() {
+        guard activeCelebration == nil, !suppressCelebrations else { return }
+        if let next = PendingCelebrationQueue.dequeue() {
+            activeCelebration = next
+        }
+    }
+
+    func checkHourMilestones() {
         let year = Calendar.current.component(.year, from: Date())
         let goalType = GoalManager.shared.globalGoalType
         let status: (hours: Double, isMet: Bool)
@@ -962,7 +983,7 @@ class AppViewModel: ObservableObject {
     private static let loadFailureMessage =
         "Couldn't open your saved records. They're still on your device — reopen the app, and contact support if this keeps happening."
 
-    private func saveData() {
+    func saveData() {
         writePersistentStore()
         refreshWidgetSnapshot()
         // Trigger debounced cloud push

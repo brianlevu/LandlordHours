@@ -1,47 +1,5 @@
 import Foundation
 
-// MARK: - Entry Source
-//
-// How a time entry was captured. Persisted in `TimeEntry.importSource` so it rides the
-// existing CloudKit field (no schema change): nil = manual entry, "timer", "voice",
-// "calendar". Entries logged before 1.1 by timer or voice carry nil and read as manual.
-enum EntrySource: String, CaseIterable {
-    case manual
-    case timer
-    case voice
-    case calendar
-
-    init(importSource: String?) {
-        switch importSource {
-        case EntrySource.calendar.rawValue: self = .calendar
-        case EntrySource.timer.rawValue: self = .timer
-        case EntrySource.voice.rawValue: self = .voice
-        default: self = .manual
-        }
-    }
-
-    /// Value stored in `TimeEntry.importSource`. Manual entries store nil.
-    var storedValue: String? {
-        self == .manual ? nil : rawValue
-    }
-
-    var displayName: String {
-        switch self {
-        case .manual: return "Manual"
-        case .timer: return "Timer"
-        case .voice: return "Voice"
-        case .calendar: return "Calendar import"
-        }
-    }
-}
-
-extension TimeEntry {
-    var source: EntrySource { EntrySource(importSource: importSource) }
-
-    /// True only for entries imported from the calendar (timer/voice entries are not imports).
-    var isCalendarImport: Bool { source == .calendar }
-}
-
 // MARK: - Audit Report Model
 
 struct AuditReport {

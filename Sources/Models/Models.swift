@@ -316,6 +316,16 @@ struct TimeEntry: Identifiable, Codable {
     var importSource: String? // nil = manual, "calendar" = calendar import
     var importExternalId: String?
     var importCalendarId: String?
+    // 2.0 auto-capture provenance. Additive and optional: 1.1 builds ignore these keys when
+    // decoding, never write them, and CloudKit `.changedKeys` pushes from 1.1 leave them alone.
+    /// When the app first noticed the activity (for calendar: max(firstSeen, eventEnd)).
+    var detectedAt: Date?
+    /// When the user confirmed the suggestion. Non-nil marks a confirm-first record.
+    var confirmedAt: Date?
+    /// Short machine detail about the source (e.g. "backfill"). Never an event title.
+    var sourceDetail: String?
+    /// The suggestion's dedupe key. The entry's `id` is derived from it (see `CaptureIdentity`).
+    var sourceKey: String?
 
     init(
         id: UUID = UUID(),
@@ -328,7 +338,11 @@ struct TimeEntry: Identifiable, Codable {
         attachments: [TimeAttachment] = [],
         importSource: String? = nil,
         importExternalId: String? = nil,
-        importCalendarId: String? = nil
+        importCalendarId: String? = nil,
+        detectedAt: Date? = nil,
+        confirmedAt: Date? = nil,
+        sourceDetail: String? = nil,
+        sourceKey: String? = nil
     ) {
         self.id = id
         self.propertyId = propertyId
@@ -341,6 +355,10 @@ struct TimeEntry: Identifiable, Codable {
         self.importSource = importSource
         self.importExternalId = importExternalId
         self.importCalendarId = importCalendarId
+        self.detectedAt = detectedAt
+        self.confirmedAt = confirmedAt
+        self.sourceDetail = sourceDetail
+        self.sourceKey = sourceKey
         self.createdAt = Date()
         self.modifiedAt = Date()
     }
@@ -360,6 +378,10 @@ struct TimeEntry: Identifiable, Codable {
         importSource = try c.decodeIfPresent(String.self, forKey: .importSource)
         importExternalId = try c.decodeIfPresent(String.self, forKey: .importExternalId)
         importCalendarId = try c.decodeIfPresent(String.self, forKey: .importCalendarId)
+        detectedAt = try c.decodeIfPresent(Date.self, forKey: .detectedAt)
+        confirmedAt = try c.decodeIfPresent(Date.self, forKey: .confirmedAt)
+        sourceDetail = try c.decodeIfPresent(String.self, forKey: .sourceDetail)
+        sourceKey = try c.decodeIfPresent(String.self, forKey: .sourceKey)
     }
     
     // Helper to get property name - call this when needed

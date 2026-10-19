@@ -803,6 +803,28 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     // MARK: - Record Mapping: TimeEntry
 
     private func entryToRecord(_ entry: TimeEntry) -> CKRecord {
+        Self.record(for: entry, zoneID: zoneID, appUserId: appUserId)
+    }
+
+    private func recordToEntry(_ record: CKRecord) -> TimeEntry? {
+        Self.entry(from: record)
+    }
+
+    /// 2.0 capture fields on the TimeEntry record type. Additive: written only when non-nil, so
+    /// a push never sends a nil for them, and pushes from 1.1 (which never set them) leave the
+    /// server values alone under `.changedKeys`. Add each to the DEVELOPMENT schema, then
+    /// deploy to Production before any 2.0 build reaches users.
+    enum CaptureEntryField {
+        static let detectedAt = "detectedAt"        // Date/Time
+        static let confirmedAt = "confirmedAt"      // Date/Time
+        static let sourceDetail = "sourceDetail"    // String
+        static let sourceKey = "sourceKey"          // String
+        static let all = [detectedAt, confirmedAt, sourceDetail, sourceKey]
+    }
+
+    /// TimeEntry → CKRecord. The record name is the entry id; for confirmed suggestions that id
+    /// is derived from the source key, so two devices confirming one event write one record.
+    nonisolated static func record(for entry: TimeEntry, zoneID: CKRecordZone.ID, appUserId: String?) -> CKRecord {
         let recordID = CKRecord.ID(recordName: entry.id.uuidString, zoneID: zoneID)
         let record = CKRecord(recordType: "TimeEntry", recordID: recordID)
         record["propertyId"] = entry.propertyId.uuidString
@@ -813,14 +835,20 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         record["notes"] = entry.notes
         record["createdAt"] = entry.createdAt
         record["modifiedAt"] = entry.modifiedAt
-        record["importSource"] = entry.importSource
-        record["importExternalId"] = entry.importExternalId
-        record["importCalendarId"] = entry.importCalendarId
-        record["appUserId"] = appUserId
+        // Optional fields: never write nil (a nil under .changedKeys would clear the server value).
+        if let importSource = entry.importSource { record["importSource"] = importSource }
+        if let importExternalId = entry.importExternalId { record["importExternalId"] = importExternalId }
+        if let importCalendarId = entry.importCalendarId { record["importCalendarId"] = importCalendarId }
+        if let detectedAt = entry.detectedAt { record[CaptureEntryField.detectedAt] = detectedAt }
+        if let confirmedAt = entry.confirmedAt { record[CaptureEntryField.confirmedAt] = confirmedAt }
+        if let sourceDetail = entry.sourceDetail { record[CaptureEntryField.sourceDetail] = sourceDetail }
+        if let sourceKey = entry.sourceKey { record[CaptureEntryField.sourceKey] = sourceKey }
+        if let appUserId { record["appUserId"] = appUserId }
         return record
     }
 
-    private func recordToEntry(_ record: CKRecord) -> TimeEntry? {
+    /// CKRecord → TimeEntry. Records written by 1.1 simply lack the capture fields.
+    nonisolated static func entry(from record: CKRecord) -> TimeEntry? {
         guard let propertyIdStr = record["propertyId"] as? String,
               let propertyId = UUID(uuidString: propertyIdStr),
               let participantRaw = record["participant"] as? String,
@@ -831,10 +859,6 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
               let date = record["date"] as? Date,
               let id = UUID(uuidString: record.recordID.recordName) else { return nil }
 
-        let notes = record["notes"] as? String ?? ""
-        let importSource = record["importSource"] as? String
-        let importExternalId = record["importExternalId"] as? String
-        let importCalendarId = record["importCalendarId"] as? String
         var entry = TimeEntry(
             id: id,
             propertyId: propertyId,
@@ -842,10 +866,14 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
             category: category,
             hours: hours,
             date: date,
-            notes: notes,
-            importSource: importSource,
-            importExternalId: importExternalId,
-            importCalendarId: importCalendarId
+            notes: record["notes"] as? String ?? "",
+            importSource: record["importSource"] as? String,
+            importExternalId: record["importExternalId"] as? String,
+            importCalendarId: record["importCalendarId"] as? String,
+            detectedAt: record[CaptureEntryField.detectedAt] as? Date,
+            confirmedAt: record[CaptureEntryField.confirmedAt] as? Date,
+            sourceDetail: record[CaptureEntryField.sourceDetail] as? String,
+            sourceKey: record[CaptureEntryField.sourceKey] as? String
         )
         entry.createdAt = record["createdAt"] as? Date ?? Date()
         entry.modifiedAt = record["modifiedAt"] as? Date ?? entry.createdAt
