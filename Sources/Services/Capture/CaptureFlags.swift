@@ -89,3 +89,21 @@ struct CaptureFlags {
         return flag.defaultValue
     }
 }
+
+// MARK: - Event-ended prompt consent (per profile, opt-in)
+//
+// End-of-event notifications are opt-in. Off by default for new profiles AND for profiles
+// upgraded from 1.x, even when calendar and notification permission were already granted.
+// The inbox opt-in screens (WP3) turn it on through `AppViewModel.eventPromptsEnabled` (or
+// `set(_:profileId:)`); the refresher reads it on every run and clears pending prompts when off.
+enum CapturePromptConsent {
+    static let baseKey = "LandlordHours.capture.eventPromptsEnabled"
+
+    static func isEnabled(profileId: String, defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: UserScope.key(baseKey, userId: profileId))
+    }
+
+    static func set(_ enabled: Bool, profileId: String, defaults: UserDefaults = .standard) {
+        defaults.set(enabled, forKey: UserScope.key(baseKey, userId: profileId))
+    }
+}

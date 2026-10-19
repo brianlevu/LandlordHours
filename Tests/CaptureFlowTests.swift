@@ -501,7 +501,7 @@ final class AppModelHostTests: CaptureTestCase {
         let s = calendarSuggestion(start: date(2026, 3, 2), propertyId: propertyId, hours: 12, category: .repairs)
         host.suggestionStore!.ingest([s], existingEntries: [], calendar: calendar)
 
-        let router = NotificationActionRouter(host: host)
+        let router = NotificationActionRouter(host: host, environment: .testing(defaults: .standard))
         var order: [String] = []
         router.onWriteFinished = { order.append("write") }
         let entriesKey = UserScope.key("LandlordHours.entries", userId: profileId)
@@ -541,14 +541,14 @@ final class AppModelHostTests: CaptureTestCase {
         let s = calendarSuggestion(start: date(2026, 3, 2), propertyId: propertyId)
         host.suggestionStore!.ingest([s], existingEntries: [], calendar: calendar)
         var completed = false
-        let outcome = await NotificationActionRouter(host: host).handle(logItRequest(s, profileId: "someone-else")) { completed = true }
+        let outcome = await NotificationActionRouter(host: host, environment: .testing(defaults: .standard)).handle(logItRequest(s, profileId: "someone-else")) { completed = true }
         XCTAssertEqual(outcome, .rejectedWrongProfile)
         XCTAssertTrue(completed, "The system handler is always called")
         XCTAssertTrue(viewModel.timeEntries.isEmpty)
 
         let missing = NotificationActionRequest(actionIdentifier: CaptureNotificationAction.logIt,
                                                 userInfo: [NotificationPayload.sourceKeyKey: s.sourceKey])
-        let noProfile = await NotificationActionRouter(host: host).handle(missing) {}
+        let noProfile = await NotificationActionRouter(host: host, environment: .testing(defaults: .standard)).handle(missing) {}
         XCTAssertEqual(noProfile, .rejectedWrongProfile)
     }
 
@@ -557,7 +557,7 @@ final class AppModelHostTests: CaptureTestCase {
         let a = calendarSuggestion(externalId: "A", start: date(2026, 3, 2), propertyId: propertyId)
         let b = calendarSuggestion(externalId: "B", start: date(2026, 3, 2), propertyId: propertyId)
         host.suggestionStore!.ingest([a, b], existingEntries: [], calendar: calendar)
-        let router = NotificationActionRouter(host: host)
+        let router = NotificationActionRouter(host: host, environment: .testing(defaults: .standard))
 
         let dismissed = await router.handle(NotificationActionRequest(
             actionIdentifier: CaptureNotificationAction.notLandlordWork,
@@ -578,7 +578,7 @@ final class AppModelHostTests: CaptureTestCase {
         let previous = UserDefaults.standard.string(forKey: AppIntentNavigationRequest.pendingDestinationKey)
         defer { UserDefaults.standard.set(previous, forKey: AppIntentNavigationRequest.pendingDestinationKey) }
         var completed = false
-        let outcome = await NotificationActionRouter(host: host).handle(NotificationActionRequest(
+        let outcome = await NotificationActionRouter(host: host, environment: .testing(defaults: .standard)).handle(NotificationActionRequest(
             actionIdentifier: "LANDLORDHOURS_ACTION_EXPORT",
             categoryIdentifier: "LANDLORDHOURS_EXPORT",
             userInfo: ["reason": "x", "destination": EngagementDestination.export.rawValue])) { completed = true }

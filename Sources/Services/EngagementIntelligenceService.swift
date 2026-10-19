@@ -177,9 +177,11 @@ final class EngagementIntelligenceService {
         )
     }
 
+    // 2.0: an in-app nudge only. End-of-event notifications (EndOfEventScheduler) replace the
+    // old "N calendar items" digest notification, so the same events never ping twice.
     private func calendarDraftRecommendation(count: Int) -> EngagementRecommendation {
         EngagementRecommendation(
-            surface: .notification,
+            surface: .homeNudge,
             reason: .calendarDraftsReady,
             destination: .calendarReview,
             title: "Review likely landlord work",
