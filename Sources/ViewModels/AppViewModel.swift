@@ -94,6 +94,8 @@ class AppViewModel: ObservableObject {
 
         // Trigger cloud sync when tax profile or goals change
         TaxProfileManager.shared.onDidChange = { [weak self] in
+            // Spouse hours / grouping change what the widget counts.
+            self?.refreshWidgetSnapshot()
             self?.syncService.schedulePush()
         }
         GoalManager.shared.onDidChange = { [weak self] in
@@ -1094,25 +1096,39 @@ class AppViewModel: ObservableObject {
         }
     }
 
+    /// The one engagement context the widget and Siri read. Same counting rules as Today's
+    /// house: REPS is your hours alone; material participation adds a spouse only when Tax
+    /// Profile "Spouse hours" is on.
+    func engagementContext(
+        now: Date = Date(),
+        taxYear: Int? = nil,
+        isTimerRunning timerRunning: Bool? = nil,
+        timerStartTime timerStart: Date? = nil
+    ) -> EngagementContext {
+        let goal = GoalManager.shared.globalGoalType
+        return EngagementContext(
+            now: now,
+            taxYear: taxYear ?? Calendar.current.component(.year, from: now),
+            properties: properties,
+            timeEntries: timeEntries,
+            calendarDraftCount: 0,
+            isTimerRunning: timerRunning ?? isTimerRunning,
+            timerStartTime: timerRunning == nil ? timerStartTime : timerStart,
+            notificationPermission: .notDetermined,
+            recentDismissals: [],
+            isProUser: SubscriptionManager.shared.isPro,
+            targetHours: goal.hoursRequired,
+            goalType: goal,
+            groupingElection: TaxProfileManager.shared.groupingElection,
+            includeSpouse: tracksSpouseJointly
+        )
+    }
+
     private func refreshWidgetSnapshot() {
         let now = Date()
         let taxYear = Calendar.current.component(.year, from: now)
         let widgetGoal = widgetGoalContext()
-        let context = EngagementContext(
-            now: now,
-            taxYear: taxYear,
-            properties: properties,
-            timeEntries: timeEntries,
-            calendarDraftCount: 0,
-            isTimerRunning: isTimerRunning,
-            timerStartTime: timerStartTime,
-            notificationPermission: .notDetermined,
-            recentDismissals: [],
-            isProUser: SubscriptionManager.shared.isPro,
-            targetHours: widgetGoal.targetHours,
-            goalType: GoalManager.shared.globalGoalType,
-            groupingElection: TaxProfileManager.shared.groupingElection
-        )
+        let context = engagementContext(now: now, taxYear: taxYear)
         let snapshot = EngagementIntelligenceService.shared.snapshot(for: context)
         let recommendation = EngagementIntelligenceService.shared.recommendation(for: context)
         EngagementWidgetSnapshotStore.save(
