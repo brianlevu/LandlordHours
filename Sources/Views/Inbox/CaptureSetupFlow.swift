@@ -154,6 +154,7 @@ struct CaptureSetupFlow: View {
             .padding(.top, 8)
             .padding(.bottom, 8)
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(mode == .whatsNew ? "capture.whatsNew" : "capture.onboarding")
     }
 
@@ -349,6 +350,7 @@ struct CaptureSetupFlow: View {
         .padding(.horizontal, 20)
         .padding(.top, 32)
         .padding(.bottom, 8)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("capture.denied")
     }
 }

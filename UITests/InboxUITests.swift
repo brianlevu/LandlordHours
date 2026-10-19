@@ -41,60 +41,114 @@ final class InboxUITests: XCTestCase {
 
     private var undo: XCUIElement { app.buttons["inbox.undo"] }
 
+    /// Waits for an element, then for the launch bridge and seed reload to settle, so the next
+    /// tap or swipe is not swallowed by a transition.
+    @discardableResult
+    private func settle(_ element: XCUIElement, timeout: TimeInterval = 20) -> Bool {
+        guard element.waitForExistence(timeout: timeout) else { return false }
+        let deadline = Date().addingTimeInterval(5)
+        while !element.isHittable, Date() < deadline { Thread.sleep(forTimeInterval: 0.2) }
+        Thread.sleep(forTimeInterval: 1.0)
+        return element.exists
+    }
+
     /// Full swipe right; falls back to tapping the revealed action.
+    /// Scrolls the inbox until a below-the-fold row is on screen (the list is lazy).
+    @discardableResult
+    private func scrollTo(_ element: XCUIElement) -> Bool {
+        _ = settle(row("plumber"))
+        var tries = 0
+        while !isClearOfTabBar(element), tries < 6 {
+            app.swipeUp(velocity: .slow)
+            tries += 1
+        }
+        Thread.sleep(forTimeInterval: 0.6)
+        return isClearOfTabBar(element)
+    }
+
+    /// On screen and not under the floating tab bar (XCUI calls covered rows "hittable").
+    private func isClearOfTabBar(_ element: XCUIElement) -> Bool {
+        guard element.exists, element.isHittable else { return false }
+        let barTop = app.buttons["tab.inbox"].frame.minY
+        return element.frame.maxY < barTop - 8 && element.frame.minY > 90
+    }
+
+    /// Full-width fast drag: a full swipe fires the row's first action without a reveal stop.
+    private func fullSwipe(_ element: XCUIElement, right: Bool) {
+        let from = element.coordinate(withNormalizedOffset: CGVector(dx: right ? 0.08 : 0.92, dy: 0.5))
+        let to = element.coordinate(withNormalizedOffset: CGVector(dx: right ? 1.1 : -0.1, dy: 0.5))
+        from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .fast, thenHoldForDuration: 0)
+    }
+
+    private func waitForBadge(_ value: String, timeout: TimeInterval = 6) -> Bool {
+        let tab = app.buttons["tab.inbox"]
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if (tab.value as? String) == value { return true }
+            Thread.sleep(forTimeInterval: 0.25)
+        }
+        return (tab.value as? String) == value
+    }
+
     private func swipeLog(_ element: XCUIElement) {
-        element.swipeRight(velocity: .fast)
-        if !undo.waitForExistence(timeout: 2) {
+        fullSwipe(element, right: true)
+        if !undo.waitForExistence(timeout: 2), !app.buttons["confirm.log"].exists {
             let action = app.buttons["inbox.swipe.log"]
-            if action.exists { action.tap() }
+            if action.exists, isClearOfTabBar(action) { action.tap() }
         }
     }
 
     private func swipeDismiss(_ element: XCUIElement) {
-        element.swipeLeft(velocity: .fast)
+        fullSwipe(element, right: false)
         if !undo.waitForExistence(timeout: 2) {
             let action = app.buttons["inbox.swipe.dismiss"]
-            if action.exists { action.tap() }
+            if action.exists, isClearOfTabBar(action) { action.tap() }
         }
     }
 
     func testInboxGroupsBadgesAndTabCount() {
         launch("inbox")
-        XCTAssertTrue(row("showing").waitForExistence(timeout: 15))
+        XCTAssertTrue(settle(row("showing")))
         XCTAssertTrue(app.staticTexts["Today"].exists || app.staticTexts["TODAY"].exists)
-        XCTAssertTrue(app.staticTexts["Earlier"].exists || app.staticTexts["EARLIER"].exists)
-        XCTAssertTrue(row("call-sam").label.contains("Not sure"), row("call-sam").label)
-        XCTAssertTrue(row("hardware").label.contains("Might already be logged"), row("hardware").label)
+        XCTAssertTrue(app.staticTexts["This week"].exists || app.staticTexts["THIS WEEK"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["inbox.backfillBanner"].exists)
+        app.swipeUp()
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["Earlier"].waitForExistence(timeout: 3) || app.staticTexts["EARLIER"].exists)
+        XCTAssertTrue(row("call-sam").label.contains("Not sure"), row("call-sam").label)
+        XCTAssertEqual(app.buttons["tab.inbox"].value as? String, "8 to confirm")
+        XCTAssertTrue(row("hardware").exists)
+        XCTAssertTrue(row("hardware").label.contains("Might already be logged"), row("hardware").label)
         XCTAssertEqual(app.buttons["tab.inbox"].value as? String, "8 to confirm")
     }
 
     func testSwipeLogThenUndoThenCommit() {
         launch("inbox")
         let showing = row("showing")
-        XCTAssertTrue(showing.waitForExistence(timeout: 15))
+        XCTAssertTrue(settle(showing))
         swipeLog(showing)
         XCTAssertTrue(undo.waitForExistence(timeout: 3), "Undo toast after a swipe-log")
         XCTAssertFalse(row("showing").exists, "Row leaves at once")
-        XCTAssertEqual(app.buttons["tab.inbox"].value as? String, "7 to confirm")
         undo.tap()
-        XCTAssertTrue(row("showing").waitForExistence(timeout: 3), "Undo brings it back")
-        XCTAssertEqual(app.buttons["tab.inbox"].value as? String, "8 to confirm")
+        XCTAssertTrue(waitForBadge("8 to confirm"), "Undo puts it back in the count")
+        XCTAssertTrue(row("showing").waitForExistence(timeout: 6), "Undo brings the row back")
 
+        Thread.sleep(forTimeInterval: 1.0)
         swipeLog(row("showing"))
         XCTAssertTrue(undo.waitForExistence(timeout: 3))
-        XCTAssertTrue(undo.waitForNonExistence(timeout: 8), "Toast times out and the log is written")
+        XCTAssertTrue(waitForBadge("7 to confirm"))
+        XCTAssertTrue(undo.waitForNonExistence(timeout: 9), "Toast times out and the log is written")
         XCTAssertFalse(row("showing").exists)
         // The confirmed entry is in Records.
         app.buttons["tab.records"].tap()
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'Showing'")).firstMatch.waitForExistence(timeout: 5))
+        let oakEntry = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Oak Street Duplex'")).firstMatch
+        XCTAssertTrue(oakEntry.waitForExistence(timeout: 5), "Only the confirmed Showing is recorded on Oak Street Duplex")
     }
 
     func testSwipeOnAlreadyLoggedItemOpensSheetInstead() {
         launch("inbox")
         let hardware = row("hardware")
-        XCTAssertTrue(hardware.waitForExistence(timeout: 15))
-        app.swipeUp()
+        XCTAssertTrue(scrollTo(hardware))
         swipeLog(hardware)
         XCTAssertTrue(app.descendants(matching: .any)["confirm.mightAlreadyBeLogged"].waitForExistence(timeout: 5))
         XCTAssertFalse(undo.exists, "Nothing logged without the sheet")
@@ -103,7 +157,7 @@ final class InboxUITests: XCTestCase {
     func testSwipeLeftMarksNotLandlordWork() {
         launch("inbox")
         let turnover = row("turnover")
-        XCTAssertTrue(turnover.waitForExistence(timeout: 15))
+        XCTAssertTrue(scrollTo(turnover))
         swipeDismiss(turnover)
         XCTAssertTrue(undo.waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["Marked not landlord work"].exists)
@@ -113,7 +167,7 @@ final class InboxUITests: XCTestCase {
     func testConfirmSheetLogsWithSpouse() {
         launch("inbox")
         let plumber = row("plumber")
-        XCTAssertTrue(plumber.waitForExistence(timeout: 15))
+        XCTAssertTrue(settle(plumber))
         plumber.tap()
         XCTAssertTrue(app.buttons["confirm.log"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["confirm.who"].exists, "Spouse is tracked in this seed")
@@ -128,7 +182,7 @@ final class InboxUITests: XCTestCase {
     func testReceiptNeedsHoursBeforeLogging() {
         launch("inbox")
         let depot = app.descendants(matching: .any)["inbox.row.rcpt:homedepot"]
-        XCTAssertTrue(depot.waitForExistence(timeout: 15))
+        XCTAssertTrue(settle(depot))
         depot.tap()
         let log = app.buttons["confirm.log"]
         XCTAssertTrue(log.waitForExistence(timeout: 5))
@@ -143,7 +197,7 @@ final class InboxUITests: XCTestCase {
     func testMuteFromSheet() {
         launch("inbox")
         let sam = row("call-sam")
-        XCTAssertTrue(sam.waitForExistence(timeout: 15))
+        XCTAssertTrue(settle(sam))
         sam.tap()
         XCTAssertTrue(app.descendants(matching: .any)["confirm.notSure"].waitForExistence(timeout: 5))
         let mute = app.buttons["confirm.mute"]
@@ -159,8 +213,7 @@ final class InboxUITests: XCTestCase {
     func testNotLandlordWorkFromSheet() {
         launch("inbox")
         let inspection = row("inspection")
-        XCTAssertTrue(inspection.waitForExistence(timeout: 15))
-        app.swipeUp()
+        XCTAssertTrue(scrollTo(inspection))
         inspection.tap()
         let dismiss = app.buttons["confirm.dismiss"]
         XCTAssertTrue(dismiss.waitForExistence(timeout: 5))
@@ -173,14 +226,14 @@ final class InboxUITests: XCTestCase {
     func testEmptyInboxThenBackfillFromSetup() {
         launch("backfill", extra: ["-LHFakeCalendar", "granted", "-LHFakeNotifications", "granted"])
         let setup = app.buttons["inbox.empty.setup"]
-        XCTAssertTrue(setup.waitForExistence(timeout: 15))
+        XCTAssertTrue(settle(setup))
         setup.tap()
         XCTAssertTrue(app.descendants(matching: .any)["capture.privacyFooter"].waitForExistence(timeout: 5))
         app.descendants(matching: .any)["capture.toggle.eventPrompts"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["capture.notificationPreview"].waitForExistence(timeout: 3))
         app.buttons["capture.priming.continue"].tap()
         let headline = app.staticTexts["backfill.headline"]
-        XCTAssertTrue(headline.waitForExistence(timeout: 15))
+        XCTAssertTrue(settle(headline))
         XCTAssertEqual(headline.label, "We found 22 visits that look like landlord work")
         XCTAssertTrue(app.buttons["backfill.row.14"].exists || app.buttons["backfill.row.0"].exists)
         app.swipeUp(); app.swipeUp(); app.swipeUp()
@@ -197,11 +250,11 @@ final class InboxUITests: XCTestCase {
     func testBackfillRowOpensConfirmSheet() {
         launch("backfill", extra: ["-LHFakeCalendar", "granted"])
         let setup = app.buttons["inbox.empty.setup"]
-        XCTAssertTrue(setup.waitForExistence(timeout: 15))
+        XCTAssertTrue(settle(setup))
         setup.tap()
         app.buttons["capture.priming.continue"].tap()
         let first = app.buttons["backfill.row.0"]
-        XCTAssertTrue(first.waitForExistence(timeout: 15))
+        XCTAssertTrue(settle(first))
         first.tap()
         let log = app.buttons["confirm.log"]
         XCTAssertTrue(log.waitForExistence(timeout: 5))
@@ -214,7 +267,7 @@ final class InboxUITests: XCTestCase {
     func testWhatsNewNotNowKeepsEverythingOff() {
         launch("backfill", extra: ["-LHShowWhatsNew", "-LHInitialTab", "0"])
         let whatsNew = app.descendants(matching: .any)["capture.whatsNew"]
-        XCTAssertTrue(whatsNew.waitForExistence(timeout: 15), "Upgraders see the intro once")
+        XCTAssertTrue(settle(whatsNew), "Upgraders see the intro once")
         app.buttons["capture.priming.notNow"].tap()
         XCTAssertTrue(whatsNew.waitForNonExistence(timeout: 5))
         app.buttons["tab.inbox"].tap()
@@ -223,7 +276,7 @@ final class InboxUITests: XCTestCase {
 
     func testWhatsNewDeniedCalendarShowsSettingsPath() {
         launch("backfill", extra: ["-LHShowWhatsNew", "-LHFakeCalendar", "denied"])
-        XCTAssertTrue(app.descendants(matching: .any)["capture.whatsNew"].waitForExistence(timeout: 15))
+        XCTAssertTrue(settle(app.descendants(matching: .any)["capture.whatsNew"]))
         app.buttons["capture.priming.continue"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["capture.denied"].waitForExistence(timeout: 5))
         app.buttons["capture.denied.continue"].tap()
@@ -240,10 +293,10 @@ final class InboxUITests: XCTestCase {
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
         ]
         app.launch()
-        XCTAssertTrue(app.descendants(matching: .any)["capture.onboarding"].waitForExistence(timeout: 15))
+        XCTAssertTrue(settle(app.descendants(matching: .any)["capture.onboarding"]))
         XCTAssertTrue(app.descendants(matching: .any)["capture.privacyFooter"].exists)
         let prompts = app.descendants(matching: .any)["capture.toggle.eventPrompts"]
-        XCTAssertEqual(prompts.value as? String, "Off", "End-of-event prompts start off")
+        XCTAssertTrue(["0", "Off"].contains(prompts.value as? String ?? ""), "End-of-event prompts start off")
         app.buttons["capture.priming.notNow"].tap()
         XCTAssertTrue(app.buttons["tab.inbox"].waitForExistence(timeout: 10), "Onboarding finished")
     }

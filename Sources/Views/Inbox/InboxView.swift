@@ -21,12 +21,6 @@ struct InboxView: View {
                 } else {
                     list
                 }
-                if let action = model.pendingAction {
-                    undoToast(action)
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 12)
-                        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-                }
             }
             .background { LHMobileCanvas() }
             .navigationBarHidden(true)
@@ -51,6 +45,7 @@ struct InboxView: View {
         .onReceive(NotificationCenter.default.publisher(for: .captureSuggestionsDidChange)) { _ in
             if model.pendingAction == nil { model.reload() }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("inbox.screen")
     }
 
@@ -89,6 +84,7 @@ struct InboxView: View {
         .listSectionSpacing(20)
         .scrollContentBackground(.hidden)
         .contentMargins(.bottom, 96, for: .scrollContent)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("inbox.list")
     }
 
@@ -219,12 +215,20 @@ struct InboxView: View {
             }
             .padding(.bottom, 96)
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("inbox.empty")
     }
+}
 
-    // MARK: Undo
+/// "Logged 2h · Undo". Shown by the shell just above the floating tab bar (the tab bar draws
+/// over tab content, so the toast can't live inside the Inbox's own safe area).
+struct InboxUndoToast: View {
+    let action: InboxPendingAction
+    var onUndo: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
-    private func undoToast(_ action: InboxPendingAction) -> some View {
+    var body: some View {
         HStack(spacing: 12) {
             Image(systemName: action.isLog ? "checkmark.circle.fill" : "xmark.circle.fill")
                 .font(.system(size: 18, weight: .semibold))
@@ -235,7 +239,7 @@ struct InboxView: View {
                 .foregroundStyle(colors.textPrimary)
                 .lineLimit(2)
             Spacer(minLength: 8)
-            Button("Undo") { model.undo() }
+            Button("Undo", action: onUndo)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(colors.action)
                 .frame(minWidth: 44, minHeight: 44)

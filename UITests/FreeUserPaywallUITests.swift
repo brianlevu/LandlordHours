@@ -293,9 +293,10 @@ final class FreeUserPaywallUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["paywall.title"].exists)
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "lifetime")).firstMatch.exists)
         tap(app.buttons["Skip for now"])
-        XCTAssertTrue(app.buttons["Connect Calendar"].waitForExistence(timeout: 6))
-        settleAndCapture("onboarding-last-step", scheme: scheme, waitFor: app.buttons["Connect Calendar"])
-        tap(app.buttons["Skip for now"])
+        // 2.0: the last step is the confirm-first capture opt-in (WP3), answered with "Not now".
+        XCTAssertTrue(app.buttons["capture.priming.notNow"].waitForExistence(timeout: 6))
+        settleAndCapture("onboarding-last-step", scheme: scheme, waitFor: app.buttons["capture.priming.notNow"])
+        tap(app.buttons["capture.priming.notNow"])
         XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 10), "Onboarding lands on the app, not a paywall")
         XCTAssertFalse(app.descendants(matching: .any)["paywall.title"].exists)
         settleAndCapture("onboarding-finished-home", scheme: scheme, waitFor: app.buttons["tab.today"])

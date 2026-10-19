@@ -136,6 +136,7 @@ struct BackfillIntroView: View {
             SuggestionConfirmSheet(suggestion: suggestion, model: inbox)
         }
         .onDisappear { inbox.commitPending() }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("backfill.intro")
     }
 

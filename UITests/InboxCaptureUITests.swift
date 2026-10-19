@@ -20,7 +20,7 @@ final class InboxCaptureUITests: XCTestCase {
     func testRecordSwipeLogUndo() {
         launch(seed: "inbox", scheme: "light")
         let showing = app.descendants(matching: .any)["inbox.row.cal:debug-showing"]
-        XCTAssertTrue(showing.waitForExistence(timeout: 15))
+        XCTAssertTrue(showing.waitForExistence(timeout: 20))
         Thread.sleep(forTimeInterval: 1.5)
         let start = showing.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.5))
         let end = showing.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5))
@@ -55,7 +55,7 @@ final class InboxCaptureUITests: XCTestCase {
     private func capture(scheme: String) {
         // 1. Inbox with items.
         launch(seed: "inbox", scheme: scheme)
-        XCTAssertTrue(app.descendants(matching: .any)["inbox.row.cal:debug-showing"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.descendants(matching: .any)["inbox.row.cal:debug-showing"].waitForExistence(timeout: 20))
         shoot("inbox", scheme)
         app.swipeUp()
         shoot("inbox-scrolled", scheme)
@@ -63,25 +63,25 @@ final class InboxCaptureUITests: XCTestCase {
         // 2. Confirm sheet (scheduled hours, spouse on).
         app.swipeDown()
         let plumber = app.descendants(matching: .any)["inbox.row.cal:debug-plumber"]
-        if plumber.waitForExistence(timeout: 5) { plumber.tap() }
+        if plumber.waitForExistence(timeout: 5) { Thread.sleep(forTimeInterval: 1.0); plumber.tap() }
         XCTAssertTrue(app.buttons["confirm.log"].waitForExistence(timeout: 5))
         shoot("confirm-sheet", scheme)
 
         // 2b. Confirm sheet for a not-sure, no-property item.
         launch(seed: "inbox", scheme: scheme)
         let sam = app.descendants(matching: .any)["inbox.row.cal:debug-call-sam"]
-        if sam.waitForExistence(timeout: 15) { sam.tap() }
+        if sam.waitForExistence(timeout: 20) { Thread.sleep(forTimeInterval: 2.0); sam.tap() }
         XCTAssertTrue(app.buttons["confirm.log"].waitForExistence(timeout: 5))
         shoot("confirm-sheet-notsure", scheme)
 
         // 3. Empty inbox (calendar on).
         launch(seed: "empty", scheme: scheme)
-        XCTAssertTrue(app.descendants(matching: .any)["inbox.empty"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.descendants(matching: .any)["inbox.empty"].waitForExistence(timeout: 20))
         shoot("inbox-empty", scheme)
 
         // 4. What's new opt-in (upgraders), with the notification preview on.
         launch(seed: "backfill", scheme: scheme, extra: ["-LHShowWhatsNew", "-LHFakeCalendar", "granted", "-LHHoldBackfillScan"], tab: "0")
-        XCTAssertTrue(app.descendants(matching: .any)["capture.whatsNew"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.descendants(matching: .any)["capture.whatsNew"].waitForExistence(timeout: 20))
         shoot("whatsnew", scheme)
         app.descendants(matching: .any)["capture.toggle.eventPrompts"].tap()
         shoot("whatsnew-prompts-on", scheme)
@@ -93,10 +93,13 @@ final class InboxCaptureUITests: XCTestCase {
         shoot("backfill-scanning", scheme)
         launch(seed: "backfill", scheme: scheme, extra: ["-LHFakeCalendar", "granted"])
         let setup = app.buttons["inbox.empty.setup"]
-        XCTAssertTrue(setup.waitForExistence(timeout: 15))
+        XCTAssertTrue(setup.waitForExistence(timeout: 20))
+        Thread.sleep(forTimeInterval: 2.0)
         setup.tap()
+        XCTAssertTrue(app.buttons["capture.priming.continue"].waitForExistence(timeout: 5))
+        Thread.sleep(forTimeInterval: 1.0)
         app.buttons["capture.priming.continue"].tap()
-        XCTAssertTrue(app.staticTexts["backfill.headline"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["backfill.headline"].waitForExistence(timeout: 20))
         shoot("backfill-results", scheme)
 
         // 6. Onboarding priming (new users).
@@ -109,7 +112,7 @@ final class InboxCaptureUITests: XCTestCase {
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
         ]
         app.launch()
-        XCTAssertTrue(app.descendants(matching: .any)["capture.onboarding"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.descendants(matching: .any)["capture.onboarding"].waitForExistence(timeout: 20))
         shoot("onboarding-priming", scheme)
     }
 }

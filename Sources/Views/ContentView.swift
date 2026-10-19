@@ -525,6 +525,15 @@ struct ContentView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
+            // WP3: Undo for the last inbox action, just above the tab bar.
+            if let action = inboxModel.pendingAction, !isCustomTabBarHidden {
+                InboxUndoToast(action: action) { inboxModel.undo() }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, Self.tabBarHeight + 8 + 12)
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(5)
+            }
+
             // Floating timer banner (visible on all tabs except Track)
             if viewModel.isTimerRunning && selectedTab != 2 && !isCustomTabBarHidden {
                 FloatingTimerBanner(viewModel: viewModel) {

@@ -277,11 +277,9 @@ final class InboxViewModelTests: CaptureTestCase {
 @MainActor
 final class CaptureOptInTests: CaptureTestCase {
     func testEverythingDefaultsOff() {
-        XCTAssertFalse(CaptureOptIn.eventPromptsEnabled())
+        XCTAssertFalse(EventPromptsConsent.isEnabled())
         XCTAssertFalse(CaptureOptIn.calendarSuggestionsEnabled())
-        XCTAssertFalse(CaptureOptIn.eventPromptsEnabled(userId: nil), "No profile, no prompts")
-        let (app, _) = makeViewModel()
-        XCTAssertFalse(app.eventPromptsEnabled)
+        XCTAssertFalse(EventPromptsConsent.isEnabled(userId: nil), "No profile, no prompts")
     }
 
     func testUpgraderSeesWhatsNewOnceAndNewUsersDoNot() {
@@ -297,25 +295,33 @@ final class CaptureOptInTests: CaptureTestCase {
 
     func testPromptsNeedAnExplicitYesAndCalendar() {
         CaptureOptIn.recordChoice(calendar: false, eventPrompts: true)
-        XCTAssertFalse(CaptureOptIn.eventPromptsEnabled(), "No calendar, no event prompts")
+        XCTAssertFalse(EventPromptsConsent.isEnabled(), "No calendar, no event prompts")
         CaptureOptIn.recordChoice(calendar: true, eventPrompts: false)
         XCTAssertTrue(CaptureOptIn.calendarSuggestionsEnabled())
-        XCTAssertFalse(CaptureOptIn.eventPromptsEnabled(), "Calendar alone does not turn on notifications")
+        XCTAssertFalse(EventPromptsConsent.isEnabled(), "Calendar alone does not turn on notifications")
         CaptureOptIn.recordChoice(calendar: true, eventPrompts: true)
-        XCTAssertTrue(CaptureOptIn.eventPromptsEnabled())
-        let (app, _) = makeViewModel()
-        XCTAssertTrue(app.eventPromptsEnabled)
-        app.eventPromptsEnabled = false
-        XCTAssertFalse(CaptureOptIn.eventPromptsEnabled())
+        XCTAssertTrue(EventPromptsConsent.isEnabled())
+        CaptureOptIn.recordChoice(calendar: false, eventPrompts: true)
+        XCTAssertFalse(EventPromptsConsent.isEnabled(), "Turning calendar off turns prompts off")
+    }
+
+    func testPromptsAnswerGoesThroughTheWP4Seam() {
+        var written: [Bool] = []
+        let saved = EventPromptsConsent.backend
+        defer { EventPromptsConsent.backend = saved }
+        EventPromptsConsent.backend = .init(isEnabled: { _ in written.last ?? false }, set: { on, _ in written.append(on) })
+        CaptureOptIn.recordChoice(calendar: true, eventPrompts: true)
+        CaptureOptIn.recordChoice(calendar: true, eventPrompts: false)
+        XCTAssertEqual(written, [true, false], "The opt-in UI only writes through EventPromptsConsent")
     }
 
     func testOptInIsPerProfile() {
         CaptureOptIn.recordChoice(calendar: true, eventPrompts: true)
         let other = "other-\(UUID().uuidString.prefix(6))"
-        XCTAssertFalse(CaptureOptIn.eventPromptsEnabled(userId: other))
+        XCTAssertFalse(EventPromptsConsent.isEnabled(userId: other))
         XCTAssertFalse(CaptureOptIn.whatsNewSeen(userId: other))
         AppViewModel.clearScopedAccountData(for: profileId)
-        XCTAssertFalse(CaptureOptIn.eventPromptsEnabled(), "Profile reset clears the opt-in")
+        XCTAssertFalse(EventPromptsConsent.isEnabled(), "Profile reset clears the opt-in")
     }
 }
 

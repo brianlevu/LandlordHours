@@ -68,7 +68,7 @@ final class InboxViewModel: ObservableObject {
         now: @escaping () -> Date = Date.init,
         calendar: Calendar = .current,
         spouseTracking: @escaping () -> Bool = { TaxProfileManager.shared.spouseTracking },
-        undoWindow: TimeInterval = 4
+        undoWindow: TimeInterval = 5
     ) {
         self.app = app
         self.storeProvider = storeProvider

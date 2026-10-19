@@ -11,6 +11,7 @@
 		01B38A6D2CE193A8A5C1D696 /* CaptureSetupFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D135777216F28364DB04F9E /* CaptureSetupFlow.swift */; };
 		03A51EB8A8E2BD88E7F540E3 /* AppViewModel+Capture.swift in Sources */ = {isa = PBXBuildFile; fileRef = D05C18E16E505EEE666FF7CC /* AppViewModel+Capture.swift */; };
 		063B1B913810D3C73CD378C4 /* CategoryManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02AE3372F32CD60F04CF317C /* CategoryManagementView.swift */; };
+		08C0C118818BAEDF043B0B44 /* CaptureOptIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E98020616099455FC14D1A1 /* CaptureOptIn.swift */; };
 		0944E4FE307628EF3B154FB8 /* ClassifierChain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E3335EA8A409DEA55AE7EAE /* ClassifierChain.swift */; };
 		0C6599A289D3958D0B6C65D9 /* LucideIcons in Frameworks */ = {isa = PBXBuildFile; productRef = 4FD8B0B1A7D7E8751EEF770F /* LucideIcons */; };
 		0D41B7310365067EB90C2D1D /* AppDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71D542D8D3135A25F2D304F8 /* AppDestination.swift */; };
@@ -65,7 +66,6 @@
 		7CB9BA413496A06323C90A38 /* AuditReportBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = D87C61D0D4C65EDFDCB0649B /* AuditReportBuilder.swift */; };
 		7E0B82EEBC8E67989BB1C257 /* TimerDraftUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27D9AE994D0696BCE6E017B9 /* TimerDraftUITests.swift */; };
 		80CEA4EE10BA0654A9DC6216 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2866F8C3251DDD2D9593392E /* AppGroup.swift */; };
-		85F95544520BFB4AFFD2DCA9 /* CaptureOptIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BACD3C3A28F9908BEFDF71E /* CaptureOptIn.swift */; };
 		86277D1C3EF4C21CAB223CB5 /* ProMoments.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF39EBE443D66C2EA654096 /* ProMoments.swift */; };
 		87DDF9CFBAAE7676D8368B8F /* SignInReplacementUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ABD160E56491F781779A536 /* SignInReplacementUITests.swift */; };
 		8DCDA53C99D6607B2EB138B8 /* LocalProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1CAE53C865D5B8D680C6F0D /* LocalProfileTests.swift */; };
@@ -183,10 +183,10 @@
 		5490464EB91A5699EED6EFCE /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
 		57E4F093C05AA801DBFA57AE /* CalendarEventSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarEventSource.swift; sourceTree = "<group>"; };
 		593E2F107A195788B317254C /* CaptureFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFlags.swift; sourceTree = "<group>"; };
-		5BACD3C3A28F9908BEFDF71E /* CaptureOptIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureOptIn.swift; sourceTree = "<group>"; };
 		5C50B0C40A29E39E7B5E6BE9 /* EngagementWidgetSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementWidgetSnapshotStore.swift; sourceTree = "<group>"; };
 		5D135777216F28364DB04F9E /* CaptureSetupFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSetupFlow.swift; sourceTree = "<group>"; };
 		5DBA40F643C4EC35A08B8784 /* BackfillIntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackfillIntroView.swift; sourceTree = "<group>"; };
+		5E98020616099455FC14D1A1 /* CaptureOptIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureOptIn.swift; sourceTree = "<group>"; };
 		5F9CB28BC741E54912DBB35F /* LandlordHoursApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordHoursApp.swift; sourceTree = "<group>"; };
 		61925A55B4CDBDF1584A392E /* LandlordHours.storekit */ = {isa = PBXFileReference; path = LandlordHours.storekit; sourceTree = "<group>"; };
 		61F1A37F861D056973D6EC70 /* TimeEntryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeEntryDetailView.swift; sourceTree = "<group>"; };
@@ -351,6 +351,7 @@
 			isa = PBXGroup;
 			children = (
 				5DBA40F643C4EC35A08B8784 /* BackfillIntroView.swift */,
+				5E98020616099455FC14D1A1 /* CaptureOptIn.swift */,
 				5D135777216F28364DB04F9E /* CaptureSetupFlow.swift */,
 				2F2F3D79FA076E4AEDF11086 /* InboxComponents.swift */,
 				992994028B8E0F68D1C27592 /* InboxDebugSeed.swift */,
@@ -399,7 +400,6 @@
 			children = (
 				2866F8C3251DDD2D9593392E /* AppGroup.swift */,
 				593E2F107A195788B317254C /* CaptureFlags.swift */,
-				5BACD3C3A28F9908BEFDF71E /* CaptureOptIn.swift */,
 				C8CC8529E297F31048301CC2 /* CaptureProtocols.swift */,
 				C656628C13179C2DDFDF9762 /* SuggestionStore.swift */,
 				815F2D2B6F5048580C2D860D /* Classifier */,
@@ -693,7 +693,7 @@
 				4C04E70D3E5565A29188DAF4 /* CalendarImportReviewView.swift in Sources */,
 				B7EE89E0AFD88DD021946318 /* CalendarImportService.swift in Sources */,
 				9F46F3E3D0E75D5FB1709E15 /* CaptureFlags.swift in Sources */,
-				85F95544520BFB4AFFD2DCA9 /* CaptureOptIn.swift in Sources */,
+				08C0C118818BAEDF043B0B44 /* CaptureOptIn.swift in Sources */,
 				000BF6498D8A3E5CABC8A66B /* CaptureProtocols.swift in Sources */,
 				01B38A6D2CE193A8A5C1D696 /* CaptureSetupFlow.swift in Sources */,
 				063B1B913810D3C73CD378C4 /* CategoryManagementView.swift in Sources */,

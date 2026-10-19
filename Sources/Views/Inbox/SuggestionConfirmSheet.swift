@@ -89,6 +89,7 @@ struct SuggestionConfirmSheet: View {
         } message: {
             Text("We stop suggesting them. Hours you already logged stay.")
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("confirm.sheet")
     }
 

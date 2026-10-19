@@ -1,17 +1,47 @@
 import Foundation
 
+// MARK: - Event prompts consent (integration seam)
+//
+// WP4 (wp4-notify) OWNS the per-profile `eventPromptsEnabled` flag and its storage
+// (CaptureFlags / AppViewModel), and its scheduler checks it. The inbox only writes the user's
+// answer through this wrapper. At integration, point `backend` at WP4's flag, e.g.
+// `EventPromptsConsent.backend = .init(isEnabled: { _ in <WP4 getter> }, set: { on, _ in <WP4 setter> })`,
+// and delete `interim`. Until then `interim` keeps the answer per profile so the flow and its
+// tests work on their own; nothing schedules from it.
+enum EventPromptsConsent {
+    struct Backend {
+        var isEnabled: (_ userId: String?) -> Bool
+        var set: (_ enabled: Bool, _ userId: String?) -> Void
+    }
+
+    /// Interim per-profile store, replaced by WP4's flag at integration.
+    static let interimBaseKey = "LandlordHours.capture.eventPromptsConsent.interim"
+
+    static let interim = Backend(
+        isEnabled: { userId in
+            guard let userId else { return false }
+            return UserDefaults.standard.bool(forKey: UserScope.key(interimBaseKey, userId: userId))
+        },
+        set: { enabled, userId in
+            guard let userId else { return }
+            UserDefaults.standard.set(enabled, forKey: UserScope.key(interimBaseKey, userId: userId))
+        }
+    )
+
+    nonisolated(unsafe) static var backend: Backend = interim
+
+    static func isEnabled(userId: String? = UserScope.userId) -> Bool { backend.isEnabled(userId) }
+
+    static func set(_ enabled: Bool, userId: String? = UserScope.userId) { backend.set(enabled, userId) }
+}
+
 // MARK: - Capture opt-in (per profile)
 //
 // 2.0 must not start sending end-of-event notifications to people who simply updated the app.
 // Everything here defaults to OFF and only an explicit choice on the "What's new" intro
-// (upgraders) or the onboarding capture step (new users) turns it on.
-//
-// WP4 integration point: `EndOfEventScheduler` / `CaptureNotificationRefresher` schedule
-// nothing unless `CaptureOptIn.eventPromptsEnabled()` (or `AppViewModel.eventPromptsEnabled`)
-// is true for the active profile; when it is false they remove all pending capture requests.
+// (upgraders) or the onboarding capture step (new users) turns it on. The prompts answer goes
+// to WP4's flag through `EventPromptsConsent`.
 enum CaptureOptIn {
-    /// "Ask me when a visit ends" — end-of-event local notifications.
-    static let eventPromptsBaseKey = "LandlordHours.capture.eventPromptsEnabled"
     /// "Find rental work in my calendar" — calendar suggestions in the inbox.
     static let calendarSuggestionsBaseKey = "LandlordHours.capture.calendarSuggestionsEnabled"
     /// The one-time 2.0 "What's new" intro was answered or dismissed.
@@ -20,7 +50,8 @@ enum CaptureOptIn {
     static let backfillCompletedBaseKey = "LandlordHours.capture.backfillCompleted"
 
     /// Every per-profile key, for profile reset / delete.
-    static let allBaseKeys = [eventPromptsBaseKey, calendarSuggestionsBaseKey, whatsNewSeenBaseKey, backfillCompletedBaseKey]
+    static let allBaseKeys = [calendarSuggestionsBaseKey, whatsNewSeenBaseKey, backfillCompletedBaseKey,
+                              EventPromptsConsent.interimBaseKey]
 
     private static func key(_ base: String, userId: String?) -> String? {
         guard let userId else { return nil }
@@ -35,18 +66,6 @@ enum CaptureOptIn {
     private static func set(_ value: Bool, _ base: String, userId: String?, defaults: UserDefaults) {
         guard let key = key(base, userId: userId) else { return }
         defaults.set(value, forKey: key)
-    }
-
-    // MARK: Event prompts (the WP4 gate)
-
-    /// True only after the user explicitly turned on "Ask me when a visit ends" for this profile.
-    /// No profile → false.
-    static func eventPromptsEnabled(userId: String? = UserScope.userId, defaults: UserDefaults = .standard) -> Bool {
-        bool(eventPromptsBaseKey, userId: userId, defaults: defaults)
-    }
-
-    static func setEventPromptsEnabled(_ enabled: Bool, userId: String? = UserScope.userId, defaults: UserDefaults = .standard) {
-        set(enabled, eventPromptsBaseKey, userId: userId, defaults: defaults)
     }
 
     // MARK: Calendar suggestions
@@ -107,22 +126,12 @@ enum CaptureOptIn {
     ) {
         setCalendarSuggestionsEnabled(calendar, userId: userId, defaults: defaults)
         // End-of-event prompts need calendar events to talk about.
-        setEventPromptsEnabled(calendar && eventPrompts, userId: userId, defaults: defaults)
+        EventPromptsConsent.set(calendar && eventPrompts, userId: userId)
         markWhatsNewSeen(userId: userId, defaults: defaults)
     }
 }
 
 extension AppViewModel {
-    /// Whether end-of-event notifications may be scheduled for the active profile. WP4's
-    /// scheduler checks this before scheduling anything.
-    var eventPromptsEnabled: Bool {
-        get { CaptureOptIn.eventPromptsEnabled() }
-        set {
-            objectWillChange.send()
-            CaptureOptIn.setEventPromptsEnabled(newValue)
-        }
-    }
-
     /// Whether calendar suggestions are on for the active profile.
     var calendarSuggestionsEnabled: Bool {
         CaptureOptIn.calendarSuggestionsEnabled()
