@@ -52,9 +52,12 @@ enum RulesEngine {
         1 / (1 + exp(-(slope * score - offset)))
     }
 
-    static func evaluate(text: String, properties: [RentalProperty]) -> RulesVerdict {
+    /// `isEmail`: the item is an email ("sender: subject"). Mailing-list tags, "% off" and the
+    /// marketing/account words only count for email; on a calendar they are ordinary
+    /// ("[Oak] Plumber", "Tenant feedback").
+    static func evaluate(text: String, properties: [RentalProperty], isEmail: Bool = false) -> RulesVerdict {
         // A mailing-list tag names the list, never a property ("[maple-neighbors]").
-        let listTag = hasMailingListTag(text)
+        let listTag = isEmail && hasMailingListTag(text)
         var normalized = normalize(listTag ? text.replacingOccurrences(of: mailingListTagPattern, with: " ", options: .regularExpression) : text)
         var score = 0.0
         var categoryVotes: [ActivityCategory: Double] = [:]
@@ -79,7 +82,7 @@ enum RulesEngine {
 
         var roles = Set<ClassifierSignal.Role>()
         var hasWorkKeyword = false
-        for signal in ClassifierKeywords.signals where matches(signal, in: padded) {
+        for signal in ClassifierKeywords.signals where (isEmail || !signal.emailOnly) && matches(signal, in: padded) {
             score += signal.landlord
             if signal.landlord > 0 {
                 hasPositive = true
@@ -105,7 +108,7 @@ enum RulesEngine {
             score += mailingListPenalty
             evidence.append("not landlord: mailing list")
         }
-        if hasPercentOff(text) {
+        if isEmail && hasPercentOff(text) {
             score -= 2.0
             evidence.append("not landlord: % off")
         }

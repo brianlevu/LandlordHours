@@ -24,7 +24,7 @@ struct RulesClassifier: CaptureClassifier {
 
     func classifySync(_ candidate: CaptureCandidate, properties: [RentalProperty]) -> CaptureClassification {
         let text = [candidate.title, candidate.location ?? ""].filter { !$0.isEmpty }.joined(separator: " ")
-        let verdict = RulesEngine.evaluate(text: text, properties: properties)
+        let verdict = RulesEngine.evaluate(text: text, properties: properties, isEmail: candidate.kind == .gmail)
         let isLandlordWork = verdict.confidence >= ClassifierThresholds.likely
 
         var evidence = verdict.evidence

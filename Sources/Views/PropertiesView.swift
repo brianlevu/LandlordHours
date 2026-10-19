@@ -1175,12 +1175,35 @@ struct PropertyDetailView: View {
                             .clipShape(Capsule())
                     }
                     .buttonStyle(.lhPressable)
-                    .disabled(newAlias.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .opacity(newAlias.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
+                    .disabled(!canAddAlias)
+                    .opacity(canAddAlias ? 1 : 0.5)
                     .accessibilityIdentifier("property.alias.add")
+                }
+
+                if let aliasHint {
+                    Text(aliasHint)
+                        .font(AppTypography.caption)
+                        .foregroundStyle(colors.caution)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("property.alias.hint")
                 }
             }
         }
+    }
+
+    private var trimmedNewAlias: String { newAlias.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private var canAddAlias: Bool {
+        trimmedNewAlias.count >= RentalProperty.aliasMinLength && aliases.count < RentalProperty.maxAliases
+    }
+
+    /// Why the typed name can't be added yet (the matcher ignores names under 3 characters).
+    private var aliasHint: String? {
+        if aliases.count >= RentalProperty.maxAliases { return "You can add up to \(RentalProperty.maxAliases) other names." }
+        if !trimmedNewAlias.isEmpty && trimmedNewAlias.count < RentalProperty.aliasMinLength {
+            return "Use at least \(RentalProperty.aliasMinLength) characters."
+        }
+        return nil
     }
 
     private func aliasChip(_ alias: String) -> some View {
@@ -1209,6 +1232,7 @@ struct PropertyDetailView: View {
     }
 
     private func addAlias() {
+        guard canAddAlias else { return }
         let cleaned = RentalProperty.cleanedAliases(aliases + [newAlias])
         guard cleaned != aliases else { newAlias = ""; return }
         withAnimation(AppAnimation.quick) {

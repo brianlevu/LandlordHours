@@ -177,7 +177,31 @@ final class ClassifierV2Tests: XCTestCase {
         XCTAssertFalse(RulesEngine.hasMailingListTag("Vrbo 123 [ ref ]"), "a spaced bracket is not a list tag")
         // The list name never matches a property.
         let maple = RentalProperty(name: "Maple Cottage", address: "88 Maple Ave", propertyType: .ltr)
-        XCTAssertNil(RulesEngine.evaluate(text: "[maple-neighbors] lost cat", properties: [maple]).propertyId)
+        XCTAssertNil(RulesEngine.evaluate(text: "[maple-neighbors] lost cat", properties: [maple], isEmail: true).propertyId)
+    }
+
+    /// Review fix: list tags and marketing/account words are email-only. On a calendar they are
+    /// ordinary words, and "party" is whole-word.
+    func testCalendarTitlesAreNotHitByEmailNegatives() {
+        let plumber = rules("[Oak] Plumber", kind: .calendar)
+        XCTAssertTrue(plumber.isLandlordWork, "[Oak] Plumber")
+        XCTAssertFalse(plumber.evidence.contains("not landlord: mailing list"))
+        XCTAssertEqual(plumber.propertyId, oak.id, "the bracketed name still names the property on a calendar")
+
+        let feedback = rules("Tenant feedback", kind: .calendar)
+        XCTAssertTrue(feedback.isLandlordWork, "Tenant feedback")
+        XCTAssertFalse(feedback.evidence.contains("not landlord: feedback"))
+
+        let inspection = rules("Third party inspection", kind: .calendar)
+        XCTAssertNotEqual(inspection.band, .unlikely, "Third party inspection stays visible")
+        XCTAssertFalse(inspection.evidence.contains("not landlord: party"))
+        XCTAssertFalse(rules("Partyka roof repair", kind: .calendar).evidence.contains("not landlord: party"))
+
+        // The same words still count against email.
+        XCTAssertTrue(rules("Vrbo: Your feedback is important to us").evidence.contains("not landlord: feedback"))
+        XCTAssertTrue(rules("Neighbors: [oak-list] plumber?").evidence.contains("not landlord: mailing list"))
+        // Social words are not email-only.
+        XCTAssertFalse(rules("Housewarming party", kind: .calendar, location: homeAddress).isLandlordWork)
     }
 
     func testContractIsWholeWordSoContractorCountsOnce() {
@@ -288,6 +312,22 @@ final class ClassifierV2Tests: XCTestCase {
         XCTAssertEqual(RentalProperty.cleanedAliases(["  Sunny Room ", "", "sunny room", "Vendor", "   "]), ["Sunny Room", "Vendor"])
     }
 
+    func testCleanedAliasesEnforcesLimits() {
+        // Under 3 characters: dropped (the matcher ignores them).
+        XCTAssertEqual(RentalProperty.cleanedAliases(["ab", " x ", "abc"]), ["abc"])
+        // Each name is cut to 80 characters.
+        let long = String(repeating: "a", count: 120)
+        XCTAssertEqual(RentalProperty.cleanedAliases([long]).first?.count, RentalProperty.aliasMaxLength)
+        // At most 10 names, first ones kept.
+        let many = (1...15).map { "Vendor \($0)" }
+        XCTAssertEqual(RentalProperty.cleanedAliases(many), Array(many.prefix(RentalProperty.maxAliases)))
+        // Applied on the way out to CloudKit and back.
+        var p = oak
+        p.aliases = many + ["no"]
+        let back = CloudKitSyncService.property(from: CloudKitSyncService.record(for: p, zoneID: zone, appUserId: nil))
+        XCTAssertEqual(back?.aliases.count, RentalProperty.maxAliases)
+    }
+
     private let zone = CKRecordZone.ID(zoneName: "LandlordHoursZone", ownerName: CKCurrentUserDefaultName)
 
     func testNewFieldsRoundTripThroughCloudKit() throws {
@@ -301,15 +341,25 @@ final class ClassifierV2Tests: XCTestCase {
         XCTAssertEqual(back.propertyType, .str)
     }
 
-    func testEmptyAliasesAreNeverWrittenButClearingStillSyncs() throws {
+    func testDefaultFieldsAreNeverWritten() throws {
+        // A user who never set aliases or "I live here": a 2.0 save touches no new field.
         let record = CloudKitSyncService.record(for: oak, zoneID: zone, appUserId: nil)
-        XCTAssertFalse(record.allKeys().contains(CloudKitSyncService.PropertyField.aliases), "no empty alias list is sent")
+        let keys = Set(record.allKeys())
+        for field in CloudKitSyncService.PropertyField.all {
+            XCTAssertFalse(keys.contains(field), "\(field) must not be sent at its default")
+        }
         XCTAssertNil(record["appUserId"])
         for key in record.allKeys() { XCTAssertNotNil(record[key], "\(key) written as nil") }
-        // A server record that still holds old aliases, after another 2.0 device cleared them.
-        record[CloudKitSyncService.PropertyField.aliases] = ["Stale"]
-        XCTAssertEqual(CloudKitSyncService.property(from: record)?.aliases, [])
-        XCTAssertEqual(CloudKitSyncService.property(from: record)?.isOwnerOccupied, false)
+        XCTAssertEqual(Set(record.changedKeys()), keys)
+        // Only the non-default one is sent.
+        var occupiedOnly = oak
+        occupiedOnly.isOwnerOccupied = true
+        let r2 = CloudKitSyncService.record(for: occupiedOnly, zoneID: zone, appUserId: nil)
+        XCTAssertEqual(r2[CloudKitSyncService.PropertyField.isOwnerOccupied] as? Int64, 1)
+        XCTAssertNil(r2[CloudKitSyncService.PropertyField.aliases])
+        XCTAssertNil(r2[CloudKitSyncService.PropertyField.aliasCount])
+        XCTAssertEqual(CloudKitSyncService.property(from: r2)?.isOwnerOccupied, true)
+        XCTAssertEqual(CloudKitSyncService.property(from: r2)?.aliases, [])
     }
 
     func testPropertyRecordWrittenBy11DecodesWithDefaults() throws {

@@ -22,6 +22,8 @@ struct ClassifierSignal: Equatable {
     let categoryWeight: Double
     let wholeWord: Bool
     let role: Role
+    /// Applies to email (.gmail) only: marketing and account words are ordinary on a calendar.
+    let emailOnly: Bool
 
     /// How a signal combines with others (classifier v2).
     enum Role: Equatable, Hashable {
@@ -36,13 +38,14 @@ struct ClassifierSignal: Equatable {
         case purchase
     }
 
-    init(_ phrase: String, _ landlord: Double, _ category: ActivityCategory? = nil, categoryWeight: Double? = nil, wholeWord: Bool = false, role: Role = .general) {
+    init(_ phrase: String, _ landlord: Double, _ category: ActivityCategory? = nil, categoryWeight: Double? = nil, wholeWord: Bool = false, role: Role = .general, emailOnly: Bool = false) {
         self.phrase = phrase
         self.landlord = landlord
         self.category = category
         self.categoryWeight = categoryWeight ?? max(landlord, 0)
         self.wholeWord = wholeWord
         self.role = role
+        self.emailOnly = emailOnly
     }
 }
 
@@ -140,7 +143,7 @@ enum ClassifierKeywords {
         .init("late fee",           1.5, .management, categoryWeight: 3),
         .init("pm",                 1.0, .management, categoryWeight: 2, wholeWord: true),
         .init("board meeting",      0.5, .management, categoryWeight: 2),
-        .init("inspect",            1.2, .management),
+        .init("inspect",            1.5, .management),
         .init("hoa",                1.2, .management, wholeWord: true),
         .init("utility transfer",   1.0, .management, categoryWeight: 2),
         .init("utilities",          0.6, .management),
@@ -349,44 +352,46 @@ enum ClassifierKeywords {
         // Social events (often at a home the owner lives in).
         .init("bbq",               -3.0, wholeWord: true),
         .init("barbecue",          -3.0),
-        .init("party",             -2.5),
+        .init("party",             -2.5, wholeWord: true),
+        .init("third party",        2.5),   // cancels "party": a vendor, not a social event
         .init("celebration",       -2.5),
         .init("housewarming",      -3.0),
         .init("get together",      -2.5),
         .init("festival",          -2.5),
         // Marketing, newsletters and account mail (rental platforms, stores, tax vendors).
-        .init("discount",          -2.5),
-        .init("promotion",         -2.5),
-        .init("promo",             -2.5, wholeWord: true),
-        .init("deals",             -2.0, wholeWord: true),
-        .init("sale",              -2.0, wholeWord: true),
-        .init("savings",           -2.0),
-        .init("stays",             -2.0, wholeWord: true),
-        .init("you should see",    -2.5),
-        .init("password",          -4.0),
-        .init("secure code",       -4.0),
-        .init("security code",     -4.0),
-        .init("verification code", -4.0),
-        .init("verify your",       -3.0),
-        .init("sign in",           -2.0),
-        .init("webinar",           -3.0),
-        .init("newsletter",        -3.0),
-        .init("unsubscribe",       -3.0),
-        .init("digest",            -3.0),
-        .init("tips",              -2.0, wholeWord: true),
-        .init("feedback",          -2.0),
-        .init("rewards",           -2.0),
-        .init("your cart",         -3.0),
-        .init("more updates",      -3.0),
-        .init("other updates",     -3.0),
-        .init("host updates",      -3.0),
-        .init("bookings",          -1.5, wholeWord: true),
+        // Email only: on a calendar these words are ordinary ("Tenant feedback").
+        .init("discount",          -2.5, emailOnly: true),
+        .init("promotion",         -2.5, emailOnly: true),
+        .init("promo",             -2.5, wholeWord: true, emailOnly: true),
+        .init("deals",             -2.0, wholeWord: true, emailOnly: true),
+        .init("sale",              -2.0, wholeWord: true, emailOnly: true),
+        .init("savings",           -2.0, emailOnly: true),
+        .init("stays",             -2.0, wholeWord: true, emailOnly: true),
+        .init("you should see",    -2.5, emailOnly: true),
+        .init("password",          -4.0, emailOnly: true),
+        .init("secure code",       -4.0, emailOnly: true),
+        .init("security code",     -4.0, emailOnly: true),
+        .init("verification code", -4.0, emailOnly: true),
+        .init("verify your",       -3.0, emailOnly: true),
+        .init("sign in",           -2.0, emailOnly: true),
+        .init("webinar",           -3.0, emailOnly: true),
+        .init("newsletter",        -3.0, emailOnly: true),
+        .init("unsubscribe",       -3.0, emailOnly: true),
+        .init("digest",            -3.0, emailOnly: true),
+        .init("tips",              -2.0, wholeWord: true, emailOnly: true),
+        .init("feedback",          -2.0, emailOnly: true),
+        .init("rewards",           -2.0, emailOnly: true),
+        .init("your cart",         -3.0, emailOnly: true),
+        .init("more updates",      -3.0, emailOnly: true),
+        .init("other updates",     -3.0, emailOnly: true),
+        .init("host updates",      -3.0, emailOnly: true),
+        .init("bookings",          -1.5, wholeWord: true, emailOnly: true),
         .init("car rental",        -4.0),
         .init("industry",          -2.0, wholeWord: true),
         .init("expert call",       -3.0),
         .init("rental car",        -4.0),
-        .init("alert",             -1.5, wholeWord: true),
-        .init("alerts",            -1.5, wholeWord: true),
+        .init("alert",             -1.5, wholeWord: true, emailOnly: true),
+        .init("alerts",            -1.5, wholeWord: true, emailOnly: true),
         .init("mom",               -1.5, wholeWord: true),
         .init("family",            -1.5),
     ]

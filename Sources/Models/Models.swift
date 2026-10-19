@@ -63,14 +63,23 @@ struct RentalProperty: Identifiable, Codable, Hashable {
         isOwnerOccupied = try c.decodeIfPresent(Bool.self, forKey: .isOwnerOccupied) ?? false
     }
 
-    /// Trimmed, non-empty, case-insensitively unique aliases (order kept).
+    static let aliasMinLength = 3
+    static let aliasMaxLength = 80
+    static let maxAliases = 10
+
+    /// Trimmed, case-insensitively unique aliases (order kept): at least 3 characters (the
+    /// matcher ignores shorter ones), each cut to 80 characters, at most 10.
     static func cleanedAliases(_ raw: [String]) -> [String] {
         var seen = Set<String>()
         var out: [String] = []
         for alias in raw {
-            let trimmed = alias.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty, seen.insert(trimmed.lowercased()).inserted else { continue }
+            var trimmed = alias.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.count > aliasMaxLength {
+                trimmed = String(trimmed.prefix(aliasMaxLength)).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            guard trimmed.count >= aliasMinLength, seen.insert(trimmed.lowercased()).inserted else { continue }
             out.append(trimmed)
+            if out.count == maxAliases { break }
         }
         return out
     }
