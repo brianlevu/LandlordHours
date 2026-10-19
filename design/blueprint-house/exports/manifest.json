@@ -259,7 +259,7 @@
    "lines": "bp_house_k18_finished_lines"
   }
  ],
- "house_notes": "Draw lines ABOVE built (the built structure is already cut out of them, so they show over the ground and never over built parts). Each keyframe pair shares one camera (320 pt square). Built: Any = light-theme lighting, Dark = dark-theme lighting. Lines are template images (alpha only): tint with Color(\"bp_drafting\") = Any #8FD3FF, Dark #60A8E6. On the theme-fixed blueprint hero use #8FD3FF in both modes if the hero does not step down.",
+ "house_notes": "Draw lines ABOVE built (the built structure is already cut out of them, so they show over the ground and never over built parts). Each keyframe pair shares one camera (320 pt square). Built: Any = light-theme lighting, Dark = dark-theme lighting. Lines are template images (alpha only): tint with Color(\"bp_drafting\") = Any #8FD3FF, Dark #60A8E6. On the theme-fixed blueprint hero use #8FD3FF in both modes if the hero does not step down. In LIGHT mode on light canvases (cards, #EEF2FA/#FFFFFF) tint the linework #2369B5 (draftingInk); #8FD3FF is only for the blueprint hero. Linework alpha: strokes 0.36, fill 0.08, flattened (never stacks).",
  "confirm_row": {
   "frames": [
    "bp_confirm_row_00",
@@ -274,21 +274,10 @@
    "bp_confirm_row_09",
    "bp_confirm_row_10",
    "bp_confirm_row_11",
-   "bp_confirm_row_12",
-   "bp_confirm_row_13",
-   "bp_confirm_row_14",
-   "bp_confirm_row_15",
-   "bp_confirm_row_16",
-   "bp_confirm_row_17",
-   "bp_confirm_row_18",
-   "bp_confirm_row_19",
-   "bp_confirm_row_20",
-   "bp_confirm_row_21",
-   "bp_confirm_row_22",
-   "bp_confirm_row_23"
+   "bp_confirm_row_12"
   ],
   "fps": 30,
   "base": "bp_house_k14_siding040_built",
-  "note": "Overlay frames, registered to the hero canvas: draw over the base keyframe built pass."
+  "note": "Overlay frames, registered to the hero canvas: draw over the base keyframe (built + linework). 13 frames at 30 fps: slide in, one overshoot, settle; the last frame is the exact rest position."
  }
 }
