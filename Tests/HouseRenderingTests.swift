@@ -9,54 +9,109 @@ final class HouseMotionTests: XCTestCase {
 
     func testReduceMotionNeverAnimates() {
         XCTAssertEqual(HouseMotion.keyframeTransition(from: .k04_frame030, to: .k05_frame040, reduceMotion: true), .instant)
-        XCTAssertEqual(HouseMotion.confirmPlan(oldHours: 680, newHours: 682, reduceMotion: true), .instantSwap)
-        XCTAssertEqual(HouseMotion.confirmPlan(oldHours: 50, newHours: 120, reduceMotion: true), .instantSwap)
-        XCTAssertEqual(HouseMotion.confirmPlan(oldHours: 499, newHours: 501, reduceMotion: true), .instantSwap)
-        for milestone in HouseMilestone.allCases {
-            XCTAssertEqual(HouseMotion.milestoneSettleDuration(milestone, reduceMotion: true), 0.2, accuracy: 0.0001)
+        for (old, new) in [(680.0, 682.0), (50, 120), (499, 501), (699, 701)] {
+            let plan = HouseMotion.confirmPlan(oldHours: old, newHours: new, reduceMotion: true)
+            XCTAssertFalse(plan.beam)
+            XCTAssertNil(plan.boardOffset)
+            XCTAssertFalse(plan.glow)
+            XCTAssertFalse(plan.countUp)
+            XCTAssertEqual(plan.keyframe, .instant)
+            XCTAssertEqual(plan.target, HouseProgress.keyframe(for: new))
+        }
+        for c in [HouseCelebration.stage(.foundation100), .stage(.roof500), .stage(.keys750), .goalMet(.mp500)] {
+            XCTAssertEqual(HouseMotion.celebrationSettleDuration(c, reduceMotion: true), 0.2, accuracy: 0.0001)
         }
     }
 
-    func testConfirmPlansWithMotion() {
-        // Same keyframe: board plays, no keyframe change after.
-        XCTAssertEqual(HouseMotion.confirmPlan(oldHours: 680, newHours: 682, reduceMotion: false),
-                       .boardSequence(frames: 13, fps: 30, thenKeyframe: .instant))
-        // Crosses a siding keyframe: board, then crossfade.
-        XCTAssertEqual(HouseMotion.confirmPlan(oldHours: 699, newHours: 701, reduceMotion: false),
-                       .boardSequence(frames: 13, fps: 30, thenKeyframe: .crossfade(duration: HouseMotion.keyframeCrossfade)))
-        // Lot: no course for the board, crossfade to the slab.
-        XCTAssertEqual(HouseMotion.confirmPlan(oldHours: 99, newHours: 101, reduceMotion: false),
-                       .crossfadeOnly(.crossfade(duration: HouseMotion.keyframeCrossfade)))
-        XCTAssertEqual(HouseMotion.confirmPlan(oldHours: 10, newHours: 12, reduceMotion: false), .crossfadeOnly(.instant))
-        // Finished house: no board.
-        XCTAssertEqual(HouseMotion.confirmPlan(oldHours: 800, newHours: 802, reduceMotion: false), .crossfadeOnly(.instant))
-        // Nothing added, or hours removed: no plan.
-        XCTAssertEqual(HouseMotion.confirmPlan(oldHours: 200, newHours: 200, reduceMotion: false), .none)
-        XCTAssertEqual(HouseMotion.confirmPlan(oldHours: 200, newHours: 150, reduceMotion: false), .none)
+    func testConfirmIsRewardingAndTheHouseOnlyGrows() {
+        // Same keyframe: beam, glow and count-up, but NO board (a board that then vanished
+        // would take a course away, which the r1 gate measured as siding falling 4.2%).
+        let same = HouseMotion.confirmPlan(oldHours: 600, newHours: 602, reduceMotion: false)
+        XCTAssertTrue(same.beam && same.glow && same.countUp)
+        XCTAssertNil(same.boardOffset)
+        XCTAssertEqual(same.keyframe, .instant)
+        XCTAssertEqual(same.target, .k14_siding040)
+        // Crossing into a siding keyframe: board onto the new course, then crossfade to it.
+        let siding = HouseMotion.confirmPlan(oldHours: 649, newHours: 651, reduceMotion: false)
+        XCTAssertEqual(siding.target, .k15_siding060)
+        XCTAssertEqual(siding.boardOffset ?? 99, HouseKeyframe.k15_siding060.courseAnchor.y - 0.577, accuracy: 0.0001)
+        XCTAssertEqual(siding.keyframe, .crossfade(duration: HouseMotion.keyframeCrossfade))
+        // Crossing a framing keyframe: no siding board, but the house crossfades and grows.
+        let frame = HouseMotion.confirmPlan(oldHours: 139, newHours: 141, reduceMotion: false)
+        XCTAssertNil(frame.boardOffset)
+        XCTAssertEqual(frame.keyframe, .crossfade(duration: HouseMotion.keyframeCrossfade))
+        XCTAssertEqual(frame.anchor, HouseKeyframe.k02_frame010.courseAnchor)
+        // Nothing added, or hours removed: nothing plays.
+        XCTAssertTrue(HouseMotion.confirmPlan(oldHours: 200, newHours: 200, reduceMotion: false).isEmpty)
+        XCTAssertTrue(HouseMotion.confirmPlan(oldHours: 200, newHours: 150, reduceMotion: false).isEmpty)
+    }
+
+    func testSidingRunsForward() {
+        // 600h and 602h are the same course (k14, siding 40%); more hours never pick an earlier one.
+        XCTAssertEqual(HouseProgress.keyframe(for: 600), .k14_siding040)
+        XCTAssertEqual(HouseProgress.keyframe(for: 602), .k14_siding040)
+        XCTAssertEqual(HouseProgress.keyframe(for: 650), .k15_siding060)
+        // Each siding keyframe's new course sits higher than the last (smaller y) until 80%.
+        let ys = [HouseKeyframe.k13_siding020, .k14_siding040, .k15_siding060, .k16_siding080].map(\.courseAnchor.y)
+        XCTAssertEqual(ys, ys.sorted(by: >))
     }
 
     func testTimingCaps() {
         XCTAssertEqual(HouseMotion.confirmFrameCount, 13)
         XCTAssertEqual(HouseMotion.confirmSequenceDuration, 13.0 / 30.0, accuracy: 0.0001)
+        XCTAssertEqual(HouseMotion.beamSpringResponse, 0.32)
+        XCTAssertEqual(HouseMotion.beamSpringDamping, 0.86)
+        XCTAssertLessThanOrEqual(HouseMotion.beamFlight, 0.2)
         XCTAssertLessThanOrEqual(HouseMotion.backfillTotalDuration, 2.5, "backfill sketch-in must finish within 2.5 s")
         XCTAssertLessThanOrEqual(HouseMotion.backfillLeadIn + HouseMotion.backfillSketchDuration, HouseMotion.backfillTotalDuration)
-        for milestone in HouseMilestone.allCases {
-            XCTAssertLessThan(HouseMotion.milestoneSettleDuration(milestone, reduceMotion: false), 3, "\(milestone) celebration must run under 3 s")
+        for c in [HouseCelebration.stage(.foundation100), .stage(.roof500), .stage(.keys750), .goalMet(.reps750), .goalMet(.mp500), .goalMet(.mp100)] {
+            XCTAssertLessThan(HouseMotion.celebrationSettleDuration(c, reduceMotion: false), 3, "\(c) must run under 3 s")
         }
         XCTAssertEqual(HouseMotion.roofDropPoints, 12)
         XCTAssertEqual(HouseMotion.confirmFrameNames.first, "bp_confirm_row_00")
         XCTAssertEqual(HouseMotion.confirmFrameNames.last, "bp_confirm_row_12")
+        XCTAssertEqual(HouseHeroView.deltaLabel(2), "+2h")
+        XCTAssertEqual(HouseHeroView.deltaLabel(1.5), "+1.5h")
+        XCTAssertEqual(HouseHeroView.deltaLabel(0.25), "+15m")
     }
 
     func testCelebrationCopyNeverOverclaims() {
-        XCTAssertTrue(MilestoneCelebrationView.detail(for: .roof500, hours: 500).contains("needs more than 500"))
-        XCTAssertTrue(MilestoneCelebrationView.detail(for: .roof500, hours: 502).contains("met, based on your records"))
-        XCTAssertTrue(MilestoneCelebrationView.detail(for: .foundation100, hours: 100).contains("needs more than 100"))
-        for milestone in HouseMilestone.allCases {
-            for hours in [milestone.thresholdHours, milestone.thresholdHours + 1] {
-                XCTAssertFalse(MilestoneCelebrationView.detail(for: milestone, hours: hours).lowercased().contains("qualif"))
+        XCTAssertTrue(MilestoneCelebrationView.detail(for: .stage(.roof500), hours: 500).contains("needs more than 500"))
+        XCTAssertTrue(MilestoneCelebrationView.detail(for: .stage(.roof500), hours: 502).contains("met, based on your records"))
+        XCTAssertTrue(MilestoneCelebrationView.detail(for: .stage(.foundation100), hours: 100).contains("needs more than 100"))
+        XCTAssertEqual(MilestoneCelebrationView.eyebrow(for: .goalMet(.mp500)), "Goal met")
+        XCTAssertNil(MilestoneCelebrationView.eyebrow(for: .stage(.roof500)))
+        XCTAssertEqual(MilestoneCelebrationView.title(for: .goalMet(.mp100)), "Keys in the door.")
+        XCTAssertEqual(MilestoneCelebrationView.hoursLine(for: .goalMet(.reps750), hours: 751.4, year: 2026), "751 confirmed hours in 2026")
+        XCTAssertNotNil(MilestoneCelebrationView.keyPlacement(for: .goalMet(.mp500)))
+        XCTAssertNil(MilestoneCelebrationView.keyPlacement(for: .stage(.keys750)))
+        let all: [HouseCelebration] = [.stage(.foundation100), .stage(.roof500), .stage(.keys750), .goalMet(.reps750), .goalMet(.mp500), .goalMet(.mp100)]
+        for c in all {
+            for hours in [c.thresholdHours, c.thresholdHours + 1] {
+                XCTAssertFalse(MilestoneCelebrationView.detail(for: c, hours: hours).lowercased().contains("qualif"))
             }
         }
+    }
+
+    func testLineworkAlphaIsLiftedToTokenContrast() throws {
+        // The exported strokes peak at alpha 92/255 (0.36); lifted they must reach >= 0.8 so
+        // #8FD3FF on #1E3FA6 clears 4:1 (non-text floor 3:1; concept ~4.3:1).
+        let boosted = try XCTUnwrap(HouseLineworkStore.image(named: HouseKeyframe.k04_frame030.linesImageName)?.cgImage)
+        let raw = try XCTUnwrap(UIImage(named: HouseKeyframe.k04_frame030.linesImageName)?.cgImage)
+        XCTAssertGreaterThanOrEqual(Self.maxAlpha(boosted), 204)
+        XCTAssertLessThanOrEqual(Self.maxAlpha(raw), 100)
+    }
+
+    static func maxAlpha(_ image: CGImage) -> Int {
+        let w = image.width, h = image.height
+        var data = [UInt8](repeating: 0, count: w * h * 4)
+        let ctx = CGContext(data: &data, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        var best: UInt8 = 0
+        var i = 3
+        while i < data.count { best = max(best, data[i]); i += 4 }
+        return Int(best)
     }
 
     func testLineworkTintPerCanvas() {
@@ -74,8 +129,10 @@ final class HouseMotionTests: XCTestCase {
         XCTAssertEqual(config?.scheme, .dark)
         XCTAssertEqual(config?.scene, .milestone)
         XCTAssertEqual(config?.settled, true)
-        XCTAssertEqual(config?.resolvedMilestone, .foundation100)
-        XCTAssertEqual(HousePreviewLaunch.parse(["app", "-LHHousePreview", "500", "reps", "light"])?.resolvedMilestone, .roof500)
+        XCTAssertEqual(config?.resolvedCelebration, .stage(.foundation100))
+        XCTAssertEqual(HousePreviewLaunch.parse(["app", "-LHHousePreview", "500", "reps", "light"])?.resolvedCelebration, .stage(.roof500))
+        XCTAssertEqual(HousePreviewLaunch.parse(["app", "-LHHousePreview", "501", "mp500", "light"])?.resolvedCelebration, .goalMet(.mp500))
+        XCTAssertEqual(HousePreviewLaunch.parse(["app", "-LHHousePreview", "300", "mp100", "light", "-LHHouseStartDelay", "2"])?.startDelay, 2)
         XCTAssertNil(HousePreviewLaunch.parse(["app", "-LHHousePreview", "abc", "reps", "light"]))
         XCTAssertNil(HousePreviewLaunch.parse(["app", "-LHHousePreview", "100"]))
         XCTAssertNil(HousePreviewLaunch.parse(["app"]))

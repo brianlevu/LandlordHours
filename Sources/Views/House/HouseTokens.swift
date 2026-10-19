@@ -15,6 +15,10 @@ enum HouseTokens {
         static let draftingInk = "2369B5"      // linework on light canvases and cards
         static let darkDrafting = "60A8E6"     // linework on dark canvases and cards
         static let timber = "E0A458"
+        static let timberLight = "F0BE7A"
+        static let timberDark = "B57A35"
+        static let nail = "6E4A20"
+        static let window = "FFD27A"
         static let brass = "D9B45A"
         static let brassLight = "F2D78C"
         static let brassDark = "A9833A"
@@ -31,6 +35,10 @@ enum HouseTokens {
     static let blueprintDeep = Color(hex: Hex.blueprintDeep)
     static let drafting = Color(hex: Hex.drafting)
     static let timber = Color(hex: Hex.timber)
+    static let timberLight = Color(hex: Hex.timberLight)
+    static let timberDark = Color(hex: Hex.timberDark)
+    static let nail = Color(hex: Hex.nail)
+    static let window = Color(hex: Hex.window)
     static let brass = Color(hex: Hex.brass)
     static let brassLight = Color(hex: Hex.brassLight)
     static let brassDark = Color(hex: Hex.brassDark)

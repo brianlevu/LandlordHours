@@ -12,7 +12,9 @@ import SwiftUI
 //   -LHHouseConfirmHours <h>    confirm scene: hours added by the confirm (default 2)
 //   -LHHouseConfirmDelay <s>    confirm scene: seconds before the confirm plays (default 1.5)
 //   -LHHouseConfirmStill <n>    show board frame n (0...12) statically over the hero
-//   -LHHouseMilestone 100|500|750   milestone scene: which celebration (default: highest reached)
+//   -LHHouseMilestone 100|500|750|goal   milestone scene: which celebration (default: the
+//                               highest one this goal has earned at these hours)
+//   -LHHouseStartDelay <s>      milestone/backfill scene: hold the first frame this long
 //   -LHHouseSettled             milestone/backfill scene: start at the end state
 //   -LHHouseSuggestions <n>     backfill scene: suggestion count (default 14)
 //
@@ -29,7 +31,8 @@ struct HousePreviewLaunch: Equatable {
     var confirmHours: Double = 2
     var confirmDelay: Double = 1.5
     var confirmStill: Int? = nil
-    var milestone: HouseMilestone? = nil
+    var milestone: String? = nil
+    var startDelay: Double = 0
     var settled = false
     var suggestions = 14
 
@@ -49,22 +52,31 @@ struct HousePreviewLaunch: Equatable {
         if let raw = value("-LHHouseConfirmHours"), let h = Double(raw) { config.confirmHours = h }
         if let raw = value("-LHHouseConfirmDelay"), let s = Double(raw) { config.confirmDelay = s }
         if let raw = value("-LHHouseConfirmStill"), let n = Int(raw) { config.confirmStill = n }
-        if let raw = value("-LHHouseMilestone"), let n = Int(raw) { config.milestone = HouseMilestone(rawValue: n) }
+        if let raw = value("-LHHouseMilestone") { config.milestone = raw.lowercased() }
+        if let raw = value("-LHHouseStartDelay"), let s = Double(raw) { config.startDelay = s }
         if let raw = value("-LHHouseSuggestions"), let n = Int(raw) { config.suggestions = n }
         config.settled = args.contains("-LHHouseSettled")
         return config
     }
 
-    /// The celebration the milestone scene shows: the explicit one, else the highest reached.
-    var resolvedMilestone: HouseMilestone {
-        milestone ?? HouseMilestone.allCases.last { $0.isReached(by: hours) } ?? .foundation100
+    /// The celebration the milestone scene shows: the explicit one, else the highest this goal
+    /// has earned at these hours (as if every hour had just been confirmed).
+    var resolvedCelebration: HouseCelebration {
+        switch milestone {
+        case "goal": return .goalMet(goal)
+        case "100": return .stage(.foundation100)
+        case "500": return .stage(.roof500)
+        case "750": return goal == .reps750 ? .goalMet(.reps750) : .stage(.keys750)
+        default:
+            return HouseProgress.celebrations(from: 0, to: max(hours, 0.01), goal: goal).last ?? .stage(.foundation100)
+        }
     }
 }
 
 struct HousePreviewRoot: View {
     let config: HousePreviewLaunch
     @State private var hours: Double
-    @State private var celebration: HouseMilestone?
+    @State private var celebration: HouseCelebration?
 
     init(config: HousePreviewLaunch) {
         self.config = config
@@ -96,7 +108,7 @@ struct HousePreviewRoot: View {
                         .padding(.top, 8)
                     HouseHeroCard(
                         progress: HouseProgress(hours: hours, goal: config.goal),
-                        onMilestone: { celebration = $0 },
+                        onCelebration: { celebration = $0 },
                         debugConfirmStill: config.confirmStill
                     )
                     Spacer()
@@ -108,15 +120,16 @@ struct HousePreviewRoot: View {
                 try? await Task.sleep(nanoseconds: UInt64(config.confirmDelay * 1_000_000_000))
                 hours += config.confirmHours
             }
-            .fullScreenCover(item: $celebration) { milestone in
-                MilestoneCelebrationView(milestone: milestone, hours: hours, artScheme: config.scheme) { celebration = nil }
+            .fullScreenCover(item: $celebration) { item in
+                MilestoneCelebrationView(celebration: item, hours: hours, artScheme: config.scheme) { celebration = nil }
             }
         case .milestone:
             MilestoneCelebrationView(
-                milestone: config.resolvedMilestone,
+                celebration: config.resolvedCelebration,
                 hours: hours,
                 artScheme: config.scheme,
                 startSettled: config.settled,
+                startDelay: config.startDelay,
                 onContinue: {}
             )
         case .backfill:
@@ -124,7 +137,8 @@ struct HousePreviewRoot: View {
                 foundHours: hours,
                 suggestionCount: config.suggestions,
                 artScheme: config.scheme,
-                startSettled: config.settled
+                startSettled: config.settled,
+                startDelay: config.startDelay
             )
         }
     }

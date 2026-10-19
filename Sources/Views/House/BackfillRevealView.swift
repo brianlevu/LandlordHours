@@ -13,6 +13,8 @@ struct BackfillRevealView: View {
     var artScheme: ColorScheme? = nil
     /// DEBUG/capture: start at the end state.
     var startSettled = false
+    /// DEBUG/capture: wait this long before the sketch-in (so a recording has no cold launch).
+    var startDelay: Double = 0
     var onReview: () -> Void = {}
     var onSkip: () -> Void = {}
 
@@ -115,7 +117,7 @@ struct BackfillRevealView: View {
     private func play() async {
         if startSettled || reduceMotion { settle(animated: false); return }
         let ns: (Double) -> UInt64 = { UInt64($0 * 1_000_000_000) }
-        try? await Task.sleep(nanoseconds: ns(HouseMotion.backfillLeadIn))
+        try? await Task.sleep(nanoseconds: ns(startDelay + HouseMotion.backfillLeadIn))
         if finished { return }
         withAnimation(.easeOut(duration: HouseMotion.backfillSketchDuration)) { sketch = 1 }
         try? await Task.sleep(nanoseconds: ns(HouseMotion.backfillHatchDelay))

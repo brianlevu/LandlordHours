@@ -1,49 +1,84 @@
 import SwiftUI
 
 /// The Blueprint house at hero size. Shows the keyframe for the current countable hours, built
-/// pass under tinted linework, and crossfades between keyframes when hours change. A confirm that
-/// adds hours plays the board sequence (when the house has a course for it to land on), fires a
-/// light haptic at settle, then updates the keyframe. Reduce Motion: no board, instant swap.
+/// pass under tinted linework, and crossfades between keyframes when hours change.
 ///
-/// One accessibility element: hours, goal and next milestone in words. The layers are hidden.
+/// A confirm that adds hours: a timber beam flies into the house (~180 ms), lands on the newest
+/// course with a warm glow pulse and a light haptic; if the hours cross a keyframe the house
+/// crossfades to it (through the board sequence when the new keyframe is a siding course). The
+/// house only ever grows. Reduce Motion: no beam, board or pulse; the keyframe swaps in place.
+///
+/// One accessibility element: hours, goal and next step in words. The layers are hidden.
 struct HouseHeroView: View {
     let progress: HouseProgress
     var canvas: HouseCanvas = .blueprintHero
-    /// Off for static uses (thumbnails, share images): changes swap or crossfade, no board.
+    /// Off for static uses (thumbnails, share images): changes swap in place, no beam.
     var animatesConfirms = true
-    /// Called after a confirm settles, once per milestone crossed (lowest first).
-    var onMilestone: (HouseMilestone) -> Void = { _ in }
-    /// DEBUG/capture: show this board frame statically over the house.
+    /// Where the beam starts, in this view's coordinates (e.g. the hero number). nil = above-left.
+    var beamOrigin: CGPoint? = nil
+    /// Called when the beam lands (or at once without motion), so the caller can count up.
+    var onLand: (HouseConfirmPlan) -> Void = { _ in }
+    /// Called after a confirm settles with the celebration it earned (the highest one), if any.
+    var onCelebration: (HouseCelebration) -> Void = { _ in }
+    /// DEBUG/capture: show this board frame statically over the house (registered position).
     var debugConfirmStill: Int? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shownKeyframe: HouseKeyframe?
     @State private var boardRun: UUID?
+    @State private var boardOffset: CGFloat = 0
     @State private var boardOpacity = 1.0
     @State private var settleTick = 0
-    @State private var pending: Pending?
+    @State private var glow = 0.0
+    @State private var glowAnchor = CGPoint(x: 0.5, y: 0.6)
+    @State private var beam: Beam?
+    @State private var pendingBoard: (target: HouseKeyframe, transition: HouseKeyframeTransition)?
 
-    private struct Pending {
-        let target: HouseKeyframe
-        let transition: HouseKeyframeTransition
-        let milestones: [HouseMilestone]
+    private struct Beam: Equatable {
+        var position: CGPoint
+        var scale: CGFloat = 1
+        var opacity: Double = 1
+        var label: String
     }
 
     private var current: HouseKeyframe { shownKeyframe ?? progress.keyframe }
 
     var body: some View {
-        ZStack {
-            HouseArtView(keyframe: current, canvas: canvas)
-                .id(current)
-                .transition(.opacity)
-            if boardRun != nil || debugConfirmStill != nil {
-                ConfirmBuildAnimation(runID: boardRun, stillFrame: debugConfirmStill, onSettle: settle)
-                    .opacity(boardOpacity)
+        GeometryReader { g in
+            let s = min(g.size.width, g.size.height)
+            ZStack(alignment: .topLeading) {
+                HouseArtView(keyframe: current, canvas: canvas)
+                    .frame(width: s, height: s)
+                    .id(current)
+                    .transition(.opacity)
+                if boardRun != nil || debugConfirmStill != nil {
+                    ConfirmBuildAnimation(runID: boardRun, stillFrame: debugConfirmStill, onSettle: boardSettled)
+                        .frame(width: s, height: s)
+                        .offset(y: boardOffset * s)
+                        .opacity(boardOpacity)
+                }
+                Capsule()
+                    .fill(RadialGradient(colors: [HouseTokens.window, HouseTokens.window.opacity(0)], center: .center, startRadius: 0, endRadius: s * 0.26))
+                    .frame(width: s * 0.56, height: s * 0.13)
+                    .blur(radius: 5)
+                    .blendMode(.plusLighter)
+                    .position(x: glowAnchor.x * s, y: glowAnchor.y * s)
+                    .opacity(glow)
+                    .allowsHitTesting(false)
+                if let beam {
+                    HouseBeam(label: beam.label)
+                        .scaleEffect(beam.scale)
+                        .rotationEffect(.degrees(-6))
+                        .position(beam.position)
+                        .opacity(beam.opacity)
+                        .allowsHitTesting(false)
+                }
             }
+            .frame(width: s, height: s)
+            .onChange(of: progress.hours) { old, new in handleChange(from: old, to: new, size: s) }
         }
         .aspectRatio(1, contentMode: .fit)
         .onAppear { if shownKeyframe == nil { shownKeyframe = progress.keyframe } }
-        .onChange(of: progress.hours) { old, new in handleChange(from: old, to: new) }
         .sensoryFeedback(.impact(weight: .light), trigger: settleTick)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(progress.accessibilityLabel)
@@ -51,45 +86,67 @@ struct HouseHeroView: View {
         .accessibilityIdentifier("house-hero")
     }
 
-    private func handleChange(from old: Double, to new: Double) {
-        let target = HouseProgress.keyframe(for: new)
-        let crossed = HouseProgress.milestonesCrossed(from: old, to: new)
-        guard animatesConfirms else {
-            apply(HouseMotion.keyframeTransition(from: current, to: target, reduceMotion: reduceMotion), target)
+    // MARK: Confirm choreography
+
+    private func handleChange(from old: Double, to new: Double, size s: CGFloat) {
+        let plan = HouseMotion.confirmPlan(oldHours: old, newHours: new, reduceMotion: reduceMotion || !animatesConfirms)
+        let celebration = HouseProgress.celebrations(from: old, to: new, goal: progress.goal).last
+        guard plan.beam else {
+            apply(plan.keyframe, plan.target)
+            onLand(plan)
+            if new > old { settleTick += 1 }
+            if let celebration { onCelebration(celebration) }
             return
         }
-        switch HouseMotion.confirmPlan(oldHours: old, newHours: new, reduceMotion: reduceMotion) {
-        case .none:
-            apply(.instant, target)
-        case .instantSwap:
-            apply(.instant, target)
-            settleTick += 1
-            crossed.forEach(onMilestone)
-        case .crossfadeOnly(let transition):
-            apply(transition, target)
-            settleTick += 1
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: UInt64(HouseMotion.keyframeCrossfade * 1_000_000_000))
-                crossed.forEach(onMilestone)
+        let ns: (Double) -> UInt64 = { UInt64($0 * 1_000_000_000) }
+        Task { @MainActor in
+            // 1. The beam flies from the number into the house.
+            let origin = beamOrigin ?? CGPoint(x: -s * 0.1, y: s * 0.1)
+            let target = CGPoint(x: plan.anchor.x * s, y: plan.anchor.y * s)
+            beam = Beam(position: origin, label: Self.deltaLabel(new - old))
+            withAnimation(.spring(response: HouseMotion.beamSpringResponse, dampingFraction: HouseMotion.beamSpringDamping)) {
+                beam?.position = target
             }
-        case .boardSequence(_, _, let transition):
-            pending = Pending(target: target, transition: transition, milestones: crossed)
-            boardOpacity = 1
-            boardRun = UUID()
+            try? await Task.sleep(nanoseconds: ns(HouseMotion.beamFlight + 0.04))
+
+            // 2. Landing: the number counts up, the course glows, the beam is absorbed.
+            onLand(plan)
+            glowAnchor = plan.anchor
+            withAnimation(.easeOut(duration: HouseMotion.glowIn)) { glow = 1 }
+            withAnimation(.easeIn(duration: 0.18)) {
+                beam?.scale = 0.3
+                beam?.opacity = 0
+            }
+            if let offset = plan.boardOffset {
+                // 3a. The board slides onto the new course, then becomes the new keyframe.
+                pendingBoard = (plan.target, plan.keyframe)
+                boardOffset = offset
+                boardOpacity = 1
+                boardRun = UUID()
+            } else {
+                // 3b. The house grows (crossfade) if a keyframe was crossed; haptic now.
+                apply(plan.keyframe, plan.target)
+                settleTick += 1
+            }
+            try? await Task.sleep(nanoseconds: ns(HouseMotion.glowIn))
+            withAnimation(.easeOut(duration: HouseMotion.glowOut)) { glow = 0 }
+            try? await Task.sleep(nanoseconds: ns(0.1))
+            beam = nil
+            let rest = plan.boardOffset != nil ? HouseMotion.confirmSequenceDuration + HouseMotion.keyframeCrossfade : HouseMotion.keyframeCrossfade
+            try? await Task.sleep(nanoseconds: ns(rest))
+            if let celebration { onCelebration(celebration) }
         }
     }
 
-    private func settle() {
+    private func boardSettled() {
         settleTick += 1
-        guard let pending else { return }
-        self.pending = nil
+        guard let pending = pendingBoard else { return }
+        pendingBoard = nil
         apply(pending.transition, pending.target)
+        withAnimation(.easeIn(duration: HouseMotion.keyframeCrossfade)) { boardOpacity = 0 }
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(HouseMotion.keyframeCrossfade * 1_000_000_000))
-            withAnimation(.easeIn(duration: HouseMotion.boardFadeOut)) { boardOpacity = 0 }
-            try? await Task.sleep(nanoseconds: UInt64(HouseMotion.boardFadeOut * 1_000_000_000))
             boardRun = nil
-            pending.milestones.forEach(onMilestone)
         }
     }
 
@@ -103,78 +160,161 @@ struct HouseHeroView: View {
             withAnimation(.easeInOut(duration: duration)) { shownKeyframe = target }
         }
     }
+
+    /// "+2h", "+1.5h", "+15m".
+    static func deltaLabel(_ hours: Double) -> String {
+        if hours < 1 { return "+\(max(1, Int((hours * 60).rounded())))m" }
+        let rounded = (hours * 10).rounded() / 10
+        return rounded == rounded.rounded() ? "+\(Int(rounded))h" : "+\(String(format: "%.1f", rounded))h"
+    }
 }
 
-/// The Today hero card on blueprint paper, ported from the approved sandbox layout
-/// (DesignSandbox/BlueprintScreens.swift `BlueprintHero`): the number column on the left, the
-/// house on the right two-thirds. Integration into DashboardView happens after WP-D merges.
+/// The confirm beam: a timber clapboard with grain and nail heads, and the hours tag above it.
+struct HouseBeam: View {
+    let label: String
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 2.5)
+                .fill(LinearGradient(colors: [HouseTokens.timberLight, HouseTokens.timber, HouseTokens.timberDark], startPoint: .top, endPoint: .bottom))
+            HStack {
+                Circle().fill(HouseTokens.nail).frame(width: 3, height: 3)
+                Spacer()
+                Circle().fill(HouseTokens.nail).frame(width: 3, height: 3)
+            }
+            .padding(.horizontal, 6)
+        }
+        .frame(width: 72, height: 12)
+        .shadow(color: .black.opacity(0.35), radius: 3, y: 2)
+        .overlay(alignment: .top) {
+            Text(label)
+                .font(.caption.weight(.heavy))
+                .monospacedDigit()
+                .foregroundStyle(HouseTokens.blueprint)
+                .padding(.horizontal, 8)
+                .frame(height: 20)
+                .background(Color.white, in: Capsule())
+                .shadow(color: .black.opacity(0.25), radius: 3, y: 2)
+                .fixedSize()
+                .offset(y: -26)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// The Today hero card on blueprint paper, ported from the approved sandbox/concept layout: the
+/// number top-left, the house filling the right two-thirds and bottom. Integration into
+/// DashboardView happens after WP-D merges.
 struct HouseHeroCard: View {
     let progress: HouseProgress
     var year: Int = Calendar.current.component(.year, from: Date())
     /// Pace words from the caller ("On pace, 18h ahead"); nil hides the line.
     var status: String? = nil
-    var onMilestone: (HouseMilestone) -> Void = { _ in }
+    var onCelebration: (HouseCelebration) -> Void = { _ in }
     var debugConfirmStill: Int? = nil
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var shownHours: Double?
+    @State private var pop = false
+
+    private var displayHours: Int { Int((shownHours ?? progress.hours).rounded(.down)) }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             HouseBlueprintPaper()
             GeometryReader { g in
-                let houseSize = min(g.size.height * 0.96, g.size.width * 0.6)
-                let columnWidth = max(0, g.size.width - houseSize - 16)
+                // The art has ~6% side and ~8% bottom margins inside its 320 pt camera; size it so
+                // the house fills the right two-thirds and rises to about a third of the card.
+                let houseSize = min(g.size.height * 0.84, g.size.width * 0.74)
+                let houseCenter = CGPoint(x: g.size.width - 4 - houseSize * 0.44, y: g.size.height - 6 - houseSize * 0.417)
+                let houseOrigin = CGPoint(x: houseCenter.x - houseSize / 2, y: houseCenter.y - houseSize / 2)
+                // Bottom lines stay clear of the lot's left tip (~6% into the camera at ~74% height).
+                let columnWidth = max(96, houseOrigin.x + houseSize * 0.04 - 24)
                 ZStack(alignment: .topLeading) {
+                    HouseHeroView(
+                        progress: progress,
+                        canvas: .blueprintHero,
+                        beamOrigin: CGPoint(x: 72 - houseOrigin.x, y: 92 - houseOrigin.y),
+                        onLand: { _ in countUp() },
+                        onCelebration: onCelebration,
+                        debugConfirmStill: debugConfirmStill
+                    )
+                    .frame(width: houseSize, height: houseSize)
+                    .position(houseCenter)
+
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(String(year)) · \(progress.goal.eyebrow)")
                             .font(.system(size: 11, weight: .medium, design: .monospaced))
                             .textCase(.uppercase)
                             .tracking(1.3)
                             .foregroundStyle(HouseTokens.drafting)
-                            .lineLimit(2)
+                            .lineLimit(1)
                             .minimumScaleFactor(0.8)
-                        Text("\(progress.wholeHours)")
+                            .fixedSize(horizontal: true, vertical: false)
+                        Text("\(displayHours)")
                             .font(.system(size: 56, weight: .bold, design: .rounded))
                             .monospacedDigit()
                             .foregroundStyle(HouseTokens.onHeroPrimary)
                             .contentTransition(.identity)
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
+                            .scaleEffect(pop ? HouseMotion.countPopScale : 1, anchor: .leading)
                             .padding(.top, 2)
+                            .accessibilityLabel("\(progress.wholeHours) hours")
                         Text("of \(Int(progress.goal.targetHours))h")
                             .font(.title3.weight(.medium))
                             .foregroundStyle(HouseTokens.onHeroSecondary)
                         Spacer(minLength: 8)
-                        if let status {
-                            Text(status)
+                        Group {
+                            if let status {
+                                Text(status)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(HouseTokens.positiveOnHero)
+                                    .lineLimit(2)
+                            }
+                            Text(progress.stage.spokenName)
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(HouseTokens.positiveOnHero)
+                                .foregroundStyle(HouseTokens.onHeroPrimary)
                                 .lineLimit(2)
+                            if progress.nextStep != nil {
+                                Text(progress.nextMilestoneLabel)
+                                    .font(.footnote)
+                                    .foregroundStyle(HouseTokens.onHeroSecondary)
+                                    .lineLimit(2)
+                            }
                         }
-                        Text(progress.stage.spokenName)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(HouseTokens.onHeroPrimary)
-                            .lineLimit(2)
-                        Text(progress.nextMilestoneLabel)
-                            .font(.footnote)
-                            .foregroundStyle(HouseTokens.onHeroSecondary)
-                            .lineLimit(2)
+                        .frame(width: columnWidth, alignment: .leading)
                     }
-                    .frame(width: columnWidth, alignment: .leading)
-                    .padding(.leading, 20)
-                    .padding(.vertical, 20)
-                    .frame(maxHeight: .infinity, alignment: .topLeading)
+                    .padding(20)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .accessibilityElement(children: .combine)
-
-                    HouseHeroView(progress: progress, canvas: .blueprintHero, onMilestone: onMilestone, debugConfirmStill: debugConfirmStill)
-                        .frame(width: houseSize, height: houseSize)
-                        .position(x: g.size.width - houseSize / 2, y: g.size.height - houseSize / 2 + 2)
                 }
             }
         }
         .frame(height: 320)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: HouseTokens.blueprint.opacity(0.25), radius: 16, y: 8)
+        .onAppear { if shownHours == nil { shownHours = progress.hours } }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("house-hero-card")
+    }
+
+    /// Whole-hour steps from the shown number to the new hours with a small spring pop.
+    private func countUp() {
+        let from = shownHours ?? progress.hours
+        let to = progress.hours
+        guard to > from, !reduceMotion else { shownHours = to; return }
+        let steps = max(1, min(30, Int(to.rounded(.down)) - Int(from.rounded(.down))))
+        let stepTime = HouseMotion.countUpMax / Double(steps)
+        Task { @MainActor in
+            withAnimation(.spring(response: 0.18, dampingFraction: 0.5)) { pop = true }
+            for i in 1...steps {
+                shownHours = from + (to - from) * Double(i) / Double(steps)
+                try? await Task.sleep(nanoseconds: UInt64(stepTime * 1_000_000_000))
+            }
+            shownHours = to
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { pop = false }
+        }
     }
 }
 

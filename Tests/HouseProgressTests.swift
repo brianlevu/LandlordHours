@@ -84,20 +84,49 @@ final class HouseProgressTests: XCTestCase {
         XCTAssertEqual(p(550).stage, .siding)
         XCTAssertEqual(p(750).stage, .siding)
         XCTAssertEqual(p(750.01).stage, .finished)
+        XCTAssertEqual(p(750.01).stage.spokenName, "House finished")
     }
 
     // MARK: Next milestone
 
-    func testNextMilestoneLabelAtEveryBoundary() {
-        for goal in HouseGoal.allCases {
-            XCTAssertEqual(p(99.99, goal).nextMilestoneLabel, "Foundation at 100h")
-            XCTAssertEqual(p(100, goal).nextMilestoneLabel, "Roof at 500h")
-            XCTAssertEqual(p(499.99, goal).nextMilestoneLabel, "Roof at 500h")
-            XCTAssertEqual(p(500, goal).nextMilestoneLabel, "Keys after 750h")
-            XCTAssertEqual(p(750, goal).nextMilestoneLabel, "Keys after 750h")
-            XCTAssertEqual(p(750.01, goal).nextMilestoneLabel, "House finished")
-            XCTAssertNil(p(750.01, goal).nextMilestone)
-        }
+    func testNextStepLabelAtEveryBoundaryPerGoal() {
+        // REPS: the keys are the finish.
+        XCTAssertEqual(p(99.99).nextMilestoneLabel, "Foundation at 100h")
+        XCTAssertEqual(p(100).nextMilestoneLabel, "Roof at 500h")
+        XCTAssertEqual(p(499.99).nextMilestoneLabel, "Roof at 500h")
+        XCTAssertEqual(p(500).nextMilestoneLabel, "Keys after 750h")
+        XCTAssertEqual(p(750).nextMilestoneLabel, "Keys after 750h")
+        XCTAssertEqual(p(750.01).nextMilestoneLabel, "House finished")
+        XCTAssertNil(p(750.01).nextStep)
+        // MP 500: keys on the roofed house, then the house keeps building.
+        XCTAssertEqual(p(99.99, .mp500).nextMilestoneLabel, "Foundation at 100h")
+        XCTAssertEqual(p(499.99, .mp500).nextMilestoneLabel, "Roof at 500h")
+        XCTAssertEqual(p(500, .mp500).nextMilestoneLabel, "Keys after 500h")
+        XCTAssertEqual(p(500.01, .mp500).nextMilestoneLabel, "Finished after 750h")
+        XCTAssertEqual(p(750, .mp500).nextMilestoneLabel, "Finished after 750h")
+        XCTAssertNil(p(750.01, .mp500).nextStep)
+        // MP 100: keys at the slab.
+        XCTAssertEqual(p(99.99, .mp100).nextMilestoneLabel, "Foundation at 100h")
+        XCTAssertEqual(p(100, .mp100).nextMilestoneLabel, "Keys after 100h")
+        XCTAssertEqual(p(100.01, .mp100).nextMilestoneLabel, "Roof at 500h")
+        XCTAssertEqual(p(500, .mp100).nextMilestoneLabel, "Finished after 750h")
+        XCTAssertNil(p(750.01, .mp100).nextStep)
+    }
+
+    func testCelebrationsUseTheOwnersGoalForTheKeys() {
+        XCTAssertEqual(HouseProgress.celebrations(from: 99, to: 100, goal: .reps750), [.stage(.foundation100)])
+        XCTAssertEqual(HouseProgress.celebrations(from: 499, to: 500, goal: .reps750), [.stage(.roof500)])
+        XCTAssertEqual(HouseProgress.celebrations(from: 750, to: 751, goal: .reps750), [.goalMet(.reps750)])
+        XCTAssertEqual(HouseProgress.celebrations(from: 749, to: 750, goal: .reps750), [])
+        // MP 500: the roof lands AT 500, the keys come past it.
+        XCTAssertEqual(HouseProgress.celebrations(from: 499, to: 500, goal: .mp500), [.stage(.roof500)])
+        XCTAssertEqual(HouseProgress.celebrations(from: 500, to: 501, goal: .mp500), [.goalMet(.mp500)])
+        XCTAssertEqual(HouseProgress.celebrations(from: 499, to: 501, goal: .mp500), [.goalMet(.mp500)])
+        XCTAssertEqual(HouseProgress.celebrations(from: 750, to: 751, goal: .mp500), [.stage(.keys750)])
+        // MP 100: keys at the slab.
+        XCTAssertEqual(HouseProgress.celebrations(from: 99, to: 101, goal: .mp100), [.goalMet(.mp100)])
+        XCTAssertEqual(HouseProgress.celebrations(from: 90, to: 600, goal: .mp100), [.goalMet(.mp100), .stage(.roof500)])
+        XCTAssertEqual(HouseProgress.celebrations(from: 600, to: 400, goal: .mp100), [])
     }
 
     func testHoursToNextMilestone() {
@@ -166,6 +195,7 @@ final class HouseProgressTests: XCTestCase {
 
         let done = p(751).accessibilityLabel
         XCTAssertTrue(done.contains("Every stage is built"), done)
+        XCTAssertTrue(p(500, .mp500).accessibilityLabel.contains("keys after 500 hours"))
         XCTAssertTrue(done.contains("based on your records"), done)
 
         XCTAssertTrue(p(499.6).accessibilityLabel.contains("1 hour to go"))
@@ -206,10 +236,10 @@ final class HouseProgressTests: XCTestCase {
         XCTAssertEqual(HouseKeyframe.k14_siding040.linesImageName, "bp_house_k14_siding040_lines")
         XCTAssertEqual(HouseKeyframe.allCases.map(\.manifestStage), [0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 4, 4, 4, 4, 4, 5])
         XCTAssertEqual(HouseKeyframe.confirmSequenceBase, .k14_siding040)
-        XCTAssertTrue(HouseKeyframe.k14_siding040.supportsConfirmBoard)
-        XCTAssertFalse(HouseKeyframe.k00_lot.supportsConfirmBoard)
-        XCTAssertFalse(HouseKeyframe.k04_frame030.supportsConfirmBoard)
-        XCTAssertFalse(HouseKeyframe.k18_finished.supportsConfirmBoard)
+        XCTAssertNotNil(HouseKeyframe.k15_siding060.confirmBoardOffset)
+        XCTAssertNil(HouseKeyframe.k00_lot.confirmBoardOffset)
+        XCTAssertNil(HouseKeyframe.k04_frame030.confirmBoardOffset)
+        XCTAssertNil(HouseKeyframe.k18_finished.confirmBoardOffset)
     }
 }
 

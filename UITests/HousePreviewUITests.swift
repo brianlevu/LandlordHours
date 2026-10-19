@@ -46,6 +46,7 @@ final class HousePreviewUITests: XCTestCase {
         let cont = app.buttons["milestone-continue"]
         XCTAssertTrue(cont.waitForExistence(timeout: 10), "the 500h celebration should open after the confirm")
         XCTAssertTrue(cont.isHittable)
+        XCTAssertTrue(app.buttons["milestone-share"].waitForExistence(timeout: 3), "celebrations carry Share")
         cont.tap()
         XCTAssertTrue(app.descendants(matching: .any)["house-hero"].waitForExistence(timeout: 5))
         XCTAssertFalse(cont.exists)

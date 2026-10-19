@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 // MARK: - House progress (pure logic)
 //
@@ -106,29 +107,57 @@ enum HouseMilestone: Int, CaseIterable, Comparable, Codable, Sendable {
         }
     }
 
-    /// "Foundation at 100h", "Roof at 500h", "Keys after 750h".
-    var label: String {
-        switch self {
-        case .foundation100: return "Foundation at 100h"
-        case .roof500: return "Roof at 500h"
-        case .keys750: return "Keys after 750h"
-        }
-    }
-
-    /// The same, in words VoiceOver reads well.
-    var spokenLabel: String {
-        switch self {
-        case .foundation100: return "foundation at 100 hours"
-        case .roof500: return "roof at 500 hours"
-        case .keys750: return "keys after 750 hours"
-        }
-    }
 
     static func < (lhs: HouseMilestone, rhs: HouseMilestone) -> Bool { lhs.rawValue < rhs.rawValue }
 }
 
-extension HouseMilestone: Identifiable {
-    var id: Int { rawValue }
+/// One step on the way to the goal, for the "next" label: a building stage or the goal's keys.
+struct HouseStep: Equatable, Sendable {
+    let thresholdHours: Double
+    /// True for "more than" tests (the keys, the finish); false for stages that land AT the hours.
+    let isStrict: Bool
+    let label: String
+    let spokenLabel: String
+
+    func isReached(by hours: Double) -> Bool { isStrict ? hours > thresholdHours : hours >= thresholdHours }
+
+    static let foundation = HouseStep(thresholdHours: 100, isStrict: false, label: "Foundation at 100h", spokenLabel: "foundation at 100 hours")
+    static let roof = HouseStep(thresholdHours: 500, isStrict: false, label: "Roof at 500h", spokenLabel: "roof at 500 hours")
+    static let finished = HouseStep(thresholdHours: 750, isStrict: true, label: "Finished after 750h", spokenLabel: "house finished after 750 hours")
+
+    static func keys(for goal: HouseGoal) -> HouseStep {
+        let t = Int(goal.targetHours)
+        return HouseStep(thresholdHours: goal.targetHours, isStrict: true, label: "Keys after \(t)h", spokenLabel: "keys after \(t) hours")
+    }
+
+    /// The steps in hour order. REPS: its keys are the finish.
+    static func steps(for goal: HouseGoal) -> [HouseStep] {
+        switch goal {
+        case .reps750: return [.foundation, .roof, keys(for: goal)]
+        case .mp500: return [.foundation, .roof, keys(for: goal), .finished]
+        case .mp100: return [.foundation, keys(for: goal), .roof, .finished]
+        }
+    }
+}
+
+/// A celebration screen: a building stage, or the goal's keys-in-the-door moment.
+enum HouseCelebration: Hashable, Identifiable, Sendable {
+    case stage(HouseMilestone)
+    case goalMet(HouseGoal)
+
+    var id: String {
+        switch self {
+        case .stage(let m): return "stage-\(m.rawValue)"
+        case .goalMet(let g): return "goal-\(g.rawValue)"
+        }
+    }
+
+    var thresholdHours: Double {
+        switch self {
+        case .stage(let m): return m.thresholdHours
+        case .goalMet(let g): return g.targetHours
+        }
+    }
 }
 
 /// The construction stage, for words and accessibility. Derived from the keyframe.
@@ -143,7 +172,7 @@ enum HouseStage: Int, CaseIterable, Comparable, Sendable {
         case .framing: return "Frame going up"
         case .roofed: return "Roof on"
         case .siding: return "Siding going up"
-        case .finished: return "Finished, keys in the door"
+        case .finished: return "House finished"
         }
     }
 
@@ -189,11 +218,44 @@ enum HouseKeyframe: String, CaseIterable, Sendable {
     /// The keyframe the confirm board sequence was registered against (manifest `confirm_row.base`).
     static let confirmSequenceBase: HouseKeyframe = .k14_siding040
 
-    /// True when the board sequence lands on built structure at this keyframe: the framing has
-    /// reached the course the board is registered to (frame 50%+) and the house is not finished.
-    /// Earlier keyframes (lot, slab, low frame) use the crossfade path instead of a floating board.
-    var supportsConfirmBoard: Bool {
-        index >= HouseKeyframe.k06_frame050.index && index <= HouseKeyframe.k17_siding100.index
+    /// Where the newest course of this keyframe sits in the 320 pt camera (unit coordinates):
+    /// the densest band of pixels that changed from the previous keyframe (measured from the
+    /// @3x light built passes, 2026-10-19). The confirm beam lands here and the glow pulses here.
+    var courseAnchor: CGPoint {
+        switch self {
+        case .k00_lot: return CGPoint(x: 0.50, y: 0.80)
+        case .k01_slab: return CGPoint(x: 0.39, y: 0.79)
+        case .k02_frame010: return CGPoint(x: 0.51, y: 0.65)
+        case .k03_frame020: return CGPoint(x: 0.53, y: 0.47)
+        case .k04_frame030: return CGPoint(x: 0.31, y: 0.53)
+        case .k05_frame040: return CGPoint(x: 0.31, y: 0.69)
+        case .k06_frame050: return CGPoint(x: 0.40, y: 0.52)
+        case .k07_frame060: return CGPoint(x: 0.54, y: 0.41)
+        case .k08_frame070: return CGPoint(x: 0.51, y: 0.31)
+        case .k09_frame080: return CGPoint(x: 0.32, y: 0.41)
+        case .k10_frame090: return CGPoint(x: 0.36, y: 0.48)
+        case .k11_frame100: return CGPoint(x: 0.40, y: 0.28)
+        case .k12_roof: return CGPoint(x: 0.42, y: 0.27)
+        case .k13_siding020: return CGPoint(x: 0.44, y: 0.67)
+        case .k14_siding040: return CGPoint(x: 0.44, y: 0.59)
+        case .k15_siding060: return CGPoint(x: 0.42, y: 0.53)
+        case .k16_siding080: return CGPoint(x: 0.57, y: 0.43)
+        case .k17_siding100: return CGPoint(x: 0.61, y: 0.57)
+        case .k18_finished: return CGPoint(x: 0.48, y: 0.65)
+        }
+    }
+
+    /// The board sequence rests at y ≈ 0.577 of the camera (its densest row). When a confirm
+    /// crosses INTO a siding keyframe, the board is shifted by this much (unit height) so it lands
+    /// on that keyframe's new course; nil where a siding board would be the wrong material
+    /// (lot, slab, framing, roof, the porch at 100% and the finish).
+    var confirmBoardOffset: CGFloat? {
+        switch self {
+        case .k13_siding020, .k14_siding040, .k15_siding060, .k16_siding080:
+            return courseAnchor.y - 0.577
+        default:
+            return nil
+        }
     }
 }
 
@@ -242,24 +304,34 @@ struct HouseProgress: Equatable, Sendable {
         }
     }
 
-    // MARK: Milestones
+    // MARK: Milestones and the goal's keys
+    //
+    // Building stages stay on the IRS thresholds (slab 100, roof 500, finished > 750) for every
+    // goal. The KEYS moment (keys in the door, windows lit) celebrates the owner's OWN goal: REPS
+    // gets it with the finished house (> 750), an MP-500 owner on the roofed house (> 500), an
+    // MP-100 owner at the slab (> 100). The house keeps building afterwards.
+
+    /// The next step on the way, in the order this goal meets them; nil when everything is done.
+    var nextStep: HouseStep? {
+        HouseStep.steps(for: goal).first { !$0.isReached(by: hours) }
+    }
 
     /// The next construction milestone not yet reached, or nil when the house is finished.
     var nextMilestone: HouseMilestone? {
         HouseMilestone.allCases.first { !$0.isReached(by: hours) }
     }
 
-    /// "Roof at 500h", or "House finished" past 750h.
+    /// "Roof at 500h", "Keys after 500h", or "House finished" when every step is done.
     var nextMilestoneLabel: String {
-        nextMilestone?.label ?? "House finished"
+        nextStep?.label ?? "House finished"
     }
 
-    /// Hours still to confirm before the next milestone; nil when finished. For the keys this is
-    /// the hours to pass 750 (a whole hour past it reads as "1h to go" at exactly 750).
+    /// Hours still to confirm before the next step; nil when done. A "more than" step at exactly
+    /// its threshold still needs an hour ("1h to go").
     var hoursToNextMilestone: Double? {
-        guard let next = nextMilestone else { return nil }
+        guard let next = nextStep else { return nil }
         let gap = next.thresholdHours - hours
-        return next == .keys750 ? max(gap, 0) + (gap <= 0 ? 1 : 0) : max(gap, 0)
+        return next.isStrict ? max(gap, 0) + (gap <= 0 ? 1 : 0) : max(gap, 0)
     }
 
     /// The goal's hour test, in the law's words: MORE than the target (750 / 500 / 100). The stage
@@ -271,6 +343,18 @@ struct HouseProgress: Equatable, Sendable {
     static func milestonesCrossed(from old: Double, to new: Double) -> [HouseMilestone] {
         guard new > old else { return [] }
         return HouseMilestone.allCases.filter { !$0.isReached(by: old) && $0.isReached(by: new) }
+    }
+
+    /// Celebrations a confirm earns, lowest first. The goal's keys replace the stage celebration
+    /// at the same threshold (REPS: the 750 finish IS the keys). The hero shows only the last.
+    static func celebrations(from old: Double, to new: Double, goal: HouseGoal) -> [HouseCelebration] {
+        guard new > old else { return [] }
+        var result: [HouseCelebration] = milestonesCrossed(from: old, to: new).map { .stage($0) }
+        if old <= goal.targetHours && new > goal.targetHours {
+            result.removeAll { $0 == .stage(goal.milestone) }
+            result.append(.goalMet(goal))
+        }
+        return result.sorted { $0.thresholdHours < $1.thresholdHours }
     }
 
     /// True when the change moves the house to a different keyframe.
@@ -292,7 +376,7 @@ struct HouseProgress: Equatable, Sendable {
         if isGoalMet {
             parts.append("Goal hours reached, based on your records.")
         }
-        if let next = nextMilestone, let toGo = hoursToNextMilestone {
+        if let next = nextStep, let toGo = hoursToNextMilestone {
             let toGoWords = Self.hoursWords(toGo)
             parts.append("Next, \(next.spokenLabel), \(toGoWords) to go.")
         } else {
