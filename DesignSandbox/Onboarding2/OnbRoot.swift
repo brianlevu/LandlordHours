@@ -28,6 +28,7 @@ struct OnbRoot: View {
 
                 OnbScene(flow: flow, step: flow.step)
                     .environment(\.colorScheme, scheme)      // light/dark house renders follow the app theme
+                    .dynamicTypeSize(.large)                  // decorative drawing; the sheet carries the readable copy
                     .frame(width: scene.width, height: scene.width)
                     .position(x: scene.midX, y: scene.midY)
 

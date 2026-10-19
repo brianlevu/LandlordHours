@@ -261,17 +261,20 @@ struct OnbCalendarStep: View {
                 .padding(.horizontal, 14)
                 .background(PC.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(PC.border, lineWidth: 1))
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: "checkmark.shield.fill")
-                        .foregroundStyle(PC.positive)
-                        .accessibilityHidden(true)
-                    Text("We read event titles on your phone. Nothing is saved until you confirm it.")
-                        .font(.subheadline)
-                        .foregroundStyle(PC.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
             }
         } actions: {
+            // Trust at the ask: pinned beside the button, never scrolled away.
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "checkmark.shield.fill")
+                    .foregroundStyle(PC.positive)
+                    .accessibilityHidden(true)
+                Text("We read event titles on your phone. Nothing is saved until you confirm it.")
+                    .font(.footnote)
+                    .foregroundStyle(PC.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 6)
             Button("Look at my calendar") { askCalendar() }
                 .buttonStyle(ProdPrimaryPill())
                 .accessibilityIdentifier("onb-primary")
