@@ -53,7 +53,10 @@ extension AppViewModel {
         let entryId = suggestion.entryId(profileId: profileId)
 
         if let existing = CaptureReconciler.confirmedEntry(for: suggestion, profileId: profileId, in: timeEntries)
-            ?? CaptureReconciler.legacyImportMatch(for: suggestion, in: timeEntries) {
+            ?? CaptureReconciler.legacyImportMatch(
+                for: suggestion, in: timeEntries,
+                excluding: store?.claimedEntryIds(excludingKey: suggestion.sourceKey) ?? []
+            ) {
             store?.markConfirmed(key: suggestion.sourceKey, entryId: existing.id)
             return .alreadyRecorded(entryId: existing.id)
         }
