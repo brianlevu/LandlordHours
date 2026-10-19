@@ -75,6 +75,8 @@ final class NotificationActionRouter {
         case mightAlreadyBeLogged
         case eventMoved
         case cannotVerify
+        /// Queued over a week waiting for iCloud; back in the inbox for review.
+        case queuedTooLong
     }
 
     enum Outcome: Equatable {
@@ -289,14 +291,29 @@ final class NotificationActionRouter {
     /// pull is still pending stays queued. Returns each key's outcome.
     @discardableResult
     func drainQueuedActions(now: Date = Date()) async -> [String: Outcome] {
-        CaptureActionQueue.prune(now: now, defaults: environment.defaults)
         guard environment.isProtectedDataAvailable(),
               let profileId = UserScope.userId,
               let store = host.suggestionStore else { return [:] }
-        let items = CaptureActionQueue.all(defaults: environment.defaults).filter { $0.profileId == profileId }
-        guard !items.isEmpty else { return [:] }
-        let gate = environment.pullGate(host)
         var outcomes: [String: Outcome] = [:]
+        // Waited too long (iCloud never finished): never dropped silently. The suggestion is
+        // still in the inbox; open it there and say so.
+        for item in CaptureActionQueue.takeExpired(profileId: profileId, now: now, defaults: environment.defaults) {
+            guard let suggestion = store.suggestion(forKey: item.sourceKey), suggestion.isPending else { continue }
+            switch item.kind {
+            case .confirm:
+                routeToEdit(item.sourceKey)
+                await environment.followUps.post(.queuedTooLong, for: suggestion, profileId: profileId)
+                outcomes[item.sourceKey] = .routedToEdit(.queuedTooLong)
+            case .dismiss:
+                host.performWrite(named: "LandlordHours.capture.dismiss") { model in
+                    model.dismiss(suggestion, reason: .notLandlordWork, store: store)
+                }
+                outcomes[item.sourceKey] = .dismissed
+            }
+        }
+        let items = CaptureActionQueue.all(defaults: environment.defaults).filter { $0.profileId == profileId }
+        guard !items.isEmpty else { return outcomes }
+        let gate = environment.pullGate(host)
         var wroteRecord = false
         for item in items {
             guard store.suggestion(forKey: item.sourceKey) != nil else {

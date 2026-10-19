@@ -7,7 +7,8 @@ private let schedulerLogger = Logger(subsystem: "com.openclaw.landlordhours", ca
 
 // MARK: - End-of-event scheduler
 //
-// One local notification per likely calendar suggestion, 5 minutes after the event ends:
+// One local notification per likely calendar suggestion, 5 minutes after the event ends
+// (an absolute-time trigger, rebuilt when the time zone changes):
 // "Plumber visit just ended. Log 2h at Pine Cabin?"
 //
 // Rules:
@@ -36,6 +37,7 @@ final class EndOfEventScheduler: CaptureNotifier {
     nonisolated static let identifierPrefix = "capture.end."
     nonisolated static let threadIdentifier = "landlordhours.capture"
     nonisolated static let fireAtKey = "fireAt"
+    nonisolated static let timeZoneKey = "timeZone"
     nonisolated static let logKey = "LandlordHours.capture.notificationLog"
 
     nonisolated static func identifier(forSourceKey key: String) -> String { identifierPrefix + key }
@@ -44,7 +46,9 @@ final class EndOfEventScheduler: CaptureNotifier {
     private let center: CaptureNotificationCenter
     private let isPhone: () -> Bool
     private let clock: () -> Date
-    private let calendar: Calendar
+    /// Read on every use, so a time-zone change (travel, DST) is picked up by the next rebuild.
+    private let calendarProvider: () -> Calendar
+    private var calendar: Calendar { calendarProvider() }
     private let defaults: UserDefaults
     private let propertyNames: () -> [UUID: String]
 
@@ -53,7 +57,7 @@ final class EndOfEventScheduler: CaptureNotifier {
         policy: Policy = Policy(),
         isPhone: @escaping () -> Bool = { UIDevice.current.userInterfaceIdiom == .phone },
         clock: @escaping () -> Date = Date.init,
-        calendar: Calendar = .current,
+        calendar: @escaping () -> Calendar = { Calendar.autoupdatingCurrent },
         defaults: UserDefaults = .standard,
         propertyNames: @escaping () -> [UUID: String] = { [:] }
     ) {
@@ -61,7 +65,7 @@ final class EndOfEventScheduler: CaptureNotifier {
         self.policy = policy
         self.isPhone = isPhone
         self.clock = clock
-        self.calendar = calendar
+        self.calendarProvider = calendar
         self.defaults = defaults
         self.propertyNames = propertyNames
     }
@@ -127,7 +131,7 @@ final class EndOfEventScheduler: CaptureNotifier {
         var toAdd: [UNNotificationRequest] = []
         var keep = Set<String>()
         for item in chosen {
-            let request = makeRequest(item, profileId: profileId)
+            let request = makeRequest(item, profileId: profileId, now: now)
             if let current = existingById[request.identifier], Self.isSame(current, request) {
                 keep.insert(request.identifier)
             } else {
@@ -206,7 +210,7 @@ final class EndOfEventScheduler: CaptureNotifier {
 
     // MARK: Content
 
-    func makeRequest(_ item: Planned, profileId: String) -> UNNotificationRequest {
+    func makeRequest(_ item: Planned, profileId: String, now: Date) -> UNNotificationRequest {
         let suggestion = item.suggestion
         let content = UNMutableNotificationContent()
         content.body = body(for: suggestion, fireDate: item.fireDate, deferred: item.deferred)
@@ -214,11 +218,14 @@ final class EndOfEventScheduler: CaptureNotifier {
         content.threadIdentifier = Self.threadIdentifier
         var info = CaptureNotificationAction.userInfo(profileId: profileId, sourceKey: suggestion.sourceKey)
         info[Self.fireAtKey] = item.fireDate.timeIntervalSince1970
+        // The zone the quiet hours and copy were computed in; a change forces a rebuild.
+        info[Self.timeZoneKey] = calendar.timeZone.identifier
         content.userInfo = info
         content.interruptionLevel = .active
 
-        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: item.fireDate)
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        // Absolute time, never wall-clock components: after a time-zone or DST change a
+        // calendar trigger would fire at the same local time, possibly before the event ends.
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, item.fireDate.timeIntervalSince(now)), repeats: false)
         return UNNotificationRequest(identifier: Self.identifier(forSourceKey: suggestion.sourceKey), content: content, trigger: trigger)
     }
 
@@ -266,6 +273,7 @@ final class EndOfEventScheduler: CaptureNotifier {
     private static func isSame(_ a: UNNotificationRequest, _ b: UNNotificationRequest) -> Bool {
         a.content.body == b.content.body
             && (a.content.userInfo[fireAtKey] as? TimeInterval) == (b.content.userInfo[fireAtKey] as? TimeInterval)
+            && (a.content.userInfo[timeZoneKey] as? String) == (b.content.userInfo[timeZoneKey] as? String)
             && (a.content.userInfo[NotificationPayload.profileIdKey] as? String) == (b.content.userInfo[NotificationPayload.profileIdKey] as? String)
     }
 

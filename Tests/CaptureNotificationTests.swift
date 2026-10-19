@@ -130,7 +130,7 @@ final class EndOfEventSchedulerTests: XCTestCase {
             center: center,
             isPhone: { [unowned self] in self.isPhone },
             clock: { [unowned self] in self.now },
-            calendar: calendar,
+            calendar: { [unowned self] in self.calendar },
             defaults: defaults,
             propertyNames: { [pineId] in [pineId: "Pine Cabin"] }
         )
@@ -169,7 +169,7 @@ final class EndOfEventSchedulerTests: XCTestCase {
     }
 
     private func fireDate(_ request: UNNotificationRequest) -> Date? {
-        (request.trigger as? UNCalendarNotificationTrigger).flatMap { calendar.date(from: $0.dateComponents) }
+        (request.content.userInfo[EndOfEventScheduler.fireAtKey] as? TimeInterval).map(Date.init(timeIntervalSince1970:))
     }
 
     func testFiresFiveMinutesAfterEndWithPlainCopyAndActions() async throws {
@@ -182,11 +182,63 @@ final class EndOfEventSchedulerTests: XCTestCase {
         XCTAssertEqual(request.content.categoryIdentifier, CaptureNotificationAction.categoryIdentifier)
         XCTAssertEqual(request.content.userInfo[NotificationPayload.profileIdKey] as? String, "p1")
         XCTAssertEqual(request.content.userInfo[NotificationPayload.sourceKeyKey] as? String, s.sourceKey)
-        XCTAssertTrue(request.trigger is UNCalendarNotificationTrigger)
+        let trigger = try XCTUnwrap(request.trigger as? UNTimeIntervalNotificationTrigger, "Absolute time, not wall-clock components")
+        XCTAssertEqual(trigger.timeInterval, date(2026, 3, 2, 12, 5).timeIntervalSince(now), accuracy: 0.5)
         XCTAssertEqual(fireDate(request), date(2026, 3, 2, 12, 5))
         for word in ["tax", "deduct", "IRS", "qualif"] {
             XCTAssertFalse(request.content.body.localizedCaseInsensitiveContains(word), "No tax claims in copy")
         }
+    }
+
+    func testAcrossDSTTheTriggerIsAbsoluteAndNeverEarly() async throws {
+        // US spring forward: 2026-03-08 02:00 PST → 03:00 PDT. "Now" is the evening before.
+        now = date(2026, 3, 7, 22)
+        let s = suggestion("DST", end: date(2026, 3, 8, 7))          // 07:05 PDT is quiet → 08:00 PDT
+        await makeScheduler().schedule([s], profileId: "p1")
+        let request = try XCTUnwrap(center.captureRequests.first)
+        let fire = try XCTUnwrap(fireDate(request))
+        XCTAssertEqual(fire, date(2026, 3, 8, 8))
+        let trigger = try XCTUnwrap(request.trigger as? UNTimeIntervalNotificationTrigger)
+        XCTAssertEqual(trigger.timeInterval, 9 * 3600, accuracy: 0.5, "22:00 PST → 08:00 PDT is 9 real hours, not 10")
+        XCTAssertGreaterThan(now.addingTimeInterval(trigger.timeInterval), s.end!)
+    }
+
+    func testTimeZoneChangeRebuildsWithNewQuietHours() async throws {
+        let scheduler = makeScheduler()
+        // 20:30 Los Angeles end → 20:35 prompt, outside quiet hours there.
+        let s = suggestion("TRAVEL", end: date(2026, 3, 2, 20, 30))
+        let endInstant = s.end!
+        await scheduler.schedule([s], profileId: "p1")
+        let before = try XCTUnwrap(center.captureRequests.first)
+        XCTAssertEqual(fireDate(before), endInstant.addingTimeInterval(300))
+        XCTAssertEqual(before.content.userInfo[EndOfEventScheduler.timeZoneKey] as? String, "America/Los_Angeles")
+
+        // The user flies to New York: the same instant is 23:35 there, inside quiet hours.
+        calendar.timeZone = TimeZone(identifier: "America/New_York")!
+        await scheduler.schedule([s], profileId: "p1")
+        XCTAssertEqual(center.captureRequests.count, 1, "Old request replaced, not kept")
+        let after = try XCTUnwrap(center.captureRequests.first)
+        XCTAssertEqual(after.content.userInfo[EndOfEventScheduler.timeZoneKey] as? String, "America/New_York")
+        XCTAssertEqual(fireDate(after), date(2026, 3, 3, 8), "08:00 New York time")
+        XCTAssertGreaterThan(fireDate(after)!, endInstant, "Never before the event ends")
+
+        // Same zone, same time: left alone.
+        let adds = center.addCount
+        await scheduler.schedule([s], profileId: "p1")
+        XCTAssertEqual(center.addCount, adds)
+    }
+
+    func testTimeZoneChangeAloneReplacesTheRequest() async throws {
+        // A mid-day event in a zone with the same offset logic: the absolute fire time is
+        // unchanged, but the zone differs, so the rebuild still replaces it.
+        let scheduler = makeScheduler()
+        let s = suggestion("TZ", end: date(2026, 3, 2, 12))
+        await scheduler.schedule([s], profileId: "p1")
+        let adds = center.addCount
+        calendar.timeZone = TimeZone(identifier: "America/Denver")!
+        await scheduler.schedule([s], profileId: "p1")
+        XCTAssertEqual(center.addCount, adds + 1)
+        XCTAssertEqual(center.captureRequests.count, 1)
     }
 
     func testAtMostTwoPerDay() async {
@@ -540,6 +592,34 @@ final class CaptureActionRouterTests: CaptureTestCase {
         XCTAssertTrue(CaptureActionQueue.all(defaults: defaults).isEmpty)
     }
 
+    func testQueuedTapOlderThanAWeekResurfacesInsteadOfVanishing() async {
+        let (host, viewModel, propertyId) = makeHost()
+        let s = calendarSuggestion(start: date(2026, 3, 2), propertyId: propertyId)
+        host.suggestionStore!.ingest([s], existingEntries: [], calendar: calendar)
+        let gate = FakePullGate()
+        gate.stateValue = .pending                       // iCloud never finished
+        let followUps = FakeFollowUps()
+        let router = NotificationActionRouter(host: host, environment: .testing(gate: gate, followUps: followUps, defaults: defaults))
+        let tappedAt = Date()
+        CaptureActionQueue.enqueue(QueuedCaptureAction(profileId: profileId, sourceKey: s.sourceKey, kind: .confirm, queuedAt: tappedAt),
+                                   defaults: defaults)
+        // Another profile's old tap is left for that profile.
+        CaptureActionQueue.enqueue(QueuedCaptureAction(profileId: "other", sourceKey: "cal:X", kind: .confirm,
+                                                       queuedAt: tappedAt.addingTimeInterval(-30 * 86_400)), defaults: defaults)
+
+        let sixDays = await router.drainQueuedActions(now: tappedAt.addingTimeInterval(6 * 86_400))
+        XCTAssertEqual(sixDays[s.sourceKey], .queued)
+        XCTAssertTrue(followUps.kinds.isEmpty)
+
+        let eightDays = await router.drainQueuedActions(now: tappedAt.addingTimeInterval(8 * 86_400))
+        XCTAssertEqual(eightDays[s.sourceKey], .routedToEdit(.queuedTooLong))
+        XCTAssertEqual(followUps.kinds, [.queuedTooLong], "The user is told, not left guessing")
+        XCTAssertEqual(UserDefaults.standard.string(forKey: CaptureNotificationAction.pendingEditKey), s.sourceKey)
+        XCTAssertTrue(host.suggestionStore!.suggestion(forKey: s.sourceKey)!.isPending, "Still in the inbox")
+        XCTAssertEqual(entryCount(viewModel, s), 0, "Never written without the pull")
+        XCTAssertEqual(CaptureActionQueue.all(defaults: defaults).map(\.profileId), ["other"])
+    }
+
     func testNoICloudDiscoveredDuringWaitConfirmsRightAway() async {
         let (host, viewModel, propertyId) = makeHost()
         let s = calendarSuggestion(start: date(2026, 3, 2), propertyId: propertyId)
@@ -659,6 +739,89 @@ final class CaptureNotificationRefresherTests: CaptureTestCase {
     }
 }
 
+private struct NoRemoteFlags: CaptureFlagRemoteSource {
+    func value(for flag: CaptureFlag) -> Bool? { nil }
+}
+
+@MainActor
+final class EventPromptOptInTests: CaptureTestCase {
+    func testUpgradeWithPermissionsGrantedGetsNoPromptsUntilOptedIn() async throws {
+        let suite = "optin-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let center = FakeCaptureNotificationCenter()      // notifications already allowed (1.x)
+        let (viewModel, propertyId) = makeViewModel()
+        let host = AppModelHost(viewModel: viewModel, backgroundTasks: FakeBackgroundTasks(), suggestionBaseDirectory: baseDir)
+        let start = Date().addingTimeInterval(3600)
+        var s = calendarSuggestion(start: start, propertyId: propertyId)
+        s.end = start.addingTimeInterval(3600)
+        host.suggestionStore!.ingest([s], existingEntries: [], calendar: calendar)
+        // A prompt left over from before (e.g. a beta build) is cleared too.
+        center.requests = [UNNotificationRequest(identifier: EndOfEventScheduler.identifierPrefix + "cal:OLD",
+                                                 content: UNMutableNotificationContent(), trigger: nil)]
+
+        let scheduler = EndOfEventScheduler(center: center, isPhone: { true }, defaults: defaults)
+        let refresher = CaptureNotificationRefresher(
+            scheduler: scheduler, host: { host },
+            flags: CaptureFlags(remote: NoRemoteFlags(), defaults: defaults),
+            isPhone: { true }, isProtectedDataAvailable: { true }, canDeliver: { true },
+            makeCoordinator: { store in
+                CalendarCaptureCoordinator(detector: CalendarDetector(source: FakeCalendarSource(access: .fullAccess)), store: store)
+            },
+            promptsEnabled: { CapturePromptConsent.isEnabled(profileId: $0, defaults: defaults) }
+        )
+
+        XCTAssertFalse(CapturePromptConsent.isEnabled(profileId: profileId, defaults: defaults), "Off by default")
+        await refresher.refresh(reason: "launch")
+        XCTAssertTrue(center.captureRequests.isEmpty, "Calendar + notifications granted, but no opt-in: no prompts")
+
+        CapturePromptConsent.set(true, profileId: profileId, defaults: defaults)
+        await refresher.refresh(reason: "opt-in")
+        XCTAssertEqual(center.captureRequests.map(\.identifier), [EndOfEventScheduler.identifier(forSourceKey: s.sourceKey)])
+
+        CapturePromptConsent.set(false, profileId: profileId, defaults: defaults)
+        await refresher.refresh(reason: "opt-out")
+        XCTAssertTrue(center.captureRequests.isEmpty, "Opting out clears pending prompts")
+    }
+
+    func testViewModelSetterIsPerProfileAndDefaultsOff() {
+        let (viewModel, _) = makeViewModel()
+        XCTAssertFalse(viewModel.eventPromptsEnabled)
+        viewModel.eventPromptsEnabled = true
+        XCTAssertTrue(CapturePromptConsent.isEnabled(profileId: profileId))
+        XCTAssertFalse(CapturePromptConsent.isEnabled(profileId: "another-profile"))
+        AppViewModel.clearScopedAccountData(for: profileId)
+        XCTAssertFalse(viewModel.eventPromptsEnabled, "Cleared with the profile")
+    }
+}
+
+final class InitialPullStateTests: XCTestCase {
+    func testOnlyADefiniteNoICloudSkipsTheWait() {
+        func state(checked: Bool = true, available: Bool = false, unknown: Bool = false, running: Bool = false) -> InitialPullState {
+            CloudKitSyncService.pullState(completed: false, cloudKitAvailable: true, accountChecked: checked,
+                                          accountAvailable: available, accountStatusUnknown: unknown,
+                                          isRunningInitialSync: running)
+        }
+        XCTAssertEqual(state(), .notApplicable, "iCloud definitely off")
+        XCTAssertEqual(state(unknown: true), .pending, "Network error while checking: wait and queue")
+        XCTAssertEqual(state(checked: false), .pending)
+        XCTAssertEqual(state(available: true), .pending)
+        XCTAssertEqual(state(running: true), .pending)
+        XCTAssertEqual(CloudKitSyncService.pullState(completed: true, cloudKitAvailable: true, accountChecked: true,
+                                                     accountAvailable: true, accountStatusUnknown: false,
+                                                     isRunningInitialSync: false), .completed)
+        XCTAssertEqual(CloudKitSyncService.pullState(completed: false, cloudKitAvailable: false, accountChecked: false,
+                                                     accountAvailable: false, accountStatusUnknown: false,
+                                                     isRunningInitialSync: false), .notApplicable)
+    }
+
+    func testBackgroundWaitIsCappedWellUnderThirtySeconds() {
+        let env = CaptureActionEnvironment(isProtectedDataAvailable: { true }, eventChecker: FakeEventChecker(),
+                                           pullGate: { _ in FakePullGate() }, followUps: FakeFollowUps(), notifier: nil)
+        XCTAssertLessThanOrEqual(env.pullWaitTimeout, 8)
+    }
+}
+
 // MARK: - Push changed records only
 
 @MainActor
@@ -686,10 +849,91 @@ final class SyncPushChangedOnlyTests: CaptureTestCase {
         return (viewModel, service, propertyId)
     }
 
+    /// Record names sent as deletes by `push`.
+    private var deleted: [String] = []
+
     private func push(_ service: CloudKitSyncService) async throws -> [CKRecord] {
         var sent: [CKRecord] = []
-        try await service.pushChangedRecords { sent = $0 }
+        var gone: [String] = []
+        try await service.pushChangedRecords(save: { sent = $0 }, delete: { gone += $0.map(\.recordName) })
+        deleted += gone
         return sent
+    }
+
+    func testOfflineDeleteIsPushedLaterAndNeverResurrects() async throws {
+        let (viewModel, service, _) = makeModel()
+        _ = try await push(service)
+        let entry = viewModel.timeEntries[0]
+        viewModel.deleteTimeEntry(entry)
+        await service.deleteEntryFromCloud(entry)   // offline in tests: the delete can't reach iCloud
+        XCTAssertEqual(service.changeTracker!.pendingDeletes, [entry.id.uuidString], "Tombstone kept")
+
+        // A failed delete keeps the tombstone.
+        struct Boom: Error {}
+        do {
+            try await service.pushChangedRecords(save: { _ in }, delete: { _ in throw Boom() })
+            XCTFail("Expected the delete to throw")
+        } catch {}
+        XCTAssertEqual(service.changeTracker!.pendingDeletes, [entry.id.uuidString])
+
+        // Survives relaunch.
+        let reopened = SyncChangeTracker(userId: profileId, baseDirectory: trackerDir)
+        XCTAssertEqual(reopened.pendingDeletes, [entry.id.uuidString])
+
+        // Next sync sends the delete and clears it.
+        deleted = []
+        let saved = try await push(service)
+        XCTAssertEqual(deleted, [entry.id.uuidString])
+        XCTAssertTrue(saved.isEmpty)
+        XCTAssertTrue(service.changeTracker!.pendingDeletes.isEmpty)
+    }
+
+    func testReAddedRecordCancelsItsTombstone() async throws {
+        let (viewModel, service, _) = makeModel()
+        _ = try await push(service)
+        let entry = viewModel.timeEntries[0]
+        await service.deleteEntryFromCloud(entry)
+        // Same id is still (or again) local, e.g. a re-confirmed suggestion.
+        deleted = []
+        let saved = try await push(service)
+        XCTAssertTrue(deleted.isEmpty, "Never delete a record that exists locally")
+        XCTAssertEqual(saved.map(\.recordID.recordName), [entry.id.uuidString])
+        XCTAssertTrue(service.changeTracker!.pendingDeletes.isEmpty)
+    }
+
+    func testResetBaselinesReuploadsEverythingButKeepsTombstones() async throws {
+        let (_, service, _) = makeModel()
+        _ = try await push(service)
+        service.changeTracker!.addTombstones(["GONE-1"])
+        service.resetSyncBaselines()
+        deleted = []
+        let saved = try await push(service)
+        XCTAssertEqual(saved.count, service.allLocalRecords().count, "Account change / zone gone: everything re-uploads")
+        XCTAssertEqual(deleted, ["GONE-1"])
+    }
+
+    func testZoneGoneErrorsAreRecognized() {
+        XCTAssertTrue(CloudKitSyncService.isZoneGone(CKError(.zoneNotFound)))
+        XCTAssertTrue(CloudKitSyncService.isZoneGone(CKError(.userDeletedZone)))
+        XCTAssertFalse(CloudKitSyncService.isZoneGone(CKError(.networkFailure)))
+        XCTAssertFalse(CloudKitSyncService.isZoneGone(NSError(domain: "x", code: 1)))
+    }
+
+    func testProfileDeleteRemovesBaselines() async throws {
+        let (_, service, _) = makeModel()
+        _ = try await push(service)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: service.changeTracker!.fileURL.path))
+        SyncChangeTracker.removeAll(forUserId: profileId, baseDirectory: trackerDir)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: service.changeTracker!.fileURL.path))
+    }
+
+    func testLegacyBaselineFileWithoutTombstonesStillLoads() throws {
+        let dir = SuggestionStore.directory(forUserId: profileId, baseDirectory: trackerDir)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data(#"{"version":1,"fingerprints":{"A":"x"}}"#.utf8).write(to: dir.appendingPathComponent("pushed-fingerprints.json"))
+        let tracker = SyncChangeTracker(userId: profileId, baseDirectory: trackerDir)
+        XCTAssertTrue(tracker.hasBaseline(for: "A"))
+        XCTAssertTrue(tracker.pendingDeletes.isEmpty)
     }
 
     func testFirstPushSendsEverythingThenOnlyChanges() async throws {
@@ -768,7 +1012,7 @@ final class SyncPushChangedOnlyTests: CaptureTestCase {
         let (_, service, _) = makeModel()
         struct Boom: Error {}
         do {
-            try await service.pushChangedRecords { _ in throw Boom() }
+            try await service.pushChangedRecords(save: { _ in throw Boom() }, delete: { _ in })
             XCTFail("Expected the save to throw")
         } catch {}
         let retry = try await push(service)

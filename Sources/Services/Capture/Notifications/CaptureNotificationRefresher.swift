@@ -25,6 +25,7 @@ final class CaptureNotificationRefresher {
     private let isProtectedDataAvailable: () -> Bool
     private let canDeliver: () async -> Bool
     private let makeCoordinator: (SuggestionStore) -> CalendarCaptureCoordinator
+    private let promptsEnabled: (String) -> Bool
 
     private var inFlight: Task<Void, Never>?
     /// Test seam: completed runs.
@@ -37,8 +38,10 @@ final class CaptureNotificationRefresher {
         isPhone: @escaping () -> Bool = { UIDevice.current.userInterfaceIdiom == .phone },
         isProtectedDataAvailable: @escaping () -> Bool = { UIApplication.shared.isProtectedDataAvailable },
         canDeliver: (() async -> Bool)? = nil,
-        makeCoordinator: ((SuggestionStore) -> CalendarCaptureCoordinator)? = nil
+        makeCoordinator: ((SuggestionStore) -> CalendarCaptureCoordinator)? = nil,
+        promptsEnabled: @escaping (String) -> Bool = { CapturePromptConsent.isEnabled(profileId: $0) }
     ) {
+        self.promptsEnabled = promptsEnabled
         let scheduler = scheduler ?? EndOfEventScheduler(propertyNames: {
             Dictionary(AppModelHost.shared.viewModel.properties.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
         })
@@ -54,13 +57,22 @@ final class CaptureNotificationRefresher {
         }
     }
 
-    /// One run at a time; a call while a run is in flight joins it.
+    private var rerunRequested = false
+
+    /// One run at a time. A call while a run is in flight asks for one more run after it (so a
+    /// change made mid-run, like opting in, is never missed) and waits for both.
     func refresh(reason: String) async {
         if let inFlight {
+            rerunRequested = true
             await inFlight.value
             return
         }
-        let task = Task { await self.run(reason: reason) }
+        let task = Task {
+            repeat {
+                self.rerunRequested = false
+                await self.run(reason: reason)
+            } while self.rerunRequested
+        }
         inFlight = task
         await task.value
         inFlight = nil
@@ -78,6 +90,11 @@ final class CaptureNotificationRefresher {
             return
         }
         guard flags.isEnabled(.autoCapture) else {
+            await scheduler.removeAllPending()
+            return
+        }
+        // Opt-in: no event-ended prompts until this profile turned them on.
+        guard promptsEnabled(profileId) else {
             await scheduler.removeAllPending()
             return
         }

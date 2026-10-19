@@ -25,6 +25,9 @@ final class SyncChangeTracker {
         var version = 1
         /// recordName → fingerprint of the content the server is known to hold.
         var fingerprints: [String: String] = [:]
+        /// Records deleted locally whose iCloud delete hasn't been confirmed (tombstones).
+        /// Optional so files written before tombstones existed still decode.
+        var pendingDeletes: [String]?
     }
 
     /// Fields rewritten on every build of the record (single-record settings stamp
@@ -42,6 +45,11 @@ final class SyncChangeTracker {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         return appSupport.appendingPathComponent("Sync", isDirectory: true)
+    }
+
+    /// Profile delete: removes the profile's baselines and tombstones.
+    nonisolated static func removeAll(forUserId userId: String, baseDirectory: URL = defaultBaseDirectory) {
+        try? FileManager.default.removeItem(at: SuggestionStore.directory(forUserId: userId, baseDirectory: baseDirectory))
     }
 
     init(userId: String, baseDirectory: URL = SyncChangeTracker.defaultBaseDirectory) {
@@ -107,6 +115,39 @@ final class SyncChangeTracker {
         guard !recordNames.isEmpty else { return }
         for name in recordNames { contents.fingerprints[name] = nil }
         save()
+    }
+
+    /// Account change or zone deleted: every local record is re-uploaded on the next push.
+    /// Tombstones stay (a local delete must still reach iCloud).
+    func resetBaselines() {
+        contents.fingerprints = [:]
+        save()
+    }
+
+    // MARK: Tombstones
+
+    var pendingDeletes: [String] { contents.pendingDeletes ?? [] }
+
+    func addTombstones(_ recordNames: [String]) {
+        var set = pendingDeletes
+        for name in recordNames where !set.contains(name) { set.append(name) }
+        guard set != pendingDeletes else { return }
+        contents.pendingDeletes = set
+        save()
+    }
+
+    /// iCloud confirmed these deletes.
+    func clearTombstones(_ recordNames: [String]) {
+        let remove = Set(recordNames)
+        let remaining = pendingDeletes.filter { !remove.contains($0) }
+        guard remaining.count != pendingDeletes.count else { return }
+        contents.pendingDeletes = remaining.isEmpty ? nil : remaining
+        save()
+    }
+
+    /// Records that exist locally again are not deletes any more.
+    func cancelTombstones(for localRecordNames: Set<String>) {
+        clearTombstones(pendingDeletes.filter { localRecordNames.contains($0) })
     }
 
     /// Profile data deleted from iCloud: the next push starts from scratch.

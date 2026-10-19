@@ -22,6 +22,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     // MARK: End-of-event notifications (2.0)
 
     private var foregroundObserver: NSObjectProtocol?
+    private var timeZoneObserver: NSObjectProtocol?
 
     /// Registers the BGAppRefresh handler (must happen during launch), then rebuilds the
     /// end-of-event schedule now, on every foreground, and in background refreshes. Queued
@@ -45,6 +46,14 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                 await NotificationActionRouter(host: AppModelHost.shared).drainQueuedActions()
                 await CaptureNotificationRefresher.shared.refresh(reason: "foreground")
                 CaptureNotificationRefresher.scheduleBackgroundRefresh()
+            }
+        }
+        // Travel or a DST switch moves quiet hours and "yesterday" in the copy: rebuild.
+        timeZoneObserver = NotificationCenter.default.addObserver(
+            forName: .NSSystemTimeZoneDidChange, object: nil, queue: .main
+        ) { _ in
+            Task { @MainActor in
+                await CaptureNotificationRefresher.shared.refresh(reason: "time-zone")
             }
         }
         Task { @MainActor in

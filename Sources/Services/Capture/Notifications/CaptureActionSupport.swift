@@ -82,10 +82,29 @@ protocol InitialPullGating {
 
 extension CloudKitSyncService: InitialPullGating {
     func state(for profileId: String) -> InitialPullState {
-        if initialSyncCompletedFor == profileId { return .completed }
-        if !isCloudKitAvailable { return .notApplicable }
-        // Checked and iCloud is off: nothing will arrive until the user turns it on.
-        if accountStatusCheckCount > 0, !accountAvailable, !isRunningInitialSync { return .notApplicable }
+        Self.pullState(
+            completed: initialSyncCompletedFor == profileId,
+            cloudKitAvailable: isCloudKitAvailable,
+            accountChecked: accountStatusCheckCount > 0,
+            accountAvailable: accountAvailable,
+            accountStatusUnknown: accountStatusUnknown,
+            isRunningInitialSync: isRunningInitialSync
+        )
+    }
+
+    /// Only a definite "iCloud is off" means there is nothing to wait for. A failed or
+    /// inconclusive account check (network error) stays pending, so the confirm is queued.
+    nonisolated static func pullState(
+        completed: Bool,
+        cloudKitAvailable: Bool,
+        accountChecked: Bool,
+        accountAvailable: Bool,
+        accountStatusUnknown: Bool,
+        isRunningInitialSync: Bool
+    ) -> InitialPullState {
+        if completed { return .completed }
+        if !cloudKitAvailable { return .notApplicable }
+        if accountChecked, !accountAvailable, !accountStatusUnknown, !isRunningInitialSync { return .notApplicable }
         return .pending
     }
 
@@ -123,6 +142,8 @@ enum CaptureFollowUp: Equatable {
     case needsInput
     /// After "Not landlord work": offer to stop suggesting events like it.
     case offerMute
+    /// A queued "Log it" waited over a week (iCloud never finished): back in the inbox.
+    case queuedTooLong
 
     func body(title: String) -> String {
         let name = EndOfEventScheduler.shortTitle(title)
@@ -133,6 +154,7 @@ enum CaptureFollowUp: Equatable {
         case .cannotVerify: return "Couldn't check \(name) on your calendar. Tap to log it yourself."
         case .needsInput: return "\(name) needs a property or hours. Tap to finish logging it."
         case .offerMute: return "Got it. Stop suggesting events like \(name)?"
+        case .queuedTooLong: return "\(name) wasn't logged yet because iCloud didn't finish syncing. Tap to review it."
         }
     }
 
@@ -202,8 +224,14 @@ enum CaptureActionQueue {
         save(all(defaults: defaults).filter { !($0.profileId == profileId && $0.sourceKey == sourceKey) }, defaults: defaults)
     }
 
-    static func prune(now: Date = Date(), defaults: UserDefaults = .standard) {
-        save(all(defaults: defaults).filter { now.timeIntervalSince($0.queuedAt) < maxAge }, defaults: defaults)
+    /// Removes and returns this profile's items older than `maxAge`. The caller surfaces them
+    /// (never dropped silently); other profiles' items wait for their own drain.
+    static func takeExpired(profileId: String, now: Date = Date(), defaults: UserDefaults = .standard) -> [QueuedCaptureAction] {
+        let items = all(defaults: defaults)
+        let expired = items.filter { $0.profileId == profileId && now.timeIntervalSince($0.queuedAt) >= maxAge }
+        guard !expired.isEmpty else { return [] }
+        save(items.filter { !expired.contains($0) }, defaults: defaults)
+        return expired
     }
 
     static func save(_ items: [QueuedCaptureAction], defaults: UserDefaults = .standard) {
@@ -225,8 +253,9 @@ struct CaptureActionEnvironment {
     var followUps: CaptureFollowUpPosting
     /// Cancels pending notifications for keys resolved elsewhere (nil: nothing to cancel).
     var notifier: CaptureNotifier?
-    /// How long a "Log it" waits for the initial pull before queueing.
-    var pullWaitTimeout: TimeInterval = 20
+    /// How long a background "Log it" waits for the initial pull before queueing for the
+    /// foreground. iOS gives an action roughly 30 s; stay well inside it.
+    var pullWaitTimeout: TimeInterval = 8
     var defaults: UserDefaults = .standard
 
     @MainActor static var live: CaptureActionEnvironment {
