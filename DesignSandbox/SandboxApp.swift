@@ -68,7 +68,10 @@ struct LHDesignSandboxApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if let screen {
+                if let s2 = S2Route.requested {
+                    // Screens2 lane (DesignSandbox/Screens2): -LHScreen <name>
+                    S2Host(name: s2)
+                } else if let screen {
                     ScreenHost(screen: screen)
                 } else {
                     GalleryView()
