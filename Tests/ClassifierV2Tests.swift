@@ -194,7 +194,7 @@ final class ClassifierV2Tests: XCTestCase {
 
         let inspection = rules("Third party inspection", kind: .calendar)
         XCTAssertNotEqual(inspection.band, .unlikely, "Third party inspection stays visible")
-        XCTAssertFalse(inspection.evidence.contains("not landlord: party"))
+        XCTAssertTrue(inspection.evidence.contains("keyword: third party"), "\"third party\" cancels \"party\"")
         XCTAssertFalse(rules("Partyka roof repair", kind: .calendar).evidence.contains("not landlord: party"))
 
         // The same words still count against email.
