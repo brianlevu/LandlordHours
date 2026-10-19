@@ -145,7 +145,7 @@ struct S2Host: View {
     }
 }
 
-private struct TypeSizeOverride: ViewModifier {
+struct TypeSizeOverride: ViewModifier {
     func body(content: Content) -> some View {
         if let t = S2Route.typeSize { content.dynamicTypeSize(t) } else { content }
     }
@@ -169,7 +169,7 @@ struct OverToday<S: View>: View {
     var body: some View {
         Tabs(tab: .today) { S2Today(state: .confirm3) }
             .sheet(isPresented: $shown) {
-                sheet().presentationDetents([.large]).presentationBackground(LHB.canvas).interactiveDismissDisabled()
+                sheet().modifier(TypeSizeOverride()).presentationDetents([.large]).presentationBackground(LHB.canvas).interactiveDismissDisabled()
             }
     }
 }
@@ -179,7 +179,7 @@ struct OverProps<S: View>: View {
     @State private var shown = true
     var body: some View {
         Tabs(tab: .properties) { S2PropertiesList(state: .list) }
-            .sheet(isPresented: $shown) { sheet().presentationDetents([.large]).presentationBackground(LHB.canvas) }
+            .sheet(isPresented: $shown) { sheet().modifier(TypeSizeOverride()).presentationDetents([.large]).presentationBackground(LHB.canvas) }
     }
 }
 
@@ -188,7 +188,7 @@ struct OverSettings<S: View>: View {
     @State private var shown = true
     var body: some View {
         S2Settings(pro: true)
-            .sheet(isPresented: $shown) { sheet().presentationDetents([.medium, .large]).presentationBackground(LHB.canvas) }
+            .sheet(isPresented: $shown) { sheet().modifier(TypeSizeOverride()).presentationDetents([.medium, .large]).presentationBackground(LHB.canvas) }
     }
 }
 

@@ -449,7 +449,7 @@ struct S2DeleteAll: View {
             // Fill: a destructive overlay revealed left → right (clip, not width, so text stays put).
             ZStack {
                 Capsule().fill(LHB.destructive)
-                label.foregroundStyle(.white)
+                label.foregroundStyle(Color(light: 0xFFFFFF, dark: 0x0B1230))
             }
             .mask(alignment: .leading) {
                 GeometryReader { g in Rectangle().frame(width: g.size.width * progress) }
@@ -458,13 +458,12 @@ struct S2DeleteAll: View {
         .overlay(Capsule().strokeBorder(LHB.destructive, lineWidth: 1.5))
         .frame(height: 52)
         .scaleEffect(holding && !reduce ? 0.98 : 1)
-        .animation(.easeOut(duration: 0.12), value: holding)
         .contentShape(Capsule())
         .onLongPressGesture(minimumDuration: 1.5, maximumDistance: 40) {
             doneTick += 1
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { done = true }
         } onPressingChanged: { pressing in
-            holding = pressing
+            withAnimation(.easeOut(duration: 0.12)) { holding = pressing }
             if pressing {
                 startTick += 1
                 withAnimation(.linear(duration: 1.5)) { progress = 1 }

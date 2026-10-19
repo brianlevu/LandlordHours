@@ -68,6 +68,7 @@ struct LogTimeSheet: View {
                 case .property: PropertyPicker(selected: property?.id ?? S2Data.pine.id, atLimit: limitPicker)
                 }
             }
+            .modifier(TypeSizeOverride())
             .presentationDetents(k == .category ? [.large] : [.medium, .large])
             .presentationBackground(LHB.canvas)
         }
@@ -253,12 +254,15 @@ struct LogTimeSheet: View {
     }
 
     private func valueRow<V: View>(_ label: String, flashOn: Bool, @ViewBuilder value: () -> V) -> some View {
-        HStack {
-            Text(label).foregroundStyle(LHB.textPrimary)
-            Spacer(minLength: 12)
+        let stack = dts.isAccessibilitySize
+        let layout = stack ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6)) : AnyLayout(HStackLayout())
+        return layout {
+            Text(label).foregroundStyle(stack ? LHB.textSecondary : LHB.textPrimary)
+            if !stack { Spacer(minLength: 12) }
             value()
         }
-        .padding(.horizontal, 16).frame(minHeight: 52)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16).padding(.vertical, stack ? 10 : 0).frame(minHeight: 52)
         .background(LHB.timber.opacity(flashOn ? flash : 0))
     }
 
