@@ -8,6 +8,11 @@ enum PropsState: String { case list, twelve, twelveBottom, empty, limit, loading
 struct S2PropertiesList: View {
     var state: PropsState = .list
     var openDetail: S2Property? = nil
+    /// Material participation without a grouping election: the 500h test is per property, so the
+    /// row can say "212h of 500h". Otherwise it says "212h this year" and the house is a stage.
+    var perPropertyGoal = false
+    var showInfo = false
+    @State private var infoShown = false
     var onUnlock: () -> Void = {}
 
     @Environment(\.dynamicTypeSize) private var dts
@@ -54,21 +59,42 @@ struct S2PropertiesList: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .center) {
                 DisplayTitle(text: "Properties")
+                Spacer()
+                if !props.isEmpty {
+                    Button { } label: { Label("Add property", systemImage: "plus") }
+                        .buttonStyle(S2Tinted())
+                }
+            }
+            VStack(alignment: .leading, spacing: 4) {
                 if state == .loading {
                     PlaceholderBar(width: 170, height: 14).padding(.top, 4)
                 } else if !props.isEmpty {
                     let total = props.reduce(0) { $0 + $1.hours }
-                    Text("\(props.count) \(props.count == 1 ? "rental" : "rentals") · \(Int(total))h this year")
-                        .font(.subheadline).foregroundStyle(LHB.textSecondary)
+                    HStack(spacing: 6) {
+                        Text("\(props.count) \(props.count == 1 ? "rental" : "rentals") · \(Int(total))h this year")
+                            .font(.subheadline).foregroundStyle(LHB.textSecondary)
+                        if !perPropertyGoal {
+                            Button { infoShown = true } label: {
+                                Image(systemName: "info.circle").font(.subheadline).foregroundStyle(LHB.action)
+                                    .frame(width: 32, height: 32).contentShape(Rectangle())
+                            }
+                            .accessibilityLabel("About the house stages")
+                            .popover(isPresented: $infoShown, arrowEdge: .top) {
+                                Text("Stages follow the 500-hour test for a single property.")
+                                    .font(.subheadline).foregroundStyle(LHB.textPrimary)
+                                    .padding(14).frame(width: 260)
+                                    .presentationCompactAdaptation(.popover)
+                            }
+                        }
+                    }
                 }
             }
-            Spacer()
-            GlassClose(systemName: "plus", label: "Add property").padding(.top, 2)
         }
         .padding(.horizontal, 4)
+        .onAppear { if showInfo { DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { infoShown = true } } }
     }
 
     private var search: some View {
@@ -85,7 +111,7 @@ struct S2PropertiesList: View {
     private var listCard: some View {
         VStack(spacing: 0) {
             ForEach(Array(props.enumerated()), id: \.element.id) { i, p in
-                NavigationLink(value: p) { S2PropertyRow(p: p) }
+                NavigationLink(value: p) { S2PropertyRow(p: p, perPropertyGoal: perPropertyGoal) }
                     .buttonStyle(.plain)
                     .contextMenu {
                         Button("Edit", systemImage: "pencil") {}
@@ -95,7 +121,7 @@ struct S2PropertiesList: View {
                 if i < props.count - 1 || state == .limit { InsetDivider(leading: 16 + 40 + 12) }
             }
             if state == .limit {
-                LockedPreview(size: .row, line: "Free covers one rental.", onUnlock: onUnlock) {
+                LockedPreview(size: .row, line: "Free covers one rental.", keeps: "Pine Cabin keeps tracking. Nothing is lost.", onUnlock: onUnlock) {
                     HStack(spacing: 12) {
                         PropertySeal(monogram: "", size: 40, dashed: true)
                         VStack(alignment: .leading, spacing: 2) {
@@ -145,6 +171,7 @@ struct S2PropertiesList: View {
 
 struct S2PropertyRow: View {
     let p: S2Property
+    var perPropertyGoal = false
     @Environment(\.dynamicTypeSize) private var dts
 
     var body: some View {
@@ -153,7 +180,7 @@ struct S2PropertyRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(p.name).font(.body.weight(.semibold)).foregroundStyle(LHB.textPrimary).lineLimit(dts.isAccessibilitySize ? 4 : 2)
                     .multilineTextAlignment(.leading)
-                Text("\(houseLine(p.hours)) · \(p.kindLabel)").font(.subheadline).foregroundStyle(LHB.textSecondary)
+                Text("\(perPropertyGoal ? houseLine(p.hours) : "\(Int(p.hours))h this year") · \(p.kindMeta)").font(.subheadline).foregroundStyle(LHB.textSecondary)
                     .monospacedDigit()
             }
             Spacer(minLength: 8)
@@ -279,7 +306,7 @@ struct S2PropertyDetail: View {
                 }
                 .padding(.top, 4)
                 Text("\(p.entries) entries · last on \(p.last)").font(.subheadline).foregroundStyle(LHB.onHeroSecondary)
-                Text(p.hours >= 500 ? "Roof’s on: past the 500h line" : "\(Int(p.hours))h of the 500h line")
+                Text(houseStage(p.hours))
                     .font(.footnote.weight(.semibold)).foregroundStyle(p.hours >= 500 ? LHB.positiveOnHero : .white)
             }
             .padding(20)

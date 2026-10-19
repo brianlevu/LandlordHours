@@ -31,7 +31,7 @@ final class Screens2DemoTests: XCTestCase {
     }
 
     func testTodaySwipe() {
-        let app = launch("today-confirm")
+        let app = launch("today-swipe")
         let row = app.descendants(matching: .any)["today.row.plumber"]
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         sleep(2)
@@ -43,7 +43,7 @@ final class Screens2DemoTests: XCTestCase {
         a.press(forDuration: 0.05, thenDragTo: b, withVelocity: 300, thenHoldForDuration: 0.15)
         sleep(3)
         // Trailing swipe: not work, with the Undo toast.
-        let row2 = app.descendants(matching: .any)["today.row.sam"]
+        let row2 = app.descendants(matching: .any)["today.row.showing"]
         XCTAssertTrue(row2.waitForExistence(timeout: 5))
         let c = row2.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
         let d = row2.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))

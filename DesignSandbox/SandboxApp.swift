@@ -85,7 +85,7 @@ struct LHDesignSandboxApp: App {
             }
             .tint(LH.action)
             .environment(\.requestedScheme, scheme)
-            .preferredColorScheme(screen == .paywall || (LHConcept.current == .blueprint && [.conceptWelcome, .conceptMilestone, .conceptBackfill].contains(screen)) ? .dark : scheme)
+            .preferredColorScheme(screen == .paywall || S2Route.requested?.hasPrefix("paywall") == true || (LHConcept.current == .blueprint && [.conceptWelcome, .conceptMilestone, .conceptBackfill].contains(screen)) ? .dark : scheme)
         }
     }
 }

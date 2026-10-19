@@ -3,7 +3,7 @@ import SwiftUI
 // §2 Today, below the house. The hero is a static port of release/2.0 HouseHeroCard.
 
 enum TodayState: String {
-    case confirm3, confirmMore, caughtUp, caughtUpOff, noProperty, loading, timerRunning, draft, freeRecord, week, weekMid
+    case confirm3, confirmTop, confirmMore, caughtUp, caughtUpOff, noProperty, loading, timerRunning, draft, freeRecord, week, weekMid, timerDiscarded
 }
 
 struct S2Today: View {
@@ -16,6 +16,19 @@ struct S2Today: View {
     @State private var hours: Double = 212
     @State private var toast: String?
     @State private var bounceID: String?
+    @Environment(S2InboxCount.self) private var inbox: S2InboxCount?
+
+    /// One pending count drives the tab badge, the To confirm capsule and "Review all N".
+    private var startPending: Int {
+        switch state {
+        case .confirmMore: 8
+        case .caughtUp, .caughtUpOff, .noProperty, .loading: 0
+        default: 3
+        }
+    }
+    private var pending: Int { inbox?.pending ?? items.count }
+    /// Pace from the hero: 600h was the on-pace mark for Oct 19.
+    private var behindBy: Int { max(0, 600 - Int(hours)) }
 
     private var hasProperty: Bool { state != .noProperty }
 
@@ -24,7 +37,7 @@ struct S2Today: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     header.padding(.bottom, 20)
-                    TodayHero(hours: hasProperty ? hours : 0, status: hasProperty ? "Behind by 388h" : nil)
+                    TodayHero(hours: hasProperty ? hours : 0, status: hasProperty ? "Behind by \(behindBy)h" : nil)
                     if state == .timerRunning || state == .draft {
                         TimerTodayCard(running: state == .timerRunning).padding(.top, 12)
                     }
@@ -47,11 +60,13 @@ struct S2Today: View {
             .background(LHB.canvas.ignoresSafeArea())
             .overlay(alignment: .top) { TopEdgeFade() }
             .onAppear {
-                items = Array(S2Data.pending.prefix(state == .confirmMore ? 8 : 3))
+                items = Array(S2Data.pending.prefix(startPending))
+                inbox?.pending = startPending
+                if state == .timerDiscarded { toast = "Timer discarded" }
                 let target: String? = switch state {
                 case .week, .weekMid: "week"
                 case .freeRecord: "record"
-                case .confirm3, .confirmMore, .caughtUp, .caughtUpOff, .loading: "confirm"
+                case .confirm3, .confirmMore, .caughtUp, .caughtUpOff, .loading, .timerDiscarded: "confirm"
                 case .noProperty: "noprop"
                 default: nil
                 }
@@ -94,13 +109,13 @@ struct S2Today: View {
     @ViewBuilder private var toConfirm: some View {
         VStack(alignment: .leading, spacing: 10) {
             S2Header(title: "To confirm") {
-                if state == .confirm3 || state == .confirmMore, !items.isEmpty {
-                    Text("\(state == .confirmMore ? 8 : items.count)")
+                if pending > 0, !items.isEmpty {
+                    Text("\(pending)")
                         .font(.footnote.weight(.semibold)).monospacedDigit()
                         .foregroundStyle(LHB.action)
                         .padding(.horizontal, 8).frame(minHeight: 22)
                         .background(Capsule().fill(LHB.actionSurface))
-                        .contentTransition(.numericText(value: Double(items.count)))
+                        .contentTransition(.numericText(value: Double(pending)))
                     Spacer()
                     SeeAll()
                 }
@@ -122,8 +137,8 @@ struct S2Today: View {
                     .transition(.asymmetric(insertion: .opacity, removal: .opacity.combined(with: .scale(scale: 0.98, anchor: .top))))
                 if i < shown.count - 1 { InsetDivider(leading: 16 + 52 + 10 + 36 + 10) }
             }
-            if state == .confirmMore {
-                Button("Review all \(S2Data.pending.count)") {}
+            if pending > 3 {
+                Button("Review all \(pending)") {}
                     .buttonStyle(S2Tinted(fullWidth: true))
                     .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 16)
             }
@@ -222,7 +237,7 @@ struct S2Today: View {
     private var yourRecord: some View {
         VStack(alignment: .leading, spacing: 10) {
             S2Header("Your record")
-            LockedPreview(size: .card, line: "Your 212 hours, ready to export.", fold: 170, surface: LHB.card) {
+            LockedPreview(size: .card, line: "Your 212 hours, ready to export.", keeps: "Your record keeps growing; export unlocks with Pro.", fold: 170, surface: LHB.card) {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 12) {
                         Image(systemName: "doc.richtext").font(.system(size: 20)).foregroundStyle(LHB.action)
@@ -248,17 +263,35 @@ struct S2Today: View {
 
     private func log(_ s: S2Data.Suggestion) {
         withAnimation(S2Motion.collapse(reduce)) { items.removeAll { $0.id == s.id } }
-        withAnimation(reduce ? nil : .easeOut(duration: 0.6)) { hours += s.hours ?? 0 }
+        withAnimation(.snappy) { inbox?.pending = max(0, pending - 1) }
+        countUp(by: s.hours ?? 0)
         show("Logged \(hm(s.hours ?? 0)) at \(s.place ?? "Pine Cabin")")
     }
 
     private func dismiss(_ s: S2Data.Suggestion) {
         withAnimation(S2Motion.collapse(reduce)) { items.removeAll { $0.id == s.id } }
+        withAnimation(.snappy) { inbox?.pending = max(0, pending - 1) }
         show("Marked not work")
+    }
+
+    /// The hero counts up in whole-hour steps (Reduce Motion: jumps).
+    private func countUp(by delta: Double) {
+        let target = hours + delta
+        guard !reduce else { hours = target; return }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            let steps = max(1, Int(delta.rounded(.up)))
+            for i in 1...steps {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { hours = min(target, hours + 1) }
+                if i < steps { try? await Task.sleep(nanoseconds: 220_000_000) }
+            }
+            hours = target
+        }
     }
 
     private func show(_ t: String) {
         withAnimation { toast = t }
+        guard state != .timerDiscarded else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 4) { withAnimation { if toast == t { toast = nil } } }
     }
 }
@@ -555,7 +588,7 @@ struct TimerTodayCard: View {
                         .foregroundStyle(LHB.textPrimary)
                         Text("Repairs at Pine Cabin · started 10:25").font(.subheadline).foregroundStyle(LHB.textSecondary)
                     } else {
-                        Text("Timer ran 1h 12m at Oak Street Duplex").font(.headline).foregroundStyle(LHB.textPrimary)
+                        Text("Timer ran 1h 12m at Pine Cabin").font(.headline).foregroundStyle(LHB.textPrimary)
                         Text("Started 10:25. It stopped when you switched profiles at 11:40.")
                             .font(.subheadline).foregroundStyle(LHB.textSecondary).fixedSize(horizontal: false, vertical: true)
                     }

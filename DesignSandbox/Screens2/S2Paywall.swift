@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // §1a PaywallView(context:) — sell Pro by showing the record itself.
 
@@ -50,7 +51,16 @@ struct S2Paywall: View {
         }
     }
 
+    @Environment(\.colorScheme) private var windowScheme
+    @Environment(\.requestedScheme) private var requested
+
+    /// The window runs dark while the paywall is up (light status-bar text over the blue hero, in
+    /// both themes); the page itself keeps the user's scheme through its environment.
     var body: some View {
+        page.environment(\.colorScheme, requested ?? windowScheme)
+    }
+
+    private var page: some View {
         GeometryReader { g in
             let heroH = g.size.height * (big ? 0.30 : 0.46) + g.safeAreaInsets.top
             ScrollViewReader { proxy in
@@ -157,12 +167,14 @@ struct S2Paywall: View {
                 .fixedSize(horizontal: false, vertical: true)
             statusLine
             buyButton
-            Button(state == .restoring ? "Checking…" : "Restore purchase") {}
-                .font(.subheadline).foregroundStyle(LHB.action)
-                .frame(maxWidth: .infinity, minHeight: 32)
-                .overlay(alignment: .bottom) {
-                    if state == .restoring { DraftingLine(color: LHB.draftingInk).frame(width: 90).offset(y: -2) }
-                }
+            if state != .success {
+                Button(state == .restoring ? "Checking…" : "Restore purchase") {}
+                    .font(.subheadline).foregroundStyle(LHB.action)
+                    .frame(maxWidth: .infinity, minHeight: 32)
+                    .overlay(alignment: .bottom) {
+                        if state == .restoring { DraftingLine(color: LHB.draftingInk).frame(width: 90).offset(y: -2) }
+                    }
+            }
             if state == .restoreNone {
                 Text("No purchase found on this Apple Account.")
                     .font(.footnote).foregroundStyle(LHB.textSecondary).frame(maxWidth: .infinity)
@@ -302,9 +314,10 @@ struct RecordPage: View {
     private let rule = Color(hex: 0xD5DBEA)
 
     private var rows: [(String, String, String)] {
-        sample
-        ? [("Sample Cabin", "Long stays", "96.0"), ("Sample Duplex", "A few nights", "44.5")]
-        : [("Pine Cabin", "A few nights", "212.0"), ("Oak Street Duplex", "Long stays", "0.0")]
+        // A free user has one rental: the page shows only that one. The second row exists only
+        // as the cyan "new row" preview in the .secondProperty context.
+        let own = sample ? [("Sample Cabin", "Long stays", "140.5")] : [("Pine Cabin", "A few nights", "212.0")]
+        return highlight == .newRow ? own + [("Oak Street Duplex", "Long stays", "—")] : own
     }
 
     var body: some View {

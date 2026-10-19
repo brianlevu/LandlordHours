@@ -388,12 +388,20 @@ struct S2Property: Identifiable, Hashable {
     var last: String = "Oct 16"
     var liveHere = false
     var aliases: [String] = []
+    /// Creation order. The seal colour cycles through the 5 palettes by this, so neighbours differ
+    /// and a property keeps its colour (it never moves in creation order).
+    var order: Int = 0
 
     var kindLabel: String { longStays ? "Long stays" : "A few nights" }
+    /// Same words with non-breaking spaces, so a meta line never wraps "A / few nights".
+    var kindMeta: String { kindLabel.replacingOccurrences(of: " ", with: "\u{00A0}") }
+    /// Initials of the first two words, skipping "The", "A" and "An".
     var monogram: String {
-        let words = name.split(separator: " ").filter { $0.first?.isLetter == true }
+        let skip: Set<String> = ["the", "a", "an"]
+        let words = name.split(separator: " ")
+            .filter { $0.first?.isLetter == true && !skip.contains($0.lowercased()) }
         if words.count >= 2 { return String(words[0].prefix(1) + words[1].prefix(1)).uppercased() }
-        return String(name.prefix(2)).uppercased()
+        return String((words.first ?? Substring(name)).prefix(2)).uppercased()
     }
 }
 
@@ -423,7 +431,7 @@ struct PropertySeal: View {
     var dashed = false
 
     init(_ p: S2Property, size: CGFloat = 40) {
-        monogram = p.monogram; palette = SealPalette.forID(p.id); self.size = size
+        monogram = p.monogram; palette = SealPalette(rawValue: p.order % 5)!; self.size = size
     }
     init(monogram: String, palette: SealPalette = .blueprint, size: CGFloat = 40, dashed: Bool = false) {
         self.monogram = monogram; self.palette = palette; self.size = size; self.dashed = dashed
@@ -525,6 +533,15 @@ struct PropertyHouse: View {
             .clipShape(RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
             .accessibilityHidden(true)
     }
+}
+
+/// The mini-house stage in words (default wording; "212h of 500h" only for a per-property goal).
+func houseStage(_ h: Double) -> String {
+    if h < 1 { return "An empty lot" }
+    if h < 100 { return "Breaking ground" }
+    if h < 140 { return "Foundation poured" }
+    if h < 500 { return "Frame going up" }
+    return "Roof on"
 }
 
 /// "212h of 500h" — neutral, never "failing". Past the line: "520h · roof's on".
@@ -668,6 +685,8 @@ enum PaywallContext: Equatable {
 struct LockedPreview<Content: View>: View {
     let size: LockSize
     let line: String
+    /// What stays active while locked (Brian's paywall law): "Pine Cabin keeps tracking. Nothing is lost."
+    let keeps: String
     /// Sharp height from the top (page/card).
     var fold: CGFloat = 120
     var unlocked = false
@@ -721,11 +740,16 @@ struct LockedPreview<Content: View>: View {
 
     private var cta: some View {
         VStack(spacing: 12) {
-            Text(line)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(LHB.textPrimary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
+            VStack(spacing: 4) {
+                Text(line)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(LHB.textPrimary)
+                Text(keeps)
+                    .font(.footnote)
+                    .foregroundStyle(LHB.textSecondary)
+            }
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 24)
             Button(action: onUnlock) { Label("Unlock Pro", systemImage: "lock.fill") }
                 .buttonStyle(S2PrimaryCompact())
                 .accessibilityIdentifier("lock.unlock")
@@ -739,9 +763,12 @@ struct LockedPreview<Content: View>: View {
             if !unlocked {
                 let layout = dts.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))
                 layout {
-                    Text(line).font(.subheadline.weight(.semibold)).foregroundStyle(LHB.textPrimary)
-                        .lineLimit(3).fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(line).font(.subheadline.weight(.semibold)).foregroundStyle(LHB.textPrimary)
+                        Text(keeps).font(.footnote).foregroundStyle(LHB.textSecondary)
+                    }
+                    .lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     Button(action: onUnlock) { Label("Unlock Pro", systemImage: "lock.fill") }
                         .buttonStyle(S2PrimaryCompact()).fixedSize()
                         .accessibilityIdentifier("lock.unlock")

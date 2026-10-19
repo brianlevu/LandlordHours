@@ -3,7 +3,7 @@ import SwiftUI
 // §3 "+" Log time, voice, pickers and the timer.
 
 enum LogState: String {
-    case empty, typed, filled, keyboard, invalid, voiceFirst, listening, voiceFilled, voiceDenied, voiceDemo, review
+    case empty, quick, typed, filled, keyboard, invalid, voiceFirst, listening, voiceFilled, voiceDenied, voiceDemo, review
 }
 
 struct LogTimeSheet: View {
@@ -23,6 +23,7 @@ struct LogTimeSheet: View {
     @State private var who = 0
     @State private var flash = 0.0
     @State private var filledFromNote = false
+    @State private var rememberedCat = false
     @State private var listening = false
     @State private var showPicker: PickerKind?
     @FocusState private var focused: Bool
@@ -51,7 +52,7 @@ struct LogTimeSheet: View {
                 if isReview {
                     Text("Timer ran 1h 14m").font(.footnote).foregroundStyle(LHB.textSecondary).padding(.horizontal, 4)
                 }
-                HoursStepper(hours: $hours, flash: flash, label: "How long?")
+                HoursStepper(hours: $hours, flash: flash, label: "How long?", chips: true)
                 rows
             }
             .padding(.horizontal, 20)
@@ -76,7 +77,11 @@ struct LogTimeSheet: View {
     }
 
     private func setUp() {
+        // Speed defaults (≤4 taps for "2h at my only property": +, 2h, Log).
+        hours = 1; property = S2Data.pine; cat = .repairs; rememberedCat = true
         switch state {
+        case .quick:
+            hours = 2
         case .typed:
             note = sample
         case .filled, .voiceFilled:
@@ -86,13 +91,15 @@ struct LogTimeSheet: View {
             property = S2Data.oak; hours = 1.5
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focused = true }
         case .invalid:
-            note = "Tenant call about the lease renewal"; hours = 0.5; cat = .management
+            // A user with several rentals: nothing to preselect.
+            note = "Tenant call about the lease renewal"; hours = 0.5; cat = .management; property = nil; rememberedCat = false
         case .listening:
             listening = true; note = "Fixed the sink at Pine"
         case .voiceDemo:
+            property = nil; cat = nil; hours = 0; rememberedCat = false
             runVoiceDemo()
         case .review:
-            property = S2Data.pine; cat = .repairs; hours = 1.25
+            property = S2Data.pine; cat = .repairs; hours = 1.25; rememberedCat = false
         default: break
         }
         if let picker { DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { showPicker = picker } }
@@ -230,7 +237,13 @@ struct LogTimeSheet: View {
             valueRow("Category", flashOn: cat != nil) {
                 Button { showPicker = .category } label: {
                     HStack(spacing: 8) {
-                        if let cat { ToolTile(cat: cat, size: 24); Text(cat.label).foregroundStyle(LHB.textPrimary) }
+                        if let cat {
+                            ToolTile(cat: cat, size: 24)
+                            VStack(alignment: .trailing, spacing: 0) {
+                                Text(cat.label).foregroundStyle(LHB.textPrimary)
+                                if rememberedCat && !filledFromNote { Text("Last used").font(.caption).foregroundStyle(LHB.textSecondary) }
+                            }
+                        }
                         else { Text("Choose").foregroundStyle(LHB.action) }
                         Image(systemName: "chevron.up.chevron.down").font(.caption.weight(.semibold)).foregroundStyle(LHB.textTertiary)
                     }
@@ -304,7 +317,9 @@ struct HoursStepper: View {
     @Binding var hours: Double
     var flash = 0.0
     var label = "How long?"
+    var chips = false
     @Environment(\.accessibilityReduceMotion) private var reduce
+    private let presets: [(String, Double)] = [("30m", 0.5), ("1h", 1), ("2h", 2), ("4h", 4)]
 
     var body: some View {
         let m = Int((hours * 60).rounded())
@@ -329,6 +344,27 @@ struct HoursStepper: View {
                 step("plus") { hours = min(24, hours + 0.25) }
             }
             .padding(16)
+
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if chips {
+                    HStack(spacing: 8) {
+                        ForEach(presets, id: \.0) { p in
+                            let on = abs(hours - p.1) < 0.01
+                            Button { withAnimation(reduce ? nil : .spring(response: 0.28, dampingFraction: 0.9)) { hours = p.1 } } label: {
+                                Text(p.0).font(.subheadline.weight(.semibold)).monospacedDigit()
+                                    .foregroundStyle(on ? LHB.onAction : LHB.textPrimary)
+                                    .frame(maxWidth: .infinity, minHeight: 36)
+                                    .background(Capsule().fill(on ? LHB.action : LHB.tertiary))
+                                    .overlay(Capsule().strokeBorder(on ? Color.clear : LHB.border, lineWidth: 0.5))
+                            }
+                            .buttonStyle(S2Press())
+                            .accessibilityAddTraits(on ? .isSelected : [])
+                            .accessibilityIdentifier("log.chip.\(p.0)")
+                        }
+                    }
+                    .padding(.horizontal, 16).padding(.bottom, 14)
+                }
+            }
             .background(LHB.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .background(LHB.timber.opacity(flash), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(LHB.timber.opacity(flash)).allowsHitTesting(false))
@@ -461,7 +497,7 @@ struct PropertyPicker: View {
                         InsetDivider(leading: 60)
                     }
                     if atLimit {
-                        LockedPreview(size: .row, line: "Free covers one rental.") {
+                        LockedPreview(size: .row, line: "Free covers one rental.", keeps: "Pine Cabin keeps tracking. Nothing is lost.") {
                             HStack(spacing: 12) {
                                 PropertySeal(monogram: "OS", size: 32, dashed: true)
                                 Text("Oak Street Duplex").font(.body.weight(.semibold)).foregroundStyle(LHB.textPrimary)

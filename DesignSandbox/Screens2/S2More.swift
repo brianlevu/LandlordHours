@@ -13,7 +13,7 @@ struct S2ExportPage: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LockedPreview(size: .page, line: "This is the record your accountant gets.", fold: 236, unlocked: unlocked || !locked, onUnlock: onUnlock) {
+                LockedPreview(size: .page, line: "This is the record your accountant gets.", keeps: "Your record keeps growing; export unlocks with Pro.", fold: 236, unlocked: unlocked || !locked, onUnlock: onUnlock) {
                     VStack(alignment: .leading, spacing: 24) {
                         VStack(alignment: .leading, spacing: 14) {
                             HStack(spacing: 12) {
@@ -114,7 +114,7 @@ struct S2Settings: View {
                     section("Location") {
                         row("Pine Cabin", "On", seal: S2Data.pine)
                         InsetDivider(leading: 60)
-                        LockedPreview(size: .row, line: "Location for every rental.", onUnlock: onUnlock) {
+                        LockedPreview(size: .row, line: "Location for every rental.", keeps: "Pine Cabin keeps its location. Nothing is lost.", onUnlock: onUnlock) {
                             row("Oak Street Duplex", "Off", seal: S2Data.oak)
                         }
                     }
@@ -248,8 +248,11 @@ struct LimitConfirmSheet: View {
                         Text("Property"); Spacer()
                         Button { picker = true } label: {
                             HStack(spacing: 6) {
-                                Text("Choose").foregroundStyle(LHB.caution).fontWeight(.semibold)
-                                Image(systemName: "chevron.up.chevron.down").font(.caption.weight(.semibold)).foregroundStyle(LHB.caution)
+                                PropertySeal(monogram: "OS", size: 24, dashed: true)
+                                Text("Oak Street Duplex").foregroundStyle(LHB.textPrimary)
+                                Text("New").font(.footnote.weight(.semibold)).foregroundStyle(LHB.informational)
+                                    .padding(.horizontal, 6).padding(.vertical, 2)
+                                    .background(Capsule().fill(LHB.informationalSurface))
                             }
                         }
                     }
@@ -268,10 +271,21 @@ struct LimitConfirmSheet: View {
         }
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 10) {
-                Text("Free covers one rental. Was this at Pine Cabin? Pick it above.")
-                    .font(.subheadline).foregroundStyle(LHB.caution).multilineTextAlignment(.center)
-                Button("Log 1h") {}.buttonStyle(S2Primary()).disabled(true)
-                Button("Not landlord work") {}.foregroundStyle(LHB.destructive)
+                VStack(spacing: 2) {
+                    Text("Free covers one rental. This visit will wait in your inbox.")
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(LHB.textPrimary)
+                    Text("Pine Cabin keeps tracking. Nothing is lost.")
+                        .font(.footnote).foregroundStyle(LHB.textSecondary)
+                }
+                .multilineTextAlignment(.center)
+                Button {} label: { Label("Unlock Pro to add Oak Street", systemImage: "lock.fill") }
+                    .buttonStyle(S2Primary())
+                    .accessibilityIdentifier("limit.unlock")
+                HStack(spacing: 24) {
+                    Button("Keep it in my inbox") {}.foregroundStyle(LHB.action)
+                    Button("Not landlord work") {}.foregroundStyle(LHB.destructive)
+                }
+                .frame(minHeight: 44)
             }
             .padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 4)
             .background(LHB.canvas.ignoresSafeArea())
@@ -299,7 +313,7 @@ struct LimitPicker: View {
                 }
                 .padding(.horizontal, 16).frame(minHeight: 60)
                 InsetDivider(leading: 60)
-                LockedPreview(size: .row, line: "Free covers one rental.") {
+                LockedPreview(size: .row, line: "Free covers one rental.", keeps: "Pine Cabin keeps tracking. Nothing is lost.") {
                     HStack(spacing: 12) {
                         PropertySeal(monogram: "OS", size: 32, dashed: true)
                         VStack(alignment: .leading, spacing: 2) {

@@ -26,15 +26,15 @@ enum S2Route {
         "limit-row", "limit-sheet", "limit-picker", "limit-waiting",
         // Today below the house
         "today-confirm", "today-confirm-more", "today-caughtup", "today-caughtup-off", "today-noproperty", "today-loading",
-        "today-week", "today-week-midweek", "today-timer-running", "today-draft",
+        "today-week", "today-week-midweek", "today-timer-running", "today-draft", "today-swipe", "today-timer-discarded",
         // Log
         "log-empty", "log-typed", "log-filled", "log-keyboard", "log-invalid",
         "log-voice-first", "log-voice-listening", "log-voice-filled", "log-voice-denied", "log-voice-demo",
-        "log-picker-category", "log-picker-property", "log-picker-property-limit",
+        "log-picker-category", "log-picker-property", "log-picker-property-limit", "log-quick",
         // Timer
         "timer-idle", "timer-running", "timer-review",
         // Properties
-        "props-list", "props-12", "props-12-bottom", "props-empty", "props-loading", "props-limit",
+        "props-list", "props-list-mp", "props-list-info", "props-12", "props-12-bottom", "props-empty", "props-loading", "props-limit",
         "prop-detail", "prop-detail-lower", "prop-detail-520", "prop-add", "prop-edit", "prop-edit-delete",
         // Leftovers
         "restore", "restore-confirm", "delete-hold", "delete-hold-mid", "help", "help-filled", "learn", "learn-article",
@@ -48,7 +48,7 @@ struct S2Host: View {
     var body: some View {
         content
             .tint(LHB.action)
-            .preferredColorScheme(scheme)
+            .preferredColorScheme(name.hasPrefix("paywall") ? .dark : scheme)
             .modifier(TypeSizeOverride())
             .onAppear { S2Font.register() }
     }
@@ -85,15 +85,17 @@ struct S2Host: View {
         case "limit-waiting": Tabs(tab: .inbox) { S2InboxLimit(state: .waiting) }
         // Today
         case "today-confirm": Tabs(tab: .today) { S2Today(state: .confirm3) }
-        case "today-confirm-more": Tabs(tab: .today) { S2Today(state: .confirmMore) }
-        case "today-caughtup": Tabs(tab: .today) { S2Today(state: .caughtUp) }
-        case "today-caughtup-off": Tabs(tab: .today) { S2Today(state: .caughtUpOff) }
-        case "today-noproperty": Tabs(tab: .today) { S2Today(state: .noProperty) }
-        case "today-loading": Tabs(tab: .today) { S2Today(state: .loading) }
+        case "today-confirm-more": Tabs(tab: .today, pending: 8) { S2Today(state: .confirmMore) }
+        case "today-caughtup": Tabs(tab: .today, pending: 0) { S2Today(state: .caughtUp) }
+        case "today-caughtup-off": Tabs(tab: .today, pending: 0) { S2Today(state: .caughtUpOff) }
+        case "today-noproperty": Tabs(tab: .today, pending: 0) { S2Today(state: .noProperty) }
+        case "today-loading": Tabs(tab: .today, pending: 0) { S2Today(state: .loading) }
         case "today-week": Tabs(tab: .today) { S2Today(state: .week) }
         case "today-week-midweek": Tabs(tab: .today) { S2Today(state: .weekMid) }
         case "today-timer-running": Tabs(tab: .today) { S2Today(state: .timerRunning) }
         case "today-draft": Tabs(tab: .today) { S2Today(state: .draft) }
+        case "today-swipe": Tabs(tab: .today) { S2Today(state: .confirmTop) }
+        case "today-timer-discarded": Tabs(tab: .today) { S2Today(state: .timerDiscarded) }
         // Log
         case let n where n.hasPrefix("log-"): OverToday { logSheet(n) }
         case "timer-idle": OverToday { TimerSheet(state: .idle) }
@@ -101,10 +103,12 @@ struct S2Host: View {
         case "timer-review": OverToday { LogTimeSheet(state: .review) }
         // Properties
         case "props-list": Tabs(tab: .properties) { S2PropertiesList(state: .list) }
+        case "props-list-mp": Tabs(tab: .properties) { S2PropertiesList(state: .list, perPropertyGoal: true) }
+        case "props-list-info": Tabs(tab: .properties) { S2PropertiesList(state: .list, showInfo: true) }
         case "props-12": Tabs(tab: .properties) { S2PropertiesList(state: .twelve) }
         case "props-12-bottom": Tabs(tab: .properties) { S2PropertiesList(state: .twelveBottom) }
-        case "props-empty": Tabs(tab: .properties) { S2PropertiesList(state: .empty) }
-        case "props-loading": Tabs(tab: .properties) { S2PropertiesList(state: .loading) }
+        case "props-empty": Tabs(tab: .properties, pending: 0) { S2PropertiesList(state: .empty) }
+        case "props-loading": Tabs(tab: .properties, pending: 0) { S2PropertiesList(state: .loading) }
         case "props-limit": Tabs(tab: .properties) { S2PropertiesList(state: .limit) }
         case "prop-detail": NavigationStack { S2PropertyDetail(p: S2Data.pine) }
         case "prop-detail-lower": NavigationStack { S2PropertyDetail(p: S2Data.pine, scrolled: true) }
@@ -140,6 +144,7 @@ struct S2Host: View {
         case "log-picker-category": LogTimeSheet(state: .filled, picker: .category)
         case "log-picker-property": LogTimeSheet(state: .filled, picker: .property)
         case "log-picker-property-limit": LogTimeSheet(state: .filled, picker: .property, limitPicker: true)
+        case "log-quick": LogTimeSheet(state: .quick)
         default: LogTimeSheet(state: .empty)
         }
     }
@@ -196,12 +201,27 @@ struct OverSettings<S: View>: View {
 
 enum S2Tab: Hashable { case today, inbox, records, properties }
 
+/// The one pending count: tab badge, Today's To confirm capsule and "Review all N" all read it.
+@Observable final class S2InboxCount {
+    var pending: Int
+    init(_ n: Int) { pending = n }
+}
+
 struct Tabs<C: View>: View {
     let tab: S2Tab
-    @ViewBuilder var content: () -> C
+    @State private var inbox: S2InboxCount
+    let content: () -> C
+
+    init(tab: S2Tab, pending: Int = 3, @ViewBuilder content: @escaping () -> C) {
+        self.tab = tab
+        _inbox = State(initialValue: S2InboxCount(pending))
+        self.content = content
+    }
+
     var body: some View {
         content()
-            .overlay(alignment: .bottom) { S2TabBar(selection: tab, badge: tab == .inbox ? 3 : 8).ignoresSafeArea(.keyboard) }
+            .environment(inbox)
+            .overlay(alignment: .bottom) { S2TabBar(selection: tab, badge: inbox.pending).ignoresSafeArea(.keyboard) }
     }
 }
 
