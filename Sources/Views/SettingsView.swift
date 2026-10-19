@@ -870,9 +870,9 @@ struct SettingsView: View {
                 VStack(spacing: 22) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Settings")
-                            .font(.system(size: 34, weight: .black, design: .rounded))
+                            .lhDisplayFont(.largeTitle)
                             .foregroundStyle(colors.textPrimary)
-                            .minimumScaleFactor(0.82)
+                            .minimumScaleFactor(0.83)
                         Text("Manage your profile, tax setup, exports, and reminders.")
                             .font(.system(size: 15, weight: .medium, design: .rounded))
                             .foregroundStyle(colors.textSecondaryOnCanvas)
