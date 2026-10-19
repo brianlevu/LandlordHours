@@ -978,6 +978,67 @@ final class SyncPushChangedOnlyTests: CaptureTestCase {
         XCTAssertTrue(server.names.contains(edited.id.uuidString))
     }
 
+    func testAccountDeleteWaitsForInFlightPushAndBlocksLaterOnes() async throws {
+        let (viewModel, service, _) = makeModel()
+        let server = FakeServer()
+        var events: [String] = []
+        var release = false
+        var saveStarted = false
+        // Push A is mid-save when the user taps "Delete Account and Data".
+        let pushA = Task { @MainActor in
+            try await service.pushChangedRecords(
+                save: { records in
+                    saveStarted = true
+                    events.append("save-start")
+                    while !release { await Task.yield() }
+                    server.save(records)
+                    events.append("save-end")
+                },
+                delete: { server.delete($0) })
+        }
+        while !saveStarted { await Task.yield() }
+        // Push B is already queued behind A.
+        let pushB = Task { @MainActor in
+            try await service.pushChangedRecords(save: { server.save($0); events.append("B-saved") },
+                                                 delete: { server.delete($0) })
+        }
+        let deletion = Task { @MainActor in
+            await service.quiescePushes()
+            events.append("quiesced")
+            server.names.removeAll()                     // the account's records are deleted
+            events.append("deleted")
+        }
+        for _ in 0..<20 { await Task.yield() }
+        XCTAssertFalse(events.contains("quiesced"), "The delete waits for the push in flight")
+
+        release = true
+        _ = try await pushA.value
+        let sentByB = try await pushB.value
+        await deletion.value
+        XCTAssertEqual(events, ["save-start", "save-end", "quiesced", "deleted"])
+        XCTAssertTrue(sentByB.isEmpty, "A queued push sends nothing once deletion has started")
+
+        // Edits after the delete (or a debounced push) bring nothing back.
+        viewModel.addTimeEntry(propertyId: viewModel.properties[0].id, participant: .selfParticipant,
+                               category: .repairs, hours: 1, date: Date(), notes: "late")
+        service.schedulePush()
+        let late = try await service.pushChangedRecords(save: { server.save($0) }, delete: { server.delete($0) })
+        XCTAssertTrue(late.isEmpty)
+        XCTAssertTrue(server.names.isEmpty, "Nothing saved back after the account delete")
+        XCTAssertTrue(service.pushesBlocked)
+    }
+
+    func testFailedAccountDeleteUnblocksPushing() async {
+        let (viewModel, service, _) = makeModel()
+        do {
+            // No CloudKit container on the simulator: the delete throws after quiescing.
+            try await service.deleteCurrentUserRecords(properties: viewModel.properties, entries: viewModel.timeEntries,
+                                                       categories: [], userId: profileId)
+            XCTFail("Expected iCloud to be unavailable in tests")
+        } catch {}
+        XCTAssertFalse(service.pushesBlocked, "The data stayed, so syncing can resume")
+    }
+
     func testDeletingAPropertyAlsoDeletesItsEntriesInICloud() async throws {
         let (viewModel, service, propertyId) = makeModel()
         let server = FakeServer()

@@ -140,6 +140,9 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     /// push. Safe to call again (Sync Now, iCloud becoming available): a failed pull keeps
     /// the gate closed and says so instead of holding silently.
     func start() async {
+        // A new initial sync (sign-in, profile switch) may push again, unless an account
+        // delete is still running.
+        if !isDeletingAccount { pushesBlocked = false }
         // One initial sync at a time; a request that arrives meanwhile (profile switch,
         // iCloud coming back, Sync Now) re-runs it afterwards instead of being dropped.
         if isRunningInitialSync {
@@ -348,6 +351,7 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     func schedulePush() {
         pushRequestCount += 1
         guard remoteUpdateDepth == 0 else { return }
+        guard !pushesBlocked else { return }
         guard isPushAllowed else {
             // Hold, don't drop: the edit is pushed once the initial pull has finished.
             heldPushRequestCount += 1
@@ -454,6 +458,8 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         let previous = pushChain
         let task = Task { @MainActor () throws -> [CKRecord] in
             await previous?.value
+            // Account deletion started while this push waited: send nothing.
+            guard !self.pushesBlocked else { return [] }
             return try await self.pushChangedRecordsNow(save: save, delete: delete)
         }
         pushChain = Task { _ = try? await task.value }
@@ -461,6 +467,21 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     }
 
     private var pushChain: Task<Void, Never>?
+    /// Set while the account's iCloud data is being deleted: no push may run or start.
+    private(set) var pushesBlocked = false
+    private var isDeletingAccount = false
+
+    /// Stops all pushing before "Delete Account and Data": cancels the debounce, blocks new
+    /// pushes, and waits for any push already in flight, so nothing can be saved back to
+    /// iCloud after the delete. Pushing resumes on the next `start()`.
+    func quiescePushes() async {
+        pushesBlocked = true
+        pushDebounceTask?.cancel()
+        pushDebounceTask = nil
+        initialSyncCompletedFor = nil
+        hasHeldPush = false
+        await pushChain?.value
+    }
 
     private func pushChangedRecordsNow(
         save: ([CKRecord]) async throws -> Void,
@@ -864,14 +885,40 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     }
 
     private func recordLocalDeletes(_ names: [String]) {
+        guard let tracker = changeTracker else {
+            // No active profile: there is nothing scoped to tombstone. Say so, never drop silently.
+            logger.error("Delete of \(names.count) record(s) not queued for iCloud: no active profile")
+            return
+        }
         // No baseline: if the same id comes back (a re-confirmed suggestion keeps its derived
         // id), it must be pushed again.
-        changeTracker?.forget(recordNames: names)
-        changeTracker?.addTombstones(names)
+        tracker.forget(recordNames: names)
+        tracker.addTombstones(names)
         schedulePush()
     }
 
     func deleteCurrentUserRecords(
+        properties: [RentalProperty],
+        entries: [TimeEntry],
+        categories: [CustomCategory],
+        userId: String
+    ) async throws {
+        // Nothing may be pushed during or after the delete (a late save would bring the
+        // user's data back).
+        isDeletingAccount = true
+        defer { isDeletingAccount = false }
+        await quiescePushes()
+        do {
+            try await deleteCurrentUserRecordsQuiesced(
+                properties: properties, entries: entries, categories: categories, userId: userId)
+        } catch {
+            // The data stays (iCloud and this device); syncing may resume on the next start().
+            pushesBlocked = false
+            throw error
+        }
+    }
+
+    private func deleteCurrentUserRecordsQuiesced(
         properties: [RentalProperty],
         entries: [TimeEntry],
         categories: [CustomCategory],
