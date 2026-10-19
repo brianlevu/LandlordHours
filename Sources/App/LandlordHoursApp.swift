@@ -2,63 +2,148 @@ import SwiftUI
 import LucideIcons
 
 // MARK: - Design System for LandlordHours
-// Tiimo-inspired — soft, rounded, friendly, modern
-// Source of truth: figma-redesign/design-system.html
+// 2.0 Blueprint brand system. Source of truth: docs/design/2.0-brand-system.md + design/brand/
 
 // MARK: - Colors
+//
+// LandlordHours 2.0 "Blueprint" palette (docs/design/2.0-brand-system.md §2, locked 2026-10-19).
+// Blueprint blue #1E3FA6 is the brand AND the light-mode action colour; dark mode's action is the
+// drafting cyan #8FD3FF ("the action colour is always the ink on the paper"). Violet is retired:
+// the legacy violet-named tokens below keep their NAMES so existing screens compile, but resolve
+// to blueprint-family values. Contrast is recorded in design/brand/contrast.txt and asserted by
+// Tests/ColorContrastTests.swift.
+//
+// Tokens that mean an intent (action, positive, caution, destructive, informational, rose) are
+// dynamic: they resolve per light/dark trait, so a bare `AppColors.x` follows the effective
+// scheme. Surfaces and neutrals named for light mode stay light-only; the `dark*` tokens are their
+// dark counterparts. Prefer `AdaptiveColors` in views.
 enum AppColors {
-    // MARK: - Light Theme (Warm Cream Base)
-    static let background = Color(hex: "FAF7F2")        // cream — warm page background
-    static let backgroundSecondary = Color.white         // pure white for cards
-    static let backgroundTertiary = Color(hex: "F0EFF4") // snow — inputs, tags, subtle surfaces
+    // MARK: Hex sources (shared by AppColors and AdaptiveColors)
+    enum Hex {
+        // Brand + materials (theme-fixed)
+        static let brand = "1E3FA6"            // blueprint
+        static let blueprintPaper = "0B1230"   // dark canvas
+        static let timber = "E0A458"
+        static let brass = "D9B45A"
+        static let terracotta = "C8553D"
+        static let plaster = "F4EFE6"
 
-    // Primary accent — Violet family.
-    // Role: brand identity, primary CTAs, selected navigation, focus, links.
-    static let primary = Color(hex: "7B68EE")
-    static let primaryLight = Color(hex: "B8AFFE")
-    static let primarySurface = Color(hex: "EDE8FF")
-    static let primaryDark = Color(hex: "5B4BC9")
+        // Light
+        static let canvas = "EEF2FA"
+        static let card = "FFFFFF"
+        static let tertiary = "F6F8FD"
+        static let actionSurface = "E3E9FA"
+        static let actionPressed = "16307F"
+        static let drafting = "8FD3FF"
+        static let draftingInk = "2369B5"
+        static let timberInk = "8A5A1B"
+        static let textPrimary = "121B33"
+        static let textSecondary = "4A5068"
+        static let textTertiary = "5F6983"
+        static let border = "D5DBEA"
+        static let borderLight = "E5EAF4"
+        static let positive = "137A42"
+        static let positiveSurface = "E4F7EB"
+        static let caution = "9A560C"
+        static let cautionSurface = "FCF0DC"
+        static let destructive = "C1303A"
+        static let destructiveSurface = "FCE4E5"
+        static let informational = "4A6392"
+        static let informationalSurface = "E6ECF6"
+        static let rose = "B04266"
+        static let roseSurface = "F9E3EA"
 
-    // Accent palette
-    static let coral = Color(hex: "FF8A7A")              // destructive, repair/maintenance emphasis
-    static let coralWash = Color(hex: "FFE8E4")
-    static let sage = Color(hex: "7EC8A0")               // success, qualified, complete, healthy progress
-    static let sageWash = Color(hex: "E4F5EC")
-    static let honey = Color(hex: "F5C563")              // warning, behind pace, needs attention
-    static let honeyWash = Color(hex: "FFF4DA")
-    static let sky = Color(hex: "6CB4EE")                // info, imports, calendar/sync
-    static let skyWash = Color(hex: "E0F0FF")
-    static let rose = Color(hex: "E88CA5")               // soft human/spouse emphasis
-    static let roseWash = Color(hex: "FFE4EC")
-    static let lavenderPanel = Color(hex: "F8F6FF")
-    static let lavenderMist = Color(hex: "E8E0FF")
-    static let lavenderField = Color(hex: "F0ECFF")
-    static let skyMist = Color(hex: "E0F2FE")
+        // Dark
+        static let darkCanvas = "0B1230"
+        static let darkCard = "141C3F"
+        static let darkTertiary = "1B2550"
+        static let darkAction = "8FD3FF"
+        static let darkOnAction = "0B1230"
+        static let darkActionSurface = "182A5C"
+        static let darkActionPressed = "BFE6FF"
+        static let darkDrafting = "60A8E6"
+        static let darkTimberInk = "F0BE7A"
+        static let darkTextPrimary = "F2F4FA"
+        static let darkTextSecondary = "B4BCD2"
+        static let darkTextTertiary = "7E88A6"
+        static let darkBorder = "2A3560"
+        static let darkPositive = "4ED48A"
+        static let darkPositiveSurface = "123A2A"
+        static let darkCaution = "FFB454"
+        static let darkCautionSurface = "3D2A10"
+        static let darkDestructive = "FF7A7A"
+        static let darkDestructiveSurface = "44181C"
+        static let darkInformational = "9BB0D0"
+        static let darkInformationalSurface = "1E2A4A"
+        static let darkRose = "F08BAA"
+        static let darkRoseSurface = "3A1A28"
+    }
+
+    // MARK: - Brand (new in 2.0)
+    /// Blueprint blue. Theme-fixed: the hero, the app icon and brand fills. White on it is 9.06:1.
+    static let brand = Color(hex: Hex.brand)
+    /// Drafting cyan linework (decorative, non-text). Light #8FD3FF; dark steps down to #60A8E6 so
+    /// linework never shares a hex with the dark action colour.
+    static let drafting = Color.lhDynamic(light: Hex.drafting, dark: Hex.darkDrafting)
+    /// SF Mono drafting labels on cards: #2369B5 (5.6:1 on white) / #60A8E6 (6.5:1 on the dark card).
+    static let draftingInk = Color.lhDynamic(light: Hex.draftingInk, dark: Hex.darkDrafting)
+    /// Timber: the warm material accent (illustration). Not for text — use `timberInk`.
+    static let timber = Color(hex: Hex.timber)
+    /// Timber as text: #8A5A1B (5.9:1 on white) / #F0BE7A (9.74:1 on the dark card).
+    static let timberInk = Color.lhDynamic(light: Hex.timberInk, dark: Hex.darkTimberInk)
+    /// Illustration-only materials.
+    static let brass = Color(hex: Hex.brass)
+    static let terracotta = Color(hex: Hex.terracotta)
+    static let plaster = Color(hex: Hex.plaster)
+
+    // MARK: - Light surfaces
+    static let background = Color(hex: Hex.canvas)
+    static let backgroundSecondary = Color.white
+    static let backgroundTertiary = Color(hex: Hex.tertiary)
+
+    // MARK: - Primary (legacy name for the action/brand blue)
+    static let primary = Color.lhDynamic(light: Hex.brand, dark: Hex.darkAction)
+    static let primaryLight = Color.lhDynamic(light: "5C7FD6", dark: Hex.darkDrafting)
+    static let primarySurface = Color.lhDynamic(light: Hex.actionSurface, dark: Hex.darkActionSurface)
+    static let primaryDark = Color.lhDynamic(light: Hex.actionPressed, dark: Hex.darkActionPressed)
+
+    // MARK: - Accent palette (legacy names, 2.0 values)
+    static let coral = Color.lhDynamic(light: Hex.terracotta, dark: Hex.darkDestructive)   // repair / destructive accent
+    static let coralWash = Color.lhDynamic(light: Hex.destructiveSurface, dark: Hex.darkDestructiveSurface)
+    static let sage = Color.lhDynamic(light: Hex.positive, dark: Hex.darkPositive)          // success, met, healthy
+    static let sageWash = Color.lhDynamic(light: Hex.positiveSurface, dark: Hex.darkPositiveSurface)
+    static let honey = Color.lhDynamic(light: Hex.caution, dark: Hex.darkCaution)           // behind pace, needs attention
+    static let honeyWash = Color.lhDynamic(light: Hex.cautionSurface, dark: Hex.darkCautionSurface)
+    static let sky = Color.lhDynamic(light: Hex.informational, dark: Hex.darkInformational) // informational slate
+    static let skyWash = Color.lhDynamic(light: Hex.informationalSurface, dark: Hex.darkInformationalSurface)
+    static let rose = Color.lhDynamic(light: Hex.rose, dark: Hex.darkRose)                  // spouse / people
+    static let roseWash = Color.lhDynamic(light: Hex.roseSurface, dark: Hex.darkRoseSurface)
+    // Former lavender/indigo washes → blueprint tints.
+    static let lavenderPanel = Color(hex: "F3F6FD")
+    static let lavenderMist = Color(hex: Hex.actionSurface)
+    static let lavenderField = Color(hex: "EDF1FB")
+    static let skyMist = Color(hex: "E6F4FE")
     static let aquaMist = Color(hex: "F0FDFA")
-    static let blueSoft = Color(hex: "93C5FD")
-    static let successDeep = Color(hex: "5BA87E")
-    static let indigoMist = Color(hex: "E0E7FF")
-    static let lavenderSoft = Color(hex: "C4B5FD")
-    static let lavenderPale = Color(hex: "F5F3FF")
-    static let darkPlum = Color(hex: "1A1535")
-    static let darkInk = Color(hex: "1C1A2E")
+    static let blueSoft = Color(hex: Hex.drafting)
+    static let successDeep = Color(hex: Hex.positive)
+    static let indigoMist = Color(hex: Hex.actionSurface)
+    static let lavenderSoft = Color(hex: "BFD0F2")
+    static let lavenderPale = Color(hex: "F3F6FD")
+    static let darkPlum = Color(hex: "101A3E")
+    static let darkInk = Color(hex: "0E1636")
 
-    // Semantic
-    static let success = Color(hex: "34D399")
-    static let warning = Color(hex: "FBBF24")
-    static let error = Color(hex: "F472B6")
+    // MARK: - Semantic (legacy names)
+    static let success = sage
+    static let warning = honey
+    static let error = Color.lhDynamic(light: Hex.destructive, dark: Hex.darkDestructive)
 
-    // Intent aliases. New UI should prefer these over raw accent names.
+    // MARK: - Intent aliases (new UI uses these)
     //
-    // Contrast decision (sign-in visual gate, 2026-10-17): text on the action fill must
-    // reach 4.5:1 in BOTH schemes. Light: the fill deepens to #6A56E0 so white text is
-    // 5.22:1 (#7B68EE was 4.15:1). Dark: the fill stays #9D8FF5 and the label turns
-    // near-black #0D0D0D (7.11:1; white was 2.73:1). Both tokens are dynamic so every
-    // `AppColors.action` / `AppColors.onAction` pairing resolves per scheme.
-    static let actionLightHex = "6A56E0"
-    static let actionDarkHex = "9D8FF5"
+    // Light: white on blueprint #1E3FA6 = 9.06:1. Dark: navy #0B1230 on cyan #8FD3FF = 11.31:1.
+    static let actionLightHex = Hex.brand
+    static let actionDarkHex = Hex.darkAction
     static let onActionLightHex = "FFFFFF"
-    static let onActionDarkHex = "0D0D0D"
+    static let onActionDarkHex = Hex.darkOnAction
     static let action = Color.lhDynamic(light: actionLightHex, dark: actionDarkHex)
     static let actionSurface = primarySurface
     static let actionPressed = primaryDark
@@ -67,98 +152,93 @@ enum AppColors {
     static let positiveSurface = sageWash
     static let caution = honey
     static let cautionSurface = honeyWash
-    // Destructive text/icons: #C2412D on white is 5.14:1 (coral #FF8A7A was 2.29:1).
-    // Dark keeps coral (7.79:1 on #161626). Coral stays the repair-category accent.
-    /// #B93A26: 4.97:1 on the #F0EFF4 pill fill (was #C2412D at 4.49:1), 5.68:1 on white.
-    static let destructiveLightHex = "B93A26"
-    static let destructive = Color.lhDynamic(light: destructiveLightHex, dark: "FF8A7A")
+    /// #C1303A: 5.6:1 on white, 4.63:1 on its own wash. Dark #FF7A7A: 6.56:1 on the dark card.
+    static let destructiveLightHex = Hex.destructive
+    static let destructive = Color.lhDynamic(light: destructiveLightHex, dark: Hex.darkDestructive)
     static let destructiveSurface = coralWash
     static let informational = sky
     static let informationalSurface = skyWash
-    // Informational TEXT on its wash: #1E5E9E on #E0F0FF is 5.74:1 (sky was 1.92:1).
-    static let informationalTextLightHex = "1E5E9E"
-    static let informationalText = Color.lhDynamic(light: informationalTextLightHex, dark: "6CB4EE")
-    // Caution TEXT on white/cards: #B45309 (5.0:1 on white); dark uses honey.
-    static let cautionTextLightHex = "B45309"
-    static let positiveTextLightHex = "047857"
+    static let informationalTextLightHex = Hex.informational
+    static let informationalText = Color.lhDynamic(light: informationalTextLightHex, dark: Hex.darkInformational)
+    static let cautionTextLightHex = Hex.caution
+    static let positiveTextLightHex = Hex.positive
 
-    // Reports goal palettes
-    static let reportsAccent = Color(hex: "8B5CF6")
-    static let reportsAccentSoft = Color(hex: "A78BFA")
-    static let reportsAccentWash = Color(hex: "EDE9FE")
-    static let mpAccent = Color(hex: "A855F7")
-    static let mpAccentSoft = Color(hex: "C084FC")
-    static let mpAccentWash = Color(hex: "F3E8FF")
-    static let successGreen = Color(hex: "059669")
-    static let successGreenLight = Color(hex: "34D399")
-    static let successGreenSoft = Color(hex: "6EE7B7")
-    static let successGreenWash = Color(hex: "ECFDF5")
-    static let cautionText = Color(hex: "D97706")
-    static let repairOrange = Color(hex: "F97316")
-    static let dataBlue = Color(hex: "60A5FA")
-    static let dataBlueDeep = Color(hex: "3B82F6")
-    static let dataRed = Color(hex: "EF4444")
-    static let dataEmerald = Color(hex: "10B981")
-    static let dataPink = Color(hex: "EC4899")
+    // MARK: - Reports goal palettes (legacy names, blueprint values)
+    static let reportsAccent = primary
+    static let reportsAccentSoft = Color.lhDynamic(light: "5C7FD6", dark: Hex.darkDrafting)
+    static let reportsAccentWash = primarySurface
+    static let mpAccent = draftingInk
+    static let mpAccentSoft = Color(hex: Hex.drafting)
+    static let mpAccentWash = Color.lhDynamic(light: "E6F2FC", dark: "16304F")
+    static let successGreen = sage
+    static let successGreenLight = Color.lhDynamic(light: "2FA866", dark: Hex.darkPositive)
+    static let successGreenSoft = Color(hex: "7FDDA6")
+    static let successGreenWash = sageWash
+    static let cautionText = Color.lhDynamic(light: Hex.caution, dark: Hex.darkCaution)
+    static let repairOrange = Color(hex: Hex.terracotta)
+    static let dataBlue = Color(hex: "60A8E6")
+    static let dataBlueDeep = Color(hex: "2369B5")
+    static let dataRed = Color(hex: "C1303A")
+    static let dataEmerald = Color(hex: "2FA866")
+    static let dataPink = Color(hex: "B04266")
 
-    // Celebration palette
-    static let celebrationDeepPurple = Color(hex: "4C3D8F")
-    static let celebrationPurple = Color(hex: "5B4BA8")
-    static let celebrationIndigo = Color(hex: "6E5DC6")
-    static let celebrationLavender = Color(hex: "8B7EC8")
-    static let celebrationNightPurple = Color(hex: "3D3270")
+    // MARK: - Celebration palette (former purples → blueprint night)
+    static let celebrationDeepPurple = Color(hex: Hex.blueprintPaper)
+    static let celebrationPurple = Color(hex: Hex.brand)
+    static let celebrationIndigo = Color(hex: "2A4FBF")
+    static let celebrationLavender = Color(hex: Hex.darkDrafting)
+    static let celebrationNightPurple = Color(hex: "101A3E")
 
-    // Logo artwork palette
-    static let logoCanvas = Color(hex: "F4F1FF")
-    static let logoWaveLightStart = Color(hex: "D8D0FF")
-    static let logoWaveMidStart = Color(hex: "A899F7")
-    static let logoWaveMidEnd = Color(hex: "9485F0")
-    static let logoWaveStrongStart = Color(hex: "8B78F0")
-    static let logoWaveDeepStart = Color(hex: "6B58DE")
-    static let logoWaveDeepEnd = Color(hex: "4A38B0")
+    // MARK: - Logo artwork palette (mark B)
+    static let logoCanvas = Color(hex: Hex.brand)
+    static let logoWaveLightStart = Color(hex: Hex.drafting)
+    static let logoWaveMidStart = Color(hex: Hex.plaster)
+    static let logoWaveMidEnd = Color(hex: Hex.plaster)
+    static let logoWaveStrongStart = Color(hex: Hex.terracotta)
+    static let logoWaveDeepStart = Color(hex: Hex.brand)
+    static let logoWaveDeepEnd = Color(hex: Hex.blueprintPaper)
 
-    // Neutrals
-    static let charcoal = Color(hex: "1A1A2E")           // headlines, primary text
-    static let ink = Color(hex: "2D2D3F")                // secondary text
-    static let slate = Color(hex: "6E6E82")              // captions, inactive labels
-    static let mist = Color(hex: "A8A8BC")               // placeholders, tertiary
-    static let cloud = Color(hex: "D4D4E0")              // borders, dividers
-    static let snow = Color(hex: "F0EFF4")               // inputs, subtle surfaces
+    // MARK: - Neutrals (light)
+    static let charcoal = Color(hex: Hex.textPrimary)    // headlines, primary text
+    static let ink = Color(hex: "2B3450")                // secondary text
+    static let slate = Color(hex: Hex.textSecondary)     // captions, inactive labels
+    static let mist = Color(hex: Hex.textTertiary)       // placeholders, tertiary
+    static let cloud = Color(hex: Hex.border)            // borders, dividers
+    static let snow = Color(hex: Hex.tertiary)           // inputs, subtle surfaces
 
     // Legacy aliases for backward compatibility
     static let textPrimary = charcoal
     static let textSecondary = slate
     static let textTertiary = mist
     static let border = cloud
-    static let borderLight = Color(hex: "E8E8F0")
+    static let borderLight = Color(hex: Hex.borderLight)
     static let info = sky
 
     // MARK: - Dark Theme Colors
-    static let darkBackground = Color(hex: "0C0C18")
-    static let darkBackgroundSecondary = Color(hex: "161626")
-    static let darkBackgroundTertiary = Color(hex: "1E1E32")
-    static let darkPrimarySurface = Color(hex: "2D2A4A")
+    static let darkBackground = Color(hex: Hex.darkCanvas)
+    static let darkBackgroundSecondary = Color(hex: Hex.darkCard)
+    static let darkBackgroundTertiary = Color(hex: Hex.darkTertiary)
+    static let darkPrimarySurface = Color(hex: Hex.darkActionSurface)
 
-    static let darkPrimary = Color(hex: "9D8FF5")
-    static let darkSuccess = Color(hex: "4ADE80")
-    static let darkWarning = Color(hex: "FCD34D")
-    static let darkError = Color(hex: "F472B6")
+    static let darkPrimary = Color(hex: Hex.darkAction)
+    static let darkSuccess = Color(hex: Hex.darkPositive)
+    static let darkWarning = Color(hex: Hex.darkCaution)
+    static let darkError = Color(hex: Hex.darkDestructive)
 
     // Dark accent washes (for jelly icon containers)
-    static let darkCoralWash = Color(hex: "3A2020")
-    static let darkSageWash = Color(hex: "1A2E22")
-    static let darkHoneyWash = Color(hex: "2E2818")
-    static let darkSkyWash = Color(hex: "1A2230")
-    static let darkRoseWash = Color(hex: "2E1A22")
+    static let darkCoralWash = Color(hex: Hex.darkDestructiveSurface)
+    static let darkSageWash = Color(hex: Hex.darkPositiveSurface)
+    static let darkHoneyWash = Color(hex: Hex.darkCautionSurface)
+    static let darkSkyWash = Color(hex: Hex.darkInformationalSurface)
+    static let darkRoseWash = Color(hex: Hex.darkRoseSurface)
 
-    static let darkTextPrimary = Color(hex: "E8E8F0")
-    static let darkTextSecondary = Color(hex: "A8A8BC")
-    static let darkTextTertiary = Color(hex: "6E6E82")
-    /// Secondary text that sits directly on the LHMobileCanvas ambient wash in dark mode.
-    /// #A8A8BC measured 4.18–4.45:1 on the top of that wash; #C4C4D4 is about 5.7:1 there.
-    static let darkTextSecondaryOnCanvasHex = "C4C4D4"
+    static let darkTextPrimary = Color(hex: Hex.darkTextPrimary)
+    static let darkTextSecondary = Color(hex: Hex.darkTextSecondary)
+    static let darkTextTertiary = Color(hex: Hex.darkTextTertiary)
+    /// Secondary text that sits directly on the dark canvas (9.68:1 on #0B1230).
+    static let darkTextSecondaryOnCanvasHex = Hex.darkTextSecondary
 
-    static let darkBorder = Color.white.opacity(0.08)
+    static let darkBorder = Color(hex: Hex.darkBorder)
 }
 
 extension Color {
@@ -189,59 +269,74 @@ extension UIColor {
 struct AdaptiveColors {
     let colorScheme: ColorScheme
 
-    var background: Color { colorScheme == .dark ? AppColors.darkBackground : AppColors.background }
-    var backgroundSecondary: Color { colorScheme == .dark ? AppColors.darkBackgroundSecondary : AppColors.backgroundSecondary }
-    var backgroundTertiary: Color { colorScheme == .dark ? AppColors.darkBackgroundTertiary : AppColors.backgroundTertiary }
-    var primarySurface: Color { colorScheme == .dark ? AppColors.darkPrimarySurface : AppColors.primarySurface }
+    private var isDark: Bool { colorScheme == .dark }
+    private func pick(_ light: String, _ dark: String) -> Color { Color(hex: isDark ? dark : light) }
+    private typealias H = AppColors.Hex
 
-    var primary: Color { colorScheme == .dark ? AppColors.darkPrimary : AppColors.primary }
-    var success: Color { colorScheme == .dark ? AppColors.darkSuccess : AppColors.success }
-    var warning: Color { colorScheme == .dark ? AppColors.darkWarning : AppColors.warning }
-    var error: Color { colorScheme == .dark ? AppColors.darkError : AppColors.error }
+    // Surfaces
+    var background: Color { pick(H.canvas, H.darkCanvas) }
+    var backgroundSecondary: Color { pick(H.card, H.darkCard) }
+    var backgroundTertiary: Color { pick(H.tertiary, H.darkTertiary) }
+    var primarySurface: Color { pick(H.actionSurface, H.darkActionSurface) }
 
-    var action: Color { Color(hex: colorScheme == .dark ? AppColors.actionDarkHex : AppColors.actionLightHex) }
-    var onAction: Color { Color(hex: colorScheme == .dark ? AppColors.onActionDarkHex : AppColors.onActionLightHex) }
+    // Brand (new in 2.0)
+    var brand: Color { AppColors.brand }
+    /// Decorative linework (non-text).
+    var drafting: Color { pick(H.drafting, H.darkDrafting) }
+    /// SF Mono drafting labels on cards / canvas.
+    var draftingInk: Color { pick(H.draftingInk, H.darkDrafting) }
+    var timber: Color { AppColors.timber }
+    var timberInk: Color { pick(H.timberInk, H.darkTimberInk) }
+
+    // Legacy names
+    var primary: Color { pick(H.brand, H.darkAction) }
+    var success: Color { positive }
+    var warning: Color { caution }
+    var error: Color { destructive }
+
+    // Intents
+    var action: Color { pick(AppColors.actionLightHex, AppColors.actionDarkHex) }
+    var onAction: Color { pick(AppColors.onActionLightHex, AppColors.onActionDarkHex) }
     var actionSurface: Color { primarySurface }
-    var positive: Color { sage }
-    var positiveSurface: Color { sageWash }
-    var caution: Color { honey }
-    var cautionSurface: Color { honeyWash }
-    var destructive: Color { colorScheme == .dark ? coral : Color(hex: AppColors.destructiveLightHex) }
-    var destructiveSurface: Color { coralWash }
-    var informational: Color { sky }
-    var informationalSurface: Color { skyWash }
-    /// Violet TEXT on actionSurface or cards: #5B4BC9 (5.34:1 on #EDE8FF) / #9D8FF5 (4.98:1 on #2D2A4A).
-    var actionText: Color { colorScheme == .dark ? AppColors.darkPrimary : AppColors.primaryDark }
-    /// Success TEXT on positiveSurface or cards: #047857 (4.85:1 on #E4F5EC) / sage (7.31:1 on #1A2E22).
-    var positiveText: Color { colorScheme == .dark ? AppColors.sage : Color(hex: AppColors.positiveTextLightHex) }
-    var informationalText: Color { colorScheme == .dark ? sky : Color(hex: AppColors.informationalTextLightHex) }
-    var cautionText: Color { colorScheme == .dark ? honey : Color(hex: AppColors.cautionTextLightHex) }
+    var positive: Color { pick(H.positive, H.darkPositive) }
+    var positiveSurface: Color { pick(H.positiveSurface, H.darkPositiveSurface) }
+    var caution: Color { pick(H.caution, H.darkCaution) }
+    var cautionSurface: Color { pick(H.cautionSurface, H.darkCautionSurface) }
+    var destructive: Color { pick(H.destructive, H.darkDestructive) }
+    var destructiveSurface: Color { pick(H.destructiveSurface, H.darkDestructiveSurface) }
+    var informational: Color { pick(H.informational, H.darkInformational) }
+    var informationalSurface: Color { pick(H.informationalSurface, H.darkInformationalSurface) }
+    /// Action-coloured TEXT on actionSurface or cards: 7.47:1 / 8.48:1.
+    var actionText: Color { action }
+    var positiveText: Color { positive }
+    var informationalText: Color { informational }
+    var cautionText: Color { caution }
 
-    var coral: Color { AppColors.coral }
-    var sage: Color { AppColors.sage }
-    var honey: Color { AppColors.honey }
-    var sky: Color { AppColors.sky }
-    var rose: Color { AppColors.rose }
+    // Legacy accent names → intents
+    var coral: Color { pick(H.terracotta, H.darkDestructive) }
+    var sage: Color { positive }
+    var honey: Color { caution }
+    var sky: Color { informational }
+    var rose: Color { pick(H.rose, H.darkRose) }
 
-    var coralWash: Color { colorScheme == .dark ? AppColors.darkCoralWash : AppColors.coralWash }
-    var sageWash: Color { colorScheme == .dark ? AppColors.darkSageWash : AppColors.sageWash }
-    var honeyWash: Color { colorScheme == .dark ? AppColors.darkHoneyWash : AppColors.honeyWash }
-    var skyWash: Color { colorScheme == .dark ? AppColors.darkSkyWash : AppColors.skyWash }
-    var roseWash: Color { colorScheme == .dark ? AppColors.darkRoseWash : AppColors.roseWash }
+    var coralWash: Color { destructiveSurface }
+    var sageWash: Color { positiveSurface }
+    var honeyWash: Color { cautionSurface }
+    var skyWash: Color { informationalSurface }
+    var roseWash: Color { pick(H.roseSurface, H.darkRoseSurface) }
 
-    var textPrimary: Color { colorScheme == .dark ? AppColors.darkTextPrimary : AppColors.charcoal }
-    /// Light #636377: 5.13:1 on input/segment fills (#F0EFF4), where slate #6E6E82 was 4.35:1.
-    var textSecondary: Color { colorScheme == .dark ? AppColors.darkTextSecondary : Color(hex: "636377") }
-    var textTertiary: Color { colorScheme == .dark ? AppColors.darkTextTertiary : AppColors.mist }
-    /// Secondary text placed straight on the ambient page canvas (not on a card).
-    var textSecondaryOnCanvas: Color {
-        colorScheme == .dark ? Color(hex: AppColors.darkTextSecondaryOnCanvasHex) : textSecondary
-    }
+    // Text
+    var textPrimary: Color { pick(H.textPrimary, H.darkTextPrimary) }
+    var textSecondary: Color { pick(H.textSecondary, H.darkTextSecondary) }
+    var textTertiary: Color { pick(H.textTertiary, H.darkTextTertiary) }
+    /// Secondary text placed straight on the page canvas (not on a card).
+    var textSecondaryOnCanvas: Color { textSecondary }
 
-    var border: Color { colorScheme == .dark ? AppColors.darkBorder : AppColors.cloud }
+    /// Hairline (decorative; cards separate by fill).
+    var border: Color { pick(H.border, H.darkBorder) }
 
     /// Glass effect background for tab bar, overlays
-    var glass: Color { colorScheme == .dark ? AppColors.darkBackground.opacity(0.85) : Color.white.opacity(0.85) }
+    var glass: Color { isDark ? AppColors.darkBackground.opacity(0.85) : Color.white.opacity(0.85) }
 }
 
 // MARK: - Appearance Preference
@@ -326,33 +421,182 @@ final class AppearanceManager: ObservableObject {
 }
 
 // MARK: - Typography
-// SF Pro Rounded for UI, Serif (New York) for editorial headlines
+//
+// 2.0 type system (docs/design/2.0-brand-system.md §3):
+// - SF Pro for body and UI, scaled with Dynamic Type through text styles.
+// - SF Pro Rounded with tabular digits for numbers (hours, counts, progress).
+// - SF Mono (`design: .monospaced`) for drafting labels: eyebrows, ticks, "2026 · REPS GOAL".
+// - Fraunces (bundled, SIL OFL 1.1, Sources/Resources/Fonts) for display text at 28pt and up ONLY:
+//   tab titles, Welcome, milestones. Never in lists, never on numbers or tax lines, never in the PDF.
+//   Prefer `.lhDisplayFont(_:)`, which also sets the optical size and SOFT axes and follows
+//   Dynamic Type; the `AppTypography.largeTitle/headline` Font tokens are the simple fallback.
 enum AppTypography {
-    // Serif headlines — maps to DM Serif Display in HTML mockups
-    static let headline = Font.system(size: 28, weight: .regular, design: .serif)
-    static let headlineLarge = Font.system(size: 34, weight: .regular, design: .serif)
+    // Fraunces display (≥28pt; Dynamic Type via relativeTo:)
+    static let display = LHFont.fraunces(LHDisplayStyle.display)
+    static let headlineLarge = LHFont.fraunces(LHDisplayStyle.largeTitle)
+    static let headline = LHFont.fraunces(LHDisplayStyle.title)
 
-    // Rounded body — maps to DM Sans in HTML mockups
-    static let subheadline = Font.system(size: 17, weight: .semibold, design: .rounded)
-    static let body = Font.system(size: 15, weight: .regular, design: .rounded)
-    static let bodyLarge = Font.system(size: 17, weight: .regular, design: .rounded)
-    static let bodySmall = Font.system(size: 13, weight: .regular, design: .rounded)
-    static let caption = Font.system(size: 12, weight: .medium, design: .rounded)
-    static let label = Font.system(size: 11, weight: .bold, design: .rounded)
-    static let heroNumber = Font.system(size: 52, weight: .heavy, design: .rounded)
-    static let ringNumber = Font.system(size: 46, weight: .bold, design: .rounded)
+    // SF Pro body / UI (text styles, so they follow Dynamic Type)
+    static let subheadline = Font.system(.body, design: .default, weight: .semibold)  // 17 semibold
+    static let body = Font.system(.subheadline, design: .default)                    // 15
+    static let bodyLarge = Font.system(.body, design: .default)                      // 17
+    static let bodySmall = Font.system(.footnote, design: .default)                  // 13
+    static let caption = Font.system(.caption, design: .default, weight: .medium)    // 12
+    static let footnote = Font.system(.footnote, design: .default)                   // 13
+
+    // SF Mono drafting labels (11pt; uppercase + .tracking(1.3) at the call site)
+    static let drafting = Font.system(.caption2, design: .monospaced, weight: .medium)
+    static let label = drafting
+
+    // SF Pro Rounded numbers, tabular. Hero numerals are fixed-size by design (they live inside a
+    // fixed-geometry ring/hero; pair them with .minimumScaleFactor); metrics scale.
+    static let heroNumber = Font.system(size: 56, weight: .bold, design: .rounded).monospacedDigit()
+    static let ringNumber = Font.system(size: 46, weight: .bold, design: .rounded).monospacedDigit()
+    static let metric = Font.system(.title2, design: .rounded, weight: .bold).monospacedDigit()
+    static let number = Font.system(.body, design: .rounded, weight: .semibold).monospacedDigit()
 
     // Buttons
-    static let buttonLarge = Font.system(size: 17, weight: .semibold, design: .rounded)
-    static let button = Font.system(size: 16, weight: .semibold, design: .rounded)
-    static let buttonSmall = Font.system(size: 13, weight: .semibold, design: .rounded)
+    static let buttonLarge = Font.system(.body, design: .default, weight: .semibold)     // 17
+    static let button = Font.system(.callout, design: .default, weight: .semibold)       // 16
+    static let buttonSmall = Font.system(.footnote, design: .default, weight: .semibold) // 13
 
-    // Legacy aliases
+    // Names kept for existing call sites
     static let largeTitle = headlineLarge
     static let title1 = headline
-    static let title2 = Font.system(size: 22, weight: .bold, design: .rounded)
-    static let title3 = Font.system(size: 20, weight: .semibold, design: .rounded)
-    static let footnote = Font.system(size: 13, weight: .regular, design: .rounded)
+    static let title2 = Font.system(.title2, design: .default, weight: .semibold)        // 22
+    static let title3 = Font.system(.title3, design: .default, weight: .semibold)        // 20
+}
+
+/// Fraunces display styles. Every case is ≥28pt: Fraunces is never used below that.
+enum LHDisplayStyle: CaseIterable {
+    /// 34 / 500, opsz 144, SOFT 50 — Welcome, milestones.
+    case display
+    /// 34 / 500, opsz 96 — tab titles.
+    case largeTitle
+    /// 28 / 500, opsz 72 — section display (Today's header greeting).
+    case title
+
+    var size: CGFloat {
+        switch self {
+        case .display, .largeTitle: return 34
+        case .title: return 28
+        }
+    }
+
+    var weight: CGFloat { 500 }
+
+    var opticalSize: CGFloat {
+        switch self {
+        case .display: return 144
+        case .largeTitle: return 96
+        case .title: return 72
+        }
+    }
+
+    var softness: CGFloat {
+        switch self {
+        case .display: return 50
+        case .largeTitle, .title: return 30
+        }
+    }
+
+    var textStyle: Font.TextStyle {
+        switch self {
+        case .display, .largeTitle: return .largeTitle
+        case .title: return .title
+        }
+    }
+
+    var uiTextStyle: UIFont.TextStyle {
+        switch self {
+        case .display, .largeTitle: return .largeTitle
+        case .title: return .title1
+        }
+    }
+}
+
+enum LHFont {
+    /// Family name of the bundled variable font (Sources/Resources/Fonts/Fraunces.ttf, UIAppFonts).
+    static let frauncesFamily = "Fraunces"
+    /// Minimum point size Fraunces may be used at.
+    static let frauncesMinimumSize: CGFloat = 28
+
+    static var isFrauncesAvailable: Bool {
+        !UIFont.fontNames(forFamilyName: frauncesFamily).isEmpty
+    }
+
+    /// Simple Font token: Fraunces at the style's size, scaled relative to its text style.
+    /// Falls back to New York (the system serif) if the font failed to register.
+    static func fraunces(_ style: LHDisplayStyle) -> Font {
+        guard isFrauncesAvailable else {
+            return Font.system(style.textStyle, design: .serif, weight: .medium)
+        }
+        return Font.custom(frauncesFamily, size: style.size, relativeTo: style.textStyle).weight(.medium)
+    }
+
+    /// Fraunces with its variation axes set (wght, opsz, SOFT), scaled for a content size category.
+    static func frauncesUIFont(_ style: LHDisplayStyle, contentSize: UIContentSizeCategory = .large) -> UIFont {
+        let traits = UITraitCollection(preferredContentSizeCategory: contentSize)
+        let metrics = UIFontMetrics(forTextStyle: style.uiTextStyle)
+        let base = UIFontDescriptor(fontAttributes: [.family: frauncesFamily])
+        let variations: [NSNumber: CGFloat] = [
+            NSNumber(value: axisTag("wght")): style.weight,
+            NSNumber(value: axisTag("opsz")): style.opticalSize,
+            NSNumber(value: axisTag("SOFT")): style.softness,
+        ]
+        let descriptor = base.addingAttributes([
+            UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String): variations
+        ])
+        let font = UIFont(descriptor: descriptor, size: style.size)
+        guard font.familyName == frauncesFamily else {
+            let serif = UIFont.systemFont(ofSize: style.size, weight: .medium)
+            let fallback = serif.fontDescriptor.withDesign(.serif).map { UIFont(descriptor: $0, size: style.size) } ?? serif
+            return metrics.scaledFont(for: fallback, compatibleWith: traits)
+        }
+        let scaled = metrics.scaledFont(for: font, compatibleWith: traits)
+        // Smaller Dynamic Type settings never take Fraunces under its 28pt floor.
+        return scaled.pointSize < frauncesMinimumSize ? scaled.withSize(frauncesMinimumSize) : scaled
+    }
+
+    static func axisTag(_ tag: String) -> UInt32 {
+        tag.unicodeScalars.reduce(UInt32(0)) { ($0 << 8) | UInt32($1.value & 0xFF) }
+    }
+}
+
+private struct LHDisplayFontModifier: ViewModifier {
+    let style: LHDisplayStyle
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    func body(content: Content) -> some View {
+        content.font(Font(LHFont.frauncesUIFont(style, contentSize: dynamicTypeSize.lhContentSizeCategory)))
+    }
+}
+
+extension View {
+    /// Fraunces display text (≥28pt) with optical size + SOFT axes, following Dynamic Type.
+    func lhDisplayFont(_ style: LHDisplayStyle = .largeTitle) -> some View {
+        modifier(LHDisplayFontModifier(style: style))
+    }
+}
+
+extension DynamicTypeSize {
+    var lhContentSizeCategory: UIContentSizeCategory {
+        switch self {
+        case .xSmall: return .extraSmall
+        case .small: return .small
+        case .medium: return .medium
+        case .large: return .large
+        case .xLarge: return .extraLarge
+        case .xxLarge: return .extraExtraLarge
+        case .xxxLarge: return .extraExtraExtraLarge
+        case .accessibility1: return .accessibilityMedium
+        case .accessibility2: return .accessibilityLarge
+        case .accessibility3: return .accessibilityExtraLarge
+        case .accessibility4: return .accessibilityExtraExtraLarge
+        case .accessibility5: return .accessibilityExtraExtraExtraLarge
+        @unknown default: return .large
+        }
+    }
 }
 
 // MARK: - Spacing

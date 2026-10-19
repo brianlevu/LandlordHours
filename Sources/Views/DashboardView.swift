@@ -290,11 +290,13 @@ struct DashboardView: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
+                // 2.0: Fraunces display (34pt, never scaled below the 28pt floor).
                 Text(dashboardTitle)
-                    .font(.system(size: dashboardTitleSize, weight: .black, design: .rounded))
+                    .lhDisplayFont(.largeTitle)
                     .foregroundStyle(colors.textPrimary)
                     .lineSpacing(-1)
-                    .minimumScaleFactor(0.82)
+                    .minimumScaleFactor(0.83)
+                    .accessibilityIdentifier("today.header.title")
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text(dashboardSubtitle)
@@ -383,10 +385,6 @@ struct DashboardView: View {
             return "Log your first hour"
         }
         return "Today's work"
-    }
-
-    private var dashboardTitleSize: CGFloat {
-        shouldShowActivationCard ? 31 : 32
     }
 
     private var dashboardSubtitle: String {

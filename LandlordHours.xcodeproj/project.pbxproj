@@ -19,6 +19,7 @@
 		1966A0BEB7460410F2A156D6 /* ProfileManagementViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 988C76EAD03340B1FA9162E3 /* ProfileManagementViews.swift */; };
 		19BD84C3A545BA2935D9A7CF /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFF3C2F4E4EAC2D09DCB3F5B /* ContentView.swift */; };
 		1A2A80F489BB65C766EBA321 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5490464EB91A5699EED6EFCE /* ReportsView.swift */; };
+		1E98FE6A65B4761018872153 /* BrandTypographyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D59E5BD8B45AF17ABFDFFAD /* BrandTypographyTests.swift */; };
 		20622DC1C008655024F7676F /* LandlordHoursUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8248EAB41ECD1E6CF7808498 /* LandlordHoursUITests.swift */; };
 		24B4A91548115D49515C797B /* PropertiesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D91BDD921FD02E42B58FE334 /* PropertiesView.swift */; };
 		2846D3E26FF2EA4A60FAF7D6 /* LandlordHoursTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01B3B8EADDB251440528314 /* LandlordHoursTests.swift */; };
@@ -30,6 +31,7 @@
 		494B71178010F1EDB70BC3A5 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 884A37AD32EE90EF18CEDAE9 /* RevenueCat */; };
 		4C04E70D3E5565A29188DAF4 /* CalendarImportReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FFC13B6D335F226D0DD7B81 /* CalendarImportReviewView.swift */; };
 		4FEB158B22F5E540112D703C /* LandlordHours.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 61925A55B4CDBDF1584A392E /* LandlordHours.storekit */; };
+		511575339D5FAE17292F68C7 /* Fraunces.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F421EA11ACB374A491346AA3 /* Fraunces.ttf */; };
 		518F77E3248E5C1571182B28 /* LandlordHoursAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 965D319F27D7A4A2332D47B2 /* LandlordHoursAppIntents.swift */; };
 		5237EDB83B597E6CAE0D5272 /* SyncGateAndTimerDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDAC9A2FCA588960D010499D /* SyncGateAndTimerDraftTests.swift */; };
 		5439EAA5232839D26953A8A4 /* NotificationActionRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0E95909D4A47DFA839E573 /* NotificationActionRouter.swift */; };
@@ -43,6 +45,7 @@
 		691B932AEB4ECA321D667151 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7002A4C1E561833705DE3B43 /* PaywallView.swift */; };
 		6D5CF36648DF854DD8526DBD /* AppModelHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B6AD9BA257E78062E5DA39E /* AppModelHost.swift */; };
 		708EDA426351E4E5ECB2A0BC /* CloudKitSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E942608EE77393A2E7F17F89 /* CloudKitSyncService.swift */; };
+		7B2EC145624B3CB62E48EA42 /* InboxPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6FE7DEA9BB811701DA87141 /* InboxPlaceholderView.swift */; };
 		7BE636161E5D4B92208041FC /* LandlordHoursTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E078FA57ABF4C028DDE04C86 /* LandlordHoursTimerAttributes.swift */; };
 		7CB9BA413496A06323C90A38 /* AuditReportBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = D87C61D0D4C65EDFDCB0649B /* AuditReportBuilder.swift */; };
 		7E0B82EEBC8E67989BB1C257 /* TimerDraftUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27D9AE994D0696BCE6E017B9 /* TimerDraftUITests.swift */; };
@@ -76,6 +79,7 @@
 		BC8F6E92451777ADF3C1AE40 /* ColorContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1240689FADA6EC9A0D1883B /* ColorContrastTests.swift */; };
 		BFF6F8AE069FE01CE9E5414F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE13F908989158FDAB28BF57 /* Models.swift */; };
 		C033DAA5B2F3EB1B50CDA1CE /* LandlordHoursApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9CB28BC741E54912DBB35F /* LandlordHoursApp.swift */; };
+		C19E20B4BBD0B73D9CFB97DB /* Fraunces-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = E44332A1A42FF1860E8AFFEA /* Fraunces-OFL.txt */; };
 		C3E06B79C92F2D90F73CE57C /* CelebrationOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF68DBFF1FFD763363015B42 /* CelebrationOverlayView.swift */; };
 		C6B50842EA064CEACA38BA96 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFBF76FD610DF2D0CDA40C0A /* AppViewModel.swift */; };
 		CB4A4FF6CB46CB23A628AA19 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD25AA91ABB5FB4C307E491 /* DashboardView.swift */; };
@@ -120,6 +124,7 @@
 		177A9D74876C4039825F19FA /* Suggestion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Suggestion.swift; sourceTree = "<group>"; };
 		1AA72A2C13136E24A749E14C /* LandlordHoursUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LandlordHoursUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1AF16D81B372852B91B92405 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		1D59E5BD8B45AF17ABFDFFAD /* BrandTypographyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandTypographyTests.swift; sourceTree = "<group>"; };
 		1E4FDA46A18FD2D2EB716A39 /* LHIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHIcons.swift; sourceTree = "<group>"; };
 		22F2A5256E57CEBACC7BDAAC /* StoreKitLocalIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitLocalIntegrationTests.swift; sourceTree = "<group>"; };
 		27D9AE994D0696BCE6E017B9 /* TimerDraftUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerDraftUITests.swift; sourceTree = "<group>"; };
@@ -167,6 +172,7 @@
 		A1240689FADA6EC9A0D1883B /* ColorContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorContrastTests.swift; sourceTree = "<group>"; };
 		A1CAE53C865D5B8D680C6F0D /* LocalProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalProfileTests.swift; sourceTree = "<group>"; };
 		A2CA9BA1AD53F0ABA92A9F2F /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		A6FE7DEA9BB811701DA87141 /* InboxPlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxPlaceholderView.swift; sourceTree = "<group>"; };
 		A7E7BE1FCB22BC25EDC53F05 /* EntrySource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntrySource.swift; sourceTree = "<group>"; };
 		AFF3C2F4E4EAC2D09DCB3F5B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B7ECB76E7A5D6C4DDACBA2AD /* AppDesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDesignSystem.swift; sourceTree = "<group>"; };
@@ -188,9 +194,11 @@
 		DBE81FD800D7C2747504BEC0 /* LocalProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalProfile.swift; sourceTree = "<group>"; };
 		DE13F908989158FDAB28BF57 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		E078FA57ABF4C028DDE04C86 /* LandlordHoursTimerAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordHoursTimerAttributes.swift; sourceTree = "<group>"; };
+		E44332A1A42FF1860E8AFFEA /* Fraunces-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Fraunces-OFL.txt"; sourceTree = "<group>"; };
 		E6D41E394791AE4ADCA1F725 /* EngagementIntelligenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementIntelligenceService.swift; sourceTree = "<group>"; };
 		E942608EE77393A2E7F17F89 /* CloudKitSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitSyncService.swift; sourceTree = "<group>"; };
 		EA1DF3BCE5385BCFDC7627DC /* LandlordPurchases.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordPurchases.swift; sourceTree = "<group>"; };
+		F421EA11ACB374A491346AA3 /* Fraunces.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fraunces.ttf; sourceTree = "<group>"; };
 		F63814CFFD3A0284AC85988D /* AITimeEntryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITimeEntryService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -218,11 +226,20 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
+		2A213114BF4DC83320D1EDE0 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				F6D3D033303840291C77E351 /* Fonts */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		396398AA798125B67EFC1B2A /* Sources */ = {
 			isa = PBXGroup;
 			children = (
 				BB5791F5978AAAD88BED36D1 /* App */,
 				0C4465A88F3803561609E98F /* Models */,
+				2A213114BF4DC83320D1EDE0 /* Resources */,
 				D1B41408B74FB81271AE7A5B /* Services */,
 				69E1FC2BCD8DEC6A7949E13D /* ViewModels */,
 				E0F8AC95A77E6D771AE995AE /* Views */,
@@ -255,6 +272,7 @@
 			isa = PBXGroup;
 			children = (
 				DA55F7A788AAB40693166F60 /* AuditReportTests.swift */,
+				1D59E5BD8B45AF17ABFDFFAD /* BrandTypographyTests.swift */,
 				CA2074D17A6358EF6451A083 /* CaptureFlowTests.swift */,
 				BB3ABA94307D665EF31EC294 /* CaptureModelTests.swift */,
 				A1240689FADA6EC9A0D1883B /* ColorContrastTests.swift */,
@@ -357,6 +375,7 @@
 				4F7DEC5DC48828C8FF4C48C2 /* EngagementLabView.swift */,
 				37718C6C352F5146B1B19AAA /* ExportPDFView.swift */,
 				754B9E894A2C95D4E5C635B0 /* HistoryView.swift */,
+				A6FE7DEA9BB811701DA87141 /* InboxPlaceholderView.swift */,
 				434AE320C71AE1DAFBBBD038 /* LearningCenterView.swift */,
 				A2CA9BA1AD53F0ABA92A9F2F /* OnboardingView.swift */,
 				7002A4C1E561833705DE3B43 /* PaywallView.swift */,
@@ -382,6 +401,15 @@
 				1AA72A2C13136E24A749E14C /* LandlordHoursUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		F6D3D033303840291C77E351 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				E44332A1A42FF1860E8AFFEA /* Fraunces-OFL.txt */,
+				F421EA11ACB374A491346AA3 /* Fraunces.ttf */,
+			);
+			path = Fonts;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -501,6 +529,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				D0FB50644A3E4250418CF25F /* Assets.xcassets in Resources */,
+				C19E20B4BBD0B73D9CFB97DB /* Fraunces-OFL.txt in Resources */,
+				511575339D5FAE17292F68C7 /* Fraunces.ttf in Resources */,
 				38B5E98FF26323E43143DBF3 /* LaunchScreen.storyboard in Resources */,
 				A6D2501F6D2AE42B9C7BA27E /* PrivacyInfo.xcprivacy in Resources */,
 			);
@@ -560,6 +590,7 @@
 				E9CC6ED534B7D4F21DE40660 /* EntrySource.swift in Sources */,
 				12BA2B1FF6DA34B9708EABF4 /* ExportPDFView.swift in Sources */,
 				A47503D607E3D15AB9B78D16 /* HistoryView.swift in Sources */,
+				7B2EC145624B3CB62E48EA42 /* InboxPlaceholderView.swift in Sources */,
 				B4CE9038708F34E70E784BF9 /* LHIcons.swift in Sources */,
 				A692C559186CE846A2E224CB /* LHLogo.swift in Sources */,
 				C033DAA5B2F3EB1B50CDA1CE /* LandlordHoursApp.swift in Sources */,
@@ -597,6 +628,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				41608B6514C2E6C81B7359F2 /* AuditReportTests.swift in Sources */,
+				1E98FE6A65B4761018872153 /* BrandTypographyTests.swift in Sources */,
 				5939EC4545165CD6A01A9D52 /* CaptureFlowTests.swift in Sources */,
 				9C56CFF4C0A527580463AA1D /* CaptureModelTests.swift in Sources */,
 				BC8F6E92451777ADF3C1AE40 /* ColorContrastTests.swift in Sources */,
