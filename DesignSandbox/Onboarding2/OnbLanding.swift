@@ -140,7 +140,7 @@ struct OnbToday: View {
         ZStack(alignment: .topLeading) {
             HouseBlueprintPaper()
             GeometryReader { g in
-                let hs = min(g.size.width * 0.62, g.size.height * 0.98)
+                let hs = min(g.size.width * (empty ? 0.5 : 0.6), g.size.height * 0.9)
                 ZStack(alignment: .topLeading) {
                     ZStack {
                         HouseArtView(keyframe: HouseProgress.keyframe(for: hours), canvas: .blueprintHero)
@@ -168,7 +168,7 @@ struct OnbToday: View {
                         heroFooter
                     }
                     .padding(20)
-                    .frame(maxWidth: g.size.width * 0.62, maxHeight: .infinity, alignment: .topLeading)
+                    .frame(maxWidth: g.size.width * (empty ? 0.56 : 0.5), maxHeight: .infinity, alignment: .topLeading)
                 }
             }
         }

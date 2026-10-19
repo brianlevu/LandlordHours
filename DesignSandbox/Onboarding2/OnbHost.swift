@@ -128,6 +128,7 @@ struct OnbHost: View {
     private func autoplay() async {
         guard let mode = UserDefaults.standard.string(forKey: "LHOnbAuto") else { return }
         let r = reduce
+        await wait(UserDefaults.standard.integer(forKey: "LHOnbAutoDelay"))   // lets the recorder start on Welcome
         await wait(2400)                                   // Welcome
         flow.next(reduce: r)                               // Start building
         await wait(1300)

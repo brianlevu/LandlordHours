@@ -9,7 +9,7 @@ struct OnbScene: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     // Measured on the k00 lot render: lot diamond and where the stake stands.
-    static let stakeBase = CGPoint(x: 0.53, y: 0.70)
+    static let stakeBase = CGPoint(x: 0.62, y: 0.79)
     /// Drafting-scale heights for 100 / 500 / 750 (slab top, eaves, ridge) in the finished linework.
     static let tickY: [Int: CGFloat] = [100: 0.775, 500: 0.43, 750: 0.17]
 
@@ -39,11 +39,19 @@ struct OnbScene: View {
     @ViewBuilder private var houseLayers: some View {
         ZStack {
             if upgrade {
-                HouseArtView(keyframe: upgradeKeyframe, canvas: .blueprintHero)
+                ZStack {
+                    Image(decorative: upgradeKeyframe.builtImageName).resizable().interpolation(.high).scaledToFit()
+                    HouseLineworkView(keyframe: upgradeKeyframe, canvas: .blueprintHero)
+                        .opacity(step == .calendar ? 0.3 : 1)
+                }
             } else {
                 // Welcome: the half-built house. Every other step: the empty lot with the full drawing over it.
-                HouseArtView(keyframe: .k00_lot, canvas: .blueprintHero)
-                    .opacity(step == .welcome ? 0 : 1)
+                ZStack {
+                    Image(decorative: HouseKeyframe.k00_lot.builtImageName).resizable().interpolation(.high).scaledToFit()
+                    HouseLineworkView(keyframe: .k00_lot, canvas: .blueprintHero)
+                        .opacity([.property, .notify, .staked].contains(step) ? 0.45 : (step == .calendar ? 0.3 : 1))
+                }
+                .opacity(step == .welcome ? 0 : 1)
                 HouseArtView(keyframe: .k09_frame080, canvas: .blueprintHero)
                     .opacity(step == .welcome ? 1 : 0)
             }
@@ -67,7 +75,7 @@ struct OnbScene: View {
 
     private func scale(_ s: CGFloat) -> some View {
         let lit: Int? = flow.goalHours
-        let x: CGFloat = 0.075
+        let x: CGFloat = 0.13
         return ZStack(alignment: .topLeading) {
             Path { p in
                 p.move(to: CGPoint(x: s * x, y: s * 0.12)); p.addLine(to: CGPoint(x: s * x, y: s * 0.86))
@@ -81,7 +89,7 @@ struct OnbScene: View {
                     .font(.system(size: 11, weight: on ? .bold : .medium, design: .monospaced))
                     .foregroundStyle(on ? HouseTokens.drafting : .white.opacity(0.62))
                     .fixedSize()
-                    .position(x: s * (x + 0.075), y: s * y - 9)
+                    .position(x: s * (x - 0.07), y: s * y)
                 // Guide from the lit tick across the drawing: where this goal tops out.
                 Path { p in p.move(to: CGPoint(x: s * (x + 0.03), y: s * y)); p.addLine(to: CGPoint(x: s * 0.94, y: s * y)) }
                     .trim(from: 0, to: on ? 1 : 0)
@@ -90,8 +98,8 @@ struct OnbScene: View {
                 Triangle()
                     .fill(HouseTokens.drafting)
                     .frame(width: 8, height: 7)
-                    .rotationEffect(.degrees(90))
-                    .position(x: s * (x - 0.035), y: s * y)
+                    .rotationEffect(.degrees(-90))
+                    .position(x: s * (x + 0.045), y: s * y)
                     .opacity(on ? 1 : 0)
             }
         }
@@ -115,7 +123,7 @@ struct OnbScene: View {
             Text("Looking back 90 days")
                 .drafting(HouseTokens.drafting)
                 .fixedSize()
-                .position(x: s * 0.5, y: s * 0.975)
+                .position(x: s * 0.80, y: s * 0.16)
         }
     }
 
@@ -126,12 +134,12 @@ struct OnbScene: View {
         let two = flow.who == .both
         ZStack(alignment: .topLeading) {
             HardHat(color: Color(hex: 0xF2C14E))
-                .frame(width: s * 0.085, height: s * 0.055)
+                .frame(width: s * 0.115, height: s * 0.075)
                 .position(x: s * 0.40, y: s * 0.775)
                 .opacity(crew ? 1 : 0)
-            HardHat(color: Color(hex: 0xF4EFE6))
-                .frame(width: s * 0.085, height: s * 0.055)
-                .position(x: s * 0.33, y: s * 0.81)
+            HardHat(color: Color(hex: 0xF08A4B))
+                .frame(width: s * 0.115, height: s * 0.075)
+                .position(x: s * 0.50, y: s * 0.80)
                 .opacity(crew && two ? 1 : 0)
                 .scaleEffect(crew && two ? 1 : 0.85, anchor: .bottom)
         }
@@ -141,7 +149,7 @@ struct OnbScene: View {
 
     private func stake(_ s: CGFloat) -> some View {
         let base = Self.stakeBase
-        let postH = s * 0.2
+        let postH = s * 0.19
         return ZStack(alignment: .topLeading) {
             Ellipse().fill(.black.opacity(0.22))
                 .frame(width: s * 0.06, height: s * 0.018)
@@ -166,9 +174,9 @@ struct OnbScene: View {
 
     private func plaque(_ s: CGFloat) -> some View {
         GoalPlaque(text: flow.goalHours.map(String.init) ?? "Record", small: flow.goalHours == nil)
-            .frame(width: s * 0.25, height: s * 0.25)
+            .frame(width: s * 0.22, height: s * 0.16)
             .shadow(color: .black.opacity(0.35), radius: 4, y: 3)
-            .position(x: s * 0.77, y: s * 0.70)
+            .position(x: s * 0.27, y: s * 0.80)
     }
 
     private var a11y: String {
@@ -236,11 +244,11 @@ struct GoalPlaque: View {
     var small = false
     var body: some View {
         ZStack {
-            if let img = conceptImage("bp-plaque-blank") {
-                img.resizable().scaledToFit()
-            } else {
-                RoundedRectangle(cornerRadius: 8).fill(HouseTokens.brass)
-            }
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(LinearGradient(colors: [HouseTokens.brassLight, HouseTokens.brass, HouseTokens.brassDark], startPoint: .topLeading, endPoint: .bottomTrailing))
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .strokeBorder(HouseTokens.brassEngrave.opacity(0.45), lineWidth: 1.2)
+                .padding(5)
             GeometryReader { g in
                 VStack(spacing: -1) {
                     Text(text)
@@ -253,9 +261,8 @@ struct GoalPlaque: View {
                 }
                 .foregroundStyle(HouseTokens.brassEngrave.opacity(0.88))
                 .shadow(color: .white.opacity(0.5), radius: 0, x: 0, y: 1)
-                .rotationEffect(.degrees(-4))
-                .frame(width: g.size.width * 0.62)
-                .position(x: g.size.width * 0.52, y: g.size.height * 0.48)
+                .frame(width: g.size.width * 0.8)
+                .position(x: g.size.width * 0.5, y: g.size.height * 0.5)
             }
         }
         .dynamicTypeSize(.large)

@@ -27,6 +27,7 @@ struct OnbRoot: View {
                     .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 0, bottomTrailingRadius: 0))
 
                 OnbScene(flow: flow, step: flow.step)
+                    .environment(\.colorScheme, scheme)      // light/dark house renders follow the app theme
                     .frame(width: scene.width, height: scene.width)
                     .position(x: scene.midX, y: scene.midY)
 
@@ -69,10 +70,10 @@ struct OnbRoot: View {
             return CGRect(x: (W - s) / 2, y: top + 18, width: s, height: s)
         default:
             let chromeH: CGFloat = embedded ? 34 : 50
-            let avail = bandH - 22 - (top + chromeH)
-            let s = min(W * 0.94, avail * 1.16)
-            let midY = top + chromeH + avail / 2 + s * 0.02
-            return CGRect(x: (W - s) / 2, y: midY - s / 2, width: s, height: s)
+            let avail = bandH - 26 - (top + chromeH)
+            let s = min(W * 1.0, avail / 0.84)
+            // The render's content sits between y 0.10 (ridge) and 0.93 (lot corner).
+            return CGRect(x: (W - s) / 2, y: top + chromeH - 0.09 * s, width: s, height: s)
         }
     }
 

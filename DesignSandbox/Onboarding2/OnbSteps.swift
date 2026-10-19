@@ -28,7 +28,7 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
                     content.padding(.top, 20)
                 }
                 .padding(.horizontal, 24)
-                .padding(.top, 26)
+                .padding(.top, 22)
                 .padding(.bottom, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -214,6 +214,8 @@ struct OnbSampleRow: View {
                     .font(.footnote)
                     .foregroundStyle(PC.textSecondary)
                     .labelStyle(TightLabel())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 Text(title)
                     .font(.headline)
                     .foregroundStyle(PC.textPrimary)
@@ -228,7 +230,7 @@ struct OnbSampleRow: View {
                 .frame(width: 20, height: 20)
                 .accessibilityHidden(true)
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 8)
         .accessibilityElement(children: .combine)
         .accessibilityHint("Suggestion, not saved")
     }
@@ -480,9 +482,10 @@ struct MockTag: View {
             .font(.system(size: 10, weight: .semibold, design: .monospaced))
             .textCase(.uppercase)
             .tracking(1)
-            .foregroundStyle(onDark ? .white.opacity(0.9) : PC.textSecondary)
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .overlay(Capsule().strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [3, 2])).foregroundStyle(onDark ? .white.opacity(0.6) : PC.textTertiary))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 9).padding(.vertical, 4)
+            .background(Color.black.opacity(0.72), in: Capsule())
+            .overlay(Capsule().strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [3, 2])).foregroundStyle(.white.opacity(0.5)))
             .accessibilityHidden(true)
     }
 }
