@@ -36,6 +36,7 @@ struct OnbSystemPrompt: View {
                     .padding(.bottom, 18)
                     VStack(spacing: 8) {
                         button(allow, primary: true) { resolve(true) }
+                            .accessibilityIdentifier("prompt-allow")
                         button("Don’t Allow", primary: false) { resolve(false) }
                     }
                     .padding(.horizontal, 16)
@@ -71,7 +72,7 @@ struct OnbSystemPrompt: View {
         } else {
             flow.notify = granted
         }
-        flow.next(reduce: reduce)
+        if flow.stage == .onboarding { flow.next(reduce: reduce) }
     }
 }
 
@@ -86,9 +87,10 @@ struct OnbToday: View {
     private var empty: Bool { flow.cohort == .new && flow.skippedProperty }
     private var goalLine: String {
         switch flow.goal {
-        case .mp500, .mp100: "2026 · Material participation"
+        case .mp500: "2026 · 500-hour goal"
+        case .mp100: "2026 · 100-hour goal"
         case .record: "2026 · Record"
-        default: "2026 · REPS goal"
+        default: "2026 · 750-hour goal"
         }
     }
 
@@ -115,6 +117,7 @@ struct OnbToday: View {
                     }
                     hero
                     if flow.suggestions > 0 && !empty { toConfirm }
+                    if flow.cohort == .new && flow.calendar != .allowed { findHoursCard }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
@@ -122,7 +125,34 @@ struct OnbToday: View {
             }
             OnbTabBar(badge: flow.inboxBadge)
         }
+        .overlay { if let p = flow.prompt { OnbSystemPrompt(kind: p, flow: flow).transition(.opacity) } }
         .environment(\.colorScheme, scheme)
+    }
+
+    private var findHoursCard: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image("bp_tool_repairs_36")
+                .resizable().scaledToFit()
+                .frame(width: 40, height: 40)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Find hours in my calendar")
+                    .font(.headline).foregroundStyle(PC.textPrimary)
+                Text("We can look back 90 days for things like a plumber visit or a showing. You confirm each one.")
+                    .font(.subheadline).foregroundStyle(PC.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Look at my calendar") {
+                    withAnimation(.easeOut(duration: 0.2)) { flow.prompt = .calendar }
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(PC.action)
+                .frame(minHeight: 36)
+                .accessibilityIdentifier("today-find-hours")
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .background(PC.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private var initials: String { flow.cohort == .upgrade ? "PC" : (empty ? "LH" : "OS") }
@@ -140,24 +170,32 @@ struct OnbToday: View {
         ZStack(alignment: .topLeading) {
             HouseBlueprintPaper()
             GeometryReader { g in
-                let hs = min(g.size.width * (empty ? 0.5 : 0.6), g.size.height * 0.9)
+                let hs = min(g.size.width * (empty ? 0.5 : 0.58), g.size.height * 0.9)
+                let staked = flow.cohort == .new && !empty
+                // Room on the right for the flag, which hangs to the right of the post.
+                let rightGap: CGFloat = staked ? 44 : -6
                 ZStack(alignment: .topLeading) {
                     ZStack {
-                        HouseArtView(keyframe: HouseProgress.keyframe(for: hours), canvas: .blueprintHero)
-                        if !empty && flow.cohort == .new && flow.foundHours > 0 {
-                            HouseHatchedView(keyframe: HouseProgress.keyframe(for: Double(max(100, flow.foundHours)) + 0.0),
-                                             subtracting: .k00_lot, canvas: .blueprintHero)
+                        let kf = HouseProgress.keyframe(for: hours)
+                        Image(decorative: kf.builtImageName).resizable().interpolation(.high).scaledToFit()
+                        // New owners see the plot, not a finished drawing: the linework stays faint.
+                        HouseLineworkView(keyframe: kf, canvas: .blueprintHero)
+                            .opacity(flow.cohort == .new ? (empty ? 0.18 : 0.4) : 1)
+                        if staked && flow.foundHours > 0 {
+                            // Found-but-unconfirmed hours: hatched, never solid (the slab they would pour).
+                            HouseHatchedView(keyframe: .k01_slab, subtracting: .k00_lot, canvas: .blueprintHero)
                                 .transition(.opacity)
                         }
-                        if flow.cohort == .new && !empty {
-                            OnbScene.MiniStake(name: flow.name.isEmpty ? "Oak Street duplex" : flow.name)
+                        if staked {
+                            OnbScene.MiniStake(name: flow.name.isEmpty ? "Oak Street duplex" : flow.name,
+                                               maxFlagWidth: hs * (1 - OnbScene.stakeBase.x) + rightGap - 12)
                         }
                     }
                     .frame(width: hs, height: hs)
-                    .position(x: g.size.width - hs / 2 + 6, y: g.size.height - hs / 2 + 4)
+                    .position(x: g.size.width - hs / 2 - rightGap, y: g.size.height - hs / 2 + 4)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(goalLine).drafting(HouseTokens.drafting)
+                        Text(goalLine).drafting(HouseTokens.drafting).fixedSize()
                         Text("\(Int(hours))")
                             .font(.system(size: 56, weight: .bold, design: .rounded)).monospacedDigit()
                             .foregroundStyle(.white)
@@ -196,9 +234,9 @@ struct OnbToday: View {
             Text("Frame going up").font(.headline).foregroundStyle(.white)
             Text("Roof at 500h").font(.footnote).foregroundStyle(HouseTokens.onHeroSecondary)
         } else if flow.foundHours > 0 {
-            Text("\(flow.foundHours)h found")
+            Text("\(flow.foundText) found")
                 .font(.headline).foregroundStyle(.white)
-                .contentTransition(.numericText(value: Double(flow.foundHours)))
+                .contentTransition(.numericText(value: flow.foundHours))
             Text("Hatched until you confirm").font(.footnote).foregroundStyle(HouseTokens.onHeroSecondary)
         } else {
             Text("No hours logged yet").font(.headline).foregroundStyle(.white)
@@ -218,9 +256,9 @@ struct OnbToday: View {
             }
             .padding(.bottom, 4)
             let place = flow.name.isEmpty ? "Oak Street duplex" : flow.name
-            OnbSampleRow(hours: "2h", tool: "bp_tool_repairs_36", when: "Calendar · Wed 9–11", title: "Plumber at \(place)", category: "Repairs", categoryColor: BP.material(.repairs))
+            OnbSampleRow(hours: "2h", tool: "bp_tool_repairs_36", when: "Calendar · Wed 9–11", title: "Plumber at \(place)", category: "Repairs", categoryColor: onbCategoryColor(.repairs))
             Divider().overlay(PC.border).padding(.leading, 64)
-            OnbSampleRow(hours: "1h", tool: "bp_tool_showing_36", when: "Calendar · Sat 10–11", title: "Showing at \(place)", category: "Leasing", categoryColor: BP.material(.leasing))
+            OnbSampleRow(hours: "1h", tool: "bp_tool_showing_36", when: "Calendar · Sat 10–11", title: "Showing at \(place)", category: "Leasing", categoryColor: onbCategoryColor(.leasing))
         }
         .padding(16)
         .background(PC.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -232,6 +270,8 @@ extension OnbScene {
     /// The stake + flag, in the hero's keyframe camera.
     struct MiniStake: View {
         var name: String
+        /// Room to the right of the post; the sign shrinks or wraps to fit it, never clips.
+        var maxFlagWidth: CGFloat? = nil
         var body: some View {
             GeometryReader { g in
                 let s = g.size.width
@@ -242,7 +282,13 @@ extension OnbScene {
                         .frame(width: 3, height: s * 0.2)
                         .position(x: s * b.x, y: s * b.y - s * 0.1)
                     Color.clear.frame(width: 1, height: 1)
-                        .overlay(alignment: .leading) { Flag(name: name).frame(height: 16).fixedSize().scaleEffect(0.85, anchor: .leading) }
+                        .overlay(alignment: .leading) {
+                            let w = maxFlagWidth ?? (s - s * b.x - 6)
+                            Flag(name: name, maxTextWidth: max(40, w - 22))
+                                .frame(minHeight: 16)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(width: w, alignment: .leading)
+                        }
                         .position(x: s * b.x + 1.5, y: s * b.y - s * 0.2 + 8)
                 }
             }
@@ -299,7 +345,7 @@ struct OnbTabBar: View {
     }
 }
 
-// MARK: - "212h found" reveal: a sheet over Today, once, when the count settles
+// MARK: - "23h found" reveal: a sheet over Today, once, when the count settles
 
 struct OnbFoundReveal: View {
     @Bindable var flow: OnbFlow
@@ -313,7 +359,7 @@ struct OnbFoundReveal: View {
             HouseBlueprintPaper().ignoresSafeArea()
             VStack(spacing: 0) {
                 Text("Looking back 90 days").drafting(HouseTokens.drafting).padding(.top, 34)
-                Text("\(Int(shown))h found")
+                Text("\(OnbFlow.hours((shown * 2).rounded() / 2)) found")
                     .font(.system(size: 44, weight: .bold, design: .rounded)).monospacedDigit()
                     .foregroundStyle(.white)
                     .contentTransition(.numericText(value: shown))
@@ -321,15 +367,15 @@ struct OnbFoundReveal: View {
                 Text("from your calendar").font(.title3).foregroundStyle(HouseTokens.onHeroSecondary)
                 ZStack {
                     HouseArtView(keyframe: .k00_lot, canvas: .blueprintHero).opacity(lines)
-                    HouseHatchedView(keyframe: .k06_frame050, subtracting: .k00_lot, canvas: .blueprintHero)
-                        .mask(HouseRisingMask(progress: shown / 212))
+                    HouseHatchedView(keyframe: .k01_slab, subtracting: .k00_lot, canvas: .blueprintHero)
+                        .mask(HouseRisingMask(progress: shown / max(1, flow.foundHours)))
                     OnbScene.MiniStake(name: flow.name.isEmpty ? "Oak Street duplex" : flow.name)
                 }
                 .frame(width: 300, height: 300)
                 .padding(.top, 8)
                 Text("Nothing is saved until you confirm.")
                     .font(.body.weight(.semibold)).foregroundStyle(.white)
-                Text("Hatched storeys are suggestions. They turn solid only when you say they were work.")
+                Text("From \(flow.suggestions) calendar events. The hatched slab turns solid only when you say they were work.")
                     .font(.subheadline).foregroundStyle(HouseTokens.onHeroSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 36).padding(.top, 4)
@@ -338,16 +384,19 @@ struct OnbFoundReveal: View {
                     .buttonStyle(ProdHeroPill())
                     .padding(.horizontal, 24)
                 Button("Later") { dismiss() }
-                    .buttonStyle(ProdLink(color: .white))
+                    .buttonStyle(ProdHeroOutlinePill())
+                    .padding(.horizontal, 24)
+                    .padding(.top, 8)
                     .padding(.bottom, 8)
             }
         }
         .task {
-            if reduce { lines = 1; shown = 212; return }
+            let total = flow.foundHours
+            if reduce { lines = 1; shown = total; return }
             withAnimation(.easeOut(duration: 0.6)) { lines = 1 }
             try? await Task.sleep(for: .milliseconds(300))
             for step in 1...16 {
-                withAnimation(.linear(duration: 0.07)) { shown = 212 * Double(step) / 16 }
+                withAnimation(.linear(duration: 0.07)) { shown = total * Double(step) / 16 }
                 try? await Task.sleep(for: .milliseconds(70))
             }
         }

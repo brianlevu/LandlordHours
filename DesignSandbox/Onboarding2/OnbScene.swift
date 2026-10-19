@@ -22,7 +22,7 @@ struct OnbScene: View {
             ZStack(alignment: .topLeading) {
                 houseLayers
                 if step == .goal { scale(s).transition(.opacity) }
-                if showsScanLine { scanLine(s).transition(.opacity) }
+                if showsScanLine { scanLine(s, label: s > 180).transition(.opacity) }
                 hats(s)
                 if flow.stakeDropped { stake(s).transition(reduce ? .opacity : .asymmetric(insertion: .offset(y: -s * 0.3).combined(with: .opacity), removal: .opacity)) }
                 if step == .staked { plaque(s).transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottom))) }
@@ -45,15 +45,17 @@ struct OnbScene: View {
                         .opacity(step == .calendar ? 0.3 : 1)
                 }
             } else {
-                // Welcome: the half-built house. Every other step: the empty lot with the full drawing over it.
+                // Every step: the empty lot with the plan drawn over it. Nothing built is ever taken down.
                 ZStack {
                     Image(decorative: HouseKeyframe.k00_lot.builtImageName).resizable().interpolation(.high).scaledToFit()
                     HouseLineworkView(keyframe: .k00_lot, canvas: .blueprintHero)
                         .opacity([.property, .notify, .staked].contains(step) ? 0.45 : (step == .calendar ? 0.3 : 1))
                 }
-                .opacity(step == .welcome ? 0 : 1)
-                HouseArtView(keyframe: .k09_frame080, canvas: .blueprintHero)
-                    .opacity(step == .welcome ? 1 : 0)
+
+            }
+            if step == .staked && flow.scanDone && flow.foundHours > 0 && !upgrade {
+                HouseHatchedView(keyframe: .k01_slab, subtracting: .k00_lot, canvas: .blueprintHero)
+                    .transition(.opacity)
             }
             if hatchKeyframe != nil {
                 ZStack {
@@ -111,7 +113,7 @@ struct OnbScene: View {
         flow.calendar == .allowed && !flow.scanDone && [.calendar, .who, .property, .notify, .staked].contains(step)
     }
 
-    private func scanLine(_ s: CGFloat) -> some View {
+    private func scanLine(_ s: CGFloat, label: Bool) -> some View {
         let pts = [CGPoint(x: 0.04, y: 0.69), CGPoint(x: 0.5, y: 0.915), CGPoint(x: 0.96, y: 0.69)]
         return ZStack(alignment: .topLeading) {
             Path { p in p.addLines(pts.map { CGPoint(x: $0.x * s, y: $0.y * s) }) }
@@ -123,6 +125,7 @@ struct OnbScene: View {
             Text("Looking back 90 days")
                 .drafting(HouseTokens.drafting)
                 .fixedSize()
+                .opacity(label ? 1 : 0)
                 .position(x: s * 0.80, y: s * 0.16)
         }
     }
@@ -191,13 +194,19 @@ struct OnbScene: View {
 
 struct Flag: View {
     let name: String
+    var maxTextWidth: CGFloat? = nil
     var body: some View {
         HStack(spacing: 0) {
             Text(name)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Color(hex: 0x121B33))
-                .lineLimit(1)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: maxTextWidth, alignment: .leading)
                 .padding(.leading, 7).padding(.trailing, 4)
+                .padding(.vertical, 2)
                 .frame(maxHeight: .infinity)
                 .background(Color(hex: 0xF4EFE6))
             PennantTail().fill(Color(hex: 0xF4EFE6)).frame(width: 9)

@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 /// Onboarding shell. Welcome and Staked are full-bleed blueprint; steps 1–5 share one layout: a
 /// blueprint band (38% of height) holding the lot scene, a sheet below with one question.
@@ -8,6 +9,15 @@ struct OnbRoot: View {
     var embedded = false               // inside the What's-new sheet: no full-bleed, no status bar
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.onbScheme) private var scheme
+    @State private var keyboardUp = false
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    private var bandFraction: CGFloat {
+        if typeSize.isAccessibilitySize { return 0.22 }
+        if typeSize >= .xxLarge { return 0.30 }
+        if flow.step == .calendar { return embedded ? 0.22 : 0.33 }
+        return 0.38
+    }
 
     var body: some View {
         GeometryReader { g in
@@ -16,7 +26,7 @@ struct OnbRoot: View {
             let H = g.size.height + top + bottom
             let W = g.size.width
             let full = flow.step.isFullBleed && !embedded
-            let bandH = full ? H : (embedded ? H * 0.40 : H * 0.38)
+            let bandH = full ? H : (keyboardUp ? top + 50 + 96 : H * (embedded ? bandFraction + 0.02 : bandFraction))
             let scene = sceneFrame(W: W, H: H, top: top, bandH: bandH)
 
             ZStack(alignment: .top) {
@@ -57,6 +67,12 @@ struct OnbRoot: View {
             .overlay { if let p = flow.prompt { OnbSystemPrompt(kind: p, flow: flow).transition(.opacity) } }
         }
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: flow.stakeDropped)
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            withAnimation(reduce ? .easeInOut(duration: 0.2) : .spring(response: 0.35, dampingFraction: 0.9)) { keyboardUp = true }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            withAnimation(reduce ? .easeInOut(duration: 0.2) : .spring(response: 0.35, dampingFraction: 0.9)) { keyboardUp = false }
+        }
     }
 
     // MARK: Layout
@@ -205,16 +221,17 @@ struct OnbWelcomeContent: View {
                 Button("Start building") { flow.next(reduce: reduce) }
                     .buttonStyle(ProdHeroPill())
                     .accessibilityIdentifier("onb-start")
-                Button {} label: {
-                    Label("Sign in with Apple", systemImage: "apple.logo")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 16)
-                        .frame(minHeight: 40)
-                        .background(.black, in: Capsule())
+                // Apple's own button (App Review): white on the blueprint, small, under the pill.
+                HStack(spacing: 10) {
+                    Text("Have an account?")
+                        .font(.footnote)
+                        .foregroundStyle(HouseTokens.onHeroSecondary)
+                    SignInWithAppleButton(.signIn) { _ in } onCompletion: { _ in }
+                        .signInWithAppleButtonStyle(.white)
+                        .frame(width: 168, height: 36)
+                        .clipShape(Capsule())
                 }
-                .buttonStyle(Pressable())
-                .accessibilityHint("For returning users")
+                .padding(.top, 4)
                 Text("Your records stay on your iPhone and in your iCloud.")
                     .font(.footnote)
                     .foregroundStyle(HouseTokens.onHeroSecondary)
@@ -224,6 +241,11 @@ struct OnbWelcomeContent: View {
             .padding(.horizontal, 24)
             .padding(.top, 12)
             .padding(.bottom, bottomInset + 8)
+            .background(alignment: .top) {
+                LinearGradient(colors: [HouseTokens.blueprintDeep.opacity(0), HouseTokens.blueprintDeep.opacity(0.85)], startPoint: .top, endPoint: .init(x: 0.5, y: 0.25))
+                    .padding(.top, -24)
+                    .allowsHitTesting(false)
+            }
         }
     }
 
@@ -258,37 +280,48 @@ struct OnbStakedContent: View {
             Color.clear.frame(height: max(0, sceneBottom - 6))
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(countLine).drafting(HouseTokens.drafting)
-                    Text("Your house is staked.")
-                        .prodDisplay()
-                        .foregroundStyle(.white)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 8)
-                        .accessibilityAddTraits(.isHeader)
-                    Text(flow.goal == .record
-                         ? "Every hour you confirm from here goes in the book."
-                         : "Every hour you confirm from here goes up on the frame.")
-                        .font(.body)
-                        .foregroundStyle(HouseTokens.onHeroSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 10)
-                    if flow.calendar == .allowed {
-                        Group {
-                            if flow.scanDone {
-                                Text("\(flow.foundHours)h found · review when you're ready")
-                            } else {
-                                Text("Looking back 90 days · \(flow.foundHours)h so far")
-                            }
+                    if flow.calendar == .allowed && flow.scanDone && flow.foundHours > 0 {
+                        // The aha leads: what we found, then that it is theirs to confirm.
+                        Text("\(flow.name.isEmpty ? "Your rental" : flow.name) is staked").drafting(HouseTokens.drafting)
+                        Text("\(flow.foundText) found")
+                            .font(.system(size: 56, weight: .bold, design: .rounded)).monospacedDigit()
+                            .foregroundStyle(.white)
+                            .minimumScaleFactor(0.6)
+                            .lineLimit(1)
+                            .padding(.top, 6)
+                            .accessibilityAddTraits(.isHeader)
+                        Text("From \(flow.suggestions) calendar events in the last 90 days. Confirm the ones that were rental work and they go up on the frame.")
+                            .font(.body)
+                            .foregroundStyle(HouseTokens.onHeroSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 8)
+                        Text("\(countLine) counted so far").drafting(HouseTokens.drafting).padding(.top, 14)
+                    } else {
+                        Text(countLine).drafting(HouseTokens.drafting)
+                        Text("Your house is staked.")
+                            .prodDisplay()
+                            .foregroundStyle(.white)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 8)
+                            .accessibilityAddTraits(.isHeader)
+                        Text(flow.goal == .record
+                             ? "Every hour you confirm from here goes in the book."
+                             : "Every hour you confirm from here goes up on the frame.")
+                            .font(.body)
+                            .foregroundStyle(HouseTokens.onHeroSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 10)
+                        if flow.calendar == .allowed {
+                            Text("Looking back 90 days · \(flow.foundText) so far")
+                                .drafting(HouseTokens.drafting)
+                                .padding(.top, 16)
                         }
-                        .drafting(HouseTokens.drafting)
-                        .contentTransition(.numericText(value: Double(flow.foundHours)))
-                        .padding(.top, 16)
                     }
                 }
                 .padding(.horizontal, 24)
             }
             .scrollBounceBehavior(.basedOnSize)
-            Button("Go to Today") { flow.finish() }
+            Button(flow.calendar == .allowed && flow.scanDone && flow.suggestions > 0 ? "Review on Today" : "Go to Today") { flow.finish() }
                 .buttonStyle(ProdHeroPill())
                 .accessibilityIdentifier("onb-today")
                 .padding(.horizontal, 24)

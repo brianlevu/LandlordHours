@@ -9,6 +9,7 @@ struct OnbHost: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     init(arg: String, scheme: ColorScheme) {
+        NSLog("LHONB reduceMotion=%@", UIAccessibility.isReduceMotionEnabled ? "on" : "off")
         self.arg = arg
         self.scheme = scheme
         _flow = State(initialValue: OnbHost.makeFlow(arg))
@@ -42,11 +43,18 @@ struct OnbHost: View {
             }
         }
         .environment(\.onbScheme, scheme)
-        // The blueprint band sits under the status bar during onboarding: light status-bar content.
-        // Content colours follow the requested appearance through `onbScheme`.
-        .preferredColorScheme(flow.cohort == .new && flow.stage == .onboarding ? .dark : scheme)
+        // The window keeps the requested appearance (so the keyboard matches the system). Only the
+        // status bar goes light while the blueprint band sits under it.
+        .preferredColorScheme(scheme)
+        .onChange(of: flow.stage, initial: true) { _, _ in applyStatusBar() }
+        .task { try? await Task.sleep(for: .milliseconds(150)); applyStatusBar() }
         .task { await autoplay() }
         .task { await landing() }
+    }
+
+    private func applyStatusBar() {
+        let overBand = flow.cohort == .new && flow.stage == .onboarding
+        StatusBarStyler.set(overBand || scheme == .dark ? .lightContent : .darkContent)
     }
 
     // MARK: Static states
@@ -58,7 +66,7 @@ struct OnbHost: View {
         f.goal = goal == "none" ? nil : OnbGoal(rawValue: goal) ?? .reps750
         f.who = OnbWho(rawValue: d.string(forKey: "LHOnbWho") ?? "me") ?? .me
         f.name = d.string(forKey: "LHOnbName") ?? ""
-        if d.string(forKey: "LHOnbAuto") != nil { f.goal = nil; return f }
+        if d.string(forKey: "LHOnbAuto") != nil || arg == "flow" { f.goal = nil; return f }
 
         func at(_ s: OnbStep) { f.index = f.sequence.firstIndex(of: s) ?? 0 }
         let prompt = d.bool(forKey: "LHOnbPrompt")
@@ -69,15 +77,15 @@ struct OnbHost: View {
             at(.goal); f.index = 2; f.calendarRows = 3
             if prompt { f.prompt = .calendar }
         case "3":
-            at(.who); f.calendar = .allowed; f.scanProgress = 0.35; f.foundHours = 74; f.suggestions = 5
+            at(.who); f.calendar = .allowed; f.setFound(5)
         case "4":
-            at(.property); f.calendar = .allowed; f.scanProgress = 0.62; f.foundHours = 131; f.suggestions = 9
+            at(.property); f.calendar = .allowed; f.setFound(9)
             if d.bool(forKey: "LHOnbStaked") {
                 if f.name.isEmpty { f.name = "Oak Street duplex" }
                 f.stakeDropped = true; f.flagOpen = true
             }
         case "5":
-            at(.notify); f.calendar = .allowed; f.scanProgress = 0.85; f.foundHours = 180; f.suggestions = 12
+            at(.notify); f.calendar = .allowed; f.setFound(12)
             if f.name.isEmpty { f.name = "Oak Street duplex" }
             f.stakeDropped = true; f.flagOpen = true
             if prompt { f.prompt = .notify }
@@ -92,6 +100,11 @@ struct OnbHost: View {
             if arg == "today-reveal" { f.revealShown = true }
         case "today-skip":
             f.stage = .today; f.skippedProperty = true; f.calendar = .denied
+        case "today-nocal":
+            // Staked, but "Not now" on the calendar: Today keeps a calm way back to the ask.
+            f.stage = .today; f.calendar = .denied
+            if f.name.isEmpty { f.name = "Oak Street duplex" }
+            f.stakeDropped = true; f.flagOpen = true
         case "wn1", "wn2", "wn3":
             f.cohort = .upgrade
             f.goal = .reps750
@@ -110,7 +123,7 @@ struct OnbHost: View {
     private func landing() async {
         guard flow.cohort == .new else { return }
         while flow.stage != .today { try? await Task.sleep(for: .milliseconds(100)); if Task.isCancelled { return } }
-        guard UserDefaults.standard.string(forKey: "LHOnbAuto") != nil else { return }
+        guard UserDefaults.standard.string(forKey: "LHOnbAuto") != nil || arg == "flow" else { return }
         guard flow.calendar == .allowed else { return }
         try? await Task.sleep(for: .milliseconds(600))
         for i in 1...flow.suggestions {

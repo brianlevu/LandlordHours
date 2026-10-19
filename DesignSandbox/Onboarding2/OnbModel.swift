@@ -45,9 +45,31 @@ final class OnbFlow {
 
     // Non-blocking backfill
     var scanProgress: Double = 0       // 0…1
-    var foundHours = 0
+    var foundHours: Double = 0
     var suggestions = 0
     var scanDone: Bool { scanProgress >= 1 }
+
+    /// The one sample dataset every screen counts from: 14 calendar events, 23h in all.
+    static let sampleEvents: [(String, Double)] = [
+        ("Plumber", 2), ("Showing", 1), ("Inspection", 1.5), ("Hardware store run", 1),
+        ("Call with tenant", 0.5), ("Turnover cleaning", 4), ("Bookkeeping", 2), ("Showing", 1),
+        ("Lease signing", 1), ("Contractor walkthrough", 2), ("Water heater repair", 3),
+        ("Showing", 1), ("HOA meeting", 1.5), ("Property tax paperwork", 1.5),
+    ]
+    static var sampleTotal: Double { sampleEvents.reduce(0) { $0 + $1.1 } }
+
+    /// Sets the scan as if `n` of the 14 events have been found so far.
+    func setFound(_ n: Int) {
+        let k = max(0, min(n, Self.sampleEvents.count))
+        suggestions = k
+        foundHours = Self.sampleEvents.prefix(k).reduce(0) { $0 + $1.1 }
+        scanProgress = Double(k) / Double(Self.sampleEvents.count)
+    }
+
+    var foundText: String { OnbFlow.hours(foundHours) }
+    static func hours(_ h: Double) -> String {
+        h == h.rounded() ? "\(Int(h))h" : String(format: "%.1fh", h)
+    }
 
     // Today landing
     var inboxBadge = 0
@@ -109,22 +131,14 @@ final class OnbFlow {
     func startScan(reduce: Bool) {
         guard scanProgress == 0 else { return }
         Task { @MainActor in
-            let ticks = 60
-            for t in 1...ticks {
-                try? await Task.sleep(for: .milliseconds(150))
-                let p = Double(t) / Double(ticks)
-                withAnimation(.linear(duration: 0.15)) {
-                    scanProgress = p
-                    foundHours = Int((212 * p).rounded())
-                    suggestions = Int((14 * p).rounded())
-                }
+            for k in 1...Self.sampleEvents.count {
+                try? await Task.sleep(for: .milliseconds(620))
+                withAnimation(.linear(duration: 0.3)) { setFound(k) }
             }
         }
     }
 
-    func finishScanInstantly() {
-        scanProgress = 1; foundHours = 212; suggestions = 14
-    }
+    func finishScanInstantly() { setFound(Self.sampleEvents.count) }
 }
 
 enum OnbMotion {

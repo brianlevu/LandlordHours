@@ -5,39 +5,57 @@ import SwiftUI
 struct OnbStepScaffold<Content: View, Actions: View>: View {
     var title: String
     var subtitle: String? = nil
+    /// A short note that belongs beside the ask (trust lines, the CPA note). Pinned above the
+    /// actions; at accessibility text sizes it moves to the end of the scrolling content instead,
+    /// so the pinned area never crowds out the question.
+    var note: AnyView? = nil
     @ViewBuilder var content: Content
     @ViewBuilder var actions: Actions
     @Environment(\.onbBottomInset) private var bottomInset
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(title)
-                        .font(.system(.title, weight: .semibold))
-                        .foregroundStyle(PC.textPrimary)
+        let pinNote = !typeSize.isAccessibilitySize
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title)
+                    .font(.system(.title, weight: .semibold))
+                    .foregroundStyle(PC.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.body)
+                        .foregroundStyle(PC.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityAddTraits(.isHeader)
-                    if let subtitle {
-                        Text(subtitle)
-                            .font(.body)
-                            .foregroundStyle(PC.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 8)
-                    }
-                    content.padding(.top, 20)
+                        .padding(.top, 8)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 22)
-                .padding(.bottom, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                content.padding(.top, 20)
+                if !pinNote, let note { note.padding(.top, 16) }
             }
-            .scrollBounceBehavior(.basedOnSize)
-            VStack(spacing: 6) { actions }
-                .padding(.horizontal, 24)
-                .padding(.top, 8)
-                .padding(.bottom, bottomInset)
-                .background(PC.card)
+            .padding(.horizontal, 24)
+            .padding(.top, 22)
+            .padding(.bottom, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollIndicatorsFlash(onAppear: true)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 6) {
+                if pinNote, let note { note.padding(.bottom, 6) }
+                actions
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 10)
+            .padding(.bottom, bottomInset)
+            .background(PC.card)
+            // A short fade above the pinned area: content slides under it, never hard-cut.
+            .background(alignment: .top) {
+                LinearGradient(colors: [PC.card.opacity(0), PC.card], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 24)
+                    .offset(y: -24)
+                    .allowsHitTesting(false)
+            }
         }
     }
 }
@@ -48,6 +66,7 @@ struct OnbOptionCard<Extra: View>: View {
     var title: String
     var detail: String
     var badge: String? = nil
+    var hint: String? = nil
     var selected: Bool
     var action: () -> Void
     @ViewBuilder var extra: Extra
@@ -82,6 +101,13 @@ struct OnbOptionCard<Extra: View>: View {
                             .font(.subheadline)
                             .foregroundStyle(PC.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
+                        if let hint {
+                            Text(hint)
+                                .font(.footnote)
+                                .foregroundStyle(PC.textTertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.top, 2)
+                        }
                     }
                     Spacer(minLength: 4)
                     Image(systemName: selected ? "checkmark.circle.fill" : "circle")
@@ -107,8 +133,8 @@ struct OnbOptionCard<Extra: View>: View {
 }
 
 extension OnbOptionCard where Extra == EmptyView {
-    init(symbol: String? = nil, title: String, detail: String, badge: String? = nil, selected: Bool, action: @escaping () -> Void) {
-        self.init(symbol: symbol, title: title, detail: detail, badge: badge, selected: selected, action: action, extra: { EmptyView() })
+    init(symbol: String? = nil, title: String, detail: String, badge: String? = nil, hint: String? = nil, selected: Bool, action: @escaping () -> Void) {
+        self.init(symbol: symbol, title: title, detail: detail, badge: badge, hint: hint, selected: selected, action: action, extra: { EmptyView() })
     }
 }
 
@@ -130,11 +156,16 @@ struct OnbGoalStep: View {
     private var isMP: Bool { flow.goal == .mp500 || flow.goal == .mp100 }
 
     var body: some View {
-        OnbStepScaffold(title: "What are you building toward?") {
+        OnbStepScaffold(title: "What are you building toward?", note: AnyView(
+            Text("Change this any time. Reaching a number is based on your records; your CPA decides what it means.")
+                .font(.footnote)
+                .foregroundStyle(PC.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading))) {
             VStack(alignment: .leading, spacing: 12) {
                 OnbOptionCard(title: "750 hours · Real estate professional",
                               detail: "The full house. For owners who make rentals their main work.",
-                              badge: "Most common",
+                              hint: "Usually for people whose main job is real estate.",
                               selected: flow.goal == .reps750) { pick(.reps750) }
                     .accessibilityIdentifier("goal-750")
                 OnbOptionCard(title: "500 or 100 hours · Material participation",
@@ -154,11 +185,6 @@ struct OnbGoalStep: View {
                               detail: "No target. A clean log for your CPA.",
                               selected: flow.goal == .record) { pick(.record) }
                     .accessibilityIdentifier("goal-record")
-                Text("Change this any time. Reaching a number is based on your records; your CPA decides what it means.")
-                    .font(.footnote)
-                    .foregroundStyle(PC.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 4)
             }
         } actions: {
             Button(cta) { flow.next(reduce: reduce) }
@@ -203,7 +229,9 @@ struct OnbSampleRow: View {
                 .font(.system(.title3, design: .rounded, weight: .bold))
                 .monospacedDigit()
                 .foregroundStyle(PC.textPrimary)
-                .frame(minWidth: 52, alignment: .leading)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(width: 70, alignment: .leading)
             Image(tool)
                 .resizable()
                 .scaledToFit()
@@ -248,12 +276,19 @@ struct OnbCalendarStep: View {
 
     var body: some View {
         OnbStepScaffold(title: "Your calendar already knows.",
-                        subtitle: "We look back 90 days for things like a plumber visit, a showing or an inspection, then ask you.") {
+                        subtitle: "We look back 90 days for things like a plumber visit, a showing or an inspection, then ask you.",
+                        note: AnyView(
+                            // Trust at the ask: what we read, what we never do.
+                            VStack(alignment: .leading, spacing: 6) {
+                                trustLine("eye", PC.informational, "What we read:", "event titles and times.")
+                                trustLine("hand.raised.fill", PC.positive, "What we never do:", "send them anywhere, or log anything without you.")
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading))) {
             VStack(alignment: .leading, spacing: 14) {
                 VStack(spacing: 0) {
                     ForEach(Array(Self.rows.enumerated()), id: \.offset) { i, r in
-                        if i > 0 { Divider().overlay(PC.border).padding(.leading, 64) }
-                        OnbSampleRow(hours: r.0, tool: r.1, when: r.2, title: r.3, category: r.4, categoryColor: BP.material(r.5))
+                        if i > 0 { Divider().overlay(PC.border).padding(.leading, 82) }
+                        OnbSampleRow(hours: r.0, tool: r.1, when: r.2, title: r.3, category: r.4, categoryColor: onbCategoryColor(r.5))
                             .opacity(flow.calendarRows > i ? 1 : 0)
                             .offset(y: flow.calendarRows > i || reduce ? 0 : 6)
                     }
@@ -263,18 +298,6 @@ struct OnbCalendarStep: View {
                 .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(PC.border, lineWidth: 1))
             }
         } actions: {
-            // Trust at the ask: pinned beside the button, never scrolled away.
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "checkmark.shield.fill")
-                    .foregroundStyle(PC.positive)
-                    .accessibilityHidden(true)
-                Text("We read event titles on your phone. Nothing is saved until you confirm it.")
-                    .font(.footnote)
-                    .foregroundStyle(PC.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, 6)
             Button("Look at my calendar") { askCalendar() }
                 .buttonStyle(ProdPrimaryPill())
                 .accessibilityIdentifier("onb-primary")
@@ -282,7 +305,7 @@ struct OnbCalendarStep: View {
                 flow.calendar = .denied
                 flow.next(reduce: reduce)
             }
-            .buttonStyle(ProdLink())
+            .buttonStyle(ProdOutlinePill())
             .accessibilityIdentifier("onb-link")
         }
         .task {
@@ -293,6 +316,19 @@ struct OnbCalendarStep: View {
                 withAnimation(reduce ? .easeOut(duration: 0.2) : .easeOut(duration: 0.28)) { flow.calendarRows = i }
                 try? await Task.sleep(for: .milliseconds(reduce ? 0 : 380))
             }
+        }
+    }
+
+    private func trustLine(_ sym: String, _ tint: Color, _ lead: String, _ rest: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: sym)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(tint)
+                .frame(width: 18)
+                .accessibilityHidden(true)
+            (Text(lead).fontWeight(.semibold).foregroundStyle(PC.textPrimary) + Text(" " + rest).foregroundStyle(PC.textSecondary))
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -362,13 +398,18 @@ struct OnbPropertyStep: View {
         OnbStepScaffold(title: "Name your first rental.") {
             VStack(alignment: .leading, spacing: 12) {
                 if flow.calendar == .allowed && flow.suggestions > 0 {
-                    Label("\(flow.suggestions) suggestions waiting", systemImage: "tray.and.arrow.down")
+                    Label(flow.scanDone ? "\(flow.suggestions) suggestions waiting" : "\(flow.suggestions) suggestions so far · still looking",
+                          systemImage: "tray.and.arrow.down")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(PC.draftingInk)
                         .contentTransition(.numericText(value: Double(flow.suggestions)))
                         .transition(.opacity)
                 }
-                TextField("Oak Street duplex", text: $flow.name)
+                Text("Property name")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(PC.textPrimary)
+                    .accessibilityHidden(true)
+                TextField("", text: $flow.name, prompt: Text("Oak Street duplex").foregroundStyle(PC.textTertiary))
                     .font(.body)
                     .foregroundStyle(PC.textPrimary)
                     .focused($focused)
@@ -382,7 +423,7 @@ struct OnbPropertyStep: View {
                     .accessibilityLabel("Rental name")
                     .accessibilityIdentifier("property-name")
                 if flow.addressOpen {
-                    TextField("Street address (optional)", text: $address)
+                    TextField("", text: $address, prompt: Text("Street address (optional)").foregroundStyle(PC.textTertiary))
                         .font(.body)
                         .padding(.horizontal, 16)
                         .frame(minHeight: 52)
@@ -406,16 +447,18 @@ struct OnbPropertyStep: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         } actions: {
-            Button("Stake it") { stake() }
+            Button(flow.stakeDropped ? "Continue" : "Stake it") {
+                if flow.stakeDropped { flow.next(reduce: reduce) } else { stake() }
+            }
                 .buttonStyle(ProdPrimaryPill())
-                .disabled(flow.name.trimmingCharacters(in: .whitespaces).isEmpty || flow.stakeDropped)
+                .disabled(flow.name.trimmingCharacters(in: .whitespaces).isEmpty)
                 .accessibilityIdentifier("onb-primary")
             Button("I'll add it later") {
                 focused = false
                 flow.skippedProperty = true
                 flow.next(reduce: reduce)
             }
-            .buttonStyle(ProdLink())
+            .buttonStyle(ProdOutlinePill())
             .accessibilityIdentifier("onb-link")
         }
         .onChange(of: UserDefaults.standard.bool(forKey: "LHOnbFocus"), initial: true) { _, f in focused = f }
@@ -521,5 +564,15 @@ struct OnbNotifyStep: View {
             .buttonStyle(ProdOutlinePill())
             .accessibilityIdentifier("onb-secondary")
         }
+    }
+}
+
+/// Category ink as the shipped Inbox draws it: Leasing is the rose token (#B04266 / #F08BAA),
+/// never the concept's plum violet.
+func onbCategoryColor(_ c: Category) -> Color {
+    switch c {
+    case .leasing: PC.rose
+    case .repairs: PC.timberInk
+    default: PC.informational
     }
 }

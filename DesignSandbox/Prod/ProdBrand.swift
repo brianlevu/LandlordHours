@@ -130,7 +130,7 @@ struct ProdOutlinePill: ButtonStyle {
             .font(.body.weight(.semibold))
             .frame(maxWidth: .infinity, minHeight: 52)
             .foregroundStyle(PC.action)
-            .overlay(Capsule().strokeBorder(PC.action.opacity(0.55), lineWidth: 1.5))
+            .overlay(Capsule().strokeBorder(PC.action, lineWidth: 1.5))
             .contentShape(Capsule())
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
@@ -162,5 +162,19 @@ struct ProdLink: ButtonStyle {
             .contentShape(Rectangle())
             .opacity(configuration.isPressed ? 0.6 : 1)
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
+    }
+}
+
+/// The secondary outline on blueprint (white).
+struct ProdHeroOutlinePill: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.body.weight(.semibold))
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .foregroundStyle(.white)
+            .overlay(Capsule().strokeBorder(.white, lineWidth: 1.5))
+            .contentShape(Capsule())
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
