@@ -22,7 +22,11 @@ private enum AuditFixture {
         attachments: [TimeAttachment] = [],
         source: EntrySource = .manual,
         loggedAt: Date? = nil,
-        editedAt: Date? = nil
+        editedAt: Date? = nil,
+        detectedAt: Date? = nil,
+        confirmedAt: Date? = nil,
+        sourceDetail: String? = nil,
+        rawImportSource: String? = nil
     ) -> TimeEntry {
         var entry = TimeEntry(
             propertyId: property.id,
@@ -32,7 +36,10 @@ private enum AuditFixture {
             date: date,
             notes: notes,
             attachments: attachments,
-            importSource: source.storedValue
+            importSource: rawImportSource ?? source.storedValue,
+            detectedAt: detectedAt,
+            confirmedAt: confirmedAt,
+            sourceDetail: sourceDetail
         )
         let logged = loggedAt ?? date.addingTimeInterval(3600)
         entry.createdAt = logged
@@ -145,6 +152,64 @@ final class AuditReportBuilderTests: XCTestCase {
         XCTAssertNil(report.entries[0].lastEditedAt)
         XCTAssertEqual(report.entries[1].lastEditedAt, F.date(2026, 3, 1, 8))
         XCTAssertEqual(report.entries[0].loggedAt, logged)
+    }
+
+    func testProvenanceLabelsForEverySourceType() {
+        let day = F.date(2026, 5, 4)
+        func row(_ raw: String?, confirmed: Date? = nil) -> AuditReport.EntryRow {
+            build([F.entry(property: F.oak, hours: 1, date: day, confirmedAt: confirmed, rawImportSource: raw)]).entries[0]
+        }
+        XCTAssertEqual(row(nil).sourceLabel, "Manual")
+        XCTAssertEqual(row("timer").sourceLabel, "Timer")
+        XCTAssertEqual(row("voice").sourceLabel, "Voice")
+        XCTAssertEqual(row("calendar").sourceLabel, "Calendar import")
+        XCTAssertEqual(row("calendar", confirmed: day).sourceLabel, "Calendar suggestion")
+        XCTAssertEqual(row("receipt").sourceLabel, "Receipt")
+        XCTAssertEqual(row("from-the-future").sourceLabel, "Other")
+        XCTAssertEqual(row("manual").sourceLabel, "Other", "a literal manual value is unknown data")
+    }
+
+    func testLegacyRowsCarryNoDetectedOrConfirmedDates() {
+        let legacy = build([F.entry(property: F.oak, hours: 1, date: F.date(2026, 5, 4), source: .calendar)]).entries[0]
+        XCTAssertNil(legacy.detectedAt)
+        XCTAssertNil(legacy.confirmedAt)
+        XCTAssertNil(legacy.confirmedDaysLater)
+        XCTAssertNil(legacy.confirmationLagText)
+        XCTAssertEqual(legacy.sourceLabel, "Calendar import")
+    }
+
+    func testConfirmationLagOnlyBeyondSevenDays() {
+        func lag(_ days: Int) -> AuditReport.EntryRow {
+            let detected = F.date(2026, 5, 1, 23, 30)
+            let confirmed = F.calendar.date(byAdding: .day, value: days, to: detected)!
+            return build([F.entry(property: F.oak, hours: 1, date: F.date(2026, 5, 1), source: .calendar, detectedAt: detected, confirmedAt: confirmed)]).entries[0]
+        }
+        XCTAssertNil(lag(0).confirmedDaysLater, "same-day confirmation shows no lag")
+        XCTAssertNil(lag(7).confirmedDaysLater, "exactly 7 days is not beyond 7")
+        XCTAssertEqual(lag(8).confirmedDaysLater, 8)
+        XCTAssertEqual(lag(8).confirmationLagText, "confirmed 8 days later")
+        XCTAssertEqual(lag(120).confirmationLagText, "confirmed 120 days later")
+        // Unconfirmed suggestion: no lag.
+        let pending = build([F.entry(property: F.oak, hours: 1, date: F.date(2026, 5, 1), source: .calendar, detectedAt: F.date(2026, 5, 1))]).entries[0]
+        XCTAssertNil(pending.confirmedDaysLater)
+    }
+
+    func testSourceTotalsCountEachSourceOnceInFixedOrder() {
+        let day = F.date(2026, 5, 4)
+        let report = build([
+            F.entry(property: F.oak, hours: 1, date: day, source: .voice),
+            F.entry(property: F.oak, hours: 1, date: day),
+            F.entry(property: F.oak, hours: 1, date: day, source: .calendar, detectedAt: day, confirmedAt: day),
+            F.entry(property: F.oak, hours: 1, date: day, source: .calendar, detectedAt: day, confirmedAt: day),
+            F.entry(property: F.oak, hours: 1, date: day, source: .calendar),
+            F.entry(property: F.oak, hours: 1, date: day, rawImportSource: "zzz"),
+        ])
+        XCTAssertEqual(report.sourceTotals, [
+            .init(label: "Manual", entryCount: 1), .init(label: "Voice", entryCount: 1),
+            .init(label: "Calendar import", entryCount: 1), .init(label: "Calendar suggestion", entryCount: 2),
+            .init(label: "Other", entryCount: 1),
+        ])
+        XCTAssertEqual(report.sourceTotals.map(\.entryCount).reduce(0, +), report.summary.entryCount)
     }
 
     func testSourceMapping() {
@@ -344,6 +409,34 @@ final class AuditReportCSVTests: XCTestCase {
         XCTAssertEqual(field("entry_ref"), "E1")
     }
 
+    func testProvenanceColumnsAndSourceDetailEscaping() {
+        let detected = F.date(2026, 4, 2, 8, 0)
+        let confirmed = F.date(2026, 4, 20, 9, 15)
+        let suggested = F.entry(property: F.oak, hours: 1, date: F.date(2026, 4, 2), source: .calendar,
+                                detectedAt: detected, confirmedAt: confirmed,
+                                sourceDetail: "=HYPERLINK(\"http://x\"), \"Showing\"\nunit 2")
+        let legacy = F.entry(property: F.oak, hours: 1, date: F.date(2026, 4, 3), source: .calendar, sourceDetail: "Plain, event")
+        let report = AuditReportBuilder.build(AuditReportBuilder.Input(entries: [suggested, legacy], properties: [F.oak], taxYear: 2026))
+        let rows = Self.parse(AuditReportCSV.make(report))
+        XCTAssertEqual(rows.count, 3)
+        let header = rows[0]
+        XCTAssertEqual(header, AuditReportCSV.header)
+        func field(_ row: [String], _ name: String) -> String { row[header.firstIndex(of: name)!] }
+        XCTAssertEqual(rows[1].count, header.count)
+        XCTAssertEqual(field(rows[1], "source"), "Calendar suggestion")
+        XCTAssertEqual(field(rows[1], "confirmation_lag"), "confirmed 18 days later")
+        XCTAssertEqual(field(rows[1], "source_detail"), "'=HYPERLINK(\"http://x\"), \"Showing\"\nunit 2", "guarded and round-trips through quoting")
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime]
+        XCTAssertEqual(parser.date(from: field(rows[1], "detected_at")), detected)
+        XCTAssertEqual(parser.date(from: field(rows[1], "confirmed_at")), confirmed)
+        XCTAssertEqual(field(rows[2], "source"), "Calendar import")
+        XCTAssertEqual(field(rows[2], "detected_at"), "")
+        XCTAssertEqual(field(rows[2], "confirmed_at"), "")
+        XCTAssertEqual(field(rows[2], "confirmation_lag"), "")
+        XCTAssertEqual(field(rows[2], "source_detail"), "Plain, event")
+    }
+
     func testHoursColumnStaysNumericForNegativeOrNegativeZero() {
         let negZero = F.entry(property: F.oak, hours: -0.0, date: F.date(2026, 4, 1))
         let negative = F.entry(property: F.oak, hours: -2, date: F.date(2026, 4, 2))
@@ -518,13 +611,26 @@ final class AuditReportPDFTests: XCTestCase {
             default: notes = "\(categories[i % categories.count].rawValue) at \(property.name)"
             }
             let source: EntrySource = [.manual, .timer, .voice, .calendar][i % 4]
+            // Mixed provenance: some calendar rows are 2.0 suggestions (same-day, late, bulk), a few are other sources.
+            var detectedAt: Date?, confirmedAt: Date?, detail: String?
+            var rawSource: String?
+            if source == .calendar {
+                switch i % 12 {
+                case 3: detectedAt = day.addingTimeInterval(2 * 3600); confirmedAt = day.addingTimeInterval(5 * 3600); detail = "Showing unit 2, Oak St"
+                case 7: detectedAt = day.addingTimeInterval(2 * 3600); confirmedAt = F.date(2026, 10, 14, 20, 5); detail = "=Plumber visit"
+                default: break
+                }
+            }
+            if i == 5 { rawSource = "receipt"; detectedAt = day; confirmedAt = day.addingTimeInterval(7200) }
+            if i == 14 { rawSource = "from-a-newer-build" }
             let editedAt: Date? = i % 7 == 0 ? day.addingTimeInterval(86_400 * 3) : nil
             entries.append(F.entry(
                 property: property, participant: participant,
                 category: categories[i % categories.count],
                 hours: [1.5, 2, 3.25, 4, 0.75][i % 5],
                 date: day, notes: notes, attachments: attachments,
-                source: source, loggedAt: day.addingTimeInterval(3 * 3600), editedAt: editedAt
+                source: source, loggedAt: day.addingTimeInterval(3 * 3600), editedAt: editedAt,
+                detectedAt: detectedAt, confirmedAt: confirmedAt, sourceDetail: detail, rawImportSource: rawSource
             ))
         }
         entries.append(F.entry(property: F.idle, hours: 9, date: F.date(2025, 11, 2)))
@@ -560,6 +666,20 @@ final class AuditReportPDFTests: XCTestCase {
         XCTAssertTrue(pages[notePage].contains("Material participation by property"), "small tables move whole instead of splitting")
     }
 
+    func testPDFShowsProvenanceColumnsAndSourceAppendix() throws {
+        let (report, images) = Self.sampleReport()
+        let document = try XCTUnwrap(PDFDocument(data: AuditReportPDFRenderer(attachmentData: { images[$0.id] }).render(report)))
+        let all = document.string ?? ""
+        for expected in ["Detected", "Confirmed", "Calendar suggestion", "Calendar import", "Receipt", "Other",
+                         "Appendix: where entries came from", AuditReportFormat.suggestionExplanation, "days later"] {
+            XCTAssertTrue(all.contains(expected), "missing \(expected)")
+        }
+        for banned in ["audit-proof", "audit proof", "score", "%"] {
+            XCTAssertFalse(all.lowercased().contains(banned), "report must stay factual: \(banned)")
+        }
+        XCTAssertTrue(report.sourceTotals.contains { $0.label == "Calendar suggestion" })
+    }
+
     func testPDFHasFooterOnEveryPageAndAllSections() throws {
         let (report, images) = Self.sampleReport()
         let pdf = AuditReportPDFRenderer(attachmentData: { images[$0.id] }).render(report)
@@ -587,7 +707,7 @@ final class AuditReportPDFTests: XCTestCase {
         let (report, images) = Self.sampleReport()
         let directory: URL
         if let hostHome = ProcessInfo.processInfo.environment["SIMULATOR_HOST_HOME"] {
-            directory = URL(fileURLWithPath: hostHome).appendingPathComponent("AgentScratch/landlordhours/2026-10-17/export-samples-r4", isDirectory: true)
+            directory = URL(fileURLWithPath: hostHome).appendingPathComponent("AgentScratch/landlordhours/2026-10-19/wp5-samples", isDirectory: true)
         } else {
             directory = FileManager.default.temporaryDirectory.appendingPathComponent("export-samples", isDirectory: true)
         }

@@ -118,6 +118,7 @@ private final class Composer {
         drawQualification()
         drawBreakdowns()
         drawEntryTable()
+        drawSourceAppendix()
         drawAttachmentAppendix()
         finishPage()
     }
@@ -268,7 +269,7 @@ private final class Composer {
         guard !report.isEmpty else { return }
         newPage()
         sectionTitle("Time entries (chronological)")
-        note("Logged = when the entry was saved in the app. Last edited appears only when the entry was changed after it was logged. Attachments refer to the photo appendix.")
+        note("Logged = when the entry was saved in the app. Last edited appears only when the entry was changed after it was logged. Detected and Confirmed appear only for entries the app suggested; other entries show Logged only. Attachments refer to the photo appendix.")
         y += 4
 
         let maxDescription = 900
@@ -287,28 +288,51 @@ private final class Composer {
                 description,
                 timestampFormatter.string(from: row.loggedAt),
                 row.lastEditedAt.map { timestampFormatter.string(from: $0) } ?? "",
-                row.source.displayName,
+                row.sourceLabel,
+                row.detectedAt.map { timestampFormatter.string(from: $0) } ?? "",
+                confirmedCell(row),
                 row.attachmentRefs.joined(separator: ", "),
             ]
         }
         table(
             columns: [
-                Column(title: "Ref", width: 28),
-                Column(title: "Date", width: 50),
-                Column(title: "Property", width: 75),
-                Column(title: "Category", width: 85),
-                Column(title: "Who", width: 36),
-                Column(title: "Hours", width: 34, alignment: .right),
-                Column(title: "Description", width: 186),
-                Column(title: "Logged", width: 62),
-                Column(title: "Last edited", width: 62),
-                Column(title: "Source", width: 52),
-                Column(title: "Attach.", width: 50),
+                Column(title: "Ref", width: 26),
+                Column(title: "Date", width: 48),
+                Column(title: "Property", width: 60),
+                Column(title: "Category", width: 70),
+                Column(title: "Who", width: 38),
+                Column(title: "Hours", width: 32, alignment: .right),
+                Column(title: "Description", width: 124),
+                Column(title: "Logged", width: 56),
+                Column(title: "Last edited", width: 56),
+                Column(title: "Source", width: 56),
+                Column(title: "Detected", width: 56),
+                Column(title: "Confirmed", width: 62),
+                Column(title: "Attach.", width: 36),
             ],
             rows: rows
         )
         y += 6
         drawText("Total: \(report.summary.entryCount) entries, \(AuditReportFormat.hours(report.summary.totalHours)) hours.", font: bodyBoldFont)
+    }
+
+    private func confirmedCell(_ row: AuditReport.EntryRow) -> String {
+        guard let confirmed = row.confirmedAt else { return "" }
+        var cell = timestampFormatter.string(from: confirmed)
+        if let lag = row.confirmationLagText { cell += "\n" + lag }
+        return cell
+    }
+
+    private func drawSourceAppendix() {
+        guard !report.isEmpty else { return }
+        ensureSpace(150)
+        y += 14
+        sectionTitle("Appendix: where entries came from")
+        table(
+            columns: [Column(title: "Source", width: 220), Column(title: "Entries", width: 80, alignment: .right)],
+            rows: report.sourceTotals.map { [$0.label, "\($0.entryCount)"] },
+            trailingNote: AuditReportFormat.suggestionExplanation
+        )
     }
 
     private func drawAttachmentAppendix() {

@@ -118,10 +118,31 @@ struct AuditReport {
         /// nil when the entry was never edited after it was logged.
         let lastEditedAt: Date?
         let source: EntrySource
+        /// When the app first proposed the entry. nil for manual, timer, voice and pre-2.0 rows.
+        let detectedAt: Date?
+        /// When the user confirmed a suggestion. nil for entries that were never suggestions.
+        let confirmedAt: Date?
+        /// Free-text detail the source recorded (for example a calendar event title).
+        let sourceDetail: String?
+        /// Whole days between detection and confirmation, only when more than 7. Otherwise nil.
+        let confirmedDaysLater: Int?
         let attachmentRefs: [String]
         let attachmentFilenames: [String]
 
         var reference: String { "E\(number)" }
+
+        /// Plain source label: "Calendar suggestion" for a confirmed calendar suggestion.
+        var sourceLabel: String { AuditReportFormat.sourceLabel(source: source, confirmedAt: confirmedAt) }
+
+        /// "confirmed N days later", shown only when the gap is more than 7 days.
+        var confirmationLagText: String? {
+            confirmedDaysLater.map { "confirmed \($0) days later" }
+        }
+    }
+
+    struct SourceTotal: Equatable {
+        let label: String
+        let entryCount: Int
     }
 
     struct AttachmentRef {
@@ -145,6 +166,8 @@ struct AuditReport {
     let categoryTotals: [CategoryTotal]
     let participantTotals: [ParticipantTotal]
     let entries: [EntryRow]
+    /// Entry counts per source, in a fixed order, only sources that appear.
+    let sourceTotals: [SourceTotal]
     let attachments: [AttachmentRef]
 
     var isEmpty: Bool { entries.isEmpty }
@@ -245,9 +268,19 @@ enum AuditReportBuilder {
                 loggedAt: entry.createdAt,
                 lastEditedAt: edited ? entry.modifiedAt : nil,
                 source: entry.source,
+                detectedAt: entry.detectedAt,
+                confirmedAt: entry.confirmedAt,
+                sourceDetail: entry.sourceDetail,
+                confirmedDaysLater: confirmedDaysLater(entry, calendar: calendar),
                 attachmentRefs: refs,
                 attachmentFilenames: entry.attachments.map(\.filename)
             ))
+        }
+
+        // Counts per source label, in a stable order.
+        let sourceCounts = Dictionary(grouping: rows, by: \.sourceLabel).mapValues(\.count)
+        let sourceTotals = AuditReportFormat.sourceLabelOrder.compactMap { label in
+            sourceCounts[label].map { AuditReport.SourceTotal(label: label, entryCount: $0) }
         }
 
         // Per-property totals: only properties with entries this year, in first-seen-by-name order.
@@ -357,8 +390,18 @@ enum AuditReportBuilder {
             categoryTotals: categoryTotals,
             participantTotals: participantTotals,
             entries: rows,
+            sourceTotals: sourceTotals,
             attachments: attachmentRefs
         )
+    }
+
+    /// Days from detection to confirmation (calendar days in the report's zone) when more than 7.
+    static let lagThresholdDays = 7
+
+    private static func confirmedDaysLater(_ entry: TimeEntry, calendar: Calendar) -> Int? {
+        guard let detected = entry.detectedAt, let confirmed = entry.confirmedAt else { return nil }
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: detected), to: calendar.startOfDay(for: confirmed)).day ?? 0
+        return days > lagThresholdDays ? days : nil
     }
 
     private static func sum(_ entries: [TimeEntry]) -> Double {
@@ -383,6 +426,21 @@ enum AuditReportBuilder {
 
 enum AuditReportFormat {
     static let disclaimer = "LandlordHours is a record-keeping tool, not tax advice. Review your qualification with a tax professional."
+
+    static let suggestionExplanation = "Suggested entries were proposed by the app (for example, from your calendar or a receipt) and added to your record only when you confirmed them."
+
+    static let calendarSuggestionLabel = "Calendar suggestion"
+
+    /// Labels in report order. Sources added after 2.0 ship use their own display name.
+    static let sourceLabelOrder: [String] = [
+        "Manual", "Timer", "Voice", "Calendar import", calendarSuggestionLabel,
+        "Receipt", "Location", "Shortcut", "Gmail", "Other",
+    ]
+
+    static func sourceLabel(source: EntrySource, confirmedAt: Date?) -> String {
+        if source == .calendar, confirmedAt != nil { return calendarSuggestionLabel }
+        return source.displayName
+    }
 
     static func hours(_ value: Double) -> String {
         String(format: "%.2f", value)
