@@ -1,0 +1,283 @@
+{
+ "tools": [
+  {
+   "category": "repairs",
+   "label": "Repairs \u00b7 wrench",
+   "images": [
+    "bp_tool_repairs_36",
+    "bp_tool_repairs_56"
+   ]
+  },
+  {
+   "category": "showing",
+   "label": "Showing / leasing \u00b7 sign",
+   "images": [
+    "bp_tool_showing_36",
+    "bp_tool_showing_56"
+   ]
+  },
+  {
+   "category": "comms",
+   "label": "Tenant comms \u00b7 phone",
+   "images": [
+    "bp_tool_comms_36",
+    "bp_tool_comms_56"
+   ]
+  },
+  {
+   "category": "bookkeeping",
+   "label": "Bookkeeping \u00b7 ledger",
+   "images": [
+    "bp_tool_bookkeeping_36",
+    "bp_tool_bookkeeping_56"
+   ]
+  },
+  {
+   "category": "travel",
+   "label": "Travel \u00b7 truck",
+   "images": [
+    "bp_tool_travel_36",
+    "bp_tool_travel_56"
+   ]
+  },
+  {
+   "category": "inspection",
+   "label": "Inspection \u00b7 flashlight",
+   "images": [
+    "bp_tool_inspection_36",
+    "bp_tool_inspection_56"
+   ]
+  },
+  {
+   "category": "renovation",
+   "label": "Renovation \u00b7 roller",
+   "images": [
+    "bp_tool_renovation_36",
+    "bp_tool_renovation_56"
+   ]
+  },
+  {
+   "category": "cleaning",
+   "label": "Turnover \u00b7 bucket + sponge",
+   "images": [
+    "bp_tool_cleaning_36",
+    "bp_tool_cleaning_56"
+   ]
+  },
+  {
+   "category": "legal",
+   "label": "Legal / admin \u00b7 sealed document",
+   "images": [
+    "bp_tool_legal_36",
+    "bp_tool_legal_56"
+   ]
+  },
+  {
+   "category": "supplies",
+   "label": "Supplies \u00b7 hardware bag",
+   "images": [
+    "bp_tool_supplies_36",
+    "bp_tool_supplies_56"
+   ]
+  },
+  {
+   "category": "management",
+   "label": "Management \u00b7 clipboard",
+   "images": [
+    "bp_tool_management_36",
+    "bp_tool_management_56"
+   ]
+  }
+ ],
+ "house": [
+  {
+   "key": "k00_lot",
+   "state": {
+    "stage": 0
+   },
+   "built": "bp_house_k00_lot_built",
+   "lines": "bp_house_k00_lot_lines"
+  },
+  {
+   "key": "k01_slab",
+   "state": {
+    "stage": 1
+   },
+   "built": "bp_house_k01_slab_built",
+   "lines": "bp_house_k01_slab_lines"
+  },
+  {
+   "key": "k02_frame010",
+   "state": {
+    "stage": 2,
+    "p": 0.1
+   },
+   "built": "bp_house_k02_frame010_built",
+   "lines": "bp_house_k02_frame010_lines"
+  },
+  {
+   "key": "k03_frame020",
+   "state": {
+    "stage": 2,
+    "p": 0.2
+   },
+   "built": "bp_house_k03_frame020_built",
+   "lines": "bp_house_k03_frame020_lines"
+  },
+  {
+   "key": "k04_frame030",
+   "state": {
+    "stage": 2,
+    "p": 0.30000000000000004
+   },
+   "built": "bp_house_k04_frame030_built",
+   "lines": "bp_house_k04_frame030_lines"
+  },
+  {
+   "key": "k05_frame040",
+   "state": {
+    "stage": 2,
+    "p": 0.4
+   },
+   "built": "bp_house_k05_frame040_built",
+   "lines": "bp_house_k05_frame040_lines"
+  },
+  {
+   "key": "k06_frame050",
+   "state": {
+    "stage": 2,
+    "p": 0.5
+   },
+   "built": "bp_house_k06_frame050_built",
+   "lines": "bp_house_k06_frame050_lines"
+  },
+  {
+   "key": "k07_frame060",
+   "state": {
+    "stage": 2,
+    "p": 0.6000000000000001
+   },
+   "built": "bp_house_k07_frame060_built",
+   "lines": "bp_house_k07_frame060_lines"
+  },
+  {
+   "key": "k08_frame070",
+   "state": {
+    "stage": 2,
+    "p": 0.7000000000000001
+   },
+   "built": "bp_house_k08_frame070_built",
+   "lines": "bp_house_k08_frame070_lines"
+  },
+  {
+   "key": "k09_frame080",
+   "state": {
+    "stage": 2,
+    "p": 0.8
+   },
+   "built": "bp_house_k09_frame080_built",
+   "lines": "bp_house_k09_frame080_lines"
+  },
+  {
+   "key": "k10_frame090",
+   "state": {
+    "stage": 2,
+    "p": 0.9
+   },
+   "built": "bp_house_k10_frame090_built",
+   "lines": "bp_house_k10_frame090_lines"
+  },
+  {
+   "key": "k11_frame100",
+   "state": {
+    "stage": 2,
+    "p": 1.0
+   },
+   "built": "bp_house_k11_frame100_built",
+   "lines": "bp_house_k11_frame100_lines"
+  },
+  {
+   "key": "k12_roof",
+   "state": {
+    "stage": 3,
+    "p": 1.0
+   },
+   "built": "bp_house_k12_roof_built",
+   "lines": "bp_house_k12_roof_lines"
+  },
+  {
+   "key": "k13_siding020",
+   "state": {
+    "stage": 4,
+    "p": 0.2
+   },
+   "built": "bp_house_k13_siding020_built",
+   "lines": "bp_house_k13_siding020_lines"
+  },
+  {
+   "key": "k14_siding040",
+   "state": {
+    "stage": 4,
+    "p": 0.4
+   },
+   "built": "bp_house_k14_siding040_built",
+   "lines": "bp_house_k14_siding040_lines"
+  },
+  {
+   "key": "k15_siding060",
+   "state": {
+    "stage": 4,
+    "p": 0.6000000000000001
+   },
+   "built": "bp_house_k15_siding060_built",
+   "lines": "bp_house_k15_siding060_lines"
+  },
+  {
+   "key": "k16_siding080",
+   "state": {
+    "stage": 4,
+    "p": 0.8
+   },
+   "built": "bp_house_k16_siding080_built",
+   "lines": "bp_house_k16_siding080_lines"
+  },
+  {
+   "key": "k17_siding100",
+   "state": {
+    "stage": 4,
+    "p": 1.0
+   },
+   "built": "bp_house_k17_siding100_built",
+   "lines": "bp_house_k17_siding100_lines"
+  },
+  {
+   "key": "k18_finished",
+   "state": {
+    "stage": 5
+   },
+   "built": "bp_house_k18_finished_built",
+   "lines": "bp_house_k18_finished_lines"
+  }
+ ],
+ "house_notes": "Draw lines ABOVE built (the built structure is already cut out of them, so they show over the ground and never over built parts). Each keyframe pair shares one camera (320 pt square). Built: Any = light-theme lighting, Dark = dark-theme lighting. Lines are template images (alpha only): tint with Color(\"bp_drafting\") = Any #8FD3FF, Dark #60A8E6. On the theme-fixed blueprint hero use #8FD3FF in both modes if the hero does not step down. In LIGHT mode on light canvases (cards, #EEF2FA/#FFFFFF) tint the linework #2369B5 (draftingInk); #8FD3FF is only for the blueprint hero. Linework alpha: strokes 0.36, fill 0.08, flattened (never stacks).",
+ "confirm_row": {
+  "frames": [
+   "bp_confirm_row_00",
+   "bp_confirm_row_01",
+   "bp_confirm_row_02",
+   "bp_confirm_row_03",
+   "bp_confirm_row_04",
+   "bp_confirm_row_05",
+   "bp_confirm_row_06",
+   "bp_confirm_row_07",
+   "bp_confirm_row_08",
+   "bp_confirm_row_09",
+   "bp_confirm_row_10",
+   "bp_confirm_row_11",
+   "bp_confirm_row_12"
+  ],
+  "fps": 30,
+  "base": "bp_house_k14_siding040_built",
+  "note": "Overlay frames, registered to the hero canvas: draw over the base keyframe (built + linework). 13 frames at 30 fps: slide in, one overshoot, settle; the last frame is the exact rest position."
+ }
+}
