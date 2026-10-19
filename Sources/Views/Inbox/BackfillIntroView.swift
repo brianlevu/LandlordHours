@@ -103,6 +103,8 @@ struct BackfillIntroView: View {
     @StateObject private var inbox: InboxViewModel
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The scheme before WP-H's reveal (which prefers dark), so the list returns to it.
+    @State private var hostScheme: ColorScheme?
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     init(scanner: BackfillScanning, inbox: @autoclosure @escaping () -> InboxViewModel, onDone: @escaping (Bool) -> Void) {
@@ -124,12 +126,14 @@ struct BackfillIntroView: View {
                 }
             case .results:
                 results
+                    .preferredColorScheme(hostScheme)
             case .blocked:
                 blocked
             }
         }
         .animation(reduceMotion ? .easeInOut(duration: 0.2) : AppAnimation.smooth, value: model.phase)
         .task {
+            if hostScheme == nil { hostScheme = colorScheme }
             inbox.undoWindow = 0
             await model.run(scanner)
             inbox.reload()

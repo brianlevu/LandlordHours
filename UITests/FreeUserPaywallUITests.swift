@@ -211,7 +211,12 @@ final class FreeUserPaywallUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["paywall.title"].waitForExistence(timeout: 8), "Paywall reopens")
         let priceLoaded = app.descendants(matching: .any)["paywall.price"].waitForExistence(timeout: 10)
         XCTAssertTrue(priceLoaded, "$29.99 from the StoreKit config is shown")
-        app.buttons["paywall.buy"].tap()
+        // On a fresh simulator StoreKit can still be loading after the price shows: wait until the
+        // button is enabled (not isLoading) before tapping, or the tap lands on a disabled button.
+        let buy = app.buttons["paywall.buy"]
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true AND isHittable == true"), object: buy)
+        XCTAssertEqual(XCTWaiter().wait(for: [ready], timeout: 15), .completed, "Unlock Pro is ready")
+        buy.tap()
 
         // Local StoreKit testing may show its confirm sheet or complete straight away, and
         // "Pro is active" shows for about a second before the sheet carries on: watch both.
@@ -219,7 +224,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         var sawActive = false
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         let confirmLabels = ["Purchase", "Buy", "Confirm", "Subscribe"]
-        let deadline = Date().addingTimeInterval(15)
+        let deadline = Date().addingTimeInterval(30)
         while Date() < deadline {
             if app.staticTexts["Pro is active"].exists { sawActive = true; break }
             if !sheetSeen {
