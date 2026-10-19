@@ -412,7 +412,7 @@ class AppViewModel: ObservableObject {
             "LandlordHours.taxProfile.nonREWorkHours"
         ]
 
-        for key in Set(localDataKeys) {
+        for key in Set(localDataKeys + CaptureOptIn.allBaseKeys) {
             defaults.removeObject(forKey: UserScope.key(key))
         }
 
@@ -515,7 +515,7 @@ class AppViewModel: ObservableObject {
             "LandlordHours.timer",
             PendingCelebrationQueue.baseKey,
             ProfileRestore.profileNameKey
-        ] + taxProfileFields.map { "LandlordHours.taxProfile.\($0)" }
+        ] + taxProfileFields.map { "LandlordHours.taxProfile.\($0)" } + CaptureOptIn.allBaseKeys
 
         for key in Set(baseKeys) {
             defaults.removeObject(forKey: UserScope.key(key, userId: userId))

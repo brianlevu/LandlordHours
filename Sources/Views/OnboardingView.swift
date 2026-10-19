@@ -450,7 +450,12 @@ struct OnboardingView: View {
                     case .notifications:
                         notificationsScreen
                     case .calendar:
-                        calendarScreen
+                        // 2.0 (WP3): confirm-first capture opt-in replaces the 1.x bulk import.
+                        // Calendar and end-of-event prompts stay off unless chosen here.
+                        CaptureSetupFlow(mode: .onboarding, environment: .current) { openInbox in
+                            CaptureSetupHandoff.openInboxAfterOnboarding = openInbox
+                            completeOnboarding()
+                        }
                     }
                 }
                 .transition(.asymmetric(
