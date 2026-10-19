@@ -2192,7 +2192,7 @@ enum AppIconOption: String, CaseIterable {
 
     var subtitle: String {
         switch self {
-        case .default: return "Original brand icon"
+        case .default: return "Blueprint house"
         case .violet: return "Violet Soft to Violet Deep"
         case .sunset: return "Coral through Rose to Violet"
         case .clock: return "Sage-to-Violet with clock face"
