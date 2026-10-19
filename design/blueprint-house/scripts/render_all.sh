@@ -9,7 +9,7 @@ mkdir -p "$OUT/tools" "$OUT/final"
 T0=$(date +%s)
 "$PY" scripts/tools.py --out "$OUT/tools" --variants light,dark --res 1024 --samples 96
 T1=$(date +%s); echo "PHASE tools $((T1-T0))s"
-"$PY" scripts/render.py --states keyframes --variants light,dark --passes built,lines,glow,mask --res 1920 --samples 128 --out "$OUT/final"
+"$PY" scripts/render.py --states keyframes --variants light,dark --passes built,lines,glow,mask,fill --res 1920 --samples 128 --out "$OUT/final"
 T2=$(date +%s); echo "PHASE house $((T2-T1))s"
 "$PY" scripts/render.py --anim --row-only --anim-base k14_siding040 --variants light,dark --res 1440 --samples 96 --out "$OUT/final"
 T3=$(date +%s); echo "PHASE anim $((T3-T2))s"

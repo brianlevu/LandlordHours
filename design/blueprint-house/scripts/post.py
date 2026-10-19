@@ -23,6 +23,10 @@ GLOW = np.array([255, 205, 120], np.float32) / 255.0
 HERO_PT = 320
 BUILT_Q = '65-90'
 LINES_Q = '50-85'
+STROKE_A = 0.36
+FILL_A = 0.08
+INK = (0x8A, 0x5A, 0x1B)       # timberInk: confirm-board outline
+SHADOW = (0x12, 0x1B, 0x33)
 TOOL_PT = (36, 56)
 PNGQUANT = shutil.which('pngquant')
 
@@ -131,7 +135,14 @@ def do_house(rd, catalog, masters):
                 im.save(tmp)
             variants_b[app] = {3: premul_resize(im, HERO_PT * 3), 2: premul_resize(im, HERO_PT * 2)}
         # linework: one alpha-only template image, tinted by the bp_drafting colour (Any #8FD3FF, Dark #60A8E6)
-        li = reink(os.path.join(rd, f'{k}__lines.png'), (255, 255, 255))
+        # gate fix: ONE flattened linework layer. Strokes (Freestyle over fully clear faces, never stacked) at a
+        # constant STROKE_A, the flat skin fill at FILL_A, combined with max() -- nothing can build up to opaque.
+        sa = np.asarray(Image.open(os.path.join(rd, f'{k}__lines.png')).convert('RGBA'))[..., 3].astype(np.float32) / 255.0
+        fp = os.path.join(rd, f'{k}__fill.png')
+        fa = np.asarray(Image.open(fp).convert('RGBA'))[..., 3].astype(np.float32) / 255.0 if os.path.exists(fp) else sa * 0
+        la = np.zeros(sa.shape + (4,), np.float32); la[..., :3] = 255
+        la[..., 3] = 255.0 * np.maximum(STROKE_A * sa, FILL_A * fa)
+        li = Image.fromarray(la.round().astype(np.uint8), 'RGBA')
         mk = os.path.join(rd, f'{k}__mask.png')
         if os.path.exists(mk):
             # cut the built structure out of the linework: lines are drawn ABOVE built, over the ground only
@@ -166,7 +177,32 @@ def do_tools(rd, catalog, masters):
         print('tool', t, flush=True)
     return out
 
-def do_anim(rd, catalog, masters, base_key='k14_siding040'):
+def board_layers(im, base_alpha):
+    """Gate fix for the confirm board: a crisp timberInk outline (reads >= 3:1 on the light card) and a soft
+    contact shadow under the board, clipped to the house so nothing spills onto the canvas."""
+    a = np.asarray(im).astype(np.float32)
+    A = a[..., 3] / 255.0
+    w = im.width
+    r = max(1, round(w / 480))                       # 3 px at 1440 -> 2 px at 960
+    solid = Image.fromarray((np.clip(A * 1.4, 0, 1) * 255).astype(np.uint8))
+    ring = np.asarray(solid.filter(ImageFilter.MaxFilter(2 * r + 1))).astype(np.float32) / 255.0
+    sh = np.roll(A, round(w * 0.0035), axis=0)        # light from above: shadow just below the board
+    sh = np.asarray(Image.fromarray((sh * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(w * 0.003))).astype(np.float32) / 255.0
+    sh = sh * 0.42 * base_alpha
+    out = np.zeros_like(a)
+    # composite bottom-up: shadow, outline, board (straight alpha "over")
+    def over(dst, rgb, al):
+        da = dst[..., 3] / 255.0
+        oa = al + da * (1 - al)
+        for c in range(3):
+            dst[..., c] = np.where(oa > 0, (rgb[c] * al + dst[..., c] * da * (1 - al)) / np.maximum(oa, 1e-6), 0)
+        dst[..., 3] = oa * 255
+    over(out, SHADOW, sh)
+    over(out, INK, ring)
+    over(out, (a[..., 0], a[..., 1], a[..., 2]), A)
+    return Image.fromarray(np.clip(out, 0, 255).round().astype(np.uint8), 'RGBA')
+
+def do_anim(rd, catalog, masters, base_key='k14_siding040', house_stage=None):
     frames = {}
     for v, app in (('light', 'any'), ('dark', 'dark')):
         d = os.path.join(rd, f'anim_confirm_row_overlay__{v}')
@@ -174,14 +210,19 @@ def do_anim(rd, catalog, masters, base_key='k14_siding040'):
     n = len(frames['any'])
     for i in range(n):
         var = {}
-        for app in ('any', 'dark'):
+        for app, v in (('any', 'light'), ('dark', 'dark')):
             im = Image.open(frames[app][i]).convert('RGBA')
             a = np.asarray(im).copy(); a[..., 3] = np.where(a[..., 3] < 3, 0, a[..., 3]); im = Image.fromarray(a, 'RGBA')
+            bp = os.path.join(house_stage or '', f'{base_key}__built__{v}.png')
+            base_alpha = np.asarray(Image.open(bp).convert('RGBA').resize(im.size, Image.LANCZOS))[..., 3].astype(np.float32) / 255.0 \
+                if house_stage and os.path.exists(bp) else np.ones(im.size[::-1], np.float32)
+            im = board_layers(im, base_alpha)
             var[app] = {3: premul_resize(im, HERO_PT * 3), 2: premul_resize(im, HERO_PT * 2)}
         write_imageset(catalog, 'ConfirmRow', f'bp_confirm_row_{i:02d}', var)
     print('anim frames', n, flush=True)
     return dict(frames=[f'bp_confirm_row_{i:02d}' for i in range(n)], fps=30, base=f'bp_house_{base_key}_built',
-                note='Overlay frames, registered to the hero canvas: draw over the base keyframe built pass.')
+                note=('Overlay frames, registered to the hero canvas: draw over the base keyframe (built + linework). '
+                      f'{n} frames at 30 fps: slide in, one overshoot, settle; the last frame is the exact rest position.'))
 
 def main():
     ap = argparse.ArgumentParser()
@@ -205,11 +246,13 @@ def main():
         man['house_notes'] = ('Draw lines ABOVE built (the built structure is already cut out of them, so they show over the ground and never over built parts). Each keyframe pair shares one camera (320 pt square). '
                               'Built: Any = light-theme lighting, Dark = dark-theme lighting. Lines are template images '
                               '(alpha only): tint with Color("bp_drafting") = Any #8FD3FF, Dark #60A8E6. On the theme-fixed '
-                              'blueprint hero use #8FD3FF in both modes if the hero does not step down.')
+                              'blueprint hero use #8FD3FF in both modes if the hero does not step down. In LIGHT mode on light canvases '
+                              '(cards, #EEF2FA/#FFFFFF) tint the linework #2369B5 (draftingInk); #8FD3FF is only for the blueprint hero. '
+                              'Linework alpha: strokes 0.36, fill 0.08, flattened (never stacks).')
     if 'tools' in only:
         write_group(cat, 'Tools'); man['tools'] = do_tools(a.tool_renders or a.renders, cat, a.masters)
     if 'anim' in only:
-        write_group(cat, 'ConfirmRow'); man['confirm_row'] = do_anim(a.renders, cat, a.masters)
+        write_group(cat, 'ConfirmRow'); man['confirm_row'] = do_anim(a.renders, cat, a.masters, house_stage=a.house_stage)
     with open(a.manifest, 'w') as f:
         json.dump(man, f, indent=1)
 

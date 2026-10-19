@@ -32,27 +32,27 @@ LABELS = {'repairs': 'Repairs · wrench', 'showing': 'Showing / leasing · sign'
 # ------------------------------------------------------------------ materials (house set + a few in the same matte language)
 
 def extra_materials():
+    """Gate fix: every tool material takes its colour from the house set (render.py/house.py MATS);
+    the names below are aliases with the house hexes, plus glass-like screen/lens/rubber accents."""
     m = H.mat
-    m('steel', '#8F98AA', 0.34, None, 0.8)
-    m('graphite', '#4A5068', 0.55)
-    m('rubber', '#41475E', 0.7)
-    m('sponge', '#EFC85A', 0.95)
-    m('galv', '#C5CBD4', 0.42, None, 0.55)
-    m('water', '#6F9FE0', 0.15)
-    m('moss', '#4E8A5C', 0.7)
-    m('kraft', '#CFA46C', 0.9)
-    m('paper', '#F7F1E6', 0.85)
-    m('inkline', '#9AA2B8', 0.8)
-    m('wax', '#C8553D', 0.45)
-    m('board', '#D9A766', 0.75)
-    m('lens', '#FFF1C9', 0.15)
+    m('steel', '#A9A7A2', 0.34, None, 0.75)     # slate
+    m('graphite', '#4A5068', 0.55)              # brand graphite
+    m('rubber', '#4A5068', 0.7)
+    m('sponge', '#D9B45A', 0.95)                # brass hex, matte
+    m('galv', '#A9A7A2', 0.42, None, 0.5)       # slate, satin
+    m('water', '#46506B', 0.12)                 # window glass
+    m('moss', '#6A9A58', 0.7)                   # shrub green
+    m('kraft', '#EBC994', 0.9)                  # ply
+    m('paper', '#F4EBDD', 0.85)                 # plaster
+    m('inkline', '#A9A7A2', 0.8)                # slate
+    m('wax', '#C8553D', 0.45)                   # terracotta
+    m('board', '#E8B474', 0.75)                 # timber
+    m('lens', '#FFD98C', 0.15)                  # lit-window glass
     l = H.MATS['lens'].node_tree.nodes['Principled BSDF']
-    l.inputs['Emission Color'].default_value = H.lin('#FFE6A8'); l.inputs['Emission Strength'].default_value = 1.6
-    m('screen', '#2B3350', 0.18)
-    s = H.MATS['screen'].node_tree.nodes['Principled BSDF']
-    s.inputs['Emission Color'].default_value = H.lin('#5C7BC9'); s.inputs['Emission Strength'].default_value = 0.35
-    m('hubcap', '#E6E1D8', 0.5)
-    m('shell', '#E4E8F0', 0.42, None, 0.15)
+    l.inputs['Emission Color'].default_value = H.lin('#FFC864'); l.inputs['Emission Strength'].default_value = 1.6
+    m('screen', '#46506B', 0.18)                # window glass
+    m('hubcap', '#F4EBDD', 0.5)                 # plaster
+    m('shell', '#F4EBDD', 0.42)                 # plaster
 
 # ------------------------------------------------------------------ geometry helpers
 
@@ -176,25 +176,40 @@ def annulus(c, r0, r1, z0, z1, seg_in=12, seg_out=56):
     return f
 
 def t_repairs():
-    # combination wrench: open jaw (left), box-end ring (right), a slim forged handle
-    obj('wrench_handle', 'steel', [box((0, 0, 0.05), (1.3, 0.24, 0.09))], bevel=0.03)
-    jaw = [(x - 0.8, y) for (x, y) in notch_disc(0.31, 0.125, -0.02)]
-    ob = obj('wrench_jaw', 'steel', [prism(jaw, 0.0, 0.11)], bevel=0.022)
-    ob.matrix_world = Matrix.Translation((-0.8, 0, 0)) @ Matrix.Rotation(math.radians(-18), 4, 'Z') @ Matrix.Translation((0.8, 0, 0))
-    obj('wrench_ring', 'steel', [annulus((0.8, 0), 0.14, 0.26, 0.0, 0.11)], bevel=0.02)
-    obj('wrench_rib', 'galv', [box((0, 0, 0.098), (0.86, 0.09, 0.012))], bevel=0.005)
-    return 'flat', math.radians(28)
+    # combination wrench: open jaw (left), box-end ring (right), a chunky handle with a terracotta grip
+    obj('wrench_handle', 'copper', [box((0, 0, 0.06), (1.3, 0.48, 0.11))], bevel=0.035)
+    obj('wrench_grip', 'graphite', [box((0.0, 0, 0.065), (1.1, 0.54, 0.15))], bevel=0.06, segs=4)
+    def c_ring(cx, cy, r0, r1, z0, z1, gap_deg, n=48):
+        """Open-end jaw: a thick C (ring with its opening toward -X), all convex quads."""
+        def f(bm):
+            g = math.radians(gap_deg)
+            angs = [g + (2 * math.pi - 2 * g) * k / n for k in range(n + 1)]
+            ring = []
+            for a_ in angs:
+                ca, sa = math.cos(a_ + math.pi), math.sin(a_ + math.pi)
+                ring.append([bm.verts.new((cx + r * ca, cy + r * sa, z)) for (r, z) in ((r0, z0), (r1, z0), (r1, z1), (r0, z1))])
+            for k in range(n):
+                A, B = ring[k], ring[k + 1]
+                for i in range(4):
+                    j = (i + 1) % 4
+                    bm.faces.new((A[i], A[j], B[j], B[i]))
+            bm.faces.new(tuple(reversed(ring[0]))); bm.faces.new(tuple(ring[-1]))
+        return f
+    obj('wrench_jaw', 'copper', [c_ring(-0.85, 0, 0.18, 0.46, 0.0, 0.13, 36)], bevel=0.025)
+    PARTS[-1].matrix_world = Matrix.Translation((-0.85, 0, 0)) @ Matrix.Rotation(math.radians(-18), 4, 'Z') @ Matrix.Translation((0.85, 0, 0))
+    obj('wrench_ring', 'copper', [annulus((0.85, 0), 0.18, 0.38, 0.0, 0.13)], bevel=0.025)
+    return 'flat', math.radians(48)
 
 def t_showing():
-    obj('post', 'timber', [box((-0.55, 0, 1.0), (0.13, 0.13, 2.0)), box((0.05, 0, 1.86), (1.4, 0.11, 0.11))], bevel=0.02)
+    obj('post', 'timber', [box((-0.55, 0, 1.0), (0.18, 0.18, 2.0)), box((0.1, 0, 1.86), (1.5, 0.15, 0.15))], bevel=0.03)
     obj('post_cap', 'trim', [box((-0.55, 0, 2.03), (0.18, 0.18, 0.07))], bevel=0.015)
-    for x in (-0.15, 0.55):
-        obj('hook%.1f' % x, 'steel', tube_path([(x, 0, 1.8), (x, 0, 1.55)], 0.018), bevel=0, smooth=True)
-    obj('sign_frame', 'tile', [prism(rounded_rect(1.0, 0.72, 0.06), -0.045, 0.045)], bevel=0.012,
+    for x in (-0.15, 0.65):
+        obj('hook%.1f' % x, 'steel', tube_path([(x, 0, 1.8), (x, 0, 1.58)], 0.025), bevel=0, smooth=True)
+    obj('sign_frame', 'tile', [prism(rounded_rect(1.25, 0.95, 0.07), -0.05, 0.05)], bevel=0.012,
         mod_extra=lambda ob: None)
-    sf = PARTS[-1]; sf.matrix_world = Matrix.Translation((0.2, 0, 1.18)) @ Matrix.Rotation(math.radians(90), 4, 'X')
-    obj('sign_face', 'paper', [prism(rounded_rect(0.84, 0.56, 0.04), -0.05, 0.05)], bevel=0.008)
-    PARTS[-1].matrix_world = Matrix.Translation((0.2, 0, 1.18)) @ Matrix.Rotation(math.radians(90), 4, 'X')
+    sf = PARTS[-1]; sf.matrix_world = Matrix.Translation((0.25, 0, 1.12)) @ Matrix.Rotation(math.radians(90), 4, 'X')
+    obj('sign_face', 'paper', [prism(rounded_rect(1.05, 0.75, 0.05), -0.055, 0.055)], bevel=0.008)
+    PARTS[-1].matrix_world = Matrix.Translation((0.25, 0, 1.12)) @ Matrix.Rotation(math.radians(90), 4, 'X')
     obj('base', 'concrete', [box((-0.55, 0, 0.04), (0.42, 0.42, 0.08))], bevel=0.02)
     return 'stand', math.radians(-28)
 
@@ -221,7 +236,7 @@ def t_bookkeeping():
     obj('spine_band', 'brass', [box((-W / 2 - 0.012, 0, T / 2), (0.03, 0.12, T + 0.01)),
                                  box((-W / 2 - 0.012, 0.5, T / 2), (0.03, 0.06, T + 0.01)),
                                  box((-W / 2 - 0.012, -0.5, T / 2), (0.03, 0.06, T + 0.01))], bevel=0.006)
-    obj('label', 'brass', [box((0.05, 0.25, T + 0.003), (0.62, 0.3, 0.012))], bevel=0.005)
+    obj('label', 'paper', [box((0.05, 0.25, T + 0.003), (0.62, 0.3, 0.012))], bevel=0.005)
     obj('ribbon', 'wax', [box((0.3, -D / 2 - 0.14, 0.2), (0.07, 0.32, 0.012), rx=math.radians(-30))], bevel=0)
     return 'flat', math.radians(28)
 
@@ -234,8 +249,9 @@ def t_travel():
             box((0.97, 0, z0 + 0.36), (0.07, 0.9, 0.34)),             # tailgate
             box((0.41, -0.415, z0 + 0.36), (1.06, 0.07, 0.34)),       # bed sides
             box((0.41, 0.415, z0 + 0.36), (1.06, 0.07, 0.34))]
-    obj('truck_body', 'tile', body, bevel=0.045)
-    obj('truck_roof', 'tile', [box((-0.43, 0, z0 + 0.83), (0.7, 0.84, 0.06))], bevel=0.03)
+    obj('truck_body', 'tile', [body[0]] + body[3:], bevel=0.045)
+    obj('truck_cab', 'paper', body[1:3], bevel=0.045)
+    obj('truck_roof', 'paper', [box((-0.43, 0, z0 + 0.83), (0.7, 0.84, 0.06))], bevel=0.03)
     obj('truck_glass', 'glass', [box((-0.83, 0, z0 + 0.6), (0.02, 0.7, 0.3)),
                                  box((-0.43, -0.445, z0 + 0.6), (0.6, 0.02, 0.3)),
                                  box((-0.43, 0.445, z0 + 0.6), (0.6, 0.02, 0.3))], bevel=0.008)
@@ -254,27 +270,27 @@ def t_travel():
 
 def t_inspection():
     # flashlight lying flat, head toward the upper right
-    obj('fl_body', 'sponge', [cyl((0.15, 0, 0.2), 0.2, 1.3, 'X', 40)], bevel=0.02)
-    obj('fl_grip', 'rubber', [cyl((x, 0, 0.2), 0.212, 0.07, 'X', 40) for x in (-0.15, 0.0, 0.15, 0.3)], bevel=0.015)
-    obj('fl_head', 'graphite', [cyl((-0.68, 0, 0.2), 0.3, 0.42, 'X', 48, r2=0.2,
+    obj('fl_body', 'sponge', [cyl((0.15, 0, 0.2), 0.25, 1.3, 'X', 40)], bevel=0.025)
+    obj('fl_grip', 'rubber', [cyl((x, 0, 0.2), 0.262, 0.07, 'X', 40) for x in (-0.15, 0.0, 0.15, 0.3)], bevel=0.015)
+    obj('fl_head', 'graphite', [cyl((-0.68, 0, 0.2), 0.37, 0.42, 'X', 48, r2=0.25,
                                     rot=Matrix.Rotation(math.radians(-90), 4, 'Y'))], bevel=0.02)
-    obj('fl_rim', 'steel', [cyl((-0.9, 0, 0.2), 0.31, 0.06, 'X', 48)], bevel=0.015)
-    obj('fl_lens', 'lens', [cyl((-0.93, 0, 0.2), 0.25, 0.02, 'X', 48)], bevel=0.005)
-    obj('fl_tail', 'graphite', [cyl((0.84, 0, 0.2), 0.205, 0.1, 'X', 40)], bevel=0.02)
-    obj('fl_switch', 'tile', [box((-0.32, 0, 0.41), (0.16, 0.1, 0.06))], bevel=0.02)
+    obj('fl_rim', 'steel', [cyl((-0.9, 0, 0.2), 0.38, 0.06, 'X', 48)], bevel=0.015)
+    obj('fl_lens', 'lens', [cyl((-0.93, 0, 0.2), 0.31, 0.02, 'X', 48)], bevel=0.005)
+    obj('fl_tail', 'graphite', [cyl((0.84, 0, 0.2), 0.255, 0.1, 'X', 40)], bevel=0.02)
+    obj('fl_switch', 'tile', [box((-0.32, 0, 0.46), (0.18, 0.12, 0.06))], bevel=0.02)
     return 'flat', math.radians(55)
 
 def t_renovation():
-    # paint roller: terracotta-loaded cover, steel frame, timber handle
-    obj('roller_cover', 'plaster', [cyl((0.0, 0.55, 0.3), 0.26, 1.1, 'X', 48)], bevel=0.04)
-    obj('roller_paint', 'tile', [cyl((0.18, 0.55, 0.3), 0.268, 0.6, 'X', 48)], bevel=0.03)
-    obj('roller_caps', 'galv', [cyl((-0.57, 0.55, 0.3), 0.12, 0.05, 'X', 32), cyl((0.57, 0.55, 0.3), 0.12, 0.05, 'X', 32)], bevel=0.01)
-    frame = [(0.6, 0.55, 0.3), (0.72, 0.55, 0.3), (0.72, 0.2, 0.3), (0.0, -0.05, 0.3), (0.0, -0.35, 0.3)]
-    obj('roller_frame', 'steel', tube_path(frame, 0.035), bevel=0, smooth=True)
-    obj('roller_ferrule', 'galv', [cyl((0.0, -0.42, 0.3), 0.07, 0.14, 'Y', 32)], bevel=0.01)
-    obj('roller_handle', 'timber', [cyl((0.0, -0.85, 0.3), 0.1, 0.75, 'Y', 32, r2=0.085)], bevel=0.03)
-    obj('roller_end', 'tile', [cyl((0.0, -1.24, 0.3), 0.085, 0.05, 'Y', 32)], bevel=0.01)
-    return 'flat', math.radians(60)
+    # paint roller, compact: terracotta-loaded cover on top, short timber handle under its middle
+    obj('roller_cover', 'plaster', [cyl((0.0, 0.5, 0.3), 0.36, 1.15, 'X', 48)], bevel=0.05)
+    obj('roller_paint', 'tile', [cyl((0.16, 0.5, 0.3), 0.372, 0.62, 'X', 48)], bevel=0.03)
+    obj('roller_caps', 'galv', [cyl((-0.6, 0.5, 0.3), 0.13, 0.05, 'X', 32), cyl((0.6, 0.5, 0.3), 0.13, 0.05, 'X', 32)], bevel=0.01)
+    frame = [(0.62, 0.5, 0.3), (0.78, 0.5, 0.3), (0.78, 0.0, 0.3), (0.15, -0.12, 0.3), (0.15, -0.3, 0.3)]
+    obj('roller_frame', 'steel', tube_path(frame, 0.055), bevel=0, smooth=True)
+    obj('roller_ferrule', 'galv', [cyl((0.15, -0.34, 0.3), 0.11, 0.12, 'Y', 32)], bevel=0.012)
+    obj('roller_handle', 'timber', [cyl((0.15, -0.66, 0.3), 0.15, 0.55, 'Y', 32, r2=0.13)], bevel=0.04)
+    obj('roller_end', 'tile', [cyl((0.15, -0.95, 0.3), 0.13, 0.05, 'Y', 32)], bevel=0.012)
+    return 'flat', math.radians(30)
 
 def t_cleaning():
     # galvanised bucket with water, sponge on the rim
@@ -289,11 +305,11 @@ def t_cleaning():
         bmesh.ops.delete(bm, geom=top, context='FACES')
         bm.to_mesh(ob.data); bm.free()
         s = ob.modifiers.new('thick', 'SOLIDIFY'); s.thickness = 0.04; s.offset = -1
-    obj('bucket', 'galv', [bucket], bevel=0.012, mod_extra=solid)
+    obj('bucket', 'board', [bucket], bevel=0.012, mod_extra=solid)
     for z in (0.25, 0.85):
         rz = r0 + (r1 - r0) * z / h
-        obj('hoop%.2f' % z, 'galv', [H.torus_fn((0, 0, z), (0, 0, 1), rz + 0.005, 0.022, 56, 10)], bevel=0, smooth=True)
-    obj('rim', 'galv', [H.torus_fn((0, 0, h), (0, 0, 1), r1 - 0.01, 0.035, 56, 12)], bevel=0, smooth=True)
+        obj('hoop%.2f' % z, 'steel', [H.torus_fn((0, 0, z), (0, 0, 1), rz + 0.005, 0.022, 56, 10)], bevel=0, smooth=True)
+    obj('rim', 'steel', [H.torus_fn((0, 0, h), (0, 0, 1), r1 - 0.01, 0.035, 56, 12)], bevel=0, smooth=True)
     obj('water', 'water', [cyl((0, 0, h * 0.78), r0 + (r1 - r0) * 0.78 - 0.04, 0.02, seg=56)], bevel=0)
     # wire handle: an arc over the top, ears on the sides
     hp = arc((0, 0, h), r1 + 0.03, 0, 180, 'YZ', 20)
@@ -312,7 +328,7 @@ def t_cleaning():
 
 def t_legal():
     # one sheet, slightly curled, text lines, a wax seal with ribbon tails
-    W, D = 1.25, 1.7
+    W, D = 1.0, 1.4
     def sheet(bm):
         nx, ny = 10, 14
         vs = {}
@@ -324,6 +340,10 @@ def t_legal():
         for i in range(nx):
             for j in range(ny):
                 bm.faces.new((vs[i, j], vs[i + 1, j], vs[i + 1, j + 1], vs[i, j + 1]))
+    obj('folder', 'board', [prism(rounded_rect(W + 0.55, D + 0.3, 0.06, 6), -0.05, -0.01)], bevel=0.01)
+    PARTS[-1].location = (0.2, -0.1, 0)
+    obj('folder_tab', 'board', [prism(rounded_rect(0.5, 0.2, 0.05, 6), -0.05, -0.01)], bevel=0.01)
+    PARTS[-1].location = (-0.25, D / 2 + 0.03, 0)
     obj('sheet', 'paper', [sheet], bevel=0, smooth=True,
         mod_extra=lambda ob: setattr(ob.modifiers.new('thick', 'SOLIDIFY'), 'thickness', 0.025))
     lines = [(0.48, 0.62, 0.8), (0.32, 0.9, 0.0), (0.2, 0.9, 0.0), (0.08, 0.9, 0.0), (-0.04, 0.62, -0.14)]
@@ -377,19 +397,19 @@ def t_supplies():
 
 def t_management():
     W, D = 1.25, 1.75
-    obj('cb_board', 'board', [prism(rounded_rect(W, D, 0.1, 8), 0, 0.05)], bevel=0.015)
-    obj('cb_paper', 'paper', [box((0, -0.06, 0.06), (W - 0.18, D - 0.3, 0.012))], bevel=0.003)
+    obj('cb_board', 'trim', [prism(rounded_rect(W, D, 0.1, 8), 0, 0.05)], bevel=0.015)
+    obj('cb_paper', 'paper', [box((0, -0.08, 0.06), (W - 0.34, D - 0.46, 0.012))], bevel=0.003)
     for k in range(4):
         y = 0.38 - k * 0.27
-        obj('cb_box%d' % k, 'inkline', [box((-0.36, y, 0.072), (0.12, 0.12, 0.012))], bevel=0.004)
-        obj('cb_line%d' % k, 'inkline', [box((0.1, y, 0.07), (0.62 - 0.1 * (k % 2), 0.045, 0.008))], bevel=0)
+        obj('cb_box%d' % k, 'inkline', [box((-0.3, y, 0.072), (0.12, 0.12, 0.012))], bevel=0.004)
+        obj('cb_line%d' % k, 'inkline', [box((0.05, y, 0.07), (0.5 - 0.1 * (k % 2), 0.045, 0.008))], bevel=0)
     # ticks in the first two boxes: timber-coloured, illustration only
     for k in range(2):
         y = 0.38 - k * 0.27
-        obj('cb_tick%d' % k, 'graphite', tube_path([(-0.41, y + 0.005, 0.085), (-0.37, y - 0.04, 0.085), (-0.29, y + 0.06, 0.085)], 0.018, 8), bevel=0, smooth=True)
-    obj('cb_clip_base', 'steel', [prism(rounded_rect(0.62, 0.2, 0.06, 6), 0.05, 0.1)], bevel=0.015)
+        obj('cb_tick%d' % k, 'graphite', tube_path([(-0.35, y + 0.005, 0.085), (-0.31, y - 0.04, 0.085), (-0.23, y + 0.06, 0.085)], 0.018, 8), bevel=0, smooth=True)
+    obj('cb_clip_base', 'brass', [prism(rounded_rect(0.62, 0.2, 0.06, 6), 0.05, 0.1)], bevel=0.015)
     PARTS[-1].location = (0, D / 2 - 0.16, 0)
-    obj('cb_clip_top', 'steel', [box((0, D / 2 - 0.12, 0.14), (0.42, 0.18, 0.06), rx=math.radians(-12))], bevel=0.02)
+    obj('cb_clip_top', 'brass', [box((0, D / 2 - 0.12, 0.14), (0.42, 0.18, 0.06), rx=math.radians(-12))], bevel=0.02)
     obj('cb_clip_ring', 'steel', [H.torus_fn((0, D / 2 - 0.02, 0.17), (0, 0, 1), 0.07, 0.018, 24, 8)], bevel=0, smooth=True)
     return 'flat', math.radians(12)
 
@@ -437,6 +457,79 @@ def frame_camera(fill=FILL):
     cam.clip_start = 1; cam.clip_end = 100
     return dict(ortho_scale=cam.ortho_scale, extent=ext)
 
+ORTHO = 3.0          # ONE camera for every tool: same rotation, same ortho scale
+TARGET_FILL = 0.30   # optical size: alpha coverage of the square canvas
+MAX_EXT = 0.90       # never let the projected bounding box exceed this share of the frame
+
+def projected_bbox():
+    dg = bpy.context.evaluated_depsgraph_get()
+    xs, ys = [], []
+    for ob in PARTS:
+        ev = ob.evaluated_get(dg); me = ev.to_mesh()
+        for v in me.vertices:
+            p = ev.matrix_world @ v.co
+            xs.append(p.dot(RIGHT)); ys.append(p.dot(UP))
+        ev.to_mesh_clear()
+    return min(xs), max(xs), min(ys), max(ys)
+
+def scale_parts(k):
+    x0, x1, y0, y1 = projected_bbox()
+    # scale about the bbox centre (any point works for ortho; this keeps numbers small)
+    c = RIGHT * ((x0 + x1) / 2) + UP * ((y0 + y1) / 2)
+    M = Matrix.Translation(c) @ Matrix.Scale(k, 4) @ Matrix.Translation(-c)
+    for ob in PARTS:
+        ob.matrix_world = M @ ob.matrix_world
+    bpy.context.view_layer.update()
+
+def place_camera(co, cx, cy):
+    co.data.ortho_scale = ORTHO
+    co.matrix_world = Matrix.Translation(RIGHT * cx + UP * cy - FWD * 40) @ ROT
+
+def measure(tmp):
+    """Quick alpha-only render: coverage and alpha centroid offset (in world units along RIGHT/UP)."""
+    sc = bpy.context.scene
+    keep = (sc.render.resolution_x, sc.cycles.samples, sc.cycles.use_denoising)
+    sc.render.resolution_x = sc.render.resolution_y = 256; sc.cycles.samples = 2; sc.cycles.use_denoising = False
+    R.render_to(tmp)
+    sc.render.resolution_x = sc.render.resolution_y = keep[0]; sc.cycles.samples = keep[1]; sc.cycles.use_denoising = keep[2]
+    import numpy as np
+    from PIL import Image
+    a = np.asarray(Image.open(tmp).convert('RGBA'))[..., 3].astype(np.float64) / 255.0
+    n = a.shape[0]
+    cov = a.mean()
+    yy, xx = np.mgrid[0:n, 0:n]
+    cx = ((a * xx).sum() / a.sum() + 0.5) / n - 0.5
+    cy = ((a * yy).sum() / a.sum() + 0.5) / n - 0.5
+    return cov, cx * ORTHO, -cy * ORTHO
+
+def normalize(tmp, log):
+    """Scale the tool to TARGET_FILL coverage (clamped by MAX_EXT) and centre its alpha centroid."""
+    sc = bpy.context.scene
+    cam = bpy.data.cameras.new('cam'); cam.type = 'ORTHO'
+    co = bpy.data.objects.new('cam', cam); sc.collection.objects.link(co); sc.camera = co
+    cam.clip_start = 1; cam.clip_end = 100
+    for it in range(4):
+        x0, x1, y0, y1 = projected_bbox()
+        ext = max(x1 - x0, y1 - y0)
+        place_camera(co, (x0 + x1) / 2, (y0 + y1) / 2)
+        cov, dx, dy = measure(tmp)
+        k = math.sqrt(TARGET_FILL / max(cov, 1e-4))
+        # the box must still fit once the alpha centroid is moved to the frame centre
+        k = min(k, 0.97 * ORTHO / (ext + 2 * max(abs(dx), abs(dy))), MAX_EXT * ORTHO / ext)
+        if abs(k - 1) < 0.01:
+            break
+        scale_parts(k)
+    x0, x1, y0, y1 = projected_bbox()
+    place_camera(co, (x0 + x1) / 2, (y0 + y1) / 2)
+    cov, dx, dy = measure(tmp)
+    # optical centre = alpha centroid, but never push the bounding box past 97% of the frame
+    lim_x = max(0.0, (0.97 * ORTHO - (x1 - x0)) / 2); lim_y = max(0.0, (0.97 * ORTHO - (y1 - y0)) / 2)
+    dx = max(-lim_x, min(lim_x, dx)); dy = max(-lim_y, min(lim_y, dy))
+    place_camera(co, (x0 + x1) / 2 + dx, (y0 + y1) / 2 + dy)
+    cov2, dx2, dy2 = measure(tmp)
+    log.update(dict(coverage=round(cov2, 4), centroid_off_px_1024=(round(dx2 / ORTHO * 1024, 1), round(-dy2 / ORTHO * 1024, 1)),
+                    bbox_ext=round(max(x1 - x0, y1 - y0) / ORTHO, 3)))
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--out', required=True)
@@ -450,7 +543,11 @@ def main():
     for t in a.tools.split(','):
         build_tool(t)
         R.setup_render(a.res, a.samples)
-        info = frame_camera()
+        for o in [o for o in bpy.context.scene.objects if o.type == 'LIGHT' or o.name.startswith('shadow_catcher')]:
+            bpy.data.objects.remove(o)
+        catcher = R.setup_lights('light'); catcher.hide_render = True
+        info = {}
+        normalize(os.path.join(out, f'_measure_{t}.png'), info)
         for v in a.variants.split(','):
             for o in [o for o in bpy.context.scene.objects if o.type == 'LIGHT' or o.name.startswith('shadow_catcher')]:
                 bpy.data.objects.remove(o)
@@ -459,7 +556,8 @@ def main():
             fn = os.path.join(out, f'tool_{t}__{v}.png')
             dt = R.render_to(fn)
             log.append(dict(file=os.path.basename(fn), seconds=round(dt, 1), **info))
-            print('RENDERED', fn, round(dt, 1), flush=True)
+            print('RENDERED', fn, round(dt, 1), json.dumps(info), flush=True)
+        os.remove(os.path.join(out, f'_measure_{t}.png'))
     with open(os.path.join(out, 'render-log.jsonl'), 'a') as f:
         for r in log:
             f.write(json.dumps(r) + '\n')

@@ -69,12 +69,12 @@ def halo_metrics(im):
 
 def corners(im):
     a = np.asarray(im)[..., 3]
-    return int(max(a[:12, :12].max(), a[:12, -12:].max(), a[-12:, :12].max(), a[-12:, -12:].max()))
+    return int(max(a[0].max(), a[-1].max(), a[:, 0].max(), a[:, -1].max()))   # outer border: anything touching the edge is clipped
 
 def specks(im):
-    """Isolated faint pixels far from the subject (> 24 px from any alpha>20 pixel)."""
+    """Isolated faint pixels far from the subject (> 24 px from any alpha>4 pixel)."""
     a = np.asarray(im)[..., 3]
-    body = Image.fromarray(((a > 20) * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(49))
+    body = Image.fromarray(((a > 4) * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(49))
     far = np.asarray(body) == 0
     return int(((a > 0) & far).sum())
 
@@ -118,7 +118,7 @@ ov = {}
 for k in keys:
     b = np.asarray(load(f'bp_house_{k}_built'))[..., 3]; l = np.asarray(load(f'bp_house_{k}_lines'))[..., 3]
     inner = np.asarray(Image.fromarray(((b > 250) * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(5))) > 0
-    ov[k] = round(100 * ((l > 200) & inner).sum() / max((l > 200).sum(), 1), 3)
+    ov[k] = round(100 * ((l > 40) & inner).sum() / max((l > 40).sum(), 1), 3)
 res['registration']['lines_over_opaque_built_pct_info'] = ov   # lines are drawn ABOVE built; overlap = future house over the lot/slab (expected)
 # lot silhouette identical across keyframes
 lots = {}
@@ -186,7 +186,61 @@ for dark, bg in (((False, BGS['blueprint']), (True, BGS['navy'])) if frames else
         # last overlay frame on the base vs the next keyframe-ish reference: rest position check
         res.setdefault('confirm_row', {})['frames'] = len(frames)
 
+# ---------------------------------------------------------------- gate blockers (self-check, same measures)
+def rel_lum(rgb):
+    c = np.asarray(rgb, np.float64) / 255.0
+    c = np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+    return 0.2126 * c[..., 0] + 0.7152 * c[..., 1] + 0.0722 * c[..., 2]
+
+def contrast(l1, l2):
+    hi, lo = np.maximum(l1, l2), np.minimum(l1, l2)
+    return (hi + 0.05) / (lo + 0.05)
+
+g = {}
+# 1. linework stacking: pixels at alpha >= 239 and the max alpha in every linework image
+g['lines_stacking'] = {k: dict(px_alpha_ge_239=int((a >= 239).sum()), max_alpha=int(a.max()), inked_px=int((a > 8).sum()))
+                       for k in keys for a in [np.asarray(load(f'bp_house_{k}_lines'))[..., 3]]}
+if frames:
+    names = [os.path.basename(f).split('.imageset')[0] for f in frames]
+    # 2. confirm board contrast on the light card (#FFFFFF) and the dark card (#141C3F), rest frame
+    for dark, card in ((False, (255, 255, 255)), (True, (0x14, 0x1C, 0x3F))):
+        fr = np.asarray(load(names[-1], dark)).astype(np.float64)
+        al = fr[..., 3] / 255.0
+        m = al > 0.9
+        comp_rgb = fr[..., :3] * al[..., None] + np.array(card, np.float64) * (1 - al[..., None])
+        cr = contrast(rel_lum(comp_rgb[m]), rel_lum(np.array(card, np.float64)))
+        g[f'board_contrast_{"dark" if dark else "light"}_card'] = dict(median=round(float(np.median(cr)), 2),
+                                                                       p75=round(float(np.percentile(cr, 75)), 2))
+    # 3. timing: mean abs alpha change between consecutive frames (motion must not stall), and orphan fragments
+    seq = [np.asarray(load(n_))[..., 3].astype(np.float64) for n_ in names]
+    g['frames'] = len(seq)
+    g['frame_motion_mean_abs_alpha'] = [round(float(np.abs(b - a).mean()), 3) for a, b in zip(seq[:-1], seq[1:])]
+    from collections import deque
+    m = seq[-1] > 128
+    small = np.asarray(Image.fromarray((m * 255).astype(np.uint8)).resize((m.shape[1] // 2, m.shape[0] // 2), Image.NEAREST)) > 0
+    lab = np.zeros(small.shape, np.int32); n = 0; sizes = []; spans = []
+    for y0, x0 in zip(*np.nonzero(small)):
+        if lab[y0, x0]:
+            continue
+        n += 1; q = deque([(y0, x0)]); lab[y0, x0] = n; cnt = 0; ys = []
+        while q:
+            y, x = q.popleft(); cnt += 1; ys.append(y)
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    yy, xx = y + dy, x + dx
+                    if 0 <= yy < small.shape[0] and 0 <= xx < small.shape[1] and small[yy, xx] and not lab[yy, xx]:
+                        lab[yy, xx] = n; q.append((yy, xx))
+        sizes.append(int(cnt * 4)); spans.append((int(min(ys) * 2), int(max(ys) * 2)))
+    if n:
+        big = max(range(n), key=lambda i: sizes[i])
+        g['rest_frame_components'] = n
+        g['rest_frame_orphans_above_board'] = [dict(px=sizes[i], top_y=spans[i][0]) for i in range(n) if spans[i][1] < spans[big][0] - 30]
+res['gate'] = g
+
 with open(os.path.join(OUT, 'qa.json'), 'w') as f:
     json.dump(res, f, indent=1)
-print(json.dumps(dict(worst=res['worst'], registration={k: v for k, v in res['registration'].items() if not isinstance(v, dict)},
+gs = dict({k: v for k, v in g.items() if k != 'lines_stacking'},
+          lines_max_alpha=max(v['max_alpha'] for v in g['lines_stacking'].values()),
+          lines_px_alpha_ge_239=sum(v['px_alpha_ge_239'] for v in g['lines_stacking'].values()))
+print(json.dumps(dict(gate=gs, worst=res['worst'], registration={k: v for k, v in res['registration'].items() if not isinstance(v, dict)},
                       lines_over_ground_max_pct=max(ov.values()) if ov else None, lot_diff_max=max(lots.values()) if lots else None), indent=1))

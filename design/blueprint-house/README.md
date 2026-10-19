@@ -23,10 +23,10 @@ scripts/render_all.sh ~/AgentScratch/landlordhours/<date>/wp-a/renders        # 
   Each has a built pass (Any = light lighting, Dark = dark lighting) and a linework pass,
   same camera, 320 pt square, @2x/@3x. WP-A change: draw linework ABOVE built. A structure-mask pass cuts the built
   structure out of the linework, so the future house now shows over the lot and slab (drawn below, the lawn hid its lower storey)
-  but never over built parts. Linework is an alpha-only template image tinted by the `bp_drafting` colour (Any #8FD3FF, Dark #60A8E6).
+  but never over built parts. Gate fix: linework is ONE flattened layer, max(0.36 x Freestyle strokes over clear faces, 0.08 x flat fill pass), so nothing stacks. Linework is an alpha-only template image tinted by the `bp_drafting` colour (Any #8FD3FF, Dark #60A8E6).
 - `tools.py`: the 11 category tools, modelled in Blender with the house materials and light rig. 36 pt and 56 pt imagesets,
   Any/Dark; 1024 masters in `exports/tools/`.
-- Confirm animation: `render.py --anim --row-only` renders 24 overlay frames (30 fps) of one clapboard row sliding in, with
+- Confirm animation: `render.py --anim --row-only` renders 13 overlay frames (30 fps, spring: slide, one overshoot, settle, exact rest) of one door-tone clapboard row (front + left walls) sliding in, with a timberInk outline and contact shadow added in post.py, with
   the rest of the house as a camera holdout, so each frame is registered to the hero canvas; draw them over the
   `k14_siding040` keyframe.
 - `exports/manifest.json` lists every asset with its construction state for the house renderer (WP-H).
@@ -35,6 +35,6 @@ Polish done in WP-A: lit windows (emission 9 plus a bloom baked from a window-ma
 kept inside the lot, catcher shadows limited to the lot plinth through shadow linking (no off-lot smudge), and linework
 re-inked to the exact brand tokens.
 
-Measured 2026-10-19 (`scripts/measure_size.sh`): Blueprint adds 9.5 MB to the universal Assets.car, 6.2 MB to an iPhone @3x
-thinned download and 3.3 MB to an iPad @2x one. Render times on the Mini (Metal): built 40 s, linework 36 s, mask 19 s per
+Measured 2026-10-19 (`scripts/measure_size.sh`): Blueprint adds 8.5 MB to the universal Assets.car, 5.5 MB to an iPhone @3x
+thinned download and 2.9 MB to an iPad @2x one (after the gate fixes). Render times on the Mini (Metal): built 40 s, linework 36 s, mask 19 s per
 keyframe at 1920; tools 6 s each at 1024; confirm-row frames 12 s at 1440; about 65 min for the whole set.

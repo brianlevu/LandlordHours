@@ -125,6 +125,11 @@ def make_materials():
     nt.links.new(tr.outputs[0], mx.inputs[1]); nt.links.new(em.outputs[0], mx.inputs[2])
     nt.links.new(mx.outputs[0], out.inputs['Surface'])
     MATS['wash'] = w
+    cl = bpy.data.materials.new('clear'); cl.use_nodes = True
+    nt = cl.node_tree; nt.nodes.clear()
+    o4 = nt.nodes.new('ShaderNodeOutputMaterial'); tn = nt.nodes.new('ShaderNodeBsdfTransparent')
+    nt.links.new(tn.outputs[0], o4.inputs['Surface'])
+    MATS['clear'] = cl
     ho = bpy.data.materials.new('holdout'); ho.use_nodes = True
     nt = ho.node_tree; nt.nodes.clear()
     o2 = nt.nodes.new('ShaderNodeOutputMaterial'); hn = nt.nodes.new('ShaderNodeHoldout')

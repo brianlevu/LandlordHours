@@ -141,6 +141,17 @@ def apply_state(st, mode, catcher, only=None):
             ob.hide_render = not b
             for m in ob.modifiers: m.show_render = True
             ob.is_holdout = (only is not None and ob != only)
+        elif mode == 'fill':
+            # coverage of the unbuilt finished-house skin, as ONE flat opaque silhouette (never stacks)
+            for m in ob.modifiers: m.show_render = (m.name == 'lump')
+            if b:
+                ob.hide_render = False
+                for slot in ob.material_slots: slot.material = H.MATS['holdout']
+            elif ob['role']:
+                ob.hide_render = False
+                for slot in ob.material_slots: slot.material = H.MATS['glowmask']
+            else:
+                ob.hide_render = True
         elif mode == 'mask':
             # built structure only (not the lot/slab ground) as flat white: post.py cuts it out of the linework,
             # so linework drawn ABOVE built shows over the ground but never over the built structure
@@ -162,13 +173,15 @@ def apply_state(st, mode, catcher, only=None):
                 for slot in ob.material_slots: slot.material = H.MATS['holdout']
             elif ob['role']:
                 ob.hide_render = False
-                for slot in ob.material_slots: slot.material = H.MATS['wash']
+                # gate fix: no translucent wash on the faces (it stacked to opaque); strokes only.
+                # The flat fill comes from the separate 'fill' pass, combined with max() in post.py.
+                for slot in ob.material_slots: slot.material = H.MATS['clear']
             else:
                 ob.hide_render = True
     catcher.hide_render = (mode != 'built') or (only is not None)
     for L in [o for o in sc.objects if o.type == 'LIGHT']:
         L.hide_render = (mode != 'built')
-    if mode in ('glow', 'mask'):
+    if mode in ('glow', 'mask', 'fill'):
         sc.view_settings.view_transform = 'Standard'
     # freestyle
     sc.render.use_freestyle = (mode == 'lines')
@@ -249,7 +262,7 @@ def main():
         for s in a.states.split(','):
             st = STATES[s]
             for p in a.passes.split(','):
-                if p in ('lines', 'glow', 'mask') and v != a.variants.split(',')[0]:
+                if p in ('lines', 'glow', 'mask', 'fill') and v != a.variants.split(',')[0]:
                     continue   # linework / glow mask are lighting-independent; render once
                 if p == 'glow' and st['stage'] < 5:
                     continue   # windows are only lit when finished
@@ -283,17 +296,38 @@ def render_anim(out, v, samples, log, catcher, base_state='stage4_siding60', row
     st2 = dict(st); st2['p'] = nxt['t']
     apply_state(st2, 'built', catcher, only=nxt if row_only else None)
     d = os.path.join(out, f'anim_confirm_row' + ('_overlay' if row_only else '') + f'__{v}'); os.makedirs(d, exist_ok=True)
+    # gate fix: only the row segments on camera-facing walls (front, left, wing front); the back-wall segment
+    # showed through the open upper framing as an orphan fragment
+    import bmesh
+    bm = bmesh.new(); bm.from_mesh(nxt.data); bm.faces.ensure_lookup_table()
+    seen, drop_f = set(), []
+    for f0 in bm.faces:                      # one island per siding box
+        if f0.index in seen:
+            continue
+        isl, stack = [], [f0]; seen.add(f0.index)
+        while stack:
+            f = stack.pop(); isl.append(f)
+            for e in f.edges:
+                for g in e.link_faces:
+                    if g.index not in seen:
+                        seen.add(g.index); stack.append(g)
+        c = sum((f.calc_center_median() for f in isl), Vector()) / len(isl)
+        if not (c.y < -2.3 or c.x < -2.5):   # front + left walls only (the wing front showed through the open framing)
+            drop_f += isl
+    bmesh.ops.delete(bm, geom=drop_f, context='FACES'); bm.to_mesh(nxt.data); bm.free()
+    # gate fix: a darker paint (door tone) so the new board reads on the light card; outline + contact shadow in post.py
+    for slot in nxt.material_slots:
+        slot.material = H.MATS['door']
     base = nxt.matrix_world.copy()
-    def ease_out_cubic(x): return 1 - (1 - x) ** 3
-    for f in range(24):
-        x = min(f / 15.0, 1.0)
-        e = ease_out_cubic(x)
-        out_off = 0.55 * (1 - e)            # metres outward (diagonal toward camera)
-        drop = 0.45 * (1 - e)               # metres above
-        bounce = 0.0
-        if 15 <= f <= 21:
-            bounce = 0.03 * math.sin(math.pi * (f - 15) / 6) * (1 - (f - 15) / 8)
-        off = Vector((-0.7071 * out_off, -0.7071 * out_off, drop + bounce))
+    N = 13
+    for f in range(N):
+        t = f / (N - 1)
+        spring = math.exp(-5 * t) * math.cos(2.5 * math.pi * t)   # 1 -> 0, one 13% overshoot, exactly 0 at t=1
+        out_off = 0.55 * (1 - t) ** 3                            # slides in from outside, never into the wall
+        drop = 0.45 * spring                                     # falls, dips below rest, settles
+        if f == N - 1:
+            out_off = drop = 0.0
+        off = Vector((-0.7071 * out_off, -0.7071 * out_off, drop))
         nxt.matrix_world = Matrix.Translation(off) @ base
         fn = os.path.join(d, f'frame_{f:02d}.png')
         dt = render_to(fn)
