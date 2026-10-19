@@ -1166,6 +1166,92 @@ final class EngagementIntelligenceServiceTests: XCTestCase {
         XCTAssertNotNil(scheduler.plan(for: context, respectingCooldown: false))
     }
 
+    // MARK: - Spouse hours: REPS never combines, material participation does
+
+    private func spouseHeavyContext(goal: HourGoalType, target: Double) -> (EngagementContext, RentalProperty) {
+        let property = makeProperty()
+        let day = date(year: 2026, month: 9, day: 28)
+        let entries = [
+            TimeEntry(propertyId: property.id, participant: .selfParticipant, category: .management, hours: 300, date: day, notes: "self"),
+            TimeEntry(propertyId: property.id, participant: .spouse, category: .management, hours: 600, date: day, notes: "spouse")
+        ]
+        var context = makeContext(now: date(year: 2026, month: 10, day: 1), properties: [property], entries: entries)
+        context.goalType = goal
+        context.targetHours = target
+        return (context, property)
+    }
+
+    func testRepsPaceCountsOnlySelfHoursNotCombinedSpouse() {
+        let (context, _) = spouseHeavyContext(goal: .reps, target: 750)
+        let snapshot = service.snapshot(for: context, calendar: calendar)
+
+        XCTAssertEqual(snapshot.yearHours, 300, accuracy: 0.001)
+        // Combined 900 would be ahead of pace; 300 by October is behind.
+        XCTAssertTrue(snapshot.isBehindPace)
+        XCTAssertEqual(service.recommendation(for: context).reason, .behindPace)
+    }
+
+    func testMaterialParticipationPaceCombinesSpouseHours() {
+        let (context, _) = spouseHeavyContext(goal: .str, target: 500)
+        let snapshot = service.snapshot(for: context, calendar: calendar)
+
+        XCTAssertEqual(snapshot.yearHours, 900, accuracy: 0.001)
+        XCTAssertFalse(snapshot.isBehindPace)
+    }
+
+    func testIntentSummaryShowsSelfHoursTowardRepsTarget() {
+        let (context, _) = spouseHeavyContext(goal: .reps, target: 750)
+        let snapshot = service.snapshot(for: context, calendar: calendar)
+        let text = LandlordHoursIntentCopy.summaryDialog(
+            year: 2026,
+            context: context,
+            snapshot: snapshot,
+            recommendation: service.recommendation(for: context)
+        )
+
+        XCTAssertTrue(text.contains("You have 300.0 hours toward 750 this year"), text)
+        XCTAssertFalse(text.contains("900"), text)
+    }
+
+    func testIntentSummaryShowsCombinedHoursForMaterialParticipation() {
+        let (context, _) = spouseHeavyContext(goal: .str, target: 500)
+        let snapshot = service.snapshot(for: context, calendar: calendar)
+        let text = LandlordHoursIntentCopy.summaryDialog(
+            year: 2026,
+            context: context,
+            snapshot: snapshot,
+            recommendation: service.recommendation(for: context)
+        )
+
+        XCTAssertTrue(text.contains("You have 900.0 hours toward 500 this year"), text)
+    }
+
+    func testWidgetSnapshotProgressUsesSelfHoursForReps() {
+        let (context, _) = spouseHeavyContext(goal: .reps, target: 750)
+        let snapshot = service.snapshot(for: context, calendar: calendar)
+        let widget = EngagementWidgetSnapshot(
+            updatedAt: Date(),
+            taxYear: 2026,
+            propertyCount: 1,
+            yearHours: snapshot.yearHours,
+            targetHours: 750,
+            targetLabel: "750h REPS",
+            targetShortLabel: "750h",
+            requiredHoursToDate: snapshot.requiredHoursToDate,
+            daysRemainingInYear: snapshot.daysRemainingInYear,
+            lastLogDate: snapshot.lastLogDate,
+            isTimerRunning: false,
+            timerStartTime: nil,
+            recommendationSurface: .none,
+            recommendationReason: .noActionNeeded,
+            recommendationDestination: .none,
+            recommendationTitle: "",
+            recommendationMessage: ""
+        )
+
+        XCTAssertEqual(widget.progress, 300.0 / 750.0, accuracy: 0.001)
+    }
+
     func testWidgetSnapshotKeepsSetupStateActionable() {
         let snapshot = EngagementWidgetSnapshot.empty
 

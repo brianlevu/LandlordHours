@@ -1079,7 +1079,8 @@ class AppViewModel: ObservableObject {
             notificationPermission: .notDetermined,
             recentDismissals: [],
             isProUser: SubscriptionManager.shared.isPro,
-            targetHours: widgetGoal.targetHours
+            targetHours: widgetGoal.targetHours,
+            goalType: GoalManager.shared.globalGoalType
         )
         let snapshot = EngagementIntelligenceService.shared.snapshot(for: context)
         let recommendation = EngagementIntelligenceService.shared.recommendation(for: context)
