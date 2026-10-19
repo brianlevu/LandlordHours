@@ -8,18 +8,30 @@ import XCTest
 // their targets; when the table or labels change, read the sweep in the test log
 // ("CALIBRATION" lines) and recommit the thresholds.
 //
-// The fixture has two splits: "tuning" (the keyword table was shaped against it, so its
-// numbers are optimistic) and "holdout" (written after the table was frozen — the honest
-// number).
+// The fixture has three splits: "tuning" (the keyword table was shaped against it, so its
+// numbers are optimistic), "holdout" (written after the table was frozen — the honest
+// number) and "realworld" (classifier v2: synthetic items, one or more per failure pattern
+// found on a real owner's calendar and inbox; the real data never enters the repo).
 
 struct CalibrationFixture: Decodable {
-    struct Property: Decodable { let key: String; let name: String; let address: String }
+    struct Property: Decodable {
+        let key: String
+        let name: String
+        let address: String
+        /// "str" or "ltr" (default ltr).
+        var type: String?
+        var ownerOccupied: Bool?
+        var aliases: [String]?
+    }
     struct Item: Decodable {
         let title: String
         let landlord: Bool
         let category: String?
         let property: String?
         let split: String
+        /// "calendar" or "email" (realworld split); the email title is "sender: subject".
+        var kind: String?
+        var location: String?
     }
 
     let properties: [Property]
@@ -33,7 +45,10 @@ struct CalibrationFixture: Decodable {
 
     /// Fixture keys → app properties (stable ids per run).
     func rentalProperties() -> [String: RentalProperty] {
-        Dictionary(uniqueKeysWithValues: properties.map { ($0.key, RentalProperty(name: $0.name, address: $0.address, propertyType: .ltr)) })
+        Dictionary(uniqueKeysWithValues: properties.map {
+            ($0.key, RentalProperty(name: $0.name, address: $0.address, propertyType: $0.type == "str" ? .str : .ltr,
+                                    aliases: $0.aliases ?? [], isOwnerOccupied: $0.ownerOccupied ?? false))
+        })
     }
 
     static func category(named name: String?) -> ActivityCategory? {
@@ -72,9 +87,9 @@ struct CalibrationScore {
 }
 
 final class CalibrationTests: XCTestCase {
-    private func candidate(_ title: String, kind: Suggestion.Kind) -> CaptureCandidate {
+    private func candidate(_ title: String, kind: Suggestion.Kind, location: String? = nil) -> CaptureCandidate {
         let start = Date(timeIntervalSince1970: 1_790_000_000)
-        return CaptureCandidate(sourceKey: "cal:\(title)", kind: kind, start: start, end: start.addingTimeInterval(3600), title: title, detectedAt: start)
+        return CaptureCandidate(sourceKey: "cal:\(title)", kind: kind, start: start, end: start.addingTimeInterval(3600), title: title, location: location, detectedAt: start)
     }
 
     /// Scores `classify` on the items in `split` (nil = all). Category is the rich table
@@ -89,7 +104,7 @@ final class CalibrationTests: XCTestCase {
         let list = fixture.properties.compactMap { byKey[$0.key] }
         var s = CalibrationScore()
         for item in fixture.items where split == nil || item.split == split {
-            let c = await classify(candidate(item.title, kind: .gmail), list)
+            let c = await classify(candidate(item.title, kind: .gmail, location: item.location), list)
             let saysYes = c.confidence >= likely
             s.total += 1
             if saysYes == item.landlord { s.correct += 1 }
@@ -122,7 +137,7 @@ final class CalibrationTests: XCTestCase {
         let rules = RulesClassifier()
         let classify: (CaptureCandidate, [RentalProperty]) async -> CaptureClassification = { await rules.classify($0, properties: $1) }
 
-        for split in ["tuning", "holdout", nil] as [String?] {
+        for split in ["tuning", "holdout", "realworld", nil] as [String?] {
             let s = await score(fixture, split: split, classify: classify)
             print("CALIBRATION rules split=\(split ?? "all") likely=\(ClassifierThresholds.likely) notSure=\(ClassifierThresholds.notSure) \(s.summary)")
         }
@@ -150,6 +165,12 @@ final class CalibrationTests: XCTestCase {
         let tuning = await score(fixture, split: "tuning", classify: classify)
         XCTAssertGreaterThanOrEqual(tuning.categoryAccuracy, ClassifierThresholds.targetRulesCategoryTuning, "rules category, tuning")
         XCTAssertGreaterThanOrEqual(holdout.categoryAccuracy, ClassifierThresholds.targetRulesCategoryHoldout, "rules category, held-out")
+        // Classifier v2: the synthetic real-world failure patterns (platform marketing, mailing
+        // lists, social events at an owner-occupied home, street collisions, alias matches).
+        let realworld = await score(fixture, split: "realworld", classify: classify)
+        XCTAssertGreaterThanOrEqual(realworld.precision, ClassifierThresholds.targetPrecisionAtLikely, "real-world patterns precision")
+        XCTAssertGreaterThanOrEqual(realworld.visibleRecall, ClassifierThresholds.targetVisibleRecall, "real-world patterns visible recall")
+        XCTAssertGreaterThanOrEqual(realworld.propertyAccuracy, 0.9, "real-world patterns property")
         // The committed value must sit within 0.02 of the best accuracy on the sweep.
         XCTAssertGreaterThanOrEqual(all.accuracy, best.accuracy - 0.02)
         XCTAssertLessThan(ClassifierThresholds.notSure, ClassifierThresholds.likely)
@@ -171,7 +192,7 @@ final class CalibrationTests: XCTestCase {
         let list = fixture.properties.compactMap { byKey[$0.key] }
         var modelCorrect = 0, modelCategory = 0, landlord = 0, answered = 0
         for item in fixture.items {
-            guard let r = await classifier.classify(candidate(item.title, kind: .gmail), properties: list) else { continue }
+            guard let r = await classifier.classify(candidate(item.title, kind: .gmail, location: item.location), properties: list) else { continue }
             answered += 1
             if r.isRentalWork == item.landlord { modelCorrect += 1 }
             if item.landlord {

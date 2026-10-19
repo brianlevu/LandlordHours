@@ -14,6 +14,13 @@ import Foundation
 //   but category only 48%: keyword categories don't generalise. Calendar items keep the 1.x
 //   category anyway; non-calendar category quality is the on-device model's job, and its
 //   85% held-out floor is asserted whenever the model actually runs.
+//
+// Classifier v2, 2026-10-19 (real-owner calibration; the real set stays private and local):
+// fixture + 44 synthetic "realworld" items (one or more per real failure pattern). Rules at
+// 0.60: tuning 100%, held-out precision 96% / recall 100%, realworld precision 100% / recall
+// 100%. On the owner's private held-out split the shipped rules scored precision ~0.4; see
+// the WP2b report for the before/after table. `likely` stays 0.60: sweeping 0.5–0.9 did not
+// fix precision (false positives were single strong signals at 0.82).
 
 enum ClassifierThresholds {
     /// At or above: "landlord work" — a normal inbox card.
@@ -21,6 +28,11 @@ enum ClassifierThresholds {
     /// Confidence floor for items with a landlord signal: they show as "Not sure this is
     /// landlord work" (never hidden) and their confidence never drops below this.
     static let notSure = 0.30
+    /// Classifier v2 "Not sure" band: an item shows as "Not sure" only with a rules score of at
+    /// least `RulesEngine.notSureMinScore` (1.5), a property or alias match, or a model "yes"
+    /// at this confidence or more. Any keyword hit used to be enough, which filled the inbox
+    /// with 26–36% of all real-world negatives (2026-10-19 owner calibration).
+    static let modelYesNotSure = 0.5
     /// Rules results this decisive skip the on-device model (saves battery on backfill).
     static let skipModelAbove = 0.97
     static let skipModelBelow = 0.02

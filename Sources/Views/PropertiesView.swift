@@ -983,6 +983,9 @@ struct PropertyDetailView: View {
     @State private var name: String
     @State private var address: String
     @State private var propertyType: PropertyType
+    @State private var aliases: [String]
+    @State private var newAlias = ""
+    @State private var isOwnerOccupied: Bool
     @State private var hasChanges = false
     @State private var coordinate: CLLocationCoordinate2D?
     @State private var addressResults: [MKMapItem] = []
@@ -993,6 +996,8 @@ struct PropertyDetailView: View {
         _name = State(initialValue: property.name)
         _address = State(initialValue: property.address)
         _propertyType = State(initialValue: property.propertyType)
+        _aliases = State(initialValue: property.aliases)
+        _isOwnerOccupied = State(initialValue: property.isOwnerOccupied)
     }
 
     private var typeColor: Color {
@@ -1022,6 +1027,7 @@ struct PropertyDetailView: View {
                     detailHeader
                     evidenceOverviewCard
                     propertyDetailsCard
+                    otherNamesCard
                     locationCard
                     if hasChanges {
                         saveButton
@@ -1107,8 +1113,133 @@ struct PropertyDetailView: View {
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: propertyType) { _, _ in hasChanges = true }
+
+                Toggle(isOn: $isOwnerOccupied) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("I live here")
+                            .font(AppTypography.body)
+                            .foregroundStyle(colors.textPrimary)
+                        Text("Events at this address only count when they mention rental work.")
+                            .font(AppTypography.caption)
+                            .foregroundStyle(colors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .tint(colors.action)
+                .accessibilityIdentifier("property.ownerOccupied")
+                .onChange(of: isOwnerOccupied) { _, _ in hasChanges = true }
             }
         }
+    }
+
+    // MARK: Other names (aliases)
+
+    private var otherNamesCard: some View {
+        propertyDetailCard(title: "Other names for this property") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Listing titles, nicknames, or a contractor you use here. We use them to match emails and events to this property.")
+                    .font(AppTypography.caption)
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if !aliases.isEmpty {
+                    LHChipFlowLayout(spacing: 8) {
+                        ForEach(aliases, id: \.self) { alias in
+                            aliasChip(alias)
+                        }
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    TextField("Add another name", text: $newAlias)
+                        .font(AppTypography.body)
+                        .foregroundStyle(colors.textPrimary)
+                        .submitLabel(.done)
+                        .onSubmit(addAlias)
+                        .onChange(of: newAlias) { _, value in
+                            if !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { hasChanges = true }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .background(colors.backgroundTertiary)
+                        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
+                        .accessibilityIdentifier("property.alias.field")
+
+                    Button(action: addAlias) {
+                        Text("Add")
+                            .font(AppTypography.button)
+                            .foregroundStyle(AppColors.onAction)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 12)
+                            .background(colors.action)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.lhPressable)
+                    .disabled(!canAddAlias)
+                    .opacity(canAddAlias ? 1 : 0.5)
+                    .accessibilityIdentifier("property.alias.add")
+                }
+
+                if let aliasHint {
+                    Text(aliasHint)
+                        .font(AppTypography.caption)
+                        .foregroundStyle(colors.caution)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("property.alias.hint")
+                }
+            }
+        }
+    }
+
+    private var trimmedNewAlias: String { newAlias.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private var canAddAlias: Bool {
+        trimmedNewAlias.count >= RentalProperty.aliasMinLength && aliases.count < RentalProperty.maxAliases
+    }
+
+    /// Why the typed name can't be added yet (the matcher ignores names under 3 characters).
+    private var aliasHint: String? {
+        if aliases.count >= RentalProperty.maxAliases { return "You can add up to \(RentalProperty.maxAliases) other names." }
+        if !trimmedNewAlias.isEmpty && trimmedNewAlias.count < RentalProperty.aliasMinLength {
+            return "Use at least \(RentalProperty.aliasMinLength) characters."
+        }
+        return nil
+    }
+
+    private func aliasChip(_ alias: String) -> some View {
+        HStack(spacing: 6) {
+            Text(alias)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(colors.textPrimary)
+                .lineLimit(1)
+            Button {
+                withAnimation(AppAnimation.quick) {
+                    aliases.removeAll { $0 == alias }
+                    hasChanges = true
+                }
+            } label: {
+                LucideIcon(image: Lucide.x, size: 12)
+                    .foregroundStyle(colors.textSecondary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.lhPressable)
+            .accessibilityLabel("Remove \(alias)")
+        }
+        .padding(.leading, 12)
+        .background(colors.actionSurface)
+        .clipShape(Capsule())
+    }
+
+    private func addAlias() {
+        guard canAddAlias else { return }
+        let cleaned = RentalProperty.cleanedAliases(aliases + [newAlias])
+        guard cleaned != aliases else { newAlias = ""; return }
+        withAnimation(AppAnimation.quick) {
+            aliases = cleaned
+            hasChanges = true
+        }
+        newAlias = ""
     }
 
     private var evidenceOverviewCard: some View {
@@ -1356,6 +1487,10 @@ struct PropertyDetailView: View {
         updated.name = name
         updated.address = address
         updated.propertyType = propertyType
+        updated.aliases = RentalProperty.cleanedAliases(aliases + [newAlias])
+        updated.isOwnerOccupied = isOwnerOccupied
+        newAlias = ""
+        aliases = updated.aliases
         viewModel.updateProperty(updated)
         hasChanges = false
         dismiss()
@@ -1365,4 +1500,50 @@ struct PropertyDetailView: View {
 #Preview {
     PropertiesView()
         .environmentObject(AppViewModel())
+}
+
+/// Wraps chips onto as many rows as they need (property aliases).
+struct LHChipFlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
+        let width = rows.map { $0.width }.max() ?? 0
+        let height = rows.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(rows.count - 1, 0))
+        return CGSize(width: min(width, proposal.width ?? width), height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(width: bounds.width, subviews: subviews) {
+            var x = bounds.minX
+            for index in row.indices {
+                let size = subviews[index].sizeThatFits(ProposedViewSize(width: bounds.width, height: nil))
+                subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(width: min(size.width, bounds.width), height: size.height))
+                x += min(size.width, bounds.width) + spacing
+            }
+            y += row.height + spacing
+        }
+    }
+
+    private struct Row { var indices: [Int] = []; var width: CGFloat = 0; var height: CGFloat = 0 }
+
+    private func arrange(width: CGFloat, subviews: Subviews) -> [Row] {
+        var rows: [Row] = []
+        var current = Row()
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(ProposedViewSize(width: width, height: nil))
+            let itemWidth = min(size.width, width)
+            let needed = current.indices.isEmpty ? itemWidth : current.width + spacing + itemWidth
+            if needed > width, !current.indices.isEmpty {
+                rows.append(current)
+                current = Row()
+            }
+            current.width = current.indices.isEmpty ? itemWidth : current.width + spacing + itemWidth
+            current.height = max(current.height, size.height)
+            current.indices.append(index)
+        }
+        if !current.indices.isEmpty { rows.append(current) }
+        return rows
+    }
 }

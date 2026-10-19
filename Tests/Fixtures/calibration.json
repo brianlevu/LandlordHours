@@ -1,5 +1,5 @@
 {
- "_note": "Hand-labelled calibration set for the 2.0 classifier (WP2, 2026-10-19). 'landlord' is the label, 'category' uses ActivityCategory case names (routine upkeep = repairs; compliance inspections = legal; management = rent, tenant communication, scheduling), 'property' uses the keys below. 'tuning' items shaped the keyword table (incl. the first held-out set, folded in after the review relabel); 'holdout' items were written after the table was frozen. Re-run CalibrationTests and recommit ClassifierThresholds after any change.",
+ "_note": "Hand-labelled calibration set for the 2.0 classifier (WP2, 2026-10-19). 'landlord' is the label, 'category' uses ActivityCategory case names (routine upkeep = repairs; compliance inspections = legal; management = rent, tenant communication, scheduling), 'property' uses the keys below. 'tuning' items shaped the keyword table (incl. the first held-out set, folded in after the review relabel); 'holdout' items were written after the table was frozen. Re-run CalibrationTests and recommit ClassifierThresholds after any change. Split 'realworld' (2026-10-19, classifier v2): synthetic items, one or more per failure pattern found on a real owner's calendar and inbox (no real data). Email items are 'sender: subject'. Property 'birchwood' is a short-term-rental room in a home the owner lives in, with aliases; 'cedar' sits on a two-word street that starts with a place-name prefix.",
  "properties": [
   {
    "key": "oak",
@@ -15,6 +15,23 @@
    "key": "lakeview",
    "name": "Lakeview Condo",
    "address": "1500 Lakeshore Blvd Unit 4B, Austin, TX 78741"
+  },
+  {
+   "key": "birchwood",
+   "name": "Birchwood Suite",
+   "address": "77 Birchwood Ln, Austin, TX 78745",
+   "type": "str",
+   "ownerOccupied": true,
+   "aliases": [
+    "Sunny Garden Room in Cozy Family Home",
+    "Ridgeline Plumbing"
+   ]
+  },
+  {
+   "key": "cedar",
+   "name": "Cedar Flats",
+   "address": "240 San Marco Ave, Austin, TX 78746",
+   "type": "ltr"
   }
  ],
  "items": [
@@ -1522,6 +1539,367 @@
    "category": null,
    "property": null,
    "split": "holdout"
+  },
+  {
+   "title": "Airbnb: Set up discounts for the fall season",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Vrbo: Increase bookings with powerful promotions",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Airbnb: Lisbon stays you should see",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Vrbo: Your password was updated",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Airbnb: Your security code is 482910",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Vrbo: Webinar - pricing tips for hosts",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Vrbo: Host Updates: March",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Airbnb: Your reservation in Denver is confirmed",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Home Depot: 20% off patio furniture this weekend",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Lowe's: Deals of the week on grills",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Tax Helper Co: Newsletter - five tips before you file",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Sam via Neighbors: [maple-neighbors] Anyone know a good plumber?",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Parent group: [oakhill-parents] Contractor recommendations for a deck",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "City Planning: Permit center newsletter - new fees",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Neighborhood Digest: roof repair question and 4 more posts",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "HomeFinder: New listings near you and 12 more updates",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Property Alerts: Alert: a building permit was requested near you",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "BBQ with the neighbors",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "77 Birchwood Ln, Austin, TX 78745"
+  },
+  {
+   "title": "Game night",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "77 Birchwood Ln, Austin, TX 78745"
+  },
+  {
+   "title": "Housewarming party",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "77 Birchwood Ln, Austin, TX 78745"
+  },
+  {
+   "title": "Birthday celebration at Birchwood",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar"
+  },
+  {
+   "title": "Parking at San Antonio airport",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "San Antonio International Airport"
+  },
+  {
+   "title": "Spa day",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "San Marcos Springs Resort"
+  },
+  {
+   "title": "Win a car rental for the weekend",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Expert call - rent industry trends",
+   "landlord": false,
+   "category": null,
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar"
+  },
+  {
+   "title": "Airbnb: RE: Reservation for Sunny Garden Room in Cozy Family Home, Mar 3 - 5",
+   "landlord": true,
+   "category": "leasing",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Airbnb: Pending: Reservation request at Sunny Garden Room in Cozy Family Home",
+   "landlord": true,
+   "category": "leasing",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Airbnb: Reminder: 5 hours left to reply to Dana's reservation request",
+   "landlord": true,
+   "category": "leasing",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Airbnb: Inquiry for Sunny Garden Room in Cozy Family Home for Apr 2 - 9",
+   "landlord": true,
+   "category": "leasing",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Airbnb: Write a review for Sam",
+   "landlord": true,
+   "category": "management",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Vrbo: Payout sent for your stay",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Vrbo: Tax form required for payments",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Ridgeline Plumbing: Quote for parts and labor",
+   "landlord": true,
+   "category": "repairs",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Ridgeline Plumbing: Invoice for services rendered",
+   "landlord": true,
+   "category": "repairs",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Fix leaking faucet in guest room",
+   "landlord": true,
+   "category": "repairs",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "77 Birchwood Ln, Austin, TX 78745"
+  },
+  {
+   "title": "Guest turnover cleaning",
+   "landlord": true,
+   "category": "repairs",
+   "property": "birchwood",
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "77 Birchwood Ln, Austin, TX 78745"
+  },
+  {
+   "title": "Cost segregation study kickoff call",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar"
+  },
+  {
+   "title": "Update depreciation schedule for the rentals",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar"
+  },
+  {
+   "title": "Send 1099s to contractors",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "realworld",
+   "kind": "calendar"
+  },
+  {
+   "title": "CPA: Schedule E draft for the duplex",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Agent Co: Landlord insurance renewal quote",
+   "landlord": true,
+   "category": "insurance",
+   "property": null,
+   "split": "realworld",
+   "kind": "email"
+  },
+  {
+   "title": "Jordan Lee and Pat",
+   "landlord": true,
+   "category": "leasing",
+   "property": "cedar",
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "240 San Marco Ave, Austin, TX 78746"
+  },
+  {
+   "title": "Riley M.",
+   "landlord": true,
+   "category": "leasing",
+   "property": "oak",
+   "split": "realworld",
+   "kind": "calendar",
+   "location": "412 Oak St, Austin, TX 78704"
+  },
+  {
+   "title": "Smoke detector check at San Marco",
+   "landlord": true,
+   "category": "repairs",
+   "property": "cedar",
+   "split": "realworld",
+   "kind": "calendar"
   }
  ]
 }

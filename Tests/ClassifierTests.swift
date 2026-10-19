@@ -303,9 +303,9 @@ final class ClassifierTests: XCTestCase {
         // Non-calendar kinds take the model's category; an unknown property ref is ignored.
         let backend2 = FakeOnDeviceBackend(answer: answer(true, 0.9, category: .repairs, ref: "P9"))
         let chain2 = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend2))
-        let gmail = await chain2.classify(candidate("Swap air filters", kind: .gmail), properties: properties)
-        XCTAssertEqual(gmail.category, .repairs)
-        XCTAssertNil(gmail.propertyId)
+        let visit = await chain2.classify(candidate("Swap air filters", kind: .location), properties: properties)
+        XCTAssertEqual(visit.category, .repairs)
+        XCTAssertNil(visit.propertyId)
     }
 
     func testModelPropertyRefMapsToId() async {
@@ -331,7 +331,7 @@ final class ClassifierTests: XCTestCase {
     func testPromptCarriesOnlyTheEventAndPropertyList() {
         let request = OnDeviceClassifier.request(for: candidate("Fix sink", location: "412 Oak St"), properties: [oak])
         let prompt = OnDeviceClassifier.prompt(for: request)
-        XCTAssertTrue(prompt.contains("Event title: Fix sink"))
+        XCTAssertTrue(prompt.contains("Item (calendar event): Fix sink"))
         XCTAssertTrue(prompt.contains("P1: Oak Street Duplex (412 Oak St)"))
         XCTAssertFalse(prompt.contains(oak.id.uuidString))
         XCTAssertTrue(OnDeviceClassifier.instructions.contains("Never give tax"))
@@ -342,7 +342,7 @@ final class ClassifierTests: XCTestCase {
 
     func testLowConfidenceStaysVisibleAsNotSure() async {
         let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: UnavailableOnDeviceBackend(reason: .deviceNotEligible)))
-        let outcome = await chain.evaluate(candidate("Upload receipts to Stessa"), properties: properties)
+        let outcome = await chain.evaluate(candidate("Check for mold"), properties: properties)
         guard case .suggest(let c) = outcome else { return XCTFail("expected suggest, got \(outcome)") }
         XCTAssertEqual(c.band, .notSure)
         XCTAssertEqual(ConfidenceBand.notSureLabel, "Not sure this is landlord work")
@@ -351,12 +351,14 @@ final class ClassifierTests: XCTestCase {
         guard case .skip = noise else { return XCTFail("expected skip, got \(noise)") }
     }
 
-    /// Review fix 1: a landlord keyword is never hidden, not by a weak score and not by a
-    /// model "no". Only items with no landlord signal (or noise that outweighs it) drop.
+    /// Review fix 1, tightened in classifier v2: an item with a real landlord signal (a rules
+    /// score of at least 1.5, or a property match) is never hidden, not by a weak score and not
+    /// by a model "no". A single weak keyword alone no longer reaches the inbox (see
+    /// ClassifierV2Tests.testNotSureBandNeedsScoreOrPropertyOrConfidentModel).
     func testKeywordItemsAreNeverHiddenEvenWhenTheModelSaysNo() async {
         let backend = FakeOnDeviceBackend(answer: answer(false, 0.0))
         let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
-        let weak = ["Upload receipts to Stessa", "Supplies", "Window", "Estimate", "Renew", "Tour", "Clean up notes", "Fix calendar"]
+        let weak = ["Check for mold", "Call locksmith", "Exterminator visit", "Pest control", "Lunch near Maple Cottage", "Lunch near Lakeshore"]
         for title in weak {
             let outcome = await chain.evaluate(candidate(title), properties: properties)
             guard case .suggest(let c) = outcome else { XCTFail("\(title) was hidden: \(outcome)"); continue }
@@ -491,7 +493,7 @@ final class ClassifierTests: XCTestCase {
         // "slow" titles take 3 s; the budget is 50 ms, so they keep the rules result.
         let backend = SlowFakeBackend(delay: 0.001, slowDelay: 3, answer: answer(true, 0.95, category: .legal))
         let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
-        let items = backfill(4, prefix: "slow receipts upload") + backfill(4, prefix: "Upload receipts to Stessa")
+        let items = backfill(4, prefix: "slow mold check") + backfill(4, prefix: "Upload receipts to Stessa")
         let started = Date()
         let results = try await chain.classifyBatch(items, properties: properties, maxConcurrent: 2, perItemBudget: 0.05)
         XCTAssertLessThan(Date().timeIntervalSince(started), 2, "budget not enforced")
