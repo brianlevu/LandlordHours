@@ -14,9 +14,9 @@ struct BlueprintHouse: View {
 
     /// Rendered layers (creative-r3 assets, registered + matted) when present; vector fallback otherwise.
     static let useArt = UIImage(named: "bp-house-built") != nil
-    static var base: CGFloat { useArt ? 0.885 : 0.90 }
-    static var foundationTop: CGFloat { useArt ? 0.83 : 0.84 }
-    static var eave: CGFloat { useArt ? 0.47 : 0.42 }
+    static var base: CGFloat { useArt ? 0.925 : 0.90 }
+    static var foundationTop: CGFloat { useArt ? 0.80 : 0.84 }
+    static var eave: CGFloat { useArt ? 0.40 : 0.42 }
     static var apex: CGFloat { useArt ? 0.05 : 0.14 }
 
     static func buildY(_ h: Double) -> CGFloat {
@@ -52,7 +52,6 @@ struct BlueprintHouse: View {
                 }
                 if hours > 100 && hours < 500 {
                     frame.mask(FeatherMask(y: max(BlueprintHouse.eave, by - 0.21), feather: 0.03))
-                        .mask(TopCut(y: BlueprintHouse.eave))
                 }
                 built.mask(FeatherMask(y: by, feather: 0.028))
                 if hours >= 500 {

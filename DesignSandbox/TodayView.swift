@@ -458,10 +458,10 @@ struct EmptyStateView: View {
                 Button {} label: {
                     Label(action, systemImage: actionSymbol ?? "plus")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(LHConcept.current == .none ? AnyShapeStyle(.primary) : AnyShapeStyle(LH.onAction))
                         .padding(.horizontal, 18)
                         .frame(height: 44)
-                        .background(LH.card, in: Capsule())
+                        .background(LHConcept.current == .none ? LH.card : LH.action, in: Capsule())
                         .shadow(color: .black.opacity(scheme == .dark ? 0 : 0.08), radius: 8, y: 3)
                 }
                 .buttonStyle(Pressable())

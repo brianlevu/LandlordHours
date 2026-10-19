@@ -206,14 +206,16 @@ struct BlueprintMilestone: View {
                     .padding(.bottom, 26)       // the roof's drop path (34 pt) stays clear of the title
                     .zIndex(1)
 
-                ZStack(alignment: .bottomTrailing) {
+                ZStack(alignment: .topLeading) {
                     BlueprintHouse(hours: 500, roofDrop: roofDrop, roofFill: roofFill, showScale: false)
                         .frame(width: 290, height: 290)
                     Plaque(number: 500)
-                        .scaleEffect(plaque ? 1 : 0.6)
+                        .scaleEffect(plaque ? 1 : 0.6, anchor: .bottom)
                         .opacity(plaque ? 1 : 0)
-                        .offset(x: 6, y: -8)
+                        .shadow(color: .black.opacity(0.35), radius: 4, y: 3)
+                        .position(x: 290 * 0.80, y: 290 * 0.80)     // standing on the plinth's front-right edge
                 }
+                .frame(width: 290, height: 290)
                 .padding(.top, 8)
 
                 Text("500 confirmed hours in 2026")
@@ -451,11 +453,11 @@ struct BlueprintEmptyHero: View {
                     Text("An empty lot.").font(.headline).foregroundStyle(.white)
                     Text("Add a property and every hour you confirm goes up on it.")
                         .font(.footnote).foregroundStyle(OnHero.secondary)
-                        .frame(width: 150, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(20)
-                Spacer(minLength: 0)
-                EmptyLot().frame(width: 188, height: 188).padding(.trailing, 16).padding(.bottom, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                EmptyLot().frame(width: 164, height: 164).padding(.trailing, 16).padding(.bottom, 16)
             }
         }
         .frame(height: 300)
