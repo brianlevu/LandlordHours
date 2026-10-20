@@ -26,7 +26,7 @@ struct SFShortcutsPage: View {
                     SFAppIcon(size: 56)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("LandlordHours").font(.system(size: 28, weight: .bold))
-                        Text("4 shortcuts").font(.subheadline).foregroundStyle(.secondary)
+                        Text("4 shortcuts").font(.subheadline).foregroundStyle(LHB.textSecondary)
                     }
                 }
                 .padding(.top, 12)
@@ -34,12 +34,12 @@ struct SFShortcutsPage: View {
                     ForEach(tiles, id: \.0) { t in tile(t.0, t.1) }
                 }
                 .padding(.top, 22)
-                Text("Ask Siri").font(.footnote.weight(.semibold)).textCase(.uppercase).foregroundStyle(.secondary)
+                Text("Ask Siri").font(.footnote.weight(.semibold)).textCase(.uppercase).foregroundStyle(LHB.textSecondary)
                     .padding(.top, 28).padding(.leading, 4)
                 VStack(spacing: 0) {
                     ForEach(Array(phrases.enumerated()), id: \.offset) { i, p in
                         HStack {
-                            Image(systemName: "waveform").foregroundStyle(.secondary)
+                            Image(systemName: "waveform").foregroundStyle(LHB.textSecondary)
                             Text(p).font(.body)
                             Spacer()
                         }
@@ -152,21 +152,29 @@ struct SFLaunchToToday: View {
     var progress: CGFloat
     /// The hero card's frame on a 402×874 screen (measured from the today capture).
     static let hero = CGRect(x: 20, y: SFLaunchToToday.heroY, width: 362, height: 320)
-    static let heroY: CGFloat = 206
+    static let heroY: CGFloat = 212
 
     var body: some View {
+        ZStack {
+            Tabs(tab: .today) { S2Today(state: .launch) }
+                .opacity(Double(min(1, progress * 1.4)))
         GeometryReader { g in
             let full = CGRect(origin: .zero, size: g.size)
             let p = progress
             let r = CGRect(x: lerp(full.minX, Self.hero.minX, p), y: lerp(full.minY, Self.hero.minY, p),
                            width: lerp(full.width, Self.hero.width, p), height: lerp(full.height, Self.hero.height, p))
             ZStack(alignment: .topLeading) {
-                Tabs(tab: .today) { S2Today(state: .launch) }
-                    .opacity(Double(min(1, p * 1.4)))
                 ZStack {
                     RoundedRectangle(cornerRadius: 24 * p + 55 * (1 - p), style: .continuous)
                         .fill(LHB.brand)
                     S2Paper(radius: 24 * p + 55 * (1 - p)).opacity(Double(p))
+                    // The hero's own content rides in the bottom of the shrinking sheet and fades up,
+                    // so when the sheet lands it IS the hero card.
+                    TodayHero(hours: 212, status: "Behind by 388h")
+                        .frame(width: r.width)
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                        .opacity(Double(min(1, max(0, (p - 0.3) / 0.6))))
+                        .clipShape(RoundedRectangle(cornerRadius: 24 * p + 55 * (1 - p), style: .continuous))
                     MarkB().frame(width: 112, height: 112)
                         .scaleEffect(1 - 0.3 * p)
                         .opacity(Double(max(0, 1 - p * 1.8)))
@@ -178,6 +186,8 @@ struct SFLaunchToToday: View {
             .ignoresSafeArea()
         }
         .ignoresSafeArea()
+        .allowsHitTesting(false)
+        }
     }
 
     private func lerp(_ a: CGFloat, _ b: CGFloat, _ t: CGFloat) -> CGFloat { a + (b - a) * t }
@@ -192,25 +202,25 @@ struct SFLaunchToWelcome: View {
         ZStack(alignment: .top) {
             LHB.brand.ignoresSafeArea()
             S2Paper(radius: 0).opacity(Double(p)).ignoresSafeArea()
-            if let l = S2House.linework("bp_house_k18_finished_lines") {
+            if let l = S2House.linework("bp_house_k00_lot_lines") {
                 Image(uiImage: l).renderingMode(.template).resizable().scaledToFit()
                     .foregroundStyle(LHB.draftingHero)
-                    .frame(width: 330, height: 330)
-                    .padding(.top, 110)
+                    .frame(width: 262, height: 262)
+                    .padding(.top, 57)
                     .opacity(Double(p))
                     .scaleEffect(0.92 + 0.08 * p)
             }
             MarkB().frame(width: 112, height: 112)
                 .scaleEffect(1 + 0.4 * p)
-                .opacity(Double(max(0, 1 - p * 1.6)))
+                .opacity(Double(max(0, 1 - p * 2.5)))
                 .frame(maxHeight: .infinity).offset(y: -12)
             VStack(alignment: .leading, spacing: 10) {
-                Spacer()
-                Text("Here’s what you’ll build").drafting(size: 12)
-                Text("Every hour builds the house.").font(S2Font.display(40, opsz: 144, soft: 50, dts: .large)).foregroundStyle(.white)
+                Color.clear.frame(height: 318)
+                Text("Here’s what you’ll build").drafting(size: 12).frame(maxWidth: .infinity)
+                Text("Every hour builds the house.").font(S2Font.display(30, opsz: 144, soft: 50, dts: .large)).foregroundStyle(.white)
             }
-            .padding(.horizontal, 24).padding(.bottom, 260)
-            .opacity(Double(max(0, p * 1.5 - 0.5)))
+            .padding(.horizontal, 24)
+            .opacity(Double(max(0, p * 2 - 1)))
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }

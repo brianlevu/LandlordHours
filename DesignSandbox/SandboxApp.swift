@@ -87,7 +87,7 @@ struct LHDesignSandboxApp: App {
             }
             .tint(LH.action)
             .environment(\.requestedScheme, scheme)
-            .preferredColorScheme(S2Route.requested != nil ? nil : screen == .paywall || (LHConcept.current == .blueprint && [.conceptWelcome, .conceptMilestone, .conceptBackfill].contains(screen)) ? .dark : scheme)
+            .preferredColorScheme(S2Route.requested.map { $0.hasPrefix("sf-") ? SFHost.rootScheme($0) : nil } ?? (S2Route.requested != nil ? nil : screen == .paywall || (LHConcept.current == .blueprint && [.conceptWelcome, .conceptMilestone, .conceptBackfill].contains(screen)) ? .dark : scheme))
         }
     }
 }

@@ -34,9 +34,10 @@ struct SFHost: View {
         case "sf-lock-widgets": onWallpaper(SFLockWidgets())
         case "sf-lock-states": onWallpaper(SFLockStates())
         // 2. Launch
+        case "sf-today-top": Tabs(tab: .today) { S2Today(state: .launch) }.preferredColorScheme(scheme)
         case "sf-launch": SFLaunch().preferredColorScheme(.dark).environment(\.colorScheme, scheme)
-        case "sf-launch-to-today": SFLaunchToToday(progress: 0.55).preferredColorScheme(scheme)
-        case "sf-launch-to-welcome": SFLaunchToWelcome(progress: 0.5).preferredColorScheme(.dark).environment(\.colorScheme, scheme)
+        case "sf-launch-to-today": SFLaunchToToday(progress: 0.7).preferredColorScheme(scheme)
+        case "sf-launch-to-welcome": SFLaunchToWelcome(progress: 0.6).preferredColorScheme(.dark).environment(\.colorScheme, scheme)
         // 3. Toasts
         case "sf-toast-undo": SFToastFrame(kind: .undo).preferredColorScheme(scheme)
         case "sf-toast-save-error": SFToastFrame(kind: .saveError).preferredColorScheme(scheme)
@@ -53,6 +54,13 @@ struct SFHost: View {
         default:
             List(SFHost.all, id: \.self) { Text($0) }
         }
+    }
+
+    /// The window's scheme (drives the status bar): white on wallpapers and blueprint.
+    static func rootScheme(_ name: String) -> ColorScheme? {
+        let wall = ["sf-home", "sf-lock", "sf-notif", "sf-launch-to-welcome"].contains { name.hasPrefix($0) } || name == "sf-launch"
+        if wall { return .dark }
+        return UserDefaults.standard.string(forKey: "appearance") == "dark" ? .dark : .light
     }
 
     static let all = [
@@ -188,7 +196,10 @@ struct SFToast: View {
     @Environment(\.dynamicTypeSize) private var dts
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
+        // At accessibility sizes the action drops under the message, so the text keeps the width.
+        let layout = dts.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
+        layout {
+          HStack(alignment: .firstTextBaseline, spacing: 12) {
             Image(systemName: spec.symbol)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(spec.tint)
@@ -196,9 +207,10 @@ struct SFToast: View {
             Text(spec.message)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(LHB.textPrimary)
-                .lineLimit(dts.isAccessibilitySize ? 4 : 2)
+                .lineLimit(nil)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
+          }
             if let a = spec.action {
                 Button(a, action: onAction)
                     .font(.subheadline.weight(.semibold))

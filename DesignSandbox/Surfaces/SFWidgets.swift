@@ -40,7 +40,7 @@ struct SFWidgetData {
         case .behind, .timer: ("exclamationmark.circle.fill", "Behind by \(gap)h", Color(hex: 0xFFB454))
         case .onPace: ("checkmark.circle.fill", "On pace", LHB.positiveOnHero)
         case .met: ("checkmark.seal.fill", "House finished", LHB.positiveOnHero)
-        case .empty: ("circle.dashed", "Nothing confirmed yet", LHB.onHeroSecondary)
+        case .empty: ("circle.dashed", "No hours yet", LHB.onHeroSecondary)
         case .noProperty: nil
         }
     }
@@ -73,10 +73,10 @@ struct SFSmallWidget: View {
         ZStack(alignment: .topLeading) {
             background
             house
-                .frame(width: 98, height: 98)
-                .position(x: 162 - 49 - 4, y: 30 + 49)
+                .frame(width: d.kind == .noProperty ? 84 : 92, height: d.kind == .noProperty ? 84 : 92)
+                .position(x: 162 - (d.kind == .noProperty ? 42 : 46) - 2, y: d.kind == .noProperty ? 12 + 42 : 40 + 46)
             VStack(alignment: .leading, spacing: 0) {
-                Text(d.kind == .timer ? "Timer" : "Your hours").drafting(labelColor, size: 10)
+                Text(d.kind == .timer ? "Timer" : d.kind == .noProperty ? "Start here" : "Your hours").drafting(labelColor, size: 10)
                     .accessibilityHidden(true)
                 if d.kind == .noProperty {
                     Spacer(minLength: 0)
@@ -91,9 +91,8 @@ struct SFSmallWidget: View {
                         .roundedNumber(34)
                         .foregroundStyle(primary)
                         .padding(.top, 4)
-                    Text("Pine Cabin").font(.system(size: 13, weight: .medium)).foregroundStyle(secondary)
                     Spacer(minLength: 0)
-                    statusLine(("timer", "Running", LHB.draftingHero))
+                    statusLine(("timer", "Pine Cabin", LHB.draftingHero))
                 } else {
                     Text(d.number)
                         .roundedNumber(36)
@@ -214,7 +213,7 @@ struct SFMediumWidget: View {
         switch d.kind {
         case .timer: "Timer · today"
         case .noProperty: "LandlordHours"
-        default: "Your REPS hours · 2026"
+        default: "Your REPS hours"
         }
     }
 
@@ -340,7 +339,7 @@ struct SFAccessoryCircular: View {
     let d: SFWidgetData
     var body: some View {
         ZStack {
-            Circle().fill(.white.opacity(0.16))
+            Circle().fill(.black.opacity(0.22))
             let p = d.kind == .noProperty ? 0 : min(1, d.hours / d.goal)
             Circle().stroke(.white.opacity(0.28), lineWidth: 5).padding(6)
             Circle().trim(from: 0, to: p).stroke(.white, style: StrokeStyle(lineWidth: 5, lineCap: .round))
@@ -371,7 +370,7 @@ struct SFAccessoryCircularPending: View {
     let n: Int
     var body: some View {
         ZStack {
-            Circle().fill(.white.opacity(0.16))
+            Circle().fill(.black.opacity(0.22))
             VStack(spacing: 1) {
                 Image(systemName: n == 0 ? "checkmark" : "tray.fill").font(.system(size: 13, weight: .semibold))
                 Text(n == 0 ? "Done" : "\(n)").font(.system(size: n == 0 ? 13 : 22, weight: .semibold, design: .rounded)).monospacedDigit()
@@ -395,14 +394,14 @@ struct SFAccessoryRectangular: View {
             switch d.kind {
             case .noProperty:
                 Text("Add a property").font(.system(size: 17, weight: .bold, design: .rounded))
-                Text("to start the house").font(.system(size: 13)).opacity(0.75)
+                Text("to start the house").font(.system(size: 13)).opacity(0.9)
             case .timer:
                 Text("0:42 · Pine Cabin").font(.system(size: 17, weight: .bold, design: .rounded)).monospacedDigit()
-                Text("Stop it to review").font(.system(size: 13)).opacity(0.75)
+                Text("Stop it to review").font(.system(size: 13)).opacity(0.9)
             default:
                 Text("\(d.number) of \(Int(d.goal))h").font(.system(size: 17, weight: .bold, design: .rounded)).monospacedDigit()
                     .lineLimit(1).minimumScaleFactor(0.8)
-                Text(rectLine).font(.system(size: 13)).opacity(0.75).lineLimit(1).minimumScaleFactor(0.85)
+                Text(rectLine).font(.system(size: 13)).opacity(0.9).lineLimit(1).minimumScaleFactor(0.85)
             }
         }
         .foregroundStyle(.white)
@@ -414,7 +413,7 @@ struct SFAccessoryRectangular: View {
         switch d.kind {
         case .behind: d.pending > 0 ? "\(d.pending) to confirm" : "Behind by \(d.gap)h"
         case .onPace: "On pace"
-        case .empty: "Nothing confirmed yet"
+        case .empty: "No hours confirmed yet"
         case .met: "House finished"
         default: ""
         }
@@ -460,7 +459,7 @@ struct SFLockChrome<Widgets: View, Below: View>: View {
                     if let inlineView { inlineView }
                 }
                 .font(.system(size: 19, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.92))
+                .foregroundStyle(.white)
                 .padding(.top, 20)
                 Text("9:41")
                     .font(.system(size: 96, weight: .semibold, design: .rounded))
