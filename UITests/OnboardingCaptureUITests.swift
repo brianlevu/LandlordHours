@@ -92,8 +92,10 @@ final class OnboardingCaptureUITests: XCTestCase {
         shot("01-goal", scheme, suffix)
         // Large text: the 500 or 100 card sits below the fold; scroll to it first.
         let mpCard = app.buttons["goal-mp"]
-        for _ in 0..<4 where !mpCard.isHittable { app.swipeUp(velocity: .slow) }
-        tap(mpCard)
+        let pinnedTop = app.buttons["onb-primary"].frame.minY
+        // Clear of the pinned button (a tap there would land on the pinned area, not the card).
+        for _ in 0..<5 where !mpCard.exists || mpCard.frame.minY + 60 > pinnedTop { app.swipeUp(velocity: .slow) }
+        mpCard.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.0)).withOffset(CGVector(dx: 0, dy: 30)).tap()
         let mp500 = app.buttons["goal-mp500"]
         for _ in 0..<3 where !(mp500.exists && mp500.isHittable) { app.swipeUp(velocity: .slow) }
         XCTAssertEqual(app.buttons["onb-primary"].label, "Build toward 500h", "The 500h goal is selected")

@@ -30,6 +30,7 @@ struct SuggestionRowView: View {
                 }
             }
         }
+        .multilineTextAlignment(.leading)
         .padding(.vertical, 12)
         .frame(minHeight: 76)
         .contentShape(Rectangle())
@@ -68,7 +69,7 @@ struct SuggestionRowView: View {
                 Image(systemName: InboxFormat.kindSymbol(suggestion.kind))
                     .font(.system(size: 11, weight: .semibold))
                 Text(InboxFormat.sourceLine(suggestion, now: now))
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
             }
             .font(.subheadline)
             .foregroundStyle(colors.textSecondary)

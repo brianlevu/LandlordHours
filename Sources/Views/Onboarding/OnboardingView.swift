@@ -561,6 +561,14 @@ struct OnbStakedContent: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 8)
                             .accessibilityAddTraits(.isHeader)
+                        if case .nothingCountable(let count) = headline {
+                            // Right under the headline, so it's seen at every text size.
+                            Text(OnbStakedHeadline.nothingCountableLine(count))
+                                .onbDrafting(HouseTokens.drafting)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.top, 10)
+                                .accessibilityIdentifier("staked-nothing-countable")
+                        }
                         Text(flow.goal == .record
                              ? "Every hour you confirm from here is saved to your record."
                              : "Every hour you confirm from here adds to your house.")
@@ -573,12 +581,6 @@ struct OnbStakedContent: View {
                                 .onbDrafting(HouseTokens.drafting)
                                 .padding(.top, 16)
                                 .accessibilityIdentifier("staked-looking")
-                        } else if case .nothingCountable(let count) = headline {
-                            Text(OnbStakedHeadline.nothingCountableLine(count))
-                                .onbDrafting(HouseTokens.drafting)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .padding(.top, 16)
-                                .accessibilityIdentifier("staked-nothing-countable")
                         } else if headline == .nothingFound {
                             Text("Nothing in the last 90 days looked like rental work")
                                 .onbDrafting(HouseTokens.drafting)

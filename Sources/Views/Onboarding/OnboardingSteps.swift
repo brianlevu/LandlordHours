@@ -58,9 +58,14 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
             .background(OnbColor.card)
             // A short fade above the pinned area: content slides under it, never hard-cut.
             .background(alignment: .top) {
-                LinearGradient(colors: [OnbColor.card.opacity(0), OnbColor.card], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 32)
-                    .offset(y: -32)
+                // Clear for the first part, so a control resting just above the pinned area keeps
+                // full contrast; only words actually sliding under it fade.
+                LinearGradient(stops: [.init(color: OnbColor.card.opacity(0), location: 0),
+                                       .init(color: OnbColor.card.opacity(0), location: 0.45),
+                                       .init(color: OnbColor.card, location: 1)],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(height: 28)
+                    .offset(y: -28)
                     .allowsHitTesting(false)
             }
         }
