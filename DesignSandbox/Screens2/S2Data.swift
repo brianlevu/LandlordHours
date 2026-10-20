@@ -55,6 +55,19 @@ enum S2Data {
 
     struct Entry: Identifiable { let id = UUID(); let cat: S2Cat; let title: String; let hours: Double; let date: String; let source: String }
 
+    /// Nine distinct entries for the export preview.
+    static let exportSample: [Entry] = [
+        Entry(cat: .repairs, title: "Plumber", hours: 2, date: "Oct 18", source: "From calendar"),
+        Entry(cat: .leasing, title: "Showing", hours: 1, date: "Oct 16", source: "From calendar"),
+        Entry(cat: .management, title: "Key handoff", hours: 0.5, date: "Oct 12", source: "From calendar"),
+        Entry(cat: .bookkeeping, title: "Monthly books", hours: 1.5, date: "Oct 8", source: "Typed"),
+        Entry(cat: .renovations, title: "Gutter repair", hours: 3, date: "Oct 4", source: "Receipt"),
+        Entry(cat: .management, title: "Tenant call", hours: 0.5, date: "Sep 30", source: "From calendar"),
+        Entry(cat: .travel, title: "Drive to the cabin", hours: 2.5, date: "Sep 27", source: "Location"),
+        Entry(cat: .legal, title: "Lease review", hours: 1, date: "Sep 22", source: "Typed"),
+        Entry(cat: .repairs, title: "Smoke detectors", hours: 1, date: "Sep 19", source: "From calendar"),
+    ]
+
     /// Hours by kind of work for one property; always sums to the property's hours.
     static func kinds(for p: S2Property) -> [(S2Cat, Double)] {
         let mix: [(S2Cat, Double)] = p.longStays

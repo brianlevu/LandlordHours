@@ -37,6 +37,7 @@ enum S2Route {
         "props-list", "props-list-mp", "props-list-info", "props-12", "props-12-bottom", "props-empty", "props-loading", "props-limit",
         "prop-detail", "prop-detail-lower", "prop-detail-520", "prop-add", "prop-edit", "prop-edit-delete",
         // Leftovers
+        "house-ladder",
         "restore", "restore-confirm", "delete-hold", "delete-hold-mid", "help", "help-filled", "learn", "learn-article",
     ]
 }
@@ -121,6 +122,7 @@ struct S2Host: View {
         case "restore-confirm": OverSettings { S2Restore(confirm: true) }
         case "delete-hold": S2DeleteAll()
         case "delete-hold-mid": S2DeleteAll(frozenProgress: 0.55)
+        case "house-ladder": HouseLadder()
         case "help": S2Help()
         case "help-filled": S2Help(filled: true)
         case "learn": S2Learn()
@@ -299,5 +301,43 @@ struct S2TabBar: View {
             }
         }
         .padding(.horizontal, 20)
+    }
+}
+
+
+/// Review frame: the property mini-house (48 and 120) and the Today hero house at 0, 128, 520 and 800h.
+struct HouseLadder: View {
+    private let hours: [Double] = [0, 128, 520, 800]
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                DisplayTitle(text: "House ladder")
+                S2Header("Property mini-house · 48pt (capped at the 500h roof)")
+                HStack(spacing: 0) {
+                    ForEach(hours, id: \.self) { h in
+                        VStack(spacing: 6) {
+                            PropertyHouse(hours: h, size: 48)
+                                .accessibilityIdentifier("ladder.\(Int(h))")
+                            Text("\(Int(h))h · \(houseStage(h))").font(.caption2).foregroundStyle(LHB.textSecondary)
+                                .multilineTextAlignment(.center).frame(height: 44, alignment: .top)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                S2Header("Property mini-house · 120pt")
+                HStack(spacing: 0) {
+                    ForEach(hours, id: \.self) { h in PropertyHouse(hours: h, size: 84).frame(maxWidth: .infinity) }
+                }
+                S2Header("Today hero house · uncapped")
+                HStack(spacing: 0) {
+                    ForEach(hours, id: \.self) { h in
+                        HouseArt(key: S2House.keyframe(h)).frame(width: 88, height: 88)
+                            .background(S2Paper(radius: 14)).frame(maxWidth: .infinity)
+                    }
+                }
+            }
+            .padding(20)
+        }
+        .background(LHB.canvas.ignoresSafeArea())
     }
 }

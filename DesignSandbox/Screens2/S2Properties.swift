@@ -34,6 +34,13 @@ struct S2PropertiesList: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         header
+                        if infoShown {
+                            Label("Stages follow the 500-hour test for a single property.", systemImage: "info.circle")
+                                .font(.subheadline).foregroundStyle(LHB.textSecondary)
+                                .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                                .background(LHB.informationalSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
                         if props.count > 8 { search }
                         switch state {
                         case .empty: empty
@@ -79,17 +86,12 @@ struct S2PropertiesList: View {
                         Text("\(props.count) \(props.count == 1 ? "rental" : "rentals") · \(Int(total))h this year")
                             .font(.subheadline).foregroundStyle(LHB.textSecondary)
                         if !perPropertyGoal {
-                            Button { infoShown = true } label: {
+                            Button { withAnimation(.easeOut(duration: 0.2)) { infoShown.toggle() } } label: {
                                 Image(systemName: "info.circle").font(.subheadline).foregroundStyle(LHB.action)
                                     .frame(width: 32, height: 32).contentShape(Rectangle())
                             }
                             .accessibilityLabel("About the house stages")
-                            .popover(isPresented: $infoShown, arrowEdge: .top) {
-                                Text("Stages follow the 500-hour test for a single property.")
-                                    .font(.subheadline).foregroundStyle(LHB.textPrimary)
-                                    .padding(14).frame(width: 260)
-                                    .presentationCompactAdaptation(.popover)
-                            }
+
                         }
                     }
                 }

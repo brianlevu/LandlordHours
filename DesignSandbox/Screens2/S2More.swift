@@ -38,7 +38,7 @@ struct S2ExportPage: View {
                             S2Header("Entries")
                             VStack(spacing: 0) {
                                 ForEach(0..<9, id: \.self) { i in
-                                    let e = S2Data.recent[i % 3]
+                                    let e = S2Data.exportSample[i]
                                     HStack(spacing: 12) {
                                         ToolTile(cat: e.cat, size: 36)
                                         VStack(alignment: .leading, spacing: 2) {
@@ -283,7 +283,7 @@ struct LimitConfirmSheet: View {
                     .accessibilityIdentifier("limit.unlock")
                 HStack(spacing: 24) {
                     Button("Keep it in my inbox") {}.foregroundStyle(LHB.action)
-                    Button("Not landlord work") {}.foregroundStyle(LHB.destructive)
+                    Button("Not landlord work") {}.foregroundStyle(LHB.textSecondary)
                 }
                 .frame(minHeight: 44)
             }

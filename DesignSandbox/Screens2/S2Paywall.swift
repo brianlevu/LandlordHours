@@ -421,7 +421,7 @@ struct RecordPage: View {
                     .padding(.horizontal, 10).padding(.vertical, 4)
                     .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color(hex: 0x2369B5).opacity(0.55), lineWidth: 1.5))
                     .rotationEffect(.degrees(-6))
-                    .padding(.top, 34).padding(.trailing, 12)
+                    .padding(.top, 52).padding(.trailing, 14)
             }
         }
         .environment(\.colorScheme, .light)

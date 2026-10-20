@@ -351,8 +351,8 @@ enum S2Cat: String, CaseIterable, Identifiable {
         case .leasing: "showing"
         case .bookkeeping: "bookkeeping"
         case .legal: "legal"
-        case .negotiation: "comms"
-        case .insurance: "inspection"
+        case .negotiation: "negotiation"
+        case .insurance: "insurance"
         case .investing: "investing"
         case .financing: "financing"
         case .travel: "travel"
@@ -366,27 +366,21 @@ enum S2Cat: String, CaseIterable, Identifiable {
         case .repairs: Color(light: 0x8A5A1B, dark: 0xF0BE7A)       // timber wrench
         case .renovations: Color(light: 0xB4432E, dark: 0xF09A84)   // terracotta roller
         case .management: Color(light: 0x8C6A00, dark: 0xF2CF5B)    // amber clipboard
-        case .leasing: Color(light: 0xB04266, dark: 0xF08BAA)       // rose sign
+        case .leasing: Color(light: 0x1B6C8C, dark: 0x7CC6E4)       // harbour blue (matches onboarding lane)
         case .bookkeeping: Color(light: 0x56702A, dark: 0xB5D07A)   // moss ledger
         case .legal: Color(light: 0x2369B5, dark: 0x60A8E6)         // drafting-ink deed
         case .travel: Color(light: 0x4A6392, dark: 0x9BB0D0)        // slate truck
-        case .negotiation: Color(light: 0x3D4A9E, dark: 0xA9B4F5)   // indigo phone
-        case .insurance: Color(light: 0x1F6F70, dark: 0x6FD3D0)     // teal torch
-        case .investing: Color(light: 0x6B4FA0, dark: 0xBBA3F0)     // violet
-        case .financing: Color(light: 0x8E3A72, dark: 0xE59AC8)     // plum
+        case .negotiation: Color(light: 0xB0560F, dark: 0xF5A867)   // orange speech bubbles
+        case .insurance: Color(light: 0x2F3E7A, dark: 0x9FB0EE)     // navy shield
+        case .investing: Color(light: 0x6E7412, dark: 0xD3D46A)     // olive-gold coins
+        case .financing: Color(light: 0x8F4A22, dark: 0xE9A27B)     // copper key
         }
     }
 
     var wash: Color { ink.opacity(0.14) }
 
-    /// Investing and Financing have no 3D render yet: a symbol in the category ink stands in.
-    var symbol: String? {
-        switch self {
-        case .investing: "chart.line.uptrend.xyaxis"
-        case .financing: "banknote"
-        default: nil
-        }
-    }
+    /// Every category has a 3D tool render now (r4); no symbol stand-ins.
+    var symbol: String? { nil }
 }
 
 struct ToolTile: View {
@@ -540,11 +534,15 @@ enum S2House {
 struct HouseArt: View {
     let key: String
     var lineColor: Color = LHB.draftingHero
+    /// The drafted future house. Full strength on heroes; faint on the 48pt mini-house so the
+    /// built stage (lot vs poured slab vs frame vs roof) is what reads at that size.
+    var lineOpacity: Double = 1
     var body: some View {
         ZStack {
             Image(decorative: "bp_house_\(key)_built").resizable().interpolation(.high).scaledToFit()
             if let l = S2House.linework("bp_house_\(key)_lines") {
                 Image(uiImage: l).renderingMode(.template).resizable().interpolation(.high).scaledToFit().foregroundStyle(lineColor)
+                    .opacity(lineOpacity)
             }
         }
         .aspectRatio(1, contentMode: .fit)
@@ -558,11 +556,12 @@ struct PropertyHouse: View {
     var size: CGFloat = 48
     @Environment(\.colorScheme) private var scheme
     var body: some View {
-        RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-            .fill(scheme == .dark ? LHB.tertiary : LHB.plaster)
+        // Blueprint tile (as on Today): the plaster slab and timber frame read against blue,
+        // where a plaster tile swallowed the slab. Linework is fainter at mini size.
+        S2Paper(radius: size * 0.28)
             .frame(width: size, height: size)
             .overlay {
-                HouseArt(key: S2House.propertyKeyframe(hours), lineColor: LHB.draftingInk)
+                HouseArt(key: S2House.propertyKeyframe(hours), lineColor: LHB.draftingHero, lineOpacity: size < 80 ? 0 : 0.8)
                     .scaleEffect(1.18)
                     .offset(y: -size * 0.02)
             }
