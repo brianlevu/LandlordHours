@@ -24,7 +24,7 @@ final class OnboardingFlowTests: XCTestCase {
         let app = launch("flow")
         let start = app.buttons["onb-start"]
         XCTAssertTrue(start.waitForExistence(timeout: 15))
-        sleep(6)                                               // pre-roll: let the screen recorder settle
+        sleep(10)                                              // pre-roll: let the screen recorder settle
         mark()
         sleep(3)
         start.tap()                                            // Welcome → Goal
@@ -46,7 +46,7 @@ final class OnboardingFlowTests: XCTestCase {
         usleep(700_000)
         field.typeText("Oak Street duplex")
         usleep(600_000)
-        tap(app.buttons["onb-primary"])                        // Stake it
+        tap(app.buttons["onb-primary"])                        // Save it (one tap; moves on by itself)
         sleep(3)
         tap(app.buttons["onb-primary"])                        // Yes, after visits → prompt (mock)
         sleep(2)
@@ -55,15 +55,17 @@ final class OnboardingFlowTests: XCTestCase {
         let today = app.buttons["onb-today"]
         XCTAssertTrue(today.waitForExistence(timeout: 8))
         sleep(4)
-        today.tap()                                            // → Today; badge counts, reveal sheet
-        sleep(6)
+        today.tap()                                            // Review 14 suggestions → Inbox
+        sleep(2)
+        tap(app.buttons["confirm-0"])                          // Confirm the plumber visit
+        sleep(3)
     }
 
     func testSkipPath() {
         let app = launch("flow")
         let start = app.buttons["onb-start"]
         XCTAssertTrue(start.waitForExistence(timeout: 15))
-        sleep(6)                                               // pre-roll: let the screen recorder settle
+        sleep(10)                                              // pre-roll: let the screen recorder settle
         mark()
         sleep(2)
         start.tap()

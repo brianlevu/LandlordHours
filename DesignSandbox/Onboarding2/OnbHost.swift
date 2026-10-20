@@ -22,6 +22,8 @@ struct OnbHost: View {
                 ZStack {
                     if flow.stage == .onboarding {
                         OnbRoot(flow: flow).transition(.opacity)
+                    } else if flow.stage == .review {
+                        OnbInbox(flow: flow).transition(.opacity)
                     } else {
                         OnbToday(flow: flow).transition(.opacity)
                     }
@@ -97,7 +99,11 @@ struct OnbHost: View {
             f.stage = .today; f.calendar = .allowed; f.finishScanInstantly(); f.inboxBadge = 14
             if f.name.isEmpty { f.name = "Oak Street duplex" }
             f.stakeDropped = true; f.flagOpen = true
-            if arg == "today-reveal" { f.revealShown = true }
+            if arg == "today-reveal" { f.revealShown = true } else { f.countShown = true }
+        case "review":
+            f.stage = .review; f.calendar = .allowed; f.finishScanInstantly(); f.inboxBadge = 14; f.countShown = true
+            if f.name.isEmpty { f.name = "Oak Street duplex" }
+            f.stakeDropped = true; f.flagOpen = true
         case "today-skip":
             f.stage = .today; f.skippedProperty = true; f.calendar = .denied
         case "today-nocal":
@@ -122,7 +128,7 @@ struct OnbHost: View {
 
     private func landing() async {
         guard flow.cohort == .new else { return }
-        while flow.stage != .today { try? await Task.sleep(for: .milliseconds(100)); if Task.isCancelled { return } }
+        while flow.stage == .onboarding { try? await Task.sleep(for: .milliseconds(100)); if Task.isCancelled { return } }
         guard UserDefaults.standard.string(forKey: "LHOnbAuto") != nil || arg == "flow" else { return }
         guard flow.calendar == .allowed else { return }
         try? await Task.sleep(for: .milliseconds(600))
@@ -131,7 +137,8 @@ struct OnbHost: View {
             try? await Task.sleep(for: .milliseconds(90))
         }
         try? await Task.sleep(for: .milliseconds(1400))
-        flow.revealShown = true
+        // The count already led on Staked: never repeat it in a sheet.
+        if !flow.countShown { flow.revealShown = true }
     }
 
     // MARK: Scripted runs for the recordings (taps are simulated; every screen is the real one)

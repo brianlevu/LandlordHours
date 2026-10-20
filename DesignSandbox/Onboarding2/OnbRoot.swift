@@ -16,6 +16,7 @@ struct OnbRoot: View {
         if typeSize.isAccessibilitySize { return 0.22 }
         if typeSize >= .xxLarge { return 0.30 }
         if flow.step == .calendar { return embedded ? 0.22 : 0.33 }
+        if flow.step == .goal { return 0.23 }
         return 0.38
     }
 
@@ -80,7 +81,7 @@ struct OnbRoot: View {
     private func sceneFrame(W: CGFloat, H: CGFloat, top: CGFloat, bandH: CGFloat) -> CGRect {
         switch flow.step {
         case .welcome where !embedded:
-            let s = min(W * 0.92, H * 0.42)
+            let s = min(W * 0.92, H * (typeSize >= .xLarge ? 0.30 : 0.42))
             return CGRect(x: (W - s) / 2, y: top + 4, width: s, height: s)
         case .staked where !embedded:
             let s = min(W * 0.96, H * 0.45)
@@ -202,17 +203,23 @@ struct OnbWelcomeContent: View {
                         .foregroundStyle(.white)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.isHeader)
-                    Text("We find the hours you already spend on your rentals. Each one you confirm goes up on the frame.")
+                    Text("We find the hours you already spend on your rentals. Each one you confirm adds to the house.")
                         .font(.body)
                         .foregroundStyle(HouseTokens.onHeroSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 10)
                     // One row when it fits; a column at larger text sizes (never truncated).
+                    // One row when it fits; otherwise a two-column grid. Never clipped.
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 8) { chips }
+                        Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 8) {
+                            GridRow { chip("100h", "Foundation"); chip("500h", "Roof") }
+                            GridRow { chip("750h", "Keys") }
+                        }
                         VStack(alignment: .leading, spacing: 8) { chips }
                     }
                     .padding(.top, 18)
+                    .padding(.bottom, 28)          // clears the scrim above the pinned buttons
                 }
                 .padding(.horizontal, 24)
             }
@@ -290,13 +297,12 @@ struct OnbStakedContent: View {
                         // The aha leads: what we found, then that it is theirs to confirm.
                         Text("\(flow.name.isEmpty ? "Your rental" : flow.name) is staked").drafting(HouseTokens.drafting)
                         Text("\(flow.foundText) found")
-                            .font(.system(size: 56, weight: .bold, design: .rounded)).monospacedDigit()
+                            .prodDisplay()
                             .foregroundStyle(.white)
-                            .minimumScaleFactor(0.6)
-                            .lineLimit(1)
                             .padding(.top, 6)
                             .accessibilityAddTraits(.isHeader)
-                        Text("From \(flow.suggestions) calendar events in the last 90 days. Confirm the ones that were rental work and they go up on the frame.")
+                            .onAppear { flow.countShown = true }
+                        Text("From \(flow.suggestions) calendar events in the last 90 days. Confirm the ones that were rental work.")
                             .font(.body)
                             .foregroundStyle(HouseTokens.onHeroSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -311,8 +317,8 @@ struct OnbStakedContent: View {
                             .padding(.top, 8)
                             .accessibilityAddTraits(.isHeader)
                         Text(flow.goal == .record
-                             ? "Every hour you confirm from here goes in the book."
-                             : "Every hour you confirm from here goes up on the frame.")
+                             ? "Every hour you confirm from here is saved to your record."
+                             : "Every hour you confirm from here adds to your house.")
                             .font(.body)
                             .foregroundStyle(HouseTokens.onHeroSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -327,7 +333,10 @@ struct OnbStakedContent: View {
                 .padding(.horizontal, 24)
             }
             .scrollBounceBehavior(.basedOnSize)
-            Button(flow.calendar == .allowed && flow.scanDone && flow.suggestions > 0 ? "Review on Today" : "Go to Today") { flow.finish() }
+            let review = flow.calendar == .allowed && flow.scanDone && flow.suggestions > 0
+            Button(review ? "Review \(flow.suggestions) suggestions" : "Go to Today") {
+                if review { withAnimation(.easeInOut(duration: 0.35)) { flow.stage = .review } } else { flow.finish() }
+            }
                 .buttonStyle(ProdHeroPill())
                 .accessibilityIdentifier("onb-today")
                 .padding(.horizontal, 24)

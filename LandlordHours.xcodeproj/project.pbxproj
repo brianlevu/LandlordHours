@@ -100,6 +100,7 @@
 		8EED89E8FC89005138C20B59 /* LandlordPurchases.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA1DF3BCE5385BCFDC7627DC /* LandlordPurchases.swift */; };
 		91BC16EB0083668060809989 /* AuditReportCSV.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111C91DE9EE369C07CE2F490 /* AuditReportCSV.swift */; };
 		9248093E88E7EBD05D601652 /* TimerDraftCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 172B3D3B09786621DD123327 /* TimerDraftCard.swift */; };
+		92B8A01AD42FA963D6A1681C /* OnbInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8E9413D6C837E1B117C4AD /* OnbInbox.swift */; };
 		92F91B52753ACEAA429095F4 /* HouseProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AFD9F09F14EE14157D8FF7C /* HouseProgress.swift */; };
 		93038CF8F63FA8C1F44A1081 /* MockStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A24AF19BB69722DE09DEABF /* MockStore.swift */; };
 		93C20D864969D6F6EC85B191 /* TimeLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11377EC6BD95D70E1AF5A9A6 /* TimeLogView.swift */; };
@@ -326,6 +327,7 @@
 		A45A5E898E99F37E67CE51D1 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
 		A8FE35C1E899CCC8EFEE74C0 /* way-scene-welcome.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "way-scene-welcome.png"; sourceTree = "<group>"; };
 		AA6DA100AE533D23763B27B5 /* bp-tool-renovation.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "bp-tool-renovation.png"; sourceTree = "<group>"; };
+		AD8E9413D6C837E1B117C4AD /* OnbInbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnbInbox.swift; sourceTree = "<group>"; };
 		AEEC27DEA34BFBE1E8090D9C /* StatusBarStyler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarStyler.swift; sourceTree = "<group>"; };
 		AF514D22B9745ADD5748D16E /* BlueprintHouse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlueprintHouse.swift; sourceTree = "<group>"; };
 		AF63DC10108B9EAC40FE0C4C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -411,6 +413,7 @@
 			isa = PBXGroup;
 			children = (
 				595F08180EA18DE7A04FEC8D /* OnbHost.swift */,
+				AD8E9413D6C837E1B117C4AD /* OnbInbox.swift */,
 				FE5A6004C3206CF65FCBBAE1 /* OnbLanding.swift */,
 				F1925F0FB541B9FDB6BBBCB6 /* OnbModel.swift */,
 				C9C5562E3F0759416E888AFB /* OnbRoot.swift */,
@@ -1053,6 +1056,7 @@
 				A4FE1AD7DEFBD2001C328D9D /* LockScreenMock.swift in Sources */,
 				93038CF8F63FA8C1F44A1081 /* MockStore.swift in Sources */,
 				006378AE349FDE96D4CA0015 /* OnbHost.swift in Sources */,
+				92B8A01AD42FA963D6A1681C /* OnbInbox.swift in Sources */,
 				764C675269257BC705825DF0 /* OnbLanding.swift in Sources */,
 				9EFB3ACC4C20B3D58DF0297B /* OnbModel.swift in Sources */,
 				6DF21DDA68ED55131FEA3CDC /* OnbRoot.swift in Sources */,

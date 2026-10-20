@@ -35,7 +35,7 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
             }
             .padding(.horizontal, 24)
             .padding(.top, 22)
-            .padding(.bottom, 12)
+            .padding(.bottom, 36)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
@@ -70,6 +70,7 @@ struct OnbOptionCard<Extra: View>: View {
     var selected: Bool
     var action: () -> Void
     @ViewBuilder var extra: Extra
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         Button(action: action) {
@@ -83,19 +84,17 @@ struct OnbOptionCard<Extra: View>: View {
                             .background(PC.actionSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                     VStack(alignment: .leading, spacing: 4) {
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        // At accessibility sizes the badge sits on its own line so the title keeps its width.
+                        let stack = typeSize.isAccessibilitySize
+                            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
+                        stack {
+                            if typeSize.isAccessibilitySize, let badge { badgeView(badge) }
                             Text(title)
                                 .font(.headline)
                                 .foregroundStyle(PC.textPrimary)
                                 .fixedSize(horizontal: false, vertical: true)
-                            if let badge {
-                                Text(badge)
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(PC.action)
-                                    .padding(.horizontal, 8).padding(.vertical, 3)
-                                    .background(PC.actionSurface, in: Capsule())
-                                    .fixedSize()
-                            }
+                            if !typeSize.isAccessibilitySize, let badge { badgeView(badge) }
                         }
                         Text(detail)
                             .font(.subheadline)
@@ -118,7 +117,7 @@ struct OnbOptionCard<Extra: View>: View {
                 extra
             }
             .multilineTextAlignment(.leading)
-            .padding(16)
+            .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(PC.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
@@ -129,6 +128,17 @@ struct OnbOptionCard<Extra: View>: View {
         }
         .buttonStyle(Pressable())
         .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+extension OnbOptionCard {
+    fileprivate func badgeView(_ badge: String) -> some View {
+        Text(badge)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(PC.action)
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(PC.actionSurface, in: Capsule())
+            .fixedSize()
     }
 }
 
@@ -162,14 +172,15 @@ struct OnbGoalStep: View {
                 .foregroundStyle(PC.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading))) {
-            VStack(alignment: .leading, spacing: 12) {
-                OnbOptionCard(title: "750 hours · Real estate professional",
-                              detail: "The full house. For owners who make rentals their main work.",
-                              hint: "Usually for people whose main job is real estate.",
+            VStack(alignment: .leading, spacing: 10) {
+                OnbOptionCard(title: "750 hours",
+                              detail: "Real estate professional. For owners who make rentals their main work.",
+                              badge: "Most common",
+                              hint: "And more than half your working hours go to real estate.",
                               selected: flow.goal == .reps750) { pick(.reps750) }
                     .accessibilityIdentifier("goal-750")
-                OnbOptionCard(title: "500 or 100 hours · Material participation",
-                              detail: "Roof or foundation. For active owners who want proof of hands-on work.",
+                OnbOptionCard(title: "500 or 100 hours",
+                              detail: "Material participation. 500 hours, or 100 and more than anyone else.",
                               selected: isMP, action: { if !isMP { pick(.mp500) } }) {
                     if isMP {
                         HStack(spacing: 8) {
@@ -222,8 +233,38 @@ struct OnbSampleRow: View {
     var title: String
     var category: String
     var categoryColor: Color
+    var onConfirm: (() -> Void)? = nil
+    var onSkip: (() -> Void)? = nil
+    var id: String = ""
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            mainRow
+            if let onConfirm {
+                HStack(spacing: 4) {
+                    Button(action: onConfirm) {
+                        Label("Confirm", systemImage: "checkmark")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(PC.onAction)
+                            .padding(.horizontal, 16)
+                            .frame(minHeight: 36)
+                            .background(PC.action, in: Capsule())
+                    }
+                    .buttonStyle(Pressable())
+                    .accessibilityIdentifier("confirm-\(id)")
+                    if let onSkip {
+                        Button("Not work", action: onSkip)
+                            .buttonStyle(ProdLink(color: PC.textSecondary))
+                            .accessibilityIdentifier("skip-\(id)")
+                    }
+                }
+                .padding(.leading, 82)
+            }
+        }
+        .padding(.vertical, 8)
+    }
+
+    private var mainRow: some View {
         HStack(spacing: 12) {
             Text(hours)
                 .font(.system(.title3, design: .rounded, weight: .bold))
@@ -252,13 +293,14 @@ struct OnbSampleRow: View {
                     .foregroundStyle(categoryColor)
             }
             Spacer(minLength: 4)
-            // Hollow: a suggestion, not a record, until the owner confirms it.
-            Circle()
-                .strokeBorder(PC.draftingInk, style: StrokeStyle(lineWidth: 1.5, dash: [3, 2.5]))
-                .frame(width: 20, height: 20)
-                .accessibilityHidden(true)
+            if onConfirm == nil {
+                // Hollow: a suggestion, not a record, until the owner confirms it.
+                Circle()
+                    .strokeBorder(PC.draftingInk, style: StrokeStyle(lineWidth: 1.5, dash: [3, 2.5]))
+                    .frame(width: 20, height: 20)
+                    .accessibilityHidden(true)
+            }
         }
-        .padding(.vertical, 8)
         .accessibilityElement(children: .combine)
         .accessibilityHint("Suggestion, not saved")
     }
@@ -447,18 +489,22 @@ struct OnbPropertyStep: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         } actions: {
-            Button(flow.stakeDropped ? "Continue" : "Stake it") {
-                if flow.stakeDropped { flow.next(reduce: reduce) } else { stake() }
+            // One tap: the stake drops, the flag shows the name, and the flow moves on by itself.
+            Button {
+                stake()
+            } label: {
+                if flow.stakeDropped { Label("Saved", systemImage: "checkmark") } else { Text("Save it") }
             }
                 .buttonStyle(ProdPrimaryPill())
                 .disabled(flow.name.trimmingCharacters(in: .whitespaces).isEmpty)
+                .allowsHitTesting(!flow.stakeDropped)
                 .accessibilityIdentifier("onb-primary")
             Button("I'll add it later") {
                 focused = false
                 flow.skippedProperty = true
                 flow.next(reduce: reduce)
             }
-            .buttonStyle(ProdOutlinePill())
+            .buttonStyle(ProdLink(color: PC.textSecondary))
             .accessibilityIdentifier("onb-link")
         }
         .onChange(of: UserDefaults.standard.bool(forKey: "LHOnbFocus"), initial: true) { _, f in focused = f }

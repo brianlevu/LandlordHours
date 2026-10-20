@@ -17,7 +17,7 @@ enum OnbGoal: String { case reps750, mp500, mp100, record }
 enum OnbWho: String { case me, both }
 enum OnbCalendar { case notAsked, allowed, denied }
 enum OnbPrompt { case calendar, notify }
-enum OnbStage { case onboarding, today, whatsNew }
+enum OnbStage { case onboarding, today, review, whatsNew }
 enum OnbCohort { case new, upgrade }
 
 @MainActor @Observable
@@ -74,6 +74,10 @@ final class OnbFlow {
     // Today landing
     var inboxBadge = 0
     var revealShown = false
+    /// Staked already led with the found hours: Today never repeats them in a sheet.
+    var countShown = false
+    var confirmed: Set<Int> = []
+    var skipped: Set<Int> = []
     var upgradeHours: Double = 312
 
     var step: OnbStep { sequence[min(index, sequence.count - 1)] }

@@ -100,11 +100,13 @@ struct OnbToday: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack {
-                        Text(initials)
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(PC.textPrimary)
+                        // No name is collected in onboarding: a neutral person glyph, never the rental's initials.
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(PC.textSecondary)
                             .frame(width: 44, height: 44)
                             .background(PC.card, in: Circle())
+                            .accessibilityLabel("Profile")
                         Spacer()
                         Image(systemName: "chart.bar")
                             .font(.system(size: 17, weight: .medium))
@@ -155,7 +157,6 @@ struct OnbToday: View {
         .background(PC.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
-    private var initials: String { flow.cohort == .upgrade ? "PC" : (empty ? "LH" : "OS") }
     private var title: String {
         if flow.cohort == .upgrade { return "Today’s work" }
         return empty ? "Add your first property" : "Log your first hour"
@@ -217,7 +218,7 @@ struct OnbToday: View {
     @ViewBuilder private var heroFooter: some View {
         if empty {
             Text("An empty lot.").font(.headline).foregroundStyle(.white)
-            Text("Add a property and every hour you confirm goes up on it.")
+            Text("Add a property. Every hour you confirm builds on it.")
                 .font(.footnote).foregroundStyle(HouseTokens.onHeroSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             Button {} label: {
@@ -237,7 +238,7 @@ struct OnbToday: View {
             Text("\(flow.foundText) found")
                 .font(.headline).foregroundStyle(.white)
                 .contentTransition(.numericText(value: flow.foundHours))
-            Text("Hatched until you confirm").font(.footnote).foregroundStyle(HouseTokens.onHeroSecondary)
+            Text("Not counted until you confirm").font(.footnote).foregroundStyle(HouseTokens.onHeroSecondary)
         } else {
             Text("No hours logged yet").font(.headline).foregroundStyle(.white)
             Text("Foundation at 100h").font(.footnote).foregroundStyle(HouseTokens.onHeroSecondary)
@@ -255,10 +256,14 @@ struct OnbToday: View {
                     .contentTransition(.numericText(value: Double(flow.suggestions)))
             }
             .padding(.bottom, 4)
-            let place = flow.name.isEmpty ? "Oak Street duplex" : flow.name
-            OnbSampleRow(hours: "2h", tool: "bp_tool_repairs_36", when: "Calendar · Wed 9–11", title: "Plumber at \(place)", category: "Repairs", categoryColor: onbCategoryColor(.repairs))
-            Divider().overlay(PC.border).padding(.leading, 64)
-            OnbSampleRow(hours: "1h", tool: "bp_tool_showing_36", when: "Calendar · Sat 10–11", title: "Showing at \(place)", category: "Leasing", categoryColor: onbCategoryColor(.leasing))
+            let open = OnbEvents.all.indices.filter { !flow.confirmed.contains($0) && !flow.skipped.contains($0) }
+            ForEach(Array(open.prefix(2).enumerated()), id: \.element) { k, i in
+                if k > 0 { Divider().overlay(PC.border).padding(.leading, 82) }
+                OnbEventRow(flow: flow, index: i)
+            }
+            Button("Review all \(open.count)") { withAnimation(.easeInOut(duration: 0.3)) { flow.stage = .review } }
+                .buttonStyle(ProdLink())
+                .accessibilityIdentifier("today-review-all")
         }
         .padding(16)
         .background(PC.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -299,12 +304,13 @@ extension OnbScene {
 
 struct OnbTabBar: View {
     var badge: Int
+    var inbox = false
     @Environment(\.colorScheme) private var cs
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 0) {
-                item("Today", "sun.max.fill", on: true)
-                item("Inbox", "tray", on: false, badge: badge)
+                item("Today", inbox ? "sun.max" : "sun.max.fill", on: !inbox)
+                item("Inbox", inbox ? "tray.fill" : "tray", on: inbox, badge: badge)
                 item("Records", "list.bullet.rectangle", on: false)
                 item("Properties", "house", on: false)
             }
@@ -375,7 +381,7 @@ struct OnbFoundReveal: View {
                 .padding(.top, 8)
                 Text("Nothing is saved until you confirm.")
                     .font(.body.weight(.semibold)).foregroundStyle(.white)
-                Text("From \(flow.suggestions) calendar events. The hatched slab turns solid only when you say they were work.")
+                Text("From \(flow.suggestions) calendar events. None of it counts until you confirm it.")
                     .font(.subheadline).foregroundStyle(HouseTokens.onHeroSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 36).padding(.top, 4)
@@ -418,7 +424,7 @@ struct OnbWhatsNewHouseStep: View {
                     .font(.body)
                     .foregroundStyle(PC.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("Each hour you confirm from now on goes up on the frame.")
+                Text("Each hour you confirm from now on adds to the house.")
                     .font(.body)
                     .foregroundStyle(PC.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
