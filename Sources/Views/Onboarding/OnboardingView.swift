@@ -99,7 +99,7 @@ extension OnbServices {
     static func live(app: AppViewModel, environment: CaptureSetupEnvironment, complete: @escaping (OnbCompletion) -> Void) -> OnbServices {
         var s = OnbServices()
         s.ensureProfile = { if !app.isSignedIn { app.continueWithoutAccount() } }
-        s.saveGoal = { goal in GoalManager.shared.setHouseGoal(goal.houseGoal) }
+        s.saveGoal = { goal in GoalManager.shared.setGoalChoice(goal.goalChoice) }
         s.saveWho = { who in TaxProfileManager.shared.spouseTracking = (who == .both) }
         s.addProperty = { name, address in app.addProperty(name: name, address: address, type: .ltr) }
         s.requestCalendar = { await environment.requestCalendar() }

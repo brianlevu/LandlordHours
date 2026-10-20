@@ -888,12 +888,13 @@ struct TaxProfileView: View {
             .listRowBackground(colors.backgroundSecondary)
 
             Section {
+                // The same four goals as onboarding (2.0 adds material participation at 500h).
                 Picker(selection: Binding(
-                    get: { goalManager.globalGoalType },
-                    set: { goalManager.setGlobalGoal($0) }
+                    get: { goalManager.goalChoice },
+                    set: { goalManager.setGoalChoice($0) }
                 )) {
-                    ForEach(HourGoalType.allCases, id: \.self) { type in
-                        Text("\(type.rawValue) · \(Int(type.hoursRequired))h").tag(type)
+                    ForEach(GoalChoice.allCases) { choice in
+                        Text(choice.title).tag(choice)
                     }
                 } label: {
                     SettingRow(symbol: "flag", title: "Goal")

@@ -45,6 +45,16 @@ enum OnbGoal: String, CaseIterable {
         }
     }
 
+    /// The stored goal ("Just keep a record" is 1.x's "Both").
+    var goalChoice: GoalChoice {
+        switch self {
+        case .reps750: return .reps750
+        case .mp500: return .mp500
+        case .mp100: return .mp100
+        case .record: return .record
+        }
+    }
+
     var targetHours: Int? {
         switch self {
         case .reps750: return 750

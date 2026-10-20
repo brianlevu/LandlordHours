@@ -372,6 +372,65 @@ final class OnboardingFlowTests: XCTestCase {
         XCTAssertNil(OnbStep(launchValue: "9"))
     }
 
+    // MARK: Goal choice: material participation at 500 hours, beside 1.x's goals
+
+    func testExistingStoredGoalsReadBackUnchanged() {
+        XCTAssertEqual(GoalChoice(hourGoalType: .reps, materialParticipationTarget: 0), .reps750)
+        XCTAssertEqual(GoalChoice(hourGoalType: .str, materialParticipationTarget: 0), .mp100, "1.x STR stays the 100-hour test")
+        XCTAssertEqual(GoalChoice(hourGoalType: .both, materialParticipationTarget: 0), .record)
+        XCTAssertEqual(GoalChoice(hourGoalType: .reps, materialParticipationTarget: 500), .reps750, "A stray target never changes REPS")
+        XCTAssertEqual(GoalChoice(hourGoalType: .str, materialParticipationTarget: 500), .mp500)
+    }
+
+    func testGoalChoiceTargetsAndHouseGoals() {
+        XCTAssertEqual(GoalChoice.allCases.map(\.targetHours), [750, 500, 100, 750])
+        XCTAssertEqual(GoalChoice.mp500.houseGoal, .mp500, "500 is never mapped to 100")
+        XCTAssertEqual(GoalChoice.mp500.hourGoalType, .str, "1.x devices keep reading a valid goal type")
+        XCTAssertEqual(GoalChoice.record.hourGoalType, .both)
+        XCTAssertEqual(GoalChoice.mp500.widgetLabels.0, "500h MP")
+        XCTAssertEqual(GoalChoice.mp100.widgetLabels.0, "100h STR")
+        XCTAssertEqual(OnbGoal.allCases.map(\.goalChoice), [.reps750, .mp500, .mp100, .record], "Onboarding and Settings offer the same goals")
+    }
+
+    func testGoalChoiceStorageRoundTripsAndSettingsChangesClearTheTarget() {
+        let manager = GoalManager.shared
+        let saved = manager.goalChoice
+        defer { manager.setGoalChoice(saved) }
+        for choice in GoalChoice.allCases {
+            manager.setGoalChoice(choice)
+            XCTAssertEqual(manager.goalChoice, choice)
+        }
+        manager.setGoalChoice(.mp500)
+        XCTAssertEqual(manager.houseGoal, .mp500)
+        manager.setGlobalGoal(.str)
+        XCTAssertEqual(manager.goalChoice, .mp100, "A plain 1.x goal change drops the 500 target")
+    }
+
+    func testSyncedTargetAppliesAndOlderRecordsKeepIt() {
+        let manager = GoalManager.shared
+        let saved = manager.goalChoice
+        defer { manager.setGoalChoice(saved) }
+        let app = AppModelHost.shared.viewModel
+        manager.setGoalChoice(.mp100)
+        app.syncDidReceiveGoalSettings(globalGoalType: .str, propertyGoals: [], materialParticipationTarget: 500)
+        XCTAssertEqual(manager.goalChoice, .mp500)
+        app.syncDidReceiveGoalSettings(globalGoalType: .str, propertyGoals: [], materialParticipationTarget: nil)
+        XCTAssertEqual(manager.goalChoice, .mp500, "A record without the field (pre-2.0 device) keeps the target")
+        app.syncDidReceiveGoalSettings(globalGoalType: .str, propertyGoals: [], materialParticipationTarget: 0)
+        XCTAssertEqual(manager.goalChoice, .mp100)
+    }
+
+    func testWidgetAndEngagementMeasureAgainstFiveHundred() {
+        let manager = GoalManager.shared
+        let saved = manager.goalChoice
+        defer { manager.setGoalChoice(saved) }
+        manager.setGoalChoice(.mp500)
+        let context = AppModelHost.shared.viewModel.engagementContext()
+        XCTAssertEqual(context.targetHours, 500)
+        manager.setGoalChoice(.mp100)
+        XCTAssertEqual(AppModelHost.shared.viewModel.engagementContext().targetHours, 100)
+    }
+
     // MARK: House goal storage (500 vs 100 hours)
 
     func testHouseGoalStoresTheFiveHundredHourTarget() {
