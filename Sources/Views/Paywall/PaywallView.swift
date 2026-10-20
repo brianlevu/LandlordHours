@@ -227,10 +227,6 @@ struct PaywallView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 0) {
-                        GeometryReader { marker in
-                            Color.clear.preference(key: PaywallScrollOffsetKey.self, value: -marker.frame(in: .named("paywallScroll")).minY)
-                        }
-                        .frame(height: 0)
                         hero(width: g.size.width, height: heroH, top: g.safeAreaInsets.top)
                         planCard
                             .padding(.horizontal, 16)
@@ -242,13 +238,11 @@ struct PaywallView: View {
                             .padding(.bottom, 48)
                     }
                 }
-                .coordinateSpace(name: "paywallScroll")
                 .scrollIndicators(.hidden)
                 .ignoresSafeArea(edges: .top)
-                .onPreferenceChange(PaywallScrollOffsetKey.self) { y in
-                    let over = y < heroH - g.safeAreaInsets.top - 8
-                    if overHero != over { overHero = over }
-                }
+                .modifier(PaywallScrollObserver { y in
+                    updateOverHero(offset: y, heroH: heroH, top: g.safeAreaInsets.top)
+                })
                 .onAppear {
                     if startsBelowFold { DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { proxy.scrollTo("benefits", anchor: .top) } }
                 }
@@ -262,6 +256,9 @@ struct PaywallView: View {
                     .offset(y: -g.safeAreaInsets.top)
                     .allowsHitTesting(false)
                     .animation(.easeOut(duration: 0.2), value: overHero)
+                    .accessibilityElement()
+                    .accessibilityLabel("")
+                    .accessibilityIdentifier(overHero ? "paywall.band.hero" : "paywall.band.canvas")
             }
             .overlay(alignment: .topTrailing) {
                 PaywallCloseButton { close() }
@@ -272,6 +269,12 @@ struct PaywallView: View {
         .background(colors.background.ignoresSafeArea())
     }
 
+    /// The blue band (and the dark window) only while the hero is under the status bar.
+    private func updateOverHero(offset y: CGFloat, heroH: CGFloat, top: CGFloat) {
+        let over = y < heroH - top - 8
+        if overHero != over { overHero = over }
+    }
+
     // MARK: Hero
 
     private func hero(width: CGFloat, height: CGFloat, top: CGFloat) -> some View {
@@ -280,6 +283,8 @@ struct PaywallView: View {
             VStack(spacing: big ? 14 : 22) {
                 Text(copy.headline)
                     .lhDisplayFont(.title)
+                    // Display type stops growing at XXL, as in the sandbox: AX sizes keep 2–3 lines.
+                    .dynamicTypeSize(...DynamicTypeSize.xxLarge)
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
                     .lineLimit(dts.isAccessibilitySize ? 4 : 2)
@@ -547,10 +552,21 @@ struct PaywallView: View {
     }
 }
 
-private struct PaywallScrollOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+/// iOS 18+: the scroll view reports its own offset. iOS 17 keeps the blueprint band throughout
+/// (still legible: white status text on blue).
+private struct PaywallScrollObserver: ViewModifier {
+    var onChange: (CGFloat) -> Void
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, y in
+                onChange(y)
+            }
+        } else {
+            content
+        }
+    }
 }
+
 
 /// "$29.99 once, yours to keep" on one baseline; stacked when it doesn't fit.
 struct PaywallPriceRow: View {

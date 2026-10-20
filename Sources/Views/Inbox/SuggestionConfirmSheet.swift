@@ -9,6 +9,7 @@ struct SuggestionConfirmSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var hours: Double
     @State private var propertyId: UUID?
     @State private var category: ActivityCategory?
@@ -75,6 +76,11 @@ struct SuggestionConfirmSheet: View {
                 notesField
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
+                if limitActionsInline {
+                    // Accessibility sizes: the at-limit choices are too tall to pin, so they
+                    // scroll with the sheet and the Property row stays reachable.
+                    limitActions.padding(.top, 16)
+                }
                 secondaryActions
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
@@ -426,8 +432,16 @@ struct SuggestionConfirmSheet: View {
 
     // MARK: Footer
 
+    private var limitActionsInline: Bool { atLimit && dynamicTypeSize.isAccessibilitySize }
+
     @ViewBuilder private var pinnedActions: some View {
-        if atLimit { limitActions } else { regularActions }
+        if limitActionsInline {
+            EmptyView()
+        } else if atLimit {
+            limitActions
+        } else {
+            regularActions
+        }
     }
 
     /// The free plan is full: say what's locked and what stays, one "Unlock Pro", and two ways

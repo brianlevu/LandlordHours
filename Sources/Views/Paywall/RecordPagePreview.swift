@@ -114,7 +114,7 @@ struct RecordPagePreview: View {
                 propertyRow(row.name, row.kind, value: hoursText(row.hours), isNew: false)
             }
             if case .newRow(let name) = highlight {
-                propertyRow(name, "Pro", value: "—", isNew: true)
+                propertyRow(name, "New rental", value: "—", isNew: true)
             }
             Rectangle().fill(rule).frame(height: 0.5)
             HStack {

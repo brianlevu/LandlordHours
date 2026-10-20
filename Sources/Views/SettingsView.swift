@@ -16,6 +16,7 @@ struct SettingsView: View {
     @StateObject private var appearanceManager = AppearanceManager.shared
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var showingProfileEdit = false
@@ -261,7 +262,11 @@ struct SettingsView: View {
 
     /// Not a lock: a plain card at the top of the plan section (redesign-specs §1b).
     private var proCard: some View {
-        HStack(spacing: 14) {
+        // At accessibility sizes the button drops under the text so "See Pro" never truncates.
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            : AnyLayout(HStackLayout(spacing: 14))
+        return layout {
             Image(systemName: "house.fill")
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(Color.white)
@@ -283,11 +288,12 @@ struct SettingsView: View {
                 .foregroundStyle(colors.textSecondary)
             }
             .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 8)
+            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
             Button("See Pro") {
                 paywall = ProPaywallRequest(context: .settings, entry: .settingsPro)
             }
             .buttonStyle(ProTintedButtonStyle())
+            .fixedSize()
             .accessibilityIdentifier("settings.proCard")
         }
         .padding(.vertical, 6)

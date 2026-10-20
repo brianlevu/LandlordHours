@@ -35,7 +35,7 @@ final class PaywallCaptureUITests: XCTestCase {
     private static let paywallStates: [(name: String, args: [String])] = [
         ("paywall-export", ["-LHPaywallPreview", "export"]),
         ("paywall-export-below", ["-LHPaywallPreview", "export", "-LHPaywallBelowFold"]),
-        ("paywall-second", ["-LHPaywallPreview", "secondProperty", "-LHPaywallProperty", "Oak Street Duplex"]),
+        ("paywall-second", ["-LHPaywallPreview", "secondProperty", "-LHPaywallProperty", "Pine Cabin"]),
         ("paywall-today", ["-LHPaywallPreview", "todayUnlock", "-LHPaywallHours", "212"]),
         ("paywall-settings", ["-LHPaywallPreview", "settings"]),
         ("paywall-sample", ["-LHPaywallPreview", "export", "-LHPaywallSample"]),
@@ -46,7 +46,7 @@ final class PaywallCaptureUITests: XCTestCase {
         ("paywall-asktobuy", ["-LHPaywallPreview", "export", "-LHPaywallPhase", "askToBuy"]),
         ("paywall-failed", ["-LHPaywallPreview", "export", "-LHPaywallPhase", "failed"]),
         ("paywall-success", ["-LHPaywallPreview", "export", "-LHPaywallPhase", "success"]),
-        ("paywall-success-second", ["-LHPaywallPreview", "secondProperty", "-LHPaywallProperty", "Oak Street Duplex", "-LHPaywallPhase", "success"]),
+        ("paywall-success-second", ["-LHPaywallPreview", "secondProperty", "-LHPaywallProperty", "Pine Cabin", "-LHPaywallPhase", "success"]),
         ("paywall-restoring", ["-LHPaywallPreview", "settings", "-LHPaywallPhase", "restoring"]),
         ("paywall-restore-none", ["-LHPaywallPreview", "settings", "-LHPaywallPhase", "restoreNone"]),
     ]
@@ -63,6 +63,18 @@ final class PaywallCaptureUITests: XCTestCase {
                 }
             }
         }
+    }
+
+    /// The status band follows the scroll: blueprint over the hero, canvas below it.
+    func testStatusBandFollowsScroll() {
+        launch(scenario: "occasional", scheme: "light", size: "UICTContentSizeCategoryXXL", extra: ["-LHPaywallPreview", "export"])
+        XCTAssertTrue(app.staticTexts["paywall.title"].waitForExistence(timeout: 12))
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.band.hero"].waitForExistence(timeout: 3), "Blue band over the hero")
+        app.swipeUp(velocity: .fast); app.swipeUp(velocity: .fast)
+        Thread.sleep(forTimeInterval: 1.5)
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.band.canvas"].waitForExistence(timeout: 3), "Canvas band once scrolled past the hero")
+        app.swipeDown(velocity: .fast); app.swipeDown(velocity: .fast); app.swipeDown(velocity: .fast)
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.band.hero"].waitForExistence(timeout: 3), "Blue again at the top")
     }
 
     // MARK: Locks
@@ -100,7 +112,10 @@ final class PaywallCaptureUITests: XCTestCase {
                 waitFor("confirm.unlockPro")
                 Thread.sleep(forTimeInterval: 0.8)
                 save("limit-sheet-\(suffix)")
-                app.buttons["confirm.property"].tap()
+                let property = app.buttons["confirm.property"]
+                var swipes = 0
+                while !property.isHittable && swipes < 6 { app.swipeUp(velocity: .slow); swipes += 1 }
+                property.tap()
                 waitFor("limitPicker")
                 Thread.sleep(forTimeInterval: 0.8)
                 save("limit-picker-\(suffix)")
