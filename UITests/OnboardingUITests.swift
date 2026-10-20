@@ -75,6 +75,12 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.buttons["tab.inbox"].waitForExistence(timeout: 10))
         XCTAssertTrue(waitForValue(app.buttons["tab.inbox"], "22 to confirm"),
                       "Every hour found is in the Inbox: \(app.buttons["tab.inbox"].value ?? "nil")")
+        // The count was shown once on Staked: Today does not replay it, and keeps "35h found".
+        tap(app.buttons["tab.today"])
+        XCTAssertFalse(app.buttons["backfill-review"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["today.hero.found"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["guidedSetup.overlay"].exists, "No coach mark")
+        tap(app.buttons["tab.inbox"])
         // Found before the property existed, placed on it when it was saved: Confirm logs in one tap.
         let confirm = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "inbox.confirm.")).firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Every Inbox row shows Confirm")
@@ -83,11 +89,6 @@ final class OnboardingUITests: XCTestCase {
         tap(confirm)
         XCTAssertFalse(app.buttons["confirm.log"].waitForExistence(timeout: 2), "No sheet: nothing was missing")
         XCTAssertTrue(waitForValue(app.buttons["tab.inbox"], "21 to confirm"), "Confirm logged the row")
-        // The count was shown once on Staked: Today does not replay it.
-        tap(app.buttons["tab.today"])
-        XCTAssertFalse(app.buttons["backfill-review"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["today.hero.found"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.descendants(matching: .any)["guidedSetup.overlay"].exists, "No coach mark")
     }
 
     // MARK: Skip path: six taps to Today
@@ -172,5 +173,69 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertFalse(app.buttons["backfill-review"].exists)
         tap(notNow)
         XCTAssertTrue(app.buttons["backfill-review"].waitForExistence(timeout: 10), "Today's reveal plays once What's new closes")
+    }
+
+    // MARK: The REAL iOS calendar prompt (no DEBUG fake), on a fresh permission state
+
+    private func walkToCalendarWithRealPrompt() -> XCUIElement {
+        app.terminate()
+        app.resetAuthorizationStatus(for: .calendar)                // iOS will ask again
+        launchFresh()
+        tap(app.buttons["onb-start"], timeout: 20)
+        tap(app.buttons["goal-750"])
+        tap(app.buttons["onb-primary"])
+        let look = app.buttons["onb-primary"]
+        XCTAssertTrue(look.waitForExistence(timeout: 5))
+        XCTAssertEqual(look.label, "Look at my calendar")
+        tap(look)
+        // iOS hosts its permission prompts in SpringBoard; check the app too, to be safe.
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let deadline = Date().addingTimeInterval(12)
+        while Date() < deadline && springboard.alerts.count == 0 && app.alerts.count == 0 {
+            Thread.sleep(forTimeInterval: 0.3)
+        }
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); shot.name = "real-prompt"; shot.lifetime = .keepAlways; add(shot)
+        let alert = springboard.alerts.count > 0 ? springboard.alerts.firstMatch : app.alerts.firstMatch
+        XCTAssertTrue(alert.exists, "iOS shows its own calendar prompt. SpringBoard: \(springboard.debugDescription.prefix(1500))")
+        return alert
+    }
+
+    private func tapAlertButton(_ alert: XCUIElement, _ labels: [String]) {
+        for label in labels where alert.buttons[label].exists {
+            alert.buttons[label].tap()
+            return
+        }
+        XCTFail("No \(labels) button on the prompt: \(alert.buttons.allElementsBoundByIndex.map(\.label))")
+    }
+
+    private func nameRental(_ name: String) {
+        tap(app.buttons["onb-primary"])                            // Who: Continue
+        let field = app.textFields["property-name"]
+        tap(field)
+        field.typeText(name)
+        tap(app.buttons["onb-primary"])                            // Save it
+    }
+
+    func testRealCalendarPromptAllowLeadsToTheVisitNote() {
+        let alert = walkToCalendarWithRealPrompt()
+        tapAlertButton(alert, ["Allow Full Access", "Allow"])
+        XCTAssertTrue(app.buttons["who-me"].waitForExistence(timeout: 8), "Allowed: on to Who does the work")
+        nameRental("Oak")
+        XCTAssertTrue(app.staticTexts["Want a note when a visit ends?"].waitForExistence(timeout: 8),
+                      "The visit-end note is asked only after a real calendar grant")
+        tap(app.buttons["onb-secondary"])                          // Not now
+        XCTAssertTrue(app.buttons["onb-today"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["0h found"].exists, "Never 0h found")
+    }
+
+    func testRealCalendarPromptDontAllowContinuesQuietly() {
+        let alert = walkToCalendarWithRealPrompt()
+        tapAlertButton(alert, ["Don’t Allow", "Don't Allow"])
+        XCTAssertTrue(app.buttons["who-me"].waitForExistence(timeout: 8), "Denied: on to Who does the work, no scolding")
+        nameRental("Pine")
+        XCTAssertTrue(app.staticTexts["Your house is staked."].waitForExistence(timeout: 8), "No visit-end note without the calendar")
+        XCTAssertEqual(app.buttons["onb-today"].label, "Go to Today")
+        tap(app.buttons["onb-today"])
+        XCTAssertTrue(app.buttons["today-find-hours"].waitForExistence(timeout: 8), "Today keeps a way back to the calendar")
     }
 }

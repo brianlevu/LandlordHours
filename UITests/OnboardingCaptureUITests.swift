@@ -33,6 +33,7 @@ final class OnboardingCaptureUITests: XCTestCase {
     func testCaptureCalendarSystemPromptDark() { captureSystemPrompt(scheme: "dark") }
 
     private func captureSystemPrompt(scheme: String) {
+        app.resetAuthorizationStatus(for: .calendar)
         launch(scheme: scheme, size: nil, ["-LHOnboardingStep", "calendar"])
         let look = app.buttons["onb-primary"]
         XCTAssertTrue(look.waitForExistence(timeout: 20))

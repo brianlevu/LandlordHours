@@ -561,6 +561,12 @@ struct OnbStakedContent: View {
                                 .onbDrafting(HouseTokens.drafting)
                                 .padding(.top, 16)
                                 .accessibilityIdentifier("staked-looking")
+                        } else if case .nothingCountable(let count) = headline {
+                            Text(OnbStakedHeadline.nothingCountableLine(count))
+                                .onbDrafting(HouseTokens.drafting)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.top, 16)
+                                .accessibilityIdentifier("staked-nothing-countable")
                         } else if headline == .nothingFound {
                             Text("Nothing in the last 90 days looked like rental work")
                                 .onbDrafting(HouseTokens.drafting)

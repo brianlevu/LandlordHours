@@ -267,6 +267,7 @@ final class OnboardingFlowTests: XCTestCase {
         let found = OnbFound.from(items, now: now)
         XCTAssertEqual(found.hours, 3, "Only countable work (and not-yet-categorised items) adds hours")
         XCTAssertEqual(found.count, 5, "Every item still waits in the Inbox")
+        XCTAssertEqual(BackfillJob.countableHours(items), 3, "Today's reveal counts the same hours")
     }
 
     func testHoursTextNeverRoundsUp() {
@@ -283,6 +284,14 @@ final class OnboardingFlowTests: XCTestCase {
         XCTAssertEqual(OnbStakedHeadline.make(calendar: .allowed, scan: .finished, found: some).reviewCount, 14)
         XCTAssertEqual(OnbStakedHeadline.make(calendar: .allowed, scan: .finished, found: .none), .nothingFound)
         XCTAssertNil(OnbStakedHeadline.nothingFound.reviewCount, "0 found goes to Today, not an empty Inbox")
+        // Found only non-countable work: never "0h found".
+        let uncounted = OnbFound(count: 3, hours: 0)
+        let headline = OnbStakedHeadline.make(calendar: .allowed, scan: .finished, found: uncounted)
+        XCTAssertEqual(headline, .nothingCountable(count: 3))
+        XCTAssertNotEqual(headline, .found(uncounted))
+        XCTAssertEqual(OnbStakedHeadline.nothingCountableLine(3), "We found 3 things, but none count toward your hours yet")
+        XCTAssertEqual(OnbStakedHeadline.nothingCountableLine(1), "We found 1 thing, but none count toward your hours yet")
+        XCTAssertEqual(headline.reviewCount, 3, "They still wait in the Inbox to be answered")
         XCTAssertEqual(OnbStakedHeadline.make(calendar: .allowed, scan: .running, found: some), .lookingBack(some))
         XCTAssertNil(OnbStakedHeadline.lookingBack(some).reviewCount, "Still running: no number to review yet")
         XCTAssertEqual(OnbStakedHeadline.make(calendar: .allowed, scan: .blocked, found: some), .plain)

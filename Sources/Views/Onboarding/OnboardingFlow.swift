@@ -184,13 +184,19 @@ enum OnbStakedHeadline: Equatable {
     case lookingBack(OnbFound)
     /// The scan finished and found nothing.
     case nothingFound
+    /// The scan found items, but none would count (only investing, financing or negotiation):
+    /// never "0h found" or a slab.
+    case nothingCountable(count: Int)
     /// No calendar (declined, denied, or blocked): "Your house is staked."
     case plain
 
     static func make(calendar: OnbCalendar, scan: OnbScanState, found: OnbFound) -> OnbStakedHeadline {
         guard calendar == .allowed else { return .plain }
         switch scan {
-        case .finished: return found.count > 0 ? .found(found) : .nothingFound
+        case .finished:
+            // "Nh found" only when the found work would count toward hours.
+            if found.count > 0 && found.hours > 0 { return .found(found) }
+            return found.count > 0 ? .nothingCountable(count: found.count) : .nothingFound
         case .running, .idle: return .lookingBack(found)
         case .blocked: return .plain
         }
@@ -198,8 +204,16 @@ enum OnbStakedHeadline: Equatable {
 
     /// Staked's button: "Review N suggestions" opens the Inbox; otherwise "Go to Today".
     var reviewCount: Int? {
-        if case .found(let f) = self { return f.count }
-        return nil
+        switch self {
+        case .found(let f): return f.count
+        case .nothingCountable(let count): return count
+        default: return nil
+        }
+    }
+
+    /// The drafting line under "Your house is staked." when nothing found counts.
+    static func nothingCountableLine(_ count: Int) -> String {
+        "We found \(count == 1 ? "1 thing" : "\(count) things"), but none count toward your hours yet"
     }
 }
 
