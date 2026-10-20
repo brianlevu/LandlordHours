@@ -150,6 +150,13 @@ struct ContentView: View {
             }
         }
         .lhMotion(AppAnimation.reveal, value: viewModel.persistenceError)
+        // WP-P: the one paywall, opened by any screen through ProPaywallPresenter.shared.
+        .proPaywallHost()
+        #if DEBUG
+        .fullScreenCover(isPresented: .constant(PaywallPreviewLaunch.current != nil)) {
+            if let preview = PaywallPreviewLaunch.current { PaywallPreviewRoot(launch: preview) }
+        }
+        #endif
         .environmentObject(CategoryManager.shared)
         .environmentObject(goalManager)
         .onAppear {

@@ -41,9 +41,11 @@ enum InboxDebugSeed {
         app.suppressCelebrations = true
         defer { app.suppressCelebrations = false }
 
+        // `limit` / `limit-waiting` (WP-P): a free user at the one-rental limit.
+        let atLimit = scenario.hasPrefix("limit")
         if app.properties.isEmpty {
             app.addProperty(name: "Pine Cabin", address: "14 Pine Ridge Rd", type: .str)
-            app.addProperty(name: "Oak Street Duplex", address: "220 Oak St", type: .ltr)
+            if !atLimit { app.addProperty(name: "Oak Street Duplex", address: "220 Oak St", type: .ltr) }
         }
         TaxProfileManager.shared.spouseTracking = true
         app.activeCelebration = nil
@@ -58,6 +60,13 @@ enum InboxDebugSeed {
             CaptureOptIn.markBackfillCompleted(userId: userId)
             let items = inboxItems(app: app, now: InboxClock.now())
             store.ingest(items, existingEntries: app.timeEntries)
+        case "limit", "limit-waiting":
+            CaptureOptIn.recordChoice(calendar: true, eventPrompts: false, userId: userId)
+            CaptureOptIn.markBackfillCompleted(userId: userId)
+            let items = limitItems(app: app, now: InboxClock.now())
+            store.ingest(items, existingEntries: app.timeEntries)
+            if scenario == "limit-waiting" { ProWaitList.shared.add(items[0].sourceKey) }
+            else { ProWaitList.shared.remove(items[0].sourceKey) }
         case "empty":
             CaptureOptIn.recordChoice(calendar: true, eventPrompts: false, userId: userId)
             CaptureOptIn.markBackfillCompleted(userId: userId)
@@ -144,6 +153,23 @@ enum InboxDebugSeed {
                  property: oak, category: .legal, confidence: 0.91, backfill: true),
             item("hoa", title: "HOA meeting", start: day(20, 18), hours: 2,
                  property: oak, category: .management, confidence: 0.66, backfill: true),
+        ]
+    }
+
+    /// A showing at a rental the user doesn't have (no property), plus work at Pine Cabin.
+    static func limitItems(app: AppViewModel, now: Date) -> [Suggestion] {
+        let pine = app.properties.first?.id
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        func day(_ offset: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+            let base = calendar.date(byAdding: .day, value: -offset, to: today) ?? today
+            return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: base) ?? base
+        }
+        return [
+            item("limit-showing", title: "Showing", start: day(1, 17, 30), hours: 1,
+                 property: nil, category: .leasing, confidence: 0.9),
+            item("limit-plumber", title: "Plumber", start: day(2, 10), hours: 2,
+                 property: pine, category: .repairs, confidence: 0.94),
         ]
     }
 

@@ -157,7 +157,7 @@ struct DashboardView: View {
         return weekday == 1 ? 6 : weekday - 2
     }
 
-    @State private var showPaywall = false
+    @State private var showRecordExport = false
     // The header line follows the hero: it keeps the pre-save total until the count-up lands.
     @State private var subtitleHoursOverride: Double?
     private var headerHours: Double { subtitleHoursOverride ?? totalHours }
@@ -225,7 +225,7 @@ struct DashboardView: View {
                         }
                         recentEntriesSection
                         thisWeekCard
-                        trialStatusNudge
+                        yourRecordLock
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 8)
@@ -247,8 +247,8 @@ struct DashboardView: View {
                 }
             }
             .navigationBarHidden(true)
-            .sheet(isPresented: $showPaywall) {
-                PaywallView(context: .dashboardUnlock, onClose: { showPaywall = false })
+            .sheet(isPresented: $showRecordExport) {
+                ExportPDFView(year: currentYear)
             }
             .navigationDestination(isPresented: $showLearningCenter) {
                 LearningCenterView()
@@ -646,35 +646,21 @@ struct DashboardView: View {
         .accessibilityLabel(title)
     }
 
-    // MARK: - Pro Status Nudge
+    // MARK: - Your record (free, 10h or more): the `.card` locked preview (WP-P)
     @ViewBuilder
-    private var trialStatusNudge: some View {
-        if !subscriptionManager.isPro && shouldShowProNudge {
-            Button { showPaywall = true } label: {
-                HStack(spacing: 12) {
-                    LHIconTile(icon: Lucide.sparkles, color: AppColors.primary, wash: colors.primarySurface, size: 44, isActive: true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Unlock Pro")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(colors.textPrimary)
-                        Text("Buy lifetime access for exports and unlimited properties.")
-                            .font(.system(size: 11, design: .rounded))
-                            .foregroundStyle(colors.textSecondary)
-                    }
-                    Spacer()
-                    Text("Upgrade")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppColors.onAction)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(AppColors.action)
-                        .clipShape(Capsule())
-                }
-                .padding(14)
-                .lhSurfaceCard(cornerRadius: 20)
+    private var yourRecordLock: some View {
+        if shouldShowProNudge && !hoursPending
+            && ProGate.showsTodayRecordLock(isPro: subscriptionManager.isPro, confirmedHours: totalHours) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Your record")
+                    .font(.footnote.weight(.semibold))
+                    .textCase(.uppercase)
+                    .tracking(0.3)
+                    .foregroundStyle(colors.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityAddTraits(.isHeader)
+                TodayRecordLockCard(year: currentYear, confirmedHours: totalHours, onUnlocked: { showRecordExport = true })
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("dashboard.unlockPro")
         }
     }
 
@@ -1222,4 +1208,84 @@ private struct DashboardScrollOffsetPreferenceKey: PreferenceKey {
     DashboardView()
         .environmentObject(AppViewModel())
         .environmentObject(GoalManager.shared)
+}
+
+/// Today's "Your record" card for a free user: a page thumbnail with its top third sharp, the rest
+/// under the lock. "Unlock Pro" opens the paywall about the user's own hours; afterwards it opens
+/// the export.
+struct TodayRecordLockCard: View {
+    let year: Int
+    let confirmedHours: Double
+    /// Runs after a purchase. The card itself disappears once Pro is on, so Today owns what comes next.
+    var onUnlocked: () -> Void
+    @EnvironmentObject private var viewModel: AppViewModel
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var page: RecordPageModel?
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    private static let pageHeight: CGFloat = 300
+    private static let sharpPage: CGFloat = 104
+
+    var body: some View {
+        LockedPreview(
+            size: .card,
+            entry: .todayRecord,
+            line: ProGate.lockLine(.todayRecord, confirmedHours: confirmedHours),
+            keeps: ProGate.keepsLine(.todayRecord),
+            surface: colors.backgroundSecondary,
+            onUnlock: {
+                ProPaywallPresenter.shared.present(entry: .todayRecord, confirmedHours: confirmedHours, onUnlocked: onUnlocked)
+            }
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    Image(systemName: "doc.richtext").font(.system(size: 20)).foregroundStyle(colors.action)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Your \(String(year)) record").font(.headline).foregroundStyle(colors.textPrimary)
+                        Text("PDF and spreadsheet · \(entryCount) \(entryCount == 1 ? "entry" : "entries")")
+                            .font(.subheadline).foregroundStyle(colors.textSecondary)
+                    }
+                }
+                pageView
+                    .frame(height: Self.sharpPage, alignment: .top)
+                    .clipShape(UnevenRoundedRectangle(topLeadingRadius: 10, topTrailingRadius: 10, style: .continuous))
+            }
+            .padding([.horizontal, .top], 16)
+        } locked: {
+            pageView
+                .offset(y: -Self.sharpPage)
+                .frame(height: Self.pageHeight - Self.sharpPage, alignment: .top)
+                .clipped()
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+        }
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(colors.backgroundSecondary))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .task { await load() }
+    }
+
+    private var entryCount: Int {
+        viewModel.timeEntries.filter { Calendar.current.component(.year, from: $0.date) == year }.count
+    }
+
+    @ViewBuilder private var pageView: some View {
+        Group {
+            if let page {
+                RecordPagePreview(model: page)
+            } else {
+                DraftingLoader(sketch: .document, surface: .adaptive, subject: "your record")
+                    .padding(40)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .frame(height: Self.pageHeight, alignment: .top)
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(colors.border, lineWidth: 0.5))
+    }
+
+    private func load() async {
+        guard page == nil else { return }
+        page = await RecordPageModel.load(entries: viewModel.timeEntries, properties: viewModel.properties,
+                                          owner: viewModel.userName, year: year)
+    }
 }

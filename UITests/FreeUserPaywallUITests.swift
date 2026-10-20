@@ -1,10 +1,12 @@
 import XCTest
 
 /// Free-to-paid journeys (Brian's release law): every Pro entry point is driven as a FREE
-/// install. Each test counts taps from Home to the StoreKit sheet, asserts the paywall is
-/// about the thing tapped, and that closing it returns cleanly to where the user was.
+/// install. Each journey counts taps from Today to the paywall and to the purchase, checks the
+/// locked preview says what stays free, that the paywall is about the thing tapped, that closing
+/// it returns cleanly to the lock, and that after a purchase the action carries on.
 ///
-/// Free fixture: `-LHMockScenario occasional` (one or more properties, entries, no Pro).
+/// Every journey prints a `TAPS_TO_PURCHASE | <entry> | paywall after N | purchase after N+1`
+/// line and attaches it, so the release verifier can read taps-to-purchase per entry point.
 final class FreeUserPaywallUITests: XCTestCase {
     private var app: XCUIApplication!
     private var taps = 0
@@ -22,120 +24,170 @@ final class FreeUserPaywallUITests: XCTestCase {
         super.tearDown()
     }
 
-    // MARK: Journeys
+    // MARK: Journeys (one per entry point)
 
-    func testReportsExportOpensExportPaywall() {
+    func testReportsExportCardLock() {
         launchFree()
         tapTab("Reports")
-        let origin = app.buttons["reports.export"]
+        let lock = lockContainer("reports_export")
+        scrollTo(lock, maxSwipes: 12)
+        // The floating tab bar sits over the end of the scroll: bring the card clear of it.
+        app.swipeUp(); app.swipeUp()
+        assertLockSaysWhatStays(lock)
+        let origin = lock.buttons["lock.unlock"]
         tap(origin)
-        assertPaywall("export", titleContains: "Export your")
-        closeThenPurchase(entryPoint: "Reports > Export", origin: origin,
-                          continuation: app.buttons["export.generatePDF"])
+        assertPaywall("export", headline: "The record your accountant gets")
+        closeThenPurchase(entryPoint: "Reports > Export card", origin: origin,
+                          continuation: exportReady)
     }
 
-    func testAddSecondPropertyOpensPropertyPaywall() {
+    func testReportsExportPageLock() {
         launchFree()
-        tapTab("Properties")
-        let origin = app.buttons["properties.add"]
+        tapTab("Reports")
+        tap(app.buttons["reports.export"])
+        let origin = exportPageUnlock()
         tap(origin)
-        assertPaywall("secondProperty", titleContains: "Track every rental")
+        assertPaywall("export", headline: "The record your accountant gets")
+        closeThenPurchase(entryPoint: "Reports > Export page", origin: origin,
+                          continuation: exportReady, continuationIsLockLifted: true)
+    }
+
+    func testRecordsExportPageLock() {
+        launchFree()
+        tap(app.buttons["Records"].firstMatch)
+        tap(app.buttons["records.export"])
+        let origin = exportPageUnlock()
+        tap(origin)
+        assertPaywall("export", headline: "The record your accountant gets")
+        closeThenPurchase(entryPoint: "Records > Export", origin: origin,
+                          continuation: exportReady, continuationIsLockLifted: true)
+    }
+
+    func testSettingsExportPageLock() {
+        launchFree()
+        tapTab("Settings")
+        let row = app.buttons["settings.exportReports"]
+        scrollTo(row, maxSwipes: 10)
+        tap(row)
+        let origin = exportPageUnlock()
+        tap(origin)
+        assertPaywall("export", headline: "The record your accountant gets")
+        closeThenPurchase(entryPoint: "Settings > Export reports", origin: origin,
+                          continuation: exportReady, continuationIsLockLifted: true)
+    }
+
+    func testSettingsProCard() {
+        launchFree()
+        tapTab("Settings")
+        let origin = app.buttons["settings.proCard"]
+        scrollTo(origin)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Pay once")).firstMatch.exists,
+                      "The card says it's paid once, with the App Store price")
+        tap(origin)
+        assertPaywall("settingsUpgrade", headline: "LandlordHours Pro")
+        closeThenPurchase(entryPoint: "Settings > See Pro", origin: origin, continuation: nil)
+    }
+
+    func testPropertiesSecondRental() {
+        launchFree()
+        tap(app.buttons["Properties"].firstMatch)
+        let origin = app.buttons["properties.add"]
+        scrollTo(origin)
+        tap(origin)
+        // Properties is rebuilt on wp-properties with a `.row` lock calling this same paywall.
+        if !app.descendants(matching: .any)["paywall.secondProperty"].waitForExistence(timeout: 4) {
+            let unlock = lockContainer("properties_limit").buttons["lock.unlock"]
+            tap(unlock)
+        }
+        assertPaywall("secondProperty", headline: "Track every rental")
         closeThenPurchase(entryPoint: "Properties > Add property", origin: origin,
                           continuation: app.textFields["property.name"])
     }
 
-    func testDashboardNudgeOpensGenericPaywall() {
+    func testTodayYourRecordLock() {
         launchFree()
-        let nudge = app.buttons["dashboard.unlockPro"]
-        scrollTo(nudge)
-        tap(nudge)
-        assertPaywall("dashboardUnlock", titleContains: "every rental")
-        closeThenPurchase(entryPoint: "Home > Unlock Pro card", origin: nudge, continuation: nil)
-    }
-
-    func testSettingsProCardOpensGenericPaywall() {
-        launchFree()
-        tapTab("Settings")
-        let origin = app.buttons["settings.proCard"]
+        let lock = lockContainer("today_record")
+        scrollTo(lock, maxSwipes: 12)
+        assertLockSaysWhatStays(lock)
+        let origin = lock.buttons["lock.unlock"]
+        scrollTo(origin, maxSwipes: 4)
         tap(origin)
-        assertPaywall("settingsUpgrade", titleContains: "LandlordHours Pro")
-        closeThenPurchase(entryPoint: "Settings > Pro card", origin: origin, continuation: nil)
+        assertPaywall("dashboardUnlock", headline: "Your hours, on paper")
+        closeThenPurchase(entryPoint: "Today > Your record", origin: origin,
+                          continuation: exportReady)
     }
 
-    func testSettingsExportRowOpensExportPaywall() {
+    func testInboxNewRentalAtTheFreeLimit() {
+        launchInboxLimit()
+        let row = app.buttons["inbox.row.cal:debug-limit-showing"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        XCTAssertTrue(row.label.contains("New place"), "The row reads normally, with New place")
+        tap(row)
+        let line = app.descendants(matching: .any)["confirm.limitLine"]
+        XCTAssertTrue(line.waitForExistence(timeout: 5))
+        XCTAssertTrue(line.label.contains("Pine Cabin keeps tracking"), "Says what stays active")
+        let origin = app.buttons["confirm.unlockPro"]
+        tap(origin)
+        assertPaywall("secondProperty", headline: "Track every rental")
+        closeThenPurchase(entryPoint: "Inbox > New place", origin: origin,
+                          continuation: app.textFields["property.name"])
+    }
+
+    func testInboxKeepForProWaitsAndBacksOutCleanly() {
+        launchInboxLimit()
+        let row = app.buttons["inbox.row.cal:debug-limit-showing"]
+        tap(row)
+        // "Was this at Pine Cabin?" — the picker offers the user's rental and the locked new one.
+        tap(app.buttons["confirm.property"])
+        XCTAssertTrue(app.descendants(matching: .any)["limitPicker"].waitForExistence(timeout: 5))
+        XCTAssertTrue(lockContainer("inbox_limit").exists, "A .row lock for the new rental")
+        app.buttons["Close"].firstMatch.tap()
+        tap(app.buttons["confirm.keepForPro"])
+        XCTAssertTrue(app.staticTexts["Kept in your inbox until you unlock Pro"].waitForExistence(timeout: 4))
+        let waiting = app.buttons["inbox.row.cal:debug-limit-showing"]
+        XCTAssertTrue(waiting.waitForExistence(timeout: 4))
+        XCTAssertTrue(waiting.label.contains("Waiting on Pro"), "Never expires silently")
+    }
+
+    func testAskToBuyShowsWaitingForApproval() {
+        UITestIsolation.setAskToBuy(true)
+        defer { UITestIsolation.setAskToBuy(false) }
         launchFree()
         tapTab("Settings")
-        let row = app.buttons["settings.exportReportsLocked"]
-        scrollTo(row)
-        tap(row)
-        assertPaywall("export", titleContains: "Export your")
-        closeThenPurchase(entryPoint: "Settings > Export Reports", origin: row,
-                          continuation: app.buttons["export.generatePDF"])
+        tap(app.buttons["settings.proCard"])
+        buyWhenReady()
+        let waiting = app.descendants(matching: .any)["paywall.askToBuy"]
+        XCTAssertTrue(waiting.waitForExistence(timeout: 20), "Ask to Buy: waiting for approval")
+        XCTAssertEqual(app.buttons["paywall.buy"].label, "Done", "The button becomes Done")
+        app.buttons["paywall.buy"].tap()
+        XCTAssertTrue(app.buttons["paywall.close"].waitForNonExistence(timeout: 6), "Done closes the paywall")
+        XCTAssertTrue(app.buttons["settings.proCard"].waitForExistence(timeout: 5), "Still free until approval")
+    }
+
+    func testFailedPurchaseCanBeRetried() {
+        UITestIsolation.setFailTransactions(true)
+        launchFree()
+        tapTab("Settings")
+        tap(app.buttons["settings.proCard"])
+        buyWhenReady()
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.failed"].waitForExistence(timeout: 20), "That didn't go through")
+        UITestIsolation.setFailTransactions(false)
+        buyWhenReady()
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.success"].waitForExistence(timeout: 30), "Retry succeeds")
     }
 
     func testOnboardingEndsWithoutAPaywall() {
         app.launchArguments = baseArguments(scenario: "firstTime", tab: 0, scheme: "light")
         app.launch()
-        walkOnboarding(captureScheme: "light")
-    }
-
-    // MARK: Frames for the visual gate
-
-    func testCaptureLaneCFramesLight() { captureAll(scheme: "light") }
-    func testCaptureLaneCFramesDark() { captureAll(scheme: "dark") }
-
-    private func captureAll(scheme: String) {
-        // Paywall from each context.
-        launchFree(scheme: scheme)
-        tapTab("Reports")
-        tap(app.buttons["reports.export"])
-        capturePaywall("paywall-export", scheme: scheme)
-
-        launchFree(scheme: scheme)
-        tapTab("Properties")
-        tap(app.buttons["properties.add"])
-        capturePaywall("paywall-secondProperty", scheme: scheme)
-
-        launchFree(scheme: scheme)
-        let nudge = app.buttons["dashboard.unlockPro"]
-        scrollTo(nudge)
-        tap(nudge)
-        capturePaywall("paywall-dashboardUnlock", scheme: scheme)
-
-        launchFree(scheme: scheme)
-        tapTab("Settings")
-        let exportRow = app.buttons["settings.exportReportsLocked"]
-        scrollTo(exportRow)
-        tap(exportRow)
-        capturePaywall("paywall-settingsExport", scheme: scheme)
-
-        launchFree(scheme: scheme)
-        tapTab("Settings")
-        tap(app.buttons["settings.proCard"])
-        capturePaywall("paywall-settingsUpgrade", scheme: scheme)
-
-        // Settings disclaimer.
-        launchFree(scheme: scheme)
-        tapTab("Settings")
-        let note = app.descendants(matching: .any)["settings.notTaxAdvice"].firstMatch
-        scrollTo(note, maxSwipes: 14)
-        app.swipeUp()
-        settleAndCapture("settings-not-tax-advice", scheme: scheme, waitFor: note)
-
-        // Dashboard: REPS goal, 750 h met, other work hours not entered.
-        app.terminate()
-        app.launchArguments = baseArguments(scenario: "frequent", tab: 0, scheme: scheme) + ["-LHOtherWorkHours", "0"]
-        app.launch()
-        // The progress card combines its children for VoiceOver, so match the prompt text.
-        let metric = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Add your other work hours to check this")).firstMatch
-        XCTAssertTrue(metric.waitForExistence(timeout: 12), "Dashboard asks for other work hours")
-        settleAndCapture("dashboard-add-other-work-hours", scheme: scheme, waitFor: metric)
-
-        // Onboarding end.
-        app.terminate()
-        app.launchArguments = baseArguments(scenario: "firstTime", tab: 0, scheme: scheme)
-        app.launch()
-        walkOnboarding(captureScheme: scheme)
+        tap(app.buttons["onboarding.goalPrimaryCTA"])
+        tap(app.buttons["onboarding.propertyPrimaryCTA"])
+        XCTAssertTrue(app.buttons["Allow reminders"].waitForExistence(timeout: 6), "Reminders follow property setup")
+        XCTAssertFalse(app.descendants(matching: .any)["paywall.title"].exists)
+        tap(app.buttons["Skip for now"])
+        XCTAssertTrue(app.buttons["capture.priming.notNow"].waitForExistence(timeout: 6))
+        tap(app.buttons["capture.priming.notNow"])
+        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 10), "Onboarding lands on the app, not a paywall")
+        XCTAssertFalse(app.descendants(matching: .any)["paywall.title"].exists)
     }
 
     // MARK: Helpers
@@ -159,8 +211,17 @@ final class FreeUserPaywallUITests: XCTestCase {
         XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 12), "Home tab bar should load")
     }
 
-    /// Today, Inbox, Records and Properties live in the tab bar (Log time is the round +);
-    /// Reports and Settings are reached from Today's header buttons. Each is one tap from Today.
+    private func launchInboxLimit() {
+        app.terminate()
+        app.launchArguments = baseArguments(scenario: "emptyMainTabs", tab: 0, scheme: "light")
+            + ["-LHSeedSuggestions", "limit"]
+        app.launch()
+        taps = 0
+        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 12))
+        tap(app.buttons["Inbox"].firstMatch)
+    }
+
+    /// Reports and Settings are reached from Today's header buttons; each is one tap.
     private func tapTab(_ title: String) {
         let label: String
         switch title {
@@ -168,116 +229,126 @@ final class FreeUserPaywallUITests: XCTestCase {
         case "Settings": label = "Open profile and settings"
         default: label = title
         }
-        tap(app.buttons[label])
+        tap(app.buttons[label].firstMatch)
+    }
+
+    /// The unlocked Export page: create (or, when it already ran, share) the report.
+    private var exportReady: XCUIElement {
+        app.buttons.matching(NSPredicate(format: "identifier IN %@", ["export.generatePDF", "export.sharePDF"])).firstMatch
+    }
+
+    private func lockContainer(_ entry: String) -> XCUIElement {
+        app.descendants(matching: .any)["lock.\(entry)"].firstMatch
+    }
+
+    private func exportPageUnlock() -> XCUIElement {
+        let lock = lockContainer("export_page")
+        XCTAssertTrue(lock.waitForExistence(timeout: 8), "The export page is a locked preview for a free user")
+        assertLockSaysWhatStays(lock)
+        let unlock = lock.buttons["lock.unlock"]
+        scrollTo(unlock, maxSwipes: 4)
+        return unlock
+    }
+
+    private func assertLockSaysWhatStays(_ lock: XCUIElement) {
+        XCTAssertTrue(lock.waitForExistence(timeout: 8), "Lock missing")
+        XCTAssertTrue(lock.descendants(matching: .any)["lock.line"].exists, "One line says what is locked")
+        XCTAssertTrue(lock.descendants(matching: .any)["lock.keeps"].exists, "One line says what stays free")
+        XCTAssertTrue(lock.buttons["lock.unlock"].exists, "One Unlock Pro action")
+        XCTAssertEqual(lock.buttons["lock.unlock"].label, "Unlock Pro")
     }
 
     private func tap(_ element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertTrue(element.waitForExistence(timeout: 8), "Missing \(element)", file: file, line: line)
-        let hittable = NSPredicate(format: "isHittable == true")
-        let expectation = XCTNSPredicateExpectation(predicate: hittable, object: element)
-        XCTAssertEqual(XCTWaiter().wait(for: [expectation], timeout: 5), .completed, "Not hittable: \(element)", file: file, line: line)
+        let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: element)
+        XCTAssertEqual(XCTWaiter().wait(for: [hittable], timeout: 5), .completed, "Not hittable: \(element)", file: file, line: line)
         element.tap()
         taps += 1
     }
 
-    private func assertPaywall(_ context: String, titleContains: String) {
+    private func assertPaywall(_ context: String, headline: String) {
         let paywall = app.descendants(matching: .any)["paywall.\(context)"]
         XCTAssertTrue(paywall.waitForExistence(timeout: 8), "Paywall for \(context) should appear")
         let title = app.staticTexts["paywall.title"]
         XCTAssertTrue(title.waitForExistence(timeout: 3))
-        XCTAssertTrue(title.label.contains(titleContains), "Title '\(title.label)' should speak to \(context)")
-        XCTAssertTrue(app.buttons["paywall.buy"].exists, "Unlock Pro button")
-        XCTAssertTrue(app.buttons["paywall.restore"].exists, "Restore purchases sits under the buy button")
-        let buyFrame = app.buttons["paywall.buy"].frame
-        let restoreFrame = app.buttons["paywall.restore"].frame
-        XCTAssertGreaterThan(restoreFrame.minY, buyFrame.minY, "Restore is below Unlock Pro")
-        XCTAssertLessThan(restoreFrame.minY - buyFrame.maxY, 40, "Restore is directly under Unlock Pro")
+        XCTAssertEqual(title.label, headline, "The paywall speaks to \(context)")
+        XCTAssertTrue(app.buttons["paywall.buy"].exists, "Unlock button")
+        XCTAssertTrue(app.buttons["paywall.restore"].exists, "Restore purchase sits under the buy button")
+        XCTAssertTrue(app.buttons["paywall.terms"].exists && app.buttons["paywall.privacy"].exists, "Terms and Privacy are visible")
+        let buy = app.buttons["paywall.buy"].frame
+        let restore = app.buttons["paywall.restore"].frame
+        XCTAssertGreaterThan(restore.minY, buy.minY, "Restore is below the buy button")
+        XCTAssertLessThan(restore.minY - buy.maxY, 40, "Restore is directly under the buy button")
     }
 
-    /// 1. Close returns cleanly to where the user was.
-    /// 2. Reopen, tap Unlock Pro: logs taps from Home to the purchase step.
-    /// 3. After purchase the paywall shows "Pro is active" and carries on with the action.
-    private func closeThenPurchase(entryPoint: String, origin: XCUIElement, continuation: XCUIElement?) {
+    /// 1. Close returns cleanly to the lock. 2. Reopen and buy: logs taps from Today.
+    /// 3. "Pro is yours", then the next-step button carries on with what the user was doing.
+    private func closeThenPurchase(entryPoint: String, origin: XCUIElement, continuation: XCUIElement?,
+                                   continuationIsLockLifted: Bool = false) {
         let tapsToPaywall = taps
         let close = app.buttons["paywall.close"]
         XCTAssertTrue(close.waitForExistence(timeout: 8))
         close.tap()
         XCTAssertTrue(close.waitForNonExistence(timeout: 6), "Paywall closes cleanly")
-        XCTAssertTrue(origin.waitForExistence(timeout: 5), "Back where the user started")
+        XCTAssertTrue(origin.waitForExistence(timeout: 5), "Back at the lock")
         let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: origin)
-        XCTAssertEqual(XCTWaiter().wait(for: [hittable], timeout: 5), .completed, "Origin is usable again after close")
+        XCTAssertEqual(XCTWaiter().wait(for: [hittable], timeout: 5), .completed, "The lock is usable again after close")
 
         origin.tap()
         XCTAssertTrue(app.staticTexts["paywall.title"].waitForExistence(timeout: 8), "Paywall reopens")
-        let priceLoaded = app.descendants(matching: .any)["paywall.price"].waitForExistence(timeout: 10)
-        XCTAssertTrue(priceLoaded, "$29.99 from the StoreKit config is shown")
-        // On a fresh simulator StoreKit can still be loading after the price shows: wait until the
-        // button is enabled (not isLoading) before tapping, or the tap lands on a disabled button.
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.price"].waitForExistence(timeout: 12), "Price from StoreKit")
         let buy = app.buttons["paywall.buy"]
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true AND isHittable == true"), object: buy)
-        XCTAssertEqual(XCTWaiter().wait(for: [ready], timeout: 15), .completed, "Unlock Pro is ready")
+        XCTAssertEqual(XCTWaiter().wait(for: [ready], timeout: 15), .completed, "Unlock is ready")
         buy.tap()
 
-        // Local StoreKit testing may show its confirm sheet or complete straight away, and
-        // "Pro is active" shows for about a second before the sheet carries on: watch both.
         var sheetSeen = false
-        var sawActive = false
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         let confirmLabels = ["Purchase", "Buy", "Confirm", "Subscribe"]
+        let success = app.descendants(matching: .any)["paywall.success"]
         let deadline = Date().addingTimeInterval(30)
         while Date() < deadline {
-            if app.staticTexts["Pro is active"].exists { sawActive = true; break }
+            if success.exists { break }
             if !sheetSeen {
                 for candidate in [app!, springboard] {
-                    let buy = candidate.buttons.matching(NSPredicate(format: "label IN %@", confirmLabels)).firstMatch
-                    if buy.exists && buy.isHittable { sheetSeen = true; buy.tap(); break }
+                    let confirm = candidate.buttons.matching(NSPredicate(format: "label IN %@", confirmLabels)).firstMatch
+                    if confirm.exists && confirm.isHittable { sheetSeen = true; confirm.tap(); break }
                 }
             }
             Thread.sleep(forTimeInterval: 0.1)
         }
-        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        shot.name = "after-purchase-\(entryPoint)"
-        shot.lifetime = .keepAlways
-        add(shot)
-
-        let summary = "TAPS_TO_PURCHASE | \(entryPoint) | paywall after \(tapsToPaywall) | purchase after \(tapsToPaywall + 1) | StoreKit sheet seen: \(sheetSeen) | Pro is active: \(sawActive)"
+        let summary = "TAPS_TO_PURCHASE | \(entryPoint) | paywall after \(tapsToPaywall) | purchase after \(tapsToPaywall + 1) | StoreKit sheet seen: \(sheetSeen) | Pro is yours: \(success.exists)"
         print(summary)
         let note = XCTAttachment(string: summary)
         note.name = "taps-\(entryPoint)"
         note.lifetime = .keepAlways
         add(note)
-        XCTAssertTrue(sawActive, "Purchase shows the Pro is active state")
+        XCTAssertTrue(success.exists, "Purchase shows Pro is yours")
 
-        // The sheet carries on by itself with what the user was doing.
-        XCTAssertTrue(close.waitForNonExistence(timeout: 8), "Paywall dismisses after purchase")
+        let next = app.buttons["paywall.continue"]
+        XCTAssertTrue(next.waitForExistence(timeout: 4), "The button becomes the next step")
+        next.tap()
+        XCTAssertTrue(close.waitForNonExistence(timeout: 8), "Paywall closes after the next step")
+        if continuationIsLockLifted {
+            XCTAssertTrue(origin.waitForNonExistence(timeout: 6), "The blur lifts: the lock is gone")
+        }
         if let continuation {
-            XCTAssertTrue(continuation.waitForExistence(timeout: 8), "Continues to \(continuation)")
+            XCTAssertTrue(continuation.waitForExistence(timeout: 10), "Continues to \(continuation)")
         }
     }
 
-    private func waitForStoreKitSheet() -> Bool {
+    private func buyWhenReady() {
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.price"].waitForExistence(timeout: 12), "Price from StoreKit")
+        let buy = app.buttons["paywall.buy"]
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == true AND isHittable == true"), object: buy)
+        XCTAssertEqual(XCTWaiter().wait(for: [ready], timeout: 15), .completed)
+        buy.tap()
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         let deadline = Date().addingTimeInterval(4)
         while Date() < deadline {
-            for candidate in [app!, springboard] {
-                let buy = candidate.buttons.matching(NSPredicate(format: "label IN %@", ["Purchase", "Buy", "Confirm", "Subscribe"])).firstMatch
-                if buy.exists { return true }
-            }
-            Thread.sleep(forTimeInterval: 0.5)
-        }
-        return false
-    }
-
-    private func confirmStoreKitSheet() {
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        for candidate in [app!, springboard] {
-            for label in ["Purchase", "Buy", "Confirm", "OK"] {
-                let button = candidate.buttons[label]
-                if button.exists && button.isHittable {
-                    button.tap()
-                    return
-                }
-            }
+            let confirm = springboard.buttons.matching(NSPredicate(format: "label IN %@", ["Purchase", "Buy", "Confirm"])).firstMatch
+            if confirm.exists && confirm.isHittable { confirm.tap(); break }
+            Thread.sleep(forTimeInterval: 0.2)
         }
     }
 
@@ -288,38 +359,5 @@ final class FreeUserPaywallUITests: XCTestCase {
             swipes += 1
         }
         XCTAssertTrue(element.waitForExistence(timeout: 3), "Could not reach \(element)")
-    }
-
-    private func walkOnboarding(captureScheme scheme: String) {
-        tap(app.buttons["onboarding.goalPrimaryCTA"])
-        tap(app.buttons["onboarding.propertyPrimaryCTA"])
-        // Straight from property to reminders: no paywall step in between.
-        XCTAssertTrue(app.buttons["Allow reminders"].waitForExistence(timeout: 6), "Reminders follow property setup")
-        XCTAssertFalse(app.descendants(matching: .any)["paywall.title"].exists)
-        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "lifetime")).firstMatch.exists)
-        tap(app.buttons["Skip for now"])
-        // 2.0: the last step is the confirm-first capture opt-in (WP3), answered with "Not now".
-        XCTAssertTrue(app.buttons["capture.priming.notNow"].waitForExistence(timeout: 6))
-        settleAndCapture("onboarding-last-step", scheme: scheme, waitFor: app.buttons["capture.priming.notNow"])
-        tap(app.buttons["capture.priming.notNow"])
-        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 10), "Onboarding lands on the app, not a paywall")
-        XCTAssertFalse(app.descendants(matching: .any)["paywall.title"].exists)
-        settleAndCapture("onboarding-finished-home", scheme: scheme, waitFor: app.buttons["tab.today"])
-    }
-
-    private func capturePaywall(_ name: String, scheme: String) {
-        XCTAssertTrue(app.staticTexts["paywall.title"].waitForExistence(timeout: 8), "\(name): paywall missing")
-        // The price comes from StoreKit; give it time, but capture either way.
-        _ = app.descendants(matching: .any)["paywall.price"].waitForExistence(timeout: 8)
-        settleAndCapture(name, scheme: scheme, waitFor: app.staticTexts["paywall.title"])
-    }
-
-    private func settleAndCapture(_ name: String, scheme: String, waitFor element: XCUIElement) {
-        XCTAssertTrue(element.waitForExistence(timeout: 10), "\(name): \(element) never appeared")
-        Thread.sleep(forTimeInterval: 1.0)
-        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        attachment.name = "\(name)-\(scheme)"
-        attachment.lifetime = .keepAlways
-        add(attachment)
     }
 }

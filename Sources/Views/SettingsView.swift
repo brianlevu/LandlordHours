@@ -19,7 +19,7 @@ struct SettingsView: View {
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var showingProfileEdit = false
-    @State private var paywallContext: PaywallContext?
+    @State private var paywall: ProPaywallRequest?
     @State private var showExport = false
     @State private var userName = ""
     @State private var userEmail = ""
@@ -120,16 +120,7 @@ struct SettingsView: View {
             .sheet(isPresented: $showingProfileEdit) {
                 ProfileEditView(userName: $userName, userEmail: $userEmail, profileImage: $profileImage)
             }
-            .sheet(item: $paywallContext) { context in
-                PaywallView(
-                    context: context,
-                    // After a purchase from the export row, carry on to the export.
-                    onUnlocked: { if context == .export { showExport = true } },
-                    // Close through the binding: environment dismiss did not close an
-                    // item-driven sheet here (caught by the free-user journey test).
-                    onClose: { paywallContext = nil }
-                )
-            }
+            .proPaywall($paywall)
             .sheet(isPresented: $showExport) {
                 ExportPDFView(year: Calendar.current.component(.year, from: Date()))
             }
@@ -218,20 +209,16 @@ struct SettingsView: View {
 
     private var planSection: some View {
         Section {
-            Button {
-                paywallContext = .settingsUpgrade
-            } label: {
+            if ProGate.isLocked(.settingsPro, isPro: subscriptionManager.isPro) {
+                proCard
+            } else {
                 SettingRow(
-                    symbol: subscriptionManager.isPro ? "checkmark.seal" : "sparkles",
-                    title: subscriptionManager.isPro ? "Pro is active" : "Upgrade to Pro",
-                    subtitle: subscriptionManager.isPro
-                        ? "Paid once. Exports and every rental are unlocked."
-                        : "Export your records and track every rental. Pay once.",
-                    showsChevron: true
+                    symbol: "checkmark.seal",
+                    title: "Pro is active",
+                    subtitle: "Paid once. Exports and every rental are unlocked."
                 )
+                .accessibilityIdentifier("settings.proActive")
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("settings.proCard")
 
             Button {
                 Task {
@@ -272,6 +259,42 @@ struct SettingsView: View {
         .listRowBackground(colors.backgroundSecondary)
     }
 
+    /// Not a lock: a plain card at the top of the plan section (redesign-specs §1b).
+    private var proCard: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "house.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color.white)
+                .frame(width: 44, height: 44)
+                .background(InboxBlueprintPaper(cornerRadius: 12))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("LandlordHours Pro")
+                    .font(.headline)
+                    .foregroundStyle(colors.textPrimary)
+                Group {
+                    if let price = subscriptionManager.proDisplayPrice {
+                        Text("Pay once, \(price)")
+                    } else {
+                        Text("Pay once")
+                    }
+                }
+                .font(.subheadline)
+                .foregroundStyle(colors.textSecondary)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            Button("See Pro") {
+                paywall = ProPaywallRequest(context: .settings, entry: .settingsPro)
+            }
+            .buttonStyle(ProTintedButtonStyle())
+            .accessibilityIdentifier("settings.proCard")
+        }
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .contain)
+        .onAppear { Analytics.lockPreviewShown(entry: .settingsPro) }
+    }
+
     // MARK: Tax setup
 
     private var taxSection: some View {
@@ -301,30 +324,14 @@ struct SettingsView: View {
 
     private var recordsSection: some View {
         Section {
-            if viewModel.canExportPDF() {
-                Button {
-                    showExport = true
-                } label: {
-                    SettingRow(symbol: "square.and.arrow.up", title: "Export reports", subtitle: "PDF and CSV for your accountant", showsChevron: true)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("settings.exportReports")
-            } else {
-                Button {
-                    paywallContext = .export
-                } label: {
-                    SettingRow(
-                        symbol: "square.and.arrow.up",
-                        title: "Export reports",
-                        subtitle: "PDF and CSV of your hours, with Pro",
-                        value: "Pro",
-                        valueColor: colors.action,
-                        showsChevron: true
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("settings.exportReportsLocked")
+            // A free user sees the Export page as a locked preview (WP-P): one route for all.
+            Button {
+                showExport = true
+            } label: {
+                SettingRow(symbol: "square.and.arrow.up", title: "Export reports", subtitle: "PDF and CSV for your accountant", showsChevron: true)
             }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("settings.exportReports")
 
             Button {
                 viewModel.syncNow()

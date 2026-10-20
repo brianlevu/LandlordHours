@@ -7,6 +7,8 @@ struct SuggestionRowView: View {
     let propertyName: String?
     let badges: SuggestionBadges
     var now: Date = InboxClock.now()
+    /// WP-P: the free plan is full and this item is at a new rental.
+    var limit: InboxRowLimit = .none
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -91,6 +93,20 @@ struct SuggestionRowView: View {
     }
 
     @ViewBuilder private var detailLine: some View {
+        switch limit {
+        case .waiting:
+            Label(InboxProLimit.waitingLabel, systemImage: "clock")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(colors.textSecondary)
+                .accessibilityIdentifier("inbox.row.waitingOnPro")
+        case .newPlace:
+            FlowBadges(items: [(InboxProLimit.newPlaceLabel, .info)] + badgeItems.filter { $0.0 != "Pick a property" })
+        case .none:
+            regularDetailLine
+        }
+    }
+
+    @ViewBuilder private var regularDetailLine: some View {
         let hasBadge = badges.notSure || badges.mightAlreadyBeLogged || badges.needsHours || propertyName == nil
         if hasBadge {
             FlowBadges(items: badgeItems)
@@ -111,7 +127,8 @@ struct SuggestionRowView: View {
     }
 
     /// VoiceOver sentence for the whole row.
-    static func accessibilityLabel(for suggestion: Suggestion, propertyName: String?, badges: SuggestionBadges, now: Date) -> String {
+    static func accessibilityLabel(for suggestion: Suggestion, propertyName: String?, badges: SuggestionBadges, now: Date,
+                                   limit: InboxRowLimit = .none) -> String {
         var parts: [String] = []
         if let hours = suggestion.proposedHours, hours > 0, !badges.needsHours {
             parts.append(InboxFormat.spokenHours(hours))
@@ -123,6 +140,11 @@ struct SuggestionRowView: View {
         if let category = suggestion.proposedCategory { parts.append(category.inboxLabel) }
         if badges.notSure { parts.append(ConfidenceBand.notSureLabel) }
         if badges.mightAlreadyBeLogged { parts.append("Might already be logged") }
+        switch limit {
+        case .waiting: parts.append(InboxProLimit.waitingLabel)
+        case .newPlace: parts.append(InboxProLimit.newPlaceLabel)
+        case .none: break
+        }
         return parts.joined(separator: ". ")
     }
 }
@@ -142,4 +164,13 @@ private struct FlowBadges: View {
         }
         .padding(.top, 2)
     }
+}
+
+/// How a row reads while the free plan is at its limit.
+enum InboxRowLimit: Equatable {
+    case none
+    /// At a rental the user doesn't have: "New place".
+    case newPlace
+    /// Kept for later: "Waiting on Pro" (a clock, textSecondary).
+    case waiting
 }

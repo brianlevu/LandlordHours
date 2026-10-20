@@ -32,7 +32,6 @@ private struct RecordsScreen: View {
     @State private var filter = RecordsFilter(year: Calendar.current.component(.year, from: Date()))
     @State private var entryToDelete: TimeEntry?
     @State private var showExport = false
-    @State private var showPaywall = false
     @FocusState private var searchFocused: Bool
 
     private var propertyNames: [UUID: String] {
@@ -134,14 +133,6 @@ private struct RecordsScreen: View {
         .sheet(isPresented: $showExport) {
             ExportPDFView(year: filter.year)
         }
-        .sheet(isPresented: $showPaywall) {
-            PaywallView(
-                context: .export,
-                year: filter.year,
-                onUnlocked: { showExport = true },
-                onClose: { showPaywall = false }
-            )
-        }
         .accessibilityIdentifier("records.screen")
     }
 
@@ -155,12 +146,13 @@ private struct RecordsScreen: View {
             BPScreenTitle(text: "Records")
             if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 12) }
             Button {
-                if viewModel.canExportPDF() { showExport = true } else { showPaywall = true }
+                // A free user sees the Export page as a locked preview (WP-P).
+                showExport = true
             } label: {
-                BPCapsuleButtonLabel(title: "Export", symbol: viewModel.canExportPDF() ? nil : "lock.fill")
+                BPCapsuleButtonLabel(title: "Export", symbol: nil)
             }
             .buttonStyle(.lhPressable)
-            .accessibilityLabel(viewModel.canExportPDF() ? "Export records" : "Export records, needs Pro")
+            .accessibilityLabel("Export records")
             .accessibilityIdentifier("records.export")
         }
     }

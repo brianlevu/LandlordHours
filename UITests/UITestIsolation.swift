@@ -19,6 +19,20 @@ enum UITestIsolation {
     /// Clears StoreKit test transactions so no test inherits a purchase. Dialogs stay off so
     /// a journey's purchase completes without the local confirm sheet (the tap that opens the
     /// sheet is what the journeys count).
+    /// Ask to Buy / failed-transaction journeys (WP-P). Reset by `resetStoreKit()`.
+    static func setAskToBuy(_ on: Bool) {
+        #if canImport(StoreKitTest)
+        session?.askToBuyEnabled = on
+        #endif
+    }
+
+    static func setFailTransactions(_ on: Bool) {
+        #if canImport(StoreKitTest)
+        session?.failTransactionsEnabled = on
+        if on { session?.failureError = .unknown }
+        #endif
+    }
+
     static func resetStoreKit() {
         #if canImport(StoreKitTest)
         if session == nil {
@@ -26,6 +40,8 @@ enum UITestIsolation {
         }
         guard let session else { return }
         session.resetToDefaultState()
+        session.askToBuyEnabled = false
+        session.failTransactionsEnabled = false
         session.disableDialogs = true
         session.clearTransactions()
         #endif
