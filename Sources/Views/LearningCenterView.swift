@@ -523,7 +523,7 @@ struct LearningCenterView: View {
     @State private var openedQuickReadId = Self.quickReadIdFromLaunchArguments()
     @State private var didApplyLearningScrollLaunchArgument = false
 #endif
-    private let filters = ["All", "Tax Strategy", "IRS Basics", "Record Keeping", "Growth"]
+    private let filters = ["All", "Tax strategy", "IRS basics", "Record keeping", "Growth"]
 
     private var filteredSections: [ArticleGroup] {
         if selectedFilter == "All" { return articleSections }
@@ -568,7 +568,7 @@ struct LearningCenterView: View {
             }
         }
         .background { LHMobileCanvas() }
-        .navigationTitle("Learn")
+        .navigationTitle("Learning center")
         .navigationBarTitleDisplayMode(.inline)
         .hidesAppTabBar()
 #if DEBUG
@@ -645,7 +645,7 @@ struct LearningCenterView: View {
     // MARK: - Header
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Learn")
+            Text("Learning center")
                 .lhDisplayFont(.largeTitle)
                 .foregroundStyle(colors.textPrimary)
                 .accessibilityAddTraits(.isHeader)

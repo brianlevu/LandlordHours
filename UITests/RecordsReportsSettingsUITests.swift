@@ -91,6 +91,9 @@ final class RecordsReportsSettingsUITests: XCTestCase {
                 launch(tab: 6, scheme: scheme, extra: ["-UIPreferredContentSizeCategoryName", size])
                 XCTAssertTrue(element("records.screen").waitForExistence(timeout: 20))
                 settleAndCapture("records-\(tag)-\(scheme)")
+                app.swipeUp()
+                app.swipeUp()
+                settleAndCapture("records-\(tag)-\(scheme)-scrolled")
                 launch(tab: 3, scheme: scheme, extra: ["-UIPreferredContentSizeCategoryName", size])
                 XCTAssertTrue(element("reports.standing.you").waitForExistence(timeout: 20))
                 settleAndCapture("reports-\(tag)-\(scheme)")
@@ -195,7 +198,7 @@ final class RecordsReportsSettingsUITests: XCTestCase {
 
         launch(tab: 4, scheme: scheme)
         tapWhenReady(element("settings.learningCenter"))
-        XCTAssertTrue(app.staticTexts["Learn"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Learning center"].waitForExistence(timeout: 5))
         settleAndCapture("settings-learning-center-\(scheme)")
 
         launch(tab: 4, scheme: scheme)
