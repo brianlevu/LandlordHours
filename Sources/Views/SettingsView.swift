@@ -212,6 +212,19 @@ struct SettingsView: View {
         Section {
             if ProGate.isLocked(.settingsPro, isPro: subscriptionManager.isPro) {
                 proCard
+                LockedPreview(
+                    size: .row,
+                    entry: .settingsExport,
+                    line: ProGate.lockLine(.settingsExport),
+                    keeps: ProGate.keepsLine(.settingsExport),
+                    rowInset: 0,
+                    onUnlock: {
+                        paywall = ProPaywallRequest(context: .export, entry: .settingsExport, onUnlocked: { showExport = true })
+                    }
+                ) {
+                    SettingRow(symbol: "square.and.arrow.up", title: "Export reports", subtitle: "PDF and CSV for your accountant", showsChevron: true)
+                        .padding(.vertical, 8)
+                }
             } else {
                 SettingRow(
                     symbol: "checkmark.seal",
@@ -274,9 +287,12 @@ struct SettingsView: View {
                 .background(InboxBlueprintPaper(cornerRadius: 12))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text("LandlordHours Pro")
+                // The product name never breaks or hyphenates: one line, scaled down if needed.
+                Text("LandlordHours\u{00A0}Pro")
                     .font(.headline)
                     .foregroundStyle(colors.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                 Group {
                     if let price = subscriptionManager.proDisplayPrice {
                         Text("Pay once, \(price)")
@@ -330,14 +346,16 @@ struct SettingsView: View {
 
     private var recordsSection: some View {
         Section {
-            // A free user sees the Export page as a locked preview (WP-P): one route for all.
-            Button {
-                showExport = true
-            } label: {
-                SettingRow(symbol: "square.and.arrow.up", title: "Export reports", subtitle: "PDF and CSV for your accountant", showsChevron: true)
+            // Free users get Export as the `.row` lock under the Pro card (WP-P): one route each.
+            if !ProGate.isExportLocked(isPro: subscriptionManager.isPro) {
+                Button {
+                    showExport = true
+                } label: {
+                    SettingRow(symbol: "square.and.arrow.up", title: "Export reports", subtitle: "PDF and CSV for your accountant", showsChevron: true)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("settings.exportReports")
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("settings.exportReports")
 
             Button {
                 viewModel.syncNow()

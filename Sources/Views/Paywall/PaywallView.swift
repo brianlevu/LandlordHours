@@ -295,14 +295,16 @@ struct PaywallView: View {
                     .padding(.trailing, dts.isAccessibilitySize ? 36 : 0)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("paywall.title")
-                if !dts.isAccessibilitySize {
-                    phone(width: width * 0.62)
-                        .opacity(shown ? 1 : 0)
-                        .offset(y: shown || reduceMotion ? 0 : 12)
-                }
+                // Accessibility sizes keep the page (smaller, cropped) so the record, the sample
+                // stamp and the drafting state still show.
+                phone(width: width * (dts.isAccessibilitySize ? 0.5 : 0.62))
+                    .frame(height: dts.isAccessibilitySize ? width * 0.42 : nil, alignment: .top)
+                    .clipped()
+                    .opacity(shown ? 1 : 0)
+                    .offset(y: shown || reduceMotion ? 0 : 12)
             }
             .padding(.top, top + 20)
-            .padding(.bottom, dts.isAccessibilitySize ? 64 : 0)
+            .padding(.bottom, dts.isAccessibilitySize ? 40 : 0)
         }
         .frame(height: dts.isAccessibilitySize ? nil : height, alignment: .top)
         .clipped()
@@ -464,19 +466,22 @@ struct PaywallView: View {
                 default: Task { await model.buy() }
                 }
             } label: {
-                Text(buyLabel).contentTransition(.opacity).lineLimit(2).multilineTextAlignment(.center)
-                    .minimumScaleFactor(0.75)
-                    .padding(.horizontal, 16)
+                // Buying: the drafting line sits under the label's own bounds, so a wrapped
+                // label at large sizes is never struck through.
+                VStack(spacing: 4) {
+                    Text(buyLabel).contentTransition(.opacity).lineLimit(3).multilineTextAlignment(.center)
+                        .minimumScaleFactor(0.75)
+                    if model.phase == .buying {
+                        PaywallDraftingLine(color: userScheme == .dark ? Color(hex: "0B1230") : HouseTokens.drafting, lineWidth: 2)
+                            .frame(width: 96)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, model.phase == .buying ? 8 : 0)
             }
             .buttonStyle(InboxPrimaryButtonStyle())
             .disabled(!(model.canBuy || model.phase == .askToBuy || model.phase == .success || model.phase == .buying))
             .allowsHitTesting(model.phase != .buying)
-            .overlay(alignment: .bottom) {
-                if model.phase == .buying {
-                    PaywallDraftingLine(color: userScheme == .dark ? Color(hex: "0B1230") : HouseTokens.drafting, lineWidth: 2)
-                        .padding(.horizontal, 26).padding(.bottom, 6)
-                }
-            }
             .animation(.easeOut(duration: 0.2), value: model.phase)
             .accessibilityIdentifier(model.phase == .success ? "paywall.continue" : "paywall.buy")
             if model.phase == .failed {
@@ -489,17 +494,27 @@ struct PaywallView: View {
     }
 
     private var legalLinks: some View {
-        HStack(spacing: 6) {
-            Button("Terms of Use") { openURL(Self.termsURL) }
-                .accessibilityIdentifier("paywall.terms")
-            Text("·").accessibilityHidden(true)
-            Button("Privacy Policy") { openURL(Self.privacyURL) }
-                .accessibilityIdentifier("paywall.privacy")
+        // Each link stays on one line; at large sizes they stack instead of breaking.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) { termsLink; Text("·").accessibilityHidden(true); privacyLink }
+            VStack(alignment: .leading, spacing: 4) { termsLink; privacyLink }
         }
         .font(.footnote)
         .foregroundStyle(colors.textSecondary)
         .buttonStyle(.plain)
         .frame(minHeight: 32)
+    }
+
+    private var termsLink: some View {
+        Button { openURL(Self.termsURL) } label: { Text("Terms\u{00A0}of\u{00A0}Use").lineLimit(1).fixedSize() }
+            .frame(minHeight: 32)
+            .accessibilityIdentifier("paywall.terms")
+    }
+
+    private var privacyLink: some View {
+        Button { openURL(Self.privacyURL) } label: { Text("Privacy\u{00A0}Policy").lineLimit(1).fixedSize() }
+            .frame(minHeight: 32)
+            .accessibilityIdentifier("paywall.privacy")
     }
 
     // MARK: Benefits

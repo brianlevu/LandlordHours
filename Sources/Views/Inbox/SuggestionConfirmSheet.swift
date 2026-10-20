@@ -77,9 +77,14 @@ struct SuggestionConfirmSheet: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
                 if limitActionsInline {
-                    // Accessibility sizes: the at-limit choices are too tall to pin, so they
-                    // scroll with the sheet and the Property row stays reachable.
-                    limitActions.padding(.top, 16)
+                    // Accessibility sizes: the explanation and the two ways out scroll with the
+                    // sheet; only "Unlock Pro" stays pinned, so the Property row stays reachable.
+                    limitExplanation
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+                    limitWaysOut
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
                 }
                 secondaryActions
                     .padding(.horizontal, 20)
@@ -115,7 +120,8 @@ struct SuggestionConfirmSheet: View {
                 onPick: { id in propertyId = id; showRentalPicker = false },
                 onUnlock: { showRentalPicker = false; DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { openPaywall() } }
             )
-            .presentationDetents([.medium, .large])
+            // Accessibility sizes open full height so the locked row's "Unlock Pro" is reachable.
+            .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large])
             .presentationBackground(colors.background)
         }
         .proPaywall($paywall)
@@ -440,7 +446,7 @@ struct SuggestionConfirmSheet: View {
 
     @ViewBuilder private var pinnedActions: some View {
         if limitActionsInline {
-            EmptyView()
+            pinnedFooter { unlockButton }
         } else if atLimit {
             limitActions
         } else {
@@ -451,35 +457,55 @@ struct SuggestionConfirmSheet: View {
     /// The free plan is full: say what's locked and what stays, one "Unlock Pro", and two ways
     /// out that lose nothing.
     private var limitActions: some View {
-        VStack(spacing: 10) {
-            VStack(spacing: 2) {
-                Text(InboxProLimit.sheetLine)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(colors.textPrimary)
-                Text(ProGate.keepsLine(.inboxLimit, firstPropertyName: model.properties.first?.name))
-                    .font(.footnote)
-                    .foregroundStyle(colors.textSecondary)
-            }
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("confirm.limitLine")
-            UnlockProButton(entry: .inboxLimit, title: "Unlock Pro to add a rental", fullWidth: true, action: openPaywall)
-                .accessibilityIdentifier("confirm.unlockPro")
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 24) { keepButton; notWorkButton }
-                VStack(spacing: 0) { keepButton; notWorkButton }
+        pinnedFooter {
+            VStack(spacing: 10) {
+                limitExplanation
+                unlockButton
+                limitWaysOut
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 14)
-        .padding(.bottom, 4)
-        .background(
-            colors.background
-                .overlay(alignment: .top) { Rectangle().fill(colors.border).frame(height: 0.5) }
-                .ignoresSafeArea(edges: .bottom)
-        )
+    }
+
+    private var limitExplanation: some View {
+        VStack(spacing: 2) {
+            Text(InboxProLimit.sheetLine)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(colors.textPrimary)
+            Text(ProGate.keepsLine(.inboxLimit, firstPropertyName: model.properties.first?.name))
+                .font(.footnote)
+                .foregroundStyle(colors.textSecondary)
+        }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("confirm.limitLine")
         .onAppear { Analytics.lockPreviewShown(entry: .inboxLimit) }
+    }
+
+    private var unlockButton: some View {
+        UnlockProButton(entry: .inboxLimit, title: "Unlock Pro to add a rental", fullWidth: true, action: openPaywall)
+            .accessibilityIdentifier("confirm.unlockPro")
+    }
+
+    private var limitWaysOut: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 24) { keepButton; notWorkButton }
+            VStack(spacing: 0) { keepButton; notWorkButton }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func pinnedFooter<C: View>(@ViewBuilder _ content: () -> C) -> some View {
+        content()
+            .padding(.horizontal, 20)
+            .padding(.top, 14)
+            .padding(.bottom, 4)
+            .background(
+                colors.background
+                    .overlay(alignment: .top) { Rectangle().fill(colors.border).frame(height: 0.5) }
+                    .ignoresSafeArea(edges: .bottom)
+            )
     }
 
     private var keepButton: some View {

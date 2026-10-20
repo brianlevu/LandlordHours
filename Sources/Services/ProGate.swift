@@ -44,6 +44,8 @@ enum LockEntry: String, CaseIterable, Identifiable {
     case exportPage = "export_page"
     /// The export card at the bottom of Reports (the Reports free preview): `.row` lock.
     case reportsExport = "reports_export"
+    /// Settings: the Export row under the Pro card, `.row` lock.
+    case settingsExport = "settings_export"
     /// Properties at the free limit: the ghost "Your next rental" row.
     case propertiesLimit = "properties_limit"
     /// Settings: the Pro card on top (not a lock, a plain card).
@@ -81,7 +83,7 @@ enum ProGate {
     /// Whether the entry point shows its locked preview right now.
     static func isLocked(_ entry: LockEntry, isPro: Bool, propertyCount: Int = 0, confirmedHours: Double = 0) -> Bool {
         switch entry {
-        case .exportPage, .reportsExport: return isExportLocked(isPro: isPro)
+        case .exportPage, .reportsExport, .settingsExport: return isExportLocked(isPro: isPro)
         case .propertiesLimit, .inboxLimit: return isAtPropertyLimit(isPro: isPro, propertyCount: propertyCount)
         case .settingsPro: return !isPro
         case .todayRecord: return showsTodayRecordLock(isPro: isPro, confirmedHours: confirmedHours)
@@ -91,7 +93,7 @@ enum ProGate {
     /// The paywall each entry point opens.
     static func context(for entry: LockEntry) -> PaywallContext {
         switch entry {
-        case .exportPage, .reportsExport: return .export
+        case .exportPage, .reportsExport, .settingsExport: return .export
         case .propertiesLimit, .inboxLimit: return .secondProperty
         case .settingsPro: return .settings
         case .todayRecord: return .todayUnlock
@@ -102,7 +104,7 @@ enum ProGate {
     static func lockLine(_ entry: LockEntry, confirmedHours: Double = 0) -> String {
         switch entry {
         case .exportPage: return "This is the record your accountant gets."
-        case .reportsExport: return "Export comes with Pro."
+        case .reportsExport, .settingsExport: return "Export comes with Pro."
         case .propertiesLimit, .inboxLimit: return "Free covers one rental."
         case .settingsPro: return "LandlordHours Pro"
         case .todayRecord: return "Your \(wholeHours(confirmedHours)) hours, ready to export."
@@ -114,6 +116,7 @@ enum ProGate {
         switch entry {
         case .exportPage, .todayRecord: return "Your record keeps growing. Export unlocks with Pro."
         case .reportsExport: return "Every report here stays free."
+        case .settingsExport: return "Your records stay free on this iPhone."
         case .propertiesLimit, .inboxLimit:
             let name = firstPropertyName?.trimmingCharacters(in: .whitespacesAndNewlines)
             return "\(name?.isEmpty == false ? name! : "Your rental") keeps tracking. Nothing is lost."

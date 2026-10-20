@@ -70,7 +70,8 @@ struct SuggestionRowView: View {
                 Image(systemName: InboxFormat.kindSymbol(suggestion.kind))
                     .font(.system(size: 11, weight: .semibold))
                 Text(InboxFormat.sourceLine(suggestion, now: now))
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .font(.subheadline)
             .foregroundStyle(colors.textSecondary)

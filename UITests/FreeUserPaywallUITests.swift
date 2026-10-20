@@ -63,17 +63,16 @@ final class FreeUserPaywallUITests: XCTestCase {
                           continuation: exportReady, continuationIsLockLifted: true)
     }
 
-    func testSettingsExportPageLock() {
+    func testSettingsExportRowLock() {
         launchFree()
         tapTab("Settings")
-        let row = app.buttons["settings.exportReports"]
-        scrollTo(row, maxSwipes: 10)
-        tap(row)
-        let origin = exportPageUnlock()
+        let lock = lockContainer("settings_export")
+        scrollTo(lock)
+        assertLockSaysWhatStays(lock)
+        let origin = lock.buttons["lock.unlock"]
         tap(origin)
         assertPaywall("export", headline: "The record your accountant gets")
-        closeThenPurchase(entryPoint: "Settings > Export reports", origin: origin,
-                          continuation: exportReady, continuationIsLockLifted: true)
+        closeThenPurchase(entryPoint: "Settings > Export row", origin: origin, continuation: exportReady)
     }
 
     func testSettingsProCard() {

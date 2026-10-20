@@ -72,12 +72,16 @@ struct ExportPDFView: View {
 
                         yearChips
 
-                        pagePreview
+                        // Free: the summary stays sharp; the page itself is what Pro unlocks,
+                        // so it sits under the lock (sandbox lock-export).
+                        if ProGate.isExportLocked(isPro: subscriptionManager.isPro) { summary }
                     }
                     .padding(.bottom, 24)
                 } locked: {
                     VStack(alignment: .leading, spacing: 24) {
-                        summary
+                        pagePreview
+
+                        if !ProGate.isExportLocked(isPro: subscriptionManager.isPro) { summary }
 
                         actions
                     }

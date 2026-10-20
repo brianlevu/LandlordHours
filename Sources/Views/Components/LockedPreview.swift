@@ -22,6 +22,8 @@ struct LockedPreview<Sharp: View, Locked: View>: View {
     var unlocked = false
     /// The fade's target colour: the canvas for pages, the card for cards.
     var surface: Color? = nil
+    /// Side inset of a `.row` lock's line and button (0 inside a List row, which insets already).
+    var rowInset: CGFloat = 16
     var onUnlock: () -> Void
     @ViewBuilder var sharp: () -> Sharp
     @ViewBuilder var locked: () -> Locked
@@ -121,7 +123,7 @@ struct LockedPreview<Sharp: View, Locked: View>: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     UnlockProButton(entry: entry, action: onUnlock).fixedSize()
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, rowInset)
                 .padding(.top, 4)
                 .padding(.bottom, 14)
                 .transition(.opacity)
@@ -135,9 +137,9 @@ struct LockedPreview<Sharp: View, Locked: View>: View {
 extension LockedPreview where Sharp == EmptyView {
     /// A row (or block) with nothing kept sharp.
     init(size: LockSize, entry: LockEntry, line: String, keeps: String, unlocked: Bool = false, surface: Color? = nil,
-         onUnlock: @escaping () -> Void, @ViewBuilder content: @escaping () -> Locked) {
+         rowInset: CGFloat = 16, onUnlock: @escaping () -> Void, @ViewBuilder content: @escaping () -> Locked) {
         self.init(size: size, entry: entry, line: line, keeps: keeps, unlocked: unlocked, surface: surface,
-                  onUnlock: onUnlock, sharp: { EmptyView() }, locked: content)
+                  rowInset: rowInset, onUnlock: onUnlock, sharp: { EmptyView() }, locked: content)
     }
 }
 

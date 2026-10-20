@@ -2,7 +2,7 @@ import XCTest
 
 /// Frames for the visual gate: every paywall state and every lock, light and dark, at the
 /// default text size, XXL and AX3. PNGs go straight to the host's
-/// `~/AgentScratch/landlordhours/<LH_CAPTURE_DATE or 2026-10-19>/paywall-prod-frames/raw/`.
+/// `~/AgentScratch/landlordhours/<LH_CAPTURE_DATE or 2026-10-19>/paywall-prod-frames-r2/raw/`.
 /// Run with `-only-testing:LandlordHoursUITests/PaywallCaptureUITests`.
 final class PaywallCaptureUITests: XCTestCase {
     private var app: XCUIApplication!
@@ -25,7 +25,7 @@ final class PaywallCaptureUITests: XCTestCase {
         let home = ProcessInfo.processInfo.environment["SIMULATOR_HOST_HOME"] ?? NSHomeDirectory()
         let date = ProcessInfo.processInfo.environment["LH_CAPTURE_DATE"] ?? "2026-10-19"
         let url = URL(fileURLWithPath: home)
-            .appendingPathComponent("AgentScratch/landlordhours/\(date)/paywall-prod-frames/raw", isDirectory: true)
+            .appendingPathComponent("AgentScratch/landlordhours/\(date)/paywall-prod-frames-r2/raw", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
@@ -36,7 +36,7 @@ final class PaywallCaptureUITests: XCTestCase {
         ("paywall-export", ["-LHPaywallPreview", "export"]),
         ("paywall-export-below", ["-LHPaywallPreview", "export", "-LHPaywallBelowFold"]),
         ("paywall-second", ["-LHPaywallPreview", "secondProperty", "-LHPaywallProperty", "Pine Cabin"]),
-        ("paywall-today", ["-LHPaywallPreview", "todayUnlock", "-LHPaywallHours", "212"]),
+        ("paywall-today", ["-LHPaywallPreview", "todayUnlock", "-LHPaywallHours", "14.5"]),
         ("paywall-settings", ["-LHPaywallPreview", "settings"]),
         ("paywall-sample", ["-LHPaywallPreview", "export", "-LHPaywallSample"]),
         ("paywall-pageloading", ["-LHPaywallPreview", "export", "-LHPaywallPageLoading"]),
@@ -119,6 +119,30 @@ final class PaywallCaptureUITests: XCTestCase {
                 waitFor("limitPicker")
                 Thread.sleep(forTimeInterval: 0.8)
                 save("limit-picker-\(suffix)")
+
+                // The full-width Inbox toast inside the at-limit flow ("Keep it in my inbox").
+                app.terminate()
+                launch(scenario: "emptyMainTabs", scheme: scheme, size: size, extra: ["-LHSeedSuggestions", "limit"])
+                tapButton("Inbox")
+                waitFor("inbox.row.cal:debug-limit-showing")
+                app.buttons["inbox.row.cal:debug-limit-showing"].tap()
+                let keep = app.buttons["confirm.keepForPro"]
+                var tries = 0
+                while !keep.isHittable && tries < 6 { app.swipeUp(velocity: .slow); tries += 1 }
+                keep.tap()
+                XCTAssertTrue(app.descendants(matching: .any)["inbox.toast"].waitForExistence(timeout: 5), "toast")
+                Thread.sleep(forTimeInterval: 0.6)
+                save("limit-toast-\(suffix)")
+                // Then "Not rental work" from the same at-limit sheet.
+                Thread.sleep(forTimeInterval: 5.5)
+                app.buttons["inbox.row.cal:debug-limit-showing"].tap()
+                let notWork = app.buttons["confirm.dismiss"]
+                tries = 0
+                while !notWork.isHittable && tries < 6 { app.swipeUp(velocity: .slow); tries += 1 }
+                notWork.tap()
+                XCTAssertTrue(app.staticTexts["Marked not rental work"].waitForExistence(timeout: 5), "rental-work toast")
+                Thread.sleep(forTimeInterval: 0.6)
+                save("limit-toast-notwork-\(suffix)")
 
                 launch(scenario: "emptyMainTabs", scheme: scheme, size: size, extra: ["-LHSeedSuggestions", "limit-waiting"])
                 tapButton("Inbox")
