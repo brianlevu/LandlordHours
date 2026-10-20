@@ -54,6 +54,7 @@ struct LogTimeSheet: View {
                 }
                 HoursStepper(hours: $hours, flash: flash, label: "How long?", chips: true)
                 rows
+                if dts.isAccessibilitySize { footer.padding(.horizontal, -20) }
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
@@ -61,7 +62,7 @@ struct LogTimeSheet: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background(LHB.canvas.ignoresSafeArea())
-        .safeAreaInset(edge: .bottom, spacing: 0) { footer }
+        .safeAreaInset(edge: .bottom, spacing: 0) { if !dts.isAccessibilitySize { footer } }
         .sheet(item: $showPicker) { k in
             Group {
                 switch k {
@@ -319,6 +320,7 @@ struct HoursStepper: View {
     var label = "How long?"
     var chips = false
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.dynamicTypeSize) private var dts
     private let presets: [(String, Double)] = [("30m", 0.5), ("1h", 1), ("2h", 2), ("4h", 4)]
 
     var body: some View {
@@ -347,11 +349,13 @@ struct HoursStepper: View {
 
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if chips {
-                    HStack(spacing: 8) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: dts.isAccessibilitySize ? 2 : 4), spacing: 8) {
                         ForEach(presets, id: \.0) { p in
                             let on = abs(hours - p.1) < 0.01
                             Button { withAnimation(reduce ? nil : .spring(response: 0.28, dampingFraction: 0.9)) { hours = p.1 } } label: {
                                 Text(p.0).font(.subheadline.weight(.semibold)).monospacedDigit()
+                                    .lineLimit(1).fixedSize()
+                                    .padding(.horizontal, 8)
                                     .foregroundStyle(on ? LHB.onAction : LHB.textPrimary)
                                     .frame(maxWidth: .infinity, minHeight: 36)
                                     .background(Capsule().fill(on ? LHB.action : LHB.tertiary))

@@ -588,7 +588,7 @@ struct S2Learn: View {
                 if article { articleView } else { list }
             }
             .background(LHB.canvas.ignoresSafeArea())
-            .navigationTitle(article ? "" : "Learn")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarLeading) { Image(systemName: "chevron.left").foregroundStyle(LHB.action) } }
         }
@@ -597,6 +597,27 @@ struct S2Learn: View {
     private var list: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
+                VStack(alignment: .leading, spacing: 16) {
+                    DisplayTitle(text: "Learn")
+                    ZStack(alignment: .topLeading) {
+                        S2Paper(radius: 24)
+                        HouseArt(key: "k12_roof")
+                            .frame(width: 150, height: 150)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                            .padding(.trailing, 2)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("The rules, in plain words").drafting()
+                            Text("What counts, how much, and what your tax pro will ask for.")
+                                .font(.headline).foregroundStyle(.white)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: 190, alignment: .leading)
+                        .padding(20)
+                    }
+                    .frame(height: 150)
+                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .accessibilityElement(children: .combine)
+                }
                 VStack(alignment: .leading, spacing: 10) {
                     S2Header("Start here")
                     VStack(spacing: 0) {

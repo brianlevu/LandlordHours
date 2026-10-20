@@ -73,6 +73,10 @@ enum S2Font {
 
     /// Fraunces 500 with opsz/SOFT set, scaled with Dynamic Type relative to .largeTitle. Never under 28pt.
     static func display(_ size: CGFloat, opsz: CGFloat = 96, soft: CGFloat = 30, dts: DynamicTypeSize) -> Font {
+        Font(displayUIFont(size, opsz: opsz, soft: soft, dts: dts))
+    }
+
+    static func displayUIFont(_ size: CGFloat, opsz: CGFloat = 96, soft: CGFloat = 30, dts: DynamicTypeSize) -> UIFont {
         let traits = UITraitCollection(preferredContentSizeCategory: dts.uiCategory)
         let base = UIFontDescriptor(fontAttributes: [.family: "Fraunces"])
         let d = base.addingAttributes([UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String): [
@@ -83,7 +87,7 @@ enum S2Font {
             f = UIFont(descriptor: UIFont.systemFont(ofSize: size, weight: .medium).fontDescriptor.withDesign(.serif)!, size: size)
         }
         let scaled = UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: f, maximumPointSize: 60, compatibleWith: traits)
-        return Font(scaled.pointSize < 28 ? scaled.withSize(28) : scaled)
+        return scaled.pointSize < 28 ? scaled.withSize(28) : scaled
     }
 }
 
@@ -111,12 +115,20 @@ extension DynamicTypeSize {
 struct DisplayTitle: View {
     let text: String
     var size: CGFloat = 34
+    /// Width left for the title (screen minus margins and any control beside it).
+    var reserve: CGFloat = 40
     @Environment(\.dynamicTypeSize) private var dts
     var body: some View {
+        let ui = S2Font.displayUIFont(size, dts: dts)
+        let avail = UIScreen.main.bounds.width - reserve
+        let longest = text.split(separator: " ").map { (String($0) as NSString).size(withAttributes: [.font: ui]).width }.max() ?? 0
+        let scale = longest > avail ? avail / longest * 0.97 : 1
         Text(text)
-            .font(S2Font.display(size, dts: dts))
+            .font(Font(ui.withSize(ui.pointSize * scale)))
             .foregroundStyle(LHB.textPrimary)
-            .lineLimit(2)
+            .lineLimit(3)
+            .allowsTightening(true)
+            .fixedSize(horizontal: false, vertical: true)
             .accessibilityAddTraits(.isHeader)
     }
 }
@@ -192,6 +204,9 @@ struct S2Primary: ButtonStyle {
         configuration.label
             .font(.body.weight(.semibold))
             .foregroundStyle(enabled ? LHB.onAction : LHB.textSecondary)
+            .multilineTextAlignment(.center)
+            .minimumScaleFactor(0.75)
+            .allowsTightening(true)
             .frame(maxWidth: .infinity, minHeight: height)
             .padding(.horizontal, 16)
             .background(Capsule().fill(enabled ? LHB.action : LHB.tertiary))
@@ -209,6 +224,8 @@ struct S2PrimaryCompact: ButtonStyle {
         configuration.label
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(LHB.onAction)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
             .padding(.horizontal, 20)
             .frame(minHeight: 44)
             .background(Capsule().fill(LHB.action))
@@ -236,6 +253,8 @@ struct S2Tinted: ButtonStyle {
         configuration.label
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(LHB.action)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
             .padding(.horizontal, 18)
             .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: 44)
             .background(Capsule().fill(LHB.actionSurface))
@@ -330,28 +349,42 @@ enum S2Cat: String, CaseIterable, Identifiable {
         case .repairs: "repairs"
         case .management: "management"
         case .leasing: "showing"
-        case .bookkeeping, .investing, .financing: "bookkeeping"
-        case .legal, .insurance, .negotiation: "legal"
+        case .bookkeeping: "bookkeeping"
+        case .legal: "legal"
+        case .negotiation: "comms"
+        case .insurance: "inspection"
+        case .investing: "investing"
+        case .financing: "financing"
         case .travel: "travel"
         case .renovations: "renovation"
         }
     }
 
+    /// Each category has its own ink, taken from its tool's colour, so bars and labels match the icon.
     var ink: Color {
         switch self {
-        case .repairs, .renovations: LHB.timberInk
-        case .leasing: LHB.rose
-        case .travel: LHB.informational
-        default: LHB.draftingInk
+        case .repairs: Color(light: 0x8A5A1B, dark: 0xF0BE7A)       // timber wrench
+        case .renovations: Color(light: 0xB4432E, dark: 0xF09A84)   // terracotta roller
+        case .management: Color(light: 0x8C6A00, dark: 0xF2CF5B)    // amber clipboard
+        case .leasing: Color(light: 0xB04266, dark: 0xF08BAA)       // rose sign
+        case .bookkeeping: Color(light: 0x56702A, dark: 0xB5D07A)   // moss ledger
+        case .legal: Color(light: 0x2369B5, dark: 0x60A8E6)         // drafting-ink deed
+        case .travel: Color(light: 0x4A6392, dark: 0x9BB0D0)        // slate truck
+        case .negotiation: Color(light: 0x3D4A9E, dark: 0xA9B4F5)   // indigo phone
+        case .insurance: Color(light: 0x1F6F70, dark: 0x6FD3D0)     // teal torch
+        case .investing: Color(light: 0x6B4FA0, dark: 0xBBA3F0)     // violet
+        case .financing: Color(light: 0x8E3A72, dark: 0xE59AC8)     // plum
         }
     }
 
-    var wash: Color {
+    var wash: Color { ink.opacity(0.14) }
+
+    /// Investing and Financing have no 3D render yet: a symbol in the category ink stands in.
+    var symbol: String? {
         switch self {
-        case .repairs, .renovations: LHB.timber.opacity(0.16)
-        case .leasing: LHB.roseSurface
-        case .travel: LHB.informationalSurface
-        default: LHB.actionSurface
+        case .investing: "chart.line.uptrend.xyaxis"
+        case .financing: "banknote"
+        default: nil
         }
     }
 }
@@ -364,7 +397,10 @@ struct ToolTile: View {
             .fill(cat?.wash ?? LHB.tertiary)
             .frame(width: size, height: size)
             .overlay {
-                if let cat {
+                if let cat, let sym = cat.symbol {
+                    Image(systemName: sym).font(.system(size: size * 0.46, weight: .semibold))
+                        .foregroundStyle(cat.ink).symbolRenderingMode(.hierarchical)
+                } else if let cat {
                     Image("bp_tool_\(cat.tool)_\(size > 40 ? 56 : 36)").resizable().scaledToFit().padding(size * 0.08)
                 } else {
                     RoundedRectangle(cornerRadius: size * 0.2, style: .continuous)
@@ -758,8 +794,9 @@ struct LockedPreview<Content: View>: View {
     }
 
     private var row: some View {
-        ZStack {
-            content().blur(radius: unlocked ? 0 : 4).opacity(unlocked ? 1 : 0.35).accessibilityHidden(true)
+        VStack(spacing: 0) {
+            content().blur(radius: unlocked ? 0 : 4).opacity(unlocked ? 1 : 0.6)
+                .accessibilityHidden(!unlocked)
             if !unlocked {
                 let layout = dts.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))
                 layout {
@@ -767,19 +804,26 @@ struct LockedPreview<Content: View>: View {
                         Text(line).font(.subheadline.weight(.semibold)).foregroundStyle(LHB.textPrimary)
                         Text(keeps).font(.footnote).foregroundStyle(LHB.textSecondary)
                     }
-                    .lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     Button(action: onUnlock) { Label("Unlock Pro", systemImage: "lock.fill") }
                         .buttonStyle(S2PrimaryCompact()).fixedSize()
                         .accessibilityIdentifier("lock.unlock")
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .padding(.top, 4)
+                .padding(.bottom, 14)
+                .transition(.opacity)
             }
         }
         .animation(reduce ? .easeOut(duration: 0.2) : .easeOut(duration: 0.3), value: unlocked)
     }
+}
 
+/// Light status-bar text while a blue hero sits under the status bar (paywall), dark otherwise.
+@MainActor @Observable final class S2StatusBar {
+    static let shared = S2StatusBar()
+    var overHero = false
 }
 
 // MARK: - Undo toast

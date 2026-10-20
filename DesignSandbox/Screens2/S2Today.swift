@@ -51,7 +51,7 @@ struct S2Today: View {
                     } else {
                         noProperty.padding(.top, 24).id("noprop")
                     }
-                    Color.clear.frame(height: 40 + 76)
+                    Color.clear.frame(height: 24)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
@@ -62,7 +62,7 @@ struct S2Today: View {
             .onAppear {
                 items = Array(S2Data.pending.prefix(startPending))
                 inbox?.pending = startPending
-                if state == .timerDiscarded { toast = "Timer discarded" }
+                if state == .timerDiscarded { inbox?.toast = "Timer discarded" }
                 let target: String? = switch state {
                 case .week, .weekMid: "week"
                 case .freeRecord: "record"
@@ -73,12 +73,6 @@ struct S2Today: View {
                 if let target {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { proxy.scrollTo(target, anchor: target == "confirm" || target == "noprop" ? .center : .top) }
                 }
-            }
-        }
-        .overlay(alignment: .bottom) {
-            if let toast {
-                UndoToast(text: toast).padding(.bottom, 84).transition(.toast)
-                    .accessibilityIdentifier("today.toast")
             }
         }
     }
@@ -290,9 +284,9 @@ struct S2Today: View {
     }
 
     private func show(_ t: String) {
-        withAnimation { toast = t }
+        withAnimation { inbox?.toast = t }
         guard state != .timerDiscarded else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { withAnimation { if toast == t { toast = nil } } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { withAnimation { if inbox?.toast == t { inbox?.toast = nil } } }
     }
 }
 
@@ -394,7 +388,7 @@ struct S2SuggestionRow: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 5) {
                 Image(systemName: s.symbol).font(.system(size: 11, weight: .semibold))
-                Text(s.source).lineLimit(1)
+                Text(s.source).lineLimit(dts.isAccessibilitySize ? 3 : 1)
             }
             .font(.subheadline).foregroundStyle(LHB.textSecondary)
             (s.place.map { Text("\(Text(s.title).fontWeight(.semibold)) at \(Text($0).fontWeight(.semibold))") } ?? Text(s.title).fontWeight(.semibold))

@@ -48,7 +48,7 @@ struct S2Host: View {
     var body: some View {
         content
             .tint(LHB.action)
-            .preferredColorScheme(name.hasPrefix("paywall") ? .dark : scheme)
+            .preferredColorScheme(name.hasPrefix("paywall") && S2StatusBar.shared.overHero ? .dark : scheme)
             .modifier(TypeSizeOverride())
             .onAppear { S2Font.register() }
     }
@@ -204,6 +204,8 @@ enum S2Tab: Hashable { case today, inbox, records, properties }
 /// The one pending count: tab badge, Today's To confirm capsule and "Review all N" all read it.
 @Observable final class S2InboxCount {
     var pending: Int
+    /// The undo toast lives in the bottom band, above the tab bar, never over content.
+    var toast: String?
     init(_ n: Int) { pending = n }
 }
 
@@ -221,7 +223,27 @@ struct Tabs<C: View>: View {
     var body: some View {
         content()
             .environment(inbox)
-            .overlay(alignment: .bottom) { S2TabBar(selection: tab, badge: inbox.pending).ignoresSafeArea(.keyboard) }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                // One bottom band: an opaque canvas scrim behind the tab pill, the "+" and the gap
+                // between them, with a short fade on top. Scroll views inset to it automatically.
+                VStack(spacing: 10) {
+                    if let t = inbox.toast {
+                        UndoToast(text: t).transition(.toast).accessibilityIdentifier("today.toast")
+                    }
+                    S2TabBar(selection: tab, badge: inbox.pending)
+                }
+                .padding(.top, 18)
+                .frame(maxWidth: .infinity)
+                .background {
+                    VStack(spacing: 0) {
+                        LinearGradient(colors: [LHB.canvas.opacity(0), LHB.canvas], startPoint: .top, endPoint: .bottom).frame(height: 18)
+                        LHB.canvas
+                    }
+                    .ignoresSafeArea(edges: .bottom)
+                    .allowsHitTesting(false)
+                }
+                .animation(.easeOut(duration: 0.22), value: inbox.toast)
+            }
     }
 }
 

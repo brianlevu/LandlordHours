@@ -40,7 +40,7 @@ struct S2PropertiesList: View {
                         case .loading: loading
                         default: listCard
                         }
-                        Color.clear.frame(height: 100).id("bottom")
+                        Color.clear.frame(height: 24).id("bottom")
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
@@ -60,12 +60,14 @@ struct S2PropertiesList: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .center) {
-                DisplayTitle(text: "Properties")
-                Spacer()
+            let stack = dts.isAccessibilitySize
+            (stack ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10)) : AnyLayout(HStackLayout(alignment: .center))) {
+                DisplayTitle(text: "Properties", reserve: stack ? 40 : 220)
+                if !stack { Spacer() }
                 if !props.isEmpty {
                     Button { } label: { Label("Add property", systemImage: "plus") }
                         .buttonStyle(S2Tinted())
+                        .fixedSize()
                 }
             }
             VStack(alignment: .leading, spacing: 4) {
@@ -175,17 +177,19 @@ struct S2PropertyRow: View {
     @Environment(\.dynamicTypeSize) private var dts
 
     var body: some View {
-        HStack(spacing: 12) {
+        let ax = dts.isAccessibilitySize
+        (ax ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))) {
             PropertySeal(p, size: 40)
             VStack(alignment: .leading, spacing: 3) {
-                Text(p.name).font(.body.weight(.semibold)).foregroundStyle(LHB.textPrimary).lineLimit(dts.isAccessibilitySize ? 4 : 2)
+                Text(p.name).font(.body.weight(.semibold)).foregroundStyle(LHB.textPrimary).lineLimit(ax ? 5 : 2)
+                    .allowsTightening(true)
                     .multilineTextAlignment(.leading)
                 Text("\(perPropertyGoal ? houseLine(p.hours) : "\(Int(p.hours))h this year") · \(p.kindMeta)").font(.subheadline).foregroundStyle(LHB.textSecondary)
                     .monospacedDigit()
             }
-            Spacer(minLength: 8)
+            if !ax { Spacer(minLength: 8) }
             if dts < .xxLarge { PropertyHouse(hours: p.hours, size: 48) }
-            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(LHB.textTertiary)
+            if !ax { Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(LHB.textTertiary) }
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
         .frame(minHeight: 76)
@@ -201,7 +205,7 @@ struct S2PropertyDetail: View {
     let p: S2Property
     var scrolled = false
 
-    private let kinds: [(S2Cat, Double)] = [(.repairs, 89), (.management, 57), (.leasing, 38), (.bookkeeping, 28)]
+    private var kinds: [(S2Cat, Double)] { S2Data.kinds(for: p) }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -216,7 +220,7 @@ struct S2PropertyDetail: View {
                                     ToolTile(cat: k.0, size: 24)
                                     Text(k.0.label).font(.subheadline).foregroundStyle(LHB.textPrimary).frame(width: 100, alignment: .leading)
                                     GeometryReader { g in
-                                        Capsule().fill(k.0.ink.opacity(0.85)).frame(width: g.size.width * k.1 / 89, height: 8)
+                                        Capsule().fill(k.0.ink.opacity(0.85)).frame(width: g.size.width * k.1 / max(1, kinds.map(\.1).max() ?? 1), height: 8)
                                             .frame(maxHeight: .infinity)
                                     }
                                     Text("\(Int(k.1))h").font(.subheadline.weight(.semibold)).monospacedDigit().foregroundStyle(LHB.textPrimary)
@@ -230,7 +234,7 @@ struct S2PropertyDetail: View {
                     VStack(alignment: .leading, spacing: 10) {
                         S2Header(title: "Recent") { SeeAll(label: "See all in Records") }
                         VStack(spacing: 0) {
-                            ForEach(Array(S2Data.recent.enumerated()), id: \.element.id) { i, e in
+                            ForEach(Array(S2Data.recent(for: p).enumerated()), id: \.element.id) { i, e in
                                 HStack(spacing: 12) {
                                     ToolTile(cat: e.cat, size: 36)
                                     VStack(alignment: .leading, spacing: 2) {
@@ -394,8 +398,8 @@ struct S2PropertyEdit: View {
                 .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 8)
                 .background(LinearGradient(stops: [.init(color: LHB.canvas.opacity(0), location: 0), .init(color: LHB.canvas, location: 0.14)], startPoint: .top, endPoint: .bottom).ignoresSafeArea())
         }
-        .confirmationDialog("Delete Pine Cabin and its 41 entries?", isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button("Delete property and entries", role: .destructive) {}
+        .alert("Delete Pine Cabin and its 41 entries?", isPresented: $confirmDelete) {
+            Button("Delete", role: .destructive) {}
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Its 41 entries and their photos are deleted too, on this iPhone and in iCloud. This can’t be undone.")

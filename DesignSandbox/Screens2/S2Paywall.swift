@@ -58,6 +58,8 @@ struct S2Paywall: View {
     /// both themes); the page itself keeps the user's scheme through its environment.
     var body: some View {
         page.environment(\.colorScheme, requested ?? windowScheme)
+            .onAppear { S2StatusBar.shared.overHero = true }
+            .onDisappear { S2StatusBar.shared.overHero = false }
     }
 
     private var page: some View {
@@ -79,9 +81,24 @@ struct S2Paywall: View {
                 }
                 .scrollIndicators(.hidden)
                 .ignoresSafeArea(edges: .top)
+                .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, y in
+                    let over = y < heroH - g.safeAreaInsets.top - 8
+                    if S2StatusBar.shared.overHero != over { S2StatusBar.shared.overHero = over }
+                }
                 .onAppear {
                     if scrolledToBenefits { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { proxy.scrollTo("benefits", anchor: .top) } }
                 }
+            }
+            .overlay(alignment: .top) {
+                // A solid band behind the status bar: blueprint while the hero is under it,
+                // canvas once scrolled past. iOS picks the status-bar ink from what is behind it,
+                // so a uniform band keeps the clock legible (white on blue, dark on canvas).
+                (S2StatusBar.shared.overHero ? LHB.brand : LHB.canvas)
+                    .frame(height: g.safeAreaInsets.top)
+                    .frame(maxWidth: .infinity)
+                    .offset(y: -g.safeAreaInsets.top)
+                    .allowsHitTesting(false)
+                    .animation(.easeOut(duration: 0.2), value: S2StatusBar.shared.overHero)
             }
             .overlay(alignment: .topTrailing) {
                 GlassClose().environment(\.colorScheme, .dark).padding(.trailing, 16).padding(.top, 4)
@@ -105,17 +122,23 @@ struct S2Paywall: View {
                     .font(S2Font.display(28, opsz: 72, dts: dts))
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
-                    .lineLimit(2)
+                    .lineLimit(dts.isAccessibilitySize ? 4 : 2)
+                    .minimumScaleFactor(0.7)
+                    .allowsTightening(true)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 60)
+                    .padding(.horizontal, dts.isAccessibilitySize ? 24 : 60)
+                    .padding(.trailing, dts.isAccessibilitySize ? 36 : 0)
                     .accessibilityAddTraits(.isHeader)
-                phone(width: width * 0.62)
-                    .opacity(shown ? 1 : 0)
-                    .offset(y: shown || reduce ? 0 : 12)
+                if !dts.isAccessibilitySize {
+                    phone(width: width * 0.62)
+                        .opacity(shown ? 1 : 0)
+                        .offset(y: shown || reduce ? 0 : 12)
+                }
             }
             .padding(.top, top + 20)
+            .padding(.bottom, dts.isAccessibilitySize ? 64 : 0)
         }
-        .frame(height: height, alignment: .top)
+        .frame(height: dts.isAccessibilitySize ? nil : height, alignment: .top)
         .clipped()
     }
 
@@ -151,8 +174,9 @@ struct S2Paywall: View {
 
     private var planCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
+            (dts.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6)) : AnyLayout(HStackLayout(spacing: 8))) {
                 Text("LandlordHours Pro").font(.headline).foregroundStyle(LHB.textPrimary)
+                    .lineLimit(1).minimumScaleFactor(0.6).allowsTightening(true)
                 Text("PAY ONCE")
                     .font(.system(size: 11, weight: .semibold)).tracking(0.6)
                     .foregroundStyle(LHB.action)
@@ -200,6 +224,8 @@ struct S2Paywall: View {
                 Text("Pro is yours").font(.system(size: 28, weight: .bold, design: .rounded)).foregroundStyle(LHB.textPrimary)
             }
             .transition(.opacity)
+        case .priceFailed:
+            EmptyView()
         case .priceLoading:
             PlaceholderBar(width: 120, height: 40)
         default:
@@ -253,7 +279,7 @@ struct S2Paywall: View {
             .disabled(state == .priceLoading || state == .priceFailed)
             .overlay(alignment: .bottom) {
                 if state == .buying {
-                    DraftingLine(color: LHB.draftingHero, lineWidth: 2).padding(.horizontal, 26).padding(.bottom, 6)
+                    DraftingLine(color: Color(light: 0x8FD3FF, dark: 0x0B1230), lineWidth: 2).padding(.horizontal, 26).padding(.bottom, 6)
                 }
             }
             .accessibilityIdentifier("paywall.buy")
@@ -297,8 +323,9 @@ struct S2Paywall: View {
 }
 
 struct S2LabelStyle: LabelStyle {
+    @ScaledMetric(relativeTo: .subheadline) private var iconWidth: CGFloat = 22
     func makeBody(configuration: Configuration) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) { configuration.icon.frame(width: 20); configuration.title }
+        HStack(alignment: .firstTextBaseline, spacing: 10) { configuration.icon.frame(minWidth: iconWidth); configuration.title }
     }
 }
 
@@ -386,14 +413,15 @@ struct RecordPage: View {
         .padding(.top, 18)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Color.white)
-        .overlay(alignment: .center) {
+        .overlay(alignment: .topTrailing) {
             if sample {
                 Text("SAMPLE")
-                    .font(.system(size: 22, weight: .bold, design: .monospaced)).tracking(4)
+                    .font(.system(size: 9, weight: .bold, design: .monospaced)).tracking(1.5)
                     .foregroundStyle(Color(hex: 0x2369B5).opacity(0.55))
                     .padding(.horizontal, 10).padding(.vertical, 4)
                     .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color(hex: 0x2369B5).opacity(0.55), lineWidth: 1.5))
-                    .rotationEffect(.degrees(-14))
+                    .rotationEffect(.degrees(-6))
+                    .padding(.top, 34).padding(.trailing, 12)
             }
         }
         .environment(\.colorScheme, .light)

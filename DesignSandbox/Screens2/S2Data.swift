@@ -6,7 +6,7 @@ enum S2Data {
     static let pine = S2Property(id: "prop-pine-cabin", name: "Pine Cabin", address: "88 Ridge Rd, Big Bear", longStays: false, hours: 212, entries: 41, last: "Oct 18", aliases: ["Cabin", "Big Bear"], order: 0)
     static let oak = S2Property(id: "prop-oak-duplex", name: "Oak Street Duplex", address: "214 Oak St, Pasadena", longStays: true, hours: 520, entries: 96, last: "Oct 16", liveHere: true, aliases: ["Oak St", "The duplex"], order: 1)
     static let maple = S2Property(id: "prop-maple-new", name: "Maple Court", address: "12 Maple Ct, Glendale", longStays: true, hours: 0, entries: 0, last: "—", order: 3)
-    static let long = S2Property(id: "prop-long-name", name: "The Old Schoolhouse Lofts at Arroyo Seco, Unit 4B", address: "1 Arroyo Blvd, Pasadena", longStays: true, hours: 62, entries: 14, last: "Oct 12", order: 2)
+    static let long = S2Property(id: "prop-long-name", name: "The Arroyo Seco Schoolhouse Lofts, Unit 4B", address: "1 Arroyo Blvd, Pasadena", longStays: true, hours: 128, entries: 26, last: "Oct 12", order: 2)
 
     static let four: [S2Property] = [pine, oak, long, maple]
 
@@ -54,6 +54,28 @@ enum S2Data {
     static let todayIndex = 6
 
     struct Entry: Identifiable { let id = UUID(); let cat: S2Cat; let title: String; let hours: Double; let date: String; let source: String }
+
+    /// Hours by kind of work for one property; always sums to the property's hours.
+    static func kinds(for p: S2Property) -> [(S2Cat, Double)] {
+        let mix: [(S2Cat, Double)] = p.longStays
+            ? [(.repairs, 0.38), (.management, 0.27), (.leasing, 0.2), (.bookkeeping, 0.15)]
+            : [(.repairs, 0.42), (.management, 0.27), (.leasing, 0.18), (.bookkeeping, 0.13)]
+        var out = mix.dropLast().map { ($0.0, (p.hours * $0.1).rounded()) }
+        out.append((mix.last!.0, p.hours - out.reduce(0) { $0 + $1.1 }))
+        return out
+    }
+
+    /// Recent entries belong to the property they are shown on.
+    static func recent(for p: S2Property) -> [Entry] {
+        switch p.id {
+        case oak.id: [
+            Entry(cat: .repairs, title: "HVAC service", hours: 1.5, date: "Oct 16", source: "From calendar"),
+            Entry(cat: .leasing, title: "Lease signing", hours: 1, date: "Oct 11", source: "From calendar"),
+            Entry(cat: .management, title: "Tenant call", hours: 0.5, date: "Oct 9", source: "Typed"),
+        ]
+        default: recent
+        }
+    }
     static let recent: [Entry] = [
         Entry(cat: .repairs, title: "Plumber", hours: 2, date: "Oct 16", source: "From calendar"),
         Entry(cat: .leasing, title: "Showing", hours: 1, date: "Oct 12", source: "From calendar"),
