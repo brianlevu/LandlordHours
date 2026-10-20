@@ -178,21 +178,11 @@ struct LandlordHoursShortcuts: AppShortcutsProvider {
 private enum LandlordHoursIntentStore {
     @MainActor
     static func engagementContext(taxYear: Int = Calendar.current.component(.year, from: Date())) -> EngagementContext {
-        let model = AppModelHost.shared.viewModel
-        return EngagementContext(
-            now: Date(),
+        // Same builder as the widget, so Siri, the widget and Today's house count alike.
+        AppModelHost.shared.viewModel.engagementContext(
             taxYear: taxYear,
-            properties: model.properties,
-            timeEntries: model.timeEntries,
-            calendarDraftCount: 0,
             isTimerRunning: UserDefaults.standard.bool(forKey: UserScope.key("LandlordHours.timer")),
-            timerStartTime: UserDefaults.standard.object(forKey: UserScope.key("timerStartTime")) as? Date,
-            notificationPermission: .notDetermined,
-            recentDismissals: [],
-            isProUser: SubscriptionManager.shared.isPro,
-            targetHours: GoalManager.shared.globalGoalType.hoursRequired,
-            goalType: GoalManager.shared.globalGoalType,
-            groupingElection: TaxProfileManager.shared.groupingElection
+            timerStartTime: UserDefaults.standard.object(forKey: UserScope.key("timerStartTime")) as? Date
         )
     }
 }

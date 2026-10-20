@@ -693,7 +693,8 @@ struct DashboardView: View {
                 statusTone: heroStatusTone,
                 onCelebration: { _ in presentNextCelebration() },
                 isLoading: hoursPending,
-                animatesChanges: !AppViewModel.isRemoteMerge(lastMergeAt: viewModel.lastRemoteMergeAt)
+                animatesChanges: viewModel.lastEntriesChangeOrigin != .remote,
+                isLookingBack: backfill.isScanning
             )
             // The art has a fixed frame; past AX2 the words would wrap into it, so cap there.
             // VoiceOver reads the whole hero as one element with the full words.
@@ -739,6 +740,9 @@ struct DashboardView: View {
     /// The WP-H words (hours, goal, stage, next step) plus the pace line, for the live hours.
     private var heroAccessibilityLabel: String {
         if hoursPending { return "\(currentYear). Loading your hours from iCloud." }
+        if backfill.isScanning {
+            return "\(currentYear). \(AppFormat.hours(totalHours)) confirmed so far. Looking through your calendar; work we find waits in your Inbox."
+        }
         let live = HouseProgress(hours: totalHours, goal: houseGoal)
         return "\(currentYear). \(live.accessibilityLabel) \(pace.text)."
     }

@@ -33,23 +33,24 @@ enum UserScope {
 @MainActor
 class AppViewModel: ObservableObject {
     @Published var properties: [RentalProperty] = []
-    @Published var timeEntries: [TimeEntry] = []
+    @Published var timeEntries: [TimeEntry] = [] {
+        didSet { lastEntriesChangeOrigin = isApplyingRemoteChanges ? .remote : .local }
+    }
+    /// Where the latest change to `timeEntries` came from. Today mutes the house build (no
+    /// "+Nh" beam, no haptic) only for iCloud merges, never for the user's own saves.
+    enum EntriesChangeOrigin: Equatable { case local, remote }
+    @Published private(set) var lastEntriesChangeOrigin: EntriesChangeOrigin = .local
+    private var isApplyingRemoteChanges = false
     @Published var selectedYear: Int = Calendar.current.component(.year, from: Date())
     /// WP-L: the active profile's first iCloud pull of this launch is still running, so the hours
     /// on Today may not be final. Today shows the drafting loader in the house slot and a
     /// placeholder for the number; everything else is usable. Never blocks: it ends when the
     /// initial sync ends (any outcome) or after `initialPullPlaceholderTimeout`.
     @Published private(set) var isAwaitingInitialPull = false
+    /// The initial sync is still running (true past the placeholder cap). Export waits on it:
+    /// a report made now could miss hours from other devices. False once it lands or fails.
+    @Published private(set) var isInitialPullRunning = false
     static let initialPullPlaceholderTimeout: TimeInterval = 6
-    /// When iCloud last merged entries in. Today updates the house quietly for these (no "+Nh"
-    /// beam, no haptic): the user didn't just log them.
-    @Published private(set) var lastRemoteMergeAt: Date?
-
-    /// True for an hours change that came from an iCloud merge (within `window` of it).
-    static func isRemoteMerge(lastMergeAt: Date?, now: Date = Date(), window: TimeInterval = 1.5) -> Bool {
-        guard let lastMergeAt else { return false }
-        return now.timeIntervalSince(lastMergeAt) <= window
-    }
     private var initialPullWaitToken = UUID()
     @Published var isSignedIn = false
     @Published var userName: String = ""
@@ -109,6 +110,8 @@ class AppViewModel: ObservableObject {
 
         // Trigger cloud sync when tax profile or goals change
         TaxProfileManager.shared.onDidChange = { [weak self] in
+            // Spouse hours / grouping change what the widget counts.
+            self?.refreshWidgetSnapshot()
             self?.syncService.schedulePush()
         }
         GoalManager.shared.onDidChange = { [weak self] in
@@ -135,9 +138,11 @@ class AppViewModel: ObservableObject {
     /// as not final until the first pull ends (any outcome) or the timeout passes.
     func startInitialSync(showsPlaceholder: Bool = true) {
         let token = showsPlaceholder && syncService.isCloudKitAvailable ? beginAwaitingInitialPull() : nil
+        isInitialPullRunning = true
         Task { [weak self] in
             guard let self else { return }
             await self.syncService.start()
+            self.isInitialPullRunning = false
             // Ends only the wait this sync began (a newer wait belongs to a newer start).
             if let token { self.endAwaitingInitialPull(token: token) }
         }
@@ -1168,25 +1173,39 @@ class AppViewModel: ObservableObject {
         }
     }
 
+    /// The one engagement context the widget and Siri read. Same counting rules as Today's
+    /// house: REPS is your hours alone; material participation adds a spouse only when Tax
+    /// Profile "Spouse hours" is on.
+    func engagementContext(
+        now: Date = Date(),
+        taxYear: Int? = nil,
+        isTimerRunning timerRunning: Bool? = nil,
+        timerStartTime timerStart: Date? = nil
+    ) -> EngagementContext {
+        let goal = GoalManager.shared.globalGoalType
+        return EngagementContext(
+            now: now,
+            taxYear: taxYear ?? Calendar.current.component(.year, from: now),
+            properties: properties,
+            timeEntries: timeEntries,
+            calendarDraftCount: 0,
+            isTimerRunning: timerRunning ?? isTimerRunning,
+            timerStartTime: timerRunning == nil ? timerStartTime : timerStart,
+            notificationPermission: .notDetermined,
+            recentDismissals: [],
+            isProUser: SubscriptionManager.shared.isPro,
+            targetHours: goal.hoursRequired,
+            goalType: goal,
+            groupingElection: TaxProfileManager.shared.groupingElection,
+            includeSpouse: tracksSpouseJointly
+        )
+    }
+
     private func refreshWidgetSnapshot() {
         let now = Date()
         let taxYear = Calendar.current.component(.year, from: now)
         let widgetGoal = widgetGoalContext()
-        let context = EngagementContext(
-            now: now,
-            taxYear: taxYear,
-            properties: properties,
-            timeEntries: timeEntries,
-            calendarDraftCount: 0,
-            isTimerRunning: isTimerRunning,
-            timerStartTime: timerStartTime,
-            notificationPermission: .notDetermined,
-            recentDismissals: [],
-            isProUser: SubscriptionManager.shared.isPro,
-            targetHours: widgetGoal.targetHours,
-            goalType: GoalManager.shared.globalGoalType,
-            groupingElection: TaxProfileManager.shared.groupingElection
-        )
+        let context = engagementContext(now: now, taxYear: taxYear)
         let snapshot = EngagementIntelligenceService.shared.snapshot(for: context)
         let recommendation = EngagementIntelligenceService.shared.recommendation(for: context)
         EngagementWidgetSnapshotStore.save(
@@ -1555,8 +1574,8 @@ extension AppViewModel: CloudKitSyncDelegate {
     }
 
     func syncDidReceiveEntries(_ remoteEntries: [TimeEntry]) {
-        // Set first, so the same update that changes the hours sees it (quiet house update).
-        lastRemoteMergeAt = Date()
+        isApplyingRemoteChanges = true
+        defer { isApplyingRemoteChanges = false }
         for remote in remoteEntries {
             if let idx = timeEntries.firstIndex(where: { $0.id == remote.id }) {
                 if remote.modifiedAt > timeEntries[idx].modifiedAt {
@@ -1576,7 +1595,8 @@ extension AppViewModel: CloudKitSyncDelegate {
     }
 
     func syncDidDeleteEntryIds(_ ids: Set<UUID>) {
-        lastRemoteMergeAt = Date()
+        isApplyingRemoteChanges = true
+        defer { isApplyingRemoteChanges = false }
         timeEntries.removeAll { ids.contains($0.id) }
         saveDataLocal()
     }

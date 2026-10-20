@@ -1,226 +1,89 @@
 import SwiftUI
 import PDFKit
-import LucideIcons
 
+/// Export: the real first page of the PDF on top (Crouton), the year, what's inside, then one
+/// action. docs/design/2.0-hifi-reference-spec.md §h.
 struct ExportPDFView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-    let year: Int
+
+    @State private var year: Int
+    @State private var sharing: ShareRequest?
     /// WP-L: the report is made in the background; this sheet can close while it runs.
     @ObservedObject private var job = ExportJob.shared
-    @State private var sharing: ShareRequest?
 
     /// The records this sheet would export now; a ready report made from other records is stale.
     private var fingerprint: String { ExportFingerprint.current(app: viewModel, year: year) }
     private var shareItem: ExportShareItem? { job.readyFiles(for: year, fingerprint: fingerprint) }
     private var reportIsStale: Bool { job.isStale(year: year, fingerprint: fingerprint) }
-    /// The first iCloud pull hasn't landed: the hours may not be final, so don't export yet.
-    private var waitingForHours: Bool { viewModel.isAwaitingInitialPull }
     private var exportError: String? { job.failureMessage(for: year) }
     private var isGenerating: Bool { job.isGenerating }
+    private var gate: ExportGate {
+        ExportGate.resolve(
+            hasEntries: canExport,
+            isGenerating: isGenerating,
+            hoursPlaceholderShowing: viewModel.isAwaitingInitialPull,
+            initialPullRunning: viewModel.isInitialPullRunning
+        )
+    }
+    @State private var preview: UIImage?
+    @State private var previewYear: Int?
+
+    init(year: Int) {
+        _year = State(initialValue: year)
+    }
+
+    private var currentYear: Int { Calendar.current.component(.year, from: Date()) }
+
+    private var yearChoices: [Int] {
+        let years = Set(viewModel.timeEntries.map { Calendar.current.component(.year, from: $0.date) })
+            .union([currentYear, year])
+        return Array(years.sorted(by: >).prefix(4))
+    }
 
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    VStack(alignment: .leading, spacing: 8) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text("Export report")
                             .lhDisplayFont(.largeTitle)
                             .foregroundStyle(colors.textPrimary)
-                            .minimumScaleFactor(0.82)
-                        Text("Create a \(String(year)) report for your records or your CPA.")
-                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .accessibilityAddTraits(.isHeader)
+                        Text("A PDF for your accountant and a CSV spreadsheet of every entry.")
+                            .font(.subheadline)
                             .foregroundStyle(colors.textSecondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    // Export action card
-                    VStack(spacing: 16) {
-                        // Preview area: the drafting line sketches the report page while it's made.
-                        ZStack {
-                            Circle()
-                                .fill(colors.backgroundTertiary)
-                                .frame(width: 64, height: 64)
-                                .overlay {
-                                    LucideIcon(image: Lucide.fileText, size: 28)
-                                        .foregroundStyle(colors.textPrimary)
-                                }
-                                .opacity(isGenerating ? 0 : 1)
-                                .scaleEffect(isGenerating ? 0.9 : 1)
-                            if isGenerating {
-                                DraftingLoader(sketch: .document, surface: .adaptive, subject: "your report", lineWidth: 2.2)
-                                    .frame(height: 112)
-                            }
-                        }
-                        .frame(height: isGenerating ? 112 : 64)
-                        .animation(.easeOut(duration: 0.24), value: isGenerating)
-                        .accessibilityIdentifier("export.preview")
-
-                        Text("Export \(String(year)) report")
-                            .font(.system(size: 22, weight: .black, design: .rounded))
-                            .foregroundStyle(colors.textPrimary)
-
-                        Text(exportSummaryText)
-                            .font(AppTypography.bodySmall)
-                            .foregroundStyle(colors.textSecondary)
-                            .multilineTextAlignment(.center)
-                            .lineSpacing(3)
-
-                        if let shareItem {
-                            VStack(spacing: 10) {
-                                HStack(spacing: 8) {
-                                    LucideIcon(image: Lucide.check, size: 16)
-                                        .foregroundStyle(colors.positive)
-                                    Text("Report ready")
-                                        .font(AppTypography.button)
-                                        .foregroundStyle(colors.textPrimary)
-                                }
-
-                                Button {
-                                    sharing = ShareRequest(url: shareItem.pdfURL, format: .pdf)
-                                } label: {
-                                    HStack(spacing: 8) {
-                                        LucideIcon(image: Lucide.share2, size: 16)
-                                        Text("Share PDF")
-                                    }
-                                    .font(AppTypography.button)
-                                    .foregroundStyle(AppColors.onAction)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
-                                    .background(colors.action)
-                                    .clipShape(Capsule())
-                                }
-                                .buttonStyle(.lhPressable)
-                                .accessibilityIdentifier("export.sharePDF")
-
-                                Button {
-                                    sharing = ShareRequest(url: shareItem.csvURL, format: .csv)
-                                } label: {
-                                    HStack(spacing: 8) {
-                                        LucideIcon(image: Lucide.fileText, size: 16)
-                                        Text("Share CSV spreadsheet")
-                                    }
-                                    .font(AppTypography.button)
-                                    .foregroundStyle(colors.action)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
-                                    .background(colors.actionSurface)
-                                    .clipShape(Capsule())
-                                }
-                                .buttonStyle(.lhPressable)
-                                .accessibilityIdentifier("export.shareCSV")
-
-                                Button("Create again") { generateExports() }
-                                    .font(AppTypography.button)
-                                    .foregroundStyle(colors.action)
-                                    .frame(minHeight: 44)
-                                    .disabled(waitingForHours)
-                                    .accessibilityHint("Makes a new report from your current records")
-                                    .accessibilityIdentifier("export.createAgain")
-                            }
-                        } else {
-                            if reportIsStale && !isGenerating {
-                                Text("Your records changed since your last report. Create it again to include them.")
-                                    .font(AppTypography.caption)
-                                    .foregroundStyle(colors.caution)
-                                    .multilineTextAlignment(.center)
-                                    .accessibilityIdentifier("export.stale")
-                            }
-                            Button {
-                                generateExports()
-                            } label: {
-                                HStack(spacing: 8) {
-                                    if isGenerating {
-                                        // Busy: the drafting line runs inside the muted button.
-                                        DraftingLoader(sketch: .chart, surface: .adaptive, lineWidth: 1.6)
-                                            .frame(width: 34, height: 14)
-                                            .accessibilityHidden(true)
-                                    } else {
-                                        LucideIcon(image: Lucide.fileDown, size: 16)
-                                    }
-                                    Text(generateButtonTitle)
-                                }
-                                .font(AppTypography.button)
-                                .foregroundStyle(generateForeground)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                                .background(generateBackground)
-                                .clipShape(Capsule())
-                            }
-                            .buttonStyle(.lhPressable)
-                            .disabled(!canGenerate)
-                            .allowsHitTesting(canGenerate)
-                            .accessibilityIdentifier("export.generatePDF")
-
-                            if isGenerating {
-                                Text("You can close this. We'll let you know when it's ready.")
-                                    .font(AppTypography.caption)
-                                    .foregroundStyle(colors.textSecondary)
-                                    .multilineTextAlignment(.center)
-                                    .accessibilityIdentifier("export.backgroundHint")
-                            }
-                        }
-
-                        if let exportError {
-                            Text(exportError)
-                                .font(AppTypography.caption)
-                                .foregroundStyle(colors.destructive)
-                                .multilineTextAlignment(.center)
-                        }
-                    }
-                    .padding(20)
-                    .background(colors.backgroundSecondary)
-                    .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 26, style: .continuous)
-                            .stroke(colors.border.opacity(0.28), lineWidth: 1)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
-                    // Report summary card
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack(spacing: 8) {
-                            LucideIcon(image: Lucide.list, size: 14)
-                                .foregroundStyle(colors.textPrimary)
-                            Text("Report includes")
-                                .font(.system(size: 19, weight: .black, design: .rounded))
-                                .foregroundStyle(colors.textPrimary)
-                        }
+                    yearChips
 
-                        VStack(spacing: 0) {
-                            reportRow(label: "Properties", value: "\(activePropertyCount) with time logged", icon: "building-2", color: AppColors.sky)
-                            Divider().padding(.leading, 48)
-                            reportRow(label: "Time Entries", value: "\(yearEntries.count) entries", icon: "clock", color: AppColors.primary)
-                            Divider().padding(.leading, 48)
-                            reportRow(label: "Total Hours", value: String(format: "%.1f hours", totalHours), icon: "hourglass", color: AppColors.honey)
-                            Divider().padding(.leading, 48)
-                            reportRow(label: "REPS hours", value: String(format: "%.1f hours", repsQualifiedHours), icon: "badge-check", color: AppColors.sage)
-                        }
-                    }
-                    .padding(20)
-                    .background(colors.backgroundSecondary)
-                    .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 26, style: .continuous)
-                            .stroke(colors.border.opacity(0.28), lineWidth: 1)
-                    }
+                    pagePreview
+
+                    summary
+
+                    actions
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 18)
-                .padding(.bottom, 40)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 32)
             }
-            .background { LHMobileCanvas() }
+            .scrollIndicators(.hidden)
+            .background(colors.background.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+                    Button("Close") { dismiss() }
+                        .foregroundStyle(colors.action)
+                        .accessibilityIdentifier("export.close")
                 }
             }
         }
         .hidesAppTabBar()
+        .task(id: year) { await renderPreview() }
         .onAppear { job.isSheetVisible = true }
         .onDisappear { job.isSheetVisible = false }
         .sheet(item: $sharing) { request in
@@ -233,20 +96,211 @@ struct ExportPDFView: View {
         }
     }
 
-    private func reportRow(label: String, value: String, icon: String, color: Color) -> some View {
-        HStack(spacing: 12) {
-            JellyBadge(systemName: icon, color: color, wash: colors.backgroundTertiary, size: 36)
+    // MARK: Year
+
+    private var yearChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(yearChoices, id: \.self) { choice in
+                    Button {
+                        year = choice
+                    } label: {
+                        BPFilterChip(title: yearLabel(choice), isActive: choice == year, showsChevron: false)
+                    }
+                    .buttonStyle(.lhPressable)
+                    .accessibilityAddTraits(choice == year ? .isSelected : [])
+                    .accessibilityIdentifier("export.year.\(choice)")
+                }
+            }
+        }
+    }
+
+    private func yearLabel(_ value: Int) -> String {
+        if value == currentYear { return "This year" }
+        if value == currentYear - 1 { return "Last year" }
+        return String(value)
+    }
+
+    // MARK: Preview
+
+    private var pagePreview: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.5 : 0.08), radius: 16, y: 4)
+            if let preview, previewYear == year {
+                Image(uiImage: preview)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                    .transition(.opacity)
+            } else {
+                // isLoading hook: the page renders off the main thread; only the page shows a
+                // placeholder (title and table lines), the rest of the sheet stays usable.
+                VStack(alignment: .leading, spacing: 10) {
+                    BPLoadingPlaceholder(kind: .number, width: 140, height: 12)
+                    BPLoadingPlaceholder(kind: .number, width: 90, height: 8)
+                    BPLoadingPlaceholder(kind: .chart, width: nil, height: 36)
+                    ForEach(0..<4, id: \.self) { _ in
+                        BPLoadingPlaceholder(kind: .number, width: nil, height: 6)
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .environment(\.colorScheme, .light)
+            }
+        }
+        .aspectRatio(11 / 8.5, contentMode: .fit)
+        .frame(maxWidth: 420)
+        .frame(maxWidth: .infinity)
+        .animation(reduceMotion ? nil : AppAnimation.reveal, value: previewYear)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Preview of the first page of the \(String(year)) report")
+        .accessibilityIdentifier("export.preview")
+    }
+
+    // MARK: Summary
+
+    private var summary: some View {
+        VStack(spacing: 0) {
+            summaryRow("Entries", value: "\(yearEntries.count)")
+            Divider().padding(.leading, 16)
+            summaryRow("Properties", value: "\(activePropertyCount)")
+            Divider().padding(.leading, 16)
+            summaryRow("All logged hours", value: BPHours.short(totalHours))
+            Divider().padding(.leading, 16)
+            summaryRow("Real estate hours", value: BPHours.short(repsQualifiedHours))
+        }
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("export.summary")
+    }
+
+    private func summaryRow(_ label: String, value: String) -> some View {
+        HStack {
             Text(label)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .font(.body)
                 .foregroundStyle(colors.textPrimary)
-            Spacer()
+            Spacer(minLength: 8)
             Text(value)
-                .font(AppTypography.bodySmall)
-                .fontWeight(.medium)
+                .font(.system(.body, design: .rounded))
+                .monospacedDigit()
                 .foregroundStyle(colors.textSecondary)
         }
-        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .frame(minHeight: 48)
+        .accessibilityElement(children: .combine)
     }
+
+    // MARK: Actions
+
+    @ViewBuilder
+    private var actions: some View {
+        VStack(spacing: 12) {
+            if let shareItem {
+                Label("Report ready", systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(colors.positive)
+                    .frame(maxWidth: .infinity)
+
+                Button {
+                    sharing = ShareRequest(url: shareItem.pdfURL, format: .pdf)
+                } label: {
+                    Label("Share PDF", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(InboxPrimaryButtonStyle())
+                .accessibilityIdentifier("export.sharePDF")
+
+                Button {
+                    sharing = ShareRequest(url: shareItem.csvURL, format: .csv)
+                } label: {
+                    Label("Share CSV spreadsheet", systemImage: "tablecells")
+                        .font(AppTypography.buttonLarge)
+                        .foregroundStyle(colors.action)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 52)
+                        .background(Capsule().fill(colors.actionSurface))
+                }
+                .buttonStyle(.lhPressable)
+                .accessibilityIdentifier("export.shareCSV")
+
+                Button("Create again") { generateExports(force: gate == .stillSyncing) }
+                    .font(AppTypography.button)
+                    .foregroundStyle(colors.action)
+                    .frame(minHeight: 44)
+                    .disabled(!gate.allowsCreate && gate != .stillSyncing)
+                    .accessibilityHint("Makes a new report from your current records")
+                    .accessibilityIdentifier("export.createAgain")
+            } else {
+                if reportIsStale && !isGenerating {
+                    Text("Your records changed since your last report. Create it again to include them.")
+                        .font(.footnote)
+                        .foregroundStyle(colors.caution)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityIdentifier("export.stale")
+                }
+                if isGenerating {
+                    // Busy: the drafting line runs inside a muted, non-tappable button.
+                    HStack(spacing: 10) {
+                        DraftingLoader(sketch: .chart, surface: .adaptive, lineWidth: 1.6)
+                            .frame(width: 34, height: 14)
+                            .accessibilityHidden(true)
+                        Text(generateButtonTitle)
+                    }
+                    .font(AppTypography.buttonLarge)
+                    .foregroundStyle(colors.action)
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 52)
+                    .background(Capsule().fill(colors.actionSurface))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("export.generatePDF")
+
+                    Text("You can close this. We'll let you know when it's ready.")
+                        .font(.footnote)
+                        .foregroundStyle(colors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityIdentifier("export.backgroundHint")
+                } else {
+                    Button {
+                        generateExports()
+                    } label: {
+                        Text(generateButtonTitle)
+                    }
+                    .buttonStyle(InboxPrimaryButtonStyle())
+                    .disabled(!gate.allowsCreate)
+                    .accessibilityIdentifier("export.generatePDF")
+
+                    if gate == .stillSyncing && canExport {
+                        // The pull is slow, not failed: the report may miss hours from other
+                        // devices. Let the user choose to go ahead anyway.
+                        Button("Create with what's on this device") { generateExports(force: true) }
+                            .font(AppTypography.button)
+                            .foregroundStyle(colors.action)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .accessibilityIdentifier("export.createLocal")
+                    }
+
+                    if !canExport && gate == .noEntries {
+                        Text("Log time in \(String(year)), then export it here.")
+                            .font(.footnote)
+                            .foregroundStyle(colors.textSecondary)
+                    }
+                }
+            }
+
+            if let exportError {
+                Label(exportError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(colors.destructive)
+                    .multilineTextAlignment(.center)
+            }
+        }
+    }
+
+    // MARK: Data
 
     var yearEntries: [TimeEntry] {
         viewModel.timeEntries.filter { Calendar.current.component(.year, from: $0.date) == year }
@@ -264,30 +318,8 @@ struct ExportPDFView: View {
         !yearEntries.isEmpty
     }
 
-    private var canGenerate: Bool { canExport && !isGenerating && !waitingForHours }
-
-    private var generateForeground: Color {
-        if isGenerating { return colors.action }
-        return canGenerate ? AppColors.onAction : colors.textSecondary
-    }
-
-    private var generateBackground: Color {
-        if isGenerating { return colors.actionSurface }
-        return canGenerate ? colors.action : colors.backgroundTertiary
-    }
-
     private var generateButtonTitle: String {
-        if !canExport { return "No entries to export" }
-        if isGenerating { return "Creating report…" }
-        if waitingForHours { return "Getting your latest hours…" }
-        return reportIsStale ? "Create again" : "Create PDF and CSV"
-    }
-
-    var exportSummaryText: String {
-        if canExport {
-            return "A PDF for your CPA, plus a spreadsheet. It shows hours by property, category, and person, every entry, and your photos."
-        }
-        return "Log time entries for \(String(year)), then export a report for your CPA or records."
+        gate.title(isStale: reportIsStale)
     }
 
     var repsQualifiedHours: Double {
@@ -307,9 +339,25 @@ struct ExportPDFView: View {
         ))
     }
 
-    private func generateExports() {
-        guard !isGenerating else { return }
-        guard !waitingForHours else { return }
+    /// Renders the real report's first page as the preview (same renderer as the export).
+    private func renderPreview() async {
+        let report = makeReport()
+        let year = year
+        let image = await Task.detached(priority: .userInitiated) { () -> UIImage? in
+            // The first page never shows photos; skip loading them for the preview.
+            let renderer = AuditReportPDFRenderer(attachmentData: { _ in nil })
+            let data = renderer.render(report)
+            guard let page = PDFDocument(data: data)?.page(at: 0) else { return nil }
+            return page.thumbnail(of: CGSize(width: 1188, height: 918), for: .mediaBox)
+        }.value
+        guard !Task.isCancelled else { return }
+        preview = image
+        previewYear = year
+    }
+
+    /// `force`: the user chose to export what's on this device while the pull is still running.
+    private func generateExports(force: Bool = false) {
+        guard gate.allowsCreate || (force && gate == .stillSyncing && canExport) else { return }
         job.start(report: makeReport(), year: year, fingerprint: fingerprint)
     }
 }
@@ -365,4 +413,36 @@ struct ActivityShareSheet: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+
+/// WP-L: when the export's Create button may run. Waiting states come before "no entries", so a
+/// profile whose iCloud pull is still running never reads "No entries to export".
+enum ExportGate: Equatable {
+    case generating
+    /// Today's hours placeholder is showing (first seconds of the pull).
+    case waitingForHours
+    /// The placeholder cap passed but the pull is still running: the report could miss hours.
+    case stillSyncing
+    case noEntries
+    case ready
+
+    static func resolve(hasEntries: Bool, isGenerating: Bool, hoursPlaceholderShowing: Bool, initialPullRunning: Bool) -> ExportGate {
+        if isGenerating { return .generating }
+        if hoursPlaceholderShowing { return .waitingForHours }
+        if initialPullRunning { return .stillSyncing }
+        if !hasEntries { return .noEntries }
+        return .ready
+    }
+
+    var allowsCreate: Bool { self == .ready }
+
+    func title(isStale: Bool) -> String {
+        switch self {
+        case .generating: return "Creating report…"
+        case .waitingForHours: return "Getting your latest hours…"
+        case .stillSyncing: return "Still syncing from iCloud"
+        case .noEntries: return "No entries to export"
+        case .ready: return isStale ? "Create again" : "Create PDF and CSV"
+        }
+    }
 }

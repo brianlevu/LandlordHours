@@ -226,6 +226,9 @@ struct HouseHeroCard: View {
     /// False for changes the user didn't make (an iCloud merge, even after the loading cap): the
     /// house and number update in place, with no beam, count-up or haptic.
     var animatesChanges = true
+    /// WP-L: a 90-day look-back is running. The words say so instead of the stage and next
+    /// milestone ("An empty lot / Foundation at 100h" reads as final while hours are coming).
+    var isLookingBack = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shownHours: Double?
@@ -341,15 +344,27 @@ struct HouseHeroCard: View {
                                 .foregroundStyle(statusColor)
                                 .accessibilityIdentifier("today.hero.status")
                             }
-                            Text(progress.stage.spokenName)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(HouseTokens.onHeroPrimary)
-                                .lineLimit(2)
-                            if progress.nextStep != nil {
-                                Text(progress.nextMilestoneLabel)
+                            if isLookingBack {
+                                Text("Looking through your calendar")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(HouseTokens.onHeroPrimary)
+                                    .lineLimit(2)
+                                    .accessibilityIdentifier("today.hero.lookingBack")
+                                Text("Work we find waits in your Inbox")
                                     .font(.footnote)
                                     .foregroundStyle(HouseTokens.onHeroSecondary)
                                     .lineLimit(2)
+                            } else {
+                                Text(progress.stage.spokenName)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(HouseTokens.onHeroPrimary)
+                                    .lineLimit(2)
+                                if progress.nextStep != nil {
+                                    Text(progress.nextMilestoneLabel)
+                                        .font(.footnote)
+                                        .foregroundStyle(HouseTokens.onHeroSecondary)
+                                        .lineLimit(2)
+                                }
                             }
                         }
                         .frame(width: columnWidth, alignment: .leading)

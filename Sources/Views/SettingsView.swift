@@ -1,828 +1,12 @@
 import SwiftUI
 import PhotosUI
-import LucideIcons
 
-// MARK: - Hour Goal Type
-
-enum HourGoalType: String, CaseIterable, Codable {
-    case reps = "REPS"
-    case str = "STR (Short-Term Rental)"
-    case both = "Both"
-
-    var description: String {
-        switch self {
-        case .reps:
-            return "750 hours plus the 50% rule (REPS)"
-        case .str:
-            return "100 hours - STR Material Participation"
-        case .both:
-            return "Track both REPS and STR goals"
-        }
-    }
-
-    var hoursRequired: Double {
-        switch self {
-        case .reps:
-            return 750
-        case .str:
-            return 100
-        case .both:
-            return 750 // Use higher as primary
-        }
-    }
-}
-
-// MARK: - Property Goal
-
-struct PropertyGoal: Identifiable, Codable {
-    var id: UUID
-    var propertyId: UUID
-    var goalType: HourGoalType
-    var modifiedAt: Date
-
-    init(id: UUID = UUID(), propertyId: UUID, goalType: HourGoalType = .both) {
-        self.id = id
-        self.propertyId = propertyId
-        self.goalType = goalType
-        self.modifiedAt = Date()
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decode(UUID.self, forKey: .id)
-        propertyId = try c.decode(UUID.self, forKey: .propertyId)
-        goalType = try c.decode(HourGoalType.self, forKey: .goalType)
-        modifiedAt = try c.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? Date()
-    }
-}
-
-// MARK: - Goal Manager
-
-class GoalManager: ObservableObject {
-    static let shared = GoalManager()
-
-    /// Called when goals change, so sync can be triggered
-    var onDidChange: (() -> Void)?
-
-    @Published var propertyGoals: [PropertyGoal] = []
-    @Published var globalGoalType: HourGoalType = .reps
-
-    private var goalsKey: String { UserScope.key("propertyGoals") }
-    private var globalGoalKey: String { UserScope.key("globalGoalType") }
-
-    private init() {
-        loadGoals()
-    }
-
-    func loadGoals() {
-        if let data = UserDefaults.standard.data(forKey: goalsKey),
-           let goals = try? JSONDecoder().decode([PropertyGoal].self, from: data) {
-            propertyGoals = goals
-        } else {
-            propertyGoals = []
-        }
-
-        if let raw = UserDefaults.standard.string(forKey: globalGoalKey),
-           let type = HourGoalType(rawValue: raw) {
-            globalGoalType = type
-        } else {
-            globalGoalType = .reps
-        }
-    }
-
-    func saveGoals() {
-        if let data = try? JSONEncoder().encode(propertyGoals) {
-            UserDefaults.standard.set(data, forKey: goalsKey)
-        }
-        UserDefaults.standard.set(globalGoalType.rawValue, forKey: globalGoalKey)
-        onDidChange?()
-    }
-
-    func resetForSignOut() {
-        propertyGoals = []
-        globalGoalType = .reps
-    }
-
-    func resetForDataReset() {
-        propertyGoals = []
-        globalGoalType = .reps
-        let ud = UserDefaults.standard
-        ud.removeObject(forKey: goalsKey)
-        ud.removeObject(forKey: globalGoalKey)
-        onDidChange?()
-    }
-
-    func setGoal(for propertyId: UUID, type: HourGoalType) {
-        if let index = propertyGoals.firstIndex(where: { $0.propertyId == propertyId }) {
-            propertyGoals[index].goalType = type
-        } else {
-            propertyGoals.append(PropertyGoal(propertyId: propertyId, goalType: type))
-        }
-        saveGoals()
-    }
-
-    func getGoal(for propertyId: UUID) -> HourGoalType {
-        propertyGoals.first(where: { $0.propertyId == propertyId })?.goalType ?? globalGoalType
-    }
-
-    func setGlobalGoal(_ type: HourGoalType) {
-        globalGoalType = type
-        saveGoals()
-    }
-}
-
-// MARK: - Filing Status
-
-enum FilingStatus: String, CaseIterable, Codable {
-    case single = "Single"
-    case marriedJoint = "Married, Joint"
-    case marriedSeparate = "Married, Separate"
-    case headOfHousehold = "Head of Household"
-    case qualifyingWidow = "Qualifying Widow(er)"
-}
-
-// MARK: - Tax Profile Manager
-
-final class TaxProfileManager: ObservableObject {
-    static let shared = TaxProfileManager()
-
-    /// Called when any field changes, so sync can be triggered
-    var onDidChange: (() -> Void)?
-
-    private func scopedKey(_ field: String) -> String {
-        UserScope.key("LandlordHours.taxProfile." + field)
-    }
-
-    /// True while `reload()` / `resetForSignOut()` apply stored or default values. Their
-    /// didSets must neither write back (resetForSignOut runs after the profile ID is cleared,
-    /// so writes would land in unscoped keys) nor fire `onDidChange` (which schedules a
-    /// CloudKit push of defaults over the iCloud TaxProfile before the first pull).
-    private(set) var isApplyingStoredValues = false
-
-    private func save(_ key: String, _ value: Any) {
-        guard !isApplyingStoredValues else { return }
-        UserDefaults.standard.set(value, forKey: key)
-        onDidChange?()
-    }
-
-    private func applyingStoredValues(_ body: () -> Void) {
-        isApplyingStoredValues = true
-        defer { isApplyingStoredValues = false }
-        body()
-    }
-
-    @Published var filingStatus: FilingStatus {
-        didSet { save(scopedKey("filingStatus"), filingStatus.rawValue) }
-    }
-    @Published var spouseTracking: Bool {
-        didSet { save(scopedKey("spouseTracking"), spouseTracking) }
-    }
-    @Published var taxYear: Int {
-        didSet { save(scopedKey("taxYear"), taxYear) }
-    }
-    @Published var groupingElection: Bool {
-        didSet { save(scopedKey("groupingElection"), groupingElection) }
-    }
-    @Published var nonREWorkHours: Double {
-        didSet { save(scopedKey("nonREWorkHours"), nonREWorkHours) }
-    }
-
-    /// IRS Test 3 (100-hour) confirmation, keyed by tax year.
-    /// A missing entry means unanswered (nil). The whole map is user-scoped like the
-    /// other tax-profile fields, so each user + tax year carries its own answer.
-    /// Mutated only through `setNoOneParticipatedMore(_:forYear:)` so loads don't re-persist.
-    @Published private(set) var noOneParticipatedMoreByYear: [Int: Bool] = [:]
-
-    private var participationKey: String { scopedKey("noOneParticipatedMore") }
-
-    private init() {
-        // Set defaults first (didSet won't fire during init)
-        filingStatus = .marriedJoint
-        spouseTracking = true
-        taxYear = Calendar.current.component(.year, from: Date())
-        groupingElection = false
-        nonREWorkHours = 0
-        reload()
-    }
-
-    func reload() {
-        applyingStoredValues {
-            let ud = UserDefaults.standard
-            if let raw = ud.string(forKey: scopedKey("filingStatus")),
-               let status = FilingStatus(rawValue: raw) {
-                filingStatus = status
-            } else {
-                filingStatus = .marriedJoint
-            }
-            if ud.object(forKey: scopedKey("spouseTracking")) != nil {
-                spouseTracking = ud.bool(forKey: scopedKey("spouseTracking"))
-            } else {
-                spouseTracking = true
-            }
-            let savedYear = ud.integer(forKey: scopedKey("taxYear"))
-            taxYear = savedYear > 0 ? savedYear : Calendar.current.component(.year, from: Date())
-            groupingElection = ud.bool(forKey: scopedKey("groupingElection"))
-            nonREWorkHours = ud.double(forKey: scopedKey("nonREWorkHours"))
-        }
-        loadParticipationConfirmations()
-    }
-
-    func resetForSignOut() {
-        applyingStoredValues {
-            filingStatus = .marriedJoint
-            spouseTracking = true
-            taxYear = Calendar.current.component(.year, from: Date())
-            groupingElection = false
-            nonREWorkHours = 0
-        }
-        noOneParticipatedMoreByYear = [:]
-    }
-
-    func resetForDataReset() {
-        filingStatus = .marriedJoint
-        spouseTracking = true
-        taxYear = Calendar.current.component(.year, from: Date())
-        groupingElection = false
-        nonREWorkHours = 0
-        noOneParticipatedMoreByYear = [:]
-
-        let ud = UserDefaults.standard
-        for field in ["filingStatus", "spouseTracking", "taxYear", "groupingElection", "nonREWorkHours", "noOneParticipatedMore"] {
-            ud.removeObject(forKey: scopedKey(field))
-        }
-        onDidChange?()
-    }
-
-    // MARK: - 100-Hour Test Confirmation
-
-    /// Answer for the given tax year: nil = unanswered, true = no one else participated
-    /// more, false = someone else did.
-    func noOneParticipatedMore(forYear year: Int) -> Bool? {
-        noOneParticipatedMoreByYear[year]
-    }
-
-    /// Records (or clears, when `value` is nil) the confirmation for a tax year and persists it.
-    func setNoOneParticipatedMore(_ value: Bool?, forYear year: Int) {
-        if let value {
-            noOneParticipatedMoreByYear[year] = value
-        } else {
-            noOneParticipatedMoreByYear.removeValue(forKey: year)
-        }
-        saveParticipationConfirmations()
-    }
-
-    private func loadParticipationConfirmations() {
-        guard let data = UserDefaults.standard.data(forKey: participationKey),
-              let decoded = try? JSONDecoder().decode([String: Bool].self, from: data) else {
-            noOneParticipatedMoreByYear = [:]
-            return
-        }
-        noOneParticipatedMoreByYear = Dictionary(uniqueKeysWithValues: decoded.compactMap { key, value in
-            Int(key).map { ($0, value) }
-        })
-    }
-
-    private func saveParticipationConfirmations() {
-        // Persist as [String: Bool] since JSON object keys must be strings.
-        let encodable = Dictionary(uniqueKeysWithValues: noOneParticipatedMoreByYear.map { (String($0.key), $0.value) })
-        if let data = try? JSONEncoder().encode(encodable) {
-            save(participationKey, data)
-        }
-    }
-}
-
-// MARK: - Setting Row Component
-
-struct SettingRow: View {
-    let icon: UIImage
-    let iconColor: Color
-    var iconWash: Color? = nil
-    let title: String
-    var subtitle: String? = nil
-    var value: String? = nil
-    var valueColor: Color? = nil
-    var showChevron: Bool = true
-    var isDanger: Bool = false
-    var subtitleColor: Color? = nil
-
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        HStack(spacing: 14) {
-            LucideIcon(image: icon, size: 20)
-                .foregroundStyle(isDanger ? colors.destructive : iconColor)
-                .frame(width: 38, height: 38)
-                .background(iconWash ?? colors.backgroundTertiary)
-                .clipShape(Circle())
-
-            // Text content
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(isDanger ? colors.destructive : colors.textPrimary)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(AppTypography.caption)
-                        .foregroundStyle(subtitleColor ?? colors.textSecondary)
-                }
-            }
-
-            Spacer()
-
-            // Optional value
-            if let value {
-                Text(value)
-                    .font(AppTypography.bodySmall)
-                    .fontWeight(.medium)
-                    .foregroundStyle(valueColor ?? colors.textSecondary)
-            }
-
-            // Chevron
-            if showChevron && !isDanger {
-                LucideIcon(image: Lucide.chevronRight, size: 12)
-                    .foregroundStyle(AppColors.cloud)
-            }
-        }
-        .padding(.vertical, 12)
-    }
-}
-
-// MARK: - Setting Toggle Row
-
-private struct SettingToggleRow: View {
-    let icon: UIImage
-    let iconColor: Color
-    var iconWash: Color? = nil
-    let title: String
-    var subtitle: String? = nil
-    @Binding var isOn: Bool
-    /// Toggle tint follows the same intent framework as the rest of Settings: neutral setting
-    /// changes use `action` (matches `tpToggleRow`'s convention below), not `positive`/sage —
-    /// sage is reserved for success/qualified states, not ordinary toggles.
-    var tint: Color = AppColors.action
-
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        HStack(spacing: 14) {
-            LucideIcon(image: icon, size: 20)
-                .foregroundStyle(iconColor)
-                .frame(width: 38, height: 38)
-                .background(iconWash ?? colors.backgroundTertiary)
-                .clipShape(Circle())
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(AppTypography.caption)
-                        .foregroundStyle(colors.textSecondary)
-                }
-            }
-
-            Spacer()
-
-            Toggle("", isOn: $isOn)
-                .labelsHidden()
-                .tint(tint)
-        }
-        .padding(.vertical, 13)
-    }
-}
-
-// MARK: - Appearance Preference Row
-
-private struct AppearancePreferenceRow: View {
-    @ObservedObject var appearanceManager: AppearanceManager
-
-    @Environment(\.colorScheme) var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var savedPulse = false
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 14) {
-                LucideIcon(image: Lucide.contrast, size: 20)
-                    .foregroundStyle(AppColors.action)
-                    .frame(width: 38, height: 38)
-                    .background(colors.actionSurface)
-                    .clipShape(Circle())
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Appearance")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                    Text("Follow the device or choose a theme")
-                        .font(AppTypography.caption)
-                        .foregroundStyle(colors.textSecondary)
-                }
-
-                Spacer()
-
-                HStack(spacing: 5) {
-                    LucideIcon(image: Lucide.check, size: 12)
-                    Text("Saved")
-                }
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(colors.positiveText)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
-                .background(colors.positiveSurface)
-                .clipShape(Capsule())
-                .opacity(savedPulse ? 1 : 0)
-                .scaleEffect(savedPulse ? 1 : 0.92)
-            }
-
-            HStack(spacing: 8) {
-                ForEach(AppAppearancePreference.allCases) { preference in
-                    appearanceButton(preference)
-                }
-            }
-
-            HStack(spacing: 6) {
-                LucideIcon(image: confirmationIcon, size: 13)
-                Text(appearanceManager.preference.confirmationText)
-            }
-            .font(.system(size: 12, weight: .semibold, design: .rounded))
-            .foregroundStyle(colors.textSecondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.vertical, 12)
-        .lhMotion(AppAnimation.quick, value: appearanceManager.preference)
-        .lhMotion(AppAnimation.reveal, value: savedPulse)
-    }
-
-    private func appearanceButton(_ preference: AppAppearancePreference) -> some View {
-        let isSelected = appearanceManager.preference == preference
-
-        return Button {
-            guard appearanceManager.preference != preference else { return }
-            if reduceMotion {
-                appearanceManager.preference = preference
-                savedPulse = true
-            } else {
-                withAnimation(AppAnimation.quick) {
-                    appearanceManager.preference = preference
-                    savedPulse = true
-                }
-            }
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
-                if reduceMotion {
-                    savedPulse = false
-                } else {
-                    withAnimation(AppAnimation.reveal) {
-                        savedPulse = false
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 6) {
-                LucideIcon(image: icon(for: preference), size: 14)
-                Text(preference.displayName)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-            }
-            .font(.system(size: 13, weight: .bold, design: .rounded))
-            .foregroundStyle(isSelected ? AppColors.onAction : colors.textSecondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(isSelected ? colors.action : colors.backgroundTertiary)
-            .clipShape(Capsule())
-            .overlay {
-                Capsule()
-                    .strokeBorder(isSelected ? Color.clear : colors.border.opacity(0.35), lineWidth: 1)
-            }
-        }
-        .buttonStyle(.lhPressable)
-        .accessibilityLabel("\(preference.displayName) appearance")
-        .accessibilityHint(preference.subtitle)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    private var confirmationIcon: UIImage {
-        switch appearanceManager.preference {
-        case .system: return Lucide.monitor
-        case .light: return Lucide.sun
-        case .dark: return Lucide.moon
-        }
-    }
-
-    private func icon(for preference: AppAppearancePreference) -> UIImage {
-        switch preference {
-        case .system: return Lucide.monitor
-        case .light: return Lucide.sun
-        case .dark: return Lucide.moon
-        }
-    }
-}
-
-// MARK: - Section Label
-
-private struct SectionLabel: View {
-    let text: String
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: 19, weight: .black, design: .rounded))
-            .foregroundStyle(colors.textPrimary)
-            .padding(.top, 28)
-            .padding(.bottom, 8)
-    }
-}
-
-// MARK: - Subscription Card
-
-private struct SubscriptionCard: View {
-    let isPro: Bool
-    let onTap: () -> Void
-
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .top, spacing: 14) {
-                    ZStack {
-                        Circle()
-                            .fill(isPro ? colors.positiveSurface : colors.actionSurface)
-                            .frame(width: 54, height: 54)
-                        LucideIcon(image: isPro ? Lucide.badgeCheck : Lucide.sparkles, size: 24)
-                            .foregroundStyle(isPro ? colors.positiveText : colors.actionText)
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(isPro ? "Pro is active" : "Upgrade to Pro")
-                            .font(.system(size: 23, weight: .black, design: .rounded))
-                            .foregroundStyle(colors.textPrimary)
-                        Text(isPro ? "Lifetime access is unlocked." : "Export your records and track every rental. Pay once.")
-                            .font(.system(size: 13, weight: .medium, design: .rounded))
-                            .foregroundStyle(colors.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer(minLength: 8)
-
-                    LucideIcon(image: Lucide.chevronRight, size: 14)
-                        .foregroundStyle(colors.textTertiary)
-                        .padding(.top, 6)
-                }
-
-                HStack(spacing: 8) {
-                    planBenefit("PDF exports", icon: Lucide.fileText)
-                    planBenefit("Unlimited properties", icon: Lucide.building2)
-                }
-
-                HStack {
-                    Text(isPro ? "Manage Pro" : "One-time lifetime purchase")
-                        .font(.system(size: 13, weight: .black, design: .rounded))
-                        .foregroundStyle(isPro ? colors.positiveText : colors.onAction)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(isPro ? colors.positiveSurface : colors.action)
-                        .clipShape(Capsule())
-
-                    Spacer()
-
-                    Text(isPro ? "ACTIVE" : "PRO")
-                        .font(.system(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(isPro ? colors.positiveText : colors.actionText)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(isPro ? colors.positiveSurface : colors.actionSurface)
-                        .clipShape(Capsule())
-                }
-            }
-            .padding(18)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                LinearGradient(
-                    colors: colorScheme == .dark
-                        ? [colors.backgroundSecondary, AppColors.darkPlum.opacity(0.72)]
-                        : [Color.white, AppColors.lavenderPale, isPro ? AppColors.successGreenWash : AppColors.lavenderPale],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(isPro ? colors.positive.opacity(0.28) : colors.action.opacity(0.22), lineWidth: 1)
-            }
-        }
-        .buttonStyle(.lhPressable)
-        .accessibilityLabel(isPro ? "Manage Pro. Lifetime access is active." : "Upgrade to Pro. One-time lifetime purchase.")
-        .accessibilityIdentifier("settings.proCard")
-    }
-
-    private func planBenefit(_ text: String, icon: UIImage) -> some View {
-        HStack(spacing: 6) {
-            LucideIcon(image: icon, size: 13)
-                .foregroundStyle(isPro ? colors.positiveText : colors.actionText)
-            Text(text)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(colors.textSecondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 9)
-        .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.5 : 0.72))
-        .clipShape(Capsule())
-    }
-}
-
-private struct SettingsGroup<Content: View>: View {
-    let title: String
-    var subtitle: String? = nil
-    @ViewBuilder let content: Content
-
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondaryOnCanvas)
-                }
-            }
-
-            VStack(spacing: 0) {
-                content
-            }
-            .padding(.horizontal, 14)
-            .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(colors.border.opacity(colorScheme == .dark ? 0.42 : 0.28), lineWidth: 1)
-            }
-        }
-    }
-}
-
-// MARK: - Not tax advice
-
-/// Plain disclaimer under Support & Legal. The PDF export carries its own version.
-struct NotTaxAdviceNote: View {
-    static let text = "LandlordHours keeps your records. It doesn't give tax advice. Check your qualification with a tax professional."
-
-    @Environment(\.colorScheme) private var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            LucideIcon(image: Lucide.info, size: 15)
-                .foregroundStyle(colors.textSecondaryOnCanvas)
-                .padding(.top, 2)
-                .accessibilityHidden(true)
-            Text(Self.text)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(colors.textSecondaryOnCanvas)
-                .lineSpacing(2)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 4)
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("settings.notTaxAdvice")
-    }
-}
-
-// MARK: - Feature List
-
-private struct FeatureListView: View {
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            FeatureItem(icon: Lucide.lock, text: "PDF Export Reports", badge: "PRO", isLocked: true)
-            FeatureItem(icon: Lucide.lock, text: "Multi-Year Tracking", badge: "PRO", isLocked: true)
-            FeatureItem(icon: Lucide.lock, text: "Unlimited Properties", badge: "PRO", isLocked: true)
-
-            Divider()
-                .background(colors.border.opacity(0.35))
-                .padding(.vertical, 6)
-
-            FeatureItem(icon: Lucide.check, text: "Basic hour tracking", badge: "FREE", isLocked: false)
-            FeatureItem(icon: Lucide.check, text: "1 property", badge: "FREE", isLocked: false)
-            FeatureItem(icon: Lucide.check, text: "Learning center", badge: "FREE", isLocked: false)
-        }
-        .padding(.vertical, 8)
-    }
-}
-
-private struct FeatureItem: View {
-    let icon: UIImage
-    let text: String
-    let badge: String
-    let isLocked: Bool
-
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        HStack(spacing: 10) {
-            LucideIcon(image: icon, size: 14)
-                .foregroundStyle(isLocked ? colors.textSecondary : colors.positiveText)
-                .frame(width: 18, height: 18)
-
-            Text(text)
-                .font(AppTypography.bodySmall)
-                .foregroundStyle(isLocked ? colors.textSecondary : colors.textPrimary)
-
-            Spacer()
-
-            Text(badge)
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(isLocked ? colors.actionText : colors.positiveText)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2)
-                .background(isLocked ? colors.actionSurface : colors.positiveSurface)
-                .clipShape(Capsule())
-        }
-        .padding(.vertical, 7)
-    }
-}
-
-// MARK: - Profile Row
-
-private struct ProfileRow: View {
-    let name: String
-    let email: String?
-    let imageData: Data?
-    let onTap: () -> Void
-
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 14) {
-                // Avatar
-                if let imageData, let uiImage = UIImage(data: imageData) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 48, height: 48)
-                        .clipShape(Circle())
-                } else {
-                    ZStack {
-                        Circle()
-                            .fill(colors.actionSurface)
-                            .frame(width: 48, height: 48)
-
-                        // Show initial or person icon
-                        if !name.isEmpty && name != "Your Name" {
-                            Text(String(name.prefix(1)).uppercased())
-                                .font(.system(size: 20, weight: .bold, design: .rounded))
-                                .foregroundStyle(colors.action)
-                        } else {
-                            LucideIcon(image: Lucide.user, size: 20)
-                                .foregroundStyle(colors.action)
-                        }
-                    }
-                }
-
-                // Name and email
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(name)
-                        .font(.system(size: 16, weight: .black, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                    if let email, !email.isEmpty {
-                        Text(email)
-                            .font(AppTypography.caption)
-                            .foregroundStyle(colors.textSecondary)
-                    }
-                }
-
-                Spacer()
-
-                LucideIcon(image: Lucide.chevronRight, size: 12)
-                    .foregroundStyle(AppColors.cloud)
-            }
-            .padding(.vertical, 14)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Settings View
+// MARK: - Settings
+//
+// Flighty's plain inset-grouped list on the Blueprint canvas: who you are and your plan on top,
+// then Auto-capture (what the app may read, and the promise that nothing counts until you
+// confirm), tax setup, records, the app, data and privacy, support, and the account exits.
+// docs/design/2.0-hifi-reference-spec.md §j.
 
 struct SettingsView: View {
     @EnvironmentObject var viewModel: AppViewModel
@@ -834,21 +18,22 @@ struct SettingsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
-    @State private var showingResetAlert = false
     @State private var showingProfileEdit = false
     @State private var paywallContext: PaywallContext?
-    @State private var showExportAfterUnlock = false
+    @State private var showExport = false
     @State private var userName = ""
     @State private var userEmail = ""
-    @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var profileImage: Data?
     @State private var restoreStatusMessage: String?
-    @State private var showDeveloperTools = false
-    /// Backs the "Share Anonymous Usage Data" toggle. Stores whether the user opted OUT (default
+    @State private var restorableProfiles: [DiscoveredProfile] = []
+    @State private var showRestoreSheet = false
+    @State private var route: SettingsRoute?
+    /// Backs the "Share anonymous usage data" toggle. Stores whether the user opted OUT (default
     /// `false`, i.e. shared/opted-in by default) directly against `Analytics.optOutKey` so this
     /// view and `Analytics` always read the same UserDefaults value.
     @AppStorage(Analytics.optOutKey) private var analyticsOptedOut = false
     #if DEBUG
+    @State private var showDeveloperTools = false
     @State private var showEngagementLab = false
     #endif
 
@@ -864,312 +49,67 @@ struct SettingsView: View {
         )
     }
 
+    private var displayName: String {
+        appleSignIn.fullName ?? (viewModel.userName.isEmpty ? "Your name" : viewModel.userName)
+    }
+
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 22) {
+            List {
+                Section {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Settings")
-                            .lhDisplayFont(.largeTitle)
-                            .foregroundStyle(colors.textPrimary)
-                            .minimumScaleFactor(0.83)
-                        Text("Manage your profile, tax setup, exports, and reminders.")
-                            .font(.system(size: 15, weight: .medium, design: .rounded))
-                            .foregroundStyle(colors.textSecondaryOnCanvas)
+                        BPBackToTodayButton()
+                        BPScreenTitle(text: "Settings")
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 4, trailing: 20))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                }
 
-                    SubscriptionCard(
-                        isPro: subscriptionManager.isPro,
-                        onTap: { paywallContext = .settingsUpgrade }
-                    )
+                profileSection
+                planSection
+                AutoCaptureSettingsSection(onOpenMuted: { route = .muted })
+                taxSection
+                recordsSection
+                appSection
+                privacySection
+                supportSection
+                SettingsAccountSection()
 
-                    if !subscriptionManager.isPro {
-                        SettingsGroup(title: "What Pro unlocks", subtitle: "The features that matter when records need to leave the app.") {
-                            FeatureListView()
-                        }
-                    }
-
-                    SettingsGroup(title: "Account", subtitle: "Profile, purchase status, and identity.") {
-                        ProfileRow(
-                            name: appleSignIn.fullName ?? (viewModel.userName.isEmpty ? "Your Name" : viewModel.userName),
-                            email: appleSignIn.email,
-                            imageData: profileImage ?? appleSignIn.profileImageData,
-                            onTap: {
-                                userName = appleSignIn.fullName ?? viewModel.userName
-                                userEmail = appleSignIn.email ?? ""
-                                profileImage = appleSignIn.profileImageData
-                                showingProfileEdit = true
-                            }
-                        )
-
-                        Divider().background(colors.border.opacity(0.35))
-
-                        Button {
-                            Task {
-                                await subscriptionManager.restorePurchases()
-                                restoreStatusMessage = subscriptionManager.hasPurchased
-                                    ? "Your Pro purchase has been restored."
-                                    : (subscriptionManager.purchaseError ?? "No previous purchase was found.")
-                            }
-                        } label: {
-                            SettingRow(
-                                icon: Lucide.badgeCheck,
-                                iconColor: AppColors.action,
-                                iconWash: colors.actionSurface,
-                                title: subscriptionManager.isLoading ? "Restoring Purchase..." : "Restore Purchase",
-                                subtitle: "Recover a previous Pro purchase"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(subscriptionManager.isLoading)
-
-                        SettingsProfileRestoreRow()
-                    }
-
-                    SettingsGroup(title: "Tax Setup", subtitle: "The assumptions that drive qualification math.") {
-                        NavigationLink {
-                            TaxProfileView()
-                        } label: {
-                            SettingRow(
-                                icon: Lucide.fileText,
-                                iconColor: AppColors.action,
-                                iconWash: colors.actionSurface,
-                                title: "Tax Profile",
-                                subtitle: "Filing, goals, spouse tracking, and 50% rule inputs"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("settings.taxProfile")
-
-                        Divider().background(colors.border.opacity(0.35))
-
-                        NavigationLink {
-                            LearningCenterView()
-                        } label: {
-                            SettingRow(
-                                icon: Lucide.bookOpen,
-                                iconColor: AppColors.informational,
-                                iconWash: colors.informationalSurface,
-                                title: "Learning Center",
-                                subtitle: "REPS, STR rules, and audit-ready logs"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("settings.learningCenter")
-                    }
-
-                    SettingsGroup(title: "Records", subtitle: "Import, sync, and export your tracking evidence.") {
-                        if viewModel.canExportPDF() {
-                            NavigationLink {
-                                ExportPDFView(year: Calendar.current.component(.year, from: Date()))
-                            } label: {
-                                SettingRow(
-                                    icon: Lucide.download,
-                                    iconColor: AppColors.action,
-                                    iconWash: colors.actionSurface,
-                                    title: "Export Reports",
-                                    subtitle: "PDF package for your accountant"
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("settings.exportReports")
-                        } else {
-                            Button {
-                                paywallContext = .export
-                            } label: {
-                                SettingRow(
-                                    icon: Lucide.download,
-                                    iconColor: AppColors.action,
-                                    iconWash: colors.actionSurface,
-                                    title: "Export Reports",
-                                    subtitle: "PDF and CSV of your hours, with Pro",
-                                    value: "PRO",
-                                    valueColor: colors.actionText
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("settings.exportReportsLocked")
-                        }
-
-                        Divider().background(colors.border.opacity(0.35))
-
-                        Button {
-                            viewModel.syncNow()
-                        } label: {
-                            SettingRow(
-                                icon: Lucide.cloudUpload,
-                                iconColor: AppColors.informational,
-                                iconWash: colors.informationalSurface,
-                                title: "Sync Now",
-                                subtitle: syncSubtitle ?? "Back up latest records to iCloud",
-                                subtitleColor: syncNeedsAttention ? colors.cautionText : nil
-                            )
-                        }
-                        .buttonStyle(.plain)
-
-                        Divider().background(colors.border.opacity(0.35))
-
-                        // 2.0: calendar work arrives as suggestions in the Inbox and is saved only
-                        // when confirmed one by one (the 1.x bulk import is retired).
-                        Button {
-                            NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex)
-                        } label: {
-                            SettingRow(
-                                icon: Lucide.calendar,
-                                iconColor: AppColors.informational,
-                                iconWash: colors.informationalSurface,
-                                title: "Calendar suggestions",
-                                subtitle: "Review rental work found in your calendar"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("settings.calendarSuggestions")
-                    }
-
-                    Text("Photos attached to time entries are stored on this device only and aren't included in iCloud sync.")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 4)
-                        .padding(.top, -2)
-                        .accessibilityIdentifier("settings.photoStorageDisclosure")
-
-                    SettingsGroup(title: "App Preferences", subtitle: "Personalize reminders, icon, and setup guidance.") {
-                        AppearancePreferenceRow(appearanceManager: appearanceManager)
-                            .accessibilityIdentifier("settings.appearance")
-
-                        Divider().background(colors.border.opacity(0.35))
-
-                        Button {
-                            if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
-                                UIApplication.shared.open(url)
-                            }
-                        } label: {
-                            SettingRow(
-                                icon: Lucide.bell,
-                                iconColor: AppColors.caution,
-                                iconWash: colors.cautionSurface,
-                                title: "Notifications",
-                                subtitle: "Manage reminder permissions in iOS Settings"
-                            )
-                        }
-                        .buttonStyle(.plain)
-
-                        Divider().background(colors.border.opacity(0.35))
-
-                        Button {
-                            NotificationCenter.default.post(name: .restartGuidedOnboarding, object: nil)
-                        } label: {
-                            SettingRow(
-                                icon: Lucide.route,
-                                iconColor: AppColors.action,
-                                iconWash: colors.actionSurface,
-                                title: "Restart Guided Setup",
-                                subtitle: "Show the first property and first activity walkthrough again"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("settings.restartGuidedSetup")
-
-                        Divider().background(colors.border.opacity(0.35))
-
-                        Button {
-                            NotificationCenter.default.post(name: .skipGuidedOnboarding, object: nil)
-                        } label: {
-                            SettingRow(
-                                icon: Lucide.circleSlash,
-                                iconColor: AppColors.textSecondary,
-                                title: "Skip Guided Setup",
-                                subtitle: "Hide first-run prompts"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("settings.skipGuidedSetup")
-                    }
-
-                    SettingsGroup(title: "Privacy", subtitle: "Control what usage data leaves this device.") {
-                        SettingToggleRow(
-                            icon: Lucide.chartNoAxesCombined,
-                            iconColor: AppColors.informational,
-                            iconWash: colors.informationalSurface,
-                            title: "Share Anonymous Usage Data",
-                            subtitle: "Helps us find bugs and improve the app",
-                            isOn: shareAnalyticsBinding
-                        )
-                        .accessibilityIdentifier("settings.analyticsOptOut")
-
-                        Text("Anonymous signals like \"a session was logged.\" Never your notes, properties, or personal data.")
-                            .font(AppTypography.caption)
+                Section {
+                    VStack(alignment: .leading, spacing: 12) {
+                        NotTaxAdviceNote()
+                        Text("LandlordHours · \(AppVersionInfo.display())")
+                            .font(.footnote)
+                            .monospacedDigit()
                             .foregroundStyle(colors.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.bottom, 12)
-                            .accessibilityIdentifier("settings.analyticsOptOutCaption")
+                            .accessibilityIdentifier("settings.version")
                     }
-
-                    SettingsGroup(title: "Support & Legal", subtitle: "Help, policies, and your data.") {
-                        NavigationLink {
-                            ContactSupportView()
-                        } label: {
-                            SettingRow(
-                                icon: Lucide.mail,
-                                iconColor: AppColors.informational,
-                                iconWash: colors.informationalSurface,
-                                title: "Contact Support",
-                                subtitle: "Questions about tracking, exports, or setup"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("settings.contactSupport")
-
-                        Divider().background(colors.border.opacity(0.35))
-
-                        Button {
-                            if let url = URL(string: "https://www.altaiventures.co/landlord-hours/terms") {
-                                UIApplication.shared.open(url)
-                            }
-                        } label: {
-                            SettingRow(
-                                icon: Lucide.scrollText,
-                                iconColor: AppColors.textSecondary,
-                                title: "Terms & Privacy"
-                            )
-                        }
-                        .buttonStyle(.plain)
-
-                        SettingsProfileExitRows()
-                    }
-
-                    NotTaxAdviceNote()
-
-                    #if DEBUG
-                    if AdminAccess.isCurrentUserAdmin {
-                        developerToolsSection
-                    }
-                    #endif
-
-                    // Version
-                    Text("LandlordHours v\(Self.appVersion)")
-                        .font(AppTypography.caption)
-                        .foregroundStyle(colors.textSecondaryOnCanvas)
-                        .padding(.bottom, AppSpacing.tabContentBottomInset)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 8)
+
+                #if DEBUG
+                if AdminAccess.isCurrentUserAdmin {
+                    developerToolsSection
+                }
+                #endif
             }
-            .background {
-                LHMobileCanvas()
-            }
+            .listStyle(.insetGrouped)
+            .listSectionSpacing(24)
+            .scrollContentBackground(.hidden)
+            .contentMargins(.bottom, 104, for: .scrollContent)
+            .background { LHMobileCanvas() }
             .navigationBarHidden(true)
-            .alert("Reset All Data?", isPresented: $showingResetAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Reset", role: .destructive) {
-                    viewModel.resetCurrentUserLocalData()
+            .navigationDestination(item: $route) { route in
+                switch route {
+                case .taxProfile: TaxProfileView()
+                case .learningCenter: LearningCenterView()
+                case .contactSupport: ContactSupportView()
+                case .muted: MutedSuggestionsView()
                 }
-            } message: {
-                Text("This will delete your local properties, time entries, goals, tax profile, categories, and setup state for this profile. Your profile and Pro purchase stay intact.")
             }
-            .alert("Restore Purchase", isPresented: Binding(
+            .alert("Restore purchase", isPresented: Binding(
                 get: { restoreStatusMessage != nil },
                 set: { if !$0 { restoreStatusMessage = nil } }
             )) {
@@ -1184,14 +124,29 @@ struct SettingsView: View {
                 PaywallView(
                     context: context,
                     // After a purchase from the export row, carry on to the export.
-                    onUnlocked: { if context == .export { showExportAfterUnlock = true } },
+                    onUnlocked: { if context == .export { showExport = true } },
                     // Close through the binding: environment dismiss did not close an
                     // item-driven sheet here (caught by the free-user journey test).
                     onClose: { paywallContext = nil }
                 )
             }
-            .navigationDestination(isPresented: $showExportAfterUnlock) {
+            .sheet(isPresented: $showExport) {
                 ExportPDFView(year: Calendar.current.component(.year, from: Date()))
+            }
+            .sheet(isPresented: $showRestoreSheet) {
+                ProfileRestoreSheet(profiles: restorableProfiles, context: .settings) { profile in
+                    showRestoreSheet = false
+                    viewModel.switchToProfile(profile)
+                    Task { restorableProfiles = await viewModel.discoverRestorableProfiles() }
+                }
+            }
+            .task(id: viewModel.isSignedIn) {
+                restorableProfiles = await viewModel.discoverRestorableProfiles()
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("-LHOpenRestoreSheet"), !restorableProfiles.isEmpty {
+                    showRestoreSheet = true
+                }
+                #endif
             }
             #if DEBUG
             .navigationDestination(isPresented: $showEngagementLab) {
@@ -1205,11 +160,280 @@ struct SettingsView: View {
             }
             #endif
         }
+        .accessibilityIdentifier("settings.screen")
     }
 
-    private static var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+    // MARK: Profile
+
+    private var profileSection: some View {
+        Section {
+            Button {
+                userName = appleSignIn.fullName ?? viewModel.userName
+                userEmail = appleSignIn.email ?? ""
+                profileImage = appleSignIn.profileImageData
+                showingProfileEdit = true
+            } label: {
+                HStack(spacing: 14) {
+                    ProfileAvatar(name: displayName, imageData: profileImage ?? appleSignIn.profileImageData, size: 56)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(displayName)
+                            .font(.headline)
+                            .foregroundStyle(colors.textPrimary)
+                        if let email = appleSignIn.email, !email.isEmpty {
+                            Text(email)
+                                .font(.subheadline)
+                                .foregroundStyle(colors.textSecondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        planBadge
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(colors.textTertiary)
+                        .accessibilityHidden(true)
+                }
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Edit your name, email and photo")
+            .accessibilityIdentifier("settings.profile")
+        }
+        .listRowBackground(colors.backgroundSecondary)
     }
+
+    private var planBadge: some View {
+        let isPro = subscriptionManager.isPro
+        return Text(isPro ? "Pro · Paid once" : "Free plan")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(isPro ? colors.positive : colors.textSecondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(isPro ? colors.positiveSurface : colors.backgroundTertiary))
+    }
+
+    // MARK: Plan
+
+    private var planSection: some View {
+        Section {
+            Button {
+                paywallContext = .settingsUpgrade
+            } label: {
+                SettingRow(
+                    symbol: subscriptionManager.isPro ? "checkmark.seal" : "sparkles",
+                    title: subscriptionManager.isPro ? "Pro is active" : "Upgrade to Pro",
+                    subtitle: subscriptionManager.isPro
+                        ? "Paid once. Exports and every rental are unlocked."
+                        : "Export your records and track every rental. Pay once.",
+                    showsChevron: true
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("settings.proCard")
+
+            Button {
+                Task {
+                    await subscriptionManager.restorePurchases()
+                    restoreStatusMessage = subscriptionManager.hasPurchased
+                        ? "Your Pro purchase has been restored."
+                        : (subscriptionManager.purchaseError ?? "No previous purchase was found.")
+                }
+            } label: {
+                SettingRow(
+                    symbol: "arrow.clockwise",
+                    title: subscriptionManager.isLoading ? "Restoring purchase…" : "Restore purchase"
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(subscriptionManager.isLoading)
+            .accessibilityIdentifier("settings.restorePurchase")
+
+            if !restorableProfiles.isEmpty {
+                Button {
+                    showRestoreSheet = true
+                } label: {
+                    SettingRow(
+                        symbol: "clock.arrow.circlepath",
+                        title: "Restore other data",
+                        subtitle: restorableProfiles.count == 1
+                            ? "1 earlier profile on this iPhone or in iCloud"
+                            : "\(restorableProfiles.count) earlier profiles on this iPhone or in iCloud",
+                        showsChevron: true
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("settings.restoreOtherData")
+            }
+        } header: {
+            BPSectionHeader(title: "Plan")
+        }
+        .listRowBackground(colors.backgroundSecondary)
+    }
+
+    // MARK: Tax setup
+
+    private var taxSection: some View {
+        Section {
+            Button {
+                route = .taxProfile
+            } label: {
+                SettingRow(symbol: "doc.text", title: "Tax profile", subtitle: "Filing, goal, spouse hours, the 50% rule", showsChevron: true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("settings.taxProfile")
+
+            Button {
+                route = .learningCenter
+            } label: {
+                SettingRow(symbol: "book", title: "Learning center", subtitle: "REPS, rentals and records, in plain words", showsChevron: true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("settings.learningCenter")
+        } header: {
+            BPSectionHeader(title: "Tax setup")
+        }
+        .listRowBackground(colors.backgroundSecondary)
+    }
+
+    // MARK: Records
+
+    private var recordsSection: some View {
+        Section {
+            if viewModel.canExportPDF() {
+                Button {
+                    showExport = true
+                } label: {
+                    SettingRow(symbol: "square.and.arrow.up", title: "Export reports", subtitle: "PDF and CSV for your accountant", showsChevron: true)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("settings.exportReports")
+            } else {
+                Button {
+                    paywallContext = .export
+                } label: {
+                    SettingRow(
+                        symbol: "square.and.arrow.up",
+                        title: "Export reports",
+                        subtitle: "PDF and CSV of your hours, with Pro",
+                        value: "Pro",
+                        valueColor: colors.action,
+                        showsChevron: true
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("settings.exportReportsLocked")
+            }
+
+            Button {
+                viewModel.syncNow()
+            } label: {
+                SettingRow(
+                    symbol: syncNeedsAttention ? "exclamationmark.icloud" : "icloud",
+                    title: "Sync now",
+                    subtitle: syncSubtitle ?? "Back up your records to iCloud"
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("settings.syncNow")
+        } header: {
+            BPSectionHeader(title: "Records")
+        } footer: {
+            Text("Photos attached to records stay on this iPhone. They aren't included in iCloud sync.")
+                .font(.footnote)
+                .foregroundStyle(colors.textSecondary)
+                .accessibilityIdentifier("settings.photoStorageDisclosure")
+        }
+        .listRowBackground(colors.backgroundSecondary)
+    }
+
+    // MARK: App
+
+    private var appSection: some View {
+        Section {
+            AppearancePreferenceRow(appearanceManager: appearanceManager)
+                .accessibilityIdentifier("settings.appearance")
+
+            Button {
+                if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            } label: {
+                SettingRow(symbol: "bell", title: "Notification permission", subtitle: "Opens iOS Settings", showsChevron: true)
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                NotificationCenter.default.post(name: .restartGuidedOnboarding, object: nil)
+            } label: {
+                SettingRow(symbol: "signpost.right", title: "Restart guided setup", subtitle: "Walk through the first property and hour again")
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("settings.restartGuidedSetup")
+
+            Button {
+                NotificationCenter.default.post(name: .skipGuidedOnboarding, object: nil)
+            } label: {
+                SettingRow(symbol: "forward", title: "Skip guided setup", subtitle: "Hide first-run tips")
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("settings.skipGuidedSetup")
+        } header: {
+            BPSectionHeader(title: "App")
+        }
+        .listRowBackground(colors.backgroundSecondary)
+    }
+
+    // MARK: Data and privacy
+
+    private var privacySection: some View {
+        Section {
+            SettingToggleRow(
+                symbol: "chart.bar.xaxis",
+                title: "Share anonymous usage data",
+                subtitle: "Signals like \u{201C}a record was saved\u{201D}. Never your notes, properties or personal data.",
+                isOn: shareAnalyticsBinding
+            )
+            .accessibilityIdentifier("settings.analyticsOptOut")
+
+            Button {
+                if let url = URL(string: "https://www.altaiventures.co/landlord-hours/terms") {
+                    UIApplication.shared.open(url)
+                }
+            } label: {
+                SettingRow(symbol: "hand.raised", title: "Terms and privacy", showsChevron: true)
+            }
+            .buttonStyle(.plain)
+        } header: {
+            BPSectionHeader(title: "Data and privacy")
+        } footer: {
+            Text("Your records live on this iPhone and in your own iCloud. We never see them.")
+                .font(.footnote)
+                .foregroundStyle(colors.textSecondary)
+                .accessibilityIdentifier("settings.analyticsOptOutCaption")
+        }
+        .listRowBackground(colors.backgroundSecondary)
+    }
+
+    // MARK: Support
+
+    private var supportSection: some View {
+        Section {
+            Button {
+                route = .contactSupport
+            } label: {
+                SettingRow(symbol: "envelope", title: "Contact support", subtitle: "Questions about tracking, exports or setup", showsChevron: true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("settings.contactSupport")
+        } header: {
+            BPSectionHeader(title: "Support")
+        }
+        .listRowBackground(colors.backgroundSecondary)
+    }
+
+    // MARK: Helpers
 
     private var syncNeedsAttention: Bool {
         !viewModel.syncService.isSyncing && !viewModel.syncService.isRunningInitialSync
@@ -1225,189 +449,406 @@ struct SettingsView: View {
             formatter.unitsStyle = .short
             return "Last sync: \(formatter.localizedString(for: date, relativeTo: Date()))"
         }
-        if !viewModel.syncService.accountAvailable { return "iCloud unavailable" }
         return nil
-    }
-
-    private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
-        if reduceMotion {
-            updates()
-        } else {
-            withAnimation(animation, updates)
-        }
     }
 
     #if DEBUG
     private var developerToolsSection: some View {
-        DisclosureGroup(isExpanded: $showDeveloperTools) {
-            VStack(spacing: 12) {
+        Section {
+            DisclosureGroup(isExpanded: $showDeveloperTools) {
                 Button {
                     subscriptionManager.unlockPro()
                 } label: {
-                    HStack {
-                        LucideIcon(image: Lucide.badgeCheck, size: 18)
-                        Text(subscriptionManager.hasPurchased ? "Pro unlocked for this build" : "Unlock Pro for testing")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                        Spacer()
-                    }
-                    .foregroundStyle(subscriptionManager.hasPurchased ? AppColors.successGreen : AppColors.onAction)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .background(subscriptionManager.hasPurchased ? AppColors.successGreenWash : AppColors.coral)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    SettingRow(symbol: "checkmark.seal", title: subscriptionManager.hasPurchased ? "Pro unlocked for this build" : "Unlock Pro for testing")
                 }
                 .buttonStyle(.plain)
 
                 Button {
                     showEngagementLab = true
                 } label: {
-                    HStack(spacing: 12) {
-                        LHIconTile(
-                            icon: Lucide.bell,
-                            color: AppColors.informational,
-                            wash: colors.informationalSurface,
-                            size: 38,
-                            isActive: true
-                        )
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Engagement Lab")
-                                .font(AppTypography.body)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(colors.textPrimary)
-                            Text("Preview notifications, widgets, Live Activities, and Siri")
-                                .font(AppTypography.caption)
-                                .foregroundStyle(colors.textSecondary)
-                        }
-
-                        Spacer()
-
-                        LucideIcon(image: Lucide.chevronRight, size: 18)
-                            .foregroundStyle(colors.textTertiary)
-                    }
-                    .padding(12)
-                    .background(colors.backgroundSecondary)
-                    .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: AppCornerRadius.large)
-                            .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
-                    }
+                    SettingRow(symbol: "bell.badge", title: "Engagement Lab", subtitle: "Notifications, widgets, Live Activities and Siri", showsChevron: true)
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("settings.engagementLab")
 
                 ForEach(AppViewModel.MockDataScenario.allCases) { scenario in
                     Button {
-                        animate(AppAnimation.smooth) {
+                        if reduceMotion {
                             viewModel.applyMockScenario(scenario)
+                        } else {
+                            withAnimation(AppAnimation.smooth) { viewModel.applyMockScenario(scenario) }
                         }
                     } label: {
-                        HStack(spacing: 12) {
-                            LHIconTile(
-                                icon: debugScenarioIcon(for: scenario),
-                                color: debugScenarioColor(for: scenario),
-                                wash: debugScenarioWash(for: scenario),
-                                size: 38,
-                                isActive: true
-                            )
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(scenario.title)
-                                    .font(AppTypography.body)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(colors.textPrimary)
-                                Text(scenario.subtitle)
-                                    .font(AppTypography.caption)
-                                    .foregroundStyle(colors.textSecondary)
-                            }
-
-                            Spacer()
-
-                            Text("Seed")
-                                .font(AppTypography.buttonSmall)
-                                .foregroundStyle(debugScenarioColor(for: scenario))
-                        }
-                        .padding(12)
-                        .background(colors.backgroundSecondary)
-                        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: AppCornerRadius.large)
-                                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
-                        }
+                        SettingRow(symbol: "tray.and.arrow.down", title: scenario.title, subtitle: scenario.subtitle, value: "Seed", valueColor: colors.action)
                     }
                     .buttonStyle(.plain)
                 }
+            } label: {
+                SettingRow(symbol: "hammer", title: "Developer tools", subtitle: "Mock data and debug-only Pro controls")
             }
-            .padding(.top, 12)
-        } label: {
-            HStack(spacing: 12) {
-                LHIconTile(
-                    icon: Lucide.code,
-                    color: AppColors.textSecondary,
-                    wash: colors.backgroundTertiary,
-                    size: 38,
-                    isActive: true
-                )
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Developer Tools")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                    Text("Mock data and debug-only Pro controls")
-                        .font(AppTypography.caption)
-                        .foregroundStyle(colors.textSecondary)
+        }
+        .listRowBackground(colors.backgroundSecondary)
+    }
+    #endif
+}
+
+// MARK: - Avatar
+
+struct ProfileAvatar: View {
+    let name: String
+    let imageData: Data?
+    var size: CGFloat = 56
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var initials: String {
+        let parts = name.split(separator: " ").prefix(2)
+        let letters = parts.compactMap(\.first).map { String($0).uppercased() }.joined()
+        return letters.isEmpty || name == "Your name" ? "" : letters
+    }
+
+    var body: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        Group {
+            if let imageData, let uiImage = UIImage(data: imageData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ZStack {
+                    Circle().fill(colors.actionSurface)
+                    if initials.isEmpty {
+                        Image(systemName: "person.fill")
+                            .font(.system(size: size * 0.4))
+                            .foregroundStyle(colors.action)
+                    } else {
+                        Text(initials)
+                            .font(.system(size: size * 0.36, weight: .semibold, design: .rounded))
+                            .foregroundStyle(colors.action)
+                    }
                 }
             }
         }
-        .padding(14)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(colors.border.opacity(0.28), lineWidth: 1)
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Auto-capture
+
+/// What the app may read and when it may ask. Both switches start off; turning the calendar on
+/// asks for access, turning prompts on asks for notification permission. Mutes live one level in.
+/// Settings' pushed screens. Buttons + one destination (not NavigationLinks in the List), so
+/// each row is a plain button for VoiceOver and UI tests, with its own chevron.
+enum SettingsRoute: Hashable {
+    case taxProfile, learningCenter, contactSupport, muted
+}
+
+private struct AutoCaptureSettingsSection: View {
+    var onOpenMuted: () -> Void = {}
+    @EnvironmentObject private var viewModel: AppViewModel
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    @State private var calendarOn = CaptureOptIn.calendarSuggestionsEnabled()
+    @State private var promptsOn = EventPromptsConsent.isEnabled()
+    @State private var muteCount = 0
+    @State private var blockedMessage: String?
+    @State private var isAsking = false
+
+    static let aiDisclosure = "Suggestions use Apple's on-device model. Nothing is sent to us or any third party."
+
+    var body: some View {
+        Section {
+            SettingToggleRow(
+                symbol: "calendar",
+                title: "Calendar",
+                subtitle: "Suggest work from your events. Titles are read on your iPhone.",
+                isOn: Binding(get: { calendarOn }, set: { setCalendar($0) })
+            )
+            .disabled(isAsking)
+            .accessibilityIdentifier("settings.capture.calendar")
+
+            SettingToggleRow(
+                symbol: "bell.badge",
+                title: "Ask when an event ends",
+                subtitle: calendarOn ? "At most twice a day, never after 9 pm." : "Turn on Calendar first.",
+                isOn: Binding(get: { promptsOn }, set: { setPrompts($0) })
+            )
+            .disabled(!calendarOn || isAsking || UserScope.userId == nil)
+            .accessibilityIdentifier("settings.capture.prompts")
+
+            Button(action: onOpenMuted) {
+                SettingRow(
+                    symbol: "speaker.slash",
+                    title: "Muted",
+                    subtitle: "Things you asked us to stop suggesting",
+                    value: muteCount == 0 ? "None" : "\(muteCount)",
+                    showsChevron: true
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("settings.capture.muted")
+
+            if let blockedMessage {
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                } label: {
+                    Label(blockedMessage, systemImage: "exclamationmark.triangle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(colors.caution)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens iOS Settings")
+                .accessibilityIdentifier("settings.capture.blocked")
+            }
+        } header: {
+            BPSectionHeader(title: "Auto-capture")
+        } footer: {
+            // Both sentences share one text column beside the shield, so the second one no
+            // longer starts back under the glyph.
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "checkmark.shield")
+                    .foregroundStyle(colors.draftingInk)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(Self.aiDisclosure)
+                        .accessibilityIdentifier("settings.capture.aiDisclosure")
+                    Text("Nothing goes in your record until you confirm it.")
+                }
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .font(.footnote)
+            .foregroundStyle(colors.textSecondary)
+            .accessibilityElement(children: .combine)
+        }
+        .listRowBackground(colors.backgroundSecondary)
+        .onAppear(perform: reload)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { reload() }
         }
     }
 
-    private func debugScenarioIcon(for scenario: AppViewModel.MockDataScenario) -> UIImage {
-        switch scenario {
-        case .firstTime: return Lucide.userPlus
-        case .emptyMainTabs: return Lucide.panelTop
-        case .occasional: return Lucide.calendarClock
-        case .frequent: return Lucide.chartNoAxesCombined
+    private func reload() {
+        calendarOn = CaptureOptIn.calendarSuggestionsEnabled()
+        promptsOn = EventPromptsConsent.isEnabled()
+        muteCount = AppModelHost.shared.suggestionStore?.muteRules.count ?? 0
+    }
+
+    private func setCalendar(_ on: Bool) {
+        blockedMessage = nil
+        if !on {
+            calendarOn = false
+            CaptureOptIn.setCalendarSuggestionsEnabled(false)
+            if promptsOn { setPrompts(false) }
+            return
+        }
+        isAsking = true
+        Task { @MainActor in
+            defer { isAsking = false }
+            let access = await CaptureSetupEnvironment.current.requestCalendar()
+            if access == .fullAccess {
+                CaptureOptIn.setCalendarSuggestionsEnabled(true)
+                calendarOn = true
+                NotificationCenter.default.post(name: .captureSuggestionsDidChange, object: nil)
+            } else {
+                calendarOn = false
+                blockedMessage = access == .limited
+                    ? "LandlordHours can only add events. Allow Full Access in iOS Settings to get suggestions."
+                    : "Calendar access is off for LandlordHours. Turn it on in iOS Settings."
+            }
         }
     }
 
-    private func debugScenarioColor(for scenario: AppViewModel.MockDataScenario) -> Color {
-        switch scenario {
-        case .firstTime: return AppColors.sky
-        case .emptyMainTabs: return AppColors.primary
-        case .occasional: return AppColors.honey
-        case .frequent: return AppColors.primary
+    private func setPrompts(_ on: Bool) {
+        blockedMessage = nil
+        if !on {
+            promptsOn = false
+            viewModel.eventPromptsEnabled = false
+            return
         }
+        isAsking = true
+        Task { @MainActor in
+            defer { isAsking = false }
+            let allowed = await CaptureSetupEnvironment.current.requestNotifications()
+            if allowed {
+                viewModel.eventPromptsEnabled = true
+                // Show what was actually stored (nothing is saved without an active profile).
+                promptsOn = viewModel.eventPromptsEnabled
+            } else {
+                promptsOn = false
+                blockedMessage = "Notifications are off for LandlordHours. Turn them on in iOS Settings."
+            }
+        }
+    }
+}
+
+/// The mute rules the user set from the Inbox ("stop suggesting things like this").
+struct MutedSuggestionsView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+    @State private var rules: [CaptureMuteRule] = []
+
+    var body: some View {
+        List {
+            if rules.isEmpty {
+                Section {
+                    BPEmptyState(
+                        symbol: "speaker.slash",
+                        title: "Nothing muted",
+                        message: "When you tell the Inbox to stop suggesting something, it shows up here."
+                    )
+                    .padding(.vertical, 32)
+                    .listRowBackground(Color.clear)
+                }
+            } else {
+                Section {
+                    ForEach(rules) { rule in
+                        SettingRow(
+                            symbol: rule.match == .titleContains ? "text.magnifyingglass" : "calendar",
+                            title: rule.match == .titleContains ? "Titles with \u{201C}\(rule.value)\u{201D}" : "Events from one calendar",
+                            subtitle: "Muted \(rule.createdAt.formatted(.dateTime.month(.abbreviated).day().year()))"
+                        )
+                        .swipeActions {
+                            Button("Unmute", role: .destructive) { remove(rule) }
+                        }
+                        .accessibilityAction(named: "Unmute") { remove(rule) }
+                    }
+                } footer: {
+                    Text("Swipe left to unmute. Muted things are never suggested again until you unmute them.")
+                        .font(.footnote)
+                        .foregroundStyle(colors.textSecondary)
+                }
+                .listRowBackground(colors.backgroundSecondary)
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(colors.background.ignoresSafeArea())
+        .navigationTitle("Muted")
+        .navigationBarTitleDisplayMode(.inline)
+        .hidesAppTabBar()
+        .onAppear { rules = AppModelHost.shared.suggestionStore?.muteRules ?? [] }
+        .accessibilityIdentifier("settings.muted.screen")
     }
 
-    private func debugScenarioWash(for scenario: AppViewModel.MockDataScenario) -> Color {
-        switch scenario {
-        case .firstTime: return colors.skyWash
-        case .emptyMainTabs: return colors.primarySurface
-        case .occasional: return colors.honeyWash
-        case .frequent: return colors.primarySurface
+    private func remove(_ rule: CaptureMuteRule) {
+        AppModelHost.shared.suggestionStore?.removeMuteRule(id: rule.id)
+        rules = AppModelHost.shared.suggestionStore?.muteRules ?? []
+        NotificationCenter.default.post(name: .captureSuggestionsDidChange, object: nil)
+    }
+}
+
+// MARK: - Appearance
+
+private struct AppearancePreferenceRow: View {
+    @ObservedObject var appearanceManager: AppearanceManager
+
+    @Environment(\.colorScheme) var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var savedTick = 0
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SettingRow(symbol: "circle.lefthalf.filled", title: "Appearance", subtitle: "Follow your iPhone or pick a theme")
+            HStack(spacing: 8) {
+                ForEach(AppAppearancePreference.allCases) { preference in
+                    appearanceButton(preference)
+                }
+            }
+            Label(appearanceManager.preference.confirmationText, systemImage: "checkmark.circle.fill")
+                .font(.footnote)
+                .foregroundStyle(colors.textSecondary)
+                .labelStyle(SavedLabelStyle(tint: colors.positive))
+        }
+        .padding(.vertical, 6)
+        .sensoryFeedback(.selection, trigger: savedTick)
+    }
+
+    private func appearanceButton(_ preference: AppAppearancePreference) -> some View {
+        let isSelected = appearanceManager.preference == preference
+        return Button {
+            guard appearanceManager.preference != preference else { return }
+            if reduceMotion {
+                appearanceManager.preference = preference
+            } else {
+                withAnimation(AppAnimation.quick) { appearanceManager.preference = preference }
+            }
+            savedTick += 1
+        } label: {
+            Label(preference.displayName, systemImage: symbol(for: preference))
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .foregroundStyle(isSelected ? colors.onAction : colors.textPrimary)
+                .frame(maxWidth: .infinity, minHeight: 40)
+                .background(Capsule().fill(isSelected ? colors.action : colors.backgroundTertiary))
+                .overlay(Capsule().strokeBorder(isSelected ? Color.clear : colors.border, lineWidth: 1))
+        }
+        .buttonStyle(.lhPressable)
+        .accessibilityLabel("\(preference.displayName) appearance")
+        .accessibilityHint(preference.subtitle)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func symbol(for preference: AppAppearancePreference) -> String {
+        switch preference {
+        case .system: return "iphone"
+        case .light: return "sun.max"
+        case .dark: return "moon"
         }
     }
-    #endif
+}
+
+private struct SavedLabelStyle: LabelStyle {
+    let tint: Color
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 6) {
+            configuration.icon.foregroundStyle(tint)
+            configuration.title
+        }
+    }
+}
+
+// MARK: - Not tax advice
+
+/// Plain disclaimer at the foot of Settings. The PDF export carries its own version.
+struct NotTaxAdviceNote: View {
+    static let text = "LandlordHours keeps your records. It doesn't give tax advice. Check your qualification with a tax professional."
+
+    @Environment(\.colorScheme) private var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "info.circle")
+                .font(.footnote)
+                .foregroundStyle(colors.textSecondary)
+                .padding(.top, 1)
+                .accessibilityHidden(true)
+            Text(Self.text)
+                .font(.footnote)
+                .foregroundStyle(colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("settings.notTaxAdvice")
+    }
 }
 
 // MARK: - Tax Profile View
 
 struct TaxProfileView: View {
     @EnvironmentObject var viewModel: AppViewModel
-    @StateObject private var taxProfile = TaxProfileManager.shared
-    @StateObject private var goalManager = GoalManager.shared
+    @ObservedObject private var taxProfile = TaxProfileManager.shared
+    @ObservedObject private var goalManager = GoalManager.shared
     @Environment(\.colorScheme) var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
-    @State private var showFilingStatusPicker = false
-    @State private var showGoalPicker = false
-    @State private var showYearPicker = false
     @State private var showWorkHoursInput = false
     @State private var showParticipationConfirmation = false
     @State private var showAddProperty = false
@@ -1416,73 +857,180 @@ struct TaxProfileView: View {
     @State private var newPropertyAddress = ""
     @State private var newPropertyType: PropertyType = .ltr
 
-    private let propertyIconStyles: [(bg: Color, fg: Color)] = [
-        (AppColors.sageWash, AppColors.charcoal),
-        (AppColors.coralWash, AppColors.charcoal),
-        (AppColors.honeyWash, AppColors.charcoal),
-        (AppColors.skyWash, AppColors.charcoal),
-        (AppColors.primarySurface, AppColors.charcoal),
-    ]
+    private var participationAnswerLabel: String {
+        switch taxProfile.noOneParticipatedMore(forYear: taxProfile.taxYear) {
+        case .none: return "Not answered"
+        case .some(true): return "No one did more"
+        case .some(false): return "Someone did more"
+        }
+    }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 8) {
+        List {
+            Section {
+                VStack(alignment: .leading, spacing: 6) {
                     Text("Tax profile")
-                        .font(.system(size: 42, weight: .black, design: .rounded))
+                        .lhDisplayFont(.largeTitle)
                         .foregroundStyle(colors.textPrimary)
-                        .minimumScaleFactor(0.82)
-                    Text("Set the filing assumptions that drive your reports.")
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .accessibilityAddTraits(.isHeader)
+                    Text("The few facts that decide which hours count.")
+                        .font(.subheadline)
                         .foregroundStyle(colors.textSecondary)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 24)
-                .padding(.top, 18)
-
-                filingStatusSection
-                qualificationGoalSection
-                materialParticipationSection
-                propertiesSection
-                fiftyPercentRuleSection
-                Spacer().frame(height: 100)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
             }
+
+            Section {
+                Picker(selection: $taxProfile.filingStatus) {
+                    ForEach(FilingStatus.allCases, id: \.self) { status in
+                        Text(status.rawValue).tag(status)
+                    }
+                } label: {
+                    SettingRow(symbol: "person.text.rectangle", title: "Filing status")
+                }
+                .tint(colors.action)
+
+                SettingToggleRow(
+                    symbol: "person.2",
+                    title: "Spouse hours",
+                    subtitle: "Track your spouse's hours too. They count together for material participation, never for your 750.",
+                    isOn: $taxProfile.spouseTracking
+                )
+                .accessibilityIdentifier("taxProfile.spouseTracking")
+            } header: {
+                BPSectionHeader(title: "You")
+            }
+            .listRowBackground(colors.backgroundSecondary)
+
+            Section {
+                Picker(selection: Binding(
+                    get: { goalManager.globalGoalType },
+                    set: { goalManager.setGlobalGoal($0) }
+                )) {
+                    ForEach(HourGoalType.allCases, id: \.self) { type in
+                        Text("\(type.rawValue) · \(Int(type.hoursRequired))h").tag(type)
+                    }
+                } label: {
+                    SettingRow(symbol: "flag", title: "Goal")
+                }
+                .tint(colors.action)
+
+                Picker(selection: $taxProfile.taxYear) {
+                    ForEach(2024...2030, id: \.self) { year in
+                        Text(String(year)).tag(year)
+                    }
+                } label: {
+                    SettingRow(symbol: "calendar", title: "Tax year")
+                }
+                .tint(colors.action)
+
+                SettingToggleRow(
+                    symbol: "square.stack.3d.up",
+                    title: "Grouping election",
+                    subtitle: "Treat all your rentals as one activity for material participation.",
+                    isOn: $taxProfile.groupingElection
+                )
+            } header: {
+                BPSectionHeader(title: "Goal")
+            }
+            .listRowBackground(colors.backgroundSecondary)
+
+            Section {
+                Button {
+                    workHoursText = taxProfile.nonREWorkHours > 0 ? String(Int(taxProfile.nonREWorkHours)) : ""
+                    showWorkHoursInput = true
+                } label: {
+                    SettingRow(
+                        symbol: "briefcase",
+                        title: "Other work hours",
+                        subtitle: "W-2 or other job hours this year",
+                        value: taxProfile.nonREWorkHours > 0 ? "\(Int(taxProfile.nonREWorkHours))h" : "Not set",
+                        valueColor: taxProfile.nonREWorkHours > 0 ? nil : colors.caution,
+                        showsChevron: true
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("taxProfile.otherWorkHours")
+            } header: {
+                BPSectionHeader(title: "50% rule")
+            } footer: {
+                Text("For REPS, your real estate hours must be more than half of all the hours you worked this year.")
+                    .font(.footnote)
+                    .foregroundStyle(colors.textSecondary)
+            }
+            .listRowBackground(colors.backgroundSecondary)
+
+            Section {
+                Button {
+                    showParticipationConfirmation = true
+                } label: {
+                    SettingRow(symbol: "checkmark.circle", title: "100-hour test", subtitle: "Did anyone else do more?", value: participationAnswerLabel, showsChevron: true)
+                }
+                .buttonStyle(.plain)
+            } header: {
+                BPSectionHeader(title: "Material participation")
+            } footer: {
+                Text("Test 3 needs more than 100 hours and no one else, like a manager or contractor, putting in more time than you.")
+                    .font(.footnote)
+                    .foregroundStyle(colors.textSecondary)
+            }
+            .listRowBackground(colors.backgroundSecondary)
+
+            Section {
+                if viewModel.properties.isEmpty {
+                    Text("No properties yet")
+                        .font(.body)
+                        .foregroundStyle(colors.textSecondary)
+                } else {
+                    ForEach(viewModel.properties) { property in
+                        HStack(spacing: 14) {
+                            Image(systemName: "house")
+                                .font(.system(size: 19))
+                                .foregroundStyle(colors.textSecondary)
+                                .frame(width: 28)
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(property.name)
+                                    .font(.body)
+                                    .foregroundStyle(colors.textPrimary)
+                                if !property.shortAddress.isEmpty {
+                                    Text(property.shortAddress)
+                                        .font(.subheadline)
+                                        .foregroundStyle(colors.textSecondary)
+                                }
+                            }
+                            Spacer(minLength: 8)
+                            Text(property.propertyType.rawValue)
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(colors.textSecondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .overlay(Capsule().strokeBorder(colors.border, lineWidth: 1))
+                        }
+                        .padding(.vertical, 4)
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+                Button {
+                    showAddProperty = true
+                } label: {
+                    Label("Add property", systemImage: "plus")
+                        .foregroundStyle(colors.action)
+                        .frame(minHeight: 36)
+                }
+            } header: {
+                BPSectionHeader(title: "Properties")
+            }
+            .listRowBackground(colors.backgroundSecondary)
         }
-        .background {
-            LHMobileCanvas()
-        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(colors.background.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .hidesAppTabBar()
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text("")
-                    .font(.system(size: 1))
-                    .foregroundStyle(colors.textPrimary)
-            }
-        }
-        .confirmationDialog("Filing Status", isPresented: $showFilingStatusPicker) {
-            ForEach(FilingStatus.allCases, id: \.self) { status in
-                Button(status.rawValue) {
-                    taxProfile.filingStatus = status
-                }
-            }
-        }
-        .confirmationDialog("Primary Goal", isPresented: $showGoalPicker) {
-            ForEach(HourGoalType.allCases, id: \.self) { type in
-                Button("\(type.rawValue) (\(Int(type.hoursRequired))h)") {
-                    goalManager.setGlobalGoal(type)
-                }
-            }
-        }
-        .sheet(isPresented: $showYearPicker) {
-            taxYearSheet
-        }
-        .sheet(isPresented: $showWorkHoursInput) {
-            workHoursSheet
-        }
-        .sheet(isPresented: $showAddProperty) {
-            addPropertySheet
-        }
+        .sheet(isPresented: $showWorkHoursInput) { workHoursSheet }
+        .sheet(isPresented: $showAddProperty) { addPropertySheet }
         .sheet(isPresented: $showParticipationConfirmation) {
             ParticipationConfirmationSheet(
                 year: taxProfile.taxYear,
@@ -1491,551 +1039,95 @@ struct TaxProfileView: View {
                 taxProfile.setNoOneParticipatedMore(answer, forYear: taxProfile.taxYear)
             }
         }
-    }
-
-    // MARK: - Filing Status Section
-
-    private var filingStatusSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            tpSectionTitle("Filing Status")
-
-            VStack(spacing: 0) {
-                Button { showFilingStatusPicker = true } label: {
-                    tpRow(
-                        icon: Lucide.fileText,
-                        iconBg: colors.backgroundTertiary,
-                        iconFg: AppColors.charcoal,
-                        title: "Filing Status",
-                        subtitle: "How you file your tax return",
-                        rightText: taxProfile.filingStatus.rawValue
-                    )
-                }
-                .buttonStyle(.plain)
-
-                Divider().background(AppColors.snow).padding(.leading, 68)
-
-                tpToggleRow(
-                    icon: Lucide.users,
-                    iconBg: AppColors.coralWash,
-                    iconFg: AppColors.charcoal,
-                    title: "Track Spouse Hours",
-                    subtitle: "Combine for Material Participation",
-                    isOn: $taxProfile.spouseTracking
-                )
-            }
-            .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .stroke(colors.border.opacity(0.28), lineWidth: 1)
-            }
-
-            tpInfoTip {
-                (Text("Spouse hours ").fontWeight(.semibold).foregroundStyle(colors.textPrimary) +
-                 Text("combine for Material Participation tests but NOT for REPS qualification. Only one spouse needs to meet the 750h + 50% rule.").foregroundStyle(AppColors.slate))
-                    .font(.system(size: 12))
-                    .lineSpacing(4)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
-    }
-
-    // MARK: - Qualification Goal Section
-
-    private var qualificationGoalSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            tpSectionTitle("Qualification Goal")
-
-            VStack(spacing: 0) {
-                Button { showGoalPicker = true } label: {
-                    tpRow(
-                        icon: Lucide.layers,
-                        iconBg: colors.backgroundTertiary,
-                        iconFg: AppColors.charcoal,
-                        title: "Primary Goal",
-                        subtitle: "Determines your Reports dashboard",
-                        rightText: "\(goalManager.globalGoalType.rawValue) (\(Int(goalManager.globalGoalType.hoursRequired))h)"
-                    )
-                }
-                .buttonStyle(.plain)
-
-                Divider().background(AppColors.snow).padding(.leading, 68)
-
-                Button { showYearPicker = true } label: {
-                    tpRow(
-                        icon: Lucide.calendar,
-                        iconBg: AppColors.sageWash,
-                        iconFg: AppColors.charcoal,
-                        title: "Tax Year",
-                        subtitle: "January 1 \u{2013} December 31",
-                        rightText: "\(taxProfile.taxYear)"
-                    )
-                }
-                .buttonStyle(.plain)
-
-                Divider().background(AppColors.snow).padding(.leading, 68)
-
-                tpToggleRow(
-                    icon: Lucide.clipboardCheck,
-                    iconBg: AppColors.honeyWash,
-                    iconFg: AppColors.charcoal,
-                    title: "Grouping Election",
-                    subtitle: "Treat all rentals as one activity",
-                    isOn: $taxProfile.groupingElection
-                )
-            }
-            .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .stroke(colors.border.opacity(0.28), lineWidth: 1)
-            }
-
-            tpInfoTip {
-                (Text("Grouping Election (1.469-9g): ").fontWeight(.semibold).foregroundStyle(colors.textPrimary) +
-                 Text("If you qualify as REP, you can test Material Participation across all properties combined instead of individually.").foregroundStyle(AppColors.slate))
-                    .font(.system(size: 12))
-                    .lineSpacing(4)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
-    }
-
-    // MARK: - Material Participation Section
-
-    private var participationAnswer: Bool? {
-        taxProfile.noOneParticipatedMore(forYear: taxProfile.taxYear)
-    }
-
-    private var participationAnswerLabel: String {
-        switch participationAnswer {
-        case .none: return "Not answered"
-        case .some(true): return "No one did more"
-        case .some(false): return "Someone did more"
-        }
-    }
-
-    private var materialParticipationSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            tpSectionTitle("Material Participation")
-
-            VStack(spacing: 0) {
-                Button { showParticipationConfirmation = true } label: {
-                    tpRow(
-                        icon: Lucide.badgeCheck,
-                        iconBg: AppColors.sageWash,
-                        iconFg: AppColors.charcoal,
-                        title: "100-Hour Test",
-                        subtitle: "Confirm no one else participated more",
-                        rightText: participationAnswerLabel
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-            .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .stroke(colors.border.opacity(0.28), lineWidth: 1)
-            }
-
-            tpInfoTip {
-                (Text("Test 3 needs 100+ hours ").foregroundStyle(AppColors.slate) +
-                 Text("and").fontWeight(.semibold).foregroundStyle(colors.textPrimary) +
-                 Text(" no one else — a property manager, contractor, or co-owner who isn\u{2019}t your spouse — putting in more time than you this year.").foregroundStyle(AppColors.slate))
-                    .font(.system(size: 12))
-                    .lineSpacing(4)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
-    }
-
-    // MARK: - Properties Section
-
-    private var propertiesSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            tpSectionTitle("Properties")
-
-            VStack(spacing: 0) {
-                if viewModel.properties.isEmpty {
-                    Text("No properties yet")
-                        .font(.system(size: 14))
-                        .foregroundStyle(AppColors.mist)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
-                } else {
-                    ForEach(Array(viewModel.properties.enumerated()), id: \.element.id) { index, property in
-                        if index > 0 {
-                            Divider().background(AppColors.snow).padding(.leading, 66)
-                        }
-                        propertyRow(property: property, index: index)
-                    }
-                }
-
-                if !viewModel.properties.isEmpty {
-                    Divider().background(AppColors.snow)
-                }
-
-                Button { showAddProperty = true } label: {
-                    HStack(spacing: 8) {
-                        LucideIcon(image: Lucide.plus, size: 18)
-                            .foregroundStyle(AppColors.primary)
-                        Text("Add Property")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(AppColors.primary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                }
-                .buttonStyle(.plain)
-            }
-            .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .stroke(colors.border.opacity(0.28), lineWidth: 1)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
-    }
-
-    // MARK: - 50% Rule Section
-
-    private var fiftyPercentRuleSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            tpSectionTitle("50% Rule Tracking")
-
-            VStack(spacing: 0) {
-                Button {
-                    workHoursText = taxProfile.nonREWorkHours > 0 ? String(Int(taxProfile.nonREWorkHours)) : ""
-                    showWorkHoursInput = true
-                } label: {
-                    tpRow(
-                        icon: Lucide.briefcase,
-                        iconBg: colors.backgroundTertiary,
-                        iconFg: AppColors.charcoal,
-                        title: "Non-RE Work Hours",
-                        subtitle: "W-2 or other job hours this year",
-                        rightText: "\(Int(taxProfile.nonREWorkHours))h"
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-            .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .stroke(colors.border.opacity(0.28), lineWidth: 1)
-            }
-
-            tpInfoTip {
-                (Text("For REPS, your RE hours must be ").foregroundStyle(AppColors.slate) +
-                 Text("more than 50%").fontWeight(.semibold).foregroundStyle(colors.textPrimary) +
-                 Text(" of all personal services. Enter your non-RE work hours so we can track this.").foregroundStyle(AppColors.slate))
-                    .font(.system(size: 12))
-                    .lineSpacing(4)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
-    }
-
-    // MARK: - Property Row
-
-    private func propertyRow(property: RentalProperty, index: Int) -> some View {
-        let style = propertyIconStyles[index % propertyIconStyles.count]
-        return HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(style.bg)
-                .frame(width: 36, height: 36)
-                .overlay(
-                    LucideIcon(image: Lucide.house, size: 18)
-                        .foregroundStyle(style.fg)
-                )
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(property.name)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(colors.textPrimary)
-                Text(property.shortAddress)
-                    .font(.system(size: 12))
-                    .foregroundStyle(AppColors.mist)
-            }
-
-            Spacer()
-
-            propertyBadge(property.propertyType)
-
-            LucideIcon(image: Lucide.chevronRight, size: 16)
-                .foregroundStyle(AppColors.cloud)
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-    }
-
-    private func propertyBadge(_ type: PropertyType) -> some View {
-        let (bg, fg): (Color, Color) = type == .ltr
-            ? (colors.sageWash, colors.textPrimary)
-            : (colors.honeyWash, colors.textPrimary)
-
-        return Text(type.rawValue)
-            .font(.system(size: 12, weight: .semibold, design: .rounded))
-            .foregroundStyle(fg)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(bg)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-    }
-
-    // MARK: - Reusable Row Helpers
-
-    private func tpSectionTitle(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 19, weight: .black, design: .rounded))
-            .foregroundStyle(colors.textPrimary)
-            .padding(.leading, 4)
-    }
-
-    private func tpRow(icon: UIImage, iconBg: Color, iconFg: Color, title: String, subtitle: String, rightText: String? = nil) -> some View {
-        HStack(spacing: 14) {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(iconBg)
-                .frame(width: 36, height: 36)
-                .overlay(
-                    LucideIcon(image: icon, size: 18)
-                        .foregroundStyle(iconFg)
-                )
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(colors.textPrimary)
-                Text(subtitle)
-                    .font(.system(size: 13))
-                    .foregroundStyle(AppColors.mist)
-            }
-
-            Spacer()
-
-            if let rightText {
-                Text(rightText)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(AppColors.primary)
-            }
-
-            LucideIcon(image: Lucide.chevronRight, size: 16)
-                .foregroundStyle(AppColors.cloud)
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 16)
-    }
-
-    private func tpToggleRow(icon: UIImage, iconBg: Color, iconFg: Color, title: String, subtitle: String, isOn: Binding<Bool>) -> some View {
-        HStack(spacing: 14) {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(iconBg)
-                .frame(width: 36, height: 36)
-                .overlay(
-                    LucideIcon(image: icon, size: 18)
-                        .foregroundStyle(iconFg)
-                )
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(colors.textPrimary)
-                Text(subtitle)
-                    .font(.system(size: 13))
-                    .foregroundStyle(AppColors.mist)
-            }
-
-            Spacer()
-
-            Toggle("", isOn: isOn)
-                .labelsHidden()
-                .tint(AppColors.primary)
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 16)
-    }
-
-    private func tpInfoTip<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            RoundedRectangle(cornerRadius: 6)
-                .fill(AppColors.sageWash)
-                .frame(width: 20, height: 20)
-                .overlay(
-                    LucideIcon(image: Lucide.info, size: 10)
-                        .foregroundStyle(AppColors.charcoal)
-                )
-
-            content()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(AppColors.sageWash.opacity(colorScheme == .dark ? 0.18 : 1))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(AppColors.sage.opacity(0.28), lineWidth: 1)
-        )
-    }
-
-    // MARK: - Sheets
-
-    private var taxYearSheet: some View {
-        NavigationStack {
-            VStack(spacing: 20) {
-                Picker("Tax Year", selection: $taxProfile.taxYear) {
-                    ForEach(2024...2030, id: \.self) { year in
-                        Text(String(year)).tag(year)
-                    }
-                }
-                .pickerStyle(.wheel)
-            }
-            .padding()
-            .navigationTitle("Tax Year")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { showYearPicker = false }
-                        .fontWeight(.semibold)
-                        .foregroundStyle(AppColors.primary)
-                }
-            }
-        }
-        .presentationDetents([.height(300)])
+        .accessibilityIdentifier("taxProfile.screen")
     }
 
     private var workHoursSheet: some View {
         NavigationStack {
             VStack(spacing: 20) {
-                Text("Enter your non-real estate work hours for this tax year.")
-                    .font(.system(size: 14))
-                    .foregroundStyle(AppColors.slate)
+                Text("Hours you worked outside real estate this year, like a W-2 job.")
+                    .font(.subheadline)
+                    .foregroundStyle(colors.textSecondary)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 TextField("Hours", text: $workHoursText)
                     .keyboardType(.numberPad)
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .monospacedDigit()
                     .multilineTextAlignment(.center)
                     .padding()
-                    .background(AppColors.snow)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(colors.backgroundSecondary))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(colors.border, lineWidth: 1))
+                    .accessibilityLabel("Other work hours")
 
-                Button {
+                Button("Save") {
                     if let hours = Double(workHoursText) {
                         taxProfile.nonREWorkHours = hours
                     }
                     showWorkHoursInput = false
-                } label: {
-                    Text("Save")
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(AppColors.action)
-                        .foregroundStyle(AppColors.onAction)
-                        .clipShape(Capsule())
                 }
+                .buttonStyle(InboxPrimaryButtonStyle())
             }
             .padding(24)
-            .navigationTitle("Non-RE Work Hours")
+            .background(colors.background.ignoresSafeArea())
+            .navigationTitle("Other work hours")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { showWorkHoursInput = false }
-                        .foregroundStyle(AppColors.slate)
+                        .foregroundStyle(colors.action)
                 }
             }
         }
-        .presentationDetents([.height(340)])
+        .presentationDetents([.height(360), .large])
     }
 
     private var addPropertySheet: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                HStack(spacing: 10) {
-                    ForEach([PropertyType.ltr, PropertyType.str], id: \.self) { type in
-                        Button {
-                            newPropertyType = type
-                        } label: {
-                            Text(type.fullName)
-                                .font(.system(size: 14, weight: .semibold))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(newPropertyType == type ? AppColors.sageWash : Color.clear)
-                                .foregroundStyle(newPropertyType == type ? AppColors.charcoal : AppColors.slate)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(newPropertyType == type ? AppColors.sage : AppColors.snow, lineWidth: 1)
-                                )
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+            Form {
+                Section {
+                    Picker("Type", selection: $newPropertyType) {
+                        ForEach([PropertyType.ltr, PropertyType.str], id: \.self) { type in
+                            Text(type.fullName).tag(type)
                         }
-                        .buttonStyle(.plain)
                     }
+                    .pickerStyle(.segmented)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
                 }
-
-                VStack(spacing: 14) {
-                    TextField("Property Name", text: $newPropertyName)
-                        .font(.system(size: 16))
-                        .padding(14)
-                        .background(colors.backgroundTertiary)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(newPropertyName.isEmpty ? colors.border.opacity(0.2) : AppColors.sage, lineWidth: 1)
-                        )
-
+                Section {
+                    TextField("Property name", text: $newPropertyName)
                     TextField("Address", text: $newPropertyAddress)
-                        .font(.system(size: 16))
-                        .padding(14)
-                        .background(colors.backgroundTertiary)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(newPropertyAddress.isEmpty ? colors.border.opacity(0.2) : AppColors.sage, lineWidth: 1)
-                        )
                 }
-
-                Button {
-                    guard !newPropertyName.isEmpty else { return }
-                    viewModel.addProperty(
-                        name: newPropertyName,
-                        address: newPropertyAddress,
-                        type: newPropertyType
-                    )
-                    newPropertyName = ""
-                    newPropertyAddress = ""
-                    newPropertyType = .ltr
-                    showAddProperty = false
-                } label: {
-                    Text("Add Property")
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(newPropertyName.isEmpty ? AppColors.cloud : AppColors.sage)
-                        .foregroundStyle(newPropertyName.isEmpty ? Color.white : AppColors.charcoal)
-                        .clipShape(Capsule())
+                .listRowBackground(colors.backgroundSecondary)
+                Section {
+                    Button("Add property") {
+                        guard !newPropertyName.isEmpty else { return }
+                        viewModel.addProperty(name: newPropertyName, address: newPropertyAddress, type: newPropertyType)
+                        newPropertyName = ""
+                        newPropertyAddress = ""
+                        newPropertyType = .ltr
+                        showAddProperty = false
+                    }
+                    .buttonStyle(InboxPrimaryButtonStyle())
+                    .disabled(newPropertyName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
                 }
-                .disabled(newPropertyName.isEmpty)
             }
-            .padding(24)
-            .navigationTitle("Add Property")
+            .scrollContentBackground(.hidden)
+            .background(colors.background.ignoresSafeArea())
+            .navigationTitle("Add property")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        showAddProperty = false
-                    }
-                    .foregroundStyle(AppColors.slate)
+                    Button("Cancel") { showAddProperty = false }
+                        .foregroundStyle(colors.action)
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
     }
 }
 
@@ -2053,32 +1145,14 @@ struct ProfileEditView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: AppSpacing.xl) {
-                    // Profile Photo Section
-                    VStack(spacing: AppSpacing.md) {
-                        if let imageData = profileImage ?? appleSignIn.profileImageData,
-                           let uiImage = UIImage(data: imageData) {
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 100, height: 100)
-                                .clipShape(Circle())
-                        } else {
-                            ZStack {
-                                Circle()
-                                    .fill(AppColors.sage)
-                                    .frame(width: 100, height: 100)
-
-                                LucideIcon(image: Lucide.user, size: 40)
-                                    .foregroundStyle(AppColors.charcoal)
-                            }
-                        }
-
+            Form {
+                Section {
+                    VStack(spacing: 12) {
+                        ProfileAvatar(name: userName.isEmpty ? "Your name" : userName, imageData: profileImage ?? appleSignIn.profileImageData, size: 96)
                         PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                            Text("Change Photo")
-                                .font(AppTypography.buttonSmall)
-                                .foregroundStyle(AppColors.charcoal)
+                            Text("Change photo")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(colors.action)
                         }
                         .onChange(of: selectedPhotoItem) { _, newValue in
                             Task {
@@ -2088,52 +1162,33 @@ struct ProfileEditView: View {
                             }
                         }
                     }
-                    .padding(.top, AppSpacing.xl)
-
-                    // Name Field
-                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                        Text("Name")
-                            .font(.system(size: 14, weight: .black, design: .rounded))
-                            .foregroundStyle(colors.textPrimary)
-
-                        TextField("Your name", text: $userName)
-                            .font(AppTypography.body)
-                            .foregroundStyle(colors.textPrimary)
-                            .padding(AppSpacing.md)
-                            .background(colors.backgroundTertiary)
-                            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
-                    }
-
-                    // Email Field
-                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                        Text("Email")
-                            .font(.system(size: 14, weight: .black, design: .rounded))
-                            .foregroundStyle(colors.textPrimary)
-
-                        TextField("your@email.com", text: $userEmail)
-                            .font(AppTypography.body)
-                            .foregroundStyle(colors.textPrimary)
-                            .textContentType(.emailAddress)
-                            .keyboardType(.emailAddress)
-                            .autocapitalization(.none)
-                            .padding(AppSpacing.md)
-                            .background(colors.backgroundTertiary)
-                            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.medium))
-                    }
-
-                    Spacer()
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
                 }
-                .padding(.horizontal, 20)
+                Section {
+                    TextField("Your name", text: $userName)
+                        .textContentType(.name)
+                    TextField("your@email.com", text: $userEmail)
+                        .textContentType(.emailAddress)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                } header: {
+                    BPSectionHeader(title: "Name and email")
+                } footer: {
+                    Text("Shown on your export so your accountant knows whose record it is.")
+                        .font(.footnote)
+                        .foregroundStyle(colors.textSecondary)
+                }
+                .listRowBackground(colors.backgroundSecondary)
             }
-            .background {
-                LHMobileCanvas()
-            }
-            .navigationTitle("Edit Profile")
+            .scrollContentBackground(.hidden)
+            .background(colors.background.ignoresSafeArea())
+            .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(colors.textSecondary)
+                        .foregroundStyle(colors.action)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -2145,7 +1200,7 @@ struct ProfileEditView: View {
                         dismiss()
                     }
                     .fontWeight(.semibold)
-                    .foregroundStyle(AppColors.primary)
+                    .foregroundStyle(colors.action)
                 }
             }
         }

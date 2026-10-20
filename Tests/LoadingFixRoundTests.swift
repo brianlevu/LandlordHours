@@ -119,17 +119,108 @@ final class TodayPresentationTests: XCTestCase {
     }
 }
 
-// MARK: - Quiet house updates for iCloud merges
+// MARK: - Quiet house updates only for iCloud merges
 
+/// The house mutes its build (no "+Nh" beam) only for changes iCloud merged in. The user's own
+/// save right after a merge still builds: there is no time window to swallow it.
 @MainActor
-final class RemoteMergeQuietTests: XCTestCase {
-    func testHoursChangeRightAfterAMergeIsQuiet() {
-        let merge = Date(timeIntervalSince1970: 1_000)
-        XCTAssertFalse(AppViewModel.isRemoteMerge(lastMergeAt: nil, now: merge))
-        XCTAssertTrue(AppViewModel.isRemoteMerge(lastMergeAt: merge, now: merge.addingTimeInterval(0.2)),
-                      "A late pull after the loading cap updates in place, no +Nh beam")
-        XCTAssertFalse(AppViewModel.isRemoteMerge(lastMergeAt: merge, now: merge.addingTimeInterval(5)),
-                       "A later save by the user still builds")
+final class EntriesChangeOriginTests: CaptureTestCase {
+    func testMergeIsRemoteAndTheUsersOwnSaveRightAfterIsLocal() {
+        let (app, oak) = makeViewModel()
+        XCTAssertEqual(app.lastEntriesChangeOrigin, .local)
+
+        let remote = TimeEntry(propertyId: oak, participant: .selfParticipant, category: .repairs,
+                               hours: 3, date: Date())
+        app.syncDidReceiveEntries([remote])
+        XCTAssertEqual(app.lastEntriesChangeOrigin, .remote, "A late pull updates the house quietly")
+
+        // Immediately after (same instant, well inside any old 1.5 s window): the user confirms.
+        app.addTimeEntry(propertyId: oak, participant: .selfParticipant, category: .repairs,
+                         hours: 1, date: Date(), notes: "")
+        XCTAssertEqual(app.lastEntriesChangeOrigin, .local, "The user's own save is never muted")
+
+        app.syncDidDeleteEntryIds([remote.id])
+        XCTAssertEqual(app.lastEntriesChangeOrigin, .remote)
+    }
+}
+
+// MARK: - Export gate (Create waits for the pull)
+
+final class ExportGateTests: XCTestCase {
+    func testCreateIsDisabledWhileTheHoursPlaceholderShows() {
+        let gate = ExportGate.resolve(hasEntries: true, isGenerating: false, hoursPlaceholderShowing: true, initialPullRunning: true)
+        XCTAssertEqual(gate, .waitingForHours)
+        XCTAssertFalse(gate.allowsCreate)
+        XCTAssertEqual(gate.title(isStale: false), "Getting your latest hours…")
+    }
+
+    func testWaitingComesBeforeNoEntries() {
+        // A restored profile mid-pull has no local entries yet: not "No entries to export".
+        let gate = ExportGate.resolve(hasEntries: false, isGenerating: false, hoursPlaceholderShowing: true, initialPullRunning: true)
+        XCTAssertEqual(gate.title(isStale: false), "Getting your latest hours…")
+        let afterCap = ExportGate.resolve(hasEntries: false, isGenerating: false, hoursPlaceholderShowing: false, initialPullRunning: true)
+        XCTAssertEqual(afterCap.title(isStale: false), "Still syncing from iCloud")
+    }
+
+    func testAfterThePlaceholderCapCreateStillWaitsForThePull() {
+        let gate = ExportGate.resolve(hasEntries: true, isGenerating: false, hoursPlaceholderShowing: false, initialPullRunning: true)
+        XCTAssertEqual(gate, .stillSyncing)
+        XCTAssertFalse(gate.allowsCreate, "No quiet export of a possibly incomplete report")
+        XCTAssertEqual(gate.title(isStale: false), "Still syncing from iCloud")
+    }
+
+    func testPullLandedOrFailedEnablesCreate() {
+        let gate = ExportGate.resolve(hasEntries: true, isGenerating: false, hoursPlaceholderShowing: false, initialPullRunning: false)
+        XCTAssertEqual(gate, .ready)
+        XCTAssertTrue(gate.allowsCreate)
+        XCTAssertEqual(gate.title(isStale: true), "Create again")
+        XCTAssertEqual(ExportGate.resolve(hasEntries: false, isGenerating: false, hoursPlaceholderShowing: false, initialPullRunning: false), .noEntries)
+        XCTAssertEqual(ExportGate.resolve(hasEntries: true, isGenerating: true, hoursPlaceholderShowing: true, initialPullRunning: true), .generating)
+    }
+}
+
+/// The view model's pull state that feeds the gate: running until the initial sync ends, by any
+/// outcome (landed, failed, no iCloud account).
+@MainActor
+final class InitialPullRunningTests: CaptureTestCase {
+    private func ops(account: Bool, pullOK: Bool, delay: UInt64) -> CloudKitSyncService.InitialSyncOperations {
+        CloudKitSyncService.InitialSyncOperations(
+            accountAvailable: { try? await Task.sleep(nanoseconds: delay); return account },
+            prepare: {},
+            push: {},
+            pull: { pullOK }
+        )
+    }
+
+    private func waitUntil(_ condition: () -> Bool) async -> Bool {
+        let deadline = Date().addingTimeInterval(5)
+        while !condition() {
+            if Date() > deadline { return false }
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+        return true
+    }
+
+    func testRunningUntilThePullLands() async {
+        let (app, _) = makeViewModel()
+        app.syncService.operationsOverride = ops(account: true, pullOK: true, delay: 150_000_000)
+        app.startInitialSync(showsPlaceholder: false)
+        XCTAssertTrue(app.isInitialPullRunning, "Export waits while the pull runs")
+        let ended = await waitUntil { !app.isInitialPullRunning }
+        XCTAssertTrue(ended)
+    }
+
+    func testFailedPullOrNoAccountEnablesExportNormally() async {
+        let (app, _) = makeViewModel()
+        app.syncService.operationsOverride = ops(account: true, pullOK: false, delay: 10_000_000)
+        app.startInitialSync(showsPlaceholder: false)
+        let afterFail = await waitUntil { !app.isInitialPullRunning }
+        XCTAssertTrue(afterFail, "A failed pull doesn't keep export waiting")
+
+        app.syncService.operationsOverride = ops(account: false, pullOK: true, delay: 10_000_000)
+        app.startInitialSync(showsPlaceholder: false)
+        let noAccount = await waitUntil { !app.isInitialPullRunning }
+        XCTAssertTrue(noAccount, "No iCloud account: export works normally")
     }
 }
 
@@ -185,6 +276,20 @@ final class ExportJobFixRoundTests: XCTestCase {
         await job.waitUntilDone()
         XCTAssertTrue(observed.value, "The writer sees the cancel")
         XCTAssertEqual(job.state, .idle)
+    }
+
+    func testResetDeletesTheOutgoingProfilesReportFiles() async throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent("LandlordHoursExport-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        let job = ExportJob(writer: { r, y in AuditExportFiles.write(report: r, year: y, directory: base) })
+        job.start(report: report(), year: 2026, fingerprint: "A")
+        await job.waitUntilDone()
+        guard let files = job.readyFiles(for: 2026) else { return XCTFail("ready") }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: files.pdfURL.path))
+        job.reset()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: files.pdfURL.path), "PDF deleted")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: files.csvURL.path), "CSV deleted")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: base.path), "Our temp folder deleted")
     }
 }
 

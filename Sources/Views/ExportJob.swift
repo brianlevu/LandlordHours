@@ -122,7 +122,11 @@ final class ExportJob: ObservableObject {
         state = .generating(year: year)
         task = Task { [weak self, writer] in
             let result = await writer(report, year)
-            guard let self, self.runID == id else { return }
+            guard let self, self.runID == id else {
+                // Reset (or a newer run) while writing: drop what this run produced.
+                if case .success(let files) = result { ExportJob.deleteFiles(files) }
+                return
+            }
             // Seen in the open sheet already: no banner for it after the sheet closes.
             self.bannerDismissed = self.isSheetVisible
             switch result {
@@ -146,11 +150,24 @@ final class ExportJob: ObservableObject {
         bannerDismissed = true
     }
 
+    /// Deletes a report's PDF and CSV, and their folder when it is one of ours.
+    nonisolated static func deleteFiles(_ files: ExportShareItem) {
+        let fm = FileManager.default
+        try? fm.removeItem(at: files.pdfURL)
+        try? fm.removeItem(at: files.csvURL)
+        let folder = files.pdfURL.deletingLastPathComponent()
+        if folder.lastPathComponent.hasPrefix("LandlordHoursExport-") {
+            try? fm.removeItem(at: folder)
+        }
+    }
+
     /// Sign-out / profile switch: the files belong to the outgoing profile.
     func reset() {
         task?.cancel()
         runID = UUID()
         reportFingerprint = nil
+        // The outgoing profile's report must not linger in temp.
+        if case .ready(let files, _) = state { Self.deleteFiles(files) }
         state = .idle
         bannerDismissed = false
         isSheetVisible = false
@@ -160,6 +177,8 @@ final class ExportJob: ObservableObject {
 /// "Your report is ready · Share". Floats above the tab bar; tap to open the share sheet. The
 /// failed variant says the report couldn't be made and to try again from Export.
 struct ExportReadyBanner: View {
+    /// The one subtitle for a ready report, on screen and for VoiceOver.
+    static let readySubtitle = "PDF and spreadsheet"
     var kind: ExportJob.Banner = .ready
     var onOpen: () -> Void
     var onDismiss: () -> Void
@@ -179,7 +198,7 @@ struct ExportReadyBanner: View {
                             Text("Your report is ready")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(colors.textPrimary)
-                            Text("PDF and spreadsheet")
+                            Text(Self.readySubtitle)
                                 .font(.footnote)
                                 .foregroundStyle(colors.textSecondary)
                         }
@@ -192,7 +211,7 @@ struct ExportReadyBanner: View {
                 }
                 .buttonStyle(.lhPressable)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Your report is ready. Share the PDF and spreadsheet")
+                .accessibilityLabel("Your report is ready. \(Self.readySubtitle). Share")
                 .accessibilityAddTraits(.isButton)
                 .accessibilityIdentifier("export.readyBanner")
             } else {
