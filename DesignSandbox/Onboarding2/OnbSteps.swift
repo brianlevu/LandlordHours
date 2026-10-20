@@ -40,6 +40,7 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .scrollIndicatorsFlash(onAppear: true)
+        .defaultScrollAnchor(UserDefaults.standard.bool(forKey: "LHOnbScrollBottom") ? .bottom : .top)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 6) {
                 if pinNote, let note { note.padding(.bottom, 6) }
@@ -246,9 +247,10 @@ struct OnbSampleRow: View {
                         Label("Confirm", systemImage: "checkmark")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(PC.onAction)
-                            .padding(.horizontal, 16)
-                            .frame(minHeight: 36)
+                            .padding(.horizontal, 18)
+                            .frame(minHeight: 44)
                             .background(PC.action, in: Capsule())
+                            .contentShape(Capsule())
                     }
                     .buttonStyle(Pressable())
                     .accessibilityIdentifier("confirm-\(id)")
@@ -323,7 +325,7 @@ struct OnbCalendarStep: View {
                             // Trust at the ask: what we read, what we never do.
                             VStack(alignment: .leading, spacing: 6) {
                                 trustLine("eye", PC.informational, "What we read:", "event titles and times.")
-                                trustLine("hand.raised.fill", PC.positive, "What we never do:", "send them anywhere, or log anything without you.")
+                                trustLine("hand.raised.fill", PC.informational, "What we never do:", "send them anywhere, or log anything without you.")
                             }
                             .frame(maxWidth: .infinity, alignment: .leading))) {
             VStack(alignment: .leading, spacing: 14) {
@@ -613,11 +615,11 @@ struct OnbNotifyStep: View {
     }
 }
 
-/// Category ink as the shipped Inbox draws it: Leasing is the rose token (#B04266 / #F08BAA),
-/// never the concept's plum violet.
+/// Category ink. Leasing has its own harbour blue, so it never reads as the spouse rose
+/// (#B04266) or the concept's violet.
 func onbCategoryColor(_ c: Category) -> Color {
     switch c {
-    case .leasing: PC.rose
+    case .leasing: Color(light: 0x1B6C8C, dark: 0x7CC6E4)
     case .repairs: PC.timberInk
     default: PC.informational
     }
