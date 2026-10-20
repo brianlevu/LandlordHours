@@ -56,7 +56,10 @@ final class TodayCaptureUITests: XCTestCase {
 
     private func capture(_ state: String, then action: ((XCUIApplication) -> String?)? = nil, as name: String? = nil) {
         guard let (_, args, anchor) = Self.states.first(where: { $0.0 == state }) else { return XCTFail("No state \(state)") }
-        for scheme in ["light", "dark"] {
+        // `LH_CAPTURE_SCHEMES=light` re-shoots one theme only (a fix round that changed one).
+        let schemes = (ProcessInfo.processInfo.environment["LH_CAPTURE_SCHEMES"] ?? "light,dark")
+            .split(separator: ",").map(String.init)
+        for scheme in schemes {
             for size in Size.allCases {
                 app.terminate()
                 var arguments = [UITestIsolation.resetProfilesArgument, "-LHNoSwipePeek", "-LHInitialTab", "0",
