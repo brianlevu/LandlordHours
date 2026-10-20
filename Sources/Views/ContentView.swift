@@ -383,7 +383,7 @@ struct ContentView: View {
         }
         .sheet(item: $exportShare) { item in
             // The report is a PDF plus a spreadsheet: share both.
-            ActivityShareSheet(items: [item.pdfURL, item.csvURL]) { completed in
+            ActivityShareSheet(items: [ExportShareFile(url: item.pdfURL), ExportShareFile(url: item.csvURL)]) { completed in
                 exportShare = nil
                 if completed { viewModel.exportShared(format: .pdf) }
             }

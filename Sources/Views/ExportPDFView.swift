@@ -72,6 +72,10 @@ struct ExportPDFView: View {
                 .padding(.bottom, 32)
             }
             .scrollIndicators(.hidden)
+            // Content scrolling up never shows through under the Close chip.
+            .modifier(HardTopScrollEdge())
+            .toolbarBackground(colors.background, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .background(colors.background.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -87,7 +91,7 @@ struct ExportPDFView: View {
         .onAppear { job.isSheetVisible = true }
         .onDisappear { job.isSheetVisible = false }
         .sheet(item: $sharing) { request in
-            ActivityShareSheet(items: [request.url]) { completed in
+            ActivityShareSheet(items: [ExportShareFile(url: request.url)]) { completed in
                 sharing = nil
                 if completed { viewModel.exportShared(format: request.format) }
             }

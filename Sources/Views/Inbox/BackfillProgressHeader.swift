@@ -40,11 +40,19 @@ struct BackfillProgressHeader: View {
                     .font(.body.weight(.semibold))
                     .foregroundStyle(OnBlueprint.primary)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(Self.detail(completed: completed, total: total, found: found))
-                    .font(.subheadline)
-                    .monospacedDigit()
-                    .foregroundStyle(OnBlueprint.secondary)
-                    .lineLimit(2)
+                // Two lines that each stay whole ("12 of 80 events" / "5 found so far"), so a
+                // count never wraps away from its words.
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(Self.eventsLine(completed: completed, total: total))
+                    if total > 0 && found > 0 {
+                        Text(Self.foundLine(found))
+                    }
+                }
+                .font(.subheadline)
+                .monospacedDigit()
+                .foregroundStyle(OnBlueprint.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
                 BackfillProgressLine(fraction: total > 0 ? Double(completed) / Double(total) : 0)
                     .frame(height: 3)
                     .padding(.top, 2)
@@ -84,7 +92,13 @@ struct BackfillProgressHeader: View {
     /// the list.
     static let cardMinHeight: CGFloat = 134
 
-    /// "Getting your events" → "12 of 80 events · 5 found so far".
+    static func eventsLine(completed: Int, total: Int) -> String {
+        total > 0 ? "\(completed) of \(total) events" : "Getting your events"
+    }
+
+    static func foundLine(_ found: Int) -> String { "\(found) found so far" }
+
+    /// "Getting your events" → "12 of 80 events · 5 found so far" (VoiceOver: one sentence).
     static func detail(completed: Int, total: Int, found: Int) -> String {
         guard total > 0 else { return "Getting your events" }
         let events = "\(completed) of \(total) events"

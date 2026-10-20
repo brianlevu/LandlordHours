@@ -1,5 +1,7 @@
 import SwiftUI
 import LucideIcons
+import LinkPresentation
+import UniformTypeIdentifiers
 
 /// WP-L: the PDF + CSV export runs in the background, so the user can close the export sheet
 /// and keep using the app. When it is ready and the sheet is closed, the shell shows a small
@@ -358,5 +360,54 @@ enum ExportFingerprint {
         let mostHours = String(describing: tax.noOneParticipatedMore(forYear: year))
         let profile = "\(tax.spouseTracking)|\(tax.nonREWorkHours)|\(tax.groupingElection)|\(mostHours)|\(tax.filingStatus)"
         return make(entries: app.timeEntries, properties: app.properties, year: year, profile: profile)
+    }
+}
+
+/// A report file for the share sheet: always the FILE (PDF, or the spreadsheet as a .csv with
+/// type public.comma-separated-values-text and its real filename), never pasted text, so it
+/// arrives as an attachment in Mail and as a file in Files.
+final class ExportShareFile: NSObject, UIActivityItemSource {
+    let url: URL
+
+    init(url: URL) {
+        self.url = url
+    }
+
+    var typeIdentifier: String {
+        url.pathExtension.lowercased() == "csv" ? UTType.commaSeparatedText.identifier : UTType.pdf.identifier
+    }
+
+    func activityViewControllerPlaceholderItem(_ activityViewController: UIActivityViewController) -> Any { url }
+
+    func activityViewController(_ activityViewController: UIActivityViewController, itemForActivityType activityType: UIActivity.ActivityType?) -> Any? { url }
+
+    func activityViewController(_ activityViewController: UIActivityViewController, dataTypeIdentifierForActivityType activityType: UIActivity.ActivityType?) -> String { typeIdentifier }
+
+    func activityViewController(_ activityViewController: UIActivityViewController, subjectForActivityType activityType: UIActivity.ActivityType?) -> String {
+        url.deletingPathExtension().lastPathComponent
+    }
+
+    func activityViewControllerLinkMetadata(_ activityViewController: UIActivityViewController) -> LPLinkMetadata? {
+        let metadata = LPLinkMetadata()
+        metadata.title = url.lastPathComponent
+        metadata.originalURL = url
+        metadata.url = url
+        // A document icon, not the generic link compass.
+        let symbol = typeIdentifier == UTType.pdf.identifier ? "doc.richtext" : "tablecells"
+        if let icon = UIImage(systemName: symbol)?.withTintColor(.systemBlue, renderingMode: .alwaysOriginal) {
+            metadata.iconProvider = NSItemProvider(object: icon)
+        }
+        return metadata
+    }
+}
+
+/// iOS 26+: a hard top scroll edge, so scrolled content never reads through the toolbar chip.
+struct HardTopScrollEdge: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.scrollEdgeEffectStyle(.hard, for: .top)
+        } else {
+            content
+        }
     }
 }
