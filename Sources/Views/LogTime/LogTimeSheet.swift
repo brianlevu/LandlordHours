@@ -630,7 +630,9 @@ struct LogTimeSheet: View {
 
     private var missingMessage: String? { form.missingMessage(properties: properties) }
     /// The caution line shows once something is typed or picked (an untouched sheet isn't scolded).
-    private var showsMissing: Bool { missingMessage != nil && (!form.note.isEmpty || isReviewing || LogSheetDebug.forcesInvalid) }
+    private var showsMissing: Bool {
+        missingMessage != nil && (!form.note.isEmpty || isReviewing || properties.isEmpty || LogSheetDebug.forcesInvalid)
+    }
 
     private var footer: some View {
         VStack(spacing: 8) {
