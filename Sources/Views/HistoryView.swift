@@ -5,13 +5,15 @@ import SwiftUI
 struct HistoryView: View {
     /// True when pushed onto another NavigationStack (Today's "See all"); the tab root owns its own.
     @Environment(\.isPresented) private var isPushed
+    /// Opens narrowed to one rental (Properties' "See all in Records").
+    var initialPropertyId: UUID? = nil
 
     var body: some View {
         if isPushed {
-            RecordsScreen(showsBackButton: true)
+            RecordsScreen(showsBackButton: true, initialPropertyId: initialPropertyId)
         } else {
             NavigationStack {
-                RecordsScreen(showsBackButton: false)
+                RecordsScreen(showsBackButton: false, initialPropertyId: initialPropertyId)
             }
         }
     }
@@ -19,6 +21,7 @@ struct HistoryView: View {
 
 private struct RecordsScreen: View {
     let showsBackButton: Bool
+    var initialPropertyId: UUID? = nil
 
     @EnvironmentObject private var viewModel: AppViewModel
     @ObservedObject private var taxProfile = TaxProfileManager.shared
@@ -30,6 +33,7 @@ private struct RecordsScreen: View {
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var filter = RecordsFilter(year: Calendar.current.component(.year, from: Date()))
+    @State private var appliedInitialFilter = false
     @State private var entryToDelete: TimeEntry?
     @State private var showExport = false
     @FocusState private var searchFocused: Bool
@@ -115,6 +119,11 @@ private struct RecordsScreen: View {
         .scrollDismissesKeyboard(.immediately)
         .contentMargins(.bottom, 104, for: .scrollContent)
         .background { LHMobileCanvas() }
+        .onAppear {
+            guard !appliedInitialFilter else { return }
+            appliedInitialFilter = true
+            if let initialPropertyId { filter.propertyId = initialPropertyId }
+        }
         .navigationBarHidden(!showsBackButton)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(showsBackButton ? .visible : .hidden, for: .navigationBar)

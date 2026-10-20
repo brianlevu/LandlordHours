@@ -21,21 +21,8 @@ extension ActivityCategory {
         }
     }
 
-    var color: Color {
-        switch self {
-        case .repairs: return AppColors.coral
-        case .management: return AppColors.sage
-        case .leasing: return AppColors.sky
-        case .bookkeeping: return AppColors.honey
-        case .legal: return AppColors.rose
-        case .insurance: return AppColors.primaryLight
-        case .travel: return AppColors.sky
-        case .renovations: return AppColors.coral
-        case .investing: return AppColors.sage
-        case .financing: return AppColors.honey
-        case .contractNegotiation: return AppColors.primary
-        }
-    }
+    /// The category's ink from the one 2.0 colour map (AppColors.categoryInkHex).
+    var color: Color { AppColors.categoryInk(self) }
 
     var chipLabel: String {
         switch self {

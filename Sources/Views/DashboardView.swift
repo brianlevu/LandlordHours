@@ -812,7 +812,10 @@ struct DashboardView: View {
                     .clipShape(Capsule())
             }
 
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+            // A plain Grid, not LazyVGrid: four tiles need no laziness, and since WP-L removed the
+            // launch splash the lazy grid left its first row out of the accessibility tree.
+            Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                GridRow {
                 activationActionTile(
                     title: "Property",
                     subtitle: viewModel.properties.isEmpty ? "Add first" : "\(viewModel.properties.count) ready",
@@ -835,6 +838,8 @@ struct DashboardView: View {
                     }
                 )
 
+                }
+                GridRow {
                 activationActionTile(
                     title: "Learn",
                     subtitle: "What counts",
@@ -856,6 +861,7 @@ struct DashboardView: View {
                         NotificationCenter.default.post(name: .switchToTab, object: 3)
                     }
                 )
+                }
             }
         }
         .padding(18)

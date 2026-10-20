@@ -96,6 +96,71 @@ enum AppColors {
     static let terracotta = Color(hex: Hex.terracotta)
     static let plaster = Color(hex: Hex.plaster)
 
+    // MARK: - Category inks (2.0 r4: one colour map, app-wide)
+    /// Each category's ink is taken from its 3D tool's material, so bars, labels and the tile wash
+    /// match the icon. Light inks are text-safe on white (≥4.5:1); dark inks on the dark card.
+    /// Leasing is harbour blue (the onboarding lane colour): never rose, which means spouse.
+    enum CategoryHex {
+        static let harbour = "1B6C8C"            // leasing (showing sign)
+        static let darkHarbour = "7CC6E4"
+        static let amber = "8C6A00"              // management (clipboard)
+        static let darkAmber = "F2CF5B"
+        static let moss = "56702A"               // bookkeeping (ledger)
+        static let darkMoss = "B5D07A"
+        static let terracottaInk = "B4432E"      // renovation (roller)
+        static let darkTerracottaInk = "F09A84"
+        static let flagOrange = "B0560F"         // negotiation (speech bubbles)
+        static let darkFlagOrange = "F5A867"
+        static let navy = "2F3E7A"               // insurance (shield)
+        static let darkNavy = "9FB0EE"
+        static let olive = "6E7412"              // investing (coins)
+        static let darkOlive = "D3D46A"
+        static let copper = "8F4A22"             // financing (key)
+        static let darkCopper = "E9A27B"
+        static let brassInk = "7A5E1E"           // property seal (brass)
+        static let darkBrassInk = "E8C877"
+    }
+
+    /// Property seal inks (never green or rose: those mean "met" and "spouse").
+    static func sealInkHex(_ palette: SealPalette) -> (light: String, dark: String) {
+        switch palette {
+        case .blueprint: return (actionLightHex, actionDarkHex)
+        case .timber: return (Hex.timberInk, Hex.darkTimberInk)
+        case .terracotta: return (CategoryHex.terracottaInk, CategoryHex.darkTerracottaInk)
+        case .brass: return (CategoryHex.brassInk, CategoryHex.darkBrassInk)
+        case .slate: return (Hex.informational, Hex.darkInformational)
+        }
+    }
+
+    /// Harbour blue: the Leasing ink (#1B6C8C / #7CC6E4).
+    static let harbour = Color.lhDynamic(light: CategoryHex.harbour, dark: CategoryHex.darkHarbour)
+
+    /// The category's ink as (light, dark) hex.
+    static func categoryInkHex(_ category: ActivityCategory) -> (light: String, dark: String) {
+        switch category {
+        case .repairs: return (Hex.timberInk, Hex.darkTimberInk)
+        case .renovations: return (CategoryHex.terracottaInk, CategoryHex.darkTerracottaInk)
+        case .management: return (CategoryHex.amber, CategoryHex.darkAmber)
+        case .leasing: return (CategoryHex.harbour, CategoryHex.darkHarbour)
+        case .bookkeeping: return (CategoryHex.moss, CategoryHex.darkMoss)
+        case .legal: return (Hex.draftingInk, Hex.darkDrafting)
+        case .travel: return (Hex.informational, Hex.darkInformational)
+        case .contractNegotiation: return (CategoryHex.flagOrange, CategoryHex.darkFlagOrange)
+        case .insurance: return (CategoryHex.navy, CategoryHex.darkNavy)
+        case .investing: return (CategoryHex.olive, CategoryHex.darkOlive)
+        case .financing: return (CategoryHex.copper, CategoryHex.darkCopper)
+        }
+    }
+
+    /// Scheme-following category ink (for static contexts).
+    static func categoryInk(_ category: ActivityCategory) -> Color {
+        let hex = categoryInkHex(category)
+        return Color.lhDynamic(light: hex.light, dark: hex.dark)
+    }
+
+    /// Tile wash opacity behind a category tool.
+    static let categoryWashOpacity: Double = 0.14
+
     // MARK: - Light surfaces
     static let background = Color(hex: Hex.canvas)
     static let backgroundSecondary = Color.white
@@ -287,6 +352,20 @@ struct AdaptiveColors {
     var draftingInk: Color { pick(H.draftingInk, H.darkDrafting) }
     var timber: Color { AppColors.timber }
     var timberInk: Color { pick(H.timberInk, H.darkTimberInk) }
+    /// Harbour blue (Leasing).
+    var harbour: Color { pick(AppColors.CategoryHex.harbour, AppColors.CategoryHex.darkHarbour) }
+    /// The category's ink (labels, bars) and its 14% tile wash.
+    func categoryInk(_ category: ActivityCategory) -> Color {
+        let hex = AppColors.categoryInkHex(category)
+        return pick(hex.light, hex.dark)
+    }
+    func categoryWash(_ category: ActivityCategory) -> Color {
+        categoryInk(category).opacity(AppColors.categoryWashOpacity)
+    }
+    func sealInk(_ palette: SealPalette) -> Color {
+        let hex = AppColors.sealInkHex(palette)
+        return pick(hex.light, hex.dark)
+    }
 
     // Legacy names
     var primary: Color { pick(H.brand, H.darkAction) }

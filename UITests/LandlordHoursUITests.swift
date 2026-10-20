@@ -177,17 +177,17 @@ final class LandlordHoursUITests: XCTestCase {
     func testMainTabVisualSmokeMatrix() {
         let matrix: [(scenario: String, tab: Int, expectedText: String, attachment: String)] = [
             ("emptyMainTabs", 0, "Add your first property", "empty-home"),
-            ("emptyMainTabs", 1, "Create the property record", "empty-properties"),
+            ("emptyMainTabs", 1, "Once we know where your rentals are", "empty-properties"),
             ("emptyMainTabs", 2, "Add a property first", "empty-track"),
             ("emptyMainTabs", 3, "Reports", "empty-reports"),
             ("emptyMainTabs", 4, "Upgrade to Pro", "empty-settings"),
             ("occasional", 0, "Today’s work", "occasional-home"),
-            ("occasional", 1, "Portfolio evidence", "occasional-properties"),
+            ("occasional", 1, "1 rental ·", "occasional-properties"),
             ("occasional", 2, "Log your time", "occasional-track"),
             ("occasional", 3, "Reports", "occasional-reports"),
             ("occasional", 4, "Settings", "occasional-settings"),
             ("frequent", 0, "counted toward 750 hours", "frequent-home"),
-            ("frequent", 1, "Portfolio evidence", "frequent-properties"),
+            ("frequent", 1, "3 rentals ·", "frequent-properties"),
             ("frequent", 2, "Log your time", "frequent-track"),
             ("frequent", 3, "Reports", "frequent-reports"),
             ("frequent", 4, "Pro is active", "frequent-settings")
@@ -405,14 +405,37 @@ final class LandlordHoursUITests: XCTestCase {
         add(attachment)
     }
 
-    private func scrollToElement(_ element: XCUIElement, maxSwipes: Int = 6) {
+    /// Since WP-L removed the launch splash, the first screen is still settling when a test
+    /// starts: wait for the element, let each swipe's scroll come to rest, then wait for it to
+    /// become hittable instead of reading `isHittable` once.
+    private func scrollToElement(_ element: XCUIElement, maxSwipes: Int = 10) {
+        _ = element.waitForExistence(timeout: 8)
         var swipes = 0
-        while (!element.exists || !element.isHittable) && swipes < maxSwipes {
-            app.swipeUp()
+        while !(waitUntilHittable(element, timeout: 1) && clearsTabBar(element)) && swipes < maxSwipes {
+            // Scroll toward the element: it can sit above the fold when a tab keeps its old
+            // scroll offset after the content above it shrank.
+            // Short, slow drags (about a third of the screen) so the target can't jump from under
+            // the floating tab bar to above the fold in one swipe.
+            let up = !(element.exists && element.frame.maxY < app.windows.firstMatch.frame.midY)
+            let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.62 : 0.32))
+            let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.32 : 0.62))
+            from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.2)
             swipes += 1
+            Thread.sleep(forTimeInterval: 0.6)
         }
         XCTAssertTrue(element.waitForExistence(timeout: 2))
-        XCTAssertTrue(element.isHittable)
+        XCTAssertTrue(waitUntilHittable(element, timeout: 4), "Not hittable after scrolling: \(element)")
+    }
+
+    /// The floating tab bar overlays content: a row under it reports hittable but a tap hits a tab.
+    private func clearsTabBar(_ element: XCUIElement) -> Bool {
+        let tabBar = app.buttons["tab.today"]
+        return !tabBar.exists || element.frame.maxY < tabBar.frame.minY - 8
+    }
+
+    private func waitUntilHittable(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND isHittable == true"), object: element)
+        return XCTWaiter().wait(for: [hittable], timeout: timeout) == .completed
     }
 
     private func scrollToText(_ text: String, timeout: TimeInterval = 5, maxSwipes: Int = 8) {

@@ -87,6 +87,38 @@
     "bp_tool_management_36",
     "bp_tool_management_56"
    ]
+  },
+  {
+   "category": "investing",
+   "label": "Investing \u00b7 rising coin stacks",
+   "images": [
+    "bp_tool_investing_36",
+    "bp_tool_investing_56"
+   ]
+  },
+  {
+   "category": "financing",
+   "label": "Financing \u00b7 house key + tag",
+   "images": [
+    "bp_tool_financing_36",
+    "bp_tool_financing_56"
+   ]
+  },
+  {
+   "category": "insurance",
+   "label": "Insurance \u00b7 shield + house",
+   "images": [
+    "bp_tool_insurance_36",
+    "bp_tool_insurance_56"
+   ]
+  },
+  {
+   "category": "negotiation",
+   "label": "Negotiation \u00b7 two speech bubbles",
+   "images": [
+    "bp_tool_negotiation_36",
+    "bp_tool_negotiation_56"
+   ]
   }
  ],
  "house": [
