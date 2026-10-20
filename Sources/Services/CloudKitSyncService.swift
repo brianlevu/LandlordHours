@@ -145,19 +145,33 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         if !isDeletingAccount { pushesBlocked = false }
         // One initial sync at a time; a request that arrives meanwhile (profile switch,
         // iCloud coming back, Sync Now) re-runs it afterwards instead of being dropped.
-        if isRunningInitialSync {
+        // A caller that arrives meanwhile waits for that re-run too: start() returns only once
+        // a pull for the profile active when it was called has run (WP-L: the export gate and
+        // Today's placeholder rely on "start() returned" meaning "this profile was pulled").
+        if let running = initialSyncTask {
             rerunRequested = true
+            await running.value
             return
         }
-        isRunningInitialSync = true
-        defer { isRunningInitialSync = false }
-        repeat {
-            rerunRequested = false
-            await runInitialSyncOnce()
-        } while rerunRequested
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.isRunningInitialSync = true
+            defer {
+                self.isRunningInitialSync = false
+                self.initialSyncTask = nil
+            }
+            repeat {
+                self.rerunRequested = false
+                await self.runInitialSyncOnce()
+            } while self.rerunRequested
+        }
+        initialSyncTask = task
+        await task.value
     }
 
     private var rerunRequested = false
+    /// The initial sync in flight; repeat start() calls await it.
+    private var initialSyncTask: Task<Void, Never>?
 
     private func runInitialSyncOnce() async {
         let startingFor = appUserId

@@ -225,13 +225,16 @@ struct ExportPDFView: View {
                 .buttonStyle(.lhPressable)
                 .accessibilityIdentifier("export.shareCSV")
 
-                Button("Create again") { generateExports(force: gate == .stillSyncing) }
+                Button("Create again") { generateExports() }
                     .font(AppTypography.button)
                     .foregroundStyle(colors.action)
                     .frame(minHeight: 44)
-                    .disabled(!gate.allowsCreate && gate != .stillSyncing)
+                    .disabled(!gate.allowsCreate)
                     .accessibilityHint("Makes a new report from your current records")
                     .accessibilityIdentifier("export.createAgain")
+                if gate == .stillSyncing {
+                    createWithLocalButton
+                }
             } else {
                 if reportIsStale && !isGenerating {
                     Text("Your records changed since your last report. Create it again to include them.")
@@ -274,13 +277,7 @@ struct ExportPDFView: View {
                     .accessibilityIdentifier("export.generatePDF")
 
                     if gate == .stillSyncing && canExport {
-                        // The pull is slow, not failed: the report may miss hours from other
-                        // devices. Let the user choose to go ahead anyway.
-                        Button("Create with what's on this device") { generateExports(force: true) }
-                            .font(AppTypography.button)
-                            .foregroundStyle(colors.action)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .accessibilityIdentifier("export.createLocal")
+                        createWithLocalButton
                     }
 
                     if !canExport && gate == .noEntries {
@@ -291,6 +288,16 @@ struct ExportPDFView: View {
                 }
             }
 
+            if viewModel.initialPullFailed && gate.allowsCreate {
+                Label("Couldn't reach iCloud. This report may be missing hours from your other devices.",
+                      systemImage: "icloud.slash")
+                    .font(.footnote)
+                    .foregroundStyle(colors.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("export.pullFailedNote")
+            }
+
             if let exportError {
                 Label(exportError, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote)
@@ -298,6 +305,16 @@ struct ExportPDFView: View {
                     .multilineTextAlignment(.center)
             }
         }
+    }
+
+    /// The pull is slow, not failed: the report may miss hours from other devices. The user
+    /// chooses to go ahead anyway (the only way to create while syncing).
+    private var createWithLocalButton: some View {
+        Button("Create with what's on this device") { generateExports(force: true) }
+            .font(AppTypography.button)
+            .foregroundStyle(colors.action)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .accessibilityIdentifier("export.createLocal")
     }
 
     // MARK: Data

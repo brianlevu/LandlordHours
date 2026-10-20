@@ -299,3 +299,101 @@ private final class CancelFlag: @unchecked Sendable {
     func set() { lock.lock(); flag = true; lock.unlock() }
     var value: Bool { lock.lock(); defer { lock.unlock() }; return flag }
 }
+
+// MARK: - Profile switch during a slow first pull (review blocker)
+
+@MainActor
+private final class PullRecorder {
+    var pulledFor: [String?] = []
+}
+
+@MainActor
+final class InitialSyncSwitchMidPullTests: CaptureTestCase {
+    private func slowOps(_ recorder: PullRecorder, pullOK: Bool = true) -> CloudKitSyncService.InitialSyncOperations {
+        CloudKitSyncService.InitialSyncOperations(
+            accountAvailable: { true },
+            prepare: {},
+            push: {},
+            pull: {
+                recorder.pulledFor.append(UserScope.userId)
+                try? await Task.sleep(nanoseconds: 120_000_000)
+                return pullOK
+            }
+        )
+    }
+
+    /// A start() for profile B that arrives while A's pull runs returns only after B is pulled.
+    func testRepeatStartWaitsForThePullOfTheCurrentProfile() async {
+        let service = CloudKitSyncService()
+        let recorder = PullRecorder()
+        service.operationsOverride = slowOps(recorder)
+        let first = Task { await service.start() }
+        try? await Task.sleep(nanoseconds: 30_000_000)          // A's pull is in flight
+        let profileB = "local-switch-\(UUID().uuidString.prefix(6))"
+        UserDefaults.standard.set(profileB, forKey: ProfileKeys.localProfileId)
+        defer { AppViewModel.clearScopedAccountData(for: profileB) }
+
+        await service.start()                                     // B's request
+        XCTAssertEqual(recorder.pulledFor, [profileId, profileB], "B's pull ran before start() returned")
+        XCTAssertEqual(service.initialSyncCompletedFor, profileB)
+        await first.value
+    }
+
+    /// The view model keeps the export gate closed until the new profile's pull has landed.
+    func testExportGateStaysClosedAcrossASwitchMidPull() async {
+        let (app, _) = makeViewModel()
+        let recorder = PullRecorder()
+        app.syncService.operationsOverride = slowOps(recorder)
+        app.startInitialSync(showsPlaceholder: false)
+        try? await Task.sleep(nanoseconds: 30_000_000)
+        let profileB = "local-switch-\(UUID().uuidString.prefix(6))"
+        UserDefaults.standard.set(profileB, forKey: ProfileKeys.localProfileId)
+        defer { AppViewModel.clearScopedAccountData(for: profileB) }
+        app.startInitialSync(showsPlaceholder: false)
+
+        // A's pull ends (~120 ms in); the gate must still be closed while B's pull runs.
+        try? await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertTrue(app.isInitialPullRunning, "Not open after A's pull: B hasn't been pulled")
+        let deadline = Date().addingTimeInterval(5)
+        while app.isInitialPullRunning && Date() < deadline { try? await Task.sleep(nanoseconds: 5_000_000) }
+        XCTAssertFalse(app.isInitialPullRunning)
+        XCTAssertEqual(recorder.pulledFor.last ?? nil, profileB)
+        XCTAssertFalse(app.initialPullFailed)
+    }
+
+    func testFailedPullOpensTheGateWithANote() async {
+        let (app, _) = makeViewModel()
+        app.syncService.operationsOverride = slowOps(PullRecorder(), pullOK: false)
+        app.startInitialSync(showsPlaceholder: false)
+        let deadline = Date().addingTimeInterval(5)
+        while app.isInitialPullRunning && Date() < deadline { try? await Task.sleep(nanoseconds: 5_000_000) }
+        XCTAssertFalse(app.isInitialPullRunning, "A failed pull doesn't block export")
+        XCTAssertTrue(app.initialPullFailed, "But the sheet says the report may miss hours")
+        XCTAssertFalse(AppViewModel.initialPullFailed(accountAvailable: false, completedFor: nil, activeProfile: "x"),
+                       "No iCloud account is not a failure")
+        XCTAssertFalse(AppViewModel.initialPullFailed(accountAvailable: true, completedFor: "x", activeProfile: "x"))
+    }
+}
+
+@MainActor
+final class ExportJobReplaceTests: XCTestCase {
+    func testStartingANewReportDeletesThePreviousFiles() async throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent("ExportReplace-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: base) }
+        let job = ExportJob(writer: { r, y in
+            AuditExportFiles.write(report: r, year: y, directory: base.appendingPathComponent(UUID().uuidString))
+        })
+        let report = AuditReportBuilder.build(AuditReportBuilder.inputFromTaxProfile(
+            entries: [], properties: [], taxYear: 2026, spouseTracking: false,
+            nonREWorkHours: 0, groupingElection: false, noOneParticipatedMore: false))
+        job.start(report: report, year: 2026, fingerprint: "A")
+        await job.waitUntilDone()
+        guard let first = job.readyFiles(for: 2026) else { return XCTFail("ready") }
+        job.start(report: report, year: 2026, fingerprint: "B")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: first.pdfURL.path), "Old PDF removed")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: first.csvURL.path), "Old CSV removed")
+        await job.waitUntilDone()
+        XCTAssertNotNil(job.readyFiles(for: 2026, fingerprint: "B"))
+    }
+}

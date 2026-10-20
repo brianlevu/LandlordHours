@@ -115,6 +115,8 @@ final class ExportJob: ObservableObject {
     /// Starts generating unless a report is already being made.
     func start(report: AuditReport, year: Int, fingerprint: String? = nil) {
         guard !isGenerating else { return }
+        // A new report replaces the old one: don't leave its PDF and CSV in temp.
+        if case .ready(let previous, _) = state { Self.deleteFiles(previous) }
         let id = UUID()
         runID = id
         reportFingerprint = fingerprint
@@ -132,6 +134,8 @@ final class ExportJob: ObservableObject {
             switch result {
             case .success(let files):
                 self.state = .ready(files, year: year)
+                // WP-R's success haptic, when the user is watching the sheet.
+                if self.isSheetVisible { UINotificationFeedbackGenerator().notificationOccurred(.success) }
             case .failure:
                 self.state = .failed(year: year, message: Self.failureMessage)
                 RatingPromptCoordinator.shared.noteError()

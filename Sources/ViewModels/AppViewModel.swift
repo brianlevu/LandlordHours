@@ -50,6 +50,10 @@ class AppViewModel: ObservableObject {
     /// The initial sync is still running (true past the placeholder cap). Export waits on it:
     /// a report made now could miss hours from other devices. False once it lands or fails.
     @Published private(set) var isInitialPullRunning = false
+    /// The last initial sync reached iCloud's account but its pull failed. Export still works,
+    /// with a note that the report may miss hours from other devices.
+    @Published private(set) var initialPullFailed = false
+    private var initialSyncsInFlight = 0
     static let initialPullPlaceholderTimeout: TimeInterval = 6
     private var initialPullWaitToken = UUID()
     @Published var isSignedIn = false
@@ -138,14 +142,32 @@ class AppViewModel: ObservableObject {
     /// as not final until the first pull ends (any outcome) or the timeout passes.
     func startInitialSync(showsPlaceholder: Bool = true) {
         let token = showsPlaceholder && syncService.isCloudKitAvailable ? beginAwaitingInitialPull() : nil
+        initialSyncsInFlight += 1
         isInitialPullRunning = true
         Task { [weak self] in
             guard let self else { return }
+            // Returns only after a pull for the profile active now has run (a call made while
+            // another profile's pull is in flight waits for the re-run).
             await self.syncService.start()
-            self.isInitialPullRunning = false
+            self.initialSyncsInFlight -= 1
+            if self.initialSyncsInFlight == 0 {
+                self.isInitialPullRunning = false
+                self.initialPullFailed = Self.initialPullFailed(
+                    accountAvailable: self.syncService.accountAvailable,
+                    completedFor: self.syncService.initialSyncCompletedFor,
+                    activeProfile: UserScope.userId
+                )
+            }
             // Ends only the wait this sync began (a newer wait belongs to a newer start).
             if let token { self.endAwaitingInitialPull(token: token) }
         }
+    }
+
+    /// Failed = iCloud was reachable as an account but this profile's pull didn't complete.
+    /// No account (or no CloudKit) is not a failure: export works normally without a note.
+    static func initialPullFailed(accountAvailable: Bool, completedFor: String?, activeProfile: String?) -> Bool {
+        guard accountAvailable, let activeProfile else { return false }
+        return completedFor != activeProfile
     }
 
     @discardableResult
