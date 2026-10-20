@@ -24,6 +24,7 @@ final class OnboardingFlowTests: XCTestCase {
         let app = launch("flow")
         let start = app.buttons["onb-start"]
         XCTAssertTrue(start.waitForExistence(timeout: 15))
+        sleep(6)                                               // pre-roll: let the screen recorder settle
         mark()
         sleep(3)
         start.tap()                                            // Welcome → Goal
@@ -62,6 +63,7 @@ final class OnboardingFlowTests: XCTestCase {
         let app = launch("flow")
         let start = app.buttons["onb-start"]
         XCTAssertTrue(start.waitForExistence(timeout: 15))
+        sleep(6)                                               // pre-roll: let the screen recorder settle
         mark()
         sleep(2)
         start.tap()

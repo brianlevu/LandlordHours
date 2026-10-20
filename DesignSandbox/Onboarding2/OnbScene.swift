@@ -22,6 +22,13 @@ struct OnbScene: View {
             ZStack(alignment: .topLeading) {
                 houseLayers
                 if step == .goal { scale(s).transition(.opacity) }
+                if step == .welcome && !upgrade {
+                    Text("Here's what you'll build")
+                        .drafting(HouseTokens.drafting)
+                        .fixedSize()
+                        .position(x: s * 0.5, y: s * 0.885)
+                        .transition(.opacity)
+                }
                 if showsScanLine { scanLine(s, label: s > 180).transition(.opacity) }
                 hats(s)
                 if flow.stakeDropped { stake(s).transition(reduce ? .opacity : .asymmetric(insertion: .offset(y: -s * 0.3).combined(with: .opacity), removal: .opacity)) }
@@ -45,9 +52,13 @@ struct OnbScene: View {
                         .opacity(step == .calendar ? 0.3 : 1)
                 }
             } else {
-                // Every step: the empty lot with the plan drawn over it. Nothing built is ever taken down.
+                // Welcome: the finished house as drafting linework only ("here's what you'll build").
+                // From step 1 the lot is there and construction begins. Nothing built is ever taken down.
+                // The finished house's full drawing is the k00 linework layer (k18's lines are empty:
+                // everything is built by then).
                 ZStack {
                     Image(decorative: HouseKeyframe.k00_lot.builtImageName).resizable().interpolation(.high).scaledToFit()
+                        .opacity(step == .welcome ? 0 : 1)
                     HouseLineworkView(keyframe: .k00_lot, canvas: .blueprintHero)
                         .opacity([.property, .notify, .staked].contains(step) ? 0.45 : (step == .calendar ? 0.3 : 1))
                 }
@@ -184,7 +195,7 @@ struct OnbScene: View {
 
     private var a11y: String {
         switch step {
-        case .welcome: "A house half built, drawn on blueprint paper."
+        case .welcome: "The finished house, drawn as a blueprint. Nothing built yet."
         case .goal: "An empty lot with the house drawn over it. Scale marks at 100, 500 and 750 hours."
         case .staked: "Your lot, staked with \(flow.name.isEmpty ? "your rental" : flow.name)."
         default: flow.stakeDropped ? "Your lot, staked with \(flow.name)." : "An empty lot with the house drawn over it."

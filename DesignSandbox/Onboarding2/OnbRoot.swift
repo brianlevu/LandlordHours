@@ -207,10 +207,10 @@ struct OnbWelcomeContent: View {
                         .foregroundStyle(HouseTokens.onHeroSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 10)
-                    HStack(spacing: 8) {
-                        chip("100h", "Foundation")
-                        chip("500h", "Roof")
-                        chip("750h", "Keys")
+                    // One row when it fits; a column at larger text sizes (never truncated).
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 8) { chips }
+                        VStack(alignment: .leading, spacing: 8) { chips }
                     }
                     .padding(.top, 18)
                 }
@@ -249,13 +249,19 @@ struct OnbWelcomeContent: View {
         }
     }
 
+    @ViewBuilder private var chips: some View {
+        chip("100h", "Foundation")
+        chip("500h", "Roof")
+        chip("750h", "Keys")
+    }
+
     private func chip(_ h: String, _ label: String) -> some View {
         HStack(spacing: 5) {
             Text(h).font(.subheadline.weight(.bold)).monospacedDigit().foregroundStyle(.white)
             Text(label).font(.subheadline).foregroundStyle(HouseTokens.onHeroSecondary)
         }
         .lineLimit(1)
-        .minimumScaleFactor(0.8)
+        .fixedSize()
         .padding(.horizontal, 10)
         .frame(minHeight: 32)
         .overlay(Capsule().strokeBorder(HouseTokens.drafting.opacity(0.45), lineWidth: 1))
