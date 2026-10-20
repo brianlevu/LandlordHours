@@ -273,10 +273,17 @@ final class LogTimeUITests: XCTestCase {
         }
     }
 
-    private func captureAll(scheme: String, size: String?) {
+    /// Today's timer card in every scheme and size (re-run after a Today-only fix).
+    func testCaptureTodayTimerCards() {
+        for scheme in ["light", "dark"] {
+            for size in [nil, "xxl", "ax3"] as [String?] { captureAll(scheme: scheme, size: size, prefix: "today-") }
+        }
+    }
+
+    private func captureAll(scheme: String, size: String?, prefix: String = "") {
         // One missing state must not cost the rest of the board.
         continueAfterFailure = true
-        for shot in shots {
+        for shot in shots where shot.name.hasPrefix(prefix) {
             app.terminate()
             launch(seed: shot.seed, scheme: scheme, extra: shot.extra + sizeArgs(size))
             let target = element(shot.waitFor)
@@ -284,9 +291,14 @@ final class LogTimeUITests: XCTestCase {
             if shot.name.hasPrefix("today-timer-") && shot.waitFor != "shell.toast" {
                 // The card sits under the hero: scroll it fully above the tab bar.
                 let bar = app.buttons["tab.today"]
+                // Short drags from mid-screen (never from an edge, which would leave the app)
+                // until the card sits fully above the tab bar.
                 var tries = 0
-                while target.frame.maxY > bar.frame.minY - 12 && tries < 4 {
-                    app.swipeUp(velocity: 300)
+                while target.frame.maxY > bar.frame.minY - 12 && target.frame.minY > 140 && tries < 8 {
+                    let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.62))
+                    let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42))
+                    from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.3)
+                    Thread.sleep(forTimeInterval: 0.5)
                     tries += 1
                 }
             }

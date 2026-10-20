@@ -100,8 +100,8 @@ struct TodayTimerSection: View {
             if viewModel.isTimerRunning, let start = viewModel.timerStartTime {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     DraftCard(
-                        title: "Timer running \u{00B7} \(LogTimeFormat.clock(min(context.date.timeIntervalSince(start), TimerReviewMath.cap)))",
-                        meta: "\(viewModel.timerCategory.inboxLabel) at \(propertyName(viewModel.timerPropertyId)) \u{00B7} started \(InboxFormat.clockTime(start))",
+                        title: "Timer running\(LogTimeFormat.dot)\(LogTimeFormat.clock(min(context.date.timeIntervalSince(start), TimerReviewMath.cap)))",
+                        meta: "\(viewModel.timerCategory.inboxLabel) at \(propertyName(viewModel.timerPropertyId))\(LogTimeFormat.dot)started \(InboxFormat.clockTime(start))",
                         primaryTitle: "Stop",
                         primaryIdentifier: "today.timer.stop",
                         onPrimary: stop,

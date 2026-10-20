@@ -226,8 +226,8 @@ struct LogTimeSheet: View {
 
     private var eyebrow: String {
         switch mode {
-        case .review(let draft): return "Timer · \(InboxFormat.longDay(draft.startDate))"
-        case .recovery(let r): return "Timer · \(InboxFormat.longDay(r.startTime))"
+        case .review(let draft): return "Timer\(LogTimeFormat.dot)\(InboxFormat.longDay(draft.startDate))"
+        case .recovery(let r): return "Timer\(LogTimeFormat.dot)\(InboxFormat.longDay(r.startTime))"
         default: return LogTimeFormat.eyebrow(Date())
         }
     }
@@ -1176,7 +1176,7 @@ struct LiveTimerCard: View {
                     .minimumScaleFactor(0.5)
                     .accessibilityLabel("Running for \(InboxFormat.spokenHours(elapsed / 3600))")
                     .accessibilityIdentifier("timer.clock")
-                Text("\(category.inboxLabel) \u{00B7} started \(InboxFormat.clockTime(start))")
+                Text("\(category.inboxLabel)\(LogTimeFormat.dot)started \(InboxFormat.clockTime(start))")
                     .font(.subheadline)
                     .foregroundStyle(HouseTokens.onHeroSecondary)
                     .fixedSize(horizontal: false, vertical: true)

@@ -219,6 +219,9 @@ enum LogParticipantRule {
 // MARK: - Formatting
 
 enum LogTimeFormat {
+    /// " · " that never ends a line: the middot is glued to the word after it (no dangling "·").
+    static let dot = " \u{00B7}\u{00A0}"
+
     /// "1h 30m", "45m", "2h".
     static func hours(_ value: Double) -> String { InboxFormat.hours(value) }
 
@@ -234,7 +237,7 @@ enum LogTimeFormat {
     /// "TODAY · SUN, OCT 19" (uppercased by the view) or "TUE, OCT 14".
     static func eyebrow(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
         let day = InboxFormat.longDay(date, calendar: calendar)
-        return calendar.isDate(date, inSameDayAs: now) ? "Today · \(day)" : day
+        return calendar.isDate(date, inSameDayAs: now) ? "Today\(dot)\(day)" : day
     }
 
     /// The Date row: "Today, Oct 19", "Yesterday, Oct 18", "Tue, Oct 14".

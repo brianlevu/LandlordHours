@@ -123,6 +123,10 @@ final class LogFormFillTests: XCTestCase {
         XCTAssertEqual(LogTimeFormat.loggedToast(hours: 1.5, propertyName: "Pine Cabin"), "Logged 1h 30m at Pine Cabin")
         XCTAssertEqual(LogTimeFormat.clock(4447), "1:14:07")
         XCTAssertEqual(LogTimeFormat.clock(42), "0:42")
+        // No dangling middot: the "·" is glued to the next word with a no-break space.
+        let eyebrow = LogTimeFormat.eyebrow(Date())
+        XCTAssertTrue(eyebrow.hasPrefix("Today \u{00B7}\u{00A0}"), eyebrow)
+        XCTAssertFalse(eyebrow.contains("\u{00B7} "), eyebrow)
     }
 }
 
