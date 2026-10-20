@@ -80,17 +80,20 @@
 		80CEA4EE10BA0654A9DC6216 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2866F8C3251DDD2D9593392E /* AppGroup.swift */; };
 		826B4790C35C2F223F1B5C19 /* HouseRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F6C712F36C0B59A33BB4D48 /* HouseRenderingTests.swift */; };
 		86277D1C3EF4C21CAB223CB5 /* ProMoments.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF39EBE443D66C2EA654096 /* ProMoments.swift */; };
+		87DBB30F160545549CF94050 /* PropertyComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51E8F6B031DC6C7B4F7EA032 /* PropertyComponents.swift */; };
 		87DDF9CFBAAE7676D8368B8F /* SignInReplacementUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ABD160E56491F781779A536 /* SignInReplacementUITests.swift */; };
 		8DCDA53C99D6607B2EB138B8 /* LocalProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1CAE53C865D5B8D680C6F0D /* LocalProfileTests.swift */; };
 		8DE67EB9BCEB8939B798F428 /* BlueprintList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A003429C65E153356A99393 /* BlueprintList.swift */; };
 		8E5DB75E645C996E2E7F0FC1 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294885677A14CB0F22849EF0 /* AppDelegate.swift */; };
 		8ED697DE6FEC7270E36DAABE /* VoiceEntryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 838ADFB389C9D4AD52D16B41 /* VoiceEntryService.swift */; };
+		8ED8AAEC6D50C47E9DC615C1 /* PropertyFigures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517CDAB2F18F0A85D206CB47 /* PropertyFigures.swift */; };
 		8EED89E8FC89005138C20B59 /* LandlordPurchases.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA1DF3BCE5385BCFDC7627DC /* LandlordPurchases.swift */; };
 		91BC16EB0083668060809989 /* AuditReportCSV.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111C91DE9EE369C07CE2F490 /* AuditReportCSV.swift */; };
 		9248093E88E7EBD05D601652 /* TimerDraftCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 172B3D3B09786621DD123327 /* TimerDraftCard.swift */; };
 		93B7E693B037558B0A327A0F /* RecordsReportsSettingsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86FFABF3A26D5A7309D8551B /* RecordsReportsSettingsUITests.swift */; };
 		93C20D864969D6F6EC85B191 /* TimeLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11377EC6BD95D70E1AF5A9A6 /* TimeLogView.swift */; };
 		94F4848B3304A1FFD709DAFD /* CalibrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09FEE56F85496C99FB9A3F46 /* CalibrationTests.swift */; };
+		95182F6767F626FFF517520A /* PropertiesDebugSeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FDEE42CEACE212DB8664E82 /* PropertiesDebugSeed.swift */; };
 		9870A084F15EEFB88DC5D372 /* TodayHouseUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8714D4DBCB581DD7B4C3F7B /* TodayHouseUITests.swift */; };
 		98CD942EF8CB9251C580627F /* InboxLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CB67517D2CB8DC4D68AEE53 /* InboxLogic.swift */; };
 		9B00BAB05110B0C26F85C687 /* HouseProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECAC09A18663B8CBE3E7BE3 /* HouseProgress.swift */; };
@@ -98,6 +101,7 @@
 		9ED242B446E98033F81CEF73 /* HousePreviewUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016D2C699C6EA42FF25E0767 /* HousePreviewUITests.swift */; };
 		9F46F3E3D0E75D5FB1709E15 /* CaptureFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = 593E2F107A195788B317254C /* CaptureFlags.swift */; };
 		A130AD4A0C3826D57BDE0E2C /* LandlordPurchasesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0914D43BECE24E5CB862706D /* LandlordPurchasesTests.swift */; };
+		A1A06A8895ADE99CEBE62EA7 /* PropertiesUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC8D329A6B3A79C54A584FAB /* PropertiesUITests.swift */; };
 		A3EF3753076C55FB93B67B65 /* CaptureNotificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8184EBDA079A1EDCB5D9208 /* CaptureNotificationTests.swift */; };
 		A47503D607E3D15AB9B78D16 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 754B9E894A2C95D4E5C635B0 /* HistoryView.swift */; };
 		A5A4A54EDF6C065AFC4FD776 /* HouseProgressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 581F7881E36776AC87431D40 /* HouseProgressTests.swift */; };
@@ -143,6 +147,7 @@
 		ECCEECAF864DD8D63F3C84B9 /* ContactSupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B38BCF663A8276A105CBCC1 /* ContactSupportView.swift */; };
 		EE3D0D14B7F8A52707C5F97A /* SuggestionRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECB7DFB3F4D68C9B839DB82D /* SuggestionRowView.swift */; };
 		F20713D35465CC3396393B14 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2CA9BA1AD53F0ABA92A9F2F /* OnboardingView.swift */; };
+		F53BA48CC55E73BBAE52C0E0 /* PropertiesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B19069D2DB3708B654ABA06 /* PropertiesTests.swift */; };
 		F7592DE1A4DA7F5A9B32BA03 /* MilestoneCelebrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4FBBCE8DA693BAC7640B104 /* MilestoneCelebrationView.swift */; };
 		F75C46FB8213306050CB9147 /* Analytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9291FAFB4986AA2BF4F05D4 /* Analytics.swift */; };
 		F7C5F8A5FB802ED1144DAB1B /* InboxCaptureUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0C1C4662F46051DF0E5A62 /* InboxCaptureUITests.swift */; };
@@ -215,6 +220,9 @@
 		4DC428FA6B6EF8A5244CC123 /* UITestIsolation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestIsolation.swift; sourceTree = "<group>"; };
 		4E79BD77CF9AD17DD821AFBF /* LandlordHoursAppEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordHoursAppEntry.swift; sourceTree = "<group>"; };
 		4F7DEC5DC48828C8FF4C48C2 /* EngagementLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementLabView.swift; sourceTree = "<group>"; };
+		4FDEE42CEACE212DB8664E82 /* PropertiesDebugSeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertiesDebugSeed.swift; sourceTree = "<group>"; };
+		517CDAB2F18F0A85D206CB47 /* PropertyFigures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyFigures.swift; sourceTree = "<group>"; };
+		51E8F6B031DC6C7B4F7EA032 /* PropertyComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyComponents.swift; sourceTree = "<group>"; };
 		548394DDA38D7BBFDD18E815 /* FreeUserPaywallUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FreeUserPaywallUITests.swift; sourceTree = "<group>"; };
 		5490464EB91A5699EED6EFCE /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
 		56416E7776DD2506FD147689 /* CaptureNotificationRefresher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureNotificationRefresher.swift; sourceTree = "<group>"; };
@@ -242,6 +250,7 @@
 		754B9E894A2C95D4E5C635B0 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		7A6155D766135551C32EC91A /* CaptureActionSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureActionSupport.swift; sourceTree = "<group>"; };
 		7B0E95909D4A47DFA839E573 /* NotificationActionRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationActionRouter.swift; sourceTree = "<group>"; };
+		7B19069D2DB3708B654ABA06 /* PropertiesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertiesTests.swift; sourceTree = "<group>"; };
 		7B4B3AC0F459D7FC09BE5961 /* CalendarDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarDetectorTests.swift; sourceTree = "<group>"; };
 		8248EAB41ECD1E6CF7808498 /* LandlordHoursUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordHoursUITests.swift; sourceTree = "<group>"; };
 		82E0459733C21A2960E1B6BA /* WPRReskinTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WPRReskinTests.swift; sourceTree = "<group>"; };
@@ -282,6 +291,7 @@
 		C9291FAFB4986AA2BF4F05D4 /* Analytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Analytics.swift; sourceTree = "<group>"; };
 		CA2074D17A6358EF6451A083 /* CaptureFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFlowTests.swift; sourceTree = "<group>"; };
 		CBF39EBE443D66C2EA654096 /* ProMoments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProMoments.swift; sourceTree = "<group>"; };
+		CC8D329A6B3A79C54A584FAB /* PropertiesUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertiesUITests.swift; sourceTree = "<group>"; };
 		CCE30070327091F72B0D4F65 /* CalendarCaptureCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarCaptureCoordinator.swift; sourceTree = "<group>"; };
 		CD4B4980260EB2F39906C0E9 /* ClassifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassifierTests.swift; sourceTree = "<group>"; };
 		CECAC09A18663B8CBE3E7BE3 /* HouseProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseProgress.swift; sourceTree = "<group>"; };
@@ -336,6 +346,14 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
+		279DE84334A87EE3941F44C9 /* Properties */ = {
+			isa = PBXGroup;
+			children = (
+				51E8F6B031DC6C7B4F7EA032 /* PropertyComponents.swift */,
+			);
+			path = Properties;
+			sourceTree = "<group>";
+		};
 		2A213114BF4DC83320D1EDE0 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
@@ -372,6 +390,8 @@
 			children = (
 				CFBF76FD610DF2D0CDA40C0A /* AppViewModel.swift */,
 				D05C18E16E505EEE666FF7CC /* AppViewModel+Capture.swift */,
+				4FDEE42CEACE212DB8664E82 /* PropertiesDebugSeed.swift */,
+				517CDAB2F18F0A85D206CB47 /* PropertyFigures.swift */,
 				612AD15E9D33825E7BD9C05B /* TodayHouse.swift */,
 			);
 			path = ViewModels;
@@ -471,6 +491,7 @@
 				0914D43BECE24E5CB862706D /* LandlordPurchasesTests.swift */,
 				A1CAE53C865D5B8D680C6F0D /* LocalProfileTests.swift */,
 				6252BC3F79F79B6164763816 /* ProMomentsTests.swift */,
+				7B19069D2DB3708B654ABA06 /* PropertiesTests.swift */,
 				22F2A5256E57CEBACC7BDAAC /* StoreKitLocalIntegrationTests.swift */,
 				BDAC9A2FCA588960D010499D /* SyncGateAndTimerDraftTests.swift */,
 				301638903EBA477566BCEDF5 /* TodayHouseTests.swift */,
@@ -541,6 +562,7 @@
 				DD0C1C4662F46051DF0E5A62 /* InboxCaptureUITests.swift */,
 				00D256C8A4030CDDD3F2378D /* InboxUITests.swift */,
 				8248EAB41ECD1E6CF7808498 /* LandlordHoursUITests.swift */,
+				CC8D329A6B3A79C54A584FAB /* PropertiesUITests.swift */,
 				65CD50959762385E221A6599 /* PropertyAliasUITests.swift */,
 				86FFABF3A26D5A7309D8551B /* RecordsReportsSettingsUITests.swift */,
 				8ABD160E56491F781779A536 /* SignInReplacementUITests.swift */,
@@ -613,6 +635,7 @@
 				D00F2E1D576C90040B5FBDA1 /* Components */,
 				7BB8590F24B4E60A0F82F47B /* House */,
 				8D53F0EF263590B43A5B6E82 /* Inbox */,
+				279DE84334A87EE3941F44C9 /* Properties */,
 				E34E082A32AEC40D63C9A7FC /* Records */,
 				8C0D1F56881ECD2CBDDD75F7 /* Reports */,
 			);
@@ -872,7 +895,10 @@
 				691B932AEB4ECA321D667151 /* PaywallView.swift in Sources */,
 				86277D1C3EF4C21CAB223CB5 /* ProMoments.swift in Sources */,
 				1966A0BEB7460410F2A156D6 /* ProfileManagementViews.swift in Sources */,
+				95182F6767F626FFF517520A /* PropertiesDebugSeed.swift in Sources */,
 				24B4A91548115D49515C797B /* PropertiesView.swift in Sources */,
+				87DBB30F160545549CF94050 /* PropertyComponents.swift in Sources */,
+				8ED8AAEC6D50C47E9DC615C1 /* PropertyFigures.swift in Sources */,
 				0F352493E9D7EEA53D9D38FC /* RecordsLogic.swift in Sources */,
 				7051CBC82B2AC4E74FCF8D3B /* ReportsLogic.swift in Sources */,
 				1A2A80F489BB65C766EBA321 /* ReportsView.swift in Sources */,
@@ -916,6 +942,7 @@
 				A130AD4A0C3826D57BDE0E2C /* LandlordPurchasesTests.swift in Sources */,
 				8DCDA53C99D6607B2EB138B8 /* LocalProfileTests.swift in Sources */,
 				FEF2ADF1DF06A3C6BA058BE9 /* ProMomentsTests.swift in Sources */,
+				F53BA48CC55E73BBAE52C0E0 /* PropertiesTests.swift in Sources */,
 				1424FAA16D7E9B48091EBE67 /* StoreKitLocalIntegrationTests.swift in Sources */,
 				5237EDB83B597E6CAE0D5272 /* SyncGateAndTimerDraftTests.swift in Sources */,
 				74917696E05B000CA0E13CC7 /* TodayHouseTests.swift in Sources */,
@@ -932,6 +959,7 @@
 				F7C5F8A5FB802ED1144DAB1B /* InboxCaptureUITests.swift in Sources */,
 				E7C67889F1F2B1F8138B9B71 /* InboxUITests.swift in Sources */,
 				20622DC1C008655024F7676F /* LandlordHoursUITests.swift in Sources */,
+				A1A06A8895ADE99CEBE62EA7 /* PropertiesUITests.swift in Sources */,
 				37D64D0788DE8C34351A264C /* PropertyAliasUITests.swift in Sources */,
 				93B7E693B037558B0A327A0F /* RecordsReportsSettingsUITests.swift in Sources */,
 				87DDF9CFBAAE7676D8368B8F /* SignInReplacementUITests.swift in Sources */,
