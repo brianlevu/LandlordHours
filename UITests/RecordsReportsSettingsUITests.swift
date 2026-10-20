@@ -103,6 +103,32 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         }
     }
 
+    /// Follow-up frames: Settings with Dark chosen ("Saved: dark mode") and Reports' branded switcher.
+    func testCaptureFollowUpFrames() {
+        for scheme in ["light", "dark"] {
+            launch(tab: 4, scheme: scheme)
+            let dark = app.buttons["Dark appearance"]
+            XCTAssertTrue(scrollTo(dark), "Dark appearance pill")
+            dark.tap()
+            let saved = app.staticTexts["Saved: dark mode"]
+            XCTAssertTrue(saved.waitForExistence(timeout: 5))
+            settleAndCapture("settings-appearance-dark-selected-\(scheme)")
+            // Restore so the choice does not leak into later runs.
+            let auto = app.buttons["Auto appearance"]
+            if auto.exists { auto.tap() }
+
+            launch(tab: 4, scheme: scheme)
+            tapWhenReady(element("settings.learningCenter"))
+            XCTAssertTrue(app.staticTexts["Learning center"].waitForExistence(timeout: 5))
+            settleAndCapture("settings-learning-center-\(scheme)")
+
+            launch(tab: 3, scheme: scheme)
+            let goal = element("reports.goal")
+            XCTAssertTrue(goal.waitForExistence(timeout: 20))
+            settleAndCapture("reports-goal-switcher-\(scheme)")
+        }
+    }
+
     /// Contact support with both fields filled: "Send email" is enabled only in this state.
     func testCaptureContactSupportFilled() {
         for scheme in ["light", "dark"] {
