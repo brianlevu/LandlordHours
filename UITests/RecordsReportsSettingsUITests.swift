@@ -100,6 +100,25 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         }
     }
 
+    /// Contact support with both fields filled: "Send email" is enabled only in this state.
+    func testCaptureContactSupportFilled() {
+        for scheme in ["light", "dark"] {
+            launch(tab: 4, scheme: scheme)
+            tapWhenReady(element("settings.contactSupport"))
+            XCTAssertTrue(element("support.screen").waitForExistence(timeout: 5))
+            XCTAssertFalse(app.buttons["support.send"].isEnabled, "Send email starts disabled")
+            let message = element("support.message")
+            message.tap()
+            message.typeText("How do I add a property to the PDF?")
+            let subject = element("support.subject")
+            subject.tap()
+            // Return on the one-line subject field ends editing, so the keyboard is gone.
+            subject.typeText("Export question\n")
+            XCTAssertTrue(app.buttons["support.send"].isEnabled, "Send email enables once both fields are filled")
+            settleAndCapture("settings-contact-support-filled-\(scheme)")
+        }
+    }
+
     private func captureAll(scheme: String) {
         // Records + record detail + edit.
         launch(tab: 6, scheme: scheme)
@@ -141,6 +160,9 @@ final class RecordsReportsSettingsUITests: XCTestCase {
             if confirmRow.waitForExistence(timeout: 3) {
                 confirmRow.tap()
                 XCTAssertTrue(app.buttons["participation.answer.yes"].waitForExistence(timeout: 5))
+                // Pull the sheet to its large detent so the whole question and both answers show.
+                let grabber = app.otherElements["participation.sheet"].firstMatch
+                (grabber.exists ? grabber : app.buttons["participation.answer.yes"]).swipeUp()
                 settleAndCapture("reports-participation-sheet-\(scheme)")
             }
         }

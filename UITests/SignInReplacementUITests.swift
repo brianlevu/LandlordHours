@@ -142,7 +142,7 @@ final class SignInReplacementUITests: XCTestCase {
         attach("05-settings-restore-sheet-\(scheme)")
         app.buttons["Cancel"].firstMatch.tap()
 
-        // 6. Settings › Switch profile + Delete All Data rows.
+        // 6. Settings › Switch profile + Delete all data rows.
         let switchRow = app.buttons["settings.switchProfile"]
         scrollTo(switchRow)
         XCTAssertTrue(switchRow.exists)
@@ -159,7 +159,7 @@ final class SignInReplacementUITests: XCTestCase {
         XCTAssertTrue(app.buttons["switchConfirm.switch"].waitForNonExistence(timeout: 5))
 
         // 8. iCloud off (the simulator has no iCloud): Sync Now shows plain caution copy.
-        let syncRow = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Sync Now")).firstMatch
+        let syncRow = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Sync now")).firstMatch
         var swipes = 0
         while (!syncRow.exists || !syncRow.isHittable || syncRow.frame.midY > 600) && swipes < 8 {
             app.swipeDown()

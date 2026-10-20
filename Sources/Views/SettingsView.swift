@@ -109,7 +109,7 @@ struct SettingsView: View {
                 case .muted: MutedSuggestionsView()
                 }
             }
-            .alert("Restore Purchase", isPresented: Binding(
+            .alert("Restore purchase", isPresented: Binding(
                 get: { restoreStatusMessage != nil },
                 set: { if !$0 { restoreStatusMessage = nil } }
             )) {
@@ -331,7 +331,7 @@ struct SettingsView: View {
             } label: {
                 SettingRow(
                     symbol: syncNeedsAttention ? "exclamationmark.icloud" : "icloud",
-                    title: "Sync Now",
+                    title: "Sync now",
                     subtitle: syncSubtitle ?? "Back up your records to iCloud"
                 )
             }
@@ -607,15 +607,18 @@ private struct AutoCaptureSettingsSection: View {
         } header: {
             BPSectionHeader(title: "Auto-capture")
         } footer: {
-            VStack(alignment: .leading, spacing: 6) {
-                Label {
+            // Both sentences share one text column beside the shield, so the second one no
+            // longer starts back under the glyph.
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "checkmark.shield")
+                    .foregroundStyle(colors.draftingInk)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 6) {
                     Text(Self.aiDisclosure)
-                } icon: {
-                    Image(systemName: "checkmark.shield")
-                        .foregroundStyle(colors.draftingInk)
+                        .accessibilityIdentifier("settings.capture.aiDisclosure")
+                    Text("Nothing goes in your record until you confirm it.")
                 }
-                .accessibilityIdentifier("settings.capture.aiDisclosure")
-                Text("Nothing goes in your record until you confirm it.")
+                .fixedSize(horizontal: false, vertical: true)
             }
             .font(.footnote)
             .foregroundStyle(colors.textSecondary)

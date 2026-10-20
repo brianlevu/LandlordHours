@@ -25,7 +25,7 @@ struct ProfileRestoreSheet: View {
                 Section {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(context == .welcome ? "Restore earlier data" : "Restore other data")
-                            .font(.title2.weight(.bold))
+                            .lhDisplayFont(.largeTitle)
                             .foregroundStyle(colors.textPrimary)
                             .accessibilityAddTraits(.isHeader)
                         Text(context == .welcome
@@ -111,9 +111,15 @@ private struct ProfileCandidateRow: View {
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
                     .monospacedDigit()
-                Label(sourceLine, systemImage: profile.sources.contains(.iCloud) ? "icloud" : "iphone")
-                    .font(.footnote)
-                    .foregroundStyle(colors.informational)
+                // Glyph sits flush with the text column above (a Label centres it in a wider
+                // icon slot, which pushed it 6pt in).
+                HStack(spacing: 6) {
+                    Image(systemName: profile.sources.contains(.iCloud) ? "icloud" : "iphone")
+                        .accessibilityHidden(true)
+                    Text(sourceLine)
+                }
+                .font(.footnote)
+                .foregroundStyle(colors.informational)
             }
 
             Spacer(minLength: 0)
@@ -164,7 +170,7 @@ struct SettingsAccountSection: View {
     @State private var deleteError: String?
 
     private var isAppleProfile: Bool { signInManager.loginType == .apple }
-    private var deleteTitle: String { isAppleProfile ? "Delete Account and Data" : "Delete All Data" }
+    private var deleteTitle: String { isAppleProfile ? "Delete account and data" : "Delete all data" }
 
     var body: some View {
         Section {
@@ -172,7 +178,7 @@ struct SettingsAccountSection: View {
                 Button {
                     viewModel.signOut()
                 } label: {
-                    SettingRow(symbol: "rectangle.portrait.and.arrow.right", title: "Sign Out")
+                    SettingRow(symbol: "rectangle.portrait.and.arrow.right", title: "Sign out")
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("settings.signOut")
@@ -180,7 +186,7 @@ struct SettingsAccountSection: View {
                 Button {
                     showSwitchConfirm = true
                 } label: {
-                    SettingRow(symbol: "arrow.left.arrow.right", title: "Switch Profile", subtitle: "Open other data or start fresh")
+                    SettingRow(symbol: "arrow.left.arrow.right", title: "Switch profile", subtitle: "Open other data or start fresh")
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("settings.switchProfile")
@@ -220,11 +226,11 @@ struct SettingsAccountSection: View {
             }
             .alert("iCloud is off", isPresented: $showICloudOffPrompt) {
                 Button("Cancel", role: .cancel) { }
-                Button("Delete from This iPhone", role: .destructive) { runDelete(allowLocalOnly: true) }
+                Button("Delete from this iPhone", role: .destructive) { runDelete(allowLocalOnly: true) }
             } message: {
                 Text("Copies saved in iCloud can't be removed right now. Delete from this iPhone anyway, or turn on iCloud and try again.")
             }
-            .alert("Couldn't Delete", isPresented: Binding(
+            .alert("Couldn't delete", isPresented: Binding(
                 get: { deleteError != nil },
                 set: { if !$0 { deleteError = nil } }
             )) {

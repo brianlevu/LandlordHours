@@ -681,7 +681,7 @@ struct LearningCenterView: View {
                         .accessibilityHidden(true)
 
                     LinearGradient(
-                        colors: [.clear, .black.opacity(0.55)],
+                        colors: [.clear, .black.opacity(0.6)],
                         startPoint: .center,
                         endPoint: .bottom
                     )
@@ -691,10 +691,12 @@ struct LearningCenterView: View {
                         Text("Build audit-ready records")
                             .font(.caption.weight(.semibold))
                     }
-                    .foregroundStyle(AppColors.onAction)
+                    // Theme-fixed: white on a dark scrim over the photo in both themes
+                    // (onAction turns navy in dark mode, which vanished on the wood).
+                    .foregroundStyle(Color.white)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
-                    .background(.black.opacity(0.24))
+                    .background(.black.opacity(0.6))
                     .clipShape(Capsule())
                     .padding(14)
                 }
@@ -808,15 +810,15 @@ struct LearningCenterView: View {
                     } label: {
                         Text(filter)
                             .font(.footnote.weight(.semibold))
-                            .foregroundStyle(selectedFilter == filter ? AppColors.charcoal : colors.textSecondary)
+                            .foregroundStyle(selectedFilter == filter ? colors.action : colors.textSecondary)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 9)
-                            .background(selectedFilter == filter ? colors.sageWash : colors.backgroundSecondary)
+                            .background(selectedFilter == filter ? colors.actionSurface : colors.backgroundSecondary)
                             .clipShape(Capsule())
                             .overlay {
                                 Capsule()
                                     .strokeBorder(
-                                        selectedFilter == filter ? AppColors.sage.opacity(0.65) : colors.border.opacity(0.35),
+                                        selectedFilter == filter ? colors.action.opacity(0.65) : colors.border.opacity(0.35),
                                         lineWidth: 1
                                     )
                             }
