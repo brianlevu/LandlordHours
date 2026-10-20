@@ -312,7 +312,10 @@ struct PropertiesView: View {
                         PlaceholderBar(width: 170, height: 10)
                     }
                     Spacer()
-                    DraftingLoader(sketch: .house, lineWidth: 1.5).frame(width: 48, height: 48)
+                    // Same rule as PropertyRow: the house tile drops out from XXL.
+                    if dynamicTypeSize < .xxLarge {
+                        DraftingLoader(sketch: .house, lineWidth: 1.5).frame(width: 48, height: 48)
+                    }
                 }
                 .padding(.horizontal, 16)
                 .frame(minHeight: 76)
@@ -537,6 +540,8 @@ struct PropertyDetailView: View {
 
     private func hero(_ property: RentalProperty, figures: PropertyFigures) -> some View {
         let ax = dynamicTypeSize.isAccessibilitySize
+        // From XXL the text lines wrap into the house's corner, so the house moves below them.
+        let stacked = dynamicTypeSize >= .xxLarge
         let stage = PropertyHouseStage.stage(for: figures.hours)
         let whole = Int(figures.hours.rounded(.down))
         let street = property.address.split(separator: ",").first.map(String.init) ?? ""
@@ -580,7 +585,7 @@ struct PropertyDetailView: View {
         let house = HouseHeroArt(keyframe: PropertyHouseStage.keyframe(for: figures.hours))
 
         return Group {
-            if ax {
+            if stacked {
                 VStack(alignment: .leading, spacing: 12) {
                     text
                     house.frame(width: 140, height: 140).frame(maxWidth: .infinity, alignment: .trailing)
@@ -901,6 +906,7 @@ struct PropertyEditSheet: View {
     }
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 titleRow
@@ -927,8 +933,17 @@ struct PropertyEditSheet: View {
                 }
             }
             .padding(20)
-            // 12pt between the last field and the footer's top edge.
-            .padding(.bottom, 12)
+            // Clear the pinned footer (its 16pt fade + the 52pt button + 8pt), plus 12pt of air.
+            .padding(.bottom, 44)
+            Color.clear.frame(height: 1).id("propertySheet.bottom")
+        }
+#if DEBUG
+        .onAppear {
+            if ProcessInfo.processInfo.arguments.contains("-LHPropertySheetScrollBottom") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { proxy.scrollTo("propertySheet.bottom", anchor: .bottom) }
+            }
+        }
+#endif
         }
         .scrollDismissesKeyboard(.interactively)
         .background(colors.background.ignoresSafeArea())
@@ -1183,6 +1198,9 @@ struct PropertyEditSheet: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { deletion = PropertyDeletion.make(for: p, in: viewModel) }
             }
         } else {
+#if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-LHPropertySheetScrollBottom") { return }
+#endif
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { focused = .name }
         }
     }

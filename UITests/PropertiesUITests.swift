@@ -128,16 +128,36 @@ final class PropertiesUITests: XCTestCase {
         }
     }
 
+    /// The add sheet scrolled to its end (keyboard down): the last field clears the pinned button.
+    func testCaptureAddSheetScrolledToBottom() {
+        for scheme in ["light", "dark"] {
+            for size in [nil, "xxl", "ax3"] as [String?] {
+                var sizeArgs: [String] = []
+                if size == "xxl" { sizeArgs = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXL"] }
+                if size == "ax3" { sizeArgs = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL"] }
+                app.terminate()
+                launch(seed: "four", scheme: scheme, extra: ["-LHOpenAddProperty", "-LHPropertySheetScrollBottom"] + sizeArgs)
+                XCTAssertTrue(app.textFields["property.alias.field"].waitForExistence(timeout: 15))
+                Thread.sleep(forTimeInterval: 1.5)
+                let last = app.descendants(matching: .any)["property.ownerOccupied"].firstMatch.frame
+                let save = app.buttons["property.save"].frame
+                XCTAssertLessThanOrEqual(last.maxY, save.minY - 12, "the last field clears the pinned button by 12pt")
+                capture("prop-add-bottom-\(scheme)\(size.map { "-\($0)" } ?? "")")
+            }
+        }
+    }
+
     /// The re-rendered keyframes on Today: the hero at each early stage (the readable slab) and
     /// the confirm board frames over the k14 base, to check they still line up.
     func testCaptureTodayHeroWithTheNewKeyframes() {
         for scheme in ["light", "dark"] {
-            for hours in ["0", "60", "120", "212", "600", "760"] {
+            for hours in ["0", "60", "120", "212", "600", "751", "760"] {
                 app.terminate()
                 app.launchArguments = ["-LHHousePreview", hours, "reps", scheme, "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
                 app.launch()
                 XCTAssertTrue(app.wait(for: .runningForeground, timeout: 15), "hero \(hours)")
-                Thread.sleep(forTimeInterval: 2.5)
+                // Let the hero settle (entrance and any count-up finish) before the shot.
+                Thread.sleep(forTimeInterval: 5)
                 capture("today-hero-\(hours)h-\(scheme)")
             }
             for still in [0, 4, 8, 12] {

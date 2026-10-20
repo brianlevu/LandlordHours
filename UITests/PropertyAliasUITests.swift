@@ -119,7 +119,11 @@ final class PropertyAliasUITests: XCTestCase {
         let chip = app.buttons["Remove Lake House"]
         bringIntoView(chip)
         capture("\(scheme)-8-ax3-aliases-three")
+        // The field itself, being typed in (a 2-letter name shows the hint).
         bringIntoView(field)
+        field.tap()
+        field.typeText("Ri")
+        XCTAssertTrue(app.staticTexts["property.alias.hint"].waitForExistence(timeout: 3), "hint at AX3")
         capture("\(scheme)-9-ax3-alias-field")
     }
 
