@@ -1268,6 +1268,8 @@ struct TodayRecordLockCard: View {
         }
         .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(colors.backgroundSecondary))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("today.yourRecord")
         .task { await load() }
     }
 

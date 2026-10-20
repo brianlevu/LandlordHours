@@ -143,7 +143,7 @@ final class LandlordHoursUITests: XCTestCase {
         assertVisibleText("Settings", timeout: 12)
         // Settings is a lazy List: rows below the fold exist only once scrolled to.
         let taxProfile = app.buttons["settings.taxProfile"]
-        _ = app.buttons["settings.proCard"].waitForExistence(timeout: 5)
+        _ = app.buttons["settings.profile"].waitForExistence(timeout: 5)
         scrollToElement(taxProfile)
         let tabBar = app.buttons["tab.today"]
         if tabBar.exists, taxProfile.frame.maxY > tabBar.frame.minY - 8 { app.swipeUp() }
@@ -180,7 +180,7 @@ final class LandlordHoursUITests: XCTestCase {
             ("emptyMainTabs", 1, "Once we know where your rentals are", "empty-properties"),
             ("emptyMainTabs", 2, "Add a property first", "empty-track"),
             ("emptyMainTabs", 3, "Reports", "empty-reports"),
-            ("emptyMainTabs", 4, "Upgrade to Pro", "empty-settings"),
+            ("emptyMainTabs", 4, "LandlordHours\u{00A0}Pro", "empty-settings"),
             ("occasional", 0, "Today’s work", "occasional-home"),
             ("occasional", 1, "1 rental ·", "occasional-properties"),
             ("occasional", 2, "Log your time", "occasional-track"),

@@ -275,7 +275,10 @@ enum InboxProLimit {
     /// A pending suggestion that belongs to a rental the user doesn't have, while the free plan
     /// is full: it can't be logged without Pro (unless the user says it was at their rental).
     static func needsNewRental(_ suggestion: Suggestion, propertyIds: Set<UUID>, isPro: Bool) -> Bool {
-        guard suggestion.isPending, ProGate.isAtPropertyLimit(isPro: isPro, propertyCount: propertyIds.count) else { return false }
+        // Only the plain free case (exactly one rental): an unassigned item there is the "new
+        // place" of redesign-specs §1c. A downgraded owner with several rentals picks among them
+        // as before ("Pick a property"), so the regular Log stays available.
+        guard suggestion.isPending, !isPro, propertyIds.count == ProGate.freeRentals else { return false }
         guard let id = suggestion.proposedPropertyId else { return true }
         return !propertyIds.contains(id)
     }

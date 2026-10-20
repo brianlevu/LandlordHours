@@ -325,6 +325,8 @@ final class InboxProLimitTests: XCTestCase {
         XCTAssertEqual(InboxProLimit.counts(items, propertyIds: [pine], isPro: true, waitingKeys: []).atLimit, 0)
         XCTAssertEqual(InboxProLimit.counts(items, propertyIds: [], isPro: false, waitingKeys: []).atLimit, 0)
         XCTAssertFalse(InboxProLimit.needsNewRental(s("a", property: pine), propertyIds: [pine], isPro: false))
+        // A downgraded owner with several rentals picks among them: the regular Log stays.
+        XCTAssertFalse(InboxProLimit.needsNewRental(s("b", property: nil), propertyIds: [pine, UUID()], isPro: false))
     }
 
     func testWaitListIsPerKeyAndPrunes() {
@@ -438,6 +440,25 @@ final class ProPurchaseStoreKitTests: XCTestCase {
         try super.tearDownWithError()
     }
 
+    private func waitForPro(_ manager: SubscriptionManager) async {
+        let deadline = Date().addingTimeInterval(5)
+        while !manager.isPro && Date() < deadline {
+            await manager.refreshEntitlements()
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+    }
+
+    private func entitlementsDump() async -> String {
+        var parts: [String] = []
+        for await r in Transaction.currentEntitlements {
+            switch r {
+            case .verified(let t): parts.append("ok \(t.productID) rev=\(String(describing: t.revocationDate))")
+            case .unverified(let t, let e): parts.append("unverified \(t.productID) \(e)")
+            }
+        }
+        return "entitlements: [\(parts.joined(separator: ", "))]"
+    }
+
     private func resetScoped() {
         UserDefaults.standard.set(testUserID, forKey: "emailUserId")
         UserDefaults.standard.set(LoginType.email.rawValue, forKey: "loginType")
@@ -464,9 +485,10 @@ final class ProPurchaseStoreKitTests: XCTestCase {
         let model = PaywallModel(context: .export, entry: .exportPage, store: manager)
         await model.start()
         XCTAssertEqual(model.phase, .ready)
-        _ = try await session.buyProduct(identifier: "com.openclaw.landlordhours.pro")
-        await manager.refreshEntitlements()
-        XCTAssertTrue(manager.isPro)
+        let bought = try await session.buyProduct(identifier: "com.openclaw.landlordhours.pro")
+        await waitForPro(manager)
+        let dump = await entitlementsDump()
+        XCTAssertTrue(manager.isPro, "bought \(bought.id) revoked=\(String(describing: bought.revocationDate)) upgraded=\(bought.isUpgraded); \(dump)")
         model.entitlementChanged(isPro: manager.isPro)
         XCTAssertEqual(model.phase, .success)
     }
@@ -480,6 +502,8 @@ final class ProPurchaseStoreKitTests: XCTestCase {
         let manager = SubscriptionManager.shared
         await manager.loadProducts()
         _ = try await session.buyProduct(identifier: "com.openclaw.landlordhours.pro")
+        // Let the purchase land in the test session's entitlements before signing "out".
+        await waitForPro(manager)
         resetScoped()
         XCTAssertFalse(manager.isPro)
         let model = PaywallModel(context: .settings, entry: .settingsPro, store: manager)

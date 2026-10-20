@@ -93,10 +93,11 @@ struct RecordPagePreview: View {
     let model: RecordPageModel
     var highlight: RecordPageHighlight = .none
 
-    private let ink = Color(hex: "121B33")
-    private let grey = Color(hex: "4A5068")
-    private let rule = Color(hex: "D5DBEA")
-    private let draftingInk = Color(hex: "2369B5")
+    // The page is paper: always the light tokens, in both themes.
+    private let ink = Color(hex: AppColors.Hex.textPrimary)
+    private let grey = Color(hex: AppColors.Hex.textSecondary)
+    private let rule = Color(hex: AppColors.Hex.border)
+    private let draftingInk = Color(hex: AppColors.Hex.draftingInk)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {

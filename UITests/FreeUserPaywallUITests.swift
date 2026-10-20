@@ -90,16 +90,13 @@ final class FreeUserPaywallUITests: XCTestCase {
     func testPropertiesSecondRental() {
         launchFree()
         tap(app.buttons["Properties"].firstMatch)
-        let origin = app.buttons["properties.add"]
-        scrollTo(origin)
+        let lock = lockContainer("properties_limit")
+        scrollTo(lock)
+        assertLockSaysWhatStays(lock)
+        let origin = lock.buttons["lock.unlock"]
         tap(origin)
-        // Properties is rebuilt on wp-properties with a `.row` lock calling this same paywall.
-        if !app.descendants(matching: .any)["paywall.secondProperty"].waitForExistence(timeout: 4) {
-            let unlock = lockContainer("properties_limit").buttons["lock.unlock"]
-            tap(unlock)
-        }
         assertPaywall("secondProperty", headline: "Track every rental")
-        closeThenPurchase(entryPoint: "Properties > Add property", origin: origin,
+        closeThenPurchase(entryPoint: "Properties > Your next rental", origin: origin,
                           continuation: app.textFields["property.name"])
     }
 
@@ -273,7 +270,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         XCTAssertEqual(title.label, headline, "The paywall speaks to \(context)")
         XCTAssertTrue(app.buttons["paywall.buy"].exists, "Unlock button")
         XCTAssertTrue(app.buttons["paywall.restore"].exists, "Restore purchase sits under the buy button")
-        XCTAssertTrue(app.buttons["paywall.terms"].exists && app.buttons["paywall.privacy"].exists, "Terms and Privacy are visible")
+        XCTAssertTrue(app.buttons["paywall.terms"].isHittable && app.buttons["paywall.privacy"].isHittable, "Terms and Privacy are visible and tappable")
         let buy = app.buttons["paywall.buy"].frame
         let restore = app.buttons["paywall.restore"].frame
         XCTAssertGreaterThan(restore.minY, buy.minY, "Restore is below the buy button")

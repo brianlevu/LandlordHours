@@ -704,7 +704,7 @@ class AppViewModel: ObservableObject {
 
     // MARK: - Subscription Features
     func canAddProperty() -> Bool {
-        !PropertyLimit.isAtLimit(isPro: SubscriptionManager.shared.isPro, propertyCount: properties.count)
+        ProGate.canAddProperty(isPro: SubscriptionManager.shared.isPro, propertyCount: properties.count)
     }
     
     func canAddTimeEntry() -> Bool {
@@ -716,7 +716,7 @@ class AppViewModel: ObservableObject {
     }
     
     func canExportPDF() -> Bool {
-        return SubscriptionManager.shared.isPro
+        !ProGate.isExportLocked(isPro: SubscriptionManager.shared.isPro)
     }
 
     /// Called after the user actually shares an export (the share sheet reported completion).

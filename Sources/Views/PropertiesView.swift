@@ -37,7 +37,7 @@ struct PropertiesView: View {
 
     @State private var path = NavigationPath()
     @State private var editor: PropertyEditorMode?
-    @State private var showingPaywall = false
+    @State private var paywall: ProPaywallRequest?
     @State private var deletion: PropertyDeletion?
     @State private var infoShown = false
     @State private var query = ""
@@ -117,17 +117,8 @@ struct PropertiesView: View {
             })
             .presentationDetents([.large])
         }
-        .sheet(isPresented: $showingPaywall) {
-            // After a purchase, carry on to adding the property.
-            PaywallView(
-                context: PropertyLimit.paywallContext,
-                onUnlocked: {
-                    NotificationCenter.default.post(name: .suspendGuidedOnboardingOverlay, object: nil)
-                    editor = .add
-                },
-                onClose: { showingPaywall = false }
-            )
-        }
+        // WP-P: the one paywall, about adding a rental; after a purchase, Add property opens.
+        .proPaywall($paywall)
         .alert(deletion?.title ?? "", isPresented: Binding(get: { deletion != nil }, set: { if !$0 { deletion = nil } })) {
             Button("Delete", role: .destructive) {
                 if let deletion {
@@ -261,7 +252,7 @@ struct PropertiesView: View {
             if atLimit {
                 PropertiesAtLimitRow(
                     firstPropertyName: viewModel.properties.first?.name,
-                    onUnlock: { showingPaywall = true }
+                    onUnlock: { openPaywall() }
                 )
             }
         }
@@ -333,8 +324,15 @@ struct PropertiesView: View {
             NotificationCenter.default.post(name: .suspendGuidedOnboardingOverlay, object: nil)
             editor = .add
         } else {
-            showingPaywall = true
+            openPaywall()
         }
+    }
+
+    private func openPaywall() {
+        paywall = ProPaywallRequest(context: ProGate.context(for: .propertiesLimit), entry: .propertiesLimit, onUnlocked: {
+            NotificationCenter.default.post(name: .suspendGuidedOnboardingOverlay, object: nil)
+            editor = .add
+        })
     }
 
 #if DEBUG
@@ -372,10 +370,9 @@ struct PropertiesView: View {
 
 // MARK: - At the free limit
 
-/// The whole Properties at-limit lock in one place: a ghost "Your next rental" row under the
-/// `.row` locked preview, saying what stays active, with one Unlock Pro.
-/// INTEGRATION (wp-paywall): swap this body for the app-wide ProGate lock; the caller keeps
-/// passing the first rental's name and the unlock action (opens the .secondProperty paywall).
+/// The Properties at-limit lock: a ghost "Your next rental" row under THE `.row` locked preview
+/// (ProGate, entry `.propertiesLimit`), saying what stays active, with one Unlock Pro that opens
+/// the `.secondProperty` paywall.
 struct PropertiesAtLimitRow: View {
     let firstPropertyName: String?
     var onUnlock: () -> Void
@@ -384,9 +381,11 @@ struct PropertiesAtLimitRow: View {
 
     var body: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
-        PropertiesLockedPreviewRow(
-            line: PropertyLimit.lockLine,
-            keeps: PropertyLimit.keepsLine(firstPropertyName: firstPropertyName),
+        LockedPreview(
+            size: .row,
+            entry: .propertiesLimit,
+            line: ProGate.lockLine(.propertiesLimit),
+            keeps: ProGate.keepsLine(.propertiesLimit, firstPropertyName: firstPropertyName),
             onUnlock: onUnlock
         ) {
             HStack(spacing: 12) {

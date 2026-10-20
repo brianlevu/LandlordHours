@@ -472,7 +472,7 @@ struct PaywallView: View {
                     Text(buyLabel).contentTransition(.opacity).lineLimit(3).multilineTextAlignment(.center)
                         .minimumScaleFactor(0.75)
                     if model.phase == .buying {
-                        PaywallDraftingLine(color: userScheme == .dark ? Color(hex: "0B1230") : HouseTokens.drafting, lineWidth: 2)
+                        PaywallDraftingLine(color: userScheme == .dark ? colors.onAction : HouseTokens.drafting, lineWidth: 2)
                             .frame(width: 96)
                     }
                 }

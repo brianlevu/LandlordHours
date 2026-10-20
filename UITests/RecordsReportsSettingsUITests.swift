@@ -198,7 +198,7 @@ final class RecordsReportsSettingsUITests: XCTestCase {
 
         // Settings and its sub-screens.
         launch(tab: 4, scheme: scheme)
-        XCTAssertTrue(element("settings.proCard").waitForExistence(timeout: 20))
+        XCTAssertTrue(element("settings.profile").waitForExistence(timeout: 20))
         settleAndCapture("settings-\(scheme)")
         for page in 1...4 {
             app.swipeUp()

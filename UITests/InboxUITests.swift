@@ -219,7 +219,7 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(settle(sam))
         sam.tap()
         XCTAssertTrue(app.descendants(matching: .any)["confirm.notSure"].waitForExistence(timeout: 5))
-        // The mute link scrolls under the pinned Log / Not landlord work bar: bring it clear first.
+        // The mute link scrolls under the pinned Log / Not rental work bar: bring it clear first.
         let mute = app.buttons["confirm.mute"]
         let pinnedTop = app.buttons["confirm.log"].frame.minY
         var swipes = 0
