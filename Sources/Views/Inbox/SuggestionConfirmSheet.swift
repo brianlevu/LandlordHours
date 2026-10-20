@@ -397,11 +397,15 @@ struct SuggestionConfirmSheet: View {
     }
 
     private func valueRow<Trailing: View>(_ label: String, @ViewBuilder trailing: () -> Trailing) -> some View {
-        HStack(spacing: 12) {
+        // Accessibility sizes: the value drops under its label so "Choose" never truncates.
+        let stacked = dynamicTypeSize.isAccessibilitySize
+        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(spacing: 12))
+        return layout {
             Text(label).foregroundStyle(colors.textSecondary)
-            Spacer(minLength: 8)
+            if !stacked { Spacer(minLength: 8) }
             trailing()
         }
+        .padding(.vertical, stacked ? 8 : 0)
         .font(.body)
         .padding(.horizontal, 16)
         .frame(minHeight: 52)
