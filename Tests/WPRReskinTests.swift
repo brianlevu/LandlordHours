@@ -322,6 +322,8 @@ final class ReportsLogicTests: XCTestCase {
         )
         let standing = ReportsLogic.mpStanding(goal: .mp100, hours: 120, result: result, includesSpouse: true, year: 2026, now: midOctober, calendar: calendar)
         XCTAssertEqual(standing.status, "100 hours reached")
+        // The hours are met; only the participation question (its own card) is caution.
+        XCTAssertEqual(standing.tone, .positive)
         XCTAssertEqual(standing.person, .household)
     }
 

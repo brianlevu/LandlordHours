@@ -225,6 +225,71 @@ struct BPFilterChip: View {
     }
 }
 
+/// Branded segmented control: the same capsules as Settings' Appearance pills (selected fills
+/// with the action colour). Text scales with Dynamic Type; when the options no longer fit side
+/// by side (accessibility sizes) they stack vertically instead of clipping.
+struct BPSegmentedPicker<Option: Hashable>: View {
+    let options: [Option]
+    @Binding var selection: Option
+    let title: (Option) -> String
+    /// `.horizontalOnly` never stacks, so a parent `ViewThatFits` can try it side by side first.
+    var layout: Layout = .automatic
+
+    enum Layout { case automatic, horizontalOnly }
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .subheadline) private var minHeight: CGFloat = 40
+
+    var body: some View {
+        Group {
+            if layout == .horizontalOnly {
+                HStack(spacing: 8) { segments }
+            } else if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: 8) { segments }
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { segments }
+                    VStack(spacing: 8) { segments }
+                }
+            }
+        }
+        .sensoryFeedback(.selection, trigger: selection)
+    }
+
+    @ViewBuilder private var segments: some View {
+        ForEach(options, id: \.self) { option in
+            segment(option)
+        }
+    }
+
+    private func segment(_ option: Option) -> some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        let isSelected = selection == option
+        return Button {
+            guard selection != option else { return }
+            if reduceMotion { selection = option } else {
+                withAnimation(AppAnimation.quick) { selection = option }
+            }
+        } label: {
+            Text(title(option))
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .fixedSize()
+                .foregroundStyle(isSelected ? colors.onAction : colors.textPrimary)
+                .padding(.horizontal, 14)
+                .frame(maxWidth: .infinity, minHeight: minHeight)
+                .background(Capsule().fill(isSelected ? colors.action : colors.backgroundTertiary))
+                .overlay(Capsule().strokeBorder(isSelected ? Color.clear : colors.border, lineWidth: 1))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.lhPressable)
+        .accessibilityLabel(title(option))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
 /// Small bordered capsule action ("Export", "Share") for title rows.
 struct BPCapsuleButtonLabel: View {
     let title: String
@@ -302,6 +367,11 @@ struct BPBarRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appeared = false
+    /// One fixed value column, so every track in a card starts and ends on the same lines
+    /// ("2h" and "120h 30m" no longer give their bars different widths).
+    @ScaledMetric(relativeTo: .subheadline) private var valueColumnWidth: CGFloat = 70
+    /// Label column grows with the text so a one-word label ("Bookkeeping") never hyphenates.
+    @ScaledMetric(relativeTo: .subheadline) private var labelColumnWidth: CGFloat = 112
 
     private var fraction: Double {
         guard maxValue > 0 else { return 0 }
@@ -323,10 +393,11 @@ struct BPBarRow: View {
             } else {
                 HStack(spacing: 12) {
                     labelText(colors)
-                        .frame(width: 112, alignment: .leading)
+                        .frame(width: labelColumnWidth, alignment: .leading)
                     bar(colors)
                     valueLabel(colors)
-                        .frame(minWidth: 52, alignment: .trailing)
+                        .minimumScaleFactor(0.8)
+                        .frame(width: valueColumnWidth, alignment: .trailing)
                 }
             }
         }

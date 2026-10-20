@@ -138,7 +138,7 @@ enum ReportsLogic {
             case .none:
                 return ReportStanding(
                     person: person, goal: goal, hours: hours, target: goal.targetHours,
-                    status: "100 hours reached", tone: .caution,
+                    status: "100 hours reached", tone: .positive,
                     detail: "Confirm no one else spent more time on it to pass this test."
                 )
             case .some(false):

@@ -190,30 +190,43 @@ struct ReportsView: View {
                 .accessibilityIdentifier("reports.export")
             }
 
-            (dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
-                : AnyLayout(HStackLayout(spacing: 8))) {
-                Menu {
-                    Picker("Year", selection: $selectedYear) {
-                        ForEach(RecordsLogic.availableYears(viewModel.timeEntries), id: \.self) { year in
-                            Text(String(year)).tag(year)
-                        }
-                    }
-                } label: {
-                    BPFilterChip(title: String(selectedYear), isActive: true)
+            // Year chip and goal switcher share a row while they fit; otherwise the switcher
+            // takes its own row (and stacks its options at accessibility sizes).
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    yearMenu
+                    goalPicker(.horizontalOnly)
                 }
-                .accessibilityLabel("Tax year, \(String(selectedYear))")
-                .accessibilityIdentifier("reports.year")
-
-                Picker("Goal", selection: $selectedGoal) {
-                    ForEach(GoalMode.allCases) { goal in
-                        Text(goal.pillLabel).tag(goal)
-                    }
+                VStack(alignment: .leading, spacing: 10) {
+                    yearMenu
+                    goalPicker(.automatic)
                 }
-                .pickerStyle(.segmented)
-                .accessibilityIdentifier("reports.goal")
             }
         }
+    }
+
+    private var yearMenu: some View {
+        Menu {
+            Picker("Year", selection: $selectedYear) {
+                ForEach(RecordsLogic.availableYears(viewModel.timeEntries), id: \.self) { year in
+                    Text(String(year)).tag(year)
+                }
+            }
+        } label: {
+            // Outlined, not filled: the filled capsule beside it is the selected goal, and a
+            // second filled pill read as part of the switcher.
+            BPFilterChip(title: String(selectedYear), isActive: false)
+        }
+        .fixedSize()
+        .accessibilityLabel("Tax year, \(String(selectedYear))")
+        .accessibilityIdentifier("reports.year")
+    }
+
+    private func goalPicker(_ layout: BPSegmentedPicker<GoalMode>.Layout) -> some View {
+        BPSegmentedPicker(options: GoalMode.allCases, selection: $selectedGoal, title: \.pillLabel, layout: layout)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Goal")
+            .accessibilityIdentifier("reports.goal")
     }
 
     // MARK: Standing
@@ -444,6 +457,8 @@ private struct StandingCard: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appeared = false
+    /// Gap between "165h" and "of 750h"; scales so the words never touch at large sizes.
+    @ScaledMetric(relativeTo: .title3) private var numberGap: CGFloat = 8
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     private var toneColor: Color {
@@ -477,7 +492,7 @@ private struct StandingCard: View {
                 BPLoadingPlaceholder(kind: .number, width: 120, height: 34)
             } else {
                 ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) { number; ofTarget }
+                    HStack(alignment: .firstTextBaseline, spacing: numberGap) { number; ofTarget }
                     VStack(alignment: .leading, spacing: 0) { number; ofTarget }
                 }
             }
@@ -621,6 +636,7 @@ struct ParticipationConfirmationSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .accessibilityIdentifier("participation.sheet")
     }
 
     private func answerButton(
