@@ -352,7 +352,7 @@ struct HouseHeroCard: View {
                     }
                     .padding(20)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .accessibilityElement(children: .combine)
+                    .accessibilityElement(children: footerIsWide ? .contain : .combine)  // the empty lot keeps its button tappable
                 }
             }
         }

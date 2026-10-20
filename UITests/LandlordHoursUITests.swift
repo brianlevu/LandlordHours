@@ -260,14 +260,16 @@ final class LandlordHoursUITests: XCTestCase {
     func testFirstTimeActivationFlowAddsPropertyAndLogsFirstHour() {
         launch(scenario: "emptyMainTabs", tab: 0)
 
-        XCTAssertTrue(app.staticTexts["Finish your tax-ready setup"].waitForExistence(timeout: 8))
-
-        // 2.0: the house hero leads Today, so the setup tiles sit below the fold.
-        let propertyTile = app.buttons["home.activation.property"]
-        scrollToElement(propertyTile)
-        tapWhenHittable(propertyTile, scrollIfNeeded: true)
-
+        // 2.0: an owner with no property sees the empty lot; its "Add property" is the one action.
+        let addProperty = app.buttons["today.hero.addProperty"].firstMatch
+        XCTAssertTrue(addProperty.waitForExistence(timeout: 8))
+        XCTAssertFalse(app.staticTexts["Finish your tax-ready setup"].exists, "Setup card follows the first property")
         let propertyName = app.textFields["property.name"]
+        // The launch splash fades over ~1s and can swallow the first tap.
+        for _ in 0..<3 where !propertyName.exists {
+            tapWhenHittable(addProperty, scrollIfNeeded: true)
+            _ = propertyName.waitForExistence(timeout: 3)
+        }
         XCTAssertTrue(propertyName.waitForExistence(timeout: 5))
         propertyName.tap()
         propertyName.typeText("Oak Street Duplex")

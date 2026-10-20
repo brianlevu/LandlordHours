@@ -703,8 +703,8 @@ struct DashboardView: View {
             .accessibilityLabel(heroAccessibilityLabel)
             .accessibilityIdentifier("today.hero")
 
-            // A new owner sees the lot, not pace maths that can't mean anything yet.
-            if !isNewOwner {
+            // The empty lot (no property yet) shows no pace maths: nothing can be counted.
+            if !viewModel.properties.isEmpty {
             HStack(alignment: .top, spacing: 12) {
                 if isREPS {
                     dashboardMiniMetric(

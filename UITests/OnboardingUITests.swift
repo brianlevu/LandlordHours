@@ -97,6 +97,10 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.buttons["today-find-hours"].exists, "Look at my calendar waits on Today")
         XCTAssertFalse(app.descendants(matching: .any)["guidedSetup.overlay"].exists, "No coach mark")
         XCTAssertEqual(app.staticTexts["today.header.title"].label, "Add your first property")
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); shot.name = "skip-today"; shot.lifetime = .keepAlways; add(shot)
+        tap(app.buttons["today.hero.addProperty"].firstMatch)
+        let after = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); after.name = "skip-after-tap"; after.lifetime = .keepAlways; add(after)
+        XCTAssertTrue(app.textFields["property.name"].waitForExistence(timeout: 6), "The empty lot's Add property opens the form")
     }
 
     // MARK: Permission denied
