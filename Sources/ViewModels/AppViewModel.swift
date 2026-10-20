@@ -33,9 +33,29 @@ enum UserScope {
 @MainActor
 class AppViewModel: ObservableObject {
     @Published var properties: [RentalProperty] = []
-    @Published var timeEntries: [TimeEntry] = []
+    @Published var timeEntries: [TimeEntry] = [] {
+        didSet { lastEntriesChangeOrigin = isApplyingRemoteChanges ? .remote : .local }
+    }
+    /// Where the latest change to `timeEntries` came from. Today mutes the house build (no
+    /// "+Nh" beam, no haptic) only for iCloud merges, never for the user's own saves.
+    enum EntriesChangeOrigin: Equatable { case local, remote }
+    @Published private(set) var lastEntriesChangeOrigin: EntriesChangeOrigin = .local
+    private var isApplyingRemoteChanges = false
     @Published var selectedYear: Int = Calendar.current.component(.year, from: Date())
-    @Published var isInitializing = true
+    /// WP-L: the active profile's first iCloud pull of this launch is still running, so the hours
+    /// on Today may not be final. Today shows the drafting loader in the house slot and a
+    /// placeholder for the number; everything else is usable. Never blocks: it ends when the
+    /// initial sync ends (any outcome) or after `initialPullPlaceholderTimeout`.
+    @Published private(set) var isAwaitingInitialPull = false
+    /// The initial sync is still running (true past the placeholder cap). Export waits on it:
+    /// a report made now could miss hours from other devices. False once it lands or fails.
+    @Published private(set) var isInitialPullRunning = false
+    /// The last initial sync reached iCloud's account but its pull failed. Export still works,
+    /// with a note that the report may miss hours from other devices.
+    @Published private(set) var initialPullFailed = false
+    private var initialSyncsInFlight = 0
+    static let initialPullPlaceholderTimeout: TimeInterval = 6
+    private var initialPullWaitToken = UUID()
     @Published var isSignedIn = false
     @Published var userName: String = ""
 
@@ -91,6 +111,12 @@ class AppViewModel: ObservableObject {
             refreshWidgetSnapshot()
         }
         syncService.delegate = self
+        // Any successful pull for the active profile (including retries that call start()
+        // directly) clears the export sheet's "Couldn't reach iCloud" note.
+        syncService.onInitialPullSucceeded = { [weak self] profileId in
+            guard let self, profileId == UserScope.userId else { return }
+            self.initialPullFailed = false
+        }
 
         // Trigger cloud sync when tax profile or goals change
         TaxProfileManager.shared.onDidChange = { [weak self] in
@@ -102,19 +128,124 @@ class AppViewModel: ObservableObject {
             self?.refreshWidgetSnapshot()
             self?.syncService.schedulePush()
         }
-        // Show branded splash screen for 1.5s, then animate into the app
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation(.easeOut(duration: 0.4)) {
-                self.isInitializing = false
+        // WP-L: no launch splash. Today renders at once from local data; the first pull runs
+        // behind it and only the hours wait on it.
+        if Self.isUnitTestHost {
+            // Unit tests build many view models; keep their sync start where it always was
+            // (after 2 s, no placeholder) so no test races a pull it didn't ask for.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                if self.isSignedIn { Task { await self.syncService.start() } }
             }
+        } else if isSignedIn {
+            #if DEBUG
+            // Capture hook: a forced pull state replaces the real sync start.
+            if Self.simulatedPullState == nil { startInitialSync(showsPlaceholder: !Self.isMockLaunch) }
+            #else
+            startInitialSync(showsPlaceholder: !Self.isMockLaunch)
+            #endif
         }
-        // Start CloudKit sync after splash if signed in
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            if self.isSignedIn {
-                Task { await self.syncService.start() }
+#if DEBUG
+        applySimulatedPendingPullIfNeeded()
+#endif
+    }
+
+    /// Starts the profile's initial iCloud sync. With `showsPlaceholder`, Today treats the hours
+    /// as not final until the first pull ends (any outcome) or the timeout passes.
+    @discardableResult
+    func startInitialSync(showsPlaceholder: Bool = true) -> Task<Void, Never> {
+        let token = showsPlaceholder && syncService.isCloudKitAvailable ? beginAwaitingInitialPull() : nil
+        initialSyncsInFlight += 1
+        isInitialPullRunning = true
+        return Task { [weak self] in
+            guard let self else { return }
+            // Returns only after a pull for the profile active now has run (a call made while
+            // another profile's pull is in flight waits for the re-run).
+            await self.syncService.start()
+            self.initialSyncsInFlight -= 1
+            if self.initialSyncsInFlight == 0 {
+                self.isInitialPullRunning = false
+                self.initialPullFailed = Self.initialPullFailed(
+                    accountAvailable: self.syncService.accountAvailable,
+                    completedFor: self.syncService.initialSyncCompletedFor,
+                    activeProfile: UserScope.userId
+                )
             }
+            // Ends only the wait this sync began (a newer wait belongs to a newer start).
+            if let token { self.endAwaitingInitialPull(token: token) }
         }
     }
+
+    /// Failed = iCloud was reachable as an account but this profile's pull didn't complete.
+    /// No account (or no CloudKit) is not a failure: export works normally without a note.
+    static func initialPullFailed(accountAvailable: Bool, completedFor: String?, activeProfile: String?) -> Bool {
+        guard accountAvailable, let activeProfile else { return false }
+        return completedFor != activeProfile
+    }
+
+    @discardableResult
+    func beginAwaitingInitialPull(timeout: TimeInterval = AppViewModel.initialPullPlaceholderTimeout) -> UUID {
+        let token = UUID()
+        initialPullWaitToken = token
+        isAwaitingInitialPull = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in
+            self?.endAwaitingInitialPull(token: token)
+        }
+        return token
+    }
+
+    /// Ends the wait `token` started; nil ends any wait (sign-out).
+    func endAwaitingInitialPull(token: UUID? = nil) {
+        if let token, token != initialPullWaitToken { return }
+        initialPullWaitToken = UUID()
+        isAwaitingInitialPull = false
+    }
+
+    /// Running inside the unit-test host (XCTest injects this variable).
+    static var isUnitTestHost: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
+    /// UI tests, captures and screenshot runs drive the app from DEBUG fixtures, not iCloud.
+    static var isMockLaunch: Bool {
+        ProcessInfo.processInfo.arguments.contains("-LHMockScenario")
+    }
+
+#if DEBUG
+    /// `-LHSimulatePendingPull <seconds>`: Today shows the first-pull loading state for that long,
+    /// then settles (captures and the "Today stays usable while loading" UI test).
+    /// `-LHSimulatePullState waiting|syncing|failed`: holds the export gate in that state
+    /// (captures of the export sheet). waiting = hours placeholder showing; syncing = past the
+    /// cap with the pull still running; failed = the pull failed (gate open with the note).
+    static var simulatedPullState: String? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "-LHSimulatePullState"), args.indices.contains(index + 1) else { return nil }
+        return args[index + 1]
+    }
+
+    private func applySimulatedPullStateIfNeeded() {
+        switch Self.simulatedPullState {
+        case "waiting":
+            isInitialPullRunning = true
+            beginAwaitingInitialPull(timeout: 3600)
+        case "syncing":
+            isInitialPullRunning = true
+        case "failed":
+            isInitialPullRunning = false
+            initialPullFailed = true
+        default:
+            break
+        }
+    }
+
+    private func applySimulatedPendingPullIfNeeded() {
+        applySimulatedPullStateIfNeeded()
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "-LHSimulatePendingPull"),
+              args.indices.contains(index + 1),
+              let seconds = Double(args[index + 1]) else { return }
+        beginAwaitingInitialPull(timeout: seconds)
+    }
+#endif
     
     func checkSignInState() {
         let defaults = UserDefaults.standard
@@ -169,8 +300,9 @@ class AppViewModel: ObservableObject {
         userName = Self.resolvedProfileName(.standard)
         AppleSignInManager.shared.checkExistingSignIn()
 
-        // Start CloudKit sync
-        Task { await syncService.start() }
+        // Start CloudKit sync; a restored profile's hours settle in when the pull lands.
+        BackfillJob.shared.reset()
+        startInitialSync()
     }
 
     /// "Continue without an account": creates a `local-<UUID>` profile.
@@ -236,6 +368,10 @@ class AppViewModel: ObservableObject {
     func signOut(keepProfileState: Bool = true) {
         // Stop CloudKit sync
         syncService.stop()
+        endAwaitingInitialPull()
+        // Background work belongs to the outgoing profile: stop it, never finish it into the next.
+        BackfillJob.shared.reset()
+        ExportJob.shared.reset()
         let defaults = UserDefaults.standard
         let outgoingId = UserScope.userId
 
@@ -1496,6 +1632,8 @@ extension AppViewModel: CloudKitSyncDelegate {
     }
 
     func syncDidReceiveEntries(_ remoteEntries: [TimeEntry]) {
+        isApplyingRemoteChanges = true
+        defer { isApplyingRemoteChanges = false }
         for remote in remoteEntries {
             if let idx = timeEntries.firstIndex(where: { $0.id == remote.id }) {
                 if remote.modifiedAt > timeEntries[idx].modifiedAt {
@@ -1515,6 +1653,8 @@ extension AppViewModel: CloudKitSyncDelegate {
     }
 
     func syncDidDeleteEntryIds(_ ids: Set<UUID>) {
+        isApplyingRemoteChanges = true
+        defer { isApplyingRemoteChanges = false }
         timeEntries.removeAll { ids.contains($0.id) }
         saveDataLocal()
     }

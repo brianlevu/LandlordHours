@@ -120,6 +120,11 @@ final class InboxViewModel: ObservableObject {
 
     /// Re-reads the store. Re-checks pending items against current entries first, so a manual
     /// log or an iCloud pull updates "might already be logged" and hides recorded items.
+    func reload(animated: Bool) {
+        guard animated else { return reload() }
+        animateChange { reload() }
+    }
+
     func reload() {
         guard let store else {
             suggestions = []

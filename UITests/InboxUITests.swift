@@ -249,6 +249,8 @@ final class InboxUITests: XCTestCase {
         XCTAssertFalse(row("inspection").exists)
     }
 
+    /// WP-L: the look-back runs in the background. Setup closes straight to the Inbox, where
+    /// suggestions stream in under a compact header; the house reveal plays once when it ends.
     func testEmptyInboxThenBackfillFromSetup() {
         launch("backfill", extra: ["-LHFakeCalendar", "granted", "-LHFakeNotifications", "granted"])
         let setup = app.buttons["inbox.empty.setup"]
@@ -260,19 +262,10 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["capture.notificationPreview"].waitForExistence(timeout: 3))
         app.buttons["capture.priming.continue"].tap()
         passReveal()
-        let headline = app.staticTexts["backfill.headline"]
-        XCTAssertTrue(settle(headline))
-        XCTAssertEqual(headline.label, "We found 22 visits that look like landlord work")
-        XCTAssertTrue(app.buttons["backfill.row.14"].exists || app.buttons["backfill.row.0"].exists)
-        app.swipeUp(); app.swipeUp(); app.swipeUp()
-        let more = app.buttons["backfill.showMore"]
-        XCTAssertTrue(more.waitForExistence(timeout: 3))
-        XCTAssertEqual(more.label, "Show 7 more")
-        more.tap()
-        XCTAssertTrue(app.buttons["backfill.row.20"].waitForExistence(timeout: 3) || app.descendants(matching: .any)["backfill.row.20"].exists)
-        app.buttons["backfill.done"].tap()
-        XCTAssertTrue(app.descendants(matching: .any)["inbox.backfillBanner"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["tab.inbox"].value as? String, "22 to confirm")
+        XCTAssertTrue(app.descendants(matching: .any)["inbox.backfillBanner"].waitForExistence(timeout: 10))
+        XCTAssertTrue(waitForBadge("22 to confirm", timeout: 10))
+        XCTAssertFalse(app.descendants(matching: .any)["inbox.backfill.header"].exists, "Header leaves when done")
+        XCTAssertFalse(app.buttons["inbox.empty.backfill"].exists, "A finished look-back is done")
     }
 
     func testBackfillRowOpensConfirmSheet() {
@@ -283,17 +276,16 @@ final class InboxUITests: XCTestCase {
         turnOnCalendar()
         app.buttons["capture.priming.continue"].tap()
         passReveal()
-        let first = app.buttons["backfill.row.0"]
+        let first = row("bf-0")
         XCTAssertTrue(settle(first))
         first.tap()
         let log = app.buttons["confirm.log"]
         XCTAssertTrue(log.waitForExistence(timeout: 5))
         log.tap()
-        XCTAssertTrue(app.staticTexts["We found 22 visits that look like landlord work"].waitForNonExistence(timeout: 5),
-                      "Count drops to 21 after a confirm")
-        XCTAssertTrue(app.staticTexts["We found 21 visits that look like landlord work"].exists)
+        XCTAssertTrue(waitForBadge("21 to confirm", timeout: 6), "Count drops to 21 after a confirm")
     }
 
+    /// Cancel stays available from the header; a stopped look-back is not done and runs again.
     func testCancelledBackfillCanRunAgain() {
         launch("backfill", extra: ["-LHFakeCalendar", "granted", "-LHHoldBackfillScan"])
         let setup = app.buttons["inbox.empty.setup"]
@@ -303,11 +295,74 @@ final class InboxUITests: XCTestCase {
         app.buttons["capture.priming.continue"].tap()
         let cancel = app.buttons["backfill.cancel"]
         XCTAssertTrue(cancel.waitForExistence(timeout: 10), "Cancel is visible while scanning")
+        XCTAssertTrue(row("bf-0").waitForExistence(timeout: 5), "Found items stream in before the end")
         cancel.tap()
         XCTAssertTrue(cancel.waitForNonExistence(timeout: 5))
-        let again = app.buttons["inbox.empty.backfill"]
+        let again = app.buttons["inbox.backfill.retry"]
         XCTAssertTrue(again.waitForExistence(timeout: 5), "Not marked done: the look-back can run again")
-        XCTAssertFalse(app.descendants(matching: .any)["inbox.backfillBanner"].exists, "Nothing ingested")
+        again.tap()
+        XCTAssertTrue(app.buttons["backfill.cancel"].waitForExistence(timeout: 5), "Running again")
+    }
+
+    /// Nothing found and calendar access gone: the Inbox keeps the look-back header with the
+    /// Settings path instead of a plain empty state (no dead end).
+    func testBlockedLookBackWithNothingFoundShowsSettingsPath() {
+        launch("backfill", extra: ["-LHFakeCalendar", "granted", "-LHFakeScanBlocked"])
+        let setup = app.buttons["inbox.empty.setup"]
+        XCTAssertTrue(settle(setup))
+        setup.tap()
+        turnOnCalendar()
+        app.buttons["capture.priming.continue"].tap()
+        let blocked = app.descendants(matching: .any)["inbox.backfill.blocked"]
+        XCTAssertTrue(blocked.waitForExistence(timeout: 10), "Blocked look-back says so")
+        XCTAssertTrue(app.buttons["Settings"].exists, "With a path to Settings")
+        XCTAssertFalse(app.descendants(matching: .any)["inbox.empty"].exists, "Not a silent empty state")
+    }
+
+    /// Cancelled before anything was found: the header with Run again stays.
+    func testCancelledLookBackWithNothingFoundKeepsRunAgain() {
+        launch("backfill", extra: ["-LHFakeCalendar", "granted", "-LHBackfillStepMs", "4000"])
+        let setup = app.buttons["inbox.empty.setup"]
+        XCTAssertTrue(settle(setup))
+        setup.tap()
+        turnOnCalendar()
+        app.buttons["capture.priming.continue"].tap()
+        let cancel = app.buttons["backfill.cancel"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10))
+        cancel.tap()
+        XCTAssertTrue(app.buttons["inbox.backfill.retry"].waitForExistence(timeout: 5), "Run again is still offered")
+        XCTAssertFalse(app.descendants(matching: .any)["inbox.empty"].exists)
+    }
+
+    /// The user can leave the look-back, use the app, and come back to live progress.
+    func testLeaveBackfillAndComeBackToStreamingProgress() {
+        launch("backfill", extra: ["-LHFakeCalendar", "granted", "-LHHoldBackfillScan"])
+        let setup = app.buttons["inbox.empty.setup"]
+        XCTAssertTrue(settle(setup))
+        setup.tap()
+        turnOnCalendar()
+        app.buttons["capture.priming.continue"].tap()
+        let header = app.descendants(matching: .any)["inbox.backfill.header"]
+        XCTAssertTrue(header.waitForExistence(timeout: 10))
+        let halfway = NSPredicate(format: "label CONTAINS %@", "11 of 22 events")
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "inbox.backfill.header")
+            .matching(halfway).firstMatch.waitForExistence(timeout: 10), header.label)
+
+        // Leave: Today is fully usable while the scan runs.
+        app.buttons["tab.today"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["today.hero"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["today.lookingBack"].waitForExistence(timeout: 5),
+                      "Today says the look-back is running, not \"Log your first hour\"")
+        app.buttons["tab.logTime"].tap()
+        XCTAssertTrue(app.buttons["tab.logTime"].waitForExistence(timeout: 3))
+
+        // Come back: the same run, still streaming, with what it found so far.
+        app.buttons["tab.inbox"].tap()
+        XCTAssertTrue(header.waitForExistence(timeout: 5), "Progress header is still there")
+        XCTAssertTrue(header.label.contains("11 of 22 events"), header.label)
+        XCTAssertTrue(header.label.contains("11 found so far"), header.label)
+        XCTAssertTrue(app.buttons["backfill.cancel"].exists, "Cancel is still available")
+        XCTAssertTrue(row("bf-0").exists, "Streamed items are in the list")
     }
 
     func testWhatsNewNotNowKeepsEverythingOff() {

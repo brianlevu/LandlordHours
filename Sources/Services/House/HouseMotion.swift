@@ -59,6 +59,10 @@ enum HouseMotion {
 
     /// Crossfade between keyframes when hours change.
     static let keyframeCrossfade: Double = 0.35
+    /// WP-L: the drafting loader hands over to the real house (crossfade), then the number
+    /// counts up from 0 over `loadCountUp`.
+    static let loadCrossfade: Double = 0.28
+    static let loadCountUp: Double = 0.5
     /// The board fades out as its keyframe crossfades in.
     static let boardFadeOut: Double = 0.18
 
