@@ -80,14 +80,23 @@ final class InboxCaptureUITests: XCTestCase {
         // 2. Confirm sheet (scheduled hours, spouse on).
         app.swipeDown()
         let plumber = app.descendants(matching: .any)["inbox.row.cal:debug-plumber"]
-        if plumber.waitForExistence(timeout: 5) { Thread.sleep(forTimeInterval: 1.0); plumber.tap() }
+        if plumber.waitForExistence(timeout: 5) {
+            Thread.sleep(forTimeInterval: 1.0)
+            for _ in 0..<4 where !plumber.isHittable { app.swipeDown() }
+            plumber.tap()
+        }
         XCTAssertTrue(app.buttons["confirm.log"].waitForExistence(timeout: 5))
         shoot("confirm-sheet", scheme)
 
         // 2b. Confirm sheet for a not-sure, no-property item.
         launch(seed: "inbox", scheme: scheme)
         let sam = app.descendants(matching: .any)["inbox.row.cal:debug-call-sam"]
-        if sam.waitForExistence(timeout: 20) { Thread.sleep(forTimeInterval: 2.0); sam.tap() }
+        // Rows carry Confirm / Not work now, so this one sits below the fold (and clear of the tab bar).
+        XCTAssertTrue(app.descendants(matching: .any)["inbox.row.cal:debug-showing"].waitForExistence(timeout: 20))
+        Thread.sleep(forTimeInterval: 2.0)
+        let tabTop = app.buttons["tab.today"].frame.minY
+        for _ in 0..<6 where !sam.exists || sam.frame.maxY > tabTop - 8 { app.swipeUp(velocity: .slow) }
+        sam.tap()
         XCTAssertTrue(app.buttons["confirm.log"].waitForExistence(timeout: 5))
         shoot("confirm-sheet-notsure", scheme)
 
@@ -96,16 +105,19 @@ final class InboxCaptureUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["inbox.empty"].waitForExistence(timeout: 20))
         shoot("inbox-empty", scheme)
 
-        // 4. What's new opt-in (upgraders), with the notification preview on.
+        // 4. What's new (upgraders): the house, then the calendar ask.
         launch(seed: "backfill", scheme: scheme, extra: ["-LHShowWhatsNew", "-LHFakeCalendar", "granted", "-LHHoldBackfillScan"], tab: "0")
-        XCTAssertTrue(app.descendants(matching: .any)["capture.whatsNew"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.descendants(matching: .any)["onb.whatsNew"].waitForExistence(timeout: 20))
         shoot("whatsnew", scheme)
-        app.descendants(matching: .any)["capture.toggle.calendar"].tap()
-        app.descendants(matching: .any)["capture.toggle.eventPrompts"].tap()
-        shoot("whatsnew-prompts-on", scheme)
+        app.buttons["onb-primary"].tap()
+        Thread.sleep(forTimeInterval: 2.0)
+        shoot("whatsnew-calendar", scheme)
 
         // 5. Backfill: streaming in the Inbox (held halfway), then the reveal and the list.
-        app.buttons["capture.priming.continue"].tap()
+        app.buttons["onb-primary"].tap()                       // Look at my calendar (fake allow, held scan)
+        XCTAssertTrue(app.buttons["onb-secondary"].waitForExistence(timeout: 5))
+        app.buttons["onb-secondary"].tap()                     // visit-end note: Not now → Today
+        app.buttons["tab.inbox"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["inbox.backfill.header"].waitForExistence(timeout: 10))
         Thread.sleep(forTimeInterval: 1.5)
         shoot("backfill-scanning", scheme)
@@ -137,7 +149,8 @@ final class InboxCaptureUITests: XCTestCase {
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
         ]
         app.launch()
-        XCTAssertTrue(app.descendants(matching: .any)["capture.onboarding"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["onb-primary"].waitForExistence(timeout: 20))
+        Thread.sleep(forTimeInterval: 2.0)
         shoot("onboarding-priming", scheme)
     }
 }

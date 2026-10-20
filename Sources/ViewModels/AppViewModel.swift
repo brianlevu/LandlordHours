@@ -532,6 +532,7 @@ class AppViewModel: ObservableObject {
             GuidedOnboardingStore.completedKey,
             GuidedOnboardingStore.skippedKey,
             "globalGoalType",
+            "materialParticipationTarget",
             "propertyGoals",
             "customCategories",
             "selectedTaxYear",
@@ -578,6 +579,7 @@ class AppViewModel: ObservableObject {
         "hasPurchasedPro",
         "trialStartDate",
         "globalGoalType",
+        "materialParticipationTarget",
         "propertyGoals",
         "iCloudBackupEnabled",
         "profileImageData",
@@ -1306,6 +1308,7 @@ class AppViewModel: ObservableObject {
         timerStartTime timerStart: Date? = nil
     ) -> EngagementContext {
         let goal = GoalManager.shared.globalGoalType
+        let choice = GoalManager.shared.goalChoice
         return EngagementContext(
             now: now,
             taxYear: taxYear ?? Calendar.current.component(.year, from: now),
@@ -1317,7 +1320,8 @@ class AppViewModel: ObservableObject {
             notificationPermission: .notDetermined,
             recentDismissals: [],
             isProUser: SubscriptionManager.shared.isPro,
-            targetHours: goal.hoursRequired,
+            // MP 500 measures against 500 (its HourGoalType stays `.str` for 1.x compatibility).
+            targetHours: choice.targetHours,
             goalType: goal,
             groupingElection: TaxProfileManager.shared.groupingElection,
             includeSpouse: tracksSpouseJointly
@@ -1356,14 +1360,9 @@ class AppViewModel: ObservableObject {
     }
 
     private func widgetGoalContext() -> (targetHours: Double, label: String, shortLabel: String) {
-        let goal = GoalManager.shared.globalGoalType
-        let hours = goal.hoursRequired
-        let short = "\(Int(hours))h"
-        switch goal {
-        case .reps: return (hours, "\(short) REPS", short)
-        case .str: return (hours, "\(short) STR", short)
-        case .both: return (hours, "\(short) REPS + STR", short)
-        }
+        let choice = GoalManager.shared.goalChoice
+        let labels = choice.widgetLabels
+        return (choice.targetHours, labels.0, labels.1)
     }
     
     private func saveTimerState() {
@@ -1738,9 +1737,11 @@ extension AppViewModel: CloudKitSyncDelegate {
         mgr.saveCategories()
     }
 
-    func syncDidReceiveGoalSettings(globalGoalType: HourGoalType, propertyGoals: [PropertyGoal]) {
+    func syncDidReceiveGoalSettings(globalGoalType: HourGoalType, propertyGoals: [PropertyGoal], materialParticipationTarget: Int?) {
         let mgr = GoalManager.shared
         mgr.globalGoalType = globalGoalType
+        // nil: a record from a device before 2.0 says nothing about the target; keep ours.
+        if let materialParticipationTarget { mgr.applyMaterialParticipationTarget(materialParticipationTarget) }
         mgr.propertyGoals = propertyGoals
         mgr.saveGoals()
     }

@@ -129,6 +129,12 @@ final class BackfillJob: ObservableObject {
         self.announce = announce
     }
 
+    /// Hours the reveal may show: investing, financing and negotiation never count, so they
+    /// never feed "Nh found" or the house.
+    static func countableHours(_ items: [Suggestion]) -> Double {
+        items.reduce(0) { $0 + (($1.proposedCategory?.countsForREPS ?? true) ? ($1.proposedHours ?? 0) : 0) }
+    }
+
     var isScanning: Bool {
         if case .scanning = phase { return true }
         return false
@@ -188,7 +194,7 @@ final class BackfillJob: ObservableObject {
             found: { [weak self] items in
                 guard let self, self.runID == id, !items.isEmpty else { return }
                 self.foundCount += items.count
-                self.foundHours += items.reduce(0) { $0 + ($1.proposedHours ?? 0) }
+                self.foundHours += Self.countableHours(items)
                 self.onItems(items)
             }
         )
@@ -209,7 +215,7 @@ final class BackfillJob: ObservableObject {
         if let pendingBackfill {
             let items = pendingBackfill()
             foundCount = items.count
-            foundHours = items.reduce(0) { $0 + ($1.proposedHours ?? 0) }
+            foundHours = Self.countableHours(items)
         }
         phase = .finished(found: foundCount)
         onItems([])

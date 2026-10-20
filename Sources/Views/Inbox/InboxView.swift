@@ -117,12 +117,33 @@ struct InboxView: View {
         let propertyName = model.propertyName(for: suggestion)
         let badges = model.badges(for: suggestion)
         let quick = model.canQuickLog(suggestion)
-        return Button {
-            model.sheetSuggestion = suggestion
-        } label: {
-            SuggestionRowView(suggestion: suggestion, propertyName: propertyName, badges: badges)
+        return VStack(alignment: .leading, spacing: 0) {
+            Button {
+                model.sheetSuggestion = suggestion
+            } label: {
+                SuggestionRowView(suggestion: suggestion, propertyName: propertyName, badges: badges)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(SuggestionRowView.accessibilityLabel(for: suggestion, propertyName: propertyName, badges: badges, now: InboxClock.now()))
+            .accessibilityHint("Opens the details to confirm")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(named: quick ? "Log \(InboxFormat.hours(suggestion.proposedHours ?? 0))" : "Review and log") {
+                swipeLog(suggestion)
+            }
+            .accessibilityAction(named: "Not rental work") { dismiss(suggestion) }
+            .accessibilityIdentifier("inbox.row.\(suggestion.sourceKey)")
+            // The visible next action on every row (2.0 onboarding: "Confirm the ones that were
+            // rental work"). Confirm logs at once when everything is known; otherwise the sheet
+            // opens and asks for what is missing (a property, hours).
+            InboxRowActions(
+                key: suggestion.sourceKey,
+                onConfirm: { swipeLog(suggestion) },
+                onNotWork: { dismiss(suggestion) }
+            )
+            .padding(.bottom, 10)
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .listRowBackground(colors.backgroundSecondary)
         .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 16))
         .alignmentGuide(.listRowSeparatorLeading) { _ in 74 }
@@ -140,21 +161,12 @@ struct InboxView: View {
             Button {
                 dismiss(suggestion)
             } label: {
-                Label("Not work", systemImage: "xmark")
+                Label("Not rental work", systemImage: "xmark")
                     .labelStyle(.iconOnly)
             }
             .tint(Color(hex: AppColors.Hex.textSecondary))
             .accessibilityIdentifier("inbox.swipe.dismiss")
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(SuggestionRowView.accessibilityLabel(for: suggestion, propertyName: propertyName, badges: badges, now: InboxClock.now()))
-        .accessibilityHint("Opens the details to confirm")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction(named: quick ? "Log \(InboxFormat.hours(suggestion.proposedHours ?? 0))" : "Review and log") {
-            swipeLog(suggestion)
-        }
-        .accessibilityAction(named: "Not rental work") { dismiss(suggestion) }
-        .accessibilityIdentifier("inbox.row.\(suggestion.sourceKey)")
     }
 
     private func swipeLog(_ suggestion: Suggestion) {
@@ -189,7 +201,7 @@ struct InboxView: View {
                 Text(total == 1 ? "1 thing to confirm" : "\(total) things to confirm")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(OnBlueprint.primary)
-                Text("\(fromBackfill) from the last 90 days. Confirm the ones that were work and they go up on the house.")
+                Text("\(fromBackfill) from the last 90 days. Confirm the ones that were rental work and they go up on the house.")
                     .font(.subheadline)
                     .foregroundStyle(OnBlueprint.secondary)
                     .fixedSize(horizontal: false, vertical: true)
