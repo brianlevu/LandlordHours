@@ -113,21 +113,6 @@ struct TimeLogView: View {
         .onChange(of: timerParticipant) { _, _ in
             if timerPhase == .finishing { saveStoppedTimerDraft() }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .prefillFirstActivity)) { _ in
-            guard viewModel.timeEntries.isEmpty, !viewModel.properties.isEmpty else { return }
-            trackMode = .log
-            entryPropertyId = viewModel.properties.first?.id
-            entryCategory = .management
-            entryHours = 1.0
-            entryDate = Date()
-            entryParticipant = .selfParticipant
-            entryNotes = "Reviewed tenant message and coordinated maintenance for the property."
-            aiParsedEntry = nil
-            aiAutoFilled = false
-            isLogDetailsExpanded = false
-            isNotesFocused = false
-            userAdjustedLogDetails = false
-        }
         .alert("Timer Capped", isPresented: $showTimerCappedAlert) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -365,7 +350,6 @@ struct TimeLogView: View {
                 )
         )
         .padding(.horizontal, 20)
-        .guidedSpotlightTarget(.firstActivity)
         .onChange(of: entryNotes) { _, newValue in
             handleNotesChange(newValue)
         }

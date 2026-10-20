@@ -271,3 +271,60 @@ struct InboxEmptyArt: View {
         .accessibilityHidden(true)
     }
 }
+
+
+/// Confirm (44pt action capsule) and Not work, under each Inbox row's words. One line when it
+/// fits; stacked at large text sizes so nothing is pushed past the card's edges.
+struct InboxRowActions: View {
+    let key: String
+    let onConfirm: () -> Void
+    let onNotWork: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 4) { confirm; notWork }
+            VStack(alignment: .leading, spacing: 2) { confirm; notWork }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        // Lines up with the row's words (hours column + tool tile), except at large text sizes.
+        .padding(.leading, dynamicTypeSize.isAccessibilitySize ? 0 : 108)
+    }
+
+    private var confirm: some View {
+        Button(action: onConfirm) {
+            // Icon and word spelled out (a Label can collapse to its icon inside a List row).
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark").accessibilityHidden(true)
+                Text("Confirm").lineLimit(1)
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(colors.onAction)
+            .padding(.horizontal, 18)
+            .frame(minHeight: 44)
+            .background(colors.action, in: Capsule())
+            .contentShape(Capsule())
+            .fixedSize()
+        }
+        .buttonStyle(.borderless)
+        .accessibilityIdentifier("inbox.confirm.\(key)")
+    }
+
+    private var notWork: some View {
+        Button(action: onNotWork) {
+            Text("Not work")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(colors.textSecondary)
+                .lineLimit(1)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+                .fixedSize()
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel("Not rental work")
+        .accessibilityIdentifier("inbox.notWork.\(key)")
+    }
+}

@@ -298,7 +298,7 @@ private struct RecordsScreen: View {
                     .font(.footnote)
                     .foregroundStyle(colors.draftingInk)
                     .accessibilityHidden(true)
-                Text(RecordsLogic.totalLabel(goal: HouseGoal(goalManager.globalGoalType), tracksSpouseJointly: taxProfile.spouseTracking))
+                Text(RecordsLogic.totalLabel(goal: goalManager.houseGoal, tracksSpouseJointly: taxProfile.spouseTracking))
                     .font(.footnote)
                     .foregroundStyle(colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -310,7 +310,7 @@ private struct RecordsScreen: View {
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
         .lhMotion(AppAnimation.standard, value: totalHours)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(BPHours.spoken(totalHours)) in \(entries.count) records. \(RecordsLogic.totalLabel(goal: HouseGoal(goalManager.globalGoalType), tracksSpouseJointly: taxProfile.spouseTracking))")
+        .accessibilityLabel("\(BPHours.spoken(totalHours)) in \(entries.count) records. \(RecordsLogic.totalLabel(goal: goalManager.houseGoal, tracksSpouseJointly: taxProfile.spouseTracking))")
         .accessibilityIdentifier("records.total")
     }
 

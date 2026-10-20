@@ -68,7 +68,7 @@ struct DashboardView: View {
     // MARK: House inputs
     // The hero counts the goal's countable hours only (TodayHouse.swift): REPS = your own
     // real-estate hours; MP = owner (+ spouse when tracked jointly). Investor-only tasks never count.
-    private var houseGoal: HouseGoal { HouseGoal(goalManager.globalGoalType) }
+    private var houseGoal: HouseGoal { goalManager.houseGoal }
     private var totalHours: Double { viewModel.houseCountableHours(goal: houseGoal, year: currentYear) }
     private var targetHours: Double { houseGoal.targetHours }
     private var isGoalMet: Bool { HouseProgress(hours: totalHours, goal: houseGoal).isGoalMet }
@@ -189,7 +189,84 @@ struct DashboardView: View {
         )
     }
 
-    private var shouldShowActivationCard: Bool { mode.showsActivationCard }
+    // MARK: New-owner landing (2.0 onboarding hands off here)
+
+    /// Calendar suggestions found by the look-back, still waiting in the Inbox (the Inbox's own
+    /// items; countable hours only).
+    @State private var foundInInbox: OnbFound = .none
+    @State private var calendarSuggestionsOn = CaptureOptIn.calendarSuggestionsEnabled()
+    @State private var isAskingCalendar = false
+
+    private var isNewOwner: Bool { viewModel.timeEntries.isEmpty }
+
+    private var heroFooter: HouseHeroFooter? {
+        guard isNewOwner else { return nil }
+        if viewModel.properties.isEmpty { return .emptyLot(onAddProperty: { openAddPropertyFromHome() }) }
+        // While the look-back runs, WP-L's "Looking through your calendar" words lead instead.
+        if !backfill.isScanning, foundInInbox.count > 0, foundInInbox.hasDisplayableHours { return .found(hoursText: foundInInbox.hoursText) }
+        return nil
+    }
+
+    private var heroStakeName: String? {
+        guard isNewOwner else { return nil }
+        return viewModel.properties.first?.name
+    }
+
+    private func refreshNewOwnerState() {
+        calendarSuggestionsOn = CaptureOptIn.calendarSuggestionsEnabled()
+        foundInInbox = OnbFound.from(AppModelHost.shared.suggestionStore?.suggestions ?? [], now: InboxClock.now())
+    }
+
+    /// "Find hours in my calendar": the same ask as onboarding's calendar step, for people who
+    /// said "Not now". The system prompt only when iOS has never asked; after a no, Settings.
+    private var findHoursCard: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image("bp_tool_repairs_36")
+                .resizable().scaledToFit()
+                .frame(width: 40, height: 40)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Find hours in my calendar")
+                    .font(.headline)
+                    .foregroundStyle(colors.textPrimary)
+                Text("We can look back 90 days for things like a plumber visit or a showing. You confirm each one.")
+                    .font(.subheadline)
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Look at my calendar") { Task { await lookAtCalendar() } }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(colors.action)
+                    .frame(minHeight: 44)
+                    .disabled(isAskingCalendar)
+                    .accessibilityIdentifier("today-find-hours")
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .accessibilityElement(children: .contain)
+    }
+
+    private func lookAtCalendar() async {
+        isAskingCalendar = true
+        defer { isAskingCalendar = false }
+        let environment = CaptureSetupEnvironment.current
+        let access = await environment.requestCalendar()
+        guard access == .fullAccess else {
+            // iOS answers at once (no prompt) after an earlier no: the switch is in Settings.
+            if let url = URL(string: UIApplication.openSettingsURLString) { await UIApplication.shared.open(url) }
+            return
+        }
+        CaptureOptIn.setCalendarSuggestionsEnabled(true)
+        Analytics.onboarding(.calendarResult(.allowed))
+        if let store = AppModelHost.shared.suggestionStore {
+            BackfillJob.shared.start(environment.makeScanner(viewModel, store))
+        }
+        refreshNewOwnerState()
+    }
+
+    /// The empty lot carries its own "Add property"; the setup card follows the first property.
+    private var shouldShowActivationCard: Bool { mode.showsActivationCard && !viewModel.properties.isEmpty }
 
     var body: some View {
         NavigationStack {
@@ -211,6 +288,9 @@ struct DashboardView: View {
                         // The house leads Today in every state (approved r6 concept); a new
                         // owner's setup steps sit right under the empty lot.
                         houseHero
+                        if isNewOwner && !calendarSuggestionsOn {
+                            findHoursCard
+                        }
                         if mode == .lookingBack {
                             BackfillProgressHeader(job: backfill, found: inboxBackfillCount, onRetry: {}, onOpen: {
                                 NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex)
@@ -220,7 +300,7 @@ struct DashboardView: View {
                             .accessibilityIdentifier("today.lookingBack")
                         } else if shouldShowActivationCard {
                             homeActivationCard
-                        } else {
+                        } else if !isNewOwner {
                             learningShortcutCard
                         }
                         recentEntriesSection
@@ -257,6 +337,7 @@ struct DashboardView: View {
                 HistoryView()
             }
             .onAppear {
+                refreshNewOwnerState()
                 isVisible = true
                 // A save while Today was away (log via +, timer stop, inbox confirm): mount the
                 // house at the pre-save height, then build up to the new one once it is on screen.
@@ -271,6 +352,9 @@ struct DashboardView: View {
                 }
             }
             .onDisappear { isVisible = false }
+            .onReceive(NotificationCenter.default.publisher(for: .captureSuggestionsDidChange)) { _ in
+                refreshNewOwnerState()
+            }
             // VoiceOver: say once when the hours finish loading (the loader itself stays quiet).
             .onChange(of: hoursPending) { wasPending, isPending in
                 guard wasPending, !isPending else { return }
@@ -366,7 +450,8 @@ struct DashboardView: View {
 
     /// The Day-1 reveal, once per profile.
     private func presentBackfillIfNeeded() {
-        guard isVisible, shownCelebration == nil, shownBackfill == nil,
+        // Never over onboarding or What's new: the flow hands the reveal back when it closes.
+        guard isVisible, shownCelebration == nil, shownBackfill == nil, !OnbBackfill.flowActive,
               let reveal = houseEvents.pendingBackfill else { return }
         houseEvents.markBackfillShown()
         shownBackfill = reveal
@@ -395,9 +480,10 @@ struct DashboardView: View {
                         .fill(colors.backgroundTertiary)
                         .frame(width: 54, height: 54)
                         .overlay {
-                            Text(userInitials)
-                                .font(.system(size: 20, weight: .black, design: .rounded))
-                                .foregroundStyle(colors.textPrimary)
+                            // No name is collected at onboarding: a neutral person glyph.
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(colors.textSecondary)
                         }
                         .overlay(alignment: .bottomTrailing) {
                             Circle()
@@ -449,7 +535,8 @@ struct DashboardView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            quickActionsRow
+            // The empty lot's own "Add property" is the one action until a property exists.
+            if !viewModel.properties.isEmpty { quickActionsRow }
         }
     }
 
@@ -458,9 +545,9 @@ struct DashboardView: View {
             Button {
                 NotificationCenter.default.post(name: .switchToTab, object: 4)
             } label: {
-                Text(userInitials)
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
+                Image(systemName: "person.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(colors.textSecondary)
                     .frame(width: 34, height: 34)
                     .background(colors.backgroundTertiary)
                     .clipShape(Circle())
@@ -534,10 +621,13 @@ struct DashboardView: View {
     private var dashboardSubtitle: String {
         if let subtitle = mode.subtitle { return subtitle }
         if viewModel.properties.isEmpty {
-            return "Start with a property so every hour has a clean record."
+            return "Every hour you log starts with a place."
         }
         if viewModel.timeEntries.isEmpty {
-            return "\(viewModel.properties.count) property ready. Capture the first activity while details are fresh."
+            let name = viewModel.properties.first?.name ?? "Your rental"
+            return foundInInbox.count > 0
+                ? "\(name) is staked. Confirm what we found, or log something new."
+                : "\(name) is staked. Log your first hour while it's fresh."
         }
         return "\(AppFormat.hours(headerHours)) counted toward \(Int(targetHours)) hours this year."
     }
@@ -679,8 +769,7 @@ struct DashboardView: View {
     }
 
     private var shouldShowProNudge: Bool {
-        !viewModel.properties.isEmpty &&
-        (!viewModel.timeEntries.isEmpty || GuidedOnboardingStore.isCompleted || GuidedOnboardingStore.isSkipped)
+        !viewModel.properties.isEmpty && !viewModel.timeEntries.isEmpty
     }
 
     // MARK: - House hero
@@ -692,18 +781,22 @@ struct DashboardView: View {
                 status: pace.text,
                 statusTone: heroStatusTone,
                 onCelebration: { _ in presentNextCelebration() },
+                footer: heroFooter,
+                stakeName: heroStakeName,
                 isLoading: hoursPending,
                 animatesChanges: viewModel.lastEntriesChangeOrigin != .remote,
                 isLookingBack: backfill.isScanning
             )
             // The art has a fixed frame; past AX2 the words would wrap into it, so cap there.
-            // VoiceOver reads the whole hero as one element with the full words.
+            // VoiceOver reads the whole hero as one element with the full words (the empty lot
+            // keeps its "Add property" button reachable).
             .dynamicTypeSize(...DynamicTypeSize.accessibility2)
-            .accessibilityElement(children: .ignore)
+            .accessibilityElement(children: viewModel.properties.isEmpty && isNewOwner ? .contain : .ignore)
             .accessibilityLabel(heroAccessibilityLabel)
-            .accessibilityAddTraits(.isImage)
             .accessibilityIdentifier("today.hero")
 
+            // The empty lot (no property yet) shows no pace maths: nothing can be counted.
+            if !viewModel.properties.isEmpty {
             HStack(alignment: .top, spacing: 12) {
                 if isREPS {
                     dashboardMiniMetric(
@@ -726,6 +819,7 @@ struct DashboardView: View {
                     )
                 }
             }
+            }
         }
     }
 
@@ -744,7 +838,14 @@ struct DashboardView: View {
             return "\(currentYear). \(AppFormat.hours(totalHours)) confirmed so far. Looking through your calendar; work we find waits in your Inbox."
         }
         let live = HouseProgress(hours: totalHours, goal: houseGoal)
-        return "\(currentYear). \(live.accessibilityLabel) \(pace.text)."
+        switch heroFooter {
+        case .emptyLot:
+            return "\(currentYear). An empty lot. Add a property. Every hour you confirm builds on it."
+        case .found(let hours):
+            return "\(currentYear). \(live.accessibilityLabel) \(hours) found in your calendar, not counted until you confirm."
+        case nil:
+            return "\(currentYear). \(live.accessibilityLabel) \(pace.text)."
+        }
     }
 
     private func dashboardMiniMetric(title: String, value: String, detail: String? = nil, isPending: Bool = false) -> some View {

@@ -13,7 +13,7 @@ protocol CloudKitSyncDelegate: AnyObject {
     func syncDidDeletePropertyIds(_ ids: Set<UUID>)
     func syncDidDeleteEntryIds(_ ids: Set<UUID>)
     func syncDidReceiveCategories(_ categories: [CustomCategory])
-    func syncDidReceiveGoalSettings(globalGoalType: HourGoalType, propertyGoals: [PropertyGoal])
+    func syncDidReceiveGoalSettings(globalGoalType: HourGoalType, propertyGoals: [PropertyGoal], materialParticipationTarget: Int?)
     func syncDidReceiveTaxProfile(_ fields: TaxProfileFields)
 }
 
@@ -813,7 +813,9 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
             if goals.isEmpty && record["propertyGoalsJSON"] != nil {
                 logger.warning("GoalSettings record has malformed propertyGoalsJSON, defaulting to empty")
             }
-            delegate?.syncDidReceiveGoalSettings(globalGoalType: goalType, propertyGoals: goals)
+            // 2.0: material participation at 500h travels beside the 1.x goal type.
+            let mpTarget = (record["materialParticipationTarget"] as? NSNumber)?.intValue
+            delegate?.syncDidReceiveGoalSettings(globalGoalType: goalType, propertyGoals: goals, materialParticipationTarget: mpTarget)
         }
         if let record = taxProfileRecord {
             if record["filingStatus"] == nil {
@@ -1209,6 +1211,7 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         let record = CKRecord(recordType: "GoalSettings", recordID: recordID)
         let gm = GoalManager.shared
         record["globalGoalType"] = gm.globalGoalType.rawValue
+        record["materialParticipationTarget"] = NSNumber(value: gm.materialParticipationTarget)
         if let json = try? JSONEncoder().encode(gm.propertyGoals),
            let str = String(data: json, encoding: .utf8) {
             record["propertyGoalsJSON"] = str

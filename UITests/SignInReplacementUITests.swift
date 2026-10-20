@@ -24,7 +24,7 @@ final class SignInReplacementUITests: XCTestCase {
         launch(["-LHSeedLegacyEmailProfile", "-LHInitialTab", "1"], scheme: "light")
 
         // No welcome / sign-in wall anywhere.
-        XCTAssertFalse(app.buttons["welcome.continueWithoutAccount"].waitForExistence(timeout: 4))
+        XCTAssertFalse(app.buttons["onb-start"].waitForExistence(timeout: 4))
         XCTAssertFalse(app.buttons["welcome.signInWithApple"].exists)
 
         // Profile A's properties are visible straight away.
@@ -73,7 +73,7 @@ final class SignInReplacementUITests: XCTestCase {
     func testSignedOutUpgradeShowsWelcomeWithRestoreAndRestoresProfile() {
         launch(["-LHSeedLegacySignedOut"], scheme: "light")
 
-        XCTAssertTrue(app.buttons["welcome.continueWithoutAccount"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 8))
         let restore = app.buttons["welcome.restoreEarlierData"]
         XCTAssertTrue(restore.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["Log in"].exists)
@@ -101,7 +101,7 @@ final class SignInReplacementUITests: XCTestCase {
     private func captureFrames(scheme: String) {
         // 1. Welcome — fresh device (no earlier data).
         launch(["-LHFreshWelcome"], scheme: scheme, resetDefaults: true)
-        XCTAssertTrue(app.buttons["welcome.continueWithoutAccount"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 8))
         settle()
         attach("01-welcome-fresh-\(scheme)")
 
