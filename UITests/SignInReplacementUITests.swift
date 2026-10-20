@@ -41,9 +41,12 @@ final class SignInReplacementUITests: XCTestCase {
 
         let restoreRow = app.buttons["settings.restoreOtherData"]
         XCTAssertTrue(restoreRow.waitForExistence(timeout: 8))
-        restoreRow.tap()
-
         let profileB = app.buttons["restore.profile.email-old.profile@example.com"]
+        // The launch splash fades over ~1s and can swallow the first tap.
+        for _ in 0..<5 where !profileB.exists {
+            if restoreRow.isHittable { restoreRow.tap() }
+            _ = profileB.waitForExistence(timeout: 3)
+        }
         XCTAssertTrue(profileB.waitForExistence(timeout: 5))
         profileB.tap()
 
@@ -53,7 +56,9 @@ final class SignInReplacementUITests: XCTestCase {
 
         // The sheet closes and Settings now shows profile B's identity.
         XCTAssertTrue(profileB.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["old.profile@example.com"].waitForExistence(timeout: 5))
+        // Settings' profile row is one button; its label carries the email.
+        let identity = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "old.profile@example.com")).firstMatch
+        XCTAssertTrue(identity.waitForExistence(timeout: 5))
         settle()
 
         let propertiesTab = app.buttons["tab.properties"].firstMatch
@@ -137,7 +142,7 @@ final class SignInReplacementUITests: XCTestCase {
         attach("05-settings-restore-sheet-\(scheme)")
         app.buttons["Cancel"].firstMatch.tap()
 
-        // 6. Settings › Switch profile + Delete All Data rows.
+        // 6. Settings › Switch profile + Delete all data rows.
         let switchRow = app.buttons["settings.switchProfile"]
         scrollTo(switchRow)
         XCTAssertTrue(switchRow.exists)
@@ -154,7 +159,7 @@ final class SignInReplacementUITests: XCTestCase {
         XCTAssertTrue(app.buttons["switchConfirm.switch"].waitForNonExistence(timeout: 5))
 
         // 8. iCloud off (the simulator has no iCloud): Sync Now shows plain caution copy.
-        let syncRow = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Sync Now")).firstMatch
+        let syncRow = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Sync now")).firstMatch
         var swipes = 0
         while (!syncRow.exists || !syncRow.isHittable || syncRow.frame.midY > 600) && swipes < 8 {
             app.swipeDown()

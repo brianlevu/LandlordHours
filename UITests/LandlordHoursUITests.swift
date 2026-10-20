@@ -113,7 +113,7 @@ final class LandlordHoursUITests: XCTestCase {
         // State 1: conditional prompt (hours over 100, confirmation unanswered).
         let confirmRow = app.buttons["reports.mp100.confirmRow"]
         XCTAssertTrue(confirmRow.waitForExistence(timeout: 5))
-        assertVisibleText("100-hour threshold reached", timeout: 5)
+        assertStanding(contains: "100 hours reached")
         attachScreenshot(named: "mp100-1-conditional-reports")
 
         // State 2: the confirmation question sheet.
@@ -126,16 +126,27 @@ final class LandlordHoursUITests: XCTestCase {
         // State 3: confirmed — the 100-hour test passes.
         answerYes.tap()
         XCTAssertTrue(app.staticTexts["No one participated more"].waitForExistence(timeout: 5))
-        assertVisibleText("Goal met!", timeout: 5)
+        assertStanding(contains: "Goal met")
         attachScreenshot(named: "mp100-3-confirmed-reports")
+    }
+
+    /// Reports' standing card speaks its status in its accessibility value.
+    private func assertStanding(contains text: String, timeout: TimeInterval = 5) {
+        let predicate = NSPredicate(format: "identifier BEGINSWITH %@ AND value CONTAINS %@", "reports.standing.", text)
+        let card = app.descendants(matching: .any).matching(predicate).firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: timeout), "Expected a standing card saying: \(text)")
     }
 
     func testSettingsSecondaryFlowsOpenWithoutSwitchingTabs() {
         launch(scenario: "frequent", tab: 4)
 
         assertVisibleText("Settings", timeout: 12)
+        // Settings is a lazy List: rows below the fold exist only once scrolled to.
         let taxProfile = app.buttons["settings.taxProfile"]
-        XCTAssertTrue(taxProfile.waitForExistence(timeout: 5))
+        _ = app.buttons["settings.proCard"].waitForExistence(timeout: 5)
+        scrollToElement(taxProfile)
+        let tabBar = app.buttons["tab.today"]
+        if tabBar.exists, taxProfile.frame.maxY > tabBar.frame.minY - 8 { app.swipeUp() }
         taxProfile.tap()
 
         XCTAssertTrue(app.staticTexts["Tax profile"].waitForExistence(timeout: 5))

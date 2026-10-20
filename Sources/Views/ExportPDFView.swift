@@ -1,180 +1,79 @@
 import SwiftUI
 import PDFKit
-import LucideIcons
 
+/// Export: the real first page of the PDF on top (Crouton), the year, what's inside, then one
+/// action. docs/design/2.0-hifi-reference-spec.md §h.
 struct ExportPDFView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-    let year: Int
+
+    @State private var year: Int
     @State private var shareItem: ExportShareItem?
     @State private var exportError: String?
     @State private var isGenerating = false
     @State private var sharing: ShareRequest?
+    @State private var preview: UIImage?
+    @State private var previewYear: Int?
+
+    init(year: Int) {
+        _year = State(initialValue: year)
+    }
+
+    private var currentYear: Int { Calendar.current.component(.year, from: Date()) }
+
+    private var yearChoices: [Int] {
+        let years = Set(viewModel.timeEntries.map { Calendar.current.component(.year, from: $0.date) })
+            .union([currentYear, year])
+        return Array(years.sorted(by: >).prefix(4))
+    }
 
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    VStack(alignment: .leading, spacing: 8) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text("Export report")
-                            .font(.system(size: 42, weight: .black, design: .rounded))
+                            .lhDisplayFont(.largeTitle)
                             .foregroundStyle(colors.textPrimary)
-                            .minimumScaleFactor(0.82)
-                        Text("Create a \(String(year)) report for your records or your CPA.")
-                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .accessibilityAddTraits(.isHeader)
+                        Text("A PDF for your accountant and a CSV spreadsheet of every entry.")
+                            .font(.subheadline)
                             .foregroundStyle(colors.textSecondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    // Export action card
-                    VStack(spacing: 16) {
-                        Circle()
-                            .fill(colors.backgroundTertiary)
-                            .frame(width: 64, height: 64)
-                            .overlay {
-                                LucideIcon(image: Lucide.fileText, size: 28)
-                                    .foregroundStyle(AppColors.charcoal)
-                            }
-
-                        Text("Export \(String(year)) report")
-                            .font(.system(size: 22, weight: .black, design: .rounded))
-                            .foregroundStyle(colors.textPrimary)
-
-                        Text(exportSummaryText)
-                            .font(AppTypography.bodySmall)
-                            .foregroundStyle(colors.textSecondary)
-                            .multilineTextAlignment(.center)
-                            .lineSpacing(3)
-
-                        if let shareItem {
-                            VStack(spacing: 10) {
-                                HStack(spacing: 8) {
-                                    LucideIcon(image: Lucide.check, size: 16)
-                                        .foregroundStyle(colors.positive)
-                                    Text("Report ready")
-                                        .font(AppTypography.button)
-                                        .foregroundStyle(colors.textPrimary)
-                                }
-
-                                Button {
-                                    sharing = ShareRequest(url: shareItem.pdfURL, format: .pdf)
-                                } label: {
-                                    HStack(spacing: 8) {
-                                        LucideIcon(image: Lucide.share2, size: 16)
-                                        Text("Share PDF")
-                                    }
-                                    .font(AppTypography.button)
-                                    .foregroundStyle(AppColors.onAction)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
-                                    .background(colors.action)
-                                    .clipShape(Capsule())
-                                }
-                                .buttonStyle(.lhPressable)
-                                .accessibilityIdentifier("export.sharePDF")
-
-                                Button {
-                                    sharing = ShareRequest(url: shareItem.csvURL, format: .csv)
-                                } label: {
-                                    HStack(spacing: 8) {
-                                        LucideIcon(image: Lucide.fileText, size: 16)
-                                        Text("Share CSV spreadsheet")
-                                    }
-                                    .font(AppTypography.button)
-                                    .foregroundStyle(colors.action)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
-                                    .background(colors.actionSurface)
-                                    .clipShape(Capsule())
-                                }
-                                .buttonStyle(.lhPressable)
-                                .accessibilityIdentifier("export.shareCSV")
-                            }
-                        } else {
-                            Button {
-                                generateExports()
-                            } label: {
-                                HStack(spacing: 8) {
-                                    if isGenerating {
-                                        ProgressView()
-                                            .tint(AppColors.onAction)
-                                    } else {
-                                        LucideIcon(image: Lucide.fileDown, size: 16)
-                                    }
-                                    Text(generateButtonTitle)
-                                }
-                                .font(AppTypography.button)
-                                .foregroundStyle(canExport ? AppColors.onAction : colors.textSecondary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                                .background(canExport ? colors.action : colors.backgroundTertiary)
-                                .clipShape(Capsule())
-                            }
-                            .buttonStyle(.lhPressable)
-                            .disabled(!canExport || isGenerating)
-                            .accessibilityIdentifier("export.generatePDF")
-                        }
-
-                        if let exportError {
-                            Text(exportError)
-                                .font(AppTypography.caption)
-                                .foregroundStyle(colors.destructive)
-                                .multilineTextAlignment(.center)
-                        }
-                    }
-                    .padding(20)
-                    .background(colors.backgroundSecondary)
-                    .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 26, style: .continuous)
-                            .stroke(colors.border.opacity(0.28), lineWidth: 1)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
-                    // Report summary card
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack(spacing: 8) {
-                            LucideIcon(image: Lucide.list, size: 14)
-                                .foregroundStyle(AppColors.charcoal)
-                            Text("Report includes")
-                                .font(.system(size: 19, weight: .black, design: .rounded))
-                                .foregroundStyle(colors.textPrimary)
-                        }
+                    yearChips
 
-                        VStack(spacing: 0) {
-                            reportRow(label: "Properties", value: "\(activePropertyCount) with time logged", icon: "building-2", color: AppColors.sky)
-                            Divider().padding(.leading, 48)
-                            reportRow(label: "Time Entries", value: "\(yearEntries.count) entries", icon: "clock", color: AppColors.primary)
-                            Divider().padding(.leading, 48)
-                            reportRow(label: "Total Hours", value: String(format: "%.1f hours", totalHours), icon: "hourglass", color: AppColors.honey)
-                            Divider().padding(.leading, 48)
-                            reportRow(label: "REPS hours", value: String(format: "%.1f hours", repsQualifiedHours), icon: "badge-check", color: AppColors.sage)
-                        }
-                    }
-                    .padding(20)
-                    .background(colors.backgroundSecondary)
-                    .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 26, style: .continuous)
-                            .stroke(colors.border.opacity(0.28), lineWidth: 1)
-                    }
+                    pagePreview
+
+                    summary
+
+                    actions
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 18)
-                .padding(.bottom, 40)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 32)
             }
-            .background { LHMobileCanvas() }
+            .scrollIndicators(.hidden)
+            .background(colors.background.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+                    Button("Close") { dismiss() }
+                        .foregroundStyle(colors.action)
+                        .accessibilityIdentifier("export.close")
                 }
             }
         }
         .hidesAppTabBar()
+        .task(id: year) { await renderPreview() }
+        .onChange(of: year) { _, _ in
+            shareItem = nil
+            exportError = nil
+        }
         .sheet(item: $sharing) { request in
             ActivityShareSheet(items: [request.url]) { completed in
                 sharing = nil
@@ -185,20 +84,161 @@ struct ExportPDFView: View {
         }
     }
 
-    private func reportRow(label: String, value: String, icon: String, color: Color) -> some View {
-        HStack(spacing: 12) {
-            JellyBadge(systemName: icon, color: color, wash: colors.backgroundTertiary, size: 36)
+    // MARK: Year
+
+    private var yearChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(yearChoices, id: \.self) { choice in
+                    Button {
+                        year = choice
+                    } label: {
+                        BPFilterChip(title: yearLabel(choice), isActive: choice == year, showsChevron: false)
+                    }
+                    .buttonStyle(.lhPressable)
+                    .accessibilityAddTraits(choice == year ? .isSelected : [])
+                    .accessibilityIdentifier("export.year.\(choice)")
+                }
+            }
+        }
+    }
+
+    private func yearLabel(_ value: Int) -> String {
+        if value == currentYear { return "This year" }
+        if value == currentYear - 1 { return "Last year" }
+        return String(value)
+    }
+
+    // MARK: Preview
+
+    private var pagePreview: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.5 : 0.08), radius: 16, y: 4)
+            if let preview, previewYear == year {
+                Image(uiImage: preview)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                    .transition(.opacity)
+            } else {
+                // isLoading hook: the page renders off the main thread; only the page shows a
+                // placeholder (title and table lines), the rest of the sheet stays usable.
+                VStack(alignment: .leading, spacing: 10) {
+                    BPLoadingPlaceholder(kind: .number, width: 140, height: 12)
+                    BPLoadingPlaceholder(kind: .number, width: 90, height: 8)
+                    BPLoadingPlaceholder(kind: .chart, width: nil, height: 36)
+                    ForEach(0..<4, id: \.self) { _ in
+                        BPLoadingPlaceholder(kind: .number, width: nil, height: 6)
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .environment(\.colorScheme, .light)
+            }
+        }
+        .aspectRatio(11 / 8.5, contentMode: .fit)
+        .frame(maxWidth: 420)
+        .frame(maxWidth: .infinity)
+        .animation(reduceMotion ? nil : AppAnimation.reveal, value: previewYear)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Preview of the first page of the \(String(year)) report")
+        .accessibilityIdentifier("export.preview")
+    }
+
+    // MARK: Summary
+
+    private var summary: some View {
+        VStack(spacing: 0) {
+            summaryRow("Entries", value: "\(yearEntries.count)")
+            Divider().padding(.leading, 16)
+            summaryRow("Properties", value: "\(activePropertyCount)")
+            Divider().padding(.leading, 16)
+            summaryRow("All logged hours", value: BPHours.short(totalHours))
+            Divider().padding(.leading, 16)
+            summaryRow("Real estate hours", value: BPHours.short(repsQualifiedHours))
+        }
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("export.summary")
+    }
+
+    private func summaryRow(_ label: String, value: String) -> some View {
+        HStack {
             Text(label)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .font(.body)
                 .foregroundStyle(colors.textPrimary)
-            Spacer()
+            Spacer(minLength: 8)
             Text(value)
-                .font(AppTypography.bodySmall)
-                .fontWeight(.medium)
+                .font(.system(.body, design: .rounded))
+                .monospacedDigit()
                 .foregroundStyle(colors.textSecondary)
         }
-        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .frame(minHeight: 48)
+        .accessibilityElement(children: .combine)
     }
+
+    // MARK: Actions
+
+    @ViewBuilder
+    private var actions: some View {
+        VStack(spacing: 12) {
+            if let shareItem {
+                Label("Report ready", systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(colors.positive)
+                    .frame(maxWidth: .infinity)
+
+                Button {
+                    sharing = ShareRequest(url: shareItem.pdfURL, format: .pdf)
+                } label: {
+                    Label("Share PDF", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(InboxPrimaryButtonStyle())
+                .accessibilityIdentifier("export.sharePDF")
+
+                Button {
+                    sharing = ShareRequest(url: shareItem.csvURL, format: .csv)
+                } label: {
+                    Label("Share CSV spreadsheet", systemImage: "tablecells")
+                        .font(AppTypography.buttonLarge)
+                        .foregroundStyle(colors.action)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 52)
+                        .background(Capsule().fill(colors.actionSurface))
+                }
+                .buttonStyle(.lhPressable)
+                .accessibilityIdentifier("export.shareCSV")
+            } else {
+                Button {
+                    generateExports()
+                } label: {
+                    Text(generateButtonTitle)
+                }
+                .buttonStyle(InboxPrimaryButtonStyle())
+                .disabled(!canExport || isGenerating)
+                .accessibilityIdentifier("export.generatePDF")
+
+                if !canExport {
+                    Text("Log time in \(String(year)), then export it here.")
+                        .font(.footnote)
+                        .foregroundStyle(colors.textSecondary)
+                }
+            }
+
+            if let exportError {
+                Label(exportError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(colors.destructive)
+                    .multilineTextAlignment(.center)
+            }
+        }
+    }
+
+    // MARK: Data
 
     var yearEntries: [TimeEntry] {
         viewModel.timeEntries.filter { Calendar.current.component(.year, from: $0.date) == year }
@@ -221,13 +261,6 @@ struct ExportPDFView: View {
         return isGenerating ? "Creating report…" : "Create PDF and CSV"
     }
 
-    var exportSummaryText: String {
-        if canExport {
-            return "A PDF for your CPA, plus a spreadsheet. It shows hours by property, category, and person, every entry, and your photos."
-        }
-        return "Log time entries for \(String(year)), then export a report for your CPA or records."
-    }
-
     var repsQualifiedHours: Double {
         yearEntries.filter { $0.countsForREPS }.reduce(0) { $0 + $1.hours }
     }
@@ -245,6 +278,22 @@ struct ExportPDFView: View {
         ))
     }
 
+    /// Renders the real report's first page as the preview (same renderer as the export).
+    private func renderPreview() async {
+        let report = makeReport()
+        let year = year
+        let image = await Task.detached(priority: .userInitiated) { () -> UIImage? in
+            // The first page never shows photos; skip loading them for the preview.
+            let renderer = AuditReportPDFRenderer(attachmentData: { _ in nil })
+            let data = renderer.render(report)
+            guard let page = PDFDocument(data: data)?.page(at: 0) else { return nil }
+            return page.thumbnail(of: CGSize(width: 1188, height: 918), for: .mediaBox)
+        }.value
+        guard !Task.isCancelled else { return }
+        preview = image
+        previewYear = year
+    }
+
     private func generateExports() {
         guard !isGenerating else { return }
         isGenerating = true
@@ -258,8 +307,9 @@ struct ExportPDFView: View {
                 switch result {
                 case .success(let files):
                     shareItem = files
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
                 case .failure:
-                    exportError = "Could not create the report. Please try again."
+                    exportError = "Couldn't create the report. Try again."
                     RatingPromptCoordinator.shared.noteError()
                 }
             }

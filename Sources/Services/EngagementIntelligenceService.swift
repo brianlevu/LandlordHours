@@ -70,6 +70,9 @@ struct EngagementContext {
     var goalType: HourGoalType = .reps
     /// Same flag the Dashboard uses to decide grouped vs best-single-property hours.
     var groupingElection: Bool = false
+    /// Tax Profile "Spouse hours". Off: spouse entries never count, the same rule Today's house
+    /// uses (`AppViewModel.houseCountableHours`). REPS never combines spouses either way.
+    var includeSpouse: Bool = true
 
     enum NotificationPermissionState: Equatable {
         case notDetermined
@@ -114,13 +117,18 @@ final class EngagementIntelligenceService {
             )
         case .str:
             yearHours = TaxQualificationEngine.materialParticipationOverview(
-                entries: context.timeEntries,
+                entries: context.includeSpouse
+                    ? context.timeEntries
+                    : context.timeEntries.filter { $0.participant == .selfParticipant },
                 properties: context.properties,
                 year: context.taxYear,
                 groupingElection: context.groupingElection
             ).ownerAndSpouseHours
         }
-        let lastLogDate = yearEntries.map(\.date).max()
+        // Spouse hours off: a spouse's entry never counts as your last log.
+        let lastLogDate = yearEntries
+            .filter { context.includeSpouse || $0.participant == .selfParticipant }
+            .map(\.date).max()
         let daysSinceLastLog = lastLogDate.map {
             max(0, calendar.dateComponents([.day], from: calendar.startOfDay(for: $0), to: calendar.startOfDay(for: context.now)).day ?? 0)
         }

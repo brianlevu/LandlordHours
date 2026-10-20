@@ -2382,11 +2382,13 @@ struct QuickLogEntryView: View {
 
             propertyPickerRow
 
-            Picker("Participant", selection: $selectedParticipant) {
-                Text("Self").tag(Participant.selfParticipant)
-                Text("Spouse").tag(Participant.spouse)
-            }
-            .pickerStyle(.segmented)
+            BPSegmentedPicker(
+                options: [Participant.selfParticipant, .spouse],
+                selection: $selectedParticipant,
+                title: { $0 == .spouse ? "Spouse" : "Self" }
+            )
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Participant")
 
             Stepper(value: $hours, in: 0.25...24, step: 0.25) {
                 HStack {
