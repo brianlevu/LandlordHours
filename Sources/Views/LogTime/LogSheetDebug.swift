@@ -22,6 +22,9 @@ enum LogSheetDebug {
         #endif
     }
 
+    /// The typed capture is the moment before the 600ms read: nothing fills.
+    static var holdsReading: Bool { state == "typed" }
+
     /// The invalid capture shows the caution line before any typing.
     static var forcesInvalid: Bool { state == "invalid" }
 

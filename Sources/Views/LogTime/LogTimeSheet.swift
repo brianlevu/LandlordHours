@@ -111,8 +111,8 @@ struct LogTimeSheet: View {
                         onClose()
                         NotificationCenter.default.post(name: .switchToPropertiesAndOpenAddProperty, object: nil)
                     })
-                    // At the free limit (the lock row) and at AX sizes the rows need the full height.
-                    .presentationDetents(isAX || !LogProGate.canAddProperty(viewModel) ? [.large] : [.medium, .large])
+                    // At AX sizes the rows need the full height (medium otherwise, as approved).
+                    .presentationDetents(isAX ? [.large] : [.medium, .large])
                 }
             }
             .environmentObject(viewModel)
@@ -834,7 +834,7 @@ struct LogTimeSheet: View {
     private func readNote(delay: Double, source: LogFillSource) {
         readTask?.cancel()
         let text = form.trimmedNote
-        guard text.count >= 6, mode == .log else {
+        guard text.count >= 6, mode == .log, !LogSheetDebug.holdsReading else {
             isReading = false
             return
         }

@@ -273,6 +273,14 @@ final class LogTimeUITests: XCTestCase {
         }
     }
 
+    /// The states a fix touched, in every scheme and size.
+    func testCaptureFixups() {
+        let names: Set<String> = ["log-typed", "log-filled-spouse", "log-save-failed", "log-not-counted", "log-invalid", "log-picker-property-limit"]
+        for scheme in ["light", "dark"] {
+            for size in [nil, "xxl", "ax3"] as [String?] { captureAll(scheme: scheme, size: size, names: names) }
+        }
+    }
+
     /// Today's timer card in every scheme and size (re-run after a Today-only fix).
     func testCaptureTodayTimerCards() {
         for scheme in ["light", "dark"] {
@@ -280,21 +288,24 @@ final class LogTimeUITests: XCTestCase {
         }
     }
 
-    private func captureAll(scheme: String, size: String?, prefix: String = "") {
+    private func captureAll(scheme: String, size: String?, prefix: String = "", names: Set<String>? = nil) {
         // One missing state must not cost the rest of the board.
         continueAfterFailure = true
-        for shot in shots where shot.name.hasPrefix(prefix) {
+        for shot in shots where shot.name.hasPrefix(prefix) && (names?.contains(shot.name) ?? true) {
             app.terminate()
             launch(seed: shot.seed, scheme: scheme, extra: shot.extra + sizeArgs(size))
             let target = element(shot.waitFor)
             XCTAssertTrue(target.waitForExistence(timeout: 15), "\(shot.name): \(shot.waitFor)")
-            if shot.name.hasPrefix("today-timer-") && shot.waitFor != "shell.toast" {
-                // The card sits under the hero: scroll it fully above the tab bar.
-                let bar = app.buttons["tab.today"]
+            if shot.waitFor != "shell.toast" && shot.waitFor != "log.done" {
+                // Today's card sits under the hero, and at AX sizes a sheet's state (the Who row,
+                // the save error) can sit below the fold: scroll it fully into view.
+                let today = app.buttons["tab.today"]
+                let bottom = shot.name.hasPrefix("today-") ? today.frame.minY : app.windows.firstMatch.frame.maxY - 24
+                let bar = (bottom: bottom, minY: bottom)
                 // Short drags from mid-screen (never from an edge, which would leave the app)
                 // until the card sits fully above the tab bar.
                 var tries = 0
-                while target.frame.maxY > bar.frame.minY - 12 && target.frame.minY > 140 && tries < 8 {
+                while target.frame.maxY > bar.minY - 12 && target.frame.minY > 140 && tries < 8 {
                     let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.62))
                     let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42))
                     from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.3)
