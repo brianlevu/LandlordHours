@@ -10,8 +10,12 @@ extension ActivityCategory {
         case .repairs: return "repairs"
         case .management: return "management"
         case .leasing: return "showing"
-        case .bookkeeping, .investing, .financing: return "bookkeeping"
-        case .legal, .insurance, .contractNegotiation: return "legal"
+        case .bookkeeping: return "bookkeeping"
+        case .legal: return "legal"
+        case .investing: return "investing"
+        case .financing: return "financing"
+        case .insurance: return "insurance"
+        case .contractNegotiation: return "negotiation"
         case .travel: return "travel"
         case .renovations: return "renovation"
         }
@@ -34,24 +38,11 @@ extension ActivityCategory {
         }
     }
 
-    /// Label ink: trades in timber, people in rose, travel in slate, desk work in drafting ink.
-    func inboxInk(_ colors: AdaptiveColors) -> Color {
-        switch self {
-        case .repairs, .renovations: return colors.timberInk
-        case .leasing: return colors.rose
-        case .travel: return colors.informational
-        default: return colors.draftingInk
-        }
-    }
+    /// Label ink: the category's own ink (AppColors.categoryInkHex), the one map used app-wide.
+    func inboxInk(_ colors: AdaptiveColors) -> Color { colors.categoryInk(self) }
 
-    func inboxWash(_ colors: AdaptiveColors) -> Color {
-        switch self {
-        case .repairs, .renovations: return AppColors.timber.opacity(0.16)
-        case .leasing: return colors.roseWash
-        case .travel: return colors.informationalSurface
-        default: return colors.actionSurface
-        }
-    }
+    /// Tile wash: the ink at 14%.
+    func inboxWash(_ colors: AdaptiveColors) -> Color { colors.categoryWash(self) }
 }
 
 /// The category's tool on a soft material tile. Falls back to a dashed drafting square, never a

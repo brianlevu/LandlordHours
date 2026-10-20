@@ -157,11 +157,11 @@ def do_house(rd, catalog, masters):
         print('house', k, flush=True)
     return manifest
 
-def do_tools(rd, catalog, masters):
+def do_tools(rd, catalog, masters, names=None):
     import tools as T
     md = os.path.join(masters, 'tools'); os.makedirs(md, exist_ok=True)
     out = []
-    for t in T.TOOLS:
+    for t in (names or T.TOOLS):
         ims = {}
         for v, app in (('light', 'any'), ('dark', 'dark')):
             p = os.path.join(rd, f'tool_{t}__{v}.png')
@@ -233,6 +233,7 @@ def main():
     ap.add_argument('--manifest', required=True)
     ap.add_argument('--only', default='house,tools,anim')
     ap.add_argument('--house-stage', default='/tmp/bp_house_stage')
+    ap.add_argument('--tools', default='', help='comma list: post only these tools; manifest entries for the others are kept')
     a = ap.parse_args()
     cat = os.path.abspath(a.catalog)
     os.makedirs(cat, exist_ok=True)
@@ -250,7 +251,12 @@ def main():
                               '(cards, #EEF2FA/#FFFFFF) tint the linework #2369B5 (draftingInk); #8FD3FF is only for the blueprint hero. '
                               'Linework alpha: strokes 0.36, fill 0.08, flattened (never stacks).')
     if 'tools' in only:
-        write_group(cat, 'Tools'); man['tools'] = do_tools(a.tool_renders or a.renders, cat, a.masters)
+        names = [t for t in a.tools.split(',') if t] or None
+        write_group(cat, 'Tools'); done = do_tools(a.tool_renders or a.renders, cat, a.masters, names)
+        if names:
+            keep = [e for e in man.get('tools', []) if e['category'] not in names]
+            done = keep + done
+        man['tools'] = done
     if 'anim' in only:
         write_group(cat, 'ConfirmRow'); man['confirm_row'] = do_anim(a.renders, cat, a.masters, house_stage=a.house_stage)
     with open(a.manifest, 'w') as f:

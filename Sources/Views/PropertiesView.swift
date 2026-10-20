@@ -1,1203 +1,1089 @@
 import SwiftUI
 import MapKit
 import CoreLocation
-import LucideIcons
+
+// MARK: - Properties (2.0 redesign, approved r4)
+//
+// List (tab root), detail (pushed) and add/edit (.large sheet). Spec: redesign-specs.md §4;
+// approved sandbox: DesignSandbox/Screens2/S2Properties.swift at fc0cf6b. Numbers come from
+// PropertyFigures.swift (per-rental countable hours, Today's stage mapping, the free limit).
+
+enum PropertyRoute: Hashable {
+    case detail(UUID)
+    case records(UUID)
+}
+
+enum PropertyEditorMode: Identifiable, Equatable {
+    case add
+    case edit(RentalProperty, confirmDelete: Bool = false)
+
+    var id: String {
+        switch self {
+        case .add: return "add"
+        case .edit(let p, _): return "edit-\(p.id.uuidString)"
+        }
+    }
+}
 
 struct PropertiesView: View {
     @EnvironmentObject var viewModel: AppViewModel
-    @Environment(\.colorScheme) var colorScheme
+    @ObservedObject private var subscription = SubscriptionManager.shared
+    @ObservedObject private var taxProfile = TaxProfileManager.shared
+    @ObservedObject private var goalManager = GoalManager.shared
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-    @State private var showingAddProperty = false
-    @State private var selectedProperty: RentalProperty?
+
+    @State private var path = NavigationPath()
+    @State private var editor: PropertyEditorMode?
     @State private var showingPaywall = false
-    @State private var propertyToDelete: RentalProperty?
-    @State private var showingDeleteConfirmation = false
+    @State private var deletion: PropertyDeletion?
+    @State private var infoShown = false
+    @State private var query = ""
 #if DEBUG
     @State private var didHandleDebugLaunchSurface = false
+    @State private var debugLoading = ProcessInfo.processInfo.arguments.contains("-LHPropertiesLoading")
 #endif
 
-    private var totalPortfolioHours: Double {
-        viewModel.properties.reduce(0) { partial, property in
-            partial + viewModel.totalHoursForProperty(property.id)
+    private var isLoading: Bool {
+#if DEBUG
+        if debugLoading { return true }
+#endif
+        // Rentals already on this iPhone show at once; only an empty list waits for the first
+        // iCloud pull (WP-L), so a returning owner never sees "Add your first property" by mistake.
+        return viewModel.isAwaitingInitialPull && viewModel.properties.isEmpty
+    }
+
+    private var goal: HouseGoal { viewModel.houseGoal }
+    private var perPropertyGoal: Bool { viewModel.propertyGoalIsPerProperty }
+    private var atLimit: Bool { viewModel.propertiesAtFreeLimit }
+
+    private var shownProperties: [RentalProperty] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return viewModel.properties }
+        return viewModel.properties.filter { p in
+            ([p.name, p.address] + p.aliases).contains { $0.range(of: q, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
         }
-    }
-
-    private var ltrCount: Int {
-        viewModel.properties.filter { $0.propertyType == .ltr }.count
-    }
-
-    private var strCount: Int {
-        viewModel.properties.filter { $0.propertyType == .str }.count
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                LHMobileCanvas()
-
-                if viewModel.properties.isEmpty {
-                    // MARK: - Empty State
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 18) {
-                            headerSection
-                            emptyPortfolioCard
-                            setupPreviewCard
+        // Observing SubscriptionManager, TaxProfileManager and GoalManager re-renders the list
+        // when Pro, the goal or spouse tracking change.
+        NavigationStack(path: $path) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        header
+                        if infoShown { infoNote }
+                        if viewModel.properties.count > 8 && !isLoading { searchField }
+                        if isLoading {
+                            loadingCard
+                        } else if viewModel.properties.isEmpty {
+                            emptyCard
+                        } else {
+                            listCard
                         }
-                        .padding(.horizontal, 24)
-                        .padding(.top, 8)
-                        .padding(.bottom, AppSpacing.tabContentBottomInset)
+                        // Room for the floating tab bar; the scroll-to-bottom anchor is its foot.
+                        Color.clear.frame(height: AppSpacing.tabContentBottomInset - 20).id("properties.bottom")
                     }
-                } else {
-                    // MARK: - Property List
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 18) {
-                            headerSection
-                            portfolioSummaryCard
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                }
+                .scrollIndicators(.hidden)
+                .scrollDismissesKeyboard(.immediately)
+                .background(colors.background.ignoresSafeArea())
+                .overlay(alignment: .top) { PropertyTopEdgeFade() }
+#if DEBUG
+                .onAppear { handleDebugLaunchSurfaceIfNeeded(proxy: proxy) }
+#endif
+            }
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(for: PropertyRoute.self) { route in
+                switch route {
+                case .detail(let id):
+                    PropertyDetailView(propertyId: id, onEdit: { property in editor = .edit(property) })
+                case .records(let id):
+                    HistoryView(initialPropertyId: id)
+                }
+            }
+        }
+        .sheet(item: $editor, onDismiss: {
+            NotificationCenter.default.post(name: .resumeGuidedOnboardingOverlay, object: nil)
+        }) { mode in
+            PropertyEditSheet(mode: mode, onDeleted: { _ in
+                // The rental is gone: back to the list.
+                path = NavigationPath()
+            })
+            .presentationDetents([.large])
+        }
+        .sheet(isPresented: $showingPaywall) {
+            // After a purchase, carry on to adding the property.
+            PaywallView(
+                context: PropertyLimit.paywallContext,
+                onUnlocked: {
+                    NotificationCenter.default.post(name: .suspendGuidedOnboardingOverlay, object: nil)
+                    editor = .add
+                },
+                onClose: { showingPaywall = false }
+            )
+        }
+        .alert(deletion?.title ?? "", isPresented: Binding(get: { deletion != nil }, set: { if !$0 { deletion = nil } })) {
+            Button("Delete", role: .destructive) {
+                if let deletion {
+                    path = NavigationPath()
+                    deletion.perform(in: viewModel)
+                }
+                deletion = nil
+            }
+            Button("Cancel", role: .cancel) { deletion = nil }
+        } message: {
+            Text(deletion?.message ?? "")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openAddProperty)) { _ in
+            openAddProperty()
+        }
+    }
 
-                            ForEach(viewModel.properties) { property in
-                                PropertyListCard(
-                                    property: property,
-                                    hours: viewModel.totalHoursForProperty(property.id),
-                                    yearHours: viewModel.hoursForProperty(property, year: Calendar.current.component(.year, from: Date())),
-                                    entryCount: viewModel.timeEntries.filter { $0.propertyId == property.id }.count,
-                                    onOpen: {
-                                        selectedProperty = property
-                                    },
-                                    onDelete: {
-                                    propertyToDelete = property
-                                    showingDeleteConfirmation = true
-                                    }
-                                )
-                            }
+    // MARK: Header
 
-                            // Add Property button at bottom of list
-                            addPropertyRow
-                                .padding(.top, 2)
-                            .guidedSpotlightTarget(.addProperty)
+    private var header: some View {
+        let stack = dynamicTypeSize.isAccessibilitySize
+        return VStack(alignment: .leading, spacing: 4) {
+            (stack ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10)) : AnyLayout(HStackLayout(alignment: .center))) {
+                BPScreenTitle(text: "Properties")
+                if !stack { Spacer(minLength: 8) }
+                if !viewModel.properties.isEmpty && !isLoading {
+                    Button(action: openAddProperty) {
+                        Label("Add property", systemImage: "plus")
+                    }
+                    .buttonStyle(PropertyTintedButtonStyle())
+                    .fixedSize()
+                    .guidedSpotlightTarget(.addProperty)
+                    .accessibilityIdentifier("properties.add")
+                }
+            }
+            if isLoading {
+                PlaceholderBar(width: 170, height: 14)
+                    .padding(.top, 8)
+            } else if !viewModel.properties.isEmpty {
+                let total = viewModel.properties.reduce(0) { $0 + viewModel.propertyCountableHours($1.id) }
+                HStack(spacing: 6) {
+                    Text("\(viewModel.properties.count) \(viewModel.properties.count == 1 ? "rental" : "rentals") · \(Int(total.rounded(.down)))h this year")
+                        .font(.subheadline)
+                        .monospacedDigit()
+                        .foregroundStyle(colors.textSecondary)
+                        .accessibilityIdentifier("properties.subtitle")
+                    if !perPropertyGoal {
+                        Button {
+                            if reduceMotion { infoShown.toggle() } else { withAnimation(.easeOut(duration: 0.2)) { infoShown.toggle() } }
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .font(.subheadline)
+                                .foregroundStyle(colors.action)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
                         }
-                        .padding(.horizontal, 24)
-                        .padding(.top, 8)
-                        .padding(.bottom, AppSpacing.tabContentBottomInset)
+                        .buttonStyle(.lhPressable)
+                        .padding(.vertical, -6)
+                        .accessibilityLabel("About the house stages")
+                        .accessibilityIdentifier("properties.info")
                     }
                 }
             }
-            .navigationBarHidden(true)
-            .sheet(isPresented: $showingAddProperty, onDismiss: {
-                NotificationCenter.default.post(name: .resumeGuidedOnboardingOverlay, object: nil)
-            }) {
-                AddPropertyView()
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private var infoNote: some View {
+        Label("Each house shows that rental’s own hours: the slab at 100h, then the frame, and the roof on at 500h.", systemImage: "info.circle")
+            .font(.subheadline)
+            .foregroundStyle(colors.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(colors.informationalSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .transition(.opacity.combined(with: .move(edge: .top)))
+            .accessibilityIdentifier("properties.infoNote")
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(colors.textTertiary)
+                .accessibilityHidden(true)
+            TextField("Search rentals", text: $query, prompt: Text("Search rentals").foregroundStyle(colors.textTertiary))
+                .foregroundStyle(colors.textPrimary)
+                .submitLabel(.search)
+                .accessibilityIdentifier("properties.search")
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: 44)
+        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(colors.border, lineWidth: 0.5))
+    }
+
+    // MARK: List
+
+    private var listCard: some View {
+        let shown = shownProperties
+        return VStack(spacing: 0) {
+            ForEach(Array(shown.enumerated()), id: \.element.id) { index, property in
+                NavigationLink(value: PropertyRoute.detail(property.id)) {
+                    PropertyRow(
+                        property: property,
+                        allProperties: viewModel.properties,
+                        hours: viewModel.propertyCountableHours(property.id),
+                        goal: goal,
+                        perPropertyGoal: perPropertyGoal
+                    )
+                }
+                .buttonStyle(.lhPressable)
+                .contextMenu {
+                    Button("Edit", systemImage: "pencil") { editor = .edit(property) }
+                    Button("Delete", systemImage: "trash", role: .destructive) {
+                        deletion = PropertyDeletion.make(for: property, in: viewModel)
+                    }
+                }
+                .accessibilityAction(named: "Edit") { editor = .edit(property) }
+                .accessibilityAction(named: "Delete") { deletion = PropertyDeletion.make(for: property, in: viewModel) }
+                .accessibilityIdentifier("properties.row.\(index)")
+                if index < shown.count - 1 || atLimit {
+                    PropertyInsetDivider(leading: dynamicTypeSize.isAccessibilitySize ? 16 : 16 + 40 + 12)
+                }
             }
-            .sheet(isPresented: $showingPaywall) {
-                // After a purchase, carry on to adding the property.
-                PaywallView(
-                    context: .secondProperty,
-                    onUnlocked: {
-                        NotificationCenter.default.post(name: .suspendGuidedOnboardingOverlay, object: nil)
-                        showingAddProperty = true
-                    },
-                    onClose: { showingPaywall = false }
+            if shown.isEmpty {
+                Text("No rentals match “\(query)”.")
+                    .font(.subheadline)
+                    .foregroundStyle(colors.textSecondary)
+                    .frame(maxWidth: .infinity, minHeight: 76)
+            }
+            if atLimit {
+                PropertiesAtLimitRow(
+                    firstPropertyName: viewModel.properties.first?.name,
+                    onUnlock: { showingPaywall = true }
                 )
             }
-            .sheet(item: $selectedProperty) { property in
-                PropertyDetailView(property: property)
-            }
-            .alert("Delete Property?", isPresented: $showingDeleteConfirmation) {
-                Button("Cancel", role: .cancel) { propertyToDelete = nil }
-                Button("Delete", role: .destructive) {
-                    if let property = propertyToDelete {
-                        viewModel.deleteProperty(property)
-                    }
-                    propertyToDelete = nil
-                }
-            } message: {
-                Text("This will permanently delete \"\(propertyToDelete?.name ?? "")\" and all its time entries. This cannot be undone.")
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .openAddProperty)) { _ in
-                if viewModel.canAddProperty() {
-                    NotificationCenter.default.post(name: .suspendGuidedOnboardingOverlay, object: nil)
-                    showingAddProperty = true
-                } else {
-                    showingPaywall = true
-                }
-            }
-#if DEBUG
-            .onAppear {
-                handleDebugLaunchSurfaceIfNeeded()
-            }
-#endif
         }
+        .propertyCard()
     }
 
-    private var emptyPortfolioCard: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .top, spacing: 12) {
-                JellyBadge(systemName: "building-2", color: AppColors.primary, wash: colors.primarySurface, size: 52)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Create the property record")
-                        .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text("Then log repairs, management, leasing, and spouse work against the right rental.")
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            Button {
-                openAddProperty()
-            } label: {
-                Label { Text("Add first property") } icon: { lucideImage(Lucide.plus) }
-                    .font(.system(size: 16, weight: .black, design: .rounded))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 15)
-                    .background(colors.action)
-                    .foregroundStyle(AppColors.onAction)
-                    .clipShape(Capsule())
-            }
-            .buttonStyle(.lhPressable)
-            .guidedSpotlightTarget(.addProperty)
-        }
-        .padding(18)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(colors.border.opacity(0.25), lineWidth: 1)
-        }
-    }
-
-    private var setupPreviewCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("What this unlocks")
-                .font(.system(size: 18, weight: .black, design: .rounded))
-                .foregroundStyle(colors.textPrimary)
-
-            setupPreviewRow(icon: Lucide.clock3, title: "Cleaner time logs", detail: "Each entry links to a property for review.")
-            setupPreviewRow(icon: Lucide.badgeCheck, title: "Tax-ready grouping", detail: "LTR and STR activity stays separated.")
-            setupPreviewRow(icon: Lucide.fileText, title: "Better exports", detail: "Reports can show hours by property.")
-        }
-        .padding(18)
-        .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.72 : 0.78))
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(colors.border.opacity(0.22), lineWidth: 1)
-        }
-    }
-
-    private func setupPreviewRow(icon: UIImage, title: String, detail: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            LucideIcon(image: icon, size: 18)
+    private var emptyCard: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "house")
+                .font(.system(size: 24, weight: .medium))
                 .foregroundStyle(colors.action)
-                .frame(width: 34, height: 34)
-                .background(colors.actionSurface)
-                .clipShape(Circle())
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                Text(detail)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(colors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-        }
-    }
-
-    private var portfolioSummaryCard: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Portfolio evidence")
-                        .font(.system(size: 19, weight: .black, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                    Text("Hours organized by rental type")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                }
-                Spacer()
-                Text(String(format: "%.0fh", totalPortfolioHours))
-                    .font(.system(size: 34, weight: .black, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-            }
-
-            HStack(spacing: 10) {
-                portfolioMetric(title: "Properties", value: "\(viewModel.properties.count)", icon: Lucide.building2, color: AppColors.primary, wash: colors.primarySurface)
-                portfolioMetric(title: "LTR", value: "\(ltrCount)", icon: Lucide.house, color: AppColors.sage, wash: colors.sageWash)
-                portfolioMetric(title: "STR", value: "\(strCount)", icon: Lucide.bedDouble, color: AppColors.honey, wash: colors.honeyWash)
-            }
-        }
-        .padding(18)
-        .premiumGlassCard(cornerRadius: 24, colors: colors, colorScheme: colorScheme)
-    }
-
-    private func portfolioMetric(title: String, value: String, icon: UIImage, color: Color, wash: Color) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            LucideIcon(image: icon, size: 16)
-                .foregroundStyle(color)
-                .frame(width: 30, height: 30)
-                .background(wash)
-                .clipShape(Circle())
-            Text(value)
-                .font(.system(size: 18, weight: .black, design: .rounded))
+                .frame(width: 56, height: 56)
+                .background(Circle().fill(colors.actionSurface))
+                .accessibilityHidden(true)
+            Text("Add your first property")
+                .font(.headline)
                 .foregroundStyle(colors.textPrimary)
-            Text(title)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .multilineTextAlignment(.center)
+                .accessibilityAddTraits(.isHeader)
+            Text("Once we know where your rentals are, every hour you confirm goes up on the house.")
+                .font(.subheadline)
                 .foregroundStyle(colors.textSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Add property", action: openAddProperty)
+                .buttonStyle(InboxPrimaryButtonStyle())
+                .padding(.top, 8)
+                .guidedSpotlightTarget(.addProperty)
+                .accessibilityIdentifier("properties.add")
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.64 : 0.74))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(20)
+        .frame(maxWidth: .infinity)
+        .propertyCard()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("properties.empty")
     }
 
-    private var addPropertyRow: some View {
-        Button {
-            openAddProperty()
-        } label: {
-            HStack(spacing: 12) {
-                LucideIcon(image: Lucide.plus, size: 18)
-                    .foregroundStyle(colors.action)
-                    .frame(width: 38, height: 38)
-                    .background(colors.actionSurface)
-                    .clipShape(Circle())
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Add another property")
-                        .font(.system(size: 16, weight: .black, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                    Text(viewModel.canAddProperty() ? "Keep each rental's evidence separate." : "Upgrade to track more properties.")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
+    /// Loading never blocks and never spins: PlaceholderBar where the names and numbers go and a
+    /// DraftingLoader house where the house goes.
+    private var loadingCard: some View {
+        VStack(spacing: 0) {
+            ForEach(0..<3, id: \.self) { i in
+                HStack(spacing: 12) {
+                    Circle().fill(colors.border.opacity(0.5))
+                        .frame(width: 40, height: 40)
+                    VStack(alignment: .leading, spacing: 8) {
+                        PlaceholderBar(width: i == 1 ? 150 : 120, height: 14)
+                        PlaceholderBar(width: 170, height: 10)
+                    }
+                    Spacer()
+                    // Same rule as PropertyRow: the house tile drops out from XXL.
+                    if dynamicTypeSize < .xxLarge {
+                        DraftingLoader(sketch: .house, lineWidth: 1.5).frame(width: 48, height: 48)
+                    }
                 }
-                Spacer()
-                LucideIcon(image: Lucide.chevronRight, size: 18)
-                    .foregroundStyle(colors.textTertiary)
-            }
-            .padding(16)
-            .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(colors.border.opacity(0.24), lineWidth: 1)
+                .padding(.horizontal, 16)
+                .frame(minHeight: 76)
+                if i < 2 { PropertyInsetDivider(leading: 68) }
             }
         }
-        .buttonStyle(.lhPressable)
+        .propertyCard()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading your rentals")
+        .accessibilityIdentifier("properties.loading")
     }
 
     private func openAddProperty() {
         if viewModel.canAddProperty() {
-            showingAddProperty = true
+            NotificationCenter.default.post(name: .suspendGuidedOnboardingOverlay, object: nil)
+            editor = .add
         } else {
             showingPaywall = true
         }
     }
 
 #if DEBUG
-    private func handleDebugLaunchSurfaceIfNeeded() {
+    /// -LHOpenAddProperty · -LHOpenFirstPropertyDetail · -LHOpenFirstPropertyDetailLower ·
+    /// -LHOpenFirstPropertyEdit · -LHOpenFirstPropertyDelete · -LHOpenSecondPropertyDetail ·
+    /// -LHPropertiesInfo · -LHPropertiesScrollBottom
+    private func handleDebugLaunchSurfaceIfNeeded(proxy: ScrollViewProxy) {
         guard !didHandleDebugLaunchSurface else { return }
-        let args = ProcessInfo.processInfo.arguments
-        guard args.contains("-LHOpenAddProperty") || args.contains("-LHOpenFirstPropertyDetail") else { return }
         didHandleDebugLaunchSurface = true
-
+        let args = ProcessInfo.processInfo.arguments
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            if args.contains("-LHPropertiesInfo") {
+                withAnimation(.easeOut(duration: 0.2)) { infoShown = true }
+            }
+            if args.contains("-LHPropertiesScrollBottom") {
+                proxy.scrollTo("properties.bottom", anchor: .bottom)
+            }
             if args.contains("-LHOpenAddProperty") {
                 openAddProperty()
-            } else if args.contains("-LHOpenFirstPropertyDetail"),
-                      let firstProperty = viewModel.properties.first {
-                selectedProperty = firstProperty
+            } else if let first = viewModel.properties.first {
+                if args.contains("-LHOpenFirstPropertyDetail") || args.contains("-LHOpenFirstPropertyDetailLower") {
+                    path.append(PropertyRoute.detail(first.id))
+                } else if args.contains("-LHOpenSecondPropertyDetail"), viewModel.properties.count > 1 {
+                    path.append(PropertyRoute.detail(viewModel.properties[1].id))
+                } else if args.contains("-LHOpenFirstPropertyEdit") {
+                    editor = .edit(first)
+                } else if args.contains("-LHOpenFirstPropertyDelete") {
+                    editor = .edit(first, confirmDelete: true)
+                }
             }
         }
     }
 #endif
-
-    // MARK: - Header
-    private var headerSection: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Properties")
-                    .lhDisplayFont(.largeTitle)
-                    .foregroundStyle(colors.textPrimary)
-                    .minimumScaleFactor(0.83)
-                Text(propertyHeaderSubtitle)
-                    .font(.system(size: 15, weight: .medium, design: .rounded))
-                    .foregroundStyle(colors.textSecondary)
-            }
-            Spacer()
-            Button {
-                openAddProperty()
-            } label: {
-                Label("Add property", systemImage: "house")
-                    .font(AppTypography.buttonSmall)
-                    .foregroundStyle(colors.action)
-                    .padding(.horizontal, 14)
-                    .frame(height: 40)
-                    .background(colors.actionSurface)
-                    .clipShape(Capsule())
-                    .padding(.top, 4)
-            }
-            .guidedSpotlightTarget(.addProperty)
-            .accessibilityLabel("Add property")
-            .accessibilityIdentifier("properties.add")
-        }
-    }
-
-    private var propertyHeaderSubtitle: String {
-        if viewModel.properties.isEmpty {
-            return "Add the rental each hour should belong to."
-        }
-        return "\(viewModel.properties.count) rental \(viewModel.properties.count == 1 ? "place" : "places")"
-    }
 }
 
-// MARK: - Property List Card
-struct PropertyListCard: View {
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+// MARK: - At the free limit
 
-    let property: RentalProperty
-    let hours: Double
-    let yearHours: Double
-    let entryCount: Int
-    let onOpen: () -> Void
-    let onDelete: () -> Void
+/// The whole Properties at-limit lock in one place: a ghost "Your next rental" row under the
+/// `.row` locked preview, saying what stays active, with one Unlock Pro.
+/// INTEGRATION (wp-paywall): swap this body for the app-wide ProGate lock; the caller keeps
+/// passing the first rental's name and the unlock action (opens the .secondProperty paywall).
+struct PropertiesAtLimitRow: View {
+    let firstPropertyName: String?
+    var onUnlock: () -> Void
 
-    private var typeColor: Color {
-        property.propertyType == .str ? AppColors.honey : AppColors.sage
-    }
-
-    private var typeWash: Color {
-        property.propertyType == .str ? colors.honeyWash : colors.sageWash
-    }
-
-    private var goalHours: Double {
-        property.propertyType == .str ? 100 : 750
-    }
-
-    private var progress: Double {
-        min(max(yearHours / max(goalHours, 1), 0), 1)
-    }
-
-    private var evidenceLabel: String {
-        property.propertyType == .str ? "STR material participation" : "REPS evidence"
-    }
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        Button(action: onOpen) {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .top, spacing: 14) {
-                    JellyBadge(
-                        systemName: property.propertyType == .str ? "bed-double" : "house",
-                        color: typeColor,
-                        wash: typeWash,
-                        size: 52
-                    )
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(property.name)
-                            .font(.system(size: 18, weight: .black, design: .rounded))
-                            .foregroundStyle(colors.textPrimary)
-                            .lineLimit(1)
-
-                        Text(property.address)
-                            .font(.system(size: 13, weight: .medium, design: .rounded))
-                            .foregroundStyle(colors.textSecondary)
-                            .lineLimit(2)
-                    }
-
-                    Spacer()
-
-                    LucideIcon(image: Lucide.chevronRight, size: 18)
-                        .foregroundStyle(colors.textTertiary)
-                        .padding(.top, 6)
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        PropertiesLockedPreviewRow(
+            line: PropertyLimit.lockLine,
+            keeps: PropertyLimit.keepsLine(firstPropertyName: firstPropertyName),
+            onUnlock: onUnlock
+        ) {
+            HStack(spacing: 12) {
+                PropertySeal(monogram: "", size: 40, dashed: true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Your next rental")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(colors.textPrimary)
+                    Text("0h this year")
+                        .font(.subheadline)
+                        .foregroundStyle(colors.textSecondary)
                 }
-
-                VStack(alignment: .leading, spacing: 9) {
-                    HStack {
-                        Text(evidenceLabel)
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(colors.textSecondary)
-                        Spacer()
-                        Text(String(format: "%.0fh / %.0fh", yearHours, goalHours))
-                            .font(.system(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(colors.textPrimary)
-                            .monospacedDigit()
-                    }
-
-                    GeometryReader { proxy in
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(colors.backgroundTertiary)
-                            Capsule()
-                                .fill(LinearGradient(colors: [typeColor, typeColor.opacity(0.62)], startPoint: .leading, endPoint: .trailing))
-                                .frame(width: proxy.size.width * progress)
-                        }
-                    }
-                    .frame(height: 8)
-                }
-
-                HStack(spacing: 10) {
-                    propertyMetric(title: property.propertyType.rawValue, value: "Type")
-                    propertyMetric(title: String(format: "%.1fh", hours), value: "Total")
-                    propertyMetric(title: "\(entryCount)", value: "Logs")
-                }
+                Spacer()
             }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 76)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(property.name), \(property.address), \(property.propertyType.rawValue), \(String(format: "%.1f hours logged", hours))")
-        .accessibilityHint("Opens property details")
-        .accessibilityElement(children: .ignore)
-        .padding(18)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(colors.border.opacity(0.28), lineWidth: 1)
-        }
-        .overlay(alignment: .topTrailing) {
-            Menu {
-                Button(role: .destructive) {
-                    onDelete()
-                } label: {
-                    Label("Delete property", systemImage: "trash")
-                }
-            } label: {
-                LucideIcon(image: Lucide.ellipsis, size: 18)
-                    .foregroundStyle(colors.textSecondary)
-                    .frame(width: 36, height: 36)
-                    .background(colors.backgroundTertiary)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("More actions for \(property.name)")
-            .padding(.top, 54)
-            .padding(.trailing, 14)
-        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("properties.lockRow")
     }
+}
 
-    private func propertyMetric(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(colors.textSecondary)
-            Text(title)
-                .font(.system(size: 15, weight: .black, design: .rounded))
-                .foregroundStyle(colors.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+// MARK: - Row
+
+struct PropertyRow: View {
+    let property: RentalProperty
+    let allProperties: [RentalProperty]
+    let hours: Double
+    let goal: HouseGoal
+    var perPropertyGoal = false
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        let ax = dynamicTypeSize.isAccessibilitySize
+        let kind = PropertyMeta.kindLabel(property.propertyType)
+        let line = PropertyMeta.hoursLine(hours, goal: goal, groupingElection: !perPropertyGoal)
+        (ax ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))) {
+            PropertySeal(property, in: allProperties, size: 40)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(property.name)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(colors.textPrimary)
+                    .lineLimit(ax ? 5 : (dynamicTypeSize >= .xxLarge ? 4 : 2))
+                    .allowsTightening(true)
+                    .multilineTextAlignment(.leading)
+                // Non-breaking spaces keep "A few nights" on one line.
+                Text("\(line) · \(kind.replacingOccurrences(of: " ", with: "\u{00A0}"))")
+                    .font(.subheadline)
+                    .monospacedDigit()
+                    .foregroundStyle(colors.textSecondary)
+                    .multilineTextAlignment(.leading)
+            }
+            if !ax { Spacer(minLength: 8) }
+            if dynamicTypeSize < .xxLarge { PropertyHouseTile(hours: hours, size: 48) }
+            if !ax {
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(colors.textTertiary)
+                    .accessibilityHidden(true)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(colors.backgroundTertiary)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(minHeight: 76)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(property.name), \(line), \(kind). \(PropertyHouseStage.stage(for: hours).spokenName).")
+        .accessibilityAddTraits(.isButton)
     }
 }
 
-private extension View {
-    @ViewBuilder
-    func premiumGlassCard(cornerRadius: CGFloat, colors: AdaptiveColors, colorScheme: ColorScheme) -> some View {
-        if #available(iOS 26.0, *) {
-            self
-                .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.42 : 0.34))
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                .glassEffect(.regular.tint(colors.actionSurface.opacity(colorScheme == .dark ? 0.16 : 0.32)), in: .rect(cornerRadius: cornerRadius))
-        } else {
-            self
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .stroke(colors.border.opacity(0.24), lineWidth: 1)
+// MARK: - Detail
+
+struct PropertyDetailView: View {
+    let propertyId: UUID
+    var onEdit: (RentalProperty) -> Void
+
+    @EnvironmentObject var viewModel: AppViewModel
+    @ObservedObject private var taxProfile = TaxProfileManager.shared
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.dismiss) private var dismiss
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    @State private var coordinate: CLLocationCoordinate2D?
+    @State private var geocodeState: GeocodeState = .idle
+    @State private var geocodedAddress: String?
+
+    private enum GeocodeState { case idle, loading, found, notFound }
+
+    /// Future smart-layer slot (key contacts). Empty today, so the section never shows.
+    private var people: [PropertyPerson] { [] }
+
+    private var property: RentalProperty? { viewModel.properties.first { $0.id == propertyId } }
+
+    var body: some View {
+        Group {
+            if let property {
+                content(property)
+            } else {
+                Color.clear.onAppear { dismiss() }
+            }
+        }
+        .background(colors.background.ignoresSafeArea())
+        .navigationTitle(property?.name ?? "")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Edit") { if let property { onEdit(property) } }
+                    .accessibilityIdentifier("property.edit")
+            }
+        }
+        .task(id: property?.address) { await geocode() }
+    }
+
+    private func content(_ property: RentalProperty) -> some View {
+        let figures = viewModel.propertyFigures(for: property)
+        return ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 32) {
+                    hero(property, figures: figures)
+                    if figures.kinds.isEmpty && figures.recent.isEmpty {
+                        nothingYet(property)
+                    } else {
+                        if !figures.kinds.isEmpty { kinds(figures.kinds) }
+                        if !figures.recent.isEmpty { recent(property, entries: figures.recent) }
+                    }
+                    if !people.isEmpty { peopleSection }
+                    details(property).id("details")
+                    Color.clear.frame(height: 24)
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+            }
+            .scrollIndicators(.hidden)
+#if DEBUG
+            .onAppear {
+                if ProcessInfo.processInfo.arguments.contains("-LHOpenFirstPropertyDetailLower") {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { proxy.scrollTo("details", anchor: .top) }
+                }
+            }
+#endif
+        }
+    }
+
+    // MARK: Hero
+
+    private func hero(_ property: RentalProperty, figures: PropertyFigures) -> some View {
+        let ax = dynamicTypeSize.isAccessibilitySize
+        // From XXL the text lines wrap into the house's corner, so the house moves below them.
+        let stacked = dynamicTypeSize >= .xxLarge
+        let stage = PropertyHouseStage.stage(for: figures.hours)
+        let whole = Int(figures.hours.rounded(.down))
+        let street = property.address.split(separator: ",").first.map(String.init) ?? ""
+        let eyebrow = [PropertyMeta.kindLabel(property.propertyType), street].filter { !$0.isEmpty }.joined(separator: " · ")
+        let last = figures.lastDate.map { $0.formatted(.dateTime.month(.abbreviated).day()) }
+        let entriesLine = figures.entryCount == 0
+            ? "No entries yet"
+            : "\(figures.entryCount) \(figures.entryCount == 1 ? "entry" : "entries")\(last.map { " · last on \($0)" } ?? "")"
+        let text = VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                PropertySeal(property, in: viewModel.properties, size: 32)
+                    .environment(\.colorScheme, .dark)
+                Text(eyebrow)
+                    .font(.system(.caption2, design: .monospaced, weight: .medium))
+                    .textCase(.uppercase)
+                    .tracking(1.3)
+                    .foregroundStyle(HouseTokens.drafting)
+                    .lineLimit(ax ? 3 : 1)
+                    .minimumScaleFactor(0.8)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text("\(whole)")
+                    .font(.system(size: 56, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .foregroundStyle(HouseTokens.onHeroPrimary)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                Text("h this year")
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(HouseTokens.onHeroSecondary)
+            }
+            .padding(.top, 4)
+            Text(entriesLine)
+                .font(.subheadline)
+                .foregroundStyle(HouseTokens.onHeroSecondary)
+            Text(stage.spokenName)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(figures.hours >= 500 ? HouseTokens.positiveOnHero : HouseTokens.onHeroPrimary)
+        }
+        let house = HouseHeroArt(keyframe: PropertyHouseStage.keyframe(for: figures.hours))
+
+        return Group {
+            if stacked {
+                VStack(alignment: .leading, spacing: 12) {
+                    text
+                    house.frame(width: 140, height: 140).frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                text
+                    .padding(20)
+                    .frame(maxWidth: .infinity, minHeight: 188, alignment: .topLeading)
+                    .background(alignment: .bottomTrailing) {
+                        house
+                            .frame(width: 150, height: 150)
+                            .padding(.trailing, 4)
+                            .padding(.bottom, 2)
+                    }
+            }
+        }
+        .background(InboxBlueprintPaper(cornerRadius: 24))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(property.name). \(whole) hours this year, \(entriesLine). \(stage.spokenName).")
+        .accessibilityIdentifier("property.hero")
+    }
+
+    // MARK: Sections
+
+    private func kinds(_ kinds: [PropertyFigures.Kind]) -> some View {
+        let maxHours = max(1, kinds.map(\.hours).max() ?? 1)
+        let ax = dynamicTypeSize.isAccessibilitySize
+        return VStack(alignment: .leading, spacing: 10) {
+            PropertySectionHeader("By kind of work")
+            VStack(spacing: 14) {
+                ForEach(kinds, id: \.category) { kind in
+                    let bar = GeometryReader { g in
+                        Capsule()
+                            .fill(colors.categoryInk(kind.category).opacity(0.85))
+                            .frame(width: max(8, g.size.width * kind.hours / maxHours), height: 8)
+                            .frame(maxHeight: .infinity)
+                    }
+                    .frame(height: 24)
+                    let value = Text(BPHours.short(kind.hours))
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(colors.textPrimary)
+                    Group {
+                        if ax {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 10) {
+                                    CategoryToolTile(category: kind.category, size: 24)
+                                    Text(kind.category.inboxLabel).font(.subheadline).foregroundStyle(colors.textPrimary)
+                                    Spacer(minLength: 8)
+                                    value
+                                }
+                                bar
+                            }
+                        } else {
+                            HStack(spacing: 10) {
+                                CategoryToolTile(category: kind.category, size: 24)
+                                Text(kind.category.inboxLabel)
+                                    .font(.subheadline)
+                                    .foregroundStyle(colors.textPrimary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                    .frame(width: dynamicTypeSize >= .xxLarge ? 128 : 100, alignment: .leading)
+                                bar
+                                value.frame(minWidth: 40, alignment: .trailing)
+                            }
+                            .frame(minHeight: 24)
+                        }
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(kind.category.inboxLabel), \(BPHours.spoken(kind.hours))")
+                }
+            }
+            .padding(16)
+            .propertyCard()
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("property.kinds")
+    }
+
+    private func recent(_ property: RentalProperty, entries: [TimeEntry]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            PropertySectionHeader(title: "Recent") {
+                NavigationLink(value: PropertyRoute.records(property.id)) {
+                    Text("See all in Records")
+                        .font(.subheadline)
+                        .foregroundStyle(colors.action)
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.lhPressable)
+                .accessibilityIdentifier("property.seeAllRecords")
+            }
+            VStack(spacing: 0) {
+                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                    NavigationLink {
+                        TimeEntryDetailView(entry: entry)
+                    } label: {
+                        recentRow(entry, propertyName: property.name)
+                    }
+                    .buttonStyle(.lhPressable)
+                    if index < entries.count - 1 { PropertyInsetDivider(leading: 64) }
+                }
+            }
+            .propertyCard()
+        }
+    }
+
+    private func recentRow(_ entry: TimeEntry, propertyName: String) -> some View {
+        let ax = dynamicTypeSize.isAccessibilitySize
+        let title = RecordsLogic.title(for: entry, propertyName: propertyName)
+        let meta = "\(entry.date.formatted(.dateTime.month(.abbreviated).day())) · \(Self.sourceText(entry))"
+        let hours = Text(BPHours.short(entry.hours))
+            .font(.system(.body, design: .rounded, weight: .semibold))
+            .monospacedDigit()
+            .foregroundStyle(colors.textPrimary)
+        return HStack(alignment: ax ? .top : .center, spacing: 12) {
+            CategoryToolTile(category: entry.category, size: 36)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.body.weight(.semibold)).foregroundStyle(colors.textPrimary).multilineTextAlignment(.leading)
+                Text(meta).font(.subheadline).foregroundStyle(colors.textSecondary).multilineTextAlignment(.leading)
+                if ax { hours.padding(.top, 2) }
+            }
+            Spacer(minLength: 8)
+            if !ax { hours }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(minHeight: 64)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title), \(BPHours.spoken(entry.hours)), \(meta)")
+        .accessibilityAddTraits(.isButton)
+    }
+
+    /// The one source vocabulary app-wide: Records' badge titles.
+    static func sourceText(_ entry: TimeEntry) -> String {
+        RecordSourceBadge(entry: entry).title
+    }
+
+    private func nothingYet(_ property: RentalProperty) -> some View {
+        Text("Nothing logged at \(property.name) yet. Hours you confirm here go up on its house.")
+            .font(.subheadline)
+            .foregroundStyle(colors.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .propertyCard()
+    }
+
+    /// Smart-layer slot, data-driven: hidden while `people` is empty.
+    private var peopleSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            PropertySectionHeader("People")
+            VStack(spacing: 0) {
+                ForEach(people) { person in
+                    HStack(spacing: 12) {
+                        PropertySeal(monogram: PropertySealStyle.monogram(person.name), palette: .slate, size: 36)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(person.name).font(.body.weight(.semibold)).foregroundStyle(colors.textPrimary)
+                            Text("\(person.role) · \(person.visits) visits").font(.subheadline).foregroundStyle(colors.textSecondary)
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 60)
+                }
+            }
+            .propertyCard()
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("property.people")
+    }
+
+    private func details(_ property: RentalProperty) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            PropertySectionHeader("Details")
+            VStack(spacing: 0) {
+                detail("Address", property.address.isEmpty ? "Not added" : property.address)
+                PropertyInsetDivider()
+                detail("How guests stay", property.propertyType == .ltr ? "Months or longer" : "A few nights at a time")
+                PropertyInsetDivider()
+                detail("Other names", property.aliases.isEmpty ? "None" : property.aliases.joined(separator: ", "))
+                PropertyInsetDivider()
+                detail("I live here", property.isOwnerOccupied ? "Yes" : "No")
+                locationRow(property)
+            }
+            .propertyCard()
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("property.details")
+    }
+
+    private func detail(_ label: String, _ value: String) -> some View {
+        let ax = dynamicTypeSize.isAccessibilitySize
+        return (ax ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 12))) {
+            Text(label).foregroundStyle(colors.textPrimary)
+            if !ax { Spacer(minLength: 8) }
+            Text(value)
+                .foregroundStyle(colors.textSecondary)
+                .multilineTextAlignment(ax ? .leading : .trailing)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.body)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(minHeight: 52)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// The location row: the address found on the map. While it looks the address up, a
+    /// DraftingLoader holds the map's place (never a spinner).
+    @ViewBuilder
+    private func locationRow(_ property: RentalProperty) -> some View {
+        let shape = UnevenRoundedRectangle(bottomLeadingRadius: 20, bottomTrailingRadius: 20, style: .continuous)
+        switch geocodeState {
+        case .found:
+            if let coordinate {
+                Map(initialPosition: .region(MKCoordinateRegion(center: coordinate, span: MKCoordinateSpan(latitudeDelta: 0.008, longitudeDelta: 0.008)))) {
+                    Marker(property.name, coordinate: coordinate).tint(AppColors.brand)
+                }
+                .allowsHitTesting(false)
+                .frame(height: 140)
+                .clipShape(shape)
+                .accessibilityLabel("Map of \(property.address)")
+                .accessibilityIdentifier("property.map")
+            }
+        case .loading, .idle:
+            if !property.address.isEmpty {
+                ZStack {
+                    shape.fill(colors.backgroundTertiary)
+                    DraftingLoader(sketch: .house, subject: "the map", lineWidth: 1.5).frame(width: 64, height: 64)
+                }
+                .frame(height: 140)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Finding the address on the map")
+                .accessibilityIdentifier("property.mapLoading")
+            }
+        case .notFound:
+            PropertyInsetDivider()
+            HStack(spacing: 10) {
+                Image(systemName: "mappin.slash")
+                    .foregroundStyle(colors.textSecondary)
+                    .accessibilityHidden(true)
+                Text("We couldn’t find this address on the map.")
+                    .font(.subheadline)
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 52)
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private func geocode() async {
+        guard let address = property?.address.trimmingCharacters(in: .whitespacesAndNewlines), !address.isEmpty else {
+            geocodeState = .idle
+            return
+        }
+        guard geocodedAddress != address else { return }
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-LHPropertiesMapLoading") { geocodeState = .loading; return }
+#endif
+        geocodeState = .loading
+        let placemarks = try? await CLGeocoder().geocodeAddressString(address)
+        geocodedAddress = address
+        if let location = placemarks?.first?.location {
+            coordinate = location.coordinate
+            geocodeState = .found
+        } else {
+            geocodeState = .notFound
         }
     }
 }
 
-// MARK: - Add Property View
-struct AddPropertyView: View {
-    private enum FocusedField {
-        case name
-        case address
+/// The detail hero's house: the built pass with drafting linework over the unbuilt parts.
+private struct HouseHeroArt: View {
+    let keyframe: HouseKeyframe
+    var body: some View {
+        HouseArtView(keyframe: keyframe, canvas: .blueprintHero)
     }
+}
+
+// MARK: - Add / edit (.large sheet)
+
+struct PropertyEditSheet: View {
+    let mode: PropertyEditorMode
+    var onDeleted: (UUID) -> Void = { _ in }
 
     @EnvironmentObject var viewModel: AppViewModel
-    @Environment(\.dismiss) var dismiss
-    @Environment(\.colorScheme) var colorScheme
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
-    let editingProperty: RentalProperty?
+    private enum Field { case name, address, alias }
 
     @State private var name = ""
     @State private var address = ""
     @State private var propertyType: PropertyType = .ltr
-    @State private var addressResults: [MKMapItem] = []
-    @State private var isSearching = false
-    @State private var showDuplicateWarning = false
-    @FocusState private var focusedField: FocusedField?
-
-    init(property: RentalProperty? = nil) {
-        self.editingProperty = property
-        if let property = property {
-            _name = State(initialValue: property.name)
-            _address = State(initialValue: property.address)
-            _propertyType = State(initialValue: property.propertyType)
-        }
-    }
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                LHMobileCanvas()
-
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 24) {
-                        addPropertyHeader
-                        propertySetupSummary
-                        propertyIdentitySection
-                        propertyTypeSection
-                        firstPropertyNudge
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 18)
-                    .padding(.bottom, 120)
-                }
-            }
-            .navigationBarHidden(true)
-            .safeAreaInset(edge: .bottom) {
-                savePropertyFooter
-            }
-            .alert("Duplicate Name", isPresented: $showDuplicateWarning) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("A property named \"\(name)\" already exists. Please use a different name.")
-            }
-        }
-    }
-
-    private var addPropertyHeader: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                Button {
-                    dismiss()
-                } label: {
-                    LucideIcon(image: Lucide.x, size: 20)
-                        .foregroundStyle(colors.textPrimary)
-                        .frame(width: 44, height: 44)
-                        .background(colors.backgroundTertiary)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Close")
-
-                Spacer()
-            }
-
-            Text(editingProperty != nil ? "Edit property" : "Add property")
-                .font(.system(size: 42, weight: .black, design: .rounded))
-                .foregroundStyle(colors.textPrimary)
-                .lineSpacing(-2)
-                .minimumScaleFactor(0.82)
-
-            Text("Name the place, choose the rental type, and keep future hours organized.")
-                .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(colors.textSecondary)
-                .lineSpacing(3)
-        }
-    }
-
-    private var propertySetupSummary: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 13) {
-                JellyBadge(systemName: "clipboard-check", color: AppColors.primary, wash: colors.primarySurface, size: 50)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(editingProperty == nil ? "Create the evidence container" : "Keep the evidence container current")
-                        .font(.system(size: 19, weight: .black, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                    Text("Every log, report, and export becomes easier to review once the property identity is clean.")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            HStack(spacing: 10) {
-                setupSummaryPill(icon: Lucide.house, title: "Name", value: name.isEmpty ? "Needed" : "Ready")
-                setupSummaryPill(icon: Lucide.mapPin, title: "Address", value: address.isEmpty ? "Needed" : "Ready")
-                setupSummaryPill(icon: propertyType == .str ? Lucide.bedDouble : Lucide.house, title: "Type", value: propertyType.rawValue)
-            }
-        }
-        .padding(18)
-        .premiumGlassCard(cornerRadius: 24, colors: colors, colorScheme: colorScheme)
-    }
-
-    private func setupSummaryPill(icon: UIImage, title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            LucideIcon(image: icon, size: 15)
-                .foregroundStyle(colors.action)
-                .frame(width: 28, height: 28)
-                .background(colors.actionSurface)
-                .clipShape(Circle())
-            Text(title)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(colors.textSecondary)
-            Text(value)
-                .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(colors.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(11)
-        .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.64 : 0.76))
-        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
-    }
-
-    private var propertyIdentitySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            propertyTextField(
-                title: "Property name",
-                placeholder: "Oak Street Duplex",
-                text: $name,
-                icon: Lucide.house,
-                accessibilityIdentifier: "property.name",
-                focusedField: .name,
-                submitLabel: .next
-            )
-            .onSubmit {
-                focusedField = .address
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                propertyTextField(
-                    title: "Address",
-                    placeholder: "123 Oak Street",
-                    text: $address,
-                    icon: Lucide.mapPin,
-                    accessibilityIdentifier: "property.address",
-                    focusedField: .address,
-                    submitLabel: .done
-                )
-                    .onSubmit {
-                        focusedField = nil
-                    }
-                    .onChange(of: address) { _, newValue in
-                        if newValue.count > 2 {
-                            searchAddress(query: newValue)
-                        } else {
-                            addressResults = []
-                        }
-                    }
-
-                if !addressResults.isEmpty && focusedField == .address {
-                    VStack(spacing: 0) {
-                        ForEach(addressResults.prefix(5), id: \.self) { item in
-                            Button {
-                                selectAddress(item)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.name ?? "Unknown")
-                                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                                        .foregroundStyle(colors.textPrimary)
-                                    if let addr = item.placemark.title {
-                                        Text(addr)
-                                            .font(AppTypography.caption)
-                                            .foregroundStyle(colors.textSecondary)
-                                            .lineLimit(2)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 12)
-                                .padding(.horizontal, 14)
-                                .background(colors.backgroundSecondary)
-                            }
-                            .buttonStyle(.plain)
-
-                            if item != addressResults.prefix(5).last {
-                                Divider()
-                            }
-                        }
-                    }
-                    .background(colors.backgroundSecondary)
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(colors.border.opacity(0.28), lineWidth: 1)
-                    }
-                }
-            }
-        }
-        .padding(18)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .stroke(colors.border.opacity(0.28), lineWidth: 1)
-        }
-    }
-
-    private func propertyTextField(
-        title: String,
-        placeholder: String,
-        text: Binding<String>,
-        icon: UIImage,
-        accessibilityIdentifier: String,
-        focusedField field: FocusedField,
-        submitLabel: SubmitLabel
-    ) -> some View {
-        HStack(spacing: 12) {
-            LucideIcon(image: icon, size: 18)
-                .foregroundStyle(colors.textPrimary)
-                .frame(width: 38, height: 38)
-                .background(colors.backgroundTertiary)
-                .clipShape(Circle())
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(colors.textSecondary)
-                TextField("", text: text, prompt: Text(placeholder).foregroundStyle(colors.textSecondary))
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                    .textInputAutocapitalization(.words)
-                    .focused($focusedField, equals: field)
-                    .submitLabel(submitLabel)
-                    .accessibilityLabel(title)
-                    .accessibilityIdentifier(accessibilityIdentifier)
-            }
-        }
-        .padding(14)
-        .background(colors.backgroundTertiary.opacity(colorScheme == .dark ? 0.72 : 0.9))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .onTapGesture {
-            focusedField = field
-        }
-    }
-
-    private var propertyTypeSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Evidence profile")
-                    .font(.system(size: 19, weight: .black, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                Text("LTR and STR hours support different tax questions, so choose the profile before logging.")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(colors.textSecondary)
-                    .lineSpacing(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            HStack(spacing: 10) {
-                propertyTypeOption(.ltr, title: "Long-term", subtitle: "LTR", icon: Lucide.house, color: AppColors.sage)
-                propertyTypeOption(.str, title: "Short-term", subtitle: "STR", icon: Lucide.bedDouble, color: AppColors.honey)
-            }
-        }
-        .padding(18)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(colors.border.opacity(0.25), lineWidth: 1)
-        }
-    }
-
-    private func propertyTypeOption(_ type: PropertyType, title: String, subtitle: String, icon: UIImage, color: Color) -> some View {
-        Button {
-            animate(AppAnimation.quick) {
-                propertyType = type
-            }
-        } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                LucideIcon(image: icon, size: 22)
-                    .foregroundStyle(propertyType == type ? AppColors.charcoal : colors.textPrimary)
-                    .frame(width: 44, height: 44)
-                    .background(propertyType == type ? color : colors.backgroundTertiary)
-                    .clipShape(Circle())
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 16, weight: .black, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                    Text(subtitle)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
-            .background(propertyType == type ? color.opacity(colorScheme == .dark ? 0.22 : 0.28) : colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .stroke(propertyType == type ? color.opacity(0.62) : colors.border.opacity(0.28), lineWidth: 1)
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    @ViewBuilder
-    private var firstPropertyNudge: some View {
-        if editingProperty == nil && viewModel.properties.isEmpty && !GuidedOnboardingStore.isCompleted && !GuidedOnboardingStore.isSkipped {
-            HStack(spacing: 10) {
-                LHIconTile(icon: Lucide.mapPinHouse, color: AppColors.sage, wash: colors.sageWash, size: 34, isActive: true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("A nickname is enough")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                    Text("Use the name you naturally say when logging work.")
-                        .font(.system(size: 12, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                }
-                Spacer()
-            }
-            .padding(14)
-            .background(AppColors.sageWash.opacity(colorScheme == .dark ? 0.18 : 1))
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        }
-    }
-
-    private var savePropertyFooter: some View {
-        VStack(spacing: 0) {
-            Button {
-                saveProperty()
-            } label: {
-                Text(editingProperty != nil ? "Save Changes" : "Save Property")
-                    .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(canSaveProperty ? AppColors.onAction : colors.textSecondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(canSaveProperty ? colors.action : colors.backgroundTertiary)
-                    .clipShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .disabled(!canSaveProperty)
-            .accessibilityIdentifier("property.save")
-            .padding(.horizontal, 24)
-            .padding(.top, 12)
-            .padding(.bottom, 10)
-            .background(.ultraThinMaterial)
-        }
-    }
-
-    private var canSaveProperty: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private func saveProperty() {
-        guard canSaveProperty else { return }
-        let normalizedName = normalizedPropertyName(name)
-        if viewModel.properties.contains(where: { property in
-            property.id != editingProperty?.id && normalizedPropertyName(property.name) == normalizedName
-        }) {
-            showDuplicateWarning = true
-            return
-        }
-        if let existingProperty = editingProperty {
-            var updatedProperty = existingProperty
-            updatedProperty.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            updatedProperty.address = address.trimmingCharacters(in: .whitespacesAndNewlines)
-            updatedProperty.propertyType = propertyType
-            viewModel.updateProperty(updatedProperty)
-        } else {
-            viewModel.addProperty(
-                name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-                address: address.trimmingCharacters(in: .whitespacesAndNewlines),
-                type: propertyType
-            )
-        }
-        dismiss()
-    }
-
-    private func normalizedPropertyName(_ value: String) -> String {
-        value.trimmingCharacters(in: .whitespacesAndNewlines)
-            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-    }
-
-    func searchAddress(query: String) {
-        isSearching = true
-        let request = MKLocalSearch.Request()
-        request.naturalLanguageQuery = query
-        request.resultTypes = .address
-
-        let search = MKLocalSearch(request: request)
-        search.start { response, error in
-            isSearching = false
-            if let response = response {
-                addressResults = response.mapItems
-            } else {
-                addressResults = []
-            }
-        }
-    }
-
-    func selectAddress(_ item: MKMapItem) {
-        let placemark = item.placemark
-        var addressString = ""
-
-        if let streetNumber = placemark.subThoroughfare {
-            addressString += streetNumber + " "
-        }
-        if let street = placemark.thoroughfare {
-            addressString += street + ", "
-        }
-        if let city = placemark.locality {
-            addressString += city + ", "
-        }
-        if let state = placemark.administrativeArea {
-            addressString += state + " "
-        }
-        if let zip = placemark.postalCode {
-            addressString += zip
-        }
-
-        address = addressString.trimmingCharacters(in: CharacterSet(charactersIn: ", "))
-        addressResults = []
-        focusedField = nil
-    }
-
-    private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
-        if reduceMotion {
-            updates()
-        } else {
-            withAnimation(animation, updates)
-        }
-    }
-}
-
-// MARK: - Property Detail View
-struct PropertyDetailView: View {
-    @EnvironmentObject var viewModel: AppViewModel
-    @Environment(\.dismiss) var dismiss
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-    let property: RentalProperty
-
-    @State private var name: String
-    @State private var address: String
-    @State private var propertyType: PropertyType
-    @State private var aliases: [String]
+    @State private var aliases: [String] = []
     @State private var newAlias = ""
-    @State private var isOwnerOccupied: Bool
-    @State private var hasChanges = false
-    @State private var coordinate: CLLocationCoordinate2D?
+    @State private var isOwnerOccupied = false
     @State private var addressResults: [MKMapItem] = []
-    @FocusState private var isAddressFocusedDetail: Bool
+    @State private var showDuplicateWarning = false
+    @State private var deletion: PropertyDeletion?
+    @State private var loaded = false
+    @FocusState private var focused: Field?
 
-    init(property: RentalProperty) {
-        self.property = property
-        _name = State(initialValue: property.name)
-        _address = State(initialValue: property.address)
-        _propertyType = State(initialValue: property.propertyType)
-        _aliases = State(initialValue: property.aliases)
-        _isOwnerOccupied = State(initialValue: property.isOwnerOccupied)
-    }
-
-    private var typeColor: Color {
-        propertyType == .str ? AppColors.honey : AppColors.sage
-    }
-
-    private var typeWash: Color {
-        propertyType == .str ? colors.honeyWash : colors.sageWash
-    }
-
-    private var evidenceGoalHours: Double {
-        propertyType == .str ? 100 : 750
-    }
-
-    private var evidenceProgress: Double {
-        min(max(yearHours / max(evidenceGoalHours, 1), 0), 1)
-    }
-
-    private var evidenceTitle: String {
-        propertyType == .str ? "STR material participation" : "REPS evidence"
+    private var editing: RentalProperty? {
+        if case .edit(let p, _) = mode { return viewModel.properties.first { $0.id == p.id } ?? p }
+        return nil
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 18) {
-                    detailHeader
-                    evidenceOverviewCard
-                    propertyDetailsCard
-                    otherNamesCard
-                    locationCard
-                    if hasChanges {
-                        saveButton
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 40)
-            }
-            .background { LHMobileCanvas() }
-            .navigationTitle("Property Details")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        dismiss()
-                    }
-                    .foregroundStyle(colors.textSecondary)
-                }
-            }
-            .onAppear {
-                loadCoordinate()
-            }
-        }
-    }
-
-    private var detailHeader: some View {
-        HStack(spacing: 14) {
-            JellyBadge(
-                systemName: propertyType == .str ? "bed-double" : "house",
-                color: typeColor,
-                wash: typeWash,
-                size: 54
-            )
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(name.isEmpty ? "Unnamed property" : name)
-                    .font(.system(size: 24, weight: .black, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                    .lineLimit(2)
-                Text(address.isEmpty ? "No address added" : address)
-                    .font(AppTypography.bodySmall)
-                    .foregroundStyle(colors.textSecondary)
-                    .lineLimit(2)
-            }
-            Spacer()
-        }
-        .padding(18)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xxl))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppCornerRadius.xxl)
-                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
-        }
-    }
-
-    private var propertyDetailsCard: some View {
-        propertyDetailCard(title: "Property identity") {
-            VStack(spacing: 12) {
-                propertyTextField("Name", text: $name)
-
+        ScrollViewReader { proxy in
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                titleRow
+                nameAndAddress
                 VStack(alignment: .leading, spacing: 8) {
-                    propertyTextField("Address", text: $address)
-                        .focused($isAddressFocusedDetail)
-                        .onChange(of: address) { _, newValue in
-                            hasChanges = true
-                            if newValue.count > 2 {
-                                searchAddress(query: newValue)
-                            } else {
-                                addressResults = []
-                            }
-                        }
-
-                    if !addressResults.isEmpty && isAddressFocusedDetail {
-                        addressResultsMenu
-                    }
-                }
-
-                Picker("Type", selection: $propertyType) {
-                    Text("Long-Term Rental").tag(PropertyType.ltr)
-                    Text("Short-Term Rental").tag(PropertyType.str)
-                }
-                .pickerStyle(.segmented)
-                .onChange(of: propertyType) { _, _ in hasChanges = true }
-
-                Toggle(isOn: $isOwnerOccupied) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("I live here")
-                            .font(AppTypography.body)
-                            .foregroundStyle(colors.textPrimary)
-                        Text("Events at this address only count when they mention rental work.")
-                            .font(AppTypography.caption)
-                            .foregroundStyle(colors.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .tint(colors.action)
-                .accessibilityIdentifier("property.ownerOccupied")
-                .onChange(of: isOwnerOccupied) { _, _ in hasChanges = true }
-            }
-        }
-    }
-
-    // MARK: Other names (aliases)
-
-    private var otherNamesCard: some View {
-        propertyDetailCard(title: "Other names for this property") {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Listing titles, nicknames, or a contractor you use here. We use them to match emails and events to this property.")
-                    .font(AppTypography.caption)
-                    .foregroundStyle(colors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if !aliases.isEmpty {
-                    LHChipFlowLayout(spacing: 8) {
-                        ForEach(aliases, id: \.self) { alias in
-                            aliasChip(alias)
-                        }
-                    }
-                }
-
-                HStack(spacing: 8) {
-                    TextField("Add another name", text: $newAlias)
-                        .font(AppTypography.body)
-                        .foregroundStyle(colors.textPrimary)
-                        .submitLabel(.done)
-                        .onSubmit(addAlias)
-                        .onChange(of: newAlias) { _, value in
-                            if !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { hasChanges = true }
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
-                        .background(colors.backgroundTertiary)
-                        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
-                        .accessibilityIdentifier("property.alias.field")
-
-                    Button(action: addAlias) {
-                        Text("Add")
-                            .font(AppTypography.button)
-                            .foregroundStyle(AppColors.onAction)
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 12)
-                            .background(colors.action)
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.lhPressable)
-                    .disabled(!canAddAlias)
-                    .opacity(canAddAlias ? 1 : 0.5)
-                    .accessibilityIdentifier("property.alias.add")
-                }
-
-                if let aliasHint {
-                    Text(aliasHint)
-                        .font(AppTypography.caption)
-                        .foregroundStyle(colors.caution)
+                    PropertySectionHeader("How do guests stay?")
+                    PropertyStaySegment(propertyType: $propertyType)
+                    Text("This changes how hours are counted for this place.")
+                        .font(.footnote)
+                        .foregroundStyle(colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("property.alias.hint")
+                        .padding(.horizontal, 4)
                 }
+                otherNames
+                liveHereCard
+                if editing != nil {
+                    Button("Delete property", role: .destructive) {
+                        if let editing { deletion = PropertyDeletion.make(for: editing, in: viewModel) }
+                    }
+                    .font(.body)
+                    .foregroundStyle(colors.destructive)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .accessibilityIdentifier("property.delete")
+                }
+            }
+            .padding(20)
+            // Clear the pinned footer (its 16pt fade + the 52pt button + 8pt), plus 12pt of air.
+            .padding(.bottom, 44)
+            Color.clear.frame(height: 1).id("propertySheet.bottom")
+        }
+#if DEBUG
+        .onAppear {
+            if ProcessInfo.processInfo.arguments.contains("-LHPropertySheetScrollBottom") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { proxy.scrollTo("propertySheet.bottom", anchor: .bottom) }
+            }
+        }
+#endif
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(colors.background.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom) {
+            Button(editing != nil ? "Save" : "Add property", action: save)
+                .buttonStyle(InboxPrimaryButtonStyle())
+                .disabled(!canSave)
+                .accessibilityIdentifier("property.save")
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
+                .background {
+                    // A 32pt scrim above the pinned button, then solid canvas behind it, so
+                    // content scrolling under it fades out instead of being sliced (all sizes).
+                    VStack(spacing: 0) {
+                        LinearGradient(colors: [colors.background.opacity(0), colors.background],
+                                       startPoint: .top, endPoint: .bottom)
+                            .frame(height: 32)
+                        colors.background
+                    }
+                    .padding(.top, -32)
+                    .ignoresSafeArea(edges: .bottom)
+                    .allowsHitTesting(false)
+                }
+        }
+        .alert("You already have a rental called \(name.trimmingCharacters(in: .whitespacesAndNewlines))", isPresented: $showDuplicateWarning) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Give this one a different name so its hours stay apart.")
+        }
+        .alert(deletion?.title ?? "", isPresented: Binding(get: { deletion != nil }, set: { if !$0 { deletion = nil } })) {
+            Button("Delete", role: .destructive) {
+                if let deletion {
+                    let id = deletion.property.id
+                    deletion.perform(in: viewModel)
+                    onDeleted(id)
+                    dismiss()
+                }
+                deletion = nil
+            }
+            Button("Cancel", role: .cancel) { deletion = nil }
+        } message: {
+            Text(deletion?.message ?? "")
+        }
+        .onAppear(perform: load)
+    }
+
+    private var titleRow: some View {
+        HStack(alignment: .center) {
+            Text(editing != nil ? "Edit property" : "New property")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(colors.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 8)
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(colors.textPrimary)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(colors.backgroundSecondary))
+                    .overlay(Circle().strokeBorder(colors.border, lineWidth: 0.5))
+            }
+            .buttonStyle(.lhPressable)
+            .accessibilityLabel("Close")
+            .accessibilityIdentifier("property.close")
+        }
+    }
+
+    private var nameAndAddress: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(spacing: 0) {
+                field("Name", text: $name, placeholder: "Pine Cabin", id: "property.name", field: .name)
+                PropertyInsetDivider()
+                field("Address", text: $address, placeholder: "Street, city", id: "property.address", field: .address)
+                    .onChange(of: address) { _, value in
+                        guard focused == .address else { return }
+                        if value.count > 2 { searchAddress(query: value) } else { addressResults = [] }
+                    }
+            }
+            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            if !addressResults.isEmpty && focused == .address {
+                addressResultsMenu
             }
         }
     }
+
+    private func field(_ label: String, text: Binding<String>, placeholder: String, id: String, field: Field) -> some View {
+        let ax = dynamicTypeSize.isAccessibilitySize
+        return (ax ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(spacing: 12))) {
+            Text(label)
+                .foregroundStyle(colors.textPrimary)
+                .frame(minWidth: ax ? nil : 76, alignment: .leading)
+                .fixedSize()
+                .accessibilityHidden(true)
+            TextField(label, text: text, prompt: Text(placeholder).foregroundStyle(colors.textTertiary), axis: ax ? .vertical : .horizontal)
+                .lineLimit(ax ? 4 : 1)
+                .foregroundStyle(colors.textPrimary)
+                .focused($focused, equals: field)
+                .submitLabel(field == .name ? .next : .done)
+                .onSubmit { if field == .name { focused = .address } else { focused = nil } }
+                .textInputAutocapitalization(.words)
+                .accessibilityLabel(label)
+                .accessibilityIdentifier(id)
+        }
+        .font(.body)
+        .padding(.horizontal, 16)
+        .padding(.vertical, ax ? 10 : 0)
+        .frame(minHeight: 52)
+    }
+
+    private var addressResultsMenu: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(addressResults.prefix(5).enumerated()), id: \.element) { index, item in
+                Button { selectAddress(item) } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.name ?? "Address").font(.body).foregroundStyle(colors.textPrimary)
+                        if let line = item.placemark.title {
+                            Text(line).font(.footnote).foregroundStyle(colors.textSecondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 16)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.lhPressable)
+                if index < min(addressResults.count, 5) - 1 { PropertyInsetDivider() }
+            }
+        }
+        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(colors.border, lineWidth: 0.5))
+    }
+
+    // MARK: Other names
 
     private var trimmedNewAlias: String { newAlias.trimmingCharacters(in: .whitespacesAndNewlines) }
-
     private var canAddAlias: Bool {
         trimmedNewAlias.count >= RentalProperty.aliasMinLength && aliases.count < RentalProperty.maxAliases
     }
-
-    /// Why the typed name can't be added yet (the matcher ignores names under 3 characters).
     private var aliasHint: String? {
         if aliases.count >= RentalProperty.maxAliases { return "You can add up to \(RentalProperty.maxAliases) other names." }
         if !trimmedNewAlias.isEmpty && trimmedNewAlias.count < RentalProperty.aliasMinLength {
@@ -1206,344 +1092,184 @@ struct PropertyDetailView: View {
         return nil
     }
 
+    private var otherNames: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            PropertySectionHeader("Other names")
+            VStack(alignment: .leading, spacing: 12) {
+                if !aliases.isEmpty {
+                    PropertyChipFlow(spacing: 8) {
+                        ForEach(aliases, id: \.self) { alias in aliasChip(alias) }
+                    }
+                }
+                HStack(spacing: 8) {
+                    TextField("Other name", text: $newAlias, prompt: Text("Add another name").foregroundStyle(colors.textTertiary))
+                        .foregroundStyle(colors.textPrimary)
+                        .focused($focused, equals: .alias)
+                        .submitLabel(.done)
+                        .onSubmit(addAlias)
+                        .accessibilityIdentifier("property.alias.field")
+                    Button("Add", action: addAlias)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(canAddAlias ? colors.action : colors.textTertiary)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .disabled(!canAddAlias)
+                        .accessibilityIdentifier("property.alias.add")
+                }
+                .padding(.horizontal, 14)
+                .frame(minHeight: 48)
+                .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                if let aliasHint {
+                    Text(aliasHint)
+                        .font(.footnote)
+                        .foregroundStyle(colors.caution)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("property.alias.hint")
+                }
+            }
+            .padding(16)
+            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            Text("The names you use for this place in your calendar, like “the cabin”. We use them to match events. Use at least 3 characters. You can add up to 10 other names.")
+                .font(.footnote)
+                .foregroundStyle(colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 4)
+        }
+    }
+
     private func aliasChip(_ alias: String) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 2) {
             Text(alias)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(colors.textPrimary)
-                .lineLimit(1)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
+                .padding(.leading, 14)
+                .padding(.vertical, 8)
             Button {
-                withAnimation(AppAnimation.quick) {
-                    aliases.removeAll { $0 == alias }
-                    hasChanges = true
+                if reduceMotion { aliases.removeAll { $0 == alias } } else {
+                    withAnimation(.easeOut(duration: 0.18)) { aliases.removeAll { $0 == alias } }
                 }
             } label: {
-                LucideIcon(image: Lucide.x, size: 12)
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(colors.textSecondary)
-                    .frame(width: 32, height: 32)
-                    .contentShape(Rectangle())
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle().inset(by: -4))
             }
-            .buttonStyle(.lhPressable)
+            .buttonStyle(.plain)
             .accessibilityLabel("Remove \(alias)")
         }
-        .padding(.leading, 12)
-        .background(colors.actionSurface)
-        .clipShape(Capsule())
+        .frame(minHeight: 36)
+        .background(Capsule().fill(colors.backgroundTertiary))
+        .overlay(Capsule().strokeBorder(colors.border, lineWidth: 0.5))
+        .transition(reduceMotion ? .opacity : .scale(scale: 0.95).combined(with: .opacity))
     }
 
     private func addAlias() {
         guard canAddAlias else { return }
         let cleaned = RentalProperty.cleanedAliases(aliases + [newAlias])
-        guard cleaned != aliases else { newAlias = ""; return }
-        withAnimation(AppAnimation.quick) {
-            aliases = cleaned
-            hasChanges = true
-        }
         newAlias = ""
+        guard cleaned != aliases else { return }
+        if reduceMotion { aliases = cleaned } else { withAnimation(.easeOut(duration: 0.18)) { aliases = cleaned } }
     }
 
-    private var evidenceOverviewCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(evidenceTitle)
-                        .font(.system(size: 19, weight: .black, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                    Text(propertyType == .str ? "Track toward the 100-hour material participation test." : "Track annual hours toward the 750-hour REPS threshold.")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                        .lineSpacing(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer()
-                Text(String(format: "%.0fh", yearHours))
-                    .font(.system(size: 34, weight: .black, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                    .monospacedDigit()
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("This tax year")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                    Spacer()
-                    Text(String(format: "%.0fh / %.0fh", yearHours, evidenceGoalHours))
-                        .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                        .monospacedDigit()
-                }
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(colors.backgroundTertiary)
-                        Capsule()
-                            .fill(LinearGradient(colors: [typeColor, typeColor.opacity(0.62)], startPoint: .leading, endPoint: .trailing))
-                            .frame(width: proxy.size.width * evidenceProgress)
-                    }
-                }
-                .frame(height: 8)
-            }
-
-            HStack(spacing: 10) {
-                evidenceMetric(title: "Total", value: String(format: "%.1fh", totalHours))
-                evidenceMetric(title: "Logs", value: "\(entryCount)")
-                evidenceMetric(title: "Type", value: propertyType.rawValue)
+    private var liveHereCard: some View {
+        Toggle(isOn: $isOwnerOccupied) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("I live here").font(.body).foregroundStyle(colors.textPrimary)
+                Text("We won’t suggest time spent at home as work.")
+                    .font(.subheadline)
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(18)
-        .premiumGlassCard(cornerRadius: 24, colors: colors, colorScheme: colorScheme)
+        .toggleStyle(InboxSwitchStyle())
+        .accessibilityIdentifier("property.ownerOccupied")
+        .padding(16)
+        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
-    private func evidenceMetric(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(colors.textSecondary)
-            Text(value)
-                .font(.system(size: 15, weight: .black, design: .rounded))
-                .foregroundStyle(colors.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.64 : 0.76))
-        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
-    }
+    // MARK: Save
 
-    private func propertyTextField(_ title: String, text: Binding<String>) -> some View {
-        TextField(title, text: text)
-            .font(AppTypography.body)
-            .foregroundStyle(colors.textPrimary)
-            .padding(14)
-            .background(colors.backgroundTertiary)
-            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
-            .overlay {
-                RoundedRectangle(cornerRadius: AppCornerRadius.large)
-                    .strokeBorder(colors.border.opacity(0.25), lineWidth: 1)
+    private var canSave: Bool { !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    private func load() {
+        guard !loaded else { return }
+        loaded = true
+        if let p = editing {
+            name = p.name
+            address = p.address
+            propertyType = p.propertyType
+            aliases = p.aliases
+            isOwnerOccupied = p.isOwnerOccupied
+            if case .edit(_, let confirmDelete) = mode, confirmDelete {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { deletion = PropertyDeletion.make(for: p, in: viewModel) }
             }
-            .onChange(of: text.wrappedValue) { _, _ in hasChanges = true }
-    }
-
-    private var addressResultsMenu: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(addressResults.prefix(5).enumerated()), id: \.element) { index, item in
-                Button {
-                    selectAddress(item)
-                } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(item.name ?? "Unknown")
-                            .font(AppTypography.body)
-                            .foregroundStyle(colors.textPrimary)
-                        if let addr = item.placemark.title {
-                            Text(addr)
-                                .font(AppTypography.caption)
-                                .foregroundStyle(colors.textSecondary)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 12)
-                }
-                .buttonStyle(.plain)
-
-                if index < min(addressResults.count, 5) - 1 {
-                    Divider()
-                }
-            }
-        }
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppCornerRadius.large)
-                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
+        } else {
+#if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-LHPropertySheetScrollBottom") { return }
+#endif
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { focused = .name }
         }
     }
 
-    private var locationCard: some View {
-        propertyDetailCard(title: "Location") {
-            if let coordinate = coordinate {
-                Map(initialPosition: .region(MKCoordinateRegion(
-                    center: coordinate,
-                    span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-                ))) {
-                    Annotation("", coordinate: coordinate) {
-                        LucideIcon(image: Lucide.house, size: 16)
-                            .foregroundStyle(AppColors.primary)
-                    }
-                }
-                .frame(height: 200)
-                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.large))
-            } else {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text("Loading location...")
-                        .font(AppTypography.body)
-                        .foregroundStyle(colors.textSecondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 30)
+    private func normalized(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    }
+
+    private func save() {
+        guard canSave else { return }
+        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        if viewModel.properties.contains(where: { $0.id != editing?.id && normalized($0.name) == normalized(cleanName) }) {
+            showDuplicateWarning = true
+            return
+        }
+        // Aliases and "I live here" are always written, so clearing them sticks.
+        let cleanedAliases = RentalProperty.cleanedAliases(aliases + [newAlias])
+        if let existing = editing {
+            var updated = existing
+            updated.name = cleanName
+            updated.address = cleanAddress
+            updated.propertyType = propertyType
+            updated.aliases = cleanedAliases
+            updated.isOwnerOccupied = isOwnerOccupied
+            viewModel.updateProperty(updated)
+        } else {
+            viewModel.addProperty(name: cleanName, address: cleanAddress, type: propertyType)
+            if var added = viewModel.properties.last, added.name == cleanName,
+               !cleanedAliases.isEmpty || isOwnerOccupied {
+                added.aliases = cleanedAliases
+                added.isOwnerOccupied = isOwnerOccupied
+                viewModel.updateProperty(added)
             }
         }
+        dismiss()
     }
 
-    private var saveButton: some View {
-        Button { saveChanges() } label: {
-            Text("Save changes")
-                .font(AppTypography.button)
-                .foregroundStyle(AppColors.onAction)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 15)
-                .background(colors.action)
-                .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func propertyDetailCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(title)
-                .font(.system(size: 17, weight: .bold, design: .rounded))
-                .foregroundStyle(colors.textPrimary)
-            content()
-        }
-        .padding(18)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xxl))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppCornerRadius.xxl)
-                .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
-        }
-    }
-
-    func loadCoordinate() {
-        let geocoder = CLGeocoder()
-        geocoder.geocodeAddressString(address) { placemarks, _ in
-            if let location = placemarks?.first?.location {
-                Task { @MainActor in
-                    self.coordinate = location.coordinate
-                }
-            }
-        }
-    }
-
-    var totalHours: Double {
-        viewModel.totalHoursForProperty(property.id)
-    }
-
-    var yearHours: Double {
-        let currentYear = Calendar.current.component(.year, from: Date())
-        return viewModel.hoursForProperty(property, year: currentYear)
-    }
-
-    var entryCount: Int {
-        viewModel.timeEntries.filter { $0.propertyId == property.id }.count
-    }
-
-    func searchAddress(query: String) {
+    private func searchAddress(query: String) {
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = query
         request.resultTypes = .address
-
-        let search = MKLocalSearch(request: request)
-        search.start { response, error in
-            if let response = response {
-                Task { @MainActor in
-                    self.addressResults = response.mapItems
-                }
-            }
+        MKLocalSearch(request: request).start { response, _ in
+            Task { @MainActor in addressResults = response?.mapItems ?? [] }
         }
     }
 
-    func selectAddress(_ item: MKMapItem) {
+    private func selectAddress(_ item: MKMapItem) {
         let placemark = item.placemark
-        var addressString = ""
-
-        if let streetNumber = placemark.subThoroughfare {
-            addressString += streetNumber + " "
-        }
-        if let street = placemark.thoroughfare {
-            addressString += street + ", "
-        }
-        if let city = placemark.locality {
-            addressString += city + ", "
-        }
-        if let state = placemark.administrativeArea {
-            addressString += state + " "
-        }
-        if let zip = placemark.postalCode {
-            addressString += zip
-        }
-
-        address = addressString.trimmingCharacters(in: CharacterSet(charactersIn: ", "))
+        var parts = ""
+        if let n = placemark.subThoroughfare { parts += n + " " }
+        if let street = placemark.thoroughfare { parts += street + ", " }
+        if let city = placemark.locality { parts += city + ", " }
+        if let state = placemark.administrativeArea { parts += state + " " }
+        if let zip = placemark.postalCode { parts += zip }
+        focused = nil
+        address = parts.trimmingCharacters(in: CharacterSet(charactersIn: ", "))
         addressResults = []
-        isAddressFocusedDetail = false
-        hasChanges = true
-    }
-
-    func saveChanges() {
-        var updated = property
-        updated.name = name
-        updated.address = address
-        updated.propertyType = propertyType
-        updated.aliases = RentalProperty.cleanedAliases(aliases + [newAlias])
-        updated.isOwnerOccupied = isOwnerOccupied
-        newAlias = ""
-        aliases = updated.aliases
-        viewModel.updateProperty(updated)
-        hasChanges = false
-        dismiss()
     }
 }
 
 #Preview {
     PropertiesView()
         .environmentObject(AppViewModel())
-}
-
-/// Wraps chips onto as many rows as they need (property aliases).
-struct LHChipFlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
-        let width = rows.map { $0.width }.max() ?? 0
-        let height = rows.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(rows.count - 1, 0))
-        return CGSize(width: min(width, proposal.width ?? width), height: height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var y = bounds.minY
-        for row in arrange(width: bounds.width, subviews: subviews) {
-            var x = bounds.minX
-            for index in row.indices {
-                let size = subviews[index].sizeThatFits(ProposedViewSize(width: bounds.width, height: nil))
-                subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(width: min(size.width, bounds.width), height: size.height))
-                x += min(size.width, bounds.width) + spacing
-            }
-            y += row.height + spacing
-        }
-    }
-
-    private struct Row { var indices: [Int] = []; var width: CGFloat = 0; var height: CGFloat = 0 }
-
-    private func arrange(width: CGFloat, subviews: Subviews) -> [Row] {
-        var rows: [Row] = []
-        var current = Row()
-        for index in subviews.indices {
-            let size = subviews[index].sizeThatFits(ProposedViewSize(width: width, height: nil))
-            let itemWidth = min(size.width, width)
-            let needed = current.indices.isEmpty ? itemWidth : current.width + spacing + itemWidth
-            if needed > width, !current.indices.isEmpty {
-                rows.append(current)
-                current = Row()
-            }
-            current.width = current.indices.isEmpty ? itemWidth : current.width + spacing + itemWidth
-            current.height = max(current.height, size.height)
-            current.indices.append(index)
-        }
-        if !current.indices.isEmpty { rows.append(current) }
-        return rows
-    }
 }
