@@ -104,20 +104,14 @@ struct SFSiriSnippet: View {
     @ScaledMetric(relativeTo: .body) private var houseSize: CGFloat = 170
     @Environment(\.dynamicTypeSize) private var dts
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            S2Paper(radius: 26)
-            // At accessibility sizes the text takes the full width and the house steps back.
-            HouseArt(key: S2House.keyframe(212)).frame(width: min(houseSize, 200), height: min(houseSize, 200))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .offset(x: 4, y: 8)
-                .opacity(dts.isAccessibilitySize ? 0.35 : 1)
+        VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Your REPS hours · 2026").font(.system(.caption2, design: .monospaced).weight(.medium))
                     .textCase(.uppercase).tracking(1.3).foregroundStyle(LHB.draftingHero)
                 Text("212").font(.system(size: number, weight: .bold, design: .rounded)).monospacedDigit()
                     .foregroundStyle(.white).padding(.top, 2)
                 Text("of 750h").font(.subheadline.weight(.medium)).foregroundStyle(LHB.onHeroSecondary)
-                Spacer(minLength: 12)
+                Color.clear.frame(height: 18)
                 (Text(Image(systemName: "exclamationmark.circle.fill")) + Text(" Behind by 388h"))
                     .font(.subheadline.weight(.semibold)).foregroundStyle(Color(hex: 0xFFB454))
                     .fixedSize(horizontal: false, vertical: true)
@@ -130,7 +124,13 @@ struct SFSiriSnippet: View {
             }
             .padding(16)
         }
-        .frame(minHeight: 200)
+        .frame(maxWidth: .infinity, minHeight: 200, alignment: .topLeading)
+        .background(alignment: .bottomTrailing) {
+            HouseArt(key: S2House.keyframe(212)).frame(width: min(houseSize, 200), height: min(houseSize, 200))
+                .offset(x: 4, y: 8)
+                .opacity(dts.isAccessibilitySize ? 0.35 : 1)
+        }
+        .background(S2Paper(radius: 26))
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .accessibilityElement(children: .combine)
     }
