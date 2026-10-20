@@ -294,10 +294,12 @@ struct InboxRowActions: View {
     var body: some View {
         HStack(spacing: 4) {
             Button(action: onConfirm) {
-                Label("Confirm", systemImage: "checkmark")
+                // Icon and word spelled out (a Label can collapse to its icon inside a List row).
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark").accessibilityHidden(true)
+                    Text("Confirm").lineLimit(1).fixedSize()
+                }
                     .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                    .fixedSize()
                     .foregroundStyle(colors.onAction)
                     .padding(.horizontal, 18)
                     .frame(minHeight: 44)

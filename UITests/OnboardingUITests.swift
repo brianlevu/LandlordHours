@@ -85,6 +85,7 @@ final class OnboardingUITests: XCTestCase {
         let confirm = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "inbox.confirm.")).firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Every Inbox row shows Confirm")
         XCTAssertGreaterThanOrEqual(confirm.frame.height, 44)
+        XCTAssertEqual(confirm.label, "Confirm", "The word is on the button, not only a checkmark")
         XCTAssertFalse(app.staticTexts["Pick a property"].exists, "The only property was attached to every suggestion")
         tap(confirm)
         XCTAssertFalse(app.buttons["confirm.log"].waitForExistence(timeout: 2), "No sheet: nothing was missing")
