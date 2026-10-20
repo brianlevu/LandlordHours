@@ -54,7 +54,7 @@ final class TodayCaptureUITests: XCTestCase {
         ("noproperty", ["-LHMockScenario", "emptyMainTabs"], "today.hero"),
     ]
 
-    private func capture(_ state: String) {
+    private func capture(_ state: String, then action: ((XCUIApplication) -> String?)? = nil, as name: String? = nil) {
         guard let (_, args, anchor) = Self.states.first(where: { $0.0 == state }) else { return XCTFail("No state \(state)") }
         for scheme in ["light", "dark"] {
             for size in Size.allCases {
@@ -67,7 +67,12 @@ final class TodayCaptureUITests: XCTestCase {
                 let element = app.descendants(matching: .any)[anchor]
                 XCTAssertTrue(element.waitForExistence(timeout: 25), "\(state) \(scheme)\(size.rawValue): \(anchor)")
                 Thread.sleep(forTimeInterval: 2.2)   // scroll hook (0.7s) + entrance motion settle
-                write("today-\(state)-\(scheme)\(size.rawValue)")
+                if let action {
+                    guard let waitFor = action(app) else { continue }
+                    XCTAssertTrue(app.descendants(matching: .any)[waitFor].waitForExistence(timeout: 5), "\(name ?? state): \(waitFor)")
+                    Thread.sleep(forTimeInterval: 0.6)
+                }
+                write("today-\(name ?? state)-\(scheme)\(size.rawValue)")
             }
         }
     }
@@ -92,4 +97,14 @@ final class TodayCaptureUITests: XCTestCase {
     func testCaptureRecord() { capture("record") }
     func testCaptureDraft() { capture("draft") }
     func testCaptureNoProperty() { capture("noproperty") }
+
+    /// The shared full-width Inbox toast after a confirm from Today (Undo showing).
+    func testCaptureToast() {
+        capture("confirm", then: { app in
+            let confirm = app.buttons["inbox.confirm.cal:debug-plumber"]
+            guard confirm.waitForExistence(timeout: 5), confirm.isHittable else { return nil }
+            confirm.tap()
+            return "inbox.toast"
+        }, as: "toast")
+    }
 }

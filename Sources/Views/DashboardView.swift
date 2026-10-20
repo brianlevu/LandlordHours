@@ -343,6 +343,8 @@ struct DashboardView: View {
                 .onPreferenceChange(DashboardScrollOffsetPreferenceKey.self) { value in
                     scrollOffset = value
                 }
+                // The hero never scrolls under the status bar (the sandbox's top edge).
+                .overlay(alignment: .top) { TodayTopEdgeFade() }
                 .overlay(alignment: .top) {
                     if isCompactHeaderVisible {
                         compactDashboardBar

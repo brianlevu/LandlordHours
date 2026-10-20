@@ -309,7 +309,7 @@ struct TodaySwipeRow: View {
                     .scaleEffect(checkPop && !reduceMotion ? 1.15 : 1)
                     .opacity(dx > 8 ? 1 : 0)
                 Spacer()
-                actionCircle("xmark", label: "Not work", fill: colors.textSecondary,
+                actionCircle("xmark", label: "Not rental work", fill: colors.textSecondary,
                              ink: colorScheme == .dark ? colors.background : .white,
                              armed: -dx > Self.threshold)
                     .opacity(dx < -8 ? 1 : 0)
@@ -414,6 +414,28 @@ struct TodaySwipeRow: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(AdaptiveColors(colorScheme: colorScheme).textSecondary)
         }
+    }
+}
+
+/// Keeps scrolled content (the blueprint hero above all) out from under the status bar: a canvas
+/// band over the top safe area that fades out below it, so the system's dark status-bar ink
+/// always sits on the light canvas (and the light ink on the dark one).
+struct TodayTopEdgeFade: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let canvas = AdaptiveColors(colorScheme: colorScheme).background
+        GeometryReader { proxy in
+            VStack(spacing: 0) {
+                canvas.frame(height: proxy.safeAreaInsets.top)
+                LinearGradient(colors: [canvas, canvas.opacity(0)], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 16)
+                Spacer(minLength: 0)
+            }
+            .ignoresSafeArea(edges: .top)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
