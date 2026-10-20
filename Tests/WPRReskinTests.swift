@@ -331,3 +331,123 @@ final class ReportsLogicTests: XCTestCase {
         XCTAssertEqual(bars.last?.hours ?? 0, 4, accuracy: 0.001)
     }
 }
+
+// MARK: - Review fixes: 100h question, spouse REPS card, last-log, record sources
+
+final class WPRReviewFixTests: XCTestCase {
+    private var calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }()
+    private var now: Date { calendar.date(from: DateComponents(year: 2026, month: 10, day: 19, hour: 12))! }
+
+    private func rep(hours: Double) -> TaxQualificationEngine.REPSResult {
+        TaxQualificationEngine.REPSResult(
+            participant: .spouse, realEstateHours: hours, nonRealEstateHours: 0,
+            meets750HourTest: hours > 750, meetsMoreThanHalfPersonalServicesTest: false
+        )
+    }
+
+    private func mp(hours: Double, met500: Bool, met100: Bool, answer: Bool?) -> TaxQualificationEngine.MaterialParticipationResult {
+        TaxQualificationEngine.MaterialParticipationResult(
+            propertyId: nil, ownerAndSpouseHours: hours, meets500HourTest: met500, meets100HourTest: met100, noOneParticipatedMore: answer
+        )
+    }
+
+    // 1. Over 500h the question is moot: the card never asks it.
+    func testMP100OverFiveHundredHoursDoesNotAskTheQuestion() {
+        let standing = ReportsLogic.mpStanding(goal: .mp100, hours: 540, result: mp(hours: 540, met500: true, met100: false, answer: nil), includesSpouse: false, year: 2026, now: now, calendar: calendar)
+        XCTAssertNotEqual(standing.status, "100 hours reached")
+        XCTAssertFalse((standing.detail ?? "").contains("Confirm"))
+        XCTAssertTrue((standing.detail ?? "").contains("500"))
+        XCTAssertEqual(standing.tone, .positive)
+    }
+
+    func testMP100BetweenHundredAndFiveHundredStillAsks() {
+        let standing = ReportsLogic.mpStanding(goal: .mp100, hours: 120, result: mp(hours: 120, met500: false, met100: false, answer: nil), includesSpouse: false, year: 2026, now: now, calendar: calendar)
+        XCTAssertEqual(standing.status, "100 hours reached")
+        XCTAssertTrue((standing.detail ?? "").contains("Confirm"))
+    }
+
+    func testMP100ExactlyHundredDoesNotAskYet() {
+        let standing = ReportsLogic.mpStanding(goal: .mp100, hours: 100, result: mp(hours: 100, met500: false, met100: false, answer: nil), includesSpouse: false, year: 2026, now: now, calendar: calendar)
+        XCTAssertNotEqual(standing.status, "100 hours reached")
+    }
+
+    func testMP100AnsweredYesIsMet() {
+        let standing = ReportsLogic.mpStanding(goal: .mp100, hours: 120, result: mp(hours: 120, met500: false, met100: true, answer: true), includesSpouse: false, year: 2026, now: now, calendar: calendar)
+        XCTAssertEqual(standing.status, "Goal met")
+    }
+
+    // 3. A spouse over 750h is never shown as qualified.
+    func testSpouseRepsCardIsNeutralAndSaysFiftyPercentIsNotTracked() {
+        for hours in [750.0, 751, 900] {
+            let standing = ReportsLogic.repsStanding(person: .spouse, rep: rep(hours: hours), year: 2026, now: now, calendar: calendar)
+            XCTAssertEqual(standing.tone, .neutral, "\(hours)h")
+            XCTAssertTrue((standing.detail ?? "").contains("50% rule not tracked for your spouse."))
+            XCTAssertFalse(standing.status.lowercased().contains("qualif"))
+        }
+        let closed = ReportsLogic.repsStanding(person: .spouse, rep: rep(hours: 800), year: 2025, now: now, calendar: calendar)
+        XCTAssertEqual(closed.tone, .neutral)
+    }
+
+    func testSpouseRepsCardUnderTargetIsNotGreen() {
+        let standing = ReportsLogic.repsStanding(person: .spouse, rep: rep(hours: 100), year: 2026, now: now, calendar: calendar)
+        XCTAssertNotEqual(standing.tone, .positive)
+    }
+
+    // 2. Last-log date ignores spouse entries when spouse hours are off.
+    private func engagementContext(includeSpouse: Bool, goal: HourGoalType) -> EngagementContext {
+        let property = RentalProperty(name: "Oak", address: "1 Oak", propertyType: .ltr)
+        let old = calendar.date(from: DateComponents(year: 2026, month: 9, day: 1, hour: 12))!
+        let recent = calendar.date(from: DateComponents(year: 2026, month: 10, day: 18, hour: 12))!
+        var context = EngagementContext(
+            now: now, taxYear: 2026, properties: [property],
+            timeEntries: [
+                TimeEntry(propertyId: property.id, participant: .selfParticipant, category: .management, hours: 2, date: old, notes: ""),
+                TimeEntry(propertyId: property.id, participant: .spouse, category: .management, hours: 2, date: recent, notes: "")
+            ],
+            calendarDraftCount: 0, isTimerRunning: false, timerStartTime: nil,
+            notificationPermission: .authorized, recentDismissals: [], isProUser: false
+        )
+        context.goalType = goal
+        context.includeSpouse = includeSpouse
+        return context
+    }
+
+    func testSpouseEntryDoesNotResetLastLogWhenSpouseOff() {
+        let service = EngagementIntelligenceService()
+        let snap = service.snapshot(for: engagementContext(includeSpouse: false, goal: .str), calendar: calendar)
+        XCTAssertEqual(snap.daysSinceLastLog, 48)
+        XCTAssertEqual(snap.lastLogDate, calendar.date(from: DateComponents(year: 2026, month: 9, day: 1, hour: 12)))
+    }
+
+    func testSpouseEntryCountsForLastLogWhenSpouseOn() {
+        let service = EngagementIntelligenceService()
+        let snap = service.snapshot(for: engagementContext(includeSpouse: true, goal: .str), calendar: calendar)
+        XCTAssertEqual(snap.daysSinceLastLog, 1)
+    }
+
+    func testSpouseOffAndNoOwnEntriesMeansNoLastLog() {
+        let service = EngagementIntelligenceService()
+        var ctx = engagementContext(includeSpouse: false, goal: .reps)
+        ctx.timeEntries = ctx.timeEntries.filter { $0.participant == .spouse }
+        XCTAssertNil(service.snapshot(for: ctx, calendar: calendar).lastLogDate)
+    }
+
+    // 5. Every source gets its own name in Records.
+    func testRecordSourceBadgesNameEverySource() {
+        let property = RentalProperty(name: "Oak", address: "1 Oak", propertyType: .ltr)
+        for source in EntrySource.allCases where source != .other && source != .manual {
+            var entry = TimeEntry(propertyId: property.id, participant: .selfParticipant, category: .management, hours: 1, date: now, notes: "")
+            entry.importSource = source.storedValue
+            let badge = RecordSourceBadge(entry: entry)
+            XCTAssertEqual(badge.title, source.displayName, "\(source)")
+            XCTAssertTrue(RecordSourceBadge.filterOrder.contains(badge), "\(source)")
+        }
+        var unknown = TimeEntry(propertyId: property.id, participant: .selfParticipant, category: .management, hours: 1, date: now, notes: "")
+        unknown.importSource = "from-the-future"
+        XCTAssertEqual(RecordSourceBadge(entry: unknown).title, "Other")
+    }
+}
