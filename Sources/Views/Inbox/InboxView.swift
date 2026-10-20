@@ -143,6 +143,7 @@ struct InboxView: View {
             )
             .padding(.bottom, 10)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .listRowBackground(colors.backgroundSecondary)
         .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 16))
         .alignmentGuide(.listRowSeparatorLeading) { _ in 74 }

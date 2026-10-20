@@ -395,6 +395,10 @@ struct HouseHeroCard: View {
                                 }
                             }
                         }
+                        // The words share a fixed-height card with the art: past XXL they would be cut
+                        // ("Behind…"), so they stop growing there and wrap (VoiceOver reads them in full).
+                        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
+                        .fixedSize(horizontal: false, vertical: true)
                         .frame(width: columnWidth, alignment: .leading)
                         .transition(.opacity)
                         }

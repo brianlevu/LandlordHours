@@ -13,13 +13,13 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
     @ViewBuilder var actions: Actions
     @Environment(\.onbBottomInset) private var bottomInset
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.onbDisplayTitles) private var displayTitles
 
     var body: some View {
         let pinNote = !typeSize.isAccessibilitySize
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text(title)
-                    .font(.system(.title, weight: .semibold))
+                titleText
                     .foregroundStyle(OnbColor.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
@@ -63,6 +63,18 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
                     .offset(y: -32)
                     .allowsHitTesting(false)
             }
+        }
+    }
+}
+
+extension OnbStepScaffold {
+    /// What's new (upgraders) titles are Fraunces display, like the app's own titles;
+    /// onboarding questions stay SF Pro (approved design).
+    @ViewBuilder fileprivate var titleText: some View {
+        if displayTitles {
+            Text(title).lhDisplayFont(.title)
+        } else {
+            Text(title).font(.system(.title, weight: .semibold))
         }
     }
 }

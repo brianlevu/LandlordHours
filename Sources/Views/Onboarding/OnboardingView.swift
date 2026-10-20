@@ -68,7 +68,7 @@ struct OnbWhatsNewSheet: View {
 
     var body: some View {
         Group {
-            if let flow { OnbRoot(flow: flow, embedded: true) } else { Color.clear }
+            if let flow { OnbRoot(flow: flow, embedded: true).environment(\.onbDisplayTitles, true) } else { Color.clear }
         }
         .background(OnbColor.card.ignoresSafeArea())
         .accessibilityElement(children: .contain)
@@ -200,6 +200,7 @@ enum OnbBackfill {
 private struct BottomInsetKey: EnvironmentKey { static let defaultValue: CGFloat = 34 }
 enum OnbWelcomeAccount { case shown, hidden }
 private struct WelcomeAccountKey: EnvironmentKey { static let defaultValue: OnbWelcomeAccount = .shown }
+private struct DisplayTitlesKey: EnvironmentKey { static let defaultValue = false }
 extension EnvironmentValues {
     var onbBottomInset: CGFloat {
         get { self[BottomInsetKey.self] }
@@ -209,6 +210,11 @@ extension EnvironmentValues {
     var onbWelcomeAccount: OnbWelcomeAccount {
         get { self[WelcomeAccountKey.self] }
         set { self[WelcomeAccountKey.self] = newValue }
+    }
+    /// Step titles in Fraunces display (What's new).
+    var onbDisplayTitles: Bool {
+        get { self[DisplayTitlesKey.self] }
+        set { self[DisplayTitlesKey.self] = newValue }
     }
 }
 

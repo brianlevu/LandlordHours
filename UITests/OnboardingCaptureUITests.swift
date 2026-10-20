@@ -90,14 +90,17 @@ final class OnboardingCaptureUITests: XCTestCase {
         shot("01a-goal-empty", scheme, suffix)
         tap(app.buttons["goal-750"])
         shot("01-goal", scheme, suffix)
-        tap(app.buttons["goal-mp"])
+        // Large text: the 500 or 100 card sits below the fold; scroll to it first.
+        let mpCard = app.buttons["goal-mp"]
+        for _ in 0..<4 where !mpCard.isHittable { app.swipeUp(velocity: .slow) }
+        tap(mpCard)
+        let mp500 = app.buttons["goal-mp500"]
+        for _ in 0..<3 where !(mp500.exists && mp500.isHittable) { app.swipeUp(velocity: .slow) }
+        XCTAssertEqual(app.buttons["onb-primary"].label, "Build toward 500h", "The 500h goal is selected")
         shot("01b-goal-mp", scheme, suffix)
-        if app.buttons["goal-mp500"].exists && !app.buttons["goal-mp500"].isHittable {
-            // Large text: the 500h / 100h chips sit below the fold; show them too.
-            app.staticTexts["What are you building toward?"].swipeUp()
-            shot("01c-goal-mp-chips", scheme, suffix)
-        }
-        tap(app.buttons["goal-750"])
+        let repsCard = app.buttons["goal-750"]
+        for _ in 0..<4 where !repsCard.isHittable { app.swipeDown(velocity: .slow) }
+        tap(repsCard)
         tap(app.buttons["onb-primary"])
         XCTAssertTrue(app.buttons["onb-link"].waitForExistence(timeout: 5))
         Thread.sleep(forTimeInterval: 1.6)                      // rows + hatched storeys
@@ -131,6 +134,24 @@ final class OnboardingCaptureUITests: XCTestCase {
         }
         tap(app.buttons["tab.today"])
         shot("07-today-landing", scheme, suffix)
+
+        // A look-back that finds only work that never counts: no "0h found", the honest words.
+        launch(scheme: scheme, size: size, perms + ["-LHBackfillNonCountable"])
+        tap(app.buttons["onb-start"], timeout: 20)
+        tap(app.buttons["goal-750"])
+        tap(app.buttons["onb-primary"])
+        tap(app.buttons["onb-primary"])                         // fake Allow
+        tap(app.buttons["onb-primary"])                         // Who: Continue
+        let rental = app.textFields["property-name"]
+        tap(rental)
+        rental.typeText("Oak Street duplex")
+        tap(app.buttons["onb-primary"])                         // Save it
+        tap(app.buttons["onb-secondary"])                       // note: Not now
+        let none = app.staticTexts["staked-nothing-countable"]
+        XCTAssertTrue(none.waitForExistence(timeout: 10))
+        XCTAssertEqual(none.label.lowercased(), "we found 22 things, but none count toward your hours yet")
+        XCTAssertFalse(app.staticTexts["staked-found"].exists, "Never 0h found")
+        shot("06c-staked-none-count", scheme, suffix)
 
         // Record goal, staked without the calendar.
         launch(scheme: scheme, size: size, ["-LHOnboardingStep", "staked", "-LHOnbGoal", "record"])
