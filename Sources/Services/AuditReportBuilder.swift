@@ -264,7 +264,7 @@ enum AuditReportBuilder {
                 category: entry.category,
                 participant: entry.participant,
                 hours: entry.hours,
-                description: entry.notes,
+                description: entry.recordDescription ?? entry.notes,
                 loggedAt: entry.createdAt,
                 lastEditedAt: edited ? entry.modifiedAt : nil,
                 source: entry.source,

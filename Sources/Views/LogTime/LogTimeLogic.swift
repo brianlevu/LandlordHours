@@ -25,7 +25,7 @@ enum LogSaveResult: Equatable {
 
 /// A field the note (or, later, a receipt or a visit) can fill.
 enum LogField: Hashable, CaseIterable {
-    case property, category, hours, participant
+    case property, category, hours, participant, date, description
 }
 
 /// Where a fill came from. Today only the note and voice fill; the rest are smart-layer slots.
@@ -54,8 +54,11 @@ struct LogForm: Equatable {
     struct Snapshot: Equatable {
         var propertyId: UUID?
         var category: ActivityCategory?
+        var categoryIsRemembered = false
         var hours: Double
         var participant: Participant
+        var date = Date()
+        var recordDescription: String?
     }
 
     var note = ""
@@ -64,6 +67,9 @@ struct LogForm: Equatable {
     var hours: Double = 0
     var participant: Participant = .selfParticipant
     var date = Date()
+    /// "Description for your record": the model's sentence (fact-checked), editable. Nil hides
+    /// the row. The note stays the user's own words.
+    private(set) var recordDescription: String?
     /// Fields the user touched. A fill skips them.
     private(set) var userSet: Set<LogField> = []
     /// Fields the last fill wrote (they flash once, and Undo puts them back).
@@ -121,42 +127,106 @@ struct LogForm: Equatable {
         filled.remove(.participant)
     }
 
+    mutating func setDate(_ value: Date) {
+        date = value
+        userSet.insert(.date)
+        filled.remove(.date)
+    }
+
+    mutating func setDescription(_ value: String) {
+        recordDescription = value
+        userSet.insert(.description)
+        filled.remove(.description)
+    }
+
+    /// The description to save: trimmed, nil when empty.
+    var descriptionToSave: String? {
+        let trimmed = recordDescription?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     static func clampHours(_ value: Double) -> Double {
         min(max(0, (value / step).rounded() * step), maxHours)
     }
 
     // MARK: Fill
 
-    /// Fills from a parsed note. Only values the parser is sure of are used: a matched property,
-    /// a matched category, hours the note said out loud, and "spouse" only when spouse hours are
-    /// tracked. Returns the fields it wrote.
+    private var snapshot: Snapshot {
+        Snapshot(propertyId: propertyId, category: category, categoryIsRemembered: categoryIsRemembered, hours: hours,
+                 participant: participant, date: date, recordDescription: recordDescription)
+    }
+
+    /// The 1.x keyword parser's result as a reading: only what it is sure of (a matched
+    /// property, a matched category, hours said out loud, a spouse).
     @discardableResult
     mutating func apply(_ parsed: ParsedTimeEntry, source: LogFillSource, spouseTracking: Bool) -> Set<LogField> {
-        let snapshot = Snapshot(propertyId: propertyId, category: category, hours: hours, participant: participant)
-        var wrote = Set<LogField>()
-        if let property = parsed.property, !userSet.contains(.property), propertyId != property.id {
-            propertyId = property.id
-            wrote.insert(.property)
+        var reading = NoteReading()
+        reading.propertyId = parsed.property?.id
+        reading.category = parsed.categoryMatched ? parsed.category : nil
+        reading.hours = parsed.hoursAreExplicit && parsed.hours > 0 ? parsed.hours : nil
+        reading.participant = parsed.participant == .spouse ? .spouse : nil
+        return apply(reading, source: source, spouseTracking: spouseTracking)
+    }
+
+    /// Fills from a note reading. Never touches a field the user set. A fill on top of a fill
+    /// (the rules first, then Apple's model; or a longer note) is ONE fill: Undo goes back to
+    /// what was there before the first one, and a field a later reading no longer fills goes
+    /// back too. Returns the fields whose value changed in this call (they flash).
+    @discardableResult
+    mutating func apply(_ reading: NoteReading, source: LogFillSource, spouseTracking: Bool,
+                        calendar: Calendar = .current) -> Set<LogField> {
+        let current = snapshot
+        let before = beforeFill ?? current
+        var next = self
+        if next.canUndoFill { next.undoFill() }
+
+        if let id = reading.propertyId, !userSet.contains(.property) {
+            next.propertyId = id
         }
-        if parsed.categoryMatched, !userSet.contains(.category), category != parsed.category || categoryIsRemembered {
-            category = parsed.category
-            categoryIsRemembered = false
-            wrote.insert(.category)
+        if let value = reading.category, !userSet.contains(.category) {
+            next.category = value
+            next.categoryIsRemembered = false
         }
-        if parsed.hoursAreExplicit, !userSet.contains(.hours), parsed.hours > 0 {
-            let value = Self.clampHours(parsed.hours)
-            if value != hours { hours = value; wrote.insert(.hours) }
+        if let value = reading.hours, value > 0, !userSet.contains(.hours) {
+            next.hours = Self.clampHours(value)
         }
-        let who = LogParticipantRule.resolve(parsed.participant, spouseTracking: spouseTracking)
-        if !userSet.contains(.participant), who != participant {
-            participant = who
-            wrote.insert(.participant)
+        if let day = reading.date, !userSet.contains(.date) {
+            // The note picks the day; the time of day stays.
+            let time = calendar.dateComponents([.hour, .minute, .second], from: date)
+            next.date = calendar.date(bySettingHour: time.hour ?? 12, minute: time.minute ?? 0, second: time.second ?? 0,
+                                      of: calendar.startOfDay(for: day)) ?? day
         }
-        guard !wrote.isEmpty else { return [] }
-        beforeFill = snapshot
-        filled = wrote
-        fillSource = source
-        return wrote
+        if let who = reading.participant, !userSet.contains(.participant) {
+            next.participant = LogParticipantRule.resolve(who, spouseTracking: spouseTracking)
+        }
+        if let text = reading.description, !userSet.contains(.description) {
+            next.recordDescription = text
+        }
+
+        let after = next.snapshot
+        let differs = Self.differing(before, after, calendar: calendar).subtracting(userSet)
+        next.filled = differs
+        if differs.isEmpty {
+            next.beforeFill = nil
+            next.fillSource = nil
+        } else {
+            next.beforeFill = before
+            next.fillSource = source
+        }
+        let changed = Self.differing(current, after, calendar: calendar).subtracting(userSet)
+        self = next
+        return changed
+    }
+
+    private static func differing(_ a: Snapshot, _ b: Snapshot, calendar: Calendar) -> Set<LogField> {
+        var out = Set<LogField>()
+        if a.propertyId != b.propertyId { out.insert(.property) }
+        if a.category != b.category || a.categoryIsRemembered != b.categoryIsRemembered { out.insert(.category) }
+        if a.hours != b.hours { out.insert(.hours) }
+        if a.participant != b.participant { out.insert(.participant) }
+        if !calendar.isDate(a.date, inSameDayAs: b.date) { out.insert(.date) }
+        if a.recordDescription != b.recordDescription { out.insert(.description) }
+        return out
     }
 
     var canUndoFill: Bool { beforeFill != nil && fillSource != nil }
@@ -165,9 +235,14 @@ struct LogForm: Equatable {
     mutating func undoFill() {
         guard let before = beforeFill else { return }
         if filled.contains(.property) { propertyId = before.propertyId }
-        if filled.contains(.category) { category = before.category }
+        if filled.contains(.category) {
+            category = before.category
+            categoryIsRemembered = before.categoryIsRemembered
+        }
         if filled.contains(.hours) { hours = before.hours }
         if filled.contains(.participant) { participant = before.participant }
+        if filled.contains(.date) { date = before.date }
+        if filled.contains(.description) { recordDescription = before.recordDescription }
         filled = []
         fillSource = nil
         beforeFill = nil

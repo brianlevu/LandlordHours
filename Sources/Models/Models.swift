@@ -358,6 +358,9 @@ struct TimeEntry: Identifiable, Codable {
     var sourceDetail: String?
     /// The suggestion's dedupe key. The entry's `id` is derived from it (see `CaptureIdentity`).
     var sourceKey: String?
+    /// 2.0 Log time: the short, fact-checked description for the record (from Apple's model,
+    /// edited or confirmed by the user). `notes` stays the user's own words. Additive/optional.
+    var recordDescription: String?
 
     init(
         id: UUID = UUID(),
@@ -374,7 +377,8 @@ struct TimeEntry: Identifiable, Codable {
         detectedAt: Date? = nil,
         confirmedAt: Date? = nil,
         sourceDetail: String? = nil,
-        sourceKey: String? = nil
+        sourceKey: String? = nil,
+        recordDescription: String? = nil
     ) {
         self.id = id
         self.propertyId = propertyId
@@ -391,6 +395,7 @@ struct TimeEntry: Identifiable, Codable {
         self.confirmedAt = confirmedAt
         self.sourceDetail = sourceDetail
         self.sourceKey = sourceKey
+        self.recordDescription = recordDescription
         self.createdAt = Date()
         self.modifiedAt = Date()
     }
@@ -414,6 +419,7 @@ struct TimeEntry: Identifiable, Codable {
         confirmedAt = try c.decodeIfPresent(Date.self, forKey: .confirmedAt)
         sourceDetail = try c.decodeIfPresent(String.self, forKey: .sourceDetail)
         sourceKey = try c.decodeIfPresent(String.self, forKey: .sourceKey)
+        recordDescription = try c.decodeIfPresent(String.self, forKey: .recordDescription)
     }
     
     // Helper to get property name - call this when needed

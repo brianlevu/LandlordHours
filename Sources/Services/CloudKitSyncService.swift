@@ -1115,7 +1115,8 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         static let confirmedAt = "confirmedAt"      // Date/Time
         static let sourceDetail = "sourceDetail"    // String
         static let sourceKey = "sourceKey"          // String
-        static let all = [detectedAt, confirmedAt, sourceDetail, sourceKey]
+        static let recordDescription = "recordDescription"  // String (Log time description)
+        static let all = [detectedAt, confirmedAt, sourceDetail, sourceKey, recordDescription]
     }
 
     /// TimeEntry → CKRecord. The record name is the entry id; for confirmed suggestions that id
@@ -1139,6 +1140,7 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         if let confirmedAt = entry.confirmedAt { record[CaptureEntryField.confirmedAt] = confirmedAt }
         if let sourceDetail = entry.sourceDetail { record[CaptureEntryField.sourceDetail] = sourceDetail }
         if let sourceKey = entry.sourceKey { record[CaptureEntryField.sourceKey] = sourceKey }
+        if let recordDescription = entry.recordDescription { record[CaptureEntryField.recordDescription] = recordDescription }
         if let appUserId { record["appUserId"] = appUserId }
         return record
     }
@@ -1169,7 +1171,8 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
             detectedAt: record[CaptureEntryField.detectedAt] as? Date,
             confirmedAt: record[CaptureEntryField.confirmedAt] as? Date,
             sourceDetail: record[CaptureEntryField.sourceDetail] as? String,
-            sourceKey: record[CaptureEntryField.sourceKey] as? String
+            sourceKey: record[CaptureEntryField.sourceKey] as? String,
+            recordDescription: record[CaptureEntryField.recordDescription] as? String
         )
         entry.createdAt = record["createdAt"] as? Date ?? Date()
         entry.modifiedAt = record["modifiedAt"] as? Date ?? entry.createdAt

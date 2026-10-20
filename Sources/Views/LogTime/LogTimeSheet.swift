@@ -5,7 +5,8 @@ import PhotosUI
 //
 // One `.large` sheet covers the tab bar, so the tab bar can never hide the field or the keyboard.
 // It moves between Log, the timer (idle / running) and the timer's review in place.
-// Wiring kept from 1.x TimeLogView: AITimeEntryService note parsing, VoiceEntryService dictation
+// The note is read by NoteReaderChain (rules → Apple's on-device model → Private Cloud Compute;
+// Services/NoteReading). Wiring kept from 1.x TimeLogView: VoiceEntryService dictation
 // (permission + denied path), the AppViewModel timer + Live Activity, the stopped-timer draft,
 // Self/Spouse honouring spouse tracking, the property limit (LogProGate), analytics (inside
 // AppViewModel.logTimeEntry) and the iCloud push (saveData path).
@@ -57,7 +58,8 @@ struct LogTimeSheet: View {
     @State private var stepTick = 0
     /// Smart-layer slots: empty today, so nothing renders.
     @State private var prefills: [LogPrefill] = []
-    @State private var recordDescription: String?
+    /// Rules, then Apple's models (one chain per sheet).
+    @State private var noteReader = NoteReaderChain.live()
     @FocusState private var noteFocused: Bool
     /// DEBUG capture of the listening state (the simulator has no microphone input).
     @State private var debugListening = false
@@ -180,6 +182,9 @@ struct LogTimeSheet: View {
         #if DEBUG
         LogSheetDebug.apply(to: &form, mode: &mode, picker: &picker, voiceIntro: &showVoiceIntro,
                             saveError: &saveError, properties: properties, viewModel: viewModel, focus: { noteFocused = true })
+        if LogSheetDebug.state == "aiNote" || LogSheetDebug.state == "aiPartial" {
+            readNote(delay: 0.6, source: .note)
+        }
         if LogSheetDebug.state == "listening" {
             debugListening = true
             form.note = "Fixed the sink at Pine"
@@ -525,26 +530,34 @@ struct LogTimeSheet: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("log.notCounted")
             }
-            if let recordDescription {
-                // Smart-layer slot: the generated sentence for the record (hidden until it exists).
+            if form.recordDescription != nil {
+                // Smart-layer slot: the fact-checked sentence for the record from Apple's model
+                // (hidden until it exists). Editable in place; the note stays the user's words.
                 divider
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Description for your record").font(.subheadline).foregroundStyle(colors.textSecondary)
-                    Text(recordDescription).foregroundStyle(colors.textPrimary).lineLimit(2)
+                    TextField("", text: Binding(get: { form.recordDescription ?? "" }, set: { form.setDescription($0) }), axis: .vertical)
+                        .lineLimit(1...3)
+                        .foregroundStyle(colors.textPrimary)
+                        .tint(colors.action)
+                        .accessibilityLabel("Description for your record")
+                        .accessibilityIdentifier("log.description.field")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
+                .background(colors.timber.opacity(form.filled.contains(.description) ? flash : 0))
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("log.description")
             }
             divider
-            valueRow("Date", flashing: false, identifier: "log.date") {
+            valueRow("Date", flashing: form.filled.contains(.date), identifier: "log.date") {
                 withMotion { showDatePicker.toggle() }
             } value: {
                 Text(LogTimeFormat.dateRow(form.date)).foregroundStyle(colors.textPrimary)
             }
             if showDatePicker {
-                DatePicker("Date", selection: $form.date, in: ...Date(), displayedComponents: .date)
+                DatePicker("Date", selection: Binding(get: { form.date }, set: { form.setDate($0) }), in: ...Date(), displayedComponents: .date)
                     .datePickerStyle(.graphical)
                     .tint(colors.action)
                     .labelsHidden()
@@ -832,7 +845,9 @@ struct LogTimeSheet: View {
         readNote(delay: 0.6, source: usedVoice ? .voice : .note)
     }
 
-    /// After a 600ms pause the on-device parser fills the empty fields (never one the user set).
+    /// After a 600ms pause the note is read: the rules fill at once, then Apple's on-device
+    /// model (and Private Cloud Compute when the phone's model can't answer) refine the fields
+    /// while the drafting line shows. Never a field the user set; nothing is saved until Log.
     private func readNote(delay: Double, source: LogFillSource) {
         readTask?.cancel()
         let text = form.trimmedNote
@@ -840,22 +855,32 @@ struct LogTimeSheet: View {
             isReading = false
             return
         }
-        let props = properties
+        let request = NoteReadRequest(text: text, properties: properties, spouseTracking: spouseTracking)
+        let chain = noteReader
         readTask = Task { @MainActor in
             if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.2)) { isReading = true }
-            let parsed = await AITimeEntryService.shared.parseTimeEntry(from: text, properties: props)
-            // Long enough to read as "we looked", short enough not to wait on.
-            try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled, form.trimmedNote == text else { return }
-            var wrote = Set<LogField>()
-            withMotion {
+            let rules = chain.rules(request)
+            fill(rules, source: source)
+            guard chain.hasModel else {
                 isReading = false
-                if let parsed { wrote = form.apply(parsed, source: source, spouseTracking: spouseTracking) }
+                return
             }
-            if !wrote.isEmpty { playFlash() }
+            withAnimation(.easeOut(duration: 0.2)) { isReading = true }
+            let outcome = await chain.read(request, rules: rules) { refined in
+                guard !Task.isCancelled, form.trimmedNote == text else { return }
+                fill(refined, source: source)
+            }
+            guard !Task.isCancelled, form.trimmedNote == text else { return }
+            withMotion { isReading = false }
+            fill(outcome.reading, source: source)
         }
+    }
+
+    private func fill(_ reading: NoteReading, source: LogFillSource) {
+        var wrote = Set<LogField>()
+        withMotion { wrote = form.apply(reading, source: source, spouseTracking: spouseTracking) }
+        if !wrote.isEmpty { playFlash() }
     }
 
     /// The timber wash on each filled value: 0 → 16% → 0 over 600ms.
@@ -934,7 +959,8 @@ struct LogTimeSheet: View {
         default:
             let result = viewModel.logTimeEntry(propertyId: propertyId, participant: participant, category: category,
                                                 hours: hours, date: form.date, notes: form.trimmedNote,
-                                                attachments: attachments, source: usedVoice ? .voice : .manual)
+                                                attachments: attachments, source: usedVoice ? .voice : .manual,
+                                                recordDescription: form.descriptionToSave)
             switch result {
             case .failed(let message): fail(message)
             case .saved(let id):

@@ -7,6 +7,8 @@ import Foundation
 //       voiceFirst | listening | voiceFilled | voiceDenied (pair with -LHVoiceDenied)
 //       pickerCategory | pickerProperty | pickerPropertyLimit (seed "limit")
 //       timerIdle | timerRunning | timerReview
+//       aiNote | aiPartial   types a note that goes through the real note reader; pair with
+//                            -LHNoteModel fake|thinking|unavailable (NoteReaderChain)
 //   -LHLogSpouse          spouse tracking on (the Who row)
 //   -LHTodayTimer running|draft|recovery   Today's timer card states
 //   -LHFailNextSave       the next save fails (the surfaced save error)
@@ -40,6 +42,8 @@ enum LogSheetDebug {
 
     #if DEBUG
     static let sample = "Fixed the sink at Pine Cabin, 1 hour"
+    static let aiSample = "fixed the sink at Oak St with Mike, about 2 hours yesterday"
+    static let aiPartialSample = "Fixed the sink, about an hour"
 
     @MainActor
     static func apply(to form: inout LogForm, mode: inout LogTimeSheet.Mode, picker: inout LogTimeSheet.Picker?,
@@ -66,6 +70,11 @@ enum LogSheetDebug {
         switch state {
         case "typed":
             form.note = sample
+        case "aiNote":
+            // Not user-set: the read fills over the defaults, as when typed.
+            form.note = aiSample
+        case "aiPartial":
+            form.note = aiPartialSample
         case "filled", "voiceFilled":
             // Defaults first (the remembered category), then the fill, so the caption shows.
             form.propertyId = nil
