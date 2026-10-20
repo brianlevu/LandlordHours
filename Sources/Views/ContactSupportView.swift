@@ -35,12 +35,14 @@ struct ContactSupportView: View {
             }
 
             Section {
-                TextField("Subject", text: $subject)
+                TextField("", text: $subject, prompt: Text("Subject").foregroundStyle(colors.textTertiary))
                     .foregroundStyle(colors.textPrimary)
+                    .accessibilityLabel("Subject")
                     .accessibilityIdentifier("support.subject")
-                TextField("What happened, and what did you expect?", text: $message, axis: .vertical)
+                TextField("", text: $message, prompt: Text("What happened, and what did you expect?").foregroundStyle(colors.textTertiary), axis: .vertical)
                     .lineLimit(5...12)
                     .foregroundStyle(colors.textPrimary)
+                    .accessibilityLabel("Message")
                     .accessibilityIdentifier("support.message")
             } header: {
                 BPSectionHeader(title: "Your message")

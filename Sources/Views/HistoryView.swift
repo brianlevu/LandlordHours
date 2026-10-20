@@ -170,11 +170,12 @@ private struct RecordsScreen: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(colors.textSecondary)
                 .accessibilityHidden(true)
-            TextField("Search records", text: $filter.searchText)
+            TextField("", text: $filter.searchText, prompt: Text("Search records").foregroundStyle(colors.textTertiary))
                 .font(.body)
                 .foregroundStyle(colors.textPrimary)
                 .focused($searchFocused)
                 .submitLabel(.search)
+                .accessibilityLabel("Search records")
                 .accessibilityIdentifier("records.search")
             if !filter.searchText.isEmpty {
                 Button {
@@ -319,7 +320,7 @@ private struct RecordsScreen: View {
         }
         .listRowBackground(colors.backgroundSecondary)
         .listRowInsets(EdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 16))
-        .alignmentGuide(.listRowSeparatorLeading) { _ in 64 }
+        .alignmentGuide(.listRowSeparatorLeading) { _ in 48 }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive) {
                 entryToDelete = entry
@@ -385,22 +386,29 @@ struct RecordRowView: View {
                 .foregroundStyle(colors.textSecondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
-            HStack(spacing: 10) {
-                Label(badge.title, systemImage: badge.symbol)
-                    .labelStyle(RecordBadgeLabelStyle(tint: badgeTint))
-                    .fixedSize()
-                if entry.participant == .spouse {
-                    Label("Spouse", systemImage: "person.2")
-                        .labelStyle(RecordBadgeLabelStyle(tint: colors.rose))
-                        .fixedSize()
-                }
-                if !entry.countsForREPS {
-                    Label("Investor task", systemImage: "minus.circle")
-                        .labelStyle(RecordBadgeLabelStyle(tint: colors.textSecondary))
-                        .fixedSize()
-                }
+            // Badges sit on one line while they fit, else stack. Fixed-size badges forced a row
+            // wider than its cell at large text (the first row's hours clipped at the corner).
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) { badges }
+                VStack(alignment: .leading, spacing: 4) { badges }
             }
             .padding(.top, 2)
+        }
+    }
+
+    @ViewBuilder private var badges: some View {
+        Label(badge.title, systemImage: badge.symbol)
+            .labelStyle(RecordBadgeLabelStyle(tint: badgeTint))
+            .fixedSize()
+        if entry.participant == .spouse {
+            Label("Spouse", systemImage: "person.2")
+                .labelStyle(RecordBadgeLabelStyle(tint: colors.rose))
+                .fixedSize()
+        }
+        if !entry.countsForREPS {
+            Label("Investor task", systemImage: "minus.circle")
+                .labelStyle(RecordBadgeLabelStyle(tint: colors.textSecondary))
+                .fixedSize()
         }
     }
 
