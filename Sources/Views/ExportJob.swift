@@ -182,10 +182,78 @@ struct ExportReadyBanner: View {
     var kind: ExportJob.Banner = .ready
     var onOpen: () -> Void
     var onDismiss: () -> Void
+    /// Seconds before the ready banner folds into a small pill, so it takes as little of the
+    /// page as possible (it sits in its own row and never covers content).
+    var collapseAfter: Double = 4
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var collapsed = false
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
+        Group {
+            if kind == .ready && collapsed {
+                pill
+                    .transition(.opacity)
+            } else {
+                full
+                    .transition(.opacity)
+            }
+        }
+        .onAppear {
+            UIAccessibility.post(notification: .announcement,
+                                 argument: kind == .ready ? "Your report is ready" : "Couldn't create your report")
+            guard kind == .ready else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + collapseAfter) {
+                if reduceMotion { collapsed = true } else { withAnimation(.easeOut(duration: 0.24)) { collapsed = true } }
+            }
+        }
+    }
+
+    /// "Report ready · Share", a compact centred pill.
+    private var pill: some View {
+        HStack(spacing: 4) {
+            Button(action: onOpen) {
+                HStack(spacing: 8) {
+                    LucideIcon(image: Lucide.fileCheck, size: 15)
+                        .foregroundStyle(colors.positive)
+                    Text("Report ready")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(colors.textPrimary)
+                    Text("Share")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(colors.action)
+                }
+                .padding(.leading, 14)
+                .frame(minHeight: 40)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.lhPressable)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Your report is ready. \(Self.readySubtitle). Share")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier("export.readyBanner")
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(colors.textSecondary)
+                    .frame(width: 36, height: 40)
+            }
+            .buttonStyle(.lhPressable)
+            .accessibilityLabel("Close")
+            .accessibilityIdentifier("export.readyBanner.close")
+        }
+        .background(
+            Capsule()
+                .fill(colors.backgroundSecondary)
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.10), radius: 10, y: 3)
+        )
+        .overlay(Capsule().strokeBorder(colors.border.opacity(0.6), lineWidth: 1))
+        .frame(maxWidth: .infinity)
+    }
+
+    private var full: some View {
         HStack(spacing: 12) {
             if kind == .ready {
                 Button(action: onOpen) {
@@ -254,10 +322,6 @@ struct ExportReadyBanner: View {
                 .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.12), radius: 16, y: 4)
         )
         .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(colors.border.opacity(0.6), lineWidth: 1))
-        .onAppear {
-            UIAccessibility.post(notification: .announcement,
-                                 argument: kind == .ready ? "Your report is ready" : "Couldn't create your report")
-        }
     }
 }
 
