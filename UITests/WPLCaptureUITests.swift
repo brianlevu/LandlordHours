@@ -140,4 +140,43 @@ final class WPLCaptureUITests: XCTestCase {
         still("export-share-\(scheme)")
         mark("c", "end")
     }
+
+    // (d) The export sheet's sync gate: waiting for hours, still syncing (with the explicit
+    // "Create with what's on this device"), and the failed-pull note. Forced via a DEBUG hook.
+    func testCaptureD_ExportSyncStates() {
+        for state in ["waiting", "syncing", "failed"] {
+            app.terminate()
+            app.launchArguments = [
+                UITestIsolation.resetProfilesArgument,
+                "-LHMockScenario", "frequent",
+                "-LHInitialTab", "3",
+                "-LHSimulatePullState", state,
+                "-LHColorScheme", schemeArg,
+                "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+            ]
+            app.launch()
+            let exportButton = app.buttons["reports.export"]
+            XCTAssertTrue(exportButton.waitForExistence(timeout: 20))
+            Thread.sleep(forTimeInterval: 1.2)
+            exportButton.tap()
+            let generate = app.buttons["export.generatePDF"]
+            XCTAssertTrue(generate.waitForExistence(timeout: 8))
+            switch state {
+            case "waiting":
+                XCTAssertEqual(generate.label, "Getting your latest hours…")
+                XCTAssertFalse(generate.isEnabled)
+            case "syncing":
+                XCTAssertEqual(generate.label, "Still syncing from iCloud")
+                XCTAssertFalse(generate.isEnabled)
+                XCTAssertTrue(app.buttons["export.createLocal"].exists)
+            default:
+                XCTAssertTrue(generate.isEnabled)
+                XCTAssertTrue(app.descendants(matching: .any)["export.pullFailedNote"].exists)
+            }
+            // The action area sits below the preview: scroll it into view for the still.
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 1.0)
+            still("export-gate-\(state)-\(scheme)")
+        }
+    }
 }

@@ -229,7 +229,7 @@ struct ExportReadyBanner: View {
                         .foregroundStyle(colors.action)
                 }
                 .padding(.leading, 14)
-                .frame(minHeight: 40)
+                .frame(minHeight: 44)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.lhPressable)
@@ -242,7 +242,7 @@ struct ExportReadyBanner: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(colors.textSecondary)
-                    .frame(width: 36, height: 40)
+                    .frame(width: 40, height: 44)
             }
             .buttonStyle(.lhPressable)
             .accessibilityLabel("Close")

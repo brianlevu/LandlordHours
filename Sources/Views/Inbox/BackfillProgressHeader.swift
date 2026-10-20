@@ -12,7 +12,6 @@ struct BackfillProgressHeader: View {
     /// Today's variant: the whole card opens the Inbox; no Cancel inside it.
     var onOpen: (() -> Void)? = nil
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Group {
@@ -45,7 +44,6 @@ struct BackfillProgressHeader: View {
                     .font(.subheadline)
                     .monospacedDigit()
                     .foregroundStyle(OnBlueprint.secondary)
-                    .contentTransition(.numericText())
                     .lineLimit(2)
                 BackfillProgressLine(fraction: total > 0 ? Double(completed) / Double(total) : 0)
                     .frame(height: 3)
@@ -75,7 +73,8 @@ struct BackfillProgressHeader: View {
         .background(InboxBlueprintPaper())
         // Only Today's variant is tappable as a whole; in the Inbox, Cancel gets every tap.
         .modifier(OpensOnTap(action: onOpen))
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: completed)
+        // No count animation: the "found so far" number ticks in the same frame as the Inbox
+        // badge (both read the inbox's backfill count).
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Looking through your calendar. \(Self.detail(completed: completed, total: total, found: found))")
         .accessibilityIdentifier("inbox.backfill.header")

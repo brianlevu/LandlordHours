@@ -131,7 +131,12 @@ class AppViewModel: ObservableObject {
                 if self.isSignedIn { Task { await self.syncService.start() } }
             }
         } else if isSignedIn {
+            #if DEBUG
+            // Capture hook: a forced pull state replaces the real sync start.
+            if Self.simulatedPullState == nil { startInitialSync(showsPlaceholder: !Self.isMockLaunch) }
+            #else
             startInitialSync(showsPlaceholder: !Self.isMockLaunch)
+            #endif
         }
 #if DEBUG
         applySimulatedPendingPullIfNeeded()
@@ -201,7 +206,32 @@ class AppViewModel: ObservableObject {
 #if DEBUG
     /// `-LHSimulatePendingPull <seconds>`: Today shows the first-pull loading state for that long,
     /// then settles (captures and the "Today stays usable while loading" UI test).
+    /// `-LHSimulatePullState waiting|syncing|failed`: holds the export gate in that state
+    /// (captures of the export sheet). waiting = hours placeholder showing; syncing = past the
+    /// cap with the pull still running; failed = the pull failed (gate open with the note).
+    static var simulatedPullState: String? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "-LHSimulatePullState"), args.indices.contains(index + 1) else { return nil }
+        return args[index + 1]
+    }
+
+    private func applySimulatedPullStateIfNeeded() {
+        switch Self.simulatedPullState {
+        case "waiting":
+            isInitialPullRunning = true
+            beginAwaitingInitialPull(timeout: 3600)
+        case "syncing":
+            isInitialPullRunning = true
+        case "failed":
+            isInitialPullRunning = false
+            initialPullFailed = true
+        default:
+            break
+        }
+    }
+
     private func applySimulatedPendingPullIfNeeded() {
+        applySimulatedPullStateIfNeeded()
         let args = ProcessInfo.processInfo.arguments
         guard let index = args.firstIndex(of: "-LHSimulatePendingPull"),
               args.indices.contains(index + 1),
