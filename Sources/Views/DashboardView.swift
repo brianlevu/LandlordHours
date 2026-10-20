@@ -740,7 +740,14 @@ struct DashboardView: View {
     /// The WP-H words (hours, goal, stage, next step) plus the pace line, for the live hours.
     private var heroAccessibilityLabel: String {
         let live = HouseProgress(hours: totalHours, goal: houseGoal)
-        return "\(currentYear). \(live.accessibilityLabel) \(pace.text)."
+        switch heroFooter {
+        case .emptyLot:
+            return "\(currentYear). An empty lot. Add a property. Every hour you confirm builds on it."
+        case .found(let hours):
+            return "\(currentYear). \(live.accessibilityLabel) \(hours) found in your calendar, not counted until you confirm."
+        case nil:
+            return "\(currentYear). \(live.accessibilityLabel) \(pace.text)."
+        }
     }
 
     private func dashboardMiniMetric(title: String, value: String, detail: String? = nil) -> some View {

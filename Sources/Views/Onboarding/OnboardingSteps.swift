@@ -269,46 +269,73 @@ struct OnbSource {
 struct OnbSampleRow: View {
     let row: OnbSource.SampleRow
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        HStack(spacing: 12) {
-            Text(row.hours)
-                .font(.system(.title3, design: .rounded, weight: .bold))
-                .monospacedDigit()
-                .foregroundStyle(OnbColor.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .frame(width: 70, alignment: .leading)
-            Image("bp_tool_\(row.category.blueprintToolName)_36")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 36, height: 36)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Label(row.when, systemImage: row.sourceGlyph)
-                    .font(.footnote)
-                    .foregroundStyle(OnbColor.textSecondary)
-                    .labelStyle(OnbTightLabel())
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                Text(row.title)
-                    .font(.headline)
-                    .foregroundStyle(OnbColor.textPrimary)
-                Text(row.category.inboxLabel)
-                    .font(.subheadline)
-                    .foregroundStyle(row.category.inboxInk(AdaptiveColors(colorScheme: colorScheme)))
+        Group {
+            if typeSize.isAccessibilitySize {
+                // Large text: hours and tool on a line of their own above the words; nothing truncates.
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 12) { hours; tool; Spacer(minLength: 4); hollow }
+                    words
+                }
+            } else {
+                HStack(spacing: 12) {
+                    hours.frame(width: 70, alignment: .leading)
+                    tool
+                    words
+                    Spacer(minLength: 4)
+                    hollow
+                }
             }
-            Spacer(minLength: 4)
-            // Hollow: a suggestion, not a record, until the owner confirms it.
-            Circle()
-                .strokeBorder(OnbColor.draftingInk, style: StrokeStyle(lineWidth: 1.5, dash: [3, 2.5]))
-                .frame(width: 20, height: 20)
-                .accessibilityHidden(true)
         }
         .padding(.vertical, 8)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Example: \(row.title), \(row.hours), \(row.category.inboxLabel)")
         .accessibilityHint("Suggestion, not saved")
+    }
+
+    private var hours: some View {
+        Text(row.hours)
+            .font(.system(.title3, design: .rounded, weight: .bold))
+            .monospacedDigit()
+            .foregroundStyle(OnbColor.textPrimary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+    }
+
+    private var tool: some View {
+        Image("bp_tool_\(row.category.blueprintToolName)_36")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 36, height: 36)
+            .accessibilityHidden(true)
+    }
+
+    private var words: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Label(row.when, systemImage: row.sourceGlyph)
+                .font(.footnote)
+                .foregroundStyle(OnbColor.textSecondary)
+                .labelStyle(OnbTightLabel())
+                .lineLimit(typeSize >= .xxLarge ? 3 : 1)
+                .minimumScaleFactor(typeSize >= .xxLarge ? 1 : 0.8)
+                .fixedSize(horizontal: false, vertical: typeSize >= .xxLarge)
+            Text(row.title)
+                .font(.headline)
+                .foregroundStyle(OnbColor.textPrimary)
+            Text(row.category.inboxLabel)
+                .font(.subheadline)
+                .foregroundStyle(row.category.inboxInk(AdaptiveColors(colorScheme: colorScheme)))
+        }
+    }
+
+    /// Hollow: a suggestion, not a record, until the owner confirms it.
+    private var hollow: some View {
+        Circle()
+            .strokeBorder(OnbColor.draftingInk, style: StrokeStyle(lineWidth: 1.5, dash: [3, 2.5]))
+            .frame(width: 20, height: 20)
+            .accessibilityHidden(true)
     }
 }
 

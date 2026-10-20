@@ -267,8 +267,10 @@ struct HouseHeroCard: View {
                 // the house fills the right half or so (the approved r6 concept proportion) and
                 // the words keep a ~130 pt column for real pace copy ("Behind by 388h").
                 // A staked lot leaves room on the right for the name flag (approved onboarding landing).
+                // The empty lot is smaller too, so its words and button keep a clear column.
                 let staked = stakeName != nil
-                let houseSize = min(g.size.height * 0.84, g.size.width * 0.62) * (staked ? 0.86 : 1)
+                let shrink: CGFloat = staked ? 0.86 : (footerIsWide ? 0.8 : 1)
+                let houseSize = min(g.size.height * 0.84, g.size.width * 0.62) * shrink
                 let houseCenter = CGPoint(x: g.size.width - 4 - houseSize * 0.44 - (staked ? 40 : 0), y: g.size.height - 6 - houseSize * 0.417)
                 let houseOrigin = CGPoint(x: houseCenter.x - houseSize / 2, y: houseCenter.y - houseSize / 2)
                 // Bottom lines stay clear of the lot's left tip (~6% into the camera at ~74% height).
@@ -316,7 +318,10 @@ struct HouseHeroCard: View {
                         Spacer(minLength: 8)
                         if let footer {
                             footerView(footer)
-                                .frame(width: columnWidth + (footerIsWide ? 40 : 0), alignment: .leading)
+                                // The lot's words share the card with the art: capped so they never
+                                // truncate or run into the house (VoiceOver reads the full words).
+                                .dynamicTypeSize(...DynamicTypeSize.large)
+                                .frame(width: columnWidth, alignment: .leading)
                         } else {
                         Group {
                             if let status {
@@ -378,6 +383,8 @@ struct HouseHeroCard: View {
                 Button(action: onAdd) {
                     Label("Add property", systemImage: "plus")
                         .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .fixedSize()
                         .foregroundStyle(HouseTokens.blueprint)
                         .padding(.horizontal, 14)
                         .frame(minHeight: 36)
