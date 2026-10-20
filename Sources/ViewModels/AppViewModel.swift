@@ -111,6 +111,12 @@ class AppViewModel: ObservableObject {
             refreshWidgetSnapshot()
         }
         syncService.delegate = self
+        // Any successful pull for the active profile (including retries that call start()
+        // directly) clears the export sheet's "Couldn't reach iCloud" note.
+        syncService.onInitialPullSucceeded = { [weak self] profileId in
+            guard let self, profileId == UserScope.userId else { return }
+            self.initialPullFailed = false
+        }
 
         // Trigger cloud sync when tax profile or goals change
         TaxProfileManager.shared.onDidChange = { [weak self] in
@@ -145,11 +151,12 @@ class AppViewModel: ObservableObject {
 
     /// Starts the profile's initial iCloud sync. With `showsPlaceholder`, Today treats the hours
     /// as not final until the first pull ends (any outcome) or the timeout passes.
-    func startInitialSync(showsPlaceholder: Bool = true) {
+    @discardableResult
+    func startInitialSync(showsPlaceholder: Bool = true) -> Task<Void, Never> {
         let token = showsPlaceholder && syncService.isCloudKitAvailable ? beginAwaitingInitialPull() : nil
         initialSyncsInFlight += 1
         isInitialPullRunning = true
-        Task { [weak self] in
+        return Task { [weak self] in
             guard let self else { return }
             // Returns only after a pull for the profile active now has run (a call made while
             // another profile's pull is in flight waits for the re-run).

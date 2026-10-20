@@ -305,6 +305,8 @@ private final class CancelFlag: @unchecked Sendable {
 @MainActor
 private final class PullRecorder {
     var pulledFor: [String?] = []
+    /// Profiles whose pull has finished (appended after the slow pull returns).
+    var finishedFor: [String?] = []
 }
 
 @MainActor
@@ -315,8 +317,10 @@ final class InitialSyncSwitchMidPullTests: CaptureTestCase {
             prepare: {},
             push: {},
             pull: {
-                recorder.pulledFor.append(UserScope.userId)
+                let profile = UserScope.userId
+                recorder.pulledFor.append(profile)
                 try? await Task.sleep(nanoseconds: 120_000_000)
+                recorder.finishedFor.append(profile)
                 return pullOK
             }
         )
@@ -349,16 +353,32 @@ final class InitialSyncSwitchMidPullTests: CaptureTestCase {
         let profileB = "local-switch-\(UUID().uuidString.prefix(6))"
         UserDefaults.standard.set(profileB, forKey: ProfileKeys.localProfileId)
         defer { AppViewModel.clearScopedAccountData(for: profileB) }
-        app.startInitialSync(showsPlaceholder: false)
+        let second = app.startInitialSync(showsPlaceholder: false)
 
-        // A's pull ends (~120 ms in); the gate must still be closed while B's pull runs.
-        try? await Task.sleep(nanoseconds: 150_000_000)
-        XCTAssertTrue(app.isInitialPullRunning, "Not open after A's pull: B hasn't been pulled")
+        // The second (profile B) sync finishes only after B's pull finished. Before the fix,
+        // start() returned at once for a request made mid-pull, so this await came back while
+        // B hadn't been pulled at all.
+        await second.value
+        XCTAssertTrue(recorder.finishedFor.contains(profileB), "B pulled before B's sync reported done")
+
         let deadline = Date().addingTimeInterval(5)
         while app.isInitialPullRunning && Date() < deadline { try? await Task.sleep(nanoseconds: 5_000_000) }
         XCTAssertFalse(app.isInitialPullRunning)
         XCTAssertEqual(recorder.pulledFor.last ?? nil, profileB)
         XCTAssertFalse(app.initialPullFailed)
+    }
+
+    /// A retry outside startInitialSync (Sync Now, iCloud coming back, a notification action)
+    /// that succeeds clears the stale "Couldn't reach iCloud" note.
+    func testAnySuccessfulRetryClearsTheFailedNote() async {
+        let (app, _) = makeViewModel()
+        app.syncService.operationsOverride = slowOps(PullRecorder(), pullOK: false)
+        await app.startInitialSync(showsPlaceholder: false).value
+        XCTAssertTrue(app.initialPullFailed)
+
+        app.syncService.operationsOverride = slowOps(PullRecorder(), pullOK: true)
+        await app.syncService.start()           // a direct retry, not startInitialSync
+        XCTAssertFalse(app.initialPullFailed, "The note goes away once iCloud is reached")
     }
 
     func testFailedPullOpensTheGateWithANote() async {

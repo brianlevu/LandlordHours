@@ -41,6 +41,10 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     weak var delegate: CloudKitSyncDelegate?
     /// Called with the profile id once its initial pull has finished and the push gate opened.
     var onInitialSyncCompleted: ((String) -> Void)?
+    /// Called with the profile id whenever its initial pull succeeds, by any path (launch,
+    /// Sync Now, iCloud coming back, a notification action's retry). The view model clears its
+    /// "couldn't reach iCloud" state here.
+    var onInitialPullSucceeded: ((String) -> Void)?
     /// False when this build has no CloudKit (simulator, missing entitlement).
     var isCloudKitAvailable: Bool { container != nil }
 
@@ -216,7 +220,10 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
             await ops.push()
         }
         // Queued notification confirms were waiting for this pull.
-        if let startingFor { onInitialSyncCompleted?(startingFor) }
+        if let startingFor {
+            onInitialPullSucceeded?(startingFor)
+            onInitialSyncCompleted?(startingFor)
+        }
     }
 
     /// Manual "Sync Now": runs the initial sync first when the gate isn't open yet, then
