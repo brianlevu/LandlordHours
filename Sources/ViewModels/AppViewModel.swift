@@ -41,6 +41,15 @@ class AppViewModel: ObservableObject {
     /// initial sync ends (any outcome) or after `initialPullPlaceholderTimeout`.
     @Published private(set) var isAwaitingInitialPull = false
     static let initialPullPlaceholderTimeout: TimeInterval = 6
+    /// When iCloud last merged entries in. Today updates the house quietly for these (no "+Nh"
+    /// beam, no haptic): the user didn't just log them.
+    @Published private(set) var lastRemoteMergeAt: Date?
+
+    /// True for an hours change that came from an iCloud merge (within `window` of it).
+    static func isRemoteMerge(lastMergeAt: Date?, now: Date = Date(), window: TimeInterval = 1.5) -> Bool {
+        guard let lastMergeAt else { return false }
+        return now.timeIntervalSince(lastMergeAt) <= window
+    }
     private var initialPullWaitToken = UUID()
     @Published var isSignedIn = false
     @Published var userName: String = ""
@@ -1546,6 +1555,8 @@ extension AppViewModel: CloudKitSyncDelegate {
     }
 
     func syncDidReceiveEntries(_ remoteEntries: [TimeEntry]) {
+        // Set first, so the same update that changes the hours sees it (quiet house update).
+        lastRemoteMergeAt = Date()
         for remote in remoteEntries {
             if let idx = timeEntries.firstIndex(where: { $0.id == remote.id }) {
                 if remote.modifiedAt > timeEntries[idx].modifiedAt {
@@ -1565,6 +1576,7 @@ extension AppViewModel: CloudKitSyncDelegate {
     }
 
     func syncDidDeleteEntryIds(_ ids: Set<UUID>) {
+        lastRemoteMergeAt = Date()
         timeEntries.removeAll { ids.contains($0.id) }
         saveDataLocal()
     }

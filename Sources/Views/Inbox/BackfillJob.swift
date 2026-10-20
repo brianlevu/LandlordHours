@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 
 // MARK: - Backfill scanning seam
 
@@ -60,7 +61,22 @@ struct CalendarBackfillScanner: BackfillScanning {
 /// (nothing counts until confirmed, and a re-run updates them in place by source key).
 @MainActor
 final class BackfillJob: ObservableObject {
-    static let shared = BackfillJob()
+    static let shared = BackfillJob(pendingBackfill: {
+        AppModelHost.shared.suggestionStore?.pending.filter(\.isBackfill) ?? []
+    })
+
+    /// The Inbox shows its empty state only when no look-back header has something to say
+    /// (a stopped or blocked look-back keeps Run again / Settings even with nothing found).
+    static func showsEmptyState(visibleIsEmpty: Bool, phase: Phase) -> Bool {
+        visibleIsEmpty && !showsHeader(phase)
+    }
+
+    static func showsHeader(_ phase: Phase) -> Bool {
+        switch phase {
+        case .scanning, .cancelled, .blocked: return true
+        case .idle, .finished: return false
+        }
+    }
 
     enum Phase: Equatable {
         case idle
@@ -83,6 +99,12 @@ final class BackfillJob: ObservableObject {
     var onFinished: @MainActor (_ foundCount: Int, _ foundHours: Double) -> Void
     /// Marks the day-1 backfill done for the active profile (default: `CaptureOptIn`).
     var markCompleted: @MainActor () -> Void
+    /// The look-back's items still waiting in the inbox. At the end of a run they are the result:
+    /// a re-run after a cancel updates earlier items in place, so they never stream as "new".
+    /// nil counts what streamed (tests with no store).
+    var pendingBackfill: (@MainActor () -> [Suggestion])?
+    /// VoiceOver: one announcement when a run ends (finished, stopped, blocked).
+    var announce: @MainActor (String) -> Void
 
     private var task: Task<Void, Never>?
     private var runID = UUID()
@@ -94,11 +116,17 @@ final class BackfillJob: ObservableObject {
         onFinished: @escaping @MainActor (Int, Double) -> Void = { count, hours in
             TodayHouseEvents.shared.backfillFinished(foundHours: hours, suggestionCount: count)
         },
-        markCompleted: @escaping @MainActor () -> Void = { CaptureOptIn.markBackfillCompleted() }
+        markCompleted: @escaping @MainActor () -> Void = { CaptureOptIn.markBackfillCompleted() },
+        pendingBackfill: (@MainActor () -> [Suggestion])? = nil,
+        announce: @escaping @MainActor (String) -> Void = { message in
+            UIAccessibility.post(notification: .announcement, argument: message)
+        }
     ) {
         self.onItems = onItems
         self.onFinished = onFinished
         self.markCompleted = markCompleted
+        self.pendingBackfill = pendingBackfill
+        self.announce = announce
     }
 
     var isScanning: Bool {
@@ -125,6 +153,7 @@ final class BackfillJob: ObservableObject {
         task?.cancel()
         runID = UUID()
         phase = .cancelled
+        announce("Stopped looking through your calendar.")
     }
 
     /// Profile switch / sign-out: stop and forget (the next profile starts clean).
@@ -167,16 +196,24 @@ final class BackfillJob: ObservableObject {
         guard runID == id else { return }
         if outcome.cancelled || Task.isCancelled {
             phase = .cancelled
+            announce("Stopped looking through your calendar.")
             return
         }
         guard outcome.access == .fullAccess else {
             phase = .blocked(outcome.access)
+            announce("Couldn't read your calendar. Turn on calendar access in Settings.")
             return
         }
         // Only a finished scan counts as the day-1 backfill.
         markCompleted()
+        if let pendingBackfill {
+            let items = pendingBackfill()
+            foundCount = items.count
+            foundHours = items.reduce(0) { $0 + ($1.proposedHours ?? 0) }
+        }
         phase = .finished(found: foundCount)
         onItems([])
         onFinished(foundCount, foundHours)
+        announce("Finished looking through your calendar. \(foundCount == 1 ? "1 suggestion" : "\(foundCount) suggestions") to confirm.")
     }
 }

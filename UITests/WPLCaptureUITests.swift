@@ -35,7 +35,11 @@ final class WPLCaptureUITests: XCTestCase {
         try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).png"))
     }
 
-    private var scheme: String { ProcessInfo.processInfo.environment["LH_WPL_SCHEME"] ?? "light" }
+    /// "light" / "dark", plus an optional suffix (e.g. "-reducemotion") for the still names.
+    private var scheme: String {
+        (ProcessInfo.processInfo.environment["LH_WPL_SCHEME"] ?? "light") + (ProcessInfo.processInfo.environment["LH_WPL_SUFFIX"] ?? "")
+    }
+    private var schemeArg: String { ProcessInfo.processInfo.environment["LH_WPL_SCHEME"] ?? "light" }
 
     // (a) Cold launch with a pending pull: Today loads the Blueprint way, then settles.
     func testCaptureA_TodayColdLaunchPendingPull() {
@@ -45,7 +49,7 @@ final class WPLCaptureUITests: XCTestCase {
             "-LHTodayHours", "212",
             "-LHSimulatePendingPull", "7",
             "-LHInitialTab", "0",
-            "-LHColorScheme", scheme,
+            "-LHColorScheme", schemeArg,
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
         ]
         app.launch()
@@ -63,7 +67,7 @@ final class WPLCaptureUITests: XCTestCase {
 
     // (b) The backfill streams into the Inbox while the user taps around.
     func testCaptureB_BackfillStreamingWhileTappingAround() {
-        app.launchArguments = InboxUITests.arguments(seed: "backfill", scheme: scheme, extra: [
+        app.launchArguments = InboxUITests.arguments(seed: "backfill", scheme: schemeArg, extra: [
             "-LHFakeCalendar", "granted", "-LHBackfillStepMs", "700",
         ])
         app.launch()
@@ -81,7 +85,9 @@ final class WPLCaptureUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 1.6)
         still("inbox-backfill-streaming-\(scheme)")
         app.buttons["tab.today"].tap()
-        Thread.sleep(forTimeInterval: 1.6)
+        Thread.sleep(forTimeInterval: 1.2)
+        still("today-lookingback-\(scheme)")
+        Thread.sleep(forTimeInterval: 0.4)
         app.buttons["tab.records"].tap()
         Thread.sleep(forTimeInterval: 1.2)
         app.buttons["tab.inbox"].tap()
@@ -106,7 +112,7 @@ final class WPLCaptureUITests: XCTestCase {
             "-LHMockScenario", "frequent",
             "-LHInitialTab", "3",
             "-LHSlowExport", "3.2",
-            "-LHColorScheme", scheme,
+            "-LHColorScheme", schemeArg,
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
         ]
         app.launch()

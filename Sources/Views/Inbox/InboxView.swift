@@ -19,7 +19,7 @@ struct InboxView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-                if model.visible.isEmpty && !backfill.isScanning {
+                if BackfillJob.showsEmptyState(visibleIsEmpty: model.visible.isEmpty, phase: backfill.phase) {
                     emptyState
                 } else {
                     list
@@ -62,7 +62,7 @@ struct InboxView: View {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                 if showsBackfillHeader {
-                    BackfillProgressHeader(job: backfill, onRetry: runBackfillAgain)
+                    BackfillProgressHeader(job: backfill, found: model.backfillCount, onRetry: runBackfillAgain)
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
@@ -98,12 +98,7 @@ struct InboxView: View {
         .accessibilityIdentifier("inbox.list")
     }
 
-    private var showsBackfillHeader: Bool {
-        switch backfill.phase {
-        case .scanning, .cancelled, .blocked: return true
-        case .idle, .finished: return false
-        }
-    }
+    private var showsBackfillHeader: Bool { BackfillJob.showsHeader(backfill.phase) }
 
     /// Runs the look-back again in the background (after a stop, or when it never finished).
     private func runBackfillAgain() {
@@ -202,6 +197,7 @@ struct InboxView: View {
             Spacer(minLength: 0)
         }
         .padding(16)
+        .frame(minHeight: BackfillProgressHeader.cardMinHeight)
         .background(InboxBlueprintPaper())
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("inbox.backfillBanner")

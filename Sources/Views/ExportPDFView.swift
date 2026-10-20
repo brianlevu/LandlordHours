@@ -12,7 +12,12 @@ struct ExportPDFView: View {
     @ObservedObject private var job = ExportJob.shared
     @State private var sharing: ShareRequest?
 
-    private var shareItem: ExportShareItem? { job.readyFiles(for: year) }
+    /// The records this sheet would export now; a ready report made from other records is stale.
+    private var fingerprint: String { ExportFingerprint.current(app: viewModel, year: year) }
+    private var shareItem: ExportShareItem? { job.readyFiles(for: year, fingerprint: fingerprint) }
+    private var reportIsStale: Bool { job.isStale(year: year, fingerprint: fingerprint) }
+    /// The first iCloud pull hasn't landed: the hours may not be final, so don't export yet.
+    private var waitingForHours: Bool { viewModel.isAwaitingInitialPull }
     private var exportError: String? { job.failureMessage(for: year) }
     private var isGenerating: Bool { job.isGenerating }
 
@@ -22,7 +27,7 @@ struct ExportPDFView: View {
                 VStack(spacing: 20) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Export report")
-                            .font(.system(size: 42, weight: .black, design: .rounded))
+                            .lhDisplayFont(.largeTitle)
                             .foregroundStyle(colors.textPrimary)
                             .minimumScaleFactor(0.82)
                         Text("Create a \(String(year)) report for your records or your CPA.")
@@ -40,7 +45,7 @@ struct ExportPDFView: View {
                                 .frame(width: 64, height: 64)
                                 .overlay {
                                     LucideIcon(image: Lucide.fileText, size: 28)
-                                        .foregroundStyle(AppColors.charcoal)
+                                        .foregroundStyle(colors.textPrimary)
                                 }
                                 .opacity(isGenerating ? 0 : 1)
                                 .scaleEffect(isGenerating ? 0.9 : 1)
@@ -106,26 +111,47 @@ struct ExportPDFView: View {
                                 }
                                 .buttonStyle(.lhPressable)
                                 .accessibilityIdentifier("export.shareCSV")
+
+                                Button("Create again") { generateExports() }
+                                    .font(AppTypography.button)
+                                    .foregroundStyle(colors.action)
+                                    .frame(minHeight: 44)
+                                    .disabled(waitingForHours)
+                                    .accessibilityHint("Makes a new report from your current records")
+                                    .accessibilityIdentifier("export.createAgain")
                             }
                         } else {
+                            if reportIsStale && !isGenerating {
+                                Text("Your records changed since your last report. Create it again to include them.")
+                                    .font(AppTypography.caption)
+                                    .foregroundStyle(colors.caution)
+                                    .multilineTextAlignment(.center)
+                                    .accessibilityIdentifier("export.stale")
+                            }
                             Button {
                                 generateExports()
                             } label: {
                                 HStack(spacing: 8) {
-                                    if !isGenerating {
+                                    if isGenerating {
+                                        // Busy: the drafting line runs inside the muted button.
+                                        DraftingLoader(sketch: .chart, surface: .adaptive, lineWidth: 1.6)
+                                            .frame(width: 34, height: 14)
+                                            .accessibilityHidden(true)
+                                    } else {
                                         LucideIcon(image: Lucide.fileDown, size: 16)
                                     }
                                     Text(generateButtonTitle)
                                 }
                                 .font(AppTypography.button)
-                                .foregroundStyle(canExport ? AppColors.onAction : colors.textSecondary)
+                                .foregroundStyle(generateForeground)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
-                                .background(canExport ? colors.action : colors.backgroundTertiary)
+                                .background(generateBackground)
                                 .clipShape(Capsule())
                             }
                             .buttonStyle(.lhPressable)
-                            .disabled(!canExport || isGenerating)
+                            .disabled(!canGenerate)
+                            .allowsHitTesting(canGenerate)
                             .accessibilityIdentifier("export.generatePDF")
 
                             if isGenerating {
@@ -156,7 +182,7 @@ struct ExportPDFView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack(spacing: 8) {
                             LucideIcon(image: Lucide.list, size: 14)
-                                .foregroundStyle(AppColors.charcoal)
+                                .foregroundStyle(colors.textPrimary)
                             Text("Report includes")
                                 .font(.system(size: 19, weight: .black, design: .rounded))
                                 .foregroundStyle(colors.textPrimary)
@@ -238,9 +264,23 @@ struct ExportPDFView: View {
         !yearEntries.isEmpty
     }
 
+    private var canGenerate: Bool { canExport && !isGenerating && !waitingForHours }
+
+    private var generateForeground: Color {
+        if isGenerating { return colors.action }
+        return canGenerate ? AppColors.onAction : colors.textSecondary
+    }
+
+    private var generateBackground: Color {
+        if isGenerating { return colors.actionSurface }
+        return canGenerate ? colors.action : colors.backgroundTertiary
+    }
+
     private var generateButtonTitle: String {
         if !canExport { return "No entries to export" }
-        return isGenerating ? "Creating report…" : "Create PDF and CSV"
+        if isGenerating { return "Creating report…" }
+        if waitingForHours { return "Getting your latest hours…" }
+        return reportIsStale ? "Create again" : "Create PDF and CSV"
     }
 
     var exportSummaryText: String {
@@ -269,7 +309,8 @@ struct ExportPDFView: View {
 
     private func generateExports() {
         guard !isGenerating else { return }
-        job.start(report: makeReport(), year: year)
+        guard !waitingForHours else { return }
+        job.start(report: makeReport(), year: year, fingerprint: fingerprint)
     }
 }
 

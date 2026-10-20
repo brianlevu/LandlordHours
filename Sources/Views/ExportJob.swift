@@ -30,6 +30,8 @@ final class ExportJob: ObservableObject {
 
     private let writer: Writer
     private var runID = UUID()
+    /// Fingerprint of the records the ready (or running) report was made from.
+    private(set) var reportFingerprint: String?
     private var task: Task<Void, Never>?
 
     /// Tests: wait for the current export to end.
@@ -61,10 +63,26 @@ final class ExportJob: ObservableObject {
         return false
     }
 
-    /// The finished files for `year`, if any.
-    func readyFiles(for year: Int) -> ExportShareItem? {
-        if case .ready(let item, let readyYear) = state, readyYear == year { return item }
-        return nil
+    /// The year of the ready or failed report, for the shell's staleness check.
+    var resultYear: Int? {
+        switch state {
+        case .ready(_, let year), .failed(let year, _): return year
+        case .idle, .generating: return nil
+        }
+    }
+
+    /// The finished files for `year`, if any. With `fingerprint`, only while the records still
+    /// match the ones the report was made from.
+    func readyFiles(for year: Int, fingerprint: String? = nil) -> ExportShareItem? {
+        guard case .ready(let item, let readyYear) = state, readyYear == year else { return nil }
+        if let fingerprint, fingerprint != reportFingerprint { return nil }
+        return item
+    }
+
+    /// A report for `year` is ready but the records changed since it was made.
+    func isStale(year: Int, fingerprint: String) -> Bool {
+        guard case .ready(_, let readyYear) = state, readyYear == year else { return false }
+        return fingerprint != reportFingerprint
     }
 
     func failureMessage(for year: Int) -> String? {
@@ -86,11 +104,20 @@ final class ExportJob: ObservableObject {
 
     var showsReadyBanner: Bool { banner == .ready }
 
+    /// The banner, unless the ready report no longer matches the records (then the export sheet
+    /// offers "Create again" instead).
+    func banner(currentFingerprint: String?) -> Banner? {
+        guard let banner else { return nil }
+        if banner == .ready, let currentFingerprint, currentFingerprint != reportFingerprint { return nil }
+        return banner
+    }
+
     /// Starts generating unless a report is already being made.
-    func start(report: AuditReport, year: Int) {
+    func start(report: AuditReport, year: Int, fingerprint: String? = nil) {
         guard !isGenerating else { return }
         let id = UUID()
         runID = id
+        reportFingerprint = fingerprint
         bannerDismissed = false
         state = .generating(year: year)
         task = Task { [weak self, writer] in
@@ -121,7 +148,9 @@ final class ExportJob: ObservableObject {
 
     /// Sign-out / profile switch: the files belong to the outgoing profile.
     func reset() {
+        task?.cancel()
         runID = UUID()
+        reportFingerprint = nil
         state = .idle
         bannerDismissed = false
         isSheetVisible = false
@@ -150,7 +179,7 @@ struct ExportReadyBanner: View {
                             Text("Your report is ready")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(colors.textPrimary)
-                            Text("Tap to share the PDF")
+                            Text("PDF and spreadsheet")
                                 .font(.footnote)
                                 .foregroundStyle(colors.textSecondary)
                         }
@@ -163,7 +192,7 @@ struct ExportReadyBanner: View {
                 }
                 .buttonStyle(.lhPressable)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Your report is ready. Share the PDF")
+                .accessibilityLabel("Your report is ready. Share the PDF and spreadsheet")
                 .accessibilityAddTraits(.isButton)
                 .accessibilityIdentifier("export.readyBanner")
             } else {
@@ -210,5 +239,37 @@ struct ExportReadyBanner: View {
             UIAccessibility.post(notification: .announcement,
                                  argument: kind == .ready ? "Your report is ready" : "Couldn't create your report")
         }
+    }
+}
+
+/// What a report was made from: the year's entries (and their edits), the properties, and the
+/// tax profile values the report prints. Any change makes a ready report out of date.
+enum ExportFingerprint {
+    static func make(entries: [TimeEntry], properties: [RentalProperty], year: Int, profile: String) -> String {
+        let calendar = Calendar.current
+        var parts: [String] = ["y\(year)", profile]
+        let yearEntries = entries
+            .filter { calendar.component(.year, from: $0.date) == year }
+            .sorted { $0.id.uuidString < $1.id.uuidString }
+        for entry in yearEntries {
+            let fields: [String] = [
+                entry.id.uuidString, entry.propertyId.uuidString, "\(entry.participant)", "\(entry.category)",
+                "\(entry.hours)", "\(entry.date.timeIntervalSince1970)", "\(entry.modifiedAt.timeIntervalSince1970)",
+                entry.notes, entry.attachments.map(\.id.uuidString).joined(separator: ","),
+            ]
+            parts.append(fields.joined(separator: "|"))
+        }
+        for property in properties.sorted(by: { $0.id.uuidString < $1.id.uuidString }) {
+            parts.append("p|\(property.id.uuidString)|\(property.name)|\(property.address)|\(property.propertyType)")
+        }
+        return parts.joined(separator: "\n")
+    }
+
+    /// The live fingerprint for the active profile.
+    @MainActor static func current(app: AppViewModel, year: Int) -> String {
+        let tax = TaxProfileManager.shared
+        let mostHours = String(describing: tax.noOneParticipatedMore(forYear: year))
+        let profile = "\(tax.spouseTracking)|\(tax.nonREWorkHours)|\(tax.groupingElection)|\(mostHours)|\(tax.filingStatus)"
+        return make(entries: app.timeEntries, properties: app.properties, year: year, profile: profile)
     }
 }

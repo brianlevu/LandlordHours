@@ -1,6 +1,57 @@
 import SwiftUI
 import LucideIcons
 
+/// WP-L: what Today says while things are still arriving. Loading (the first iCloud pull) never
+/// reads as a brand-new user, and a running 90-day look-back gets its own state instead of
+/// "Log your first hour".
+enum TodayPresentation {
+    enum Mode: Equatable {
+        case loading, lookingBack, newUser, normal
+
+        var showsActivationCard: Bool { self == .newUser }
+
+        /// nil: the caller's own copy (new-user setup titles or the live hours).
+        var title: String? {
+            switch self {
+            case .loading: return "Today’s work"
+            case .lookingBack: return "Looking through your calendar"
+            case .newUser, .normal: return nil
+            }
+        }
+
+        var subtitle: String? {
+            switch self {
+            case .loading: return "Bringing in your latest hours from iCloud."
+            case .lookingBack: return "Rental work we find goes to your Inbox. Nothing counts until you confirm it."
+            case .newUser, .normal: return nil
+            }
+        }
+
+        var compactTitle: String? {
+            switch self {
+            case .loading: return "Getting your hours"
+            case .lookingBack: return "Looking through your calendar"
+            case .newUser, .normal: return nil
+            }
+        }
+
+        /// nil for `.normal`: the live pace line.
+        var compactSubtitle: String? {
+            switch self {
+            case .loading: return "Bringing in your latest hours"
+            case .lookingBack: return "Suggestions go to your Inbox"
+            case .newUser, .normal: return nil
+            }
+        }
+    }
+
+    static func mode(hoursPending: Bool, backfillScanning: Bool, hasProperties: Bool, hasEntries: Bool) -> Mode {
+        if hoursPending { return .loading }
+        guard hasProperties && hasEntries else { return backfillScanning ? .lookingBack : .newUser }
+        return .normal
+    }
+}
+
 struct DashboardView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @EnvironmentObject var goalManager: GoalManager
@@ -125,9 +176,20 @@ struct DashboardView: View {
         ProcessInfo.processInfo.arguments.contains("-LHOpenLearningCenter")
     }
 
-    private var shouldShowActivationCard: Bool {
-        viewModel.properties.isEmpty || viewModel.timeEntries.isEmpty
+    @ObservedObject private var backfill = BackfillJob.shared
+    /// Backfill items in the Inbox (the same count as its tab badge), for the look-back card.
+    var inboxBackfillCount = 0
+
+    private var mode: TodayPresentation.Mode {
+        TodayPresentation.mode(
+            hoursPending: hoursPending,
+            backfillScanning: backfill.isScanning,
+            hasProperties: !viewModel.properties.isEmpty,
+            hasEntries: !viewModel.timeEntries.isEmpty
+        )
     }
+
+    private var shouldShowActivationCard: Bool { mode.showsActivationCard }
 
     var body: some View {
         NavigationStack {
@@ -149,7 +211,14 @@ struct DashboardView: View {
                         // The house leads Today in every state (approved r6 concept); a new
                         // owner's setup steps sit right under the empty lot.
                         houseHero
-                        if shouldShowActivationCard {
+                        if mode == .lookingBack {
+                            BackfillProgressHeader(job: backfill, found: inboxBackfillCount, onRetry: {}, onOpen: {
+                                NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex)
+                            })
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityHint("Opens your Inbox")
+                            .accessibilityIdentifier("today.lookingBack")
+                        } else if shouldShowActivationCard {
                             homeActivationCard
                         } else {
                             learningShortcutCard
@@ -202,6 +271,12 @@ struct DashboardView: View {
                 }
             }
             .onDisappear { isVisible = false }
+            // VoiceOver: say once when the hours finish loading (the loader itself stays quiet).
+            .onChange(of: hoursPending) { wasPending, isPending in
+                guard wasPending, !isPending else { return }
+                UIAccessibility.post(notification: .announcement,
+                                     argument: "Hours up to date. \(Int(totalHours.rounded(.down))) of \(Int(targetHours)) hours.")
+            }
             // Live: a save while Today is on screen. The hero builds from the live hours change
             // itself; consume the event so it does not replay on the next appear.
             .onChange(of: houseEvents.pendingConfirm) { _, confirm in
@@ -446,6 +521,7 @@ struct DashboardView: View {
     }
 
     private var dashboardTitle: String {
+        if let title = mode.title { return title }
         if viewModel.properties.isEmpty {
             return "Add your first property"
         }
@@ -456,23 +532,24 @@ struct DashboardView: View {
     }
 
     private var dashboardSubtitle: String {
+        if let subtitle = mode.subtitle { return subtitle }
         if viewModel.properties.isEmpty {
             return "Start with a property so every hour has a clean record."
         }
         if viewModel.timeEntries.isEmpty {
             return "\(viewModel.properties.count) property ready. Capture the first activity while details are fresh."
         }
-        if hoursPending { return "Bringing in your latest hours from iCloud." }
         return "\(AppFormat.hours(headerHours)) counted toward \(Int(targetHours)) hours this year."
     }
 
     private var compactHeaderTitle: String {
+        if let title = mode.compactTitle { return title }
         if shouldShowActivationCard { return "Finish setup" }
-        if hoursPending { return "Getting your hours" }
         return "\(AppFormat.hours(headerHours)) logged"
     }
 
     private var compactHeaderSubtitle: String {
+        if let subtitle = mode.compactSubtitle { return subtitle }
         if shouldShowActivationCard {
             return "\(completedActivationSteps)/2 essentials complete"
         }
@@ -615,7 +692,8 @@ struct DashboardView: View {
                 status: pace.text,
                 statusTone: heroStatusTone,
                 onCelebration: { _ in presentNextCelebration() },
-                isLoading: hoursPending
+                isLoading: hoursPending,
+                animatesChanges: !AppViewModel.isRemoteMerge(lastMergeAt: viewModel.lastRemoteMergeAt)
             )
             // The art has a fixed frame; past AX2 the words would wrap into it, so cap there.
             // VoiceOver reads the whole hero as one element with the full words.
@@ -630,7 +708,7 @@ struct DashboardView: View {
                     dashboardMiniMetric(
                         title: "50% rule",
                         value: fiftyPercentValue,
-                        detail: hoursPending ? nil : fiftyPercentDetail,
+                        detail: fiftyPercentDetail,
                         isPending: hoursPending
                     )
                     .accessibilityIdentifier("dashboard.fiftyPercent")
@@ -683,10 +761,21 @@ struct DashboardView: View {
                 }
                 .accessibilityLabel(isPending ? "Loading" : value)
             if let detail {
+                // While pending the words are laid out but hidden, so the card already has its
+                // settled height and nothing below it moves when the hours land.
                 Text(detail)
                     .font(.system(.caption, design: .rounded, weight: .medium))
                     .foregroundStyle(colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .opacity(isPending ? 0 : 1)
+                    .overlay(alignment: .topLeading) {
+                        if isPending {
+                            PlaceholderBar(width: 96, height: 10)
+                                .padding(.top, 3)
+                                .transition(.opacity)
+                        }
+                    }
+                    .accessibilityHidden(isPending)
             }
         }
         .accessibilityElement(children: .combine)

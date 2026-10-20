@@ -94,7 +94,7 @@ struct HouseHeroView: View {
         guard plan.beam else {
             apply(plan.keyframe, plan.target)
             onLand(plan)
-            if new > old { settleTick += 1 }
+            if new > old && animatesConfirms { settleTick += 1 }
             if let celebration { onCelebration(celebration) }
             return
         }
@@ -223,6 +223,9 @@ struct HouseHeroCard: View {
     /// soft placeholder bar and the house slot shows the drafting line sketching the house; when
     /// it turns false the real house crossfades in and the number counts up.
     var isLoading = false
+    /// False for changes the user didn't make (an iCloud merge, even after the loading cap): the
+    /// house and number update in place, with no beam, count-up or haptic.
+    var animatesChanges = true
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shownHours: Double?
@@ -274,6 +277,7 @@ struct HouseHeroCard: View {
                             HouseHeroView(
                                 progress: progress,
                                 canvas: .blueprintHero,
+                                animatesConfirms: animatesChanges,
                                 beamOrigin: CGPoint(x: 72 - houseOrigin.x, y: 92 - houseOrigin.y),
                                 onLand: { _ in countUp() },
                                 onCelebration: onCelebration,
@@ -382,7 +386,7 @@ struct HouseHeroCard: View {
     private func countUp(over duration: Double = HouseMotion.countUpMax) {
         let from = shownHours ?? progress.hours
         let to = progress.hours
-        guard to > from, !reduceMotion else { shownHours = to; return }
+        guard to > from, !reduceMotion, animatesChanges else { shownHours = to; return }
         let steps = max(1, min(30, Int(to.rounded(.down)) - Int(from.rounded(.down))))
         let stepTime = duration / Double(steps)
         Task { @MainActor in

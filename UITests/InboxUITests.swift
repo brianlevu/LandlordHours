@@ -304,6 +304,36 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(app.buttons["backfill.cancel"].waitForExistence(timeout: 5), "Running again")
     }
 
+    /// Nothing found and calendar access gone: the Inbox keeps the look-back header with the
+    /// Settings path instead of a plain empty state (no dead end).
+    func testBlockedLookBackWithNothingFoundShowsSettingsPath() {
+        launch("backfill", extra: ["-LHFakeCalendar", "granted", "-LHFakeScanBlocked"])
+        let setup = app.buttons["inbox.empty.setup"]
+        XCTAssertTrue(settle(setup))
+        setup.tap()
+        turnOnCalendar()
+        app.buttons["capture.priming.continue"].tap()
+        let blocked = app.descendants(matching: .any)["inbox.backfill.blocked"]
+        XCTAssertTrue(blocked.waitForExistence(timeout: 10), "Blocked look-back says so")
+        XCTAssertTrue(app.buttons["Settings"].exists, "With a path to Settings")
+        XCTAssertFalse(app.descendants(matching: .any)["inbox.empty"].exists, "Not a silent empty state")
+    }
+
+    /// Cancelled before anything was found: the header with Run again stays.
+    func testCancelledLookBackWithNothingFoundKeepsRunAgain() {
+        launch("backfill", extra: ["-LHFakeCalendar", "granted", "-LHBackfillStepMs", "4000"])
+        let setup = app.buttons["inbox.empty.setup"]
+        XCTAssertTrue(settle(setup))
+        setup.tap()
+        turnOnCalendar()
+        app.buttons["capture.priming.continue"].tap()
+        let cancel = app.buttons["backfill.cancel"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10))
+        cancel.tap()
+        XCTAssertTrue(app.buttons["inbox.backfill.retry"].waitForExistence(timeout: 5), "Run again is still offered")
+        XCTAssertFalse(app.descendants(matching: .any)["inbox.empty"].exists)
+    }
+
     /// The user can leave the look-back, use the app, and come back to live progress.
     func testLeaveBackfillAndComeBackToStreamingProgress() {
         launch("backfill", extra: ["-LHFakeCalendar", "granted", "-LHHoldBackfillScan"])
@@ -321,6 +351,8 @@ final class InboxUITests: XCTestCase {
         // Leave: Today is fully usable while the scan runs.
         app.buttons["tab.today"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["today.hero"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["today.lookingBack"].waitForExistence(timeout: 5),
+                      "Today says the look-back is running, not \"Log your first hour\"")
         app.buttons["tab.logTime"].tap()
         XCTAssertTrue(app.buttons["tab.logTime"].waitForExistence(timeout: 3))
 

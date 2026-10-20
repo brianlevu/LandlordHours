@@ -6,7 +6,11 @@ import SwiftUI
 /// Settings path. Suggestions stream into the list below it as they are classified.
 struct BackfillProgressHeader: View {
     @ObservedObject var job: BackfillJob
+    /// Found so far, from the same source as the tab badge (the inbox's backfill items).
+    var found: Int
     var onRetry: () -> Void
+    /// Today's variant: the whole card opens the Inbox; no Cancel inside it.
+    var onOpen: (() -> Void)? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -37,7 +41,7 @@ struct BackfillProgressHeader: View {
                     .font(.body.weight(.semibold))
                     .foregroundStyle(OnBlueprint.primary)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(Self.detail(completed: completed, total: total, found: job.foundCount))
+                Text(Self.detail(completed: completed, total: total, found: found))
                     .font(.subheadline)
                     .monospacedDigit()
                     .foregroundStyle(OnBlueprint.secondary)
@@ -49,22 +53,37 @@ struct BackfillProgressHeader: View {
                     .accessibilityHidden(true)
             }
             Spacer(minLength: 0)
-            Button("Cancel") { job.cancel() }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(OnBlueprint.primary)
-                .frame(minWidth: 44, minHeight: 44)
-                .accessibilityHint("Stops looking back. You can run it again.")
-                .accessibilityIdentifier("backfill.cancel")
+            if onOpen == nil {
+                Button("Cancel") { job.cancel() }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(OnBlueprint.primary)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityHint("Stops looking back. You can run it again.")
+                    .accessibilityIdentifier("backfill.cancel")
+            } else {
+                Image(systemName: "chevron.right")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(OnBlueprint.secondary)
+                    .accessibilityHidden(true)
+            }
         }
         .padding(.vertical, 14)
         .padding(.leading, 14)
         .padding(.trailing, 10)
+        // Same height as the Inbox's "things to confirm" banner that replaces it at the end.
+        .frame(minHeight: Self.cardMinHeight)
         .background(InboxBlueprintPaper())
+        // Only Today's variant is tappable as a whole; in the Inbox, Cancel gets every tap.
+        .modifier(OpensOnTap(action: onOpen))
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: completed)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Looking through your calendar. \(Self.detail(completed: completed, total: total, found: job.foundCount))")
+        .accessibilityLabel("Looking through your calendar. \(Self.detail(completed: completed, total: total, found: found))")
         .accessibilityIdentifier("inbox.backfill.header")
     }
+
+    /// The header and the backfill banner share this height so the swap at the end doesn't shift
+    /// the list.
+    static let cardMinHeight: CGFloat = 134
 
     /// "Getting your events" → "12 of 80 events · 5 found so far".
     static func detail(completed: Int, total: Int, found: Int) -> String {
@@ -82,7 +101,7 @@ struct BackfillProgressHeader: View {
                 Text("Stopped looking back")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(OnBlueprint.primary)
-                Text(job.foundCount > 0
+                Text(found > 0
                      ? "What we found so far is below. Run it again to finish the last 90 days."
                      : "Run it again any time to check the last 90 days.")
                     .font(.subheadline)
@@ -145,6 +164,19 @@ struct BackfillProgressLine: View {
                 Capsule().fill(HouseTokens.drafting)
                     .frame(width: max(3, g.size.width * min(max(fraction, 0), 1)))
             }
+        }
+    }
+}
+
+/// Makes the whole card a tap target only when it has somewhere to go.
+private struct OpensOnTap: ViewModifier {
+    let action: (() -> Void)?
+
+    func body(content: Content) -> some View {
+        if let action {
+            content.contentShape(Rectangle()).onTapGesture(perform: action)
+        } else {
+            content
         }
     }
 }

@@ -143,6 +143,7 @@
 		EE3D0D14B7F8A52707C5F97A /* SuggestionRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECB7DFB3F4D68C9B839DB82D /* SuggestionRowView.swift */; };
 		F20713D35465CC3396393B14 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2CA9BA1AD53F0ABA92A9F2F /* OnboardingView.swift */; };
 		F7592DE1A4DA7F5A9B32BA03 /* MilestoneCelebrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4FBBCE8DA693BAC7640B104 /* MilestoneCelebrationView.swift */; };
+		F759C697D4CF44644ADE3BDC /* LoadingFixRoundTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3A37B5F2B28B58848A8FC9 /* LoadingFixRoundTests.swift */; };
 		F75C46FB8213306050CB9147 /* Analytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9291FAFB4986AA2BF4F05D4 /* Analytics.swift */; };
 		F7C5F8A5FB802ED1144DAB1B /* InboxCaptureUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0C1C4662F46051DF0E5A62 /* InboxCaptureUITests.swift */; };
 		FA95A196F8212B3525A97088 /* FreeUserPaywallUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 548394DDA38D7BBFDD18E815 /* FreeUserPaywallUITests.swift */; };
@@ -232,6 +233,7 @@
 		66F916D5F37122A02CA6ADF4 /* RulesClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesClassifier.swift; sourceTree = "<group>"; };
 		6B4C495D3F22E19737D9DDB4 /* BackfillJob.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackfillJob.swift; sourceTree = "<group>"; };
 		6D7987DD5DAFB64A0DD0B89D /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		6F3A37B5F2B28B58848A8FC9 /* LoadingFixRoundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingFixRoundTests.swift; sourceTree = "<group>"; };
 		7002A4C1E561833705DE3B43 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		71D542D8D3135A25F2D304F8 /* AppDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDestination.swift; sourceTree = "<group>"; };
 		74E7F35CA9ADFE290A5D0420 /* LandlordHours.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = LandlordHours.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -458,6 +460,7 @@
 				090AC6457EB4FB394F170292 /* InboxTests.swift */,
 				A01B3B8EADDB251440528314 /* LandlordHoursTests.swift */,
 				0914D43BECE24E5CB862706D /* LandlordPurchasesTests.swift */,
+				6F3A37B5F2B28B58848A8FC9 /* LoadingFixRoundTests.swift */,
 				820B581AFB8B62B3E8DF9D48 /* LoadingJobsTests.swift */,
 				A1CAE53C865D5B8D680C6F0D /* LocalProfileTests.swift */,
 				6252BC3F79F79B6164763816 /* ProMomentsTests.swift */,
@@ -893,6 +896,7 @@
 				3455FD1A4EC9DB8EBF327EA6 /* InboxTests.swift in Sources */,
 				2846D3E26FF2EA4A60FAF7D6 /* LandlordHoursTests.swift in Sources */,
 				A130AD4A0C3826D57BDE0E2C /* LandlordPurchasesTests.swift in Sources */,
+				F759C697D4CF44644ADE3BDC /* LoadingFixRoundTests.swift in Sources */,
 				484E25374A62B01C3588F609 /* LoadingJobsTests.swift in Sources */,
 				8DCDA53C99D6607B2EB138B8 /* LocalProfileTests.swift in Sources */,
 				FEF2ADF1DF06A3C6BA058BE9 /* ProMomentsTests.swift in Sources */,

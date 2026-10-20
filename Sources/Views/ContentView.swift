@@ -285,8 +285,9 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .safeAreaInset(edge: .bottom) {
                     if !isCustomTabBarHidden {
+                        // WP-L: room for the export banner too, so it never covers content.
                         Color.clear
-                            .frame(height: AppSpacing.floatingTabBarReservedHeight)
+                            .frame(height: AppSpacing.floatingTabBarReservedHeight + (exportBanner == nil ? 0 : Self.exportBannerReserve))
                             .accessibilityHidden(true)
                     }
                 }
@@ -320,7 +321,7 @@ struct ContentView: View {
             }
 
             // WP-L: the export finished in the background while its sheet was closed.
-            if let banner = exportJob.banner {
+            if let banner = exportBanner {
                 ExportReadyBanner(
                     kind: banner,
                     onOpen: { exportShare = exportJob.takeReadyForSharing() },
@@ -359,7 +360,7 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .captureSuggestionsDidChange)) { _ in
             inboxModel.reload(animated: true)
         }
-        .lhMotion(AppAnimation.reveal, value: exportJob.banner)
+        .lhMotion(AppAnimation.reveal, value: exportBanner)
         // WP-L: the look-back finished in the background. Today plays the house reveal itself;
         // on any other tab the shell plays it once, when no sheet is in the way.
         .onChange(of: houseEvents.pendingBackfill) { _, _ in scheduleShellBackfillReveal() }
@@ -379,7 +380,8 @@ struct ContentView: View {
             )
         }
         .sheet(item: $exportShare) { item in
-            ActivityShareSheet(items: [item.pdfURL]) { completed in
+            // The report is a PDF plus a spreadsheet: share both.
+            ActivityShareSheet(items: [item.pdfURL, item.csvURL]) { completed in
                 exportShare = nil
                 if completed { viewModel.exportShared(format: .pdf) }
             }
@@ -428,6 +430,15 @@ struct ContentView: View {
         }
     }
 
+    private static let exportBannerReserve: CGFloat = 72
+
+    /// The export banner, hidden when the ready report no longer matches the records.
+    private var exportBanner: ExportJob.Banner? {
+        guard exportJob.banner != nil else { return nil }
+        let fingerprint = exportJob.resultYear.map { ExportFingerprint.current(app: viewModel, year: $0) }
+        return exportJob.banner(currentFingerprint: fingerprint)
+    }
+
     /// Plays the look-back reveal from the shell when Today isn't on screen to play it.
     private func scheduleShellBackfillReveal() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
@@ -446,7 +457,7 @@ struct ContentView: View {
     private var selectedTabContent: some View {
         switch selectedTab {
         case 0:
-            DashboardView()
+            DashboardView(inboxBackfillCount: inboxModel.backfillCount)
         case 1:
             PropertiesView()
         case 2:
@@ -460,7 +471,7 @@ struct ContentView: View {
         case ShellTab.recordsIndex:
             HistoryView()
         default:
-            DashboardView()
+            DashboardView(inboxBackfillCount: inboxModel.backfillCount)
         }
     }
 

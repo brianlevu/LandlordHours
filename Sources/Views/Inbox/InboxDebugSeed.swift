@@ -191,6 +191,11 @@ struct DebugBackfillScanner: BackfillScanning {
         progress: @escaping @MainActor (ClassifierBatchProgress) -> Void,
         found: @escaping @MainActor ([Suggestion]) -> Void
     ) async -> BackfillScanOutcome {
+        // `-LHFakeScanBlocked`: calendar access went away between the prompt and the scan.
+        if ProcessInfo.processInfo.arguments.contains("-LHFakeScanBlocked") {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            return BackfillScanOutcome(access: .denied, foundCount: 0)
+        }
         let items = InboxDebugSeed.backfillItems(app: app, now: InboxClock.now())
         let holdAtHalf = ProcessInfo.processInfo.arguments.contains("-LHHoldBackfillScan")
         let stepMs = InboxDebugSeed.value(after: "-LHBackfillStepMs").flatMap(UInt64.init) ?? 60
