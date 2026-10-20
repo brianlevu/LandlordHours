@@ -231,6 +231,10 @@ final class SuggestionStore {
                 guard contents.suggestions[index].isPending else { continue }
                 candidate.id = contents.suggestions[index].id
                 candidate.detectedAt = min(contents.suggestions[index].detectedAt, candidate.detectedAt)
+                // A re-scan that can't place the event keeps the property it was given since.
+                if candidate.proposedPropertyId == nil {
+                    candidate.proposedPropertyId = contents.suggestions[index].proposedPropertyId
+                }
                 candidate.state = .pending
                 contents.suggestions[index] = resolved(candidate, entries: existingEntries, calendar: calendar)
                 continue
@@ -242,6 +246,21 @@ final class SuggestionStore {
         }
         save()
         return added
+    }
+
+    /// Puts `propertyId` on every pending suggestion that has no property. Onboarding calls it
+    /// when the owner's first and only property is saved, since the look-back may have found
+    /// events before there was a property to attach them to. Returns how many changed.
+    @discardableResult
+    func attachPropertyToUnplaced(_ propertyId: UUID) -> Int {
+        var changed = 0
+        for index in contents.suggestions.indices
+        where contents.suggestions[index].isPending && contents.suggestions[index].proposedPropertyId == nil {
+            contents.suggestions[index].proposedPropertyId = propertyId
+            changed += 1
+        }
+        if changed > 0 { save() }
+        return changed
     }
 
     /// Re-checks every pending suggestion against current entries (after a sync pull, a manual

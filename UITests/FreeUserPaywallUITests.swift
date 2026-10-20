@@ -175,15 +175,7 @@ final class FreeUserPaywallUITests: XCTestCase {
     func testOnboardingEndsWithoutAPaywall() {
         app.launchArguments = baseArguments(scenario: "firstTime", tab: 0, scheme: "light")
         app.launch()
-        tap(app.buttons["onboarding.goalPrimaryCTA"])
-        tap(app.buttons["onboarding.propertyPrimaryCTA"])
-        XCTAssertTrue(app.buttons["Allow reminders"].waitForExistence(timeout: 6), "Reminders follow property setup")
-        XCTAssertFalse(app.descendants(matching: .any)["paywall.title"].exists)
-        tap(app.buttons["Skip for now"])
-        XCTAssertTrue(app.buttons["capture.priming.notNow"].waitForExistence(timeout: 6))
-        tap(app.buttons["capture.priming.notNow"])
-        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 10), "Onboarding lands on the app, not a paywall")
-        XCTAssertFalse(app.descendants(matching: .any)["paywall.title"].exists)
+        walkOnboarding(captureScheme: "light")
     }
 
     // MARK: Helpers
@@ -355,5 +347,39 @@ final class FreeUserPaywallUITests: XCTestCase {
             swipes += 1
         }
         XCTAssertTrue(element.waitForExistence(timeout: 3), "Could not reach \(element)")
+    }
+
+    /// 2.0 onboarding, the quickest way through: no calendar, no property (six taps to Today).
+    private func walkOnboarding(captureScheme scheme: String) {
+        tap(app.buttons["onb-start"])
+        tap(app.buttons["goal-750"])
+        tap(app.buttons["onb-primary"])                        // Build toward 750h
+        tap(app.buttons["onb-link"])                           // Calendar: Not now
+        tap(app.buttons["onb-primary"])                        // Who: Continue
+        // No paywall step anywhere in onboarding.
+        XCTAssertFalse(app.descendants(matching: .any)["paywall.title"].exists)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "lifetime")).firstMatch.exists)
+        XCTAssertTrue(app.buttons["onb-link"].waitForExistence(timeout: 6))
+        settleAndCapture("onboarding-last-step", scheme: scheme, waitFor: app.buttons["onb-link"])
+        tap(app.buttons["onb-link"])                           // I'll add it later
+        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 10), "Onboarding lands on the app, not a paywall")
+        XCTAssertFalse(app.descendants(matching: .any)["paywall.title"].exists)
+        settleAndCapture("onboarding-finished-home", scheme: scheme, waitFor: app.buttons["tab.today"])
+    }
+
+    private func capturePaywall(_ name: String, scheme: String) {
+        XCTAssertTrue(app.staticTexts["paywall.title"].waitForExistence(timeout: 8), "\(name): paywall missing")
+        // The price comes from StoreKit; give it time, but capture either way.
+        _ = app.descendants(matching: .any)["paywall.price"].waitForExistence(timeout: 8)
+        settleAndCapture(name, scheme: scheme, waitFor: app.staticTexts["paywall.title"])
+    }
+
+    private func settleAndCapture(_ name: String, scheme: String, waitFor element: XCUIElement) {
+        XCTAssertTrue(element.waitForExistence(timeout: 10), "\(name): \(element) never appeared")
+        Thread.sleep(forTimeInterval: 1.0)
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = "\(name)-\(scheme)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }

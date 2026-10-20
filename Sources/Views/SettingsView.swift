@@ -394,22 +394,6 @@ struct SettingsView: View {
                 SettingRow(symbol: "bell", title: "Notification permission", subtitle: "Opens iOS Settings", showsChevron: true)
             }
             .buttonStyle(.plain)
-
-            Button {
-                NotificationCenter.default.post(name: .restartGuidedOnboarding, object: nil)
-            } label: {
-                SettingRow(symbol: "signpost.right", title: "Restart guided setup", subtitle: "Walk through the first property and hour again")
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("settings.restartGuidedSetup")
-
-            Button {
-                NotificationCenter.default.post(name: .skipGuidedOnboarding, object: nil)
-            } label: {
-                SettingRow(symbol: "forward", title: "Skip guided setup", subtitle: "Hide first-run tips")
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("settings.skipGuidedSetup")
         } header: {
             BPSectionHeader(title: "App")
         }
@@ -935,12 +919,13 @@ struct TaxProfileView: View {
             .listRowBackground(colors.backgroundSecondary)
 
             Section {
+                // The same four goals as onboarding (2.0 adds material participation at 500h).
                 Picker(selection: Binding(
-                    get: { goalManager.globalGoalType },
-                    set: { goalManager.setGlobalGoal($0) }
+                    get: { goalManager.goalChoice },
+                    set: { goalManager.setGoalChoice($0) }
                 )) {
-                    ForEach(HourGoalType.allCases, id: \.self) { type in
-                        Text("\(type.rawValue) · \(Int(type.hoursRequired))h").tag(type)
+                    ForEach(GoalChoice.allCases) { choice in
+                        Text(choice.title).tag(choice)
                     }
                 } label: {
                     SettingRow(symbol: "flag", title: "Goal")

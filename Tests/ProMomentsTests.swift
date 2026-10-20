@@ -211,9 +211,33 @@ final class FunnelAnalyticsTests: XCTestCase {
 
     func testPropertyFreeEvents() {
         Analytics.purchaseRestored()
-        Analytics.onboardingCompleted()
         XCTAssertEqual(only("purchase_restored")?.isEmpty, true)
-        XCTAssertEqual(only("onboarding_completed")?.isEmpty, true)
+    }
+
+    /// 2.0 onboarding keeps `onboarding_completed` and adds a step funnel; every value is fixed.
+    func testOnboardingEventsCarryFixedValuesOnly() {
+        Analytics.onboardingCompleted(skippedProperty: true, calendar: OnbCalendar.notNow.analyticsKey)
+        XCTAssertEqual(only("onboarding_completed")?["skipped_property"] as? Bool, true)
+        XCTAssertEqual(only("onboarding_completed")?["calendar"] as? String, "not_now")
+        events = []
+        Analytics.onboarding(.stepViewed(.property, .new))
+        XCTAssertEqual(only("onboarding_step_viewed")?["step"] as? String, "property")
+        XCTAssertEqual(only("onboarding_step_viewed")?["cohort"] as? String, "new")
+        events = []
+        Analytics.onboarding(.goalSelected(.mp500))
+        XCTAssertEqual(only("onboarding_goal_selected")?["goal"] as? String, "mp500")
+        events = []
+        Analytics.onboarding(.calendarResult(.allowed))
+        XCTAssertEqual(only("calendar_permission_result")?["result"] as? String, "full")
+        events = []
+        Analytics.onboarding(.whoSelected(.both))
+        XCTAssertEqual(only("onboarding_who_selected")?["who"] as? String, "both")
+        events = []
+        Analytics.onboarding(.propertyAdded(hasAddress: false, skipped: true))
+        XCTAssertEqual(only("onboarding_property_added")?["skipped"] as? Bool, true)
+        events = []
+        Analytics.onboarding(.notifyResult("declined_in_app"))
+        XCTAssertEqual(only("notify_permission_result")?["result"] as? String, "declined_in_app")
     }
 
     func testProfileCreatedKind() {
@@ -336,9 +360,9 @@ final class PaywallContextTests: XCTestCase {
     }
 
     func testOnboardingHasNoPaywallStep() {
-        XCTAssertEqual(OnboardingStep.allCases, [.goalSelection, .addProperty, .notifications, .calendar])
-        XCTAssertEqual(OnboardingStep.totalSegments, 4)
-        XCTAssertNil(OnboardingStep.fromLaunchArgument("paywall"))
+        XCTAssertEqual(OnbRouting.newUserSequence, [.welcome, .goal, .calendar, .who, .property, .notify, .staked])
+        XCTAssertEqual(OnbRouting.upgradeSequence, [.wnHouse, .calendar, .notify])
+        XCTAssertNil(OnbStep(launchValue: "paywall"))
     }
 }
 

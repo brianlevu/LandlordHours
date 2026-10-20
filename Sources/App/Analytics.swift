@@ -224,9 +224,32 @@ enum Analytics {
         capture("purchase_restored")
     }
 
-    /// The first-run onboarding flow finished.
-    static func onboardingCompleted() {
-        capture("onboarding_completed")
+    /// The first-run onboarding flow finished. `calendar`: full | denied | not_now | not_asked.
+    static func onboardingCompleted(skippedProperty: Bool = false, calendar: String = "not_asked") {
+        capture("onboarding_completed", properties: [
+            "skipped_property": skippedProperty,
+            "calendar": calendar
+        ])
+    }
+
+    // MARK: - 2.0 onboarding funnel
+    // Fixed enums only: never a property name, an address or an event title.
+
+    static func onboarding(_ event: OnbEvent) {
+        switch event {
+        case .stepViewed(let step, let cohort):
+            capture("onboarding_step_viewed", properties: ["step": step.analyticsKey, "cohort": cohort.rawValue])
+        case .goalSelected(let goal):
+            capture("onboarding_goal_selected", properties: ["goal": goal.rawValue])
+        case .calendarResult(let answer):
+            capture("calendar_permission_result", properties: ["result": answer.analyticsKey, "context": "onboarding"])
+        case .whoSelected(let who):
+            capture("onboarding_who_selected", properties: ["who": who == .both ? "both" : "self"])
+        case .propertyAdded(let hasAddress, let skipped):
+            capture("onboarding_property_added", properties: ["has_address": hasAddress, "skipped": skipped])
+        case .notifyResult(let result):
+            capture("notify_permission_result", properties: ["result": result, "context": "onboarding"])
+        }
     }
 
     enum ProfileKind: String {

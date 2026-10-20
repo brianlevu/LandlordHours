@@ -30,6 +30,68 @@ enum HourGoalType: String, CaseIterable, Codable {
     }
 }
 
+// MARK: - Goal choice (2.0: the four goals onboarding and Settings offer)
+
+/// What the owner is building toward. 1.x stored three `HourGoalType`s; 2.0 adds material
+/// participation at 500 hours (MP test 1) beside 100 hours (test 3). The 500 target is stored
+/// next to `.str`, so `HourGoalType` (synced and read by 1.x) never changes and every existing
+/// stored goal reads back exactly as before: `.reps` → 750, `.str` → 100, `.both` → record.
+enum GoalChoice: String, CaseIterable, Identifiable {
+    case reps750, mp500, mp100, record
+
+    var id: String { rawValue }
+
+    init(hourGoalType: HourGoalType, materialParticipationTarget: Int) {
+        switch hourGoalType {
+        case .reps: self = .reps750
+        case .both: self = .record
+        case .str: self = materialParticipationTarget == 500 ? .mp500 : .mp100
+        }
+    }
+
+    var hourGoalType: HourGoalType {
+        switch self {
+        case .reps750: return .reps
+        case .mp500, .mp100: return .str
+        case .record: return .both
+        }
+    }
+
+    /// 500 only for MP 500; 0 (none) otherwise.
+    var materialParticipationTarget: Int { self == .mp500 ? 500 : 0 }
+
+    /// The house goal. "Keep a record" keeps the REPS scale, as 1.x's "Both" did.
+    var houseGoal: HouseGoal {
+        switch self {
+        case .reps750, .record: return .reps750
+        case .mp500: return .mp500
+        case .mp100: return .mp100
+        }
+    }
+
+    var targetHours: Double { houseGoal.targetHours }
+
+    /// Settings picker words (the same four options as onboarding).
+    var title: String {
+        switch self {
+        case .reps750: return "750 hours · Real estate professional"
+        case .mp500: return "500 hours · Material participation"
+        case .mp100: return "100 hours · Material participation"
+        case .record: return "Just keep a record"
+        }
+    }
+
+    /// Widget labels: (long, short).
+    var widgetLabels: (String, String) {
+        switch self {
+        case .reps750: return ("750h REPS", "750h")
+        case .mp500: return ("500h MP", "500h")
+        case .mp100: return ("100h STR", "100h")
+        case .record: return ("750h REPS + STR", "750h")
+        }
+    }
+}
+
 // MARK: - Property Goal
 
 struct PropertyGoal: Identifiable, Codable {
@@ -125,7 +187,48 @@ class GoalManager: ObservableObject {
 
     func setGlobalGoal(_ type: HourGoalType) {
         globalGoalType = type
+        // A plain goal type change drops the 500-hour target: `.str` then means 100 hours, as in 1.x.
+        UserDefaults.standard.removeObject(forKey: mpTargetKey)
         saveGoals()
+    }
+
+    // MARK: 2.0 goal choice (adds material participation at 500 hours)
+
+    /// Per profile, next to `globalGoalType`; synced in the GoalSettings record.
+    private var mpTargetKey: String { UserScope.key("materialParticipationTarget") }
+
+    var materialParticipationTarget: Int { UserDefaults.standard.integer(forKey: mpTargetKey) }
+
+    var goalChoice: GoalChoice {
+        GoalChoice(hourGoalType: globalGoalType, materialParticipationTarget: materialParticipationTarget)
+    }
+
+    /// The goal the house and every 2.0 surface measure against.
+    var houseGoal: HouseGoal { goalChoice.houseGoal }
+
+    func setGoalChoice(_ choice: GoalChoice) {
+        globalGoalType = choice.hourGoalType
+        applyMaterialParticipationTarget(choice.materialParticipationTarget)
+        saveGoals()
+    }
+
+    /// Saves a house goal (REPS, MP 500 or MP 100).
+    func setHouseGoal(_ goal: HouseGoal) {
+        switch goal {
+        case .reps750: setGoalChoice(.reps750)
+        case .mp500: setGoalChoice(.mp500)
+        case .mp100: setGoalChoice(.mp100)
+        }
+    }
+
+    /// iCloud: the target arrives with the goal type; 0 or a missing field means none.
+    func applyMaterialParticipationTarget(_ target: Int) {
+        if target == 500 {
+            UserDefaults.standard.set(500, forKey: mpTargetKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: mpTargetKey)
+        }
+        objectWillChange.send()
     }
 }
 

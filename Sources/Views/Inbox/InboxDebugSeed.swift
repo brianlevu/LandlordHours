@@ -183,12 +183,18 @@ enum InboxDebugSeed {
         ]
         let calendar = Calendar.current
         return (0..<22).map { index in
-            let (title, category) = titles[index % titles.count]
+            let (title, listedCategory) = titles[index % titles.count]
+            // `-LHBackfillNonCountable`: a look-back that finds only work that never counts
+            // (investing, financing, negotiation), for the honest "none count" state.
+            let nonCountable: [ActivityCategory] = [.financing, .investing, .contractNegotiation]
+            let category = ProcessInfo.processInfo.arguments.contains("-LHBackfillNonCountable")
+                ? nonCountable[index % nonCountable.count] : listedCategory
             let base = calendar.date(byAdding: .day, value: -(3 + index * 4), to: calendar.startOfDay(for: now)) ?? now
             let start = calendar.date(bySettingHour: 9 + index % 8, minute: index % 2 == 0 ? 0 : 30, second: 0, of: base) ?? base
             let confidence = [0.95, 0.9, 0.84, 0.78, 0.71, 0.64, 0.55, 0.45, 0.38][index % 9]
             return item("bf-\(index)", title: title, start: start, hours: [1, 2, 1.5, 0.5, 3][index % 5],
-                        property: index % 6 == 5 ? nil : ids[index % max(ids.count, 1)],
+                        // Onboarding scans before the first property exists: no property then.
+                        property: index % 6 == 5 || ids.isEmpty ? nil : ids[index % ids.count],
                         category: category, confidence: confidence, backfill: true)
         }
     }

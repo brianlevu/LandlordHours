@@ -108,9 +108,7 @@ struct PropertiesView: View {
                 }
             }
         }
-        .sheet(item: $editor, onDismiss: {
-            NotificationCenter.default.post(name: .resumeGuidedOnboardingOverlay, object: nil)
-        }) { mode in
+        .sheet(item: $editor) { mode in
             PropertyEditSheet(mode: mode, onDeleted: { _ in
                 // The rental is gone: back to the list.
                 path = NavigationPath()
@@ -150,7 +148,6 @@ struct PropertiesView: View {
                     }
                     .buttonStyle(PropertyTintedButtonStyle())
                     .fixedSize()
-                    .guidedSpotlightTarget(.addProperty)
                     .accessibilityIdentifier("properties.add")
                 }
             }
@@ -280,7 +277,6 @@ struct PropertiesView: View {
             Button("Add property", action: openAddProperty)
                 .buttonStyle(InboxPrimaryButtonStyle())
                 .padding(.top, 8)
-                .guidedSpotlightTarget(.addProperty)
                 .accessibilityIdentifier("properties.add")
         }
         .padding(20)
@@ -321,7 +317,6 @@ struct PropertiesView: View {
 
     private func openAddProperty() {
         if viewModel.canAddProperty() {
-            NotificationCenter.default.post(name: .suspendGuidedOnboardingOverlay, object: nil)
             editor = .add
         } else {
             openPaywall()

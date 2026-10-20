@@ -69,7 +69,7 @@ struct BackfillRevealView: View {
                     .font(.body.weight(.semibold))
                     .foregroundStyle(HouseTokens.onHeroPrimary)
                     .padding(.top, 4)
-                Text("Hatched floors are suggestions. They turn solid only when you say they were work.")
+                Text("Hatched floors are suggestions. They turn solid only when you say they were rental work.")
                     .font(.subheadline)
                     .foregroundStyle(HouseTokens.onHeroSecondary)
                     .multilineTextAlignment(.center)

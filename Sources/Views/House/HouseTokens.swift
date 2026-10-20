@@ -29,6 +29,10 @@ enum HouseTokens {
         static let cardLight = "FFFFFF"
         static let cardDark = "141C3F"
         static let positiveOnHero = "7FE3A8"
+        static let hardHatYellow = "F2C14E"     // onboarding crew (illustration only)
+        static let hardHatOrange = "F08A4B"
+        static let flagPaper = "F4EFE6"         // the stake's name flag
+        static let flagInk = "121B33"           // name on the flag (15:1 on flagPaper)
         static let cautionOnHero = "FFB454"     // behind-pace words on blueprint (5.2:1 on #1E3FA6)
     }
 
@@ -48,6 +52,10 @@ enum HouseTokens {
     static let onHeroSecondary = Color(hex: Hex.onHeroSecondary)
     static let positiveOnHero = Color(hex: Hex.positiveOnHero)
     static let cautionOnHero = Color(hex: Hex.cautionOnHero)
+    static let hardHatYellow = Color(hex: Hex.hardHatYellow)
+    static let hardHatOrange = Color(hex: Hex.hardHatOrange)
+    static let flagPaper = Color(hex: Hex.flagPaper)
+    static let flagInk = Color(hex: Hex.flagInk)
 
     static func canvas(_ scheme: ColorScheme) -> Color {
         Color(hex: scheme == .dark ? Hex.canvasDark : Hex.canvasLight)

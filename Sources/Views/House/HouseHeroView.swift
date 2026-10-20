@@ -211,6 +211,13 @@ enum HouseStatusTone: Equatable, Sendable {
 /// The Today hero card on blueprint paper, ported from the approved sandbox/concept layout: the
 /// number top-left, the house filling the right two-thirds and bottom. DashboardView (Today)
 /// feeds it the goal's countable hours and the pace line.
+/// What the hero's bottom lines say when Today is new: the empty lot (with its one action), or
+/// hours found in the calendar that don't count until confirmed. nil: the pace and stage lines.
+enum HouseHeroFooter {
+    case emptyLot(onAddProperty: () -> Void)
+    case found(hoursText: String)
+}
+
 struct HouseHeroCard: View {
     let progress: HouseProgress
     var year: Int = Calendar.current.component(.year, from: Date())
@@ -219,6 +226,10 @@ struct HouseHeroCard: View {
     var statusTone: HouseStatusTone = .positive
     var onCelebration: (HouseCelebration) -> Void = { _ in }
     var debugConfirmStill: Int? = nil
+    /// New-owner states (onboarding landing); nil keeps the pace and stage lines.
+    var footer: HouseHeroFooter? = nil
+    /// The first property's name on a stake in the lot, until the first hour is logged.
+    var stakeName: String? = nil
     /// WP-L: the hours aren't final yet (the first iCloud pull is still running). The number is a
     /// soft placeholder bar and the house slot shows the drafting line sketching the house; when
     /// it turns false the real house crossfades in and the number counts up.
@@ -265,8 +276,12 @@ struct HouseHeroCard: View {
                 // The art has ~6% side and ~8% bottom margins inside its 320 pt camera; size it so
                 // the house fills the right half or so (the approved r6 concept proportion) and
                 // the words keep a ~130 pt column for real pace copy ("Behind by 388h").
-                let houseSize = min(g.size.height * 0.84, g.size.width * 0.62)
-                let houseCenter = CGPoint(x: g.size.width - 4 - houseSize * 0.44, y: g.size.height - 6 - houseSize * 0.417)
+                // A staked lot leaves room on the right for the name flag (approved onboarding landing).
+                // The empty lot is smaller too, so its words and button keep a clear column.
+                let staked = stakeName != nil
+                let shrink: CGFloat = staked ? 0.86 : (footerIsWide ? 0.8 : 1)
+                let houseSize = min(g.size.height * 0.84, g.size.width * 0.62) * shrink
+                let houseCenter = CGPoint(x: g.size.width - 4 - houseSize * 0.44 - (staked ? 40 : 0), y: g.size.height - 6 - houseSize * 0.417)
                 let houseOrigin = CGPoint(x: houseCenter.x - houseSize / 2, y: houseCenter.y - houseSize / 2)
                 // Bottom lines stay clear of the lot's left tip (~6% into the camera at ~74% height).
                 let columnWidth = max(96, houseOrigin.x + houseSize * 0.04 - 24)
@@ -290,6 +305,12 @@ struct HouseHeroCard: View {
                         }
                     }
                     .frame(width: houseSize, height: houseSize)
+                    .overlay {
+                        if let stakeName {
+                            // Room on the right for the flag, which hangs to the right of the post.
+                            OnbMiniStake(name: stakeName, maxFlagWidth: g.size.width - (houseOrigin.x + houseSize * OnbScene.stakeBase.x) - 12)
+                        }
+                    }
                     .position(houseCenter)
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -330,6 +351,13 @@ struct HouseHeroCard: View {
                             }
                             .frame(width: columnWidth, alignment: .leading)
                             .transition(.opacity)
+                        } else if let footer {
+                            footerView(footer)
+                                // The lot's words share the card with the art: capped so they never
+                                // truncate or run into the house (VoiceOver reads the full words).
+                                .dynamicTypeSize(...DynamicTypeSize.large)
+                                .frame(width: columnWidth, alignment: .leading)
+                                .transition(.opacity)
                         } else {
                         Group {
                             if let status {
@@ -350,7 +378,7 @@ struct HouseHeroCard: View {
                                     .foregroundStyle(HouseTokens.onHeroPrimary)
                                     .lineLimit(2)
                                     .accessibilityIdentifier("today.hero.lookingBack")
-                                Text("Work we find waits in your Inbox")
+                                Text("Rental work we find waits in your Inbox")
                                     .font(.footnote)
                                     .foregroundStyle(HouseTokens.onHeroSecondary)
                                     .lineLimit(2)
@@ -367,13 +395,17 @@ struct HouseHeroCard: View {
                                 }
                             }
                         }
+                        // The words share a fixed-height card with the art: past XXL they would be cut
+                        // ("Behind…"), so they stop growing there and wrap (VoiceOver reads them in full).
+                        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
+                        .fixedSize(horizontal: false, vertical: true)
                         .frame(width: columnWidth, alignment: .leading)
                         .transition(.opacity)
                         }
                     }
                     .padding(20)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .accessibilityElement(children: .combine)
+                    .accessibilityElement(children: footerIsWide ? .contain : .combine)  // the empty lot keeps its button tappable
                 }
             }
         }
@@ -395,6 +427,51 @@ struct HouseHeroCard: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("house-hero-card")
+    }
+
+    private var footerIsWide: Bool {
+        if case .emptyLot = footer { return true }
+        return false
+    }
+
+    @ViewBuilder private func footerView(_ footer: HouseHeroFooter) -> some View {
+        switch footer {
+        case .emptyLot(let onAdd):
+            VStack(alignment: .leading, spacing: 2) {
+                Text("An empty lot.")
+                    .font(.headline)
+                    .foregroundStyle(HouseTokens.onHeroPrimary)
+                Text("Add a property. Every hour you confirm builds on it.")
+                    .font(.footnote)
+                    .foregroundStyle(HouseTokens.onHeroSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button(action: onAdd) {
+                    Label("Add property", systemImage: "plus")
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .fixedSize()
+                        .foregroundStyle(HouseTokens.blueprint)
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 36)
+                        .background(HouseTokens.onHeroPrimary, in: Capsule())
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.lhPressable)
+                .padding(.top, 10)
+                .accessibilityIdentifier("today.hero.addProperty")
+            }
+        case .found(let hoursText):
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(hoursText) found")
+                    .font(.headline)
+                    .foregroundStyle(HouseTokens.onHeroPrimary)
+                    .accessibilityIdentifier("today.hero.found")
+                Text("Not counted until you confirm")
+                    .font(.footnote)
+                    .foregroundStyle(HouseTokens.onHeroSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     /// Whole-hour steps from the shown number to the new hours with a small spring pop.

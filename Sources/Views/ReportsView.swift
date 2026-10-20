@@ -154,7 +154,7 @@ struct ReportsView: View {
                 }
             }
             .onAppear {
-                selectedGoal = GoalMode(HouseGoal(goalManager.globalGoalType))
+                selectedGoal = GoalMode(goalManager.houseGoal)
                 Analytics.reportViewed()
             }
         }
