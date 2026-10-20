@@ -706,8 +706,7 @@ class AppViewModel: ObservableObject {
 
     // MARK: - Subscription Features
     func canAddProperty() -> Bool {
-        if SubscriptionManager.shared.isPro { return true }
-        return properties.count < 1
+        !PropertyLimit.isAtLimit(isPro: SubscriptionManager.shared.isPro, propertyCount: properties.count)
     }
     
     func canAddTimeEntry() -> Bool {
@@ -1839,6 +1838,7 @@ extension AppViewModel: CloudKitSyncDelegate {
         TodayHouseEvents.shared.resetInMemoryState()
         #if DEBUG
         applyTodayHoursSeedIfNeeded()
+        applyPropertiesSeedIfNeeded()
         #endif
     }
 

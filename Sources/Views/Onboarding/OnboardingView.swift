@@ -563,8 +563,10 @@ struct OnbStakedContent: View {
                             .accessibilityAddTraits(.isHeader)
                         if case .nothingCountable(let count) = headline {
                             // Right under the headline, so it's seen at every text size.
-                            Text(OnbStakedHeadline.nothingCountableLine(count))
-                                .onbDrafting(HouseTokens.drafting)
+                            // A sentence, so body text (mono caps are for short eyebrows only).
+                            Text(OnbStakedHeadline.nothingCountableLine(count) + ".")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(HouseTokens.onHeroPrimary)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .padding(.top, 10)
                                 .accessibilityIdentifier("staked-nothing-countable")

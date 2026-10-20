@@ -69,7 +69,7 @@ struct SuggestionRowView: View {
                 Image(systemName: InboxFormat.kindSymbol(suggestion.kind))
                     .font(.system(size: 11, weight: .semibold))
                 Text(InboxFormat.sourceLine(suggestion, now: now))
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
+                    .lineLimit(dynamicTypeSize >= .xxLarge ? 3 : 1)   // end times wrap, never "12:…"
             }
             .font(.subheadline)
             .foregroundStyle(colors.textSecondary)

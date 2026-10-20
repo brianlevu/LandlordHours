@@ -9,6 +9,9 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
     /// actions; at accessibility text sizes it moves to the end of the scrolling content, so the
     /// pinned area never crowds out the question.
     var note: AnyView? = nil
+    /// Scrolls this id into view whenever it changes (the property step keeps "Add address"
+    /// above the keyboard).
+    var scrollTarget: String? = nil
     @ViewBuilder var content: Content
     @ViewBuilder var actions: Actions
     @Environment(\.onbBottomInset) private var bottomInset
@@ -17,6 +20,7 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
 
     var body: some View {
         let pinNote = !typeSize.isAccessibilitySize
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 titleText
@@ -37,6 +41,13 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
             .padding(.top, 22)
             .padding(.bottom, 36)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .onChange(of: scrollTarget) { _, target in
+            guard let target else { return }
+            // After the keyboard has moved the sheet.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                withAnimation(AppAnimation.standard) { proxy.scrollTo(target, anchor: .bottom) }
+            }
         }
         .scrollBounceBehavior(.basedOnSize)
         // Scrolled-up words fade at the sheet's top edge instead of being cut mid-line.
@@ -68,6 +79,7 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
                     .offset(y: -28)
                     .allowsHitTesting(false)
             }
+        }
         }
     }
 }
@@ -473,7 +485,7 @@ struct OnbPropertyStep: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        OnbStepScaffold(title: "Name your first rental.") {
+        OnbStepScaffold(title: "Name your first rental.", scrollTarget: focused ? "property-add-address-row" : nil) {
             VStack(alignment: .leading, spacing: 12) {
                 if let hint = flow.propertyHint {
                     Label(hint, systemImage: "tray.and.arrow.down")
@@ -524,6 +536,7 @@ struct OnbPropertyStep: View {
                     }
                     .buttonStyle(OnbPressable())
                     .accessibilityIdentifier("property-add-address")
+                    .id("property-add-address-row")
                 }
                 Text("A nickname is fine. Addresses, units and more places come later.")
                     .font(.footnote)

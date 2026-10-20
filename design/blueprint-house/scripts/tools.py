@@ -23,11 +23,14 @@ FWD = R3 @ Vector((0, 0, -1)); RIGHT = R3 @ Vector((1, 0, 0)); UP = R3 @ Vector(
 TILT = Matrix.Rotation(math.radians(40), 4, Vector((0.7071, -0.7071, 0)))
 
 TOOLS = ['repairs', 'showing', 'comms', 'bookkeeping', 'travel', 'inspection',
-         'renovation', 'cleaning', 'legal', 'supplies', 'management']
+         'renovation', 'cleaning', 'legal', 'supplies', 'management',
+         'investing', 'financing', 'insurance', 'negotiation']
 LABELS = {'repairs': 'Repairs · wrench', 'showing': 'Showing / leasing · sign', 'comms': 'Tenant comms · phone',
           'bookkeeping': 'Bookkeeping · ledger', 'travel': 'Travel · truck', 'inspection': 'Inspection · flashlight',
           'renovation': 'Renovation · roller', 'cleaning': 'Turnover · bucket + sponge', 'legal': 'Legal / admin · sealed document',
-          'supplies': 'Supplies · hardware bag', 'management': 'Management · clipboard'}
+          'supplies': 'Supplies · hardware bag', 'management': 'Management · clipboard',
+          'investing': 'Investing · rising coin stacks', 'financing': 'Financing · house key + tag',
+          'insurance': 'Insurance · shield + house', 'negotiation': 'Negotiation · two speech bubbles'}
 
 # ------------------------------------------------------------------ materials (house set + a few in the same matte language)
 
@@ -53,6 +56,10 @@ def extra_materials():
     m('screen', '#46506B', 0.18)                # window glass
     m('hubcap', '#F4EBDD', 0.5)                 # plaster
     m('shell', '#F4EBDD', 0.42)                 # plaster
+    m('coin', '#D9B45A', 0.36, None, 0.8)       # brass (investing)
+    m('navy', '#46506B', 0.55)                  # window glass, matte (insurance shield)
+    m('flag', '#E07A3A', 0.68)                  # house flag orange (negotiation)
+    m('keysteel', '#9A6B45', 0.42, None, 0.35)  # house trunk bronze, satin (financing key)
 
 # ------------------------------------------------------------------ geometry helpers
 
@@ -413,9 +420,100 @@ def t_management():
     obj('cb_clip_ring', 'steel', [H.torus_fn((0, D / 2 - 0.02, 0.17), (0, 0, 1), 0.07, 0.018, 24, 8)], bevel=0, smooth=True)
     return 'flat', math.radians(12)
 
+# ------------------------------------------------------------------ r4: four more categories (2026-10-19)
+
+def upright(y=0.0, x=0.0, z=0.0):
+    """Prism drawn in XY, stood up in the XZ plane (extrusion along Y, front face toward -Y = camera)."""
+    return Matrix.Translation((x, y, z)) @ Matrix.Rotation(math.radians(90), 4, 'X')
+
+def t_investing():
+    # three brass coin stacks rising left to right, a moss growth arrow climbing over them
+    import random
+    rnd = random.Random(7)
+    r, t = 0.3, 0.1
+    for si, (x, n) in enumerate(((-0.72, 3), (0.0, 6), (0.72, 9))):
+        fns = []
+        for k in range(n):
+            fns.append(cyl((x + rnd.uniform(-0.025, 0.025), rnd.uniform(-0.025, 0.025), t / 2 + k * t), r, t * 0.92, seg=48))
+        obj('coins%d' % si, 'coin', fns, bevel=0.022)
+        obj('coin_face%d' % si, 'trim', [cyl((x, 0, n * t + 0.004), r * 0.62, 0.012, seg=40)], bevel=0.004)
+    pts = [(-0.95, -0.42, 0.62), (-0.35, -0.42, 0.98), (0.05, -0.42, 0.86), (0.62, -0.42, 1.34)]
+    obj('arrow', 'moss', tube_path(pts, 0.065, 16), bevel=0, smooth=True)
+    d = (Vector(pts[-1]) - Vector(pts[-2])).normalized()
+    q = d.to_track_quat('Z', 'Y').to_matrix().to_4x4()
+    obj('arrow_head', 'moss', [cyl(Vector(pts[-1]) + d * 0.14, 0.17, 0.32, rot=q, seg=32, r2=0.0)], bevel=0.02)
+    return 'stand', math.radians(-18)
+
+def t_financing():
+    # a house-shaped key bow (window cut through it), shaft and bit, on a split ring with a round tag
+    cut = cutter('key_window', [box((-0.575, -0.02, 0.06), (0.24, 0.24, 0.4))])
+    cut.hide_viewport = False; cut.display_type = 'WIRE'   # a viewport-hidden cutter drops out of the depsgraph
+    bow = [(-0.95, -0.36), (-0.2, -0.36), (-0.2, 0.18), (-0.575, 0.52), (-0.95, 0.18)]
+    kb = obj('key_bow', 'keysteel', [prism(bow, 0.0, 0.12)], bevel=0.03, booleans=(cut,))
+    cut.parent = kb   # build_tool/normalize only move PARTS; the cutter has to ride along
+    obj('key_shaft', 'keysteel', [box((0.32, -0.12, 0.06), (1.05, 0.15, 0.1))], bevel=0.025)
+    obj('key_bit', 'keysteel', [prism([(0.45, -0.2), (0.45, -0.4), (0.58, -0.4), (0.64, -0.3), (0.72, -0.3), (0.72, -0.4),
+                                        (0.84, -0.4), (0.84, -0.2)], 0.0, 0.1)], bevel=0.015)
+    obj('key_ring', 'coin', [H.torus_fn((-0.575, 0.68, 0.08), (0, 0, 1), 0.2, 0.035, 40, 10)], bevel=0, smooth=True)
+    obj('tag', 'tile', [cyl((-0.3, 1.16, 0.05), 0.34, 0.06, seg=48)], bevel=0.02)
+    obj('tag_eye', 'galv', [H.torus_fn((-0.44, 0.9, 0.09), (0, 0, 1), 0.05, 0.016, 20, 8)], bevel=0, smooth=True)
+    obj('tag_mark', 'paper', [box((-0.3, 1.16, 0.085), (0.3, 0.07, 0.012))], bevel=0.003)
+    return 'flat', math.radians(-30)
+
+def shield_outline(w, h, n=14):
+    """Heater shield, counter-clockwise: slightly arched top, sides curving down to one point."""
+    top = h * 0.5
+    def side(u, sgn):
+        return (sgn * (w / 2) * math.cos(u * math.pi / 2) ** 0.75, top - 0.08 - (h - 0.08) * u ** 1.15)
+    pts = [side(k / n, 1) for k in range(n + 1)]                 # right shoulder -> tip
+    pts += [side(k / n, -1) for k in range(n - 1, -1, -1)]       # tip -> left shoulder
+    pts += [(-w / 2 + w * k / 8, top - 0.08 + 0.08 * math.sin(math.pi * k / 8)) for k in range(1, 8)]   # top arc, left -> right
+    return list(reversed(pts))
+
+def t_insurance():
+    W, Hs = 1.5, 1.8
+    outer = shield_outline(W, Hs)
+    obj('shield_rim', 'coin', [prism(outer, -0.11, 0.11)], bevel=0.04)
+    PARTS[-1].matrix_world = upright(0.0, 0, Hs / 2)
+    inner = [(x * 0.84, y * 0.86 - 0.02) for x, y in outer]
+    obj('shield_face', 'navy', [prism(inner, -0.15, 0.15)], bevel=0.035)
+    PARTS[-1].matrix_world = upright(0.0, 0, Hs / 2)
+    # house emblem, raised on the front face (prism z -> -Y, toward the camera)
+    hz = Hs / 2 + 0.04
+    obj('em_wall', 'paper', [prism([(-0.3, -0.32), (0.3, -0.32), (0.3, 0.08), (-0.3, 0.08)], 0.12, 0.22)], bevel=0.02)
+    PARTS[-1].matrix_world = upright(0, 0, hz)
+    obj('em_roof', 'tile', [prism([(-0.44, 0.02), (0.44, 0.02), (0.0, 0.42)], 0.12, 0.25)], bevel=0.02)
+    PARTS[-1].matrix_world = upright(0, 0, hz)
+    obj('em_door', 'trim', [prism([(-0.08, -0.32), (0.08, -0.32), (0.08, -0.06), (-0.08, -0.06)], 0.21, 0.25)], bevel=0.01)
+    PARTS[-1].matrix_world = upright(0, 0, hz)
+    return 'stand', math.radians(-16)
+
+def bubble(w, h, r, tail_side, seg=8):
+    pts = rounded_rect(w, h, r, seg)
+    # bottom edge sits between the BL corner (index 3*(seg+1)-1) and the BR corner start
+    i = 3 * (seg + 1)
+    if tail_side < 0:
+        x1, x2, tip = -w / 2 + r + 0.02, -w / 2 + r + 0.3, (-w / 2 + 0.02, -h / 2 - 0.32)
+    else:
+        x1, x2, tip = w / 2 - r - 0.3, w / 2 - r - 0.02, (w / 2 - 0.02, -h / 2 - 0.32)
+    return pts[:i] + [(x1, -h / 2), tip, (x2, -h / 2)] + pts[i:]
+
+def t_negotiation():
+    # two chunky speech bubbles facing each other: a plaster one behind (upper left), a flag-orange one in front (lower right)
+    obj('bub_back', 'paper', [prism(bubble(1.3, 0.85, 0.36, -1), -0.12, 0.12)], bevel=0.05, segs=4)
+    PARTS[-1].matrix_world = upright(0.22, -0.42, 1.35)
+    obj('back_lines', 'slate', [box((-0.5, 0.085, 1.48), (0.62, 0.03, 0.07)),
+                                 box((-0.6, 0.085, 1.3), (0.42, 0.03, 0.07))], bevel=0.012)
+    obj('bub_front', 'flag', [prism(bubble(1.3, 0.85, 0.36, +1), -0.13, 0.13)], bevel=0.05, segs=4)
+    PARTS[-1].matrix_world = upright(-0.22, 0.42, 0.78)
+    for k, x in enumerate((-0.3, 0.0, 0.3)):
+        obj('dot%d' % k, 'paper', [sphere((0.42 + x, -0.35, 0.8), 0.085, 3, (1, 0.45, 1))], bevel=0, smooth=True)
+    return 'stand', math.radians(-10)
+
 BUILDERS = {'repairs': t_repairs, 'showing': t_showing, 'comms': t_comms, 'bookkeeping': t_bookkeeping, 'travel': t_travel,
             'inspection': t_inspection, 'renovation': t_renovation, 'cleaning': t_cleaning, 'legal': t_legal,
-            'supplies': t_supplies, 'management': t_management}
+            'supplies': t_supplies, 'management': t_management, 'investing': t_investing, 'financing': t_financing,
+            'insurance': t_insurance, 'negotiation': t_negotiation}
 
 # ------------------------------------------------------------------ scene
 

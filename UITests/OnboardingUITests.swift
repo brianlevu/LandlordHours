@@ -256,7 +256,7 @@ final class OnboardingUITests: XCTestCase {
         tap(app.buttons["onb-secondary"])                          // note: Not now
         let line = app.staticTexts["staked-nothing-countable"]
         XCTAssertTrue(line.waitForExistence(timeout: 10))
-        XCTAssertEqual(line.label.lowercased(), "we found 22 things, but none count toward your hours yet")
+        XCTAssertEqual(line.label.lowercased(), "we found 22 things, but none count toward your hours yet.")
         XCTAssertTrue(app.staticTexts["Your house is staked."].exists)
         XCTAssertFalse(app.staticTexts["staked-found"].exists, "Never a found-hours headline")
         XCTAssertEqual(app.buttons["onb-today"].label, "Review 22 suggestions", "They still wait in the Inbox")
