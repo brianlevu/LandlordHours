@@ -365,9 +365,9 @@ enum AppAppearancePreference: String, CaseIterable, Identifiable {
 
     var confirmationText: String {
         switch self {
-        case .system: return "Saved - following device"
-        case .light: return "Saved - light mode"
-        case .dark: return "Saved - dark mode"
+        case .system: return "Saved: following device"
+        case .light: return "Saved: light mode"
+        case .dark: return "Saved: dark mode"
         }
     }
 

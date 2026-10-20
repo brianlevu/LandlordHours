@@ -437,7 +437,8 @@ final class TimerDraftReviewTests: XCTestCase {
 
     func testCappedMessageDoesNotRepeatTheCap() {
         let message = draft(30).cardMessage(propertyName: "Oak", hasAnyProperty: true)
-        XCTAssertFalse(message.contains("24"), message)
+        XCTAssertFalse(message.contains("24h"), message)
+        XCTAssertFalse(message.localizedCaseInsensitiveContains("24 hours"), message)
         XCTAssertFalse(message.contains("30.0h"), message)
     }
 

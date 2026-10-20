@@ -297,6 +297,25 @@ struct TimeEntryDetailView: View {
 
     // MARK: Edit
 
+    /// Branded date chip: our capsule is the visual; the system date picker sits invisibly on top
+    /// so tapping still opens the native calendar (and VoiceOver still reads a date picker).
+    private var dateChip: some View {
+        Text(date.formatted(date: .abbreviated, time: .omitted))
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(colors.action)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 40)
+            .background(Capsule().fill(colors.backgroundTertiary))
+            .overlay(Capsule().strokeBorder(colors.border, lineWidth: 1))
+            .overlay {
+                DatePicker("Date", selection: $date, in: ...Date.distantFuture, displayedComponents: .date)
+                    .labelsHidden()
+                    .tint(colors.action)
+                    .opacity(0.02)
+            }
+            .contentShape(Capsule())
+    }
+
     @ViewBuilder
     private var editSections: some View {
         Section {
@@ -307,16 +326,16 @@ struct TimeEntryDetailView: View {
             }
             .tint(colors.action)
 
-            HStack {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Who")
                     .foregroundStyle(colors.textPrimary)
-                Spacer(minLength: 12)
-                Picker("Who", selection: $participant) {
-                    Text("Me").tag(Participant.selfParticipant)
-                    Text("Spouse").tag(Participant.spouse)
-                }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 200)
+                BPSegmentedPicker(
+                    options: [Participant.selfParticipant, .spouse],
+                    selection: $participant,
+                    title: { $0 == .spouse ? "Spouse" : "Me" }
+                )
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Who")
             }
 
             Picker("Category", selection: $category) {
@@ -326,8 +345,12 @@ struct TimeEntryDetailView: View {
             }
             .tint(colors.action)
 
-            DatePicker("Date", selection: $date, in: ...Date.distantFuture, displayedComponents: .date)
-                .tint(colors.action)
+            HStack {
+                Text("Date")
+                    .foregroundStyle(colors.textPrimary)
+                Spacer(minLength: 12)
+                dateChip
+            }
         }
         .listRowBackground(colors.backgroundSecondary)
 

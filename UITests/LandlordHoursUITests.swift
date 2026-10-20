@@ -164,14 +164,14 @@ final class LandlordHoursUITests: XCTestCase {
         scrollToElement(app.buttons["Dark appearance"])
         app.buttons["Dark appearance"].tap()
 
-        XCTAssertTrue(app.staticTexts["Saved - dark mode"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Saved: dark mode"].waitForExistence(timeout: 5))
 
         app.terminate()
         launch(scenario: "frequent", tab: 4)
 
         XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 8))
-        scrollToElement(app.staticTexts["Saved - dark mode"])
-        XCTAssertTrue(app.staticTexts["Saved - dark mode"].exists)
+        scrollToElement(app.staticTexts["Saved: dark mode"])
+        XCTAssertTrue(app.staticTexts["Saved: dark mode"].exists)
     }
 
     func testMainTabVisualSmokeMatrix() {
