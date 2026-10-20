@@ -53,8 +53,8 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
             // A short fade above the pinned area: content slides under it, never hard-cut.
             .background(alignment: .top) {
                 LinearGradient(colors: [OnbColor.card.opacity(0), OnbColor.card], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 24)
-                    .offset(y: -24)
+                    .frame(height: 32)
+                    .offset(y: -32)
                     .allowsHitTesting(false)
             }
         }

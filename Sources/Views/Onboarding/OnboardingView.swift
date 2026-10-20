@@ -101,7 +101,10 @@ extension OnbServices {
         s.ensureProfile = { if !app.isSignedIn { app.continueWithoutAccount() } }
         s.saveGoal = { goal in GoalManager.shared.setGoalChoice(goal.goalChoice) }
         s.saveWho = { who in TaxProfileManager.shared.spouseTracking = (who == .both) }
-        s.addProperty = { name, address in app.addProperty(name: name, address: address, type: .ltr) }
+        s.addProperty = { name, address in
+            app.addProperty(name: name, address: address, type: .ltr)
+            OnbBackfill.placeUnplaced(app: app)
+        }
         s.requestCalendar = { await environment.requestCalendar() }
         s.setCalendarSuggestions = { on in
             CaptureOptIn.setCalendarSuggestionsEnabled(on)
@@ -144,6 +147,16 @@ enum OnbBackfill {
         }
     }
 
+    /// The look-back may find events before the first property exists. Once the owner has exactly
+    /// one property, every unplaced pending suggestion goes to it, in the store, before the
+    /// Inbox shows them (so each row can be confirmed in one tap).
+    static func placeUnplaced(app: AppViewModel) {
+        guard let id = OnbPlacement.soleProperty(app.properties),
+              let store = AppModelHost.shared.suggestionStore,
+              store.attachPropertyToUnplaced(id) > 0 else { return }
+        NotificationCenter.default.post(name: .captureSuggestionsDidChange, object: nil)
+    }
+
     static func start(app: AppViewModel, environment: CaptureSetupEnvironment, update: @escaping @MainActor (OnbScanUpdate) -> Void) {
         guard let store = AppModelHost.shared.suggestionStore else {
             update(OnbScanUpdate(state: .blocked, found: .none))
@@ -156,6 +169,8 @@ enum OnbBackfill {
             .receive(on: DispatchQueue.main)
             .sink { phase, _ in
                 MainActor.assumeIsolated {
+                    // Items that stream in after the first property was saved go to it too.
+                    placeUnplaced(app: app)
                     let found = OnbFound.from(store.suggestions, now: InboxClock.now())
                     update(OnbScanUpdate(state: state(phase), found: found, progress: progress(phase)))
                 }
@@ -334,7 +349,8 @@ struct OnbRoot: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(OnbColor.card, in: UnevenRoundedRectangle(topLeadingRadius: 26, topTrailingRadius: 26))
         .frame(height: max(0, H - bandH + overlap))
-        .clipped()
+        // Clipped to the sheet's own shape: scrolled content never shows over the blueprint band.
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 26, topTrailingRadius: 26))
         .frame(maxHeight: .infinity, alignment: .bottom)
     }
 
@@ -424,7 +440,7 @@ struct OnbWelcomeContent: View {
             .padding(.bottom, bottomInset + 8)
             .background(alignment: .top) {
                 LinearGradient(colors: [HouseTokens.blueprintDeep.opacity(0), HouseTokens.blueprintDeep.opacity(0.85)], startPoint: .top, endPoint: .init(x: 0.5, y: 0.25))
-                    .padding(.top, -24)
+                    .padding(.top, -40)
                     .allowsHitTesting(false)
             }
         }
@@ -555,6 +571,7 @@ struct OnbStakedContent: View {
                     }
                 }
                 .padding(.horizontal, 24)
+                .padding(.bottom, 28)          // clears the scrim above the pinned button
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .scrollBounceBehavior(.basedOnSize)
@@ -564,7 +581,14 @@ struct OnbStakedContent: View {
             .buttonStyle(OnbHeroPill())
             .accessibilityIdentifier("onb-today")
             .padding(.horizontal, 24)
+            .padding(.top, 12)
             .padding(.bottom, bottomInset + 8)
+            .background(alignment: .top) {
+                // Words scrolling under the pinned button fade out instead of running under it.
+                LinearGradient(colors: [HouseTokens.blueprintDeep.opacity(0), HouseTokens.blueprintDeep.opacity(0.85)], startPoint: .top, endPoint: .init(x: 0.5, y: 0.25))
+                    .padding(.top, -40)
+                    .allowsHitTesting(false)
+            }
         }
         .animation(AppAnimation.standard, value: headline)
     }

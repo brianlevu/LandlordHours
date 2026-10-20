@@ -137,6 +137,16 @@ enum OnbFormat {
     static func suggestions(_ n: Int) -> String { n == 1 ? "1 suggestion" : "\(n) suggestions" }
 }
 
+// MARK: - Placing what was found (pure)
+
+enum OnbPlacement {
+    /// The property every unplaced suggestion goes to: the owner's only property. With several
+    /// properties nothing is guessed; the Inbox asks on Confirm.
+    static func soleProperty(_ properties: [RentalProperty]) -> UUID? {
+        properties.count == 1 ? properties.first?.id : nil
+    }
+}
+
 // MARK: - Routing (pure)
 
 enum OnbRouting {

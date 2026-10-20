@@ -449,3 +449,68 @@ final class OnboardingFlowTests: XCTestCase {
         XCTAssertEqual(manager.houseGoal, .reps750)
     }
 }
+
+// MARK: - Placing what the look-back found before the first property existed
+
+@MainActor
+final class OnboardingPlacementTests: XCTestCase {
+    private var dir: URL!
+
+    override func setUp() {
+        super.setUp()
+        dir = FileManager.default.temporaryDirectory.appendingPathComponent("onb-place-\(UUID().uuidString)")
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: dir)
+        super.tearDown()
+    }
+
+    private func item(_ key: String, property: UUID? = nil, pending: Bool = true) -> Suggestion {
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        var s = Suggestion(sourceKey: "cal:\(key)", kind: .calendar, detectedAt: start, start: start,
+                           end: start.addingTimeInterval(3600), title: key, proposedPropertyId: property,
+                           proposedCategory: .repairs, proposedHours: 1, hoursBasis: .scheduled, confidence: 0.9,
+                           isBackfill: true)
+        if !pending { s.state = .dismissed(reason: .notLandlordWork) }
+        return s
+    }
+
+    func testOnlyASolePropertyIsUsed() {
+        let one = RentalProperty(name: "Oak", address: "", propertyType: .ltr)
+        let two = RentalProperty(name: "Pine", address: "", propertyType: .str)
+        XCTAssertEqual(OnbPlacement.soleProperty([one]), one.id)
+        XCTAssertNil(OnbPlacement.soleProperty([one, two]), "Several properties: nothing is guessed")
+        XCTAssertNil(OnbPlacement.soleProperty([]))
+    }
+
+    func testOnePropertyAttachesToEveryPendingUnplacedSuggestion() {
+        let store = SuggestionStore(userId: "onb", baseDirectory: dir)
+        let oak = UUID(), elsewhere = UUID()
+        store.ingest([item("a"), item("b"), item("placed", property: elsewhere)], existingEntries: [])
+        XCTAssertEqual(store.attachPropertyToUnplaced(oak), 2)
+        XCTAssertEqual(store.pending.filter { $0.proposedPropertyId == oak }.count, 2)
+        XCTAssertEqual(store.suggestion(forKey: "cal:placed")?.proposedPropertyId, elsewhere, "A matched property is kept")
+        // Saved: a fresh store reads the same.
+        let reread = SuggestionStore(userId: "onb", baseDirectory: dir)
+        XCTAssertTrue(reread.pending.allSatisfy { $0.proposedPropertyId != nil })
+        // Every row is now one-tap confirmable.
+        XCTAssertTrue(reread.pending.filter { $0.proposedPropertyId == oak }
+            .allSatisfy { InboxLogic.canQuickLog($0, propertyIds: [oak, elsewhere]) })
+    }
+
+    func testARescanKeepsTheAttachedProperty() {
+        let store = SuggestionStore(userId: "onb", baseDirectory: dir)
+        let oak = UUID()
+        store.ingest([item("a")], existingEntries: [])
+        store.attachPropertyToUnplaced(oak)
+        store.ingest([item("a")], existingEntries: [])            // the look-back runs again
+        XCTAssertEqual(store.suggestion(forKey: "cal:a")?.proposedPropertyId, oak)
+    }
+
+    func testNothingToAttachChangesNothing() {
+        let store = SuggestionStore(userId: "onb", baseDirectory: dir)
+        store.ingest([item("placed", property: UUID())], existingEntries: [])
+        XCTAssertEqual(store.attachPropertyToUnplaced(UUID()), 0)
+    }
+}

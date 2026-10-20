@@ -63,12 +63,12 @@ enum HouseGoal: String, CaseIterable, Codable, Sendable {
         }
     }
 
-    /// Hero eyebrow, e.g. "REPS goal".
+    /// Hero eyebrow in plain words, e.g. "750-hour goal" (no "REPS"/"MP" jargon on screen).
     var eyebrow: String {
         switch self {
-        case .reps750: return "REPS goal"
-        case .mp500: return "MP 500h goal"
-        case .mp100: return "MP 100h goal"
+        case .reps750: return "750-hour goal"
+        case .mp500: return "500-hour goal"
+        case .mp100: return "100-hour goal"
         }
     }
 

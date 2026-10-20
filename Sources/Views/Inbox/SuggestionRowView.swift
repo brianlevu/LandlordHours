@@ -90,14 +90,16 @@ struct SuggestionRowView: View {
         return Text("\(noun) at \(Text(propertyName).fontWeight(.semibold))")
     }
 
+    /// The classifier's category on every row; status words (not sure, might be logged, needs
+    /// hours) follow it. A missing property is asked for on Confirm, not flagged with a chip.
     @ViewBuilder private var detailLine: some View {
-        let hasBadge = badges.notSure || badges.mightAlreadyBeLogged || badges.needsHours || propertyName == nil
-        if hasBadge {
-            FlowBadges(items: badgeItems)
-        } else if let category = suggestion.proposedCategory {
+        if let category = suggestion.proposedCategory {
             Text(category.inboxLabel)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(category.inboxInk(colors))
+        }
+        if badges.notSure || badges.mightAlreadyBeLogged || badges.needsHours {
+            FlowBadges(items: badgeItems)
         }
     }
 
@@ -106,7 +108,6 @@ struct SuggestionRowView: View {
         if badges.notSure { items.append(("Not sure", .caution)) }
         if badges.mightAlreadyBeLogged { items.append(("Might already be logged", .info)) }
         if badges.needsHours { items.append(("Needs hours", .caution)) }
-        if propertyName == nil { items.append(("Pick a property", .info)) }
         return items
     }
 

@@ -98,12 +98,15 @@ struct OnbScene: View {
             ForEach([100, 500, 750], id: \.self) { h in
                 let on = lit == h
                 let y = Self.tickY[h] ?? 0
+                // Right-aligned a fixed 6pt left of the axis, so the marker (right of the axis)
+                // never covers a digit at any band size.
                 Text("\(h)")
                     .font(.system(size: 11, weight: on ? .bold : .medium, design: .monospaced))
                     .foregroundStyle(on ? HouseTokens.drafting : HouseTokens.onHeroPrimary.opacity(0.62))
                     .fixedSize()
-                    .position(x: s * (x - 0.07), y: s * y)
-                Path { p in p.move(to: CGPoint(x: s * (x + 0.03), y: s * y)); p.addLine(to: CGPoint(x: s * 0.94, y: s * y)) }
+                    .frame(width: 30, alignment: .trailing)
+                    .position(x: s * x - 6 - 15, y: s * y)
+                Path { p in p.move(to: CGPoint(x: s * x + 12, y: s * y)); p.addLine(to: CGPoint(x: s * 0.94, y: s * y)) }
                     .trim(from: 0, to: on ? 1 : 0)
                     .stroke(HouseTokens.drafting, style: StrokeStyle(lineWidth: 1.2, dash: [4, 3]))
                     .opacity(on ? 0.9 : 0)
@@ -111,7 +114,7 @@ struct OnbScene: View {
                     .fill(HouseTokens.drafting)
                     .frame(width: 8, height: 7)
                     .rotationEffect(.degrees(-90))
-                    .position(x: s * (x + 0.045), y: s * y)
+                    .position(x: s * x + 7, y: s * y)
                     .opacity(on ? 1 : 0)
             }
         }

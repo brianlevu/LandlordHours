@@ -378,7 +378,7 @@ struct HouseHeroCard: View {
                                     .foregroundStyle(HouseTokens.onHeroPrimary)
                                     .lineLimit(2)
                                     .accessibilityIdentifier("today.hero.lookingBack")
-                                Text("Work we find waits in your Inbox")
+                                Text("Rental work we find waits in your Inbox")
                                     .font(.footnote)
                                     .foregroundStyle(HouseTokens.onHeroSecondary)
                                     .lineLimit(2)

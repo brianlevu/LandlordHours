@@ -75,6 +75,14 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.buttons["tab.inbox"].waitForExistence(timeout: 10))
         XCTAssertTrue(waitForValue(app.buttons["tab.inbox"], "22 to confirm"),
                       "Every hour found is in the Inbox: \(app.buttons["tab.inbox"].value ?? "nil")")
+        // Found before the property existed, placed on it when it was saved: Confirm logs in one tap.
+        let confirm = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "inbox.confirm.")).firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Every Inbox row shows Confirm")
+        XCTAssertGreaterThanOrEqual(confirm.frame.height, 44)
+        XCTAssertFalse(app.staticTexts["Pick a property"].exists, "The only property was attached to every suggestion")
+        tap(confirm)
+        XCTAssertFalse(app.buttons["confirm.log"].waitForExistence(timeout: 2), "No sheet: nothing was missing")
+        XCTAssertTrue(waitForValue(app.buttons["tab.inbox"], "21 to confirm"), "Confirm logged the row")
         // The count was shown once on Staked: Today does not replay it.
         tap(app.buttons["tab.today"])
         XCTAssertFalse(app.buttons["backfill-review"].waitForExistence(timeout: 3))

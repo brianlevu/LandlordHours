@@ -280,3 +280,43 @@ struct InboxEmptyArt: View {
         .accessibilityHidden(true)
     }
 }
+
+
+/// Confirm (44pt action capsule) and Not work, under each Inbox row's words.
+struct InboxRowActions: View {
+    let key: String
+    let onConfirm: () -> Void
+    let onNotWork: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Button(action: onConfirm) {
+                Label("Confirm", systemImage: "checkmark")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(colors.onAction)
+                    .padding(.horizontal, 18)
+                    .frame(minHeight: 44)
+                    .background(colors.action, in: Capsule())
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.borderless)
+            .accessibilityIdentifier("inbox.confirm.\(key)")
+            Button(action: onNotWork) {
+                Text("Not work")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(colors.textSecondary)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Not rental work")
+            .accessibilityIdentifier("inbox.notWork.\(key)")
+        }
+        // Lines up with the row's words (hours column + tool tile), except at large text sizes.
+        .padding(.leading, dynamicTypeSize.isAccessibilitySize ? 0 : 108)
+    }
+}

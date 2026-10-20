@@ -27,6 +27,26 @@ final class OnboardingCaptureUITests: XCTestCase {
     func testCaptureLightAX3() { captureAll(scheme: "light", size: "ax3") }
     func testCaptureDarkAX3() { captureAll(scheme: "dark", size: "ax3") }
 
+    /// The real iOS calendar prompt over the calendar step (the host resets calendar privacy
+    /// first so iOS asks). Answers "Don't Allow" after the frame.
+    func testCaptureCalendarSystemPromptLight() { captureSystemPrompt(scheme: "light") }
+    func testCaptureCalendarSystemPromptDark() { captureSystemPrompt(scheme: "dark") }
+
+    private func captureSystemPrompt(scheme: String) {
+        launch(scheme: scheme, size: nil, ["-LHOnboardingStep", "calendar"])
+        let look = app.buttons["onb-primary"]
+        XCTAssertTrue(look.waitForExistence(timeout: 20))
+        Thread.sleep(forTimeInterval: 1.6)
+        tap(look)
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let alert = springboard.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 10), "iOS shows its calendar prompt")
+        shot("02b-calendar-system-prompt", scheme, nil)
+        for label in ["Don’t Allow", "Don't Allow"] where alert.buttons[label].exists {
+            alert.buttons[label].tap(); break
+        }
+    }
+
     func testCaptureReduceMotionWelcomeLight() { captureWelcome(scheme: "light", suffix: "rm") }
     func testCaptureReduceMotionWelcomeDark() { captureWelcome(scheme: "dark", suffix: "rm") }
 
@@ -71,6 +91,11 @@ final class OnboardingCaptureUITests: XCTestCase {
         shot("01-goal", scheme, suffix)
         tap(app.buttons["goal-mp"])
         shot("01b-goal-mp", scheme, suffix)
+        if app.buttons["goal-mp500"].exists && !app.buttons["goal-mp500"].isHittable {
+            // Large text: the 500h / 100h chips sit below the fold; show them too.
+            app.staticTexts["What are you building toward?"].swipeUp()
+            shot("01c-goal-mp-chips", scheme, suffix)
+        }
         tap(app.buttons["goal-750"])
         tap(app.buttons["onb-primary"])
         XCTAssertTrue(app.buttons["onb-link"].waitForExistence(timeout: 5))
@@ -98,6 +123,11 @@ final class OnboardingCaptureUITests: XCTestCase {
         tap(app.buttons["onb-today"])                           // Review → Inbox
         XCTAssertTrue(app.buttons["tab.inbox"].waitForExistence(timeout: 10))
         shot("07d-inbox-review", scheme, suffix)
+        let confirm = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "inbox.confirm.")).firstMatch
+        if confirm.waitForExistence(timeout: 5) {
+            tap(confirm)
+            shot("07e-inbox-confirmed", scheme, suffix)
+        }
         tap(app.buttons["tab.today"])
         shot("07-today-landing", scheme, suffix)
 
