@@ -45,6 +45,12 @@ enum LHB {
     static let informational = Color(light: 0x4A6392, dark: 0x9BB0D0)
     static let informationalSurface = Color(light: 0xE6ECF6, dark: 0x1E2A4A)
     static let rose = Color(light: 0xB04266, dark: 0xF08BAA)
+    /// Decorative data marks (week bars): blueprint in light; drafting #60A8E6 in dark so a
+    /// bar never shares the tappable cyan (brand doc §2).
+    static let chartBar = Color(light: 0x1E3FA6, dark: 0x60A8E6)
+    /// The one toast surface (named so builders don't sample glass): card in light, a lifted
+    /// navy in dark so the toast separates from cards it floats over.
+    static let toastSurface = Color(light: 0xFFFFFF, dark: 0x1B2550)
     static let roseSurface = Color(light: 0xF9E3EA, dark: 0x3A1A28)
 }
 

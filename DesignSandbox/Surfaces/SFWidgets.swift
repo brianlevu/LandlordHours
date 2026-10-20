@@ -368,18 +368,28 @@ struct SFAccessoryCircular: View {
 /// Counted-or-pending accessory: inbox count big, for people who want "what needs me".
 struct SFAccessoryCircularPending: View {
     let n: Int
+    var kind: SFWidgetData.Kind = .behind
+    /// "Done" only when there are hours and nothing waits; a new user sees a neutral state.
+    private var face: (symbol: String, text: String, big: Bool, a11y: String) {
+        if n > 0 { return ("tray.fill", "\(n)", true, "\(n) to confirm") }
+        switch kind {
+        case .noProperty: return ("plus", "Add", false, "Add a property")
+        case .empty: return ("tray", "–", true, "Nothing to confirm yet")
+        default: return ("checkmark", "Done", false, "Nothing to confirm")
+        }
+    }
     var body: some View {
         ZStack {
             Circle().fill(.black.opacity(0.22))
             VStack(spacing: 1) {
-                Image(systemName: n == 0 ? "checkmark" : "tray.fill").font(.system(size: 13, weight: .semibold))
-                Text(n == 0 ? "Done" : "\(n)").font(.system(size: n == 0 ? 13 : 22, weight: .semibold, design: .rounded)).monospacedDigit()
+                Image(systemName: face.symbol).font(.system(size: 13, weight: .semibold))
+                Text(face.text).font(.system(size: face.big ? 22 : 13, weight: .semibold, design: .rounded)).monospacedDigit()
             }
             .foregroundStyle(.white)
         }
         .frame(width: 72, height: 72)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(n == 0 ? "Nothing to confirm" : "\(n) to confirm")
+        .accessibilityLabel(face.a11y)
     }
 }
 
@@ -516,7 +526,7 @@ struct SFLockStates: View {
                         HStack(spacing: 10) {
                             SFAccessoryRectangular(d: r.1)
                             SFAccessoryCircular(d: r.1)
-                            SFAccessoryCircularPending(n: r.1.pending)
+                            SFAccessoryCircularPending(n: r.1.pending, kind: r.1.kind)
                         }
                     }
                 }

@@ -93,7 +93,7 @@ struct SFNotificationExpanded: View {
                     Divider().overlay(divider)
                     action("Edit…", "pencil")
                     Divider().overlay(divider)
-                    action("Not landlord work", "xmark.circle")
+                    action("Not rental work", "xmark.circle")
                 }
                 .glassEffect(.regular.tint(scheme == .dark ? Color.black.opacity(0.35) : Color.white.opacity(0.55)), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .frame(width: 250)

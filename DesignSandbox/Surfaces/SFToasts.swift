@@ -4,12 +4,13 @@ import SwiftUI
 // Today undo toast lives. It replaces: the 1.x property-added confetti, the LHErrorBanner card,
 // and the plain-text UndoToast.
 
-enum SFToastKind { case undo, saveError, loadError, propertyAdded }
+enum SFToastKind { case undo, timerDiscarded, saveError, loadError, propertyAdded }
 
 extension SFToastKind {
     var spec: SFToastSpec {
         switch self {
-        case .undo: SFToastSpec(kind: .neutral, message: "Marked not landlord work", action: "Undo")
+        case .undo: SFToastSpec(kind: .neutral, message: "Marked not rental work", action: "Undo")
+        case .timerDiscarded: SFToastSpec(kind: .neutral, message: "Timer discarded", action: "Undo")
         case .saveError: SFToastSpec(kind: .problem, message: "Couldn’t save your last change. Your iPhone may be out of space.", action: "Retry")
         case .loadError: SFToastSpec(kind: .problem, message: "Couldn’t open your records. They’re still safe on this iPhone.", action: "Help")
         case .propertyAdded: SFToastSpec(kind: .success, message: "Added The Arroyo Seco Schoolhouse Lofts, Unit 4B")
@@ -40,7 +41,7 @@ struct SFToastBoard: View {
                     .fixedSize(horizontal: false, vertical: true)
                 S2Header("Undo").padding(.top, 8)
                 SFToast(spec: SFToastKind.undo.spec)
-                SFToast(spec: SFToastSpec(kind: .neutral, message: "Timer discarded", action: "Undo"))
+                SFToast(spec: SFToastKind.timerDiscarded.spec)
                 S2Header("Saved").padding(.top, 8)
                 SFToast(spec: SFToastSpec(kind: .success, message: "Added Oak Street Duplex"))
                 SFToast(spec: SFToastSpec(kind: .success, message: "Logged 2h at Pine Cabin", action: "Undo"))

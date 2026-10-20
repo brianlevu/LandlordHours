@@ -83,7 +83,7 @@ struct SFSiriSnippetFrame: View {
                 .allowsHitTesting(false)
             VStack(spacing: 10) {
                 Text("You have 212 of your 750 hours for 2026. You’re 388 behind pace, and 3 visits are waiting for you to confirm.")
-                    .font(.system(size: 17, weight: .medium))
+                    .font(.body.weight(.medium))
                     .foregroundStyle(scheme == .dark ? .white : Color(hex: 0x111111))
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(16)
@@ -100,32 +100,37 @@ struct SFSiriSnippetFrame: View {
 
 /// The snippet view itself (ShowsSnippetView). Theme-fixed blueprint, like the hero.
 struct SFSiriSnippet: View {
+    @ScaledMetric(relativeTo: .largeTitle) private var number: CGFloat = 48
+    @ScaledMetric(relativeTo: .body) private var houseSize: CGFloat = 170
+    @Environment(\.dynamicTypeSize) private var dts
     var body: some View {
         ZStack(alignment: .topLeading) {
             S2Paper(radius: 26)
-            HouseArt(key: S2House.keyframe(212)).frame(width: 170, height: 170)
+            // At accessibility sizes the text takes the full width and the house steps back.
+            HouseArt(key: S2House.keyframe(212)).frame(width: min(houseSize, 200), height: min(houseSize, 200))
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 .offset(x: 4, y: 8)
+                .opacity(dts.isAccessibilitySize ? 0.35 : 1)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Your REPS hours · 2026").drafting(size: 10)
-                Text("212").roundedNumber(48).foregroundStyle(.white).padding(.top, 2)
-                Text("of 750h").font(.system(size: 15, weight: .medium)).foregroundStyle(LHB.onHeroSecondary)
-                Spacer(minLength: 0)
-                HStack(spacing: 4) {
-                    Image(systemName: "exclamationmark.circle.fill").font(.system(size: 12, weight: .bold))
-                    Text("Behind by 388h")
-                }
-                .font(.system(size: 14, weight: .semibold)).foregroundStyle(Color(hex: 0xFFB454))
+                Text("Your REPS hours · 2026").font(.system(.caption2, design: .monospaced).weight(.medium))
+                    .textCase(.uppercase).tracking(1.3).foregroundStyle(LHB.draftingHero)
+                Text("212").font(.system(size: number, weight: .bold, design: .rounded)).monospacedDigit()
+                    .foregroundStyle(.white).padding(.top, 2)
+                Text("of 750h").font(.subheadline.weight(.medium)).foregroundStyle(LHB.onHeroSecondary)
+                Spacer(minLength: 12)
+                (Text(Image(systemName: "exclamationmark.circle.fill")) + Text(" Behind by 388h"))
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(Color(hex: 0xFFB454))
+                    .fixedSize(horizontal: false, vertical: true)
                 Label("3 to confirm", systemImage: "tray.fill")
-                    .font(.system(size: 13, weight: .semibold)).labelStyle(TightLabel2())
+                    .font(.footnote.weight(.semibold)).labelStyle(TightLabel2())
                     .foregroundStyle(LHB.brand)
-                    .padding(.horizontal, 12).frame(height: 30)
+                    .padding(.horizontal, 12).padding(.vertical, 6).frame(minHeight: 30)
                     .background(Capsule().fill(.white))
                     .padding(.top, 8)
             }
             .padding(16)
         }
-        .frame(height: 200)
+        .frame(minHeight: 200)
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .accessibilityElement(children: .combine)
     }
@@ -138,9 +143,10 @@ struct SFSiriSnippet: View {
 struct SFLaunch: View {
     var body: some View {
         ZStack {
-            LHB.brand.ignoresSafeArea()
+            LHB.brand
             MarkB().frame(width: 112, height: 112).offset(y: -12)
         }
+        .ignoresSafeArea()
         .accessibilityHidden(true)
     }
 }
@@ -176,6 +182,7 @@ struct SFLaunchToToday: View {
                         .opacity(Double(min(1, max(0, (p - 0.3) / 0.6))))
                         .clipShape(RoundedRectangle(cornerRadius: 24 * p + 55 * (1 - p), style: .continuous))
                     MarkB().frame(width: 112, height: 112)
+                        .offset(y: -12 * (1 - p))
                         .scaleEffect(1 - 0.3 * p)
                         .opacity(Double(max(0, 1 - p * 1.8)))
                 }
@@ -213,7 +220,9 @@ struct SFLaunchToWelcome: View {
             MarkB().frame(width: 112, height: 112)
                 .scaleEffect(1 + 0.4 * p)
                 .opacity(Double(max(0, 1 - p * 2.5)))
-                .frame(maxHeight: .infinity).offset(y: -12)
+                .offset(y: -12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea()
             VStack(alignment: .leading, spacing: 10) {
                 Color.clear.frame(height: 318)
                 Text("Here’s what you’ll build").drafting(size: 12).frame(maxWidth: .infinity)

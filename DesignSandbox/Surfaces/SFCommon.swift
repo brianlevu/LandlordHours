@@ -37,9 +37,12 @@ struct SFHost: View {
         case "sf-today-top": Tabs(tab: .today) { S2Today(state: .launch) }.preferredColorScheme(scheme)
         case "sf-launch": SFLaunch().preferredColorScheme(.dark).environment(\.colorScheme, scheme)
         case "sf-launch-to-today": SFLaunchToToday(progress: 0.7).preferredColorScheme(scheme)
+        case "sf-launch-today-settled": SFLaunchToToday(progress: 1).preferredColorScheme(scheme)
+        case "sf-launch-welcome-settled": SFLaunchToWelcome(progress: 1).preferredColorScheme(.dark).environment(\.colorScheme, scheme)
         case "sf-launch-to-welcome": SFLaunchToWelcome(progress: 0.6).preferredColorScheme(.dark).environment(\.colorScheme, scheme)
         // 3. Toasts
         case "sf-toast-undo": SFToastFrame(kind: .undo).preferredColorScheme(scheme)
+        case "sf-toast-timer-discarded": SFToastFrame(kind: .timerDiscarded).preferredColorScheme(scheme)
         case "sf-toast-save-error": SFToastFrame(kind: .saveError).preferredColorScheme(scheme)
         case "sf-toast-load-error": SFToastFrame(kind: .loadError).preferredColorScheme(scheme)
         case "sf-toast-property-added": SFToastFrame(kind: .propertyAdded).preferredColorScheme(scheme)
@@ -58,14 +61,14 @@ struct SFHost: View {
 
     /// The window's scheme (drives the status bar): white on wallpapers and blueprint.
     static func rootScheme(_ name: String) -> ColorScheme? {
-        let wall = ["sf-home", "sf-lock", "sf-notif", "sf-launch-to-welcome"].contains { name.hasPrefix($0) } || name == "sf-launch"
+        let wall = ["sf-home", "sf-lock", "sf-notif", "sf-launch-to-welcome"].contains { name.hasPrefix($0) } || name == "sf-launch" || name == "sf-launch-welcome-settled"
         if wall { return .dark }
         return UserDefaults.standard.string(forKey: "appearance") == "dark" ? .dark : .light
     }
 
     static let all = [
         "sf-home-a", "sf-home-b", "sf-home-tinted", "sf-lock-widgets", "sf-lock-states",
-        "sf-launch", "sf-launch-to-today", "sf-launch-to-welcome",
+        "sf-launch", "sf-launch-to-today", "sf-launch-to-welcome", "sf-launch-today-settled", "sf-launch-welcome-settled", "sf-toast-timer-discarded",
         "sf-toast-undo", "sf-toast-save-error", "sf-toast-load-error", "sf-toast-property-added", "sf-toast-board",
         "sf-notif-list", "sf-notif-followups", "sf-notif-expanded",
         "sf-shortcuts", "sf-siri-snippet",
@@ -192,7 +195,7 @@ struct SFToastSpec: Equatable {
 struct SFToast: View {
     let spec: SFToastSpec
     var onAction: () -> Void = {}
-    @Environment(\.accessibilityReduceTransparency) private var solid
+    @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var dts
 
     var body: some View {
@@ -224,8 +227,12 @@ struct SFToast: View {
         .padding(.trailing, spec.action == nil ? 16 : 8)
         .padding(.vertical, 6)
         .frame(minHeight: 52)
-        .background { if solid { RoundedRectangle(cornerRadius: 22, style: .continuous).fill(LHB.card) } }
-        .glassEffect(solid ? .identity : .regular, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(LHB.toastSurface)
+                .shadow(color: .black.opacity(scheme == .dark ? 0.4 : 0.12), radius: 16, y: 4)
+        )
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(LHB.border, lineWidth: 1))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("toast")
     }

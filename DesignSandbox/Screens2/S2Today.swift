@@ -392,7 +392,7 @@ struct S2SuggestionRow: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 5) {
                 Image(systemName: s.symbol).font(.system(size: 11, weight: .semibold))
-                Text(s.metaLine).lineLimit(dts.isAccessibilitySize ? 3 : 1)
+                Text(s.metaLine).lineLimit(dts.isAccessibilitySize ? 3 : (dts >= .xxLarge ? 2 : 1))
             }
             .font(.subheadline).foregroundStyle(LHB.textSecondary)
             (s.place.map { Text("\(Text(s.title).fontWeight(.semibold)) at \(Text($0).fontWeight(.semibold))") } ?? Text(s.title).fontWeight(.semibold))
@@ -528,7 +528,7 @@ struct WeekStrip: View {
     @ViewBuilder private func bar(_ v: Double?, maxH: Double) -> some View {
         if let v {
             if v > 0 {
-                Capsule().fill(LHB.action).frame(width: 10, height: max(10, 56 * v / maxH))
+                Capsule().fill(LHB.chartBar).frame(width: 10, height: max(10, 56 * v / maxH))
             } else {
                 Circle().fill(LHB.border).frame(width: 4, height: 4).padding(.top, 6)
             }
