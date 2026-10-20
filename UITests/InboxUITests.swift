@@ -180,7 +180,7 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(scrollTo(turnover))
         swipeDismiss(turnover)
         XCTAssertTrue(undo.waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["Marked not landlord work"].exists)
+        XCTAssertTrue(app.staticTexts["Marked not rental work"].exists)
         XCTAssertFalse(row("turnover").exists)
     }
 

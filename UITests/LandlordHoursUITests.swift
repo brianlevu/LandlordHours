@@ -320,10 +320,10 @@ final class LandlordHoursUITests: XCTestCase {
 
     func testAttachmentPhotoSurvivesForceQuitAndRelaunch() {
         // Launch 1: seed an entry that carries a real, file-backed attachment.
-        launch(scenario: "occasional", tab: 0, extraArguments: ["-LHSeedAttachment"])
+        // 2.0: Today no longer lists recent entries (Records owns them), so open Records.
+        launch(scenario: "occasional", tab: 6, extraArguments: ["-LHSeedAttachment"])
 
-        // Recent Activity sits below the fold on the redesigned Home, and the splash
-        // can still be fading: scroll until the row is hittable before tapping.
+        // Scroll until the row is hittable before tapping.
         let entryRow = app.staticTexts["Property Management"]
         XCTAssertTrue(entryRow.waitForExistence(timeout: 20))
         tapWhenHittable(entryRow, scrollIfNeeded: true)
@@ -336,7 +336,7 @@ final class LandlordHoursUITests: XCTestCase {
         // load from disk (the user stays signed in via the persisted scope keys).
         app.terminate()
         app.launchArguments = [
-            "-LHInitialTab", "0",
+            "-LHInitialTab", "6",
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US"
         ]

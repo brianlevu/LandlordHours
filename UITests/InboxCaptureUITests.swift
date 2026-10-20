@@ -42,7 +42,7 @@ final class InboxCaptureUITests: XCTestCase {
         let sam = app.descendants(matching: .any)["inbox.row.cal:debug-call-sam"]
         XCTAssertTrue(sam.waitForExistence(timeout: 5))
         drag(sam, right: false)
-        XCTAssertTrue(app.staticTexts["Marked not landlord work"].waitForExistence(timeout: 3), "Swipe-left dismissed")
+        XCTAssertTrue(app.staticTexts["Marked not rental work"].waitForExistence(timeout: 3), "Swipe-left dismissed")
         Thread.sleep(forTimeInterval: 2.0)
         print("VIDEO_MARK_END \(Date().timeIntervalSince1970)")
     }
