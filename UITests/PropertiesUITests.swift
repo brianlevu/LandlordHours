@@ -74,6 +74,14 @@ final class PropertiesUITests: XCTestCase {
 
     // MARK: Frames
 
+    /// Text fields and the pinned sheet button (placeholder token, footer scrim), every size.
+    func testCaptureFieldStates() {
+        let only: Set<String> = ["props-12", "prop-add", "prop-edit"]
+        for scheme in ["light", "dark"] {
+            for size in [nil, "xxl", "ax3"] as [String?] { captureAll(scheme: scheme, size: size, only: only) }
+        }
+    }
+
     func testCaptureLightDefault() { captureAll(scheme: "light", size: nil) }
     func testCaptureDarkDefault() { captureAll(scheme: "dark", size: nil) }
     func testCaptureLightXXL() { captureAll(scheme: "light", size: "xxl") }
@@ -106,14 +114,14 @@ final class PropertiesUITests: XCTestCase {
         Shot(name: "prop-edit-delete", seed: "four", extra: ["-LHOpenFirstPropertyDelete"], waitFor: "ALERT"),
     ]
 
-    private func captureAll(scheme: String, size: String?) {
+    private func captureAll(scheme: String, size: String?, only: Set<String>? = nil) {
         var sizeArgs: [String] = []
         switch size {
         case "xxl": sizeArgs = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXL"]
         case "ax3": sizeArgs = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL"]
         default: break
         }
-        for shot in shots {
+        for shot in shots where only?.contains(shot.name) ?? true {
             app.terminate()
             launch(seed: shot.seed, scheme: scheme, extra: shot.extra + sizeArgs)
             if shot.waitFor == "ALERT" {

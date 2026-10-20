@@ -212,7 +212,7 @@ struct PropertiesView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(colors.textTertiary)
                 .accessibilityHidden(true)
-            TextField("Search rentals", text: $query)
+            TextField("Search rentals", text: $query, prompt: Text("Search rentals").foregroundStyle(colors.textTertiary))
                 .foregroundStyle(colors.textPrimary)
                 .submitLabel(.search)
                 .accessibilityIdentifier("properties.search")
@@ -955,12 +955,19 @@ struct PropertyEditSheet: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
                 .padding(.bottom, 8)
-                .background(
-                    LinearGradient(stops: [.init(color: colors.background.opacity(0), location: 0),
-                                           .init(color: colors.background, location: 0.14)],
-                                   startPoint: .top, endPoint: .bottom)
-                        .ignoresSafeArea()
-                )
+                .background {
+                    // A 32pt scrim above the pinned button, then solid canvas behind it, so
+                    // content scrolling under it fades out instead of being sliced (all sizes).
+                    VStack(spacing: 0) {
+                        LinearGradient(colors: [colors.background.opacity(0), colors.background],
+                                       startPoint: .top, endPoint: .bottom)
+                            .frame(height: 32)
+                        colors.background
+                    }
+                    .padding(.top, -32)
+                    .ignoresSafeArea(edges: .bottom)
+                    .allowsHitTesting(false)
+                }
         }
         .alert("You already have a rental called \(name.trimmingCharacters(in: .whitespacesAndNewlines))", isPresented: $showDuplicateWarning) {
             Button("OK", role: .cancel) {}
@@ -1032,7 +1039,7 @@ struct PropertyEditSheet: View {
                 .frame(minWidth: ax ? nil : 76, alignment: .leading)
                 .fixedSize()
                 .accessibilityHidden(true)
-            TextField(placeholder, text: text, axis: ax ? .vertical : .horizontal)
+            TextField(label, text: text, prompt: Text(placeholder).foregroundStyle(colors.textTertiary), axis: ax ? .vertical : .horizontal)
                 .lineLimit(ax ? 4 : 1)
                 .foregroundStyle(colors.textPrimary)
                 .focused($focused, equals: field)
@@ -1095,7 +1102,7 @@ struct PropertyEditSheet: View {
                     }
                 }
                 HStack(spacing: 8) {
-                    TextField("Add another name", text: $newAlias)
+                    TextField("Other name", text: $newAlias, prompt: Text("Add another name").foregroundStyle(colors.textTertiary))
                         .foregroundStyle(colors.textPrimary)
                         .focused($focused, equals: .alias)
                         .submitLabel(.done)
