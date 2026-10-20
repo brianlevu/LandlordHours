@@ -363,22 +363,6 @@ struct SettingsView: View {
                 SettingRow(symbol: "bell", title: "Notification permission", subtitle: "Opens iOS Settings", showsChevron: true)
             }
             .buttonStyle(.plain)
-
-            Button {
-                NotificationCenter.default.post(name: .restartGuidedOnboarding, object: nil)
-            } label: {
-                SettingRow(symbol: "signpost.right", title: "Restart guided setup", subtitle: "Walk through the first property and hour again")
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("settings.restartGuidedSetup")
-
-            Button {
-                NotificationCenter.default.post(name: .skipGuidedOnboarding, object: nil)
-            } label: {
-                SettingRow(symbol: "forward", title: "Skip guided setup", subtitle: "Hide first-run tips")
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("settings.skipGuidedSetup")
         } header: {
             BPSectionHeader(title: "App")
         }

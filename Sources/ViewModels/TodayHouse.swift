@@ -20,7 +20,7 @@ import Foundation
 
 extension AppViewModel {
     /// The goal the house measures against, from the 1.x goal setting.
-    var houseGoal: HouseGoal { HouseGoal(GoalManager.shared.globalGoalType) }
+    var houseGoal: HouseGoal { GoalManager.shared.houseGoal }
 
     /// Whether spouse hours are tracked jointly (Tax Profile "Spouse hours").
     var tracksSpouseJointly: Bool { TaxProfileManager.shared.spouseTracking }

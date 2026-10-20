@@ -34,11 +34,12 @@ extension ActivityCategory {
         }
     }
 
-    /// Label ink: trades in timber, people in rose, travel in slate, desk work in drafting ink.
+    /// Label ink: trades in timber, leasing in harbour blue, travel in slate, desk work in drafting ink.
     func inboxInk(_ colors: AdaptiveColors) -> Color {
         switch self {
         case .repairs, .renovations: return colors.timberInk
-        case .leasing: return colors.rose
+        // Leasing has its own harbour blue: rose is reserved for the spouse.
+        case .leasing: return AppColors.leasingInk
         case .travel: return colors.informational
         default: return colors.draftingInk
         }
@@ -47,8 +48,7 @@ extension ActivityCategory {
     func inboxWash(_ colors: AdaptiveColors) -> Color {
         switch self {
         case .repairs, .renovations: return AppColors.timber.opacity(0.16)
-        case .leasing: return colors.roseWash
-        case .travel: return colors.informationalSurface
+        case .leasing, .travel: return colors.informationalSurface
         default: return colors.actionSurface
         }
     }

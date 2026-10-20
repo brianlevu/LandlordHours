@@ -125,7 +125,36 @@ class GoalManager: ObservableObject {
 
     func setGlobalGoal(_ type: HourGoalType) {
         globalGoalType = type
+        // A plain goal change (Settings) drops the 2.0 material-participation target: `.str`
+        // then means the 100-hour test, as in 1.x.
+        UserDefaults.standard.removeObject(forKey: mpTargetKey)
         saveGoals()
+    }
+
+    // MARK: 2.0 house goal (onboarding offers 500 OR 100 hours of material participation)
+
+    /// 1.x stores material participation as `.str` (the 100-hour test). The 500-hour target is a
+    /// per-profile addition on top, so 1.x devices keep reading a valid `HourGoalType`.
+    private var mpTargetKey: String { UserScope.key("materialParticipationTarget") }
+
+    /// The goal the house and every 2.0 surface measure against.
+    var houseGoal: HouseGoal {
+        guard globalGoalType == .str else { return HouseGoal(globalGoalType) }
+        return UserDefaults.standard.integer(forKey: mpTargetKey) == 500 ? .mp500 : .mp100
+    }
+
+    /// Saves a 2.0 goal: REPS, or material participation at 500 or 100 hours.
+    func setHouseGoal(_ goal: HouseGoal) {
+        switch goal {
+        case .reps750:
+            setGlobalGoal(.reps)
+        case .mp100:
+            setGlobalGoal(.str)
+        case .mp500:
+            globalGoalType = .str
+            UserDefaults.standard.set(500, forKey: mpTargetKey)
+            saveGoals()
+        }
     }
 }
 

@@ -73,7 +73,6 @@ struct PropertiesView: View {
                             // Add Property button at bottom of list
                             addPropertyRow
                                 .padding(.top, 2)
-                            .guidedSpotlightTarget(.addProperty)
                         }
                         .padding(.horizontal, 24)
                         .padding(.top, 8)
@@ -82,9 +81,7 @@ struct PropertiesView: View {
                 }
             }
             .navigationBarHidden(true)
-            .sheet(isPresented: $showingAddProperty, onDismiss: {
-                NotificationCenter.default.post(name: .resumeGuidedOnboardingOverlay, object: nil)
-            }) {
+            .sheet(isPresented: $showingAddProperty) {
                 AddPropertyView()
             }
             .sheet(isPresented: $showingPaywall) {
@@ -92,7 +89,6 @@ struct PropertiesView: View {
                 PaywallView(
                     context: .secondProperty,
                     onUnlocked: {
-                        NotificationCenter.default.post(name: .suspendGuidedOnboardingOverlay, object: nil)
                         showingAddProperty = true
                     },
                     onClose: { showingPaywall = false }
@@ -114,7 +110,6 @@ struct PropertiesView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .openAddProperty)) { _ in
                 if viewModel.canAddProperty() {
-                    NotificationCenter.default.post(name: .suspendGuidedOnboardingOverlay, object: nil)
                     showingAddProperty = true
                 } else {
                     showingPaywall = true
@@ -158,7 +153,6 @@ struct PropertiesView: View {
                     .clipShape(Capsule())
             }
             .buttonStyle(.lhPressable)
-            .guidedSpotlightTarget(.addProperty)
         }
         .padding(18)
         .background(colors.backgroundSecondary)
@@ -341,7 +335,6 @@ struct PropertiesView: View {
                     .clipShape(Capsule())
                     .padding(.top, 4)
             }
-            .guidedSpotlightTarget(.addProperty)
             .accessibilityLabel("Add property")
             .accessibilityIdentifier("properties.add")
         }
@@ -844,7 +837,7 @@ struct AddPropertyView: View {
 
     @ViewBuilder
     private var firstPropertyNudge: some View {
-        if editingProperty == nil && viewModel.properties.isEmpty && !GuidedOnboardingStore.isCompleted && !GuidedOnboardingStore.isSkipped {
+        if editingProperty == nil && viewModel.properties.isEmpty {
             HStack(spacing: 10) {
                 LHIconTile(icon: Lucide.mapPinHouse, color: AppColors.sage, wash: colors.sageWash, size: 34, isActive: true)
                 VStack(alignment: .leading, spacing: 2) {

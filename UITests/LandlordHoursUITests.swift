@@ -15,34 +15,32 @@ final class LandlordHoursUITests: XCTestCase {
         super.tearDown()
     }
 
-    func testFirstRunPropertySetupCTARequiresNameAndAddressForSaveCopy() {
+    /// 2.0: the first property needs only a name; the address is folded away.
+    func testFirstRunPropertyNeedsOnlyAName() {
         launch(scenario: "firstTime", tab: 0)
+        waitAndTap(app.buttons["onb-start"])
+        XCTAssertTrue(app.staticTexts["What are you building toward?"].waitForExistence(timeout: 8))
+        let goalCTA = app.buttons["onb-primary"]
+        XCTAssertFalse(goalCTA.isEnabled, "The goal button waits for a choice")
+        waitAndTap(app.buttons["goal-mp"])
+        XCTAssertTrue(app.buttons["goal-mp100"].waitForExistence(timeout: 3), "500 or 100 reveals its two chips")
+        XCTAssertEqual(goalCTA.label, "Build toward 500h")
+        waitAndTap(goalCTA)
+        waitAndTap(app.buttons["onb-link"])                    // Calendar: Not now
+        waitAndTap(app.buttons["who-both"])
+        XCTAssertTrue(app.descendants(matching: .any)["who-note"].waitForExistence(timeout: 3))
+        waitAndTap(app.buttons["onb-primary"])
 
-        let goalTitle = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "main goal")).firstMatch
-        XCTAssertTrue(goalTitle.waitForExistence(timeout: 8))
-        XCTAssertTrue(app.staticTexts["750h + 50% rule"].exists)
-        XCTAssertTrue(app.staticTexts["100h STR test"].exists)
-        XCTAssertTrue(app.staticTexts["Records first"].exists)
-        XCTAssertTrue(app.staticTexts["Guided setup"].exists)
-        waitAndTap(app.buttons["onboarding.goalPrimaryCTA"])
-
-        let propertyTitle = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Add your first")).firstMatch
-        XCTAssertTrue(propertyTitle.waitForExistence(timeout: 5))
-        let propertyCTA = app.buttons["onboarding.propertyPrimaryCTA"]
-        XCTAssertTrue(propertyCTA.waitForExistence(timeout: 3))
-        XCTAssertTrue(propertyCTA.label.contains("Continue without property"))
-
-        let nameField = app.textFields["onboarding.propertyName"]
-        XCTAssertTrue(nameField.waitForExistence(timeout: 3))
+        let save = app.buttons["onb-primary"]
+        XCTAssertTrue(app.staticTexts["Name your first rental."].waitForExistence(timeout: 5))
+        XCTAssertFalse(save.isEnabled, "Save waits for a name")
+        XCTAssertFalse(app.textFields["property-address"].exists, "Address folded away")
+        let nameField = app.textFields["property-name"]
         nameField.tap()
         nameField.typeText("Oak Street Duplex")
-        XCTAssertTrue(propertyCTA.label.contains("Continue without property"))
-
-        let addressField = app.textFields["onboarding.streetAddress"]
-        XCTAssertTrue(addressField.waitForExistence(timeout: 3))
-        addressField.tap()
-        addressField.typeText("123 Main Street")
-        XCTAssertTrue(propertyCTA.label.contains("Save property"))
+        XCTAssertTrue(save.isEnabled)
+        waitAndTap(app.buttons["property-add-address"])
+        XCTAssertTrue(app.textFields["property-address"].waitForExistence(timeout: 3))
     }
 
     func testTrackManualDetailsFlowIsReachable() {

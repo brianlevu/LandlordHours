@@ -312,25 +312,32 @@ final class InboxUITests: XCTestCase {
 
     func testWhatsNewNotNowKeepsEverythingOff() {
         launch("backfill", extra: ["-LHShowWhatsNew", "-LHInitialTab", "0"])
-        let whatsNew = app.descendants(matching: .any)["capture.whatsNew"]
+        let whatsNew = app.descendants(matching: .any)["onb.whatsNew"]
         XCTAssertTrue(settle(whatsNew), "Upgraders see the intro once")
-        app.buttons["capture.priming.notNow"].tap()
+        app.buttons["onb-primary"].tap()                       // Your hours now build a house → Continue
+        let notNow = app.buttons["onb-link"]
+        XCTAssertTrue(notNow.waitForExistence(timeout: 5))
+        notNow.tap()                                           // Calendar → Not now: no prompt spent
         XCTAssertTrue(whatsNew.waitForNonExistence(timeout: 5))
         app.buttons["tab.inbox"].tap()
         XCTAssertTrue(app.buttons["inbox.empty.setup"].waitForExistence(timeout: 5), "Calendar suggestions stay off")
     }
 
-    func testWhatsNewDeniedCalendarShowsSettingsPath() {
+    func testWhatsNewDeniedCalendarClosesWithoutTheNote() {
         launch("backfill", extra: ["-LHShowWhatsNew", "-LHFakeCalendar", "denied"])
-        XCTAssertTrue(settle(app.descendants(matching: .any)["capture.whatsNew"]))
-        turnOnCalendar()
-        app.buttons["capture.priming.continue"].tap()
-        XCTAssertTrue(app.descendants(matching: .any)["capture.denied"].waitForExistence(timeout: 5))
-        app.buttons["capture.denied.continue"].tap()
+        let whatsNew = app.descendants(matching: .any)["onb.whatsNew"]
+        XCTAssertTrue(settle(whatsNew))
+        app.buttons["onb-primary"].tap()
+        let look = app.buttons["onb-primary"]
+        XCTAssertTrue(look.waitForExistence(timeout: 5))
+        XCTAssertEqual(look.label, "Look at my calendar")
+        look.tap()
+        XCTAssertTrue(whatsNew.waitForNonExistence(timeout: 5), "Denied: no visit-end note, back to Today")
+        app.buttons["tab.inbox"].tap()
         XCTAssertTrue(app.buttons["inbox.empty.setup"].waitForExistence(timeout: 5))
     }
 
-    func testOnboardingCaptureStepIsOptIn() {
+    func testOnboardingCalendarStepIsOptIn() {
         app.terminate()
         app.launchArguments = [
             UITestIsolation.resetProfilesArgument,
@@ -340,13 +347,11 @@ final class InboxUITests: XCTestCase {
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
         ]
         app.launch()
-        XCTAssertTrue(settle(app.descendants(matching: .any)["capture.onboarding"]))
-        XCTAssertTrue(app.descendants(matching: .any)["capture.privacyFooter"].exists)
-        let calendarSwitch = app.descendants(matching: .any)["capture.toggle.calendar"]
-        XCTAssertTrue(["0", "Off"].contains(calendarSwitch.value as? String ?? ""), "Calendar starts off")
-        let prompts = app.descendants(matching: .any)["capture.toggle.eventPrompts"]
-        XCTAssertTrue(["0", "Off"].contains(prompts.value as? String ?? ""), "End-of-event prompts start off")
-        app.buttons["capture.priming.notNow"].tap()
-        XCTAssertTrue(app.buttons["tab.inbox"].waitForExistence(timeout: 10), "Onboarding finished")
+        let look = app.buttons["onb-primary"]
+        XCTAssertTrue(settle(look))
+        XCTAssertEqual(look.label, "Look at my calendar")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "What we never do")).firstMatch.exists)
+        app.buttons["onb-link"].tap()                          // Not now
+        XCTAssertTrue(app.buttons["who-me"].waitForExistence(timeout: 5), "On to Who does the work")
     }
 }

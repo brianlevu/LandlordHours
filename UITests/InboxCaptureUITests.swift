@@ -96,19 +96,15 @@ final class InboxCaptureUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["inbox.empty"].waitForExistence(timeout: 20))
         shoot("inbox-empty", scheme)
 
-        // 4. What's new opt-in (upgraders), with the notification preview on.
+        // 4. What's new (upgraders): the house, then the calendar ask.
         launch(seed: "backfill", scheme: scheme, extra: ["-LHShowWhatsNew", "-LHFakeCalendar", "granted", "-LHHoldBackfillScan"], tab: "0")
-        XCTAssertTrue(app.descendants(matching: .any)["capture.whatsNew"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.descendants(matching: .any)["onb.whatsNew"].waitForExistence(timeout: 20))
         shoot("whatsnew", scheme)
-        app.descendants(matching: .any)["capture.toggle.calendar"].tap()
-        app.descendants(matching: .any)["capture.toggle.eventPrompts"].tap()
-        shoot("whatsnew-prompts-on", scheme)
+        app.buttons["onb-primary"].tap()
+        Thread.sleep(forTimeInterval: 2.0)
+        shoot("whatsnew-calendar", scheme)
 
-        // 5. Backfill intro: scanning (held halfway), then results.
-        app.buttons["capture.priming.continue"].tap()
-        XCTAssertTrue(app.descendants(matching: .any)["backfill.progress"].waitForExistence(timeout: 10))
-        Thread.sleep(forTimeInterval: 1.0)
-        shoot("backfill-scanning", scheme)
+        // 5. Backfill intro from the Inbox setup: results.
         launch(seed: "backfill", scheme: scheme, extra: ["-LHFakeCalendar", "granted"])
         let setup = app.buttons["inbox.empty.setup"]
         XCTAssertTrue(setup.waitForExistence(timeout: 20))
@@ -142,7 +138,8 @@ final class InboxCaptureUITests: XCTestCase {
             "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
         ]
         app.launch()
-        XCTAssertTrue(app.descendants(matching: .any)["capture.onboarding"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["onb-primary"].waitForExistence(timeout: 20))
+        Thread.sleep(forTimeInterval: 2.0)
         shoot("onboarding-priming", scheme)
     }
 }

@@ -211,6 +211,13 @@ enum HouseStatusTone: Equatable, Sendable {
 /// The Today hero card on blueprint paper, ported from the approved sandbox/concept layout: the
 /// number top-left, the house filling the right two-thirds and bottom. DashboardView (Today)
 /// feeds it the goal's countable hours and the pace line.
+/// What the hero's bottom lines say when Today is new: the empty lot (with its one action), or
+/// hours found in the calendar that don't count until confirmed. nil: the pace and stage lines.
+enum HouseHeroFooter {
+    case emptyLot(onAddProperty: () -> Void)
+    case found(hoursText: String)
+}
+
 struct HouseHeroCard: View {
     let progress: HouseProgress
     var year: Int = Calendar.current.component(.year, from: Date())
@@ -219,6 +226,10 @@ struct HouseHeroCard: View {
     var statusTone: HouseStatusTone = .positive
     var onCelebration: (HouseCelebration) -> Void = { _ in }
     var debugConfirmStill: Int? = nil
+    /// New-owner states (onboarding landing); nil keeps the pace and stage lines.
+    var footer: HouseHeroFooter? = nil
+    /// The first property's name on a stake in the lot, until the first hour is logged.
+    var stakeName: String? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shownHours: Double?
@@ -270,6 +281,12 @@ struct HouseHeroCard: View {
                         debugConfirmStill: debugConfirmStill
                     )
                     .frame(width: houseSize, height: houseSize)
+                    .overlay {
+                        if let stakeName {
+                            // Room on the right for the flag, which hangs to the right of the post.
+                            OnbMiniStake(name: stakeName, maxFlagWidth: g.size.width - (houseOrigin.x + houseSize * OnbScene.stakeBase.x) - 12)
+                        }
+                    }
                     .position(houseCenter)
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -295,6 +312,10 @@ struct HouseHeroCard: View {
                             .font(.title3.weight(.medium))
                             .foregroundStyle(HouseTokens.onHeroSecondary)
                         Spacer(minLength: 8)
+                        if let footer {
+                            footerView(footer)
+                                .frame(width: columnWidth + (footerIsWide ? 40 : 0), alignment: .leading)
+                        } else {
                         Group {
                             if let status {
                                 // Glyph inline with the words so the line wraps as one sentence;
@@ -320,6 +341,7 @@ struct HouseHeroCard: View {
                             }
                         }
                         .frame(width: columnWidth, alignment: .leading)
+                        }
                     }
                     .padding(20)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -333,6 +355,49 @@ struct HouseHeroCard: View {
         .onAppear { if shownHours == nil { shownHours = progress.hours } }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("house-hero-card")
+    }
+
+    private var footerIsWide: Bool {
+        if case .emptyLot = footer { return true }
+        return false
+    }
+
+    @ViewBuilder private func footerView(_ footer: HouseHeroFooter) -> some View {
+        switch footer {
+        case .emptyLot(let onAdd):
+            VStack(alignment: .leading, spacing: 2) {
+                Text("An empty lot.")
+                    .font(.headline)
+                    .foregroundStyle(HouseTokens.onHeroPrimary)
+                Text("Add a property. Every hour you confirm builds on it.")
+                    .font(.footnote)
+                    .foregroundStyle(HouseTokens.onHeroSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button(action: onAdd) {
+                    Label("Add property", systemImage: "plus")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(HouseTokens.blueprint)
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 36)
+                        .background(HouseTokens.onHeroPrimary, in: Capsule())
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.lhPressable)
+                .padding(.top, 10)
+                .accessibilityIdentifier("today.hero.addProperty")
+            }
+        case .found(let hoursText):
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(hoursText) found")
+                    .font(.headline)
+                    .foregroundStyle(HouseTokens.onHeroPrimary)
+                    .accessibilityIdentifier("today.hero.found")
+                Text("Not counted until you confirm")
+                    .font(.footnote)
+                    .foregroundStyle(HouseTokens.onHeroSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     /// Whole-hour steps from the shown number to the new hours with a small spring pop.

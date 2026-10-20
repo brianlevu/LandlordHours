@@ -77,6 +77,9 @@ enum AppColors {
         static let darkInformationalSurface = "1E2A4A"
         static let darkRose = "F08BAA"
         static let darkRoseSurface = "3A1A28"
+        // Category ink: Leasing's harbour blue, so it never reads as the spouse rose or the brand.
+        static let leasingInk = "1B6C8C"
+        static let darkLeasingInk = "7CC6E4"
     }
 
     // MARK: - Brand (new in 2.0)
@@ -95,6 +98,8 @@ enum AppColors {
     static let brass = Color(hex: Hex.brass)
     static let terracotta = Color(hex: Hex.terracotta)
     static let plaster = Color(hex: Hex.plaster)
+    /// Leasing category ink: #1B6C8C (5.9:1 on white) / #7CC6E4 on the dark card.
+    static let leasingInk = Color.lhDynamic(light: Hex.leasingInk, dark: Hex.darkLeasingInk)
 
     // MARK: - Light surfaces
     static let background = Color(hex: Hex.canvas)

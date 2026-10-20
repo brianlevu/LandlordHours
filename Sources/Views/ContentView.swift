@@ -6,45 +6,17 @@ extension Notification.Name {
     static let switchToTab = Notification.Name("switchToTab")
     static let openAddProperty = Notification.Name("openAddProperty")
     static let switchToPropertiesAndOpenAddProperty = Notification.Name("switchToPropertiesAndOpenAddProperty")
-    static let prefillFirstActivity = Notification.Name("prefillFirstActivity")
-    static let restartGuidedOnboarding = Notification.Name("restartGuidedOnboarding")
-    static let skipGuidedOnboarding = Notification.Name("skipGuidedOnboarding")
-    static let suspendGuidedOnboardingOverlay = Notification.Name("suspendGuidedOnboardingOverlay")
-    static let resumeGuidedOnboardingOverlay = Notification.Name("resumeGuidedOnboardingOverlay")
 }
 
+/// 1.x first-run coach-mark flags. The coach mark is gone (2.0 onboarding ends on Today with
+/// no overlay); the keys stay so profile reset and the legacy fixture keep clearing them.
 enum GuidedOnboardingStore {
     static let completedKey = "hasCompletedGuidedOnboarding"
     static let skippedKey = "hasSkippedGuidedOnboarding"
 
-    static var isCompleted: Bool {
-        UserDefaults.standard.bool(forKey: UserScope.key(completedKey))
-    }
-
-    static var isSkipped: Bool {
-        UserDefaults.standard.bool(forKey: UserScope.key(skippedKey))
-    }
-
-    static func markCompleted() {
-        UserDefaults.standard.set(true, forKey: UserScope.key(completedKey))
-        UserDefaults.standard.removeObject(forKey: UserScope.key(skippedKey))
-    }
-
     static func skip() {
         UserDefaults.standard.set(true, forKey: UserScope.key(skippedKey))
     }
-
-    static func restart() {
-        UserDefaults.standard.removeObject(forKey: UserScope.key(completedKey))
-        UserDefaults.standard.removeObject(forKey: UserScope.key(skippedKey))
-    }
-}
-
-enum GuidedOnboardingStep: Hashable {
-    case propertyTab
-    case addProperty
-    case trackTab
-    case firstActivity
 }
 
 private struct AppTabBarHiddenPreferenceKey: PreferenceKey {
@@ -73,12 +45,6 @@ struct ContentView: View {
     @State private var selectedTab = Self.initialTabFromLaunchArguments()
     @State private var showOnboarding = false
     @State private var showSplashAfterSignOut = false
-    @State private var guidedOnboardingRefresh = false
-    @State private var isReplayingGuidedOnboarding = false
-    @State private var isGuidedOnboardingSuspended = false
-    @State private var isForcingGuidedOnboardingHome = false
-    @State private var hasAcknowledgedFirstActivityCoach = false
-    @State private var didApplyGuidedReplayLaunchArgument = false
     @State private var isCustomTabBarHidden = false
     @State private var isSplashAnimating = true
     @State private var isShowingInitialLaunchBridge = true
@@ -92,12 +58,6 @@ struct ContentView: View {
 
     private static func initialTabFromLaunchArguments() -> Int {
         let args = ProcessInfo.processInfo.arguments
-        if args.contains("-LHForceGuidedSetupHome") {
-            return 0
-        }
-        if args.contains("-LHReplayGuidedSetup") {
-            return 1
-        }
         guard let index = args.firstIndex(of: "-LHInitialTab"),
               args.indices.contains(index + 1),
               let tab = Int(args[index + 1]) else {
@@ -106,21 +66,13 @@ struct ContentView: View {
         return min(max(tab, 0), ShellTab.maxIndex)
     }
 
-    private static var shouldReplayGuidedSetupFromLaunchArguments: Bool {
-        ProcessInfo.processInfo.arguments.contains("-LHReplayGuidedSetup")
-    }
-
-    private static var shouldForceGuidedSetupHomeFromLaunchArguments: Bool {
-        ProcessInfo.processInfo.arguments.contains("-LHForceGuidedSetupHome")
-    }
-
     var body: some View {
         Group {
             if viewModel.isInitializing || showSplashAfterSignOut || isShowingInitialLaunchBridge {
                 splashScreen
-            } else if !viewModel.isSignedIn {
-                LoginView()
-            } else if showOnboarding {
+            } else if !viewModel.isSignedIn || showOnboarding {
+                // 2.0: Welcome replaces the sign-in wall; "Start building" makes a profile on
+                // this iPhone and the same flow carries on (one branch, one view identity).
                 OnboardingView(showOnboarding: $showOnboarding)
             } else {
                 mainContent
@@ -187,41 +139,6 @@ struct ContentView: View {
                     }
                 }
             }
-        }
-        .onChange(of: viewModel.timeEntries.count) { _, newValue in
-            if newValue > 0, !GuidedOnboardingStore.isCompleted {
-                GuidedOnboardingStore.markCompleted()
-                guidedOnboardingRefresh.toggle()
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .restartGuidedOnboarding)) { _ in
-            GuidedOnboardingStore.restart()
-            showOnboarding = false
-            animate(AppAnimation.smooth) {
-                isReplayingGuidedOnboarding = true
-                isGuidedOnboardingSuspended = false
-                hasAcknowledgedFirstActivityCoach = false
-                selectedTab = 1
-                guidedOnboardingRefresh.toggle()
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .skipGuidedOnboarding)) { _ in
-            GuidedOnboardingStore.skip()
-            isReplayingGuidedOnboarding = false
-            isGuidedOnboardingSuspended = false
-            hasAcknowledgedFirstActivityCoach = false
-            guidedOnboardingRefresh.toggle()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .suspendGuidedOnboardingOverlay)) { _ in
-            isGuidedOnboardingSuspended = true
-            guidedOnboardingRefresh.toggle()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .resumeGuidedOnboardingOverlay)) { _ in
-            isGuidedOnboardingSuspended = false
-            guidedOnboardingRefresh.toggle()
-        }
-        .onAppear {
-            applyGuidedReplayLaunchArgumentIfNeeded()
         }
         .onChange(of: ratingPrompt.pendingRequest) { _, trigger in
             guard trigger != nil else { return }
@@ -451,10 +368,10 @@ struct ContentView: View {
         }
     }
 
-    /// Shows the 2.0 auto-capture intro once to people who finished 1.x onboarding. Never on
-    /// top of onboarding or the guided setup overlay.
+    /// Shows the 2.0 What's new once to people who finished 1.x onboarding. Never on top of
+    /// onboarding.
     private func presentCaptureWhatsNewIfNeeded() {
-        guard !showOnboarding, guidedOnboardingStep == nil else { return }
+        guard !showOnboarding else { return }
         let completed = UserDefaults.standard.bool(forKey: UserScope.key("hasCompletedOnboarding"))
         guard CaptureOptIn.shouldShowWhatsNew(hasCompletedOnboarding: completed) else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
@@ -567,39 +484,17 @@ struct ContentView: View {
             CaptureOptIn.markWhatsNewSeen()
             inboxModel.reload()
         }) {
-            CaptureSetupFlow(mode: .whatsNew, environment: .current) { openInbox in
+            OnbWhatsNewSheet { openInbox in
                 showCaptureWhatsNew = false
                 if openInbox { selectedTab = ShellTab.inboxIndex }
             }
             .environmentObject(viewModel)
+            .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
         .onPreferenceChange(AppTabBarHiddenPreferenceKey.self) { hidden in
             animate(AppAnimation.quick) {
                 isCustomTabBarHidden = hidden
-            }
-        }
-        .overlayPreferenceValue(GuidedSpotlightTargetKey.self) { targets in
-            GeometryReader { proxy in
-                if let step = guidedOnboardingStep {
-                    let measuredTarget = targets[step].map { proxy[$0].insetBy(dx: -5, dy: -5) }
-
-                    GuidedOnboardingOverlay(
-                        step: step,
-                        spotlightOverride: measuredTarget,
-                        isReplay: isReplayingGuidedOnboarding,
-                        onPrimary: { handleGuidedOnboardingPrimary(step) },
-                        onSecondary: { handleGuidedOnboardingSecondary(step) },
-                        onSkip: {
-                            GuidedOnboardingStore.skip()
-                            isReplayingGuidedOnboarding = false
-                            guidedOnboardingRefresh.toggle()
-                        }
-                    )
-                    .accessibilityIdentifier("guidedSetup.overlay")
-                    .transition(.opacity)
-                    .zIndex(20)
-                }
             }
         }
     }
@@ -632,11 +527,7 @@ struct ContentView: View {
         HStack(spacing: 10) {
             HStack(spacing: 0) {
                 ForEach(AppTab.allCases, id: \.self) { tab in
-                    if tab == .properties {
-                        tabBarButton(tab).guidedSpotlightTarget(.propertyTab)
-                    } else {
-                        tabBarButton(tab)
-                    }
+                    tabBarButton(tab)
                 }
             }
             .padding(.horizontal, 5)
@@ -645,7 +536,6 @@ struct ContentView: View {
             .floatingGlass(in: Capsule(), colors: colors, colorScheme: colorScheme)
 
             logTimeButton
-                .guidedSpotlightTarget(.trackTab)
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
@@ -764,99 +654,12 @@ struct ContentView: View {
             .accessibilityIdentifier("tab.inbox.badge")
     }
 
-    private var guidedOnboardingStep: GuidedOnboardingStep? {
-        _ = guidedOnboardingRefresh
-        guard viewModel.isSignedIn,
-              !showOnboarding,
-              !isGuidedOnboardingSuspended else {
-            return nil
-        }
-
-        if isForcingGuidedOnboardingHome {
-            return currentGuidedOnboardingStep
-        }
-
-        if isReplayingGuidedOnboarding {
-            if selectedTab == 1 { return .addProperty }
-            if selectedTab == 2 { return .firstActivity }
-            return .propertyTab
-        }
-
-        guard !GuidedOnboardingStore.isCompleted,
-              !GuidedOnboardingStore.isSkipped else {
-            return nil
-        }
-
-        return currentGuidedOnboardingStep
-    }
-
-    private var currentGuidedOnboardingStep: GuidedOnboardingStep? {
-        if viewModel.properties.isEmpty {
-            return selectedTab == 1 ? .addProperty : .propertyTab
-        }
-        if viewModel.timeEntries.isEmpty {
-            if hasAcknowledgedFirstActivityCoach {
-                return nil
-            }
-            return selectedTab == 2 ? .firstActivity : .trackTab
-        }
-        return nil
-    }
-
-    private func handleGuidedOnboardingPrimary(_ step: GuidedOnboardingStep) {
-        switch step {
-        case .propertyTab:
-            animate(AppAnimation.smooth) { selectedTab = 1 }
-        case .addProperty:
-            isGuidedOnboardingSuspended = true
-            NotificationCenter.default.post(name: .openAddProperty, object: nil)
-            if isReplayingGuidedOnboarding, !viewModel.properties.isEmpty {
-                isReplayingGuidedOnboarding = false
-                guidedOnboardingRefresh.toggle()
-            }
-        case .trackTab:
-            animate(AppAnimation.smooth) { selectedTab = 2 }
-        case .firstActivity:
-            NotificationCenter.default.post(name: .prefillFirstActivity, object: nil)
-            isReplayingGuidedOnboarding = false
-            hasAcknowledgedFirstActivityCoach = true
-            guidedOnboardingRefresh.toggle()
-        }
-    }
-
-    private func handleGuidedOnboardingSecondary(_ step: GuidedOnboardingStep) {
-        switch step {
-        case .firstActivity:
-            isReplayingGuidedOnboarding = false
-            hasAcknowledgedFirstActivityCoach = true
-            guidedOnboardingRefresh.toggle()
-        default:
-            GuidedOnboardingStore.skip()
-            isReplayingGuidedOnboarding = false
-            guidedOnboardingRefresh.toggle()
-        }
-    }
-
     private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
         if reduceMotion {
             updates()
         } else {
             withAnimation(animation, updates)
         }
-    }
-
-    private func applyGuidedReplayLaunchArgumentIfNeeded() {
-        guard Self.shouldReplayGuidedSetupFromLaunchArguments || Self.shouldForceGuidedSetupHomeFromLaunchArguments,
-              !didApplyGuidedReplayLaunchArgument else { return }
-        didApplyGuidedReplayLaunchArgument = true
-        GuidedOnboardingStore.restart()
-        showOnboarding = false
-        isForcingGuidedOnboardingHome = Self.shouldForceGuidedSetupHomeFromLaunchArguments
-        isReplayingGuidedOnboarding = Self.shouldReplayGuidedSetupFromLaunchArguments
-        isGuidedOnboardingSuspended = false
-        hasAcknowledgedFirstActivityCoach = false
-        selectedTab = Self.shouldForceGuidedSetupHomeFromLaunchArguments ? 0 : 1
-        guidedOnboardingRefresh.toggle()
     }
 }
 
