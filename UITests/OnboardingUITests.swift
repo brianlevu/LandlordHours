@@ -144,4 +144,21 @@ final class OnboardingUITests: XCTestCase {
         tap(app.buttons["onb-back"])
         XCTAssertTrue(app.staticTexts["What are you building toward?"].waitForExistence(timeout: 5))
     }
+
+    // MARK: Upgraders
+
+    func testWhatsNewHoldsTheRevealUntilItCloses() {
+        launchFresh(["-LHMockScenario", "occasional", "-LHShowWhatsNew", "-LHInitialTab", "0",
+                     "-LHFakeCalendar", "granted", "-LHFakeNotifications", "granted"])
+        XCTAssertTrue(app.descendants(matching: .any)["onb.whatsNew"].waitForExistence(timeout: 20))
+        tap(app.buttons["onb-primary"])                            // the house → Continue
+        tap(app.buttons["onb-primary"])                            // Look at my calendar (fake allow)
+        let notNow = app.buttons["onb-secondary"]
+        XCTAssertTrue(notNow.waitForExistence(timeout: 5), "The visit-end note follows a calendar grant")
+        Thread.sleep(forTimeInterval: 3)                           // the fixture look-back finishes
+        XCTAssertTrue(notNow.exists && notNow.isHittable, "Nothing covers What's new while it is open")
+        XCTAssertFalse(app.buttons["backfill-review"].exists)
+        tap(notNow)
+        XCTAssertTrue(app.buttons["backfill-review"].waitForExistence(timeout: 10), "Today's reveal plays once What's new closes")
+    }
 }

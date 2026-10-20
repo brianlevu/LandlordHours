@@ -31,6 +31,7 @@ struct OnboardingView: View {
                 finish(completion)
             }, startAt: start)
             OnbDebugLaunch.apply(to: made)
+            OnbBackfill.flowActive = true
             // A capture launch past Welcome needs a profile to write to.
             if (start ?? .welcome) != .welcome, !viewModel.isSignedIn { viewModel.continueWithoutAccount() }
             flow = made
@@ -47,7 +48,7 @@ struct OnboardingView: View {
         // The question the 2.0 What's new asks was answered here.
         CaptureOptIn.markWhatsNewSeen()
         // Staked led with the found hours: Today never repeats them in a reveal.
-        if completion.foundShown { TodayHouseEvents.shared.markBackfillShown() }
+        OnbBackfill.flowEnded(foundShown: completion.foundShown)
         CaptureSetupHandoff.openInboxAfterOnboarding = completion.openInbox
         Analytics.onboardingCompleted(skippedProperty: completion.skippedProperty, calendar: completion.calendar.analyticsKey)
         viewModel.suppressCelebrations = false
@@ -73,8 +74,10 @@ struct OnbWhatsNewSheet: View {
             guard flow == nil else { return }
             let made = OnbFlow(cohort: .upgrade, services: .live(app: viewModel, environment: .current) { completion in
                 CaptureOptIn.markWhatsNewSeen()
+                OnbBackfill.flowEnded(foundShown: completion.foundShown)
                 onFinish(completion.openInbox)
             })
+            OnbBackfill.flowActive = true
             made.upgradeHours = viewModel.houseCountableHours()
             made.upgradeGoal = viewModel.houseGoal
             made.goal = viewModel.houseGoal == .reps750 ? .reps750 : (viewModel.houseGoal == .mp500 ? .mp500 : .mp100)
@@ -119,6 +122,21 @@ extension OnbServices {
 /// reports is read back from the profile's inbox, so the counts are the Inbox's.
 @MainActor
 enum OnbBackfill {
+    /// An onboarding or What's new flow is on screen.
+    static var flowActive = false
+    private static var heldReveal: OnbFound?
+
+    /// The flow ended: hand Today the reveal it held, unless Staked already showed the count.
+    static func flowEnded(foundShown: Bool) {
+        flowActive = false
+        defer { heldReveal = nil }
+        if foundShown {
+            TodayHouseEvents.shared.markBackfillShown()
+        } else if let found = heldReveal {
+            TodayHouseEvents.shared.backfillFinished(foundHours: found.hours, suggestionCount: found.count)
+        }
+    }
+
     static func start(app: AppViewModel, environment: CaptureSetupEnvironment, update: @escaping @MainActor (OnbScanUpdate) -> Void) {
         guard let store = AppModelHost.shared.suggestionStore else {
             update(OnbScanUpdate(state: .blocked, found: .none))
@@ -142,8 +160,13 @@ enum OnbBackfill {
             CaptureOptIn.markBackfillCompleted()
             NotificationCenter.default.post(name: .captureSuggestionsDidChange, object: nil)
             let found = current()
-            // Today's reveal plays once if Staked did not already show the count.
-            TodayHouseEvents.shared.backfillFinished(foundHours: found.hours, suggestionCount: found.count)
+            // Today's reveal plays once, never over onboarding or What's new: held until the
+            // flow ends, and dropped if Staked already showed the count.
+            if flowActive {
+                heldReveal = found
+            } else {
+                TodayHouseEvents.shared.backfillFinished(foundHours: found.hours, suggestionCount: found.count)
+            }
             update(OnbScanUpdate(state: .finished, found: found, progress: 1))
         }
     }

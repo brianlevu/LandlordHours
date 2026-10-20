@@ -266,8 +266,10 @@ struct HouseHeroCard: View {
                 // The art has ~6% side and ~8% bottom margins inside its 320 pt camera; size it so
                 // the house fills the right half or so (the approved r6 concept proportion) and
                 // the words keep a ~130 pt column for real pace copy ("Behind by 388h").
-                let houseSize = min(g.size.height * 0.84, g.size.width * 0.62)
-                let houseCenter = CGPoint(x: g.size.width - 4 - houseSize * 0.44, y: g.size.height - 6 - houseSize * 0.417)
+                // A staked lot leaves room on the right for the name flag (approved onboarding landing).
+                let staked = stakeName != nil
+                let houseSize = min(g.size.height * 0.84, g.size.width * 0.62) * (staked ? 0.86 : 1)
+                let houseCenter = CGPoint(x: g.size.width - 4 - houseSize * 0.44 - (staked ? 40 : 0), y: g.size.height - 6 - houseSize * 0.417)
                 let houseOrigin = CGPoint(x: houseCenter.x - houseSize / 2, y: houseCenter.y - houseSize / 2)
                 // Bottom lines stay clear of the lot's left tip (~6% into the camera at ~74% height).
                 let columnWidth = max(96, houseOrigin.x + houseSize * 0.04 - 24)

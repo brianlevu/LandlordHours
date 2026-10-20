@@ -703,6 +703,8 @@ struct DashboardView: View {
             .accessibilityLabel(heroAccessibilityLabel)
             .accessibilityIdentifier("today.hero")
 
+            // A new owner sees the lot, not pace maths that can't mean anything yet.
+            if !isNewOwner {
             HStack(alignment: .top, spacing: 12) {
                 if isREPS {
                     dashboardMiniMetric(
@@ -722,6 +724,7 @@ struct DashboardView: View {
                         value: "\(Int(hoursPerWeekNeeded.rounded(.up)))h a week"
                     )
                 }
+            }
             }
         }
     }
