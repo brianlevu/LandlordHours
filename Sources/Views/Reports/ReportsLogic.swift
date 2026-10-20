@@ -70,10 +70,12 @@ enum ReportsLogic {
         let hours = rep.realEstateHours
         if person == .spouse {
             let pace = paceStatus(hours: hours, goal: .reps750, year: year, now: now, calendar: calendar)
+            // Hours alone never show a spouse as qualified: the 50% rule isn't tracked for them,
+            // so this card is never green.
             return ReportStanding(
                 person: .spouse, goal: .reps750, hours: hours, target: 750,
-                status: pace.text, tone: pace.tone,
-                detail: "Your spouse's own hours. REPS is met by one spouse alone, so these never add to yours."
+                status: pace.text, tone: pace.tone == .caution ? .caution : .neutral,
+                detail: "50% rule not tracked for your spouse. REPS is met by one spouse alone, so these hours never add to yours."
             )
         }
         if rep.isQualified {
@@ -120,6 +122,15 @@ enum ReportsLogic {
                 person: person, goal: goal, hours: hours, target: goal.targetHours,
                 status: "Goal met", tone: .positive,
                 detail: goal == .mp100 ? "More than 100 hours, and no one else did more." : "More than 500 hours on this activity."
+            )
+        }
+        // Over 500 hours the 500-hour test is met, so who else spent more time doesn't matter.
+        // The card says so instead of asking a question the Reports screen has no row for.
+        if goal == .mp100, result.meets500HourTest {
+            return ReportStanding(
+                person: person, goal: goal, hours: hours, target: goal.targetHours,
+                status: "Over 500 hours", tone: .positive,
+                detail: "The 500-hour test is met, so the 100-hour question doesn't apply."
             )
         }
         if goal == .mp100, result.ownerAndSpouseHours > 100 {
