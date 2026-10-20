@@ -209,6 +209,8 @@ enum S2Tab: Hashable { case today, inbox, records, properties }
     var pending: Int
     /// The undo toast lives in the bottom band, above the tab bar, never over content.
     var toast: String?
+    /// Surfaces lane: the one toast system (glyph · message · action).
+    var spec: SFToastSpec?
     init(_ n: Int) { pending = n }
 }
 
@@ -217,9 +219,11 @@ struct Tabs<C: View>: View {
     @State private var inbox: S2InboxCount
     let content: () -> C
 
-    init(tab: S2Tab, pending: Int = 3, @ViewBuilder content: @escaping () -> C) {
+    init(tab: S2Tab, pending: Int = 3, toast: SFToastSpec? = nil, @ViewBuilder content: @escaping () -> C) {
         self.tab = tab
-        _inbox = State(initialValue: S2InboxCount(pending))
+        let box = S2InboxCount(pending)
+        box.spec = toast
+        _inbox = State(initialValue: box)
         self.content = content
     }
 
@@ -230,7 +234,9 @@ struct Tabs<C: View>: View {
                 // One bottom band: an opaque canvas scrim behind the tab pill, the "+" and the gap
                 // between them, with a short fade on top. Scroll views inset to it automatically.
                 VStack(spacing: 10) {
-                    if let t = inbox.toast {
+                    if let sp = inbox.spec {
+                        SFToast(spec: sp).padding(.horizontal, 20).transition(.toast)
+                    } else if let t = inbox.toast {
                         UndoToast(text: t).transition(.toast).accessibilityIdentifier("today.toast")
                     }
                     S2TabBar(selection: tab, badge: inbox.pending)

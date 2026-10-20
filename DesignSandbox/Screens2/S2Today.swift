@@ -3,7 +3,7 @@ import SwiftUI
 // §2 Today, below the house. The hero is a static port of release/2.0 HouseHeroCard.
 
 enum TodayState: String {
-    case confirm3, confirmTop, confirmMore, caughtUp, caughtUpOff, noProperty, loading, timerRunning, draft, freeRecord, week, weekMid, timerDiscarded
+    case confirm3, confirmTop, confirmMore, caughtUp, caughtUpOff, noProperty, loading, timerRunning, draft, freeRecord, week, weekMid, timerDiscarded, launch
 }
 
 struct S2Today: View {

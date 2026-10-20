@@ -68,7 +68,9 @@ struct LHDesignSandboxApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if let s2 = S2Route.requested {
+                if let s2 = S2Route.requested, s2.hasPrefix("sf-") {
+                    SFHost(name: s2)
+                } else if let s2 = S2Route.requested {
                     // Screens2 lane (DesignSandbox/Screens2): -LHScreen <name>
                     S2Host(name: s2)
                 } else if let screen {
