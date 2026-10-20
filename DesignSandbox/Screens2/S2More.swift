@@ -458,7 +458,7 @@ struct S2DeleteAll: View {
     private var holdButton: some View {
         let label = Text("Hold to delete everything").font(.body.weight(.semibold))
         return ZStack {
-            Capsule().fill(LHB.destructiveSurface.opacity(0.5))
+            Capsule().fill(LHB.destructive.opacity(0.08))
             label.foregroundStyle(LHB.destructive)
             // Fill: a destructive overlay revealed left → right (clip, not width, so text stays put).
             ZStack {
