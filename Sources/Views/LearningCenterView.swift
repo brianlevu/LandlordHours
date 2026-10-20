@@ -729,7 +729,7 @@ struct LearningCenterView: View {
                         title: "Understand STR vs LTR",
                         subtitle: "Property type changes the tax strategy.",
                         icon: Lucide.house,
-                        color: AppColors.destructive,
+                        color: AppColors.coral,
                         wash: colors.coralWash
                     )
                 }
@@ -772,7 +772,7 @@ struct LearningCenterView: View {
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(AppColors.onAction)
                         .frame(width: 17, height: 17)
-                        .background(color)
+                        .background(colors.action)
                         .clipShape(Circle())
                         .offset(x: 4, y: -4)
                 }
