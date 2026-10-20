@@ -576,7 +576,7 @@ private struct AutoCaptureSettingsSection: View {
                 subtitle: calendarOn ? "At most twice a day, never after 9 pm." : "Turn on Calendar first.",
                 isOn: Binding(get: { promptsOn }, set: { setPrompts($0) })
             )
-            .disabled(!calendarOn || isAsking)
+            .disabled(!calendarOn || isAsking || UserScope.userId == nil)
             .accessibilityIdentifier("settings.capture.prompts")
 
             Button(action: onOpenMuted) {
@@ -672,7 +672,8 @@ private struct AutoCaptureSettingsSection: View {
             let allowed = await CaptureSetupEnvironment.current.requestNotifications()
             if allowed {
                 viewModel.eventPromptsEnabled = true
-                promptsOn = true
+                // Show what was actually stored (nothing is saved without an active profile).
+                promptsOn = viewModel.eventPromptsEnabled
             } else {
                 promptsOn = false
                 blockedMessage = "Notifications are off for LandlordHours. Turn them on in iOS Settings."
