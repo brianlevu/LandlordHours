@@ -425,6 +425,7 @@ struct RecordRowView: View {
         case .calendarImport: return colors.informational
         case .suggested: return colors.draftingInk
         case .timer, .voice: return colors.timberInk
+        case .receipt, .location, .shortcut, .gmail: return colors.informational
         case .manual, .other: return colors.textSecondary
         }
     }

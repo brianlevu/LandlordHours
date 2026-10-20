@@ -11,6 +11,10 @@ enum RecordSourceBadge: String, CaseIterable, Equatable {
     case voice
     case calendarImport
     case suggested
+    case receipt
+    case location
+    case shortcut
+    case gmail
     case other
 
     init(entry: TimeEntry) {
@@ -24,7 +28,11 @@ enum RecordSourceBadge: String, CaseIterable, Equatable {
         case .timer: self = .timer
         case .voice: self = .voice
         case .calendar: self = .calendarImport
-        default: self = .other
+        case .receipt: self = .receipt
+        case .location: self = .location
+        case .shortcut: self = .shortcut
+        case .gmail: self = .gmail
+        case .other: self = .other
         }
     }
 
@@ -35,7 +43,11 @@ enum RecordSourceBadge: String, CaseIterable, Equatable {
         case .voice: return "Voice"
         case .calendarImport: return "Calendar import"
         case .suggested: return "Suggested"
-        case .other: return "Other"
+        case .receipt: return EntrySource.receipt.displayName
+        case .location: return EntrySource.location.displayName
+        case .shortcut: return EntrySource.shortcut.displayName
+        case .gmail: return EntrySource.gmail.displayName
+        case .other: return EntrySource.other.displayName
         }
     }
 
@@ -46,12 +58,16 @@ enum RecordSourceBadge: String, CaseIterable, Equatable {
         case .voice: return "waveform"
         case .calendarImport: return "calendar"
         case .suggested: return "tray.and.arrow.down"
+        case .receipt: return "doc.text.viewfinder"
+        case .location: return "location"
+        case .shortcut: return "square.stack.3d.up"
+        case .gmail: return "envelope"
         case .other: return "questionmark.circle"
         }
     }
 
     /// The filter menu lists the sources that can occur, in this order.
-    static let filterOrder: [RecordSourceBadge] = [.manual, .timer, .voice, .calendarImport, .suggested, .other]
+    static let filterOrder: [RecordSourceBadge] = [.manual, .timer, .voice, .calendarImport, .suggested, .receipt, .location, .shortcut, .gmail, .other]
 }
 
 struct RecordsMonthSection: Identifiable, Equatable {
