@@ -139,7 +139,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         XCTAssertTrue(lockContainer("inbox_limit").exists, "A .row lock for the new rental")
         app.buttons["Close"].firstMatch.tap()
         tap(app.buttons["confirm.keepForPro"])
-        XCTAssertTrue(app.staticTexts["Kept in your inbox until you unlock Pro"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts["Kept in your inbox"].waitForExistence(timeout: 4))
         let waiting = app.buttons["inbox.row.cal:debug-limit-showing"]
         XCTAssertTrue(waiting.waitForExistence(timeout: 4))
         XCTAssertTrue(waiting.label.contains("Waiting on Pro"), "Never expires silently")

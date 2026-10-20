@@ -59,6 +59,14 @@ final class PaywallCaptureUITests: XCTestCase {
                     let title = app.staticTexts["paywall.title"]
                     XCTAssertTrue(title.waitForExistence(timeout: 12), "\(state.name): paywall missing")
                     Thread.sleep(forTimeInterval: state.name.contains("below") ? 2.0 : 1.4)
+                    // Large sizes push a state's status line below the fold: bring it into view
+                    // so every state is captured for real (the r1 gate found identical frames).
+                    for id in ["paywall.restoreNone", "paywall.failed", "paywall.askToBuy", "paywall.priceFailed", "paywall.success"] {
+                        let status = app.descendants(matching: .any)[id].firstMatch
+                        var swipes = 0
+                        while status.exists && !status.isHittable && swipes < 4 { app.swipeUp(velocity: .slow); swipes += 1 }
+                        if swipes > 0 { Thread.sleep(forTimeInterval: 0.8) }
+                    }
                     save("\(state.name)-\(scheme)-\(sizeName)")
                 }
             }
@@ -75,6 +83,18 @@ final class PaywallCaptureUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["paywall.band.canvas"].waitForExistence(timeout: 3), "Canvas band once scrolled past the hero")
         app.swipeDown(velocity: .fast); app.swipeDown(velocity: .fast); app.swipeDown(velocity: .fast)
         XCTAssertTrue(app.descendants(matching: .any)["paywall.band.hero"].waitForExistence(timeout: 3), "Blue again at the top")
+    }
+
+    /// Properties at the free limit: the shared `.row` lock (entry properties_limit).
+    func testCapturePropertiesLock() {
+        for (sizeName, size) in Self.sizes {
+            for scheme in Self.schemes {
+                launch(scenario: "occasional", scheme: scheme, size: size)
+                tapButton("Properties")
+                scrollTo("lock.properties_limit")
+                save("lock-properties-\(scheme)-\(sizeName)")
+            }
+        }
     }
 
     // MARK: Locks
@@ -112,9 +132,15 @@ final class PaywallCaptureUITests: XCTestCase {
                 waitFor("confirm.unlockPro")
                 Thread.sleep(forTimeInterval: 0.8)
                 save("limit-sheet-\(suffix)")
+                // At AX sizes the pinned "Unlock Pro" covers the lower sheet: scroll the Property
+                // row clear of it before tapping.
                 let property = app.buttons["confirm.property"]
+                let pinned = app.buttons["confirm.unlockPro"]
                 var swipes = 0
-                while !property.isHittable && swipes < 6 { app.swipeUp(velocity: .slow); swipes += 1 }
+                while (!property.isHittable || property.frame.maxY > pinned.frame.minY - 8) && swipes < 8 {
+                    app.descendants(matching: .any)["confirm.sheet"].firstMatch.swipeUp(velocity: .slow)
+                    swipes += 1
+                }
                 property.tap()
                 waitFor("limitPicker")
                 Thread.sleep(forTimeInterval: 0.8)

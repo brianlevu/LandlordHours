@@ -142,7 +142,7 @@ final class InboxViewModel: ObservableObject {
         if sheetSuggestion?.sourceKey == suggestion.sourceKey { sheetSuggestion = nil }
         waitList.add(suggestion.sourceKey)
         changed()
-        present(InboxToast(message: "Kept in your inbox until you unlock Pro", kind: .neutral, undo: nil))
+        present(InboxToast(message: "Kept in your inbox", kind: .neutral, undo: nil))
     }
 
     /// The paywall about adding a rental, opened from the Inbox.

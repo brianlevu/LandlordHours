@@ -153,9 +153,15 @@ struct UnlockProButton: View {
 
     var body: some View {
         Button(action: action) {
-            Label(title, systemImage: "lock.fill")
+            // Glyph and words drawn explicitly: some containers (List rows) render a Label as
+            // icon-only, which hid "Unlock Pro" in Settings.
+            HStack(spacing: 6) {
+                Image(systemName: "lock.fill").accessibilityHidden(true)
+                Text(title)
+            }
         }
         .buttonStyle(ProUnlockButtonStyle(fullWidth: fullWidth))
+        .accessibilityLabel(title)
         .accessibilityHint("Opens LandlordHours Pro")
         .accessibilityIdentifier("lock.unlock")
     }
