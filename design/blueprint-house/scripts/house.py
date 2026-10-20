@@ -88,7 +88,7 @@ def make_materials():
     mat('shrub', '#84AE68', 0.75, '#6A9A58')
     mat('trunk', '#9A6B45', 0.8)
     foliage('foliage', '#86B26A', '#5E9150', '#A6C982')
-    mat('concrete', '#D3CEC6', 0.9, '#CBC5BB')
+    mat('concrete', '#97938B', 0.92, '#908C84')   # r4: mid stone grey so the poured slab reads against the lawn
     mat('timber', '#E8B474', 0.72, '#DDA35E')       # framing
     mat('ply', '#EBC994', 0.8, '#E2BC80')           # sheathing
     mat('tile', '#D46A4A', 0.62, '#C95E40')         # terracotta roof
@@ -778,9 +778,18 @@ def lumpy(ob, strength, size, vgroup_mat=None):
         vg.add(idx, 1.0, 'REPLACE')
         dm.vertex_group = 'foliage'
 
-def build_slab():
+def build_slab(walls):
     new_obj('slab', [('concrete', [], [prism_fn(FOOT, -0.06, F)])], 1, 0, 'major', 'slab', bevel=0.02)
     new_obj('porch_deck', [('concrete', [M_box((1.175, -3.275, (F - 0.06 - 0.06) / 2), (3.55, 1.45, F - 0.06 + 0.06))], [])], 1, 0, 'major', 'slab', bevel=0.02)
+    # r4: timber sill plates bolted to the slab along every wall line (real builds lay them before framing).
+    # They read as "foundation poured" at hero size and sit just proud of the framing bottom plates.
+    SH = 0.05
+    sills = []
+    for w in walls:
+        L0, L1 = w.trim, w.L - w.trim
+        c = w.P((L0 + L1) / 2, -SD / 2, F + SH / 2)
+        sills.append(M_box(c, (L1 - L0, SD + 0.05, SH), w.ang))
+    new_obj('sill_plates', [('timber', sills, [])], 1, 0, '', 'slab', bevel=0.006)
 
 def build_stake():
     sb = []
@@ -806,7 +815,7 @@ def build_all():
     reset()
     make_materials()
     walls = build_walls()
-    build_lot(); build_stake(); build_slab()
+    build_lot(); build_stake(); build_slab(walls)
     build_frame(walls); build_roof()
     rows = build_siding(walls)
     build_units(walls); build_porch()
