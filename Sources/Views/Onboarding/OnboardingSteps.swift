@@ -39,6 +39,12 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
+        // Scrolled-up words fade at the sheet's top edge instead of being cut mid-line.
+        .overlay(alignment: .top) {
+            LinearGradient(colors: [OnbColor.card, OnbColor.card.opacity(0)], startPoint: .top, endPoint: .bottom)
+                .frame(height: 22)
+                .allowsHitTesting(false)
+        }
         .scrollIndicatorsFlash(onAppear: true)
         .defaultScrollAnchor(OnbDebugLaunch.scrollToBottom ? .bottom : .top)
         .safeAreaInset(edge: .bottom, spacing: 0) {

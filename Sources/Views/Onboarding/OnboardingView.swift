@@ -410,6 +410,12 @@ struct OnbWelcomeContent: View {
                 .padding(.horizontal, 24)
             }
             .scrollBounceBehavior(.basedOnSize)
+            // Words that scroll toward the pinned button fade out before they reach it.
+            .overlay(alignment: .bottom) {
+                LinearGradient(colors: [HouseTokens.blueprintDeep.opacity(0), HouseTokens.blueprintDeep], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 44)
+                    .allowsHitTesting(false)
+            }
             VStack(spacing: 10) {
                 Button("Start building") { flow.start(OnbMotion.morph(reduce)) }
                     .buttonStyle(OnbHeroPill())
@@ -581,6 +587,12 @@ struct OnbStakedContent: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .scrollBounceBehavior(.basedOnSize)
+            // Words that scroll toward the pinned button fade out before they reach it.
+            .overlay(alignment: .bottom) {
+                LinearGradient(colors: [HouseTokens.blueprintDeep.opacity(0), HouseTokens.blueprintDeep], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 44)
+                    .allowsHitTesting(false)
+            }
             Button(headline.reviewCount.map { "Review \(OnbFormat.suggestions($0))" } ?? "Go to Today") {
                 flow.leaveStaked()
             }

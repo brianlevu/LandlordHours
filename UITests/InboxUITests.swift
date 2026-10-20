@@ -131,13 +131,14 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Today"].exists || app.staticTexts["TODAY"].exists)
         XCTAssertTrue(app.staticTexts["This week"].exists || app.staticTexts["THIS WEEK"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["inbox.backfillBanner"].exists)
-        app.swipeUp()
-        app.swipeUp()
-        XCTAssertTrue(app.staticTexts["Earlier"].waitForExistence(timeout: 3) || app.staticTexts["EARLIER"].exists)
+        // Rows carry Confirm / Not work, so they are taller: scroll to each one.
+        XCTAssertTrue(scrollTo(row("call-sam")))
         XCTAssertTrue(row("call-sam").label.contains("Not sure"), row("call-sam").label)
         XCTAssertEqual(app.buttons["tab.inbox"].value as? String, "8 to confirm")
-        XCTAssertTrue(row("hardware").exists)
+        XCTAssertTrue(scrollTo(row("hardware")))
         XCTAssertTrue(row("hardware").label.contains("Might already be logged"), row("hardware").label)
+        XCTAssertTrue(scrollTo(row("inspection")))
+        XCTAssertTrue(app.staticTexts["Earlier"].waitForExistence(timeout: 3) || app.staticTexts["EARLIER"].exists)
         XCTAssertEqual(app.buttons["tab.inbox"].value as? String, "8 to confirm")
     }
 
@@ -201,7 +202,7 @@ final class InboxUITests: XCTestCase {
     func testReceiptNeedsHoursBeforeLogging() {
         launch("inbox")
         let depot = app.descendants(matching: .any)["inbox.row.rcpt:homedepot"]
-        XCTAssertTrue(settle(depot))
+        XCTAssertTrue(scrollTo(depot), "The receipt row is below the fold (rows carry Confirm)")
         depot.tap()
         let log = app.buttons["confirm.log"]
         XCTAssertTrue(log.waitForExistence(timeout: 5))
@@ -217,6 +218,7 @@ final class InboxUITests: XCTestCase {
         launch("inbox")
         let sam = row("call-sam")
         XCTAssertTrue(settle(sam))
+        XCTAssertTrue(scrollTo(sam))
         sam.tap()
         XCTAssertTrue(app.descendants(matching: .any)["confirm.notSure"].waitForExistence(timeout: 5))
         // The mute link scrolls under the pinned Log / Not landlord work bar: bring it clear first.

@@ -296,6 +296,8 @@ struct InboxRowActions: View {
             Button(action: onConfirm) {
                 Label("Confirm", systemImage: "checkmark")
                     .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .fixedSize()
                     .foregroundStyle(colors.onAction)
                     .padding(.horizontal, 18)
                     .frame(minHeight: 44)
@@ -307,6 +309,8 @@ struct InboxRowActions: View {
             Button(action: onNotWork) {
                 Text("Not work")
                     .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .fixedSize()
                     .foregroundStyle(colors.textSecondary)
                     .padding(.horizontal, 12)
                     .frame(minHeight: 44)

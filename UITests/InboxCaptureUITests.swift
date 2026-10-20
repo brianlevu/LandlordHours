@@ -80,14 +80,23 @@ final class InboxCaptureUITests: XCTestCase {
         // 2. Confirm sheet (scheduled hours, spouse on).
         app.swipeDown()
         let plumber = app.descendants(matching: .any)["inbox.row.cal:debug-plumber"]
-        if plumber.waitForExistence(timeout: 5) { Thread.sleep(forTimeInterval: 1.0); plumber.tap() }
+        if plumber.waitForExistence(timeout: 5) {
+            Thread.sleep(forTimeInterval: 1.0)
+            for _ in 0..<4 where !plumber.isHittable { app.swipeDown() }
+            plumber.tap()
+        }
         XCTAssertTrue(app.buttons["confirm.log"].waitForExistence(timeout: 5))
         shoot("confirm-sheet", scheme)
 
         // 2b. Confirm sheet for a not-sure, no-property item.
         launch(seed: "inbox", scheme: scheme)
         let sam = app.descendants(matching: .any)["inbox.row.cal:debug-call-sam"]
-        if sam.waitForExistence(timeout: 20) { Thread.sleep(forTimeInterval: 2.0); sam.tap() }
+        // Rows carry Confirm / Not work now, so this one sits below the fold (and clear of the tab bar).
+        XCTAssertTrue(app.descendants(matching: .any)["inbox.row.cal:debug-showing"].waitForExistence(timeout: 20))
+        Thread.sleep(forTimeInterval: 2.0)
+        let tabTop = app.buttons["tab.today"].frame.minY
+        for _ in 0..<6 where !sam.exists || sam.frame.maxY > tabTop - 8 { app.swipeUp(velocity: .slow) }
+        sam.tap()
         XCTAssertTrue(app.buttons["confirm.log"].waitForExistence(timeout: 5))
         shoot("confirm-sheet-notsure", scheme)
 
