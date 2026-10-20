@@ -125,7 +125,10 @@ final class EngagementIntelligenceService {
                 groupingElection: context.groupingElection
             ).ownerAndSpouseHours
         }
-        let lastLogDate = yearEntries.map(\.date).max()
+        // Spouse hours off: a spouse's entry never counts as your last log.
+        let lastLogDate = yearEntries
+            .filter { context.includeSpouse || $0.participant == .selfParticipant }
+            .map(\.date).max()
         let daysSinceLastLog = lastLogDate.map {
             max(0, calendar.dateComponents([.day], from: calendar.startOfDay(for: $0), to: calendar.startOfDay(for: context.now)).day ?? 0)
         }
