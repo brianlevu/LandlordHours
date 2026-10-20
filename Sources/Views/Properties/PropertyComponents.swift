@@ -91,50 +91,6 @@ struct PropertyHouseTile: View {
     }
 }
 
-/// A missing number while loading: a soft bar in the border ink (never a spinner).
-/// TODO(wp-l-loading): replace with PlaceholderBar when wp-l-loading lands on release/2.0.
-struct PropertyPlaceholderBar: View {
-    var width: CGFloat? = 120
-    var height: CGFloat = 14
-    @Environment(\.colorScheme) private var colorScheme
-    var body: some View {
-        RoundedRectangle(cornerRadius: height / 2, style: .continuous)
-            .fill(AdaptiveColors(colorScheme: colorScheme).border.opacity(0.7))
-            .frame(width: width, height: height)
-            .accessibilityHidden(true)
-    }
-}
-
-/// A missing house while loading: the house outline drawn in drafting ink, still.
-/// TODO(wp-l-loading): replace with DraftingLoader(sketch: .house) when it lands.
-struct PropertyHouseSketch: View {
-    @Environment(\.colorScheme) private var colorScheme
-    var body: some View {
-        let ink = AdaptiveColors(colorScheme: colorScheme).draftingInk
-        GeometryReader { g in
-            let w = g.size.width, h = g.size.height
-            ZStack {
-                Path { p in
-                    p.move(to: CGPoint(x: w * 0.18, y: h * 0.86))
-                    p.addLine(to: CGPoint(x: w * 0.18, y: h * 0.48))
-                    p.addLine(to: CGPoint(x: w * 0.5, y: h * 0.2))
-                    p.addLine(to: CGPoint(x: w * 0.82, y: h * 0.48))
-                    p.addLine(to: CGPoint(x: w * 0.82, y: h * 0.86))
-                    p.closeSubpath()
-                }
-                .stroke(ink, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
-                Path { p in
-                    p.addRect(CGRect(x: w * 0.42, y: h * 0.62, width: w * 0.16, height: h * 0.24))
-                    p.move(to: CGPoint(x: w * 0.08, y: h * 0.86)); p.addLine(to: CGPoint(x: w * 0.92, y: h * 0.86))
-                }
-                .stroke(ink.opacity(0.6), lineWidth: 1)
-            }
-        }
-        .aspectRatio(1, contentMode: .fit)
-        .accessibilityHidden(true)
-    }
-}
-
 /// Progress toward the slab, drawn on the blueprint tile: a 3pt drafting track with a cyan fill.
 struct GroundworkProgressLine: View {
     let fraction: Double
@@ -154,7 +110,7 @@ struct GroundworkProgressLine: View {
 /// THE locked preview, `.row` size (redesign-specs §0): the real row renders as a ghost at a 4pt
 /// blur, then one line saying what is locked, one saying what stays active, and one "Unlock Pro"
 /// capsule that opens the paywall for this context. After a purchase the blur lifts.
-struct LockedPreviewRow<Content: View>: View {
+struct PropertiesLockedPreviewRow<Content: View>: View {
     let line: String
     let keeps: String
     var unlocked = false

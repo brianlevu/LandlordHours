@@ -50,7 +50,9 @@ struct PropertiesView: View {
 #if DEBUG
         if debugLoading { return true }
 #endif
-        return viewModel.isInitializing
+        // Rentals already on this iPhone show at once; only an empty list waits for the first
+        // iCloud pull (WP-L), so a returning owner never sees "Add your first property" by mistake.
+        return viewModel.isAwaitingInitialPull && viewModel.properties.isEmpty
     }
 
     private var goal: HouseGoal { viewModel.houseGoal }
@@ -162,7 +164,7 @@ struct PropertiesView: View {
                 }
             }
             if isLoading {
-                PropertyPlaceholderBar(width: 170, height: 14)
+                PlaceholderBar(width: 170, height: 14)
                     .padding(.top, 8)
             } else if !viewModel.properties.isEmpty {
                 let total = viewModel.properties.reduce(0) { $0 + viewModel.propertyCountableHours($1.id) }
@@ -257,28 +259,10 @@ struct PropertiesView: View {
                     .frame(maxWidth: .infinity, minHeight: 76)
             }
             if atLimit {
-                LockedPreviewRow(
-                    line: PropertyLimit.lockLine,
-                    keeps: PropertyLimit.keepsLine(firstPropertyName: viewModel.properties.first?.name),
+                PropertiesAtLimitRow(
+                    firstPropertyName: viewModel.properties.first?.name,
                     onUnlock: { showingPaywall = true }
-                ) {
-                    HStack(spacing: 12) {
-                        PropertySeal(monogram: "", size: 40, dashed: true)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Your next rental")
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(colors.textPrimary)
-                            Text("0h this year")
-                                .font(.subheadline)
-                                .foregroundStyle(colors.textSecondary)
-                        }
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 76)
-                }
-                .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("properties.lockRow")
+                )
             }
         }
         .propertyCard()
@@ -315,8 +299,8 @@ struct PropertiesView: View {
         .accessibilityIdentifier("properties.empty")
     }
 
-    /// Loading never blocks and never spins: placeholder bars where the names and numbers go and
-    /// a drafted house outline where the house goes (see the TODOs on those two components).
+    /// Loading never blocks and never spins: PlaceholderBar where the names and numbers go and a
+    /// DraftingLoader house where the house goes.
     private var loadingCard: some View {
         VStack(spacing: 0) {
             ForEach(0..<3, id: \.self) { i in
@@ -324,11 +308,11 @@ struct PropertiesView: View {
                     Circle().fill(colors.border.opacity(0.5))
                         .frame(width: 40, height: 40)
                     VStack(alignment: .leading, spacing: 8) {
-                        PropertyPlaceholderBar(width: i == 1 ? 150 : 120, height: 14)
-                        PropertyPlaceholderBar(width: 170, height: 10)
+                        PlaceholderBar(width: i == 1 ? 150 : 120, height: 14)
+                        PlaceholderBar(width: 170, height: 10)
                     }
                     Spacer()
-                    PropertyHouseSketch().frame(width: 48, height: 48)
+                    DraftingLoader(sketch: .house, lineWidth: 1.5).frame(width: 48, height: 48)
                 }
                 .padding(.horizontal, 16)
                 .frame(minHeight: 76)
@@ -381,6 +365,45 @@ struct PropertiesView: View {
         }
     }
 #endif
+}
+
+// MARK: - At the free limit
+
+/// The whole Properties at-limit lock in one place: a ghost "Your next rental" row under the
+/// `.row` locked preview, saying what stays active, with one Unlock Pro.
+/// INTEGRATION (wp-paywall): swap this body for the app-wide ProGate lock; the caller keeps
+/// passing the first rental's name and the unlock action (opens the .secondProperty paywall).
+struct PropertiesAtLimitRow: View {
+    let firstPropertyName: String?
+    var onUnlock: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        PropertiesLockedPreviewRow(
+            line: PropertyLimit.lockLine,
+            keeps: PropertyLimit.keepsLine(firstPropertyName: firstPropertyName),
+            onUnlock: onUnlock
+        ) {
+            HStack(spacing: 12) {
+                PropertySeal(monogram: "", size: 40, dashed: true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Your next rental")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(colors.textPrimary)
+                    Text("0h this year")
+                        .font(.subheadline)
+                        .foregroundStyle(colors.textSecondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 76)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("properties.lockRow")
+    }
 }
 
 // MARK: - Row
@@ -771,8 +794,7 @@ struct PropertyDetailView: View {
     }
 
     /// The location row: the address found on the map. While it looks the address up, a
-    /// placeholder holds the map's place (never a spinner).
-    /// TODO(wp-l-loading): use DraftingLoader(sketch: .house) here when it lands on release/2.0.
+    /// DraftingLoader holds the map's place (never a spinner).
     @ViewBuilder
     private func locationRow(_ property: RentalProperty) -> some View {
         let shape = UnevenRoundedRectangle(bottomLeadingRadius: 20, bottomTrailingRadius: 20, style: .continuous)
@@ -792,7 +814,7 @@ struct PropertyDetailView: View {
             if !property.address.isEmpty {
                 ZStack {
                     shape.fill(colors.backgroundTertiary)
-                    PropertyHouseSketch().frame(width: 56, height: 56)
+                    DraftingLoader(sketch: .house, subject: "the map", lineWidth: 1.5).frame(width: 64, height: 64)
                 }
                 .frame(height: 140)
                 .accessibilityElement(children: .ignore)
