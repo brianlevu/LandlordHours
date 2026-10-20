@@ -325,7 +325,6 @@ struct PropertiesView: View {
 
     private func openPaywall() {
         paywall = ProPaywallRequest(context: ProGate.context(for: .propertiesLimit), entry: .propertiesLimit, onUnlocked: {
-            NotificationCenter.default.post(name: .suspendGuidedOnboardingOverlay, object: nil)
             editor = .add
         })
     }
