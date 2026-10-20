@@ -324,7 +324,7 @@ final class LandlordHoursUITests: XCTestCase {
         launch(scenario: "occasional", tab: 6, extraArguments: ["-LHSeedAttachment"])
 
         // Scroll until the row is hittable before tapping.
-        let entryRow = app.staticTexts["Property Management"]
+        let entryRow = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Called tenant")).firstMatch
         XCTAssertTrue(entryRow.waitForExistence(timeout: 20))
         tapWhenHittable(entryRow, scrollIfNeeded: true)
 
@@ -342,7 +342,7 @@ final class LandlordHoursUITests: XCTestCase {
         ]
         app.launch()
 
-        let entryRowAgain = app.staticTexts["Property Management"]
+        let entryRowAgain = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Called tenant")).firstMatch
         XCTAssertTrue(entryRowAgain.waitForExistence(timeout: 20),
                       "Persisted entry should still be present after relaunch")
         tapWhenHittable(entryRowAgain, scrollIfNeeded: true)

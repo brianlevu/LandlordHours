@@ -723,13 +723,14 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Pace cards (2-up; stacked at accessibility sizes)
+    // MARK: - Pace cards (2-up; stacked from XXL)
 
     /// The empty lot (no property yet) shows no pace maths: nothing can be counted.
     @ViewBuilder
     private var paceCards: some View {
         if !viewModel.properties.isEmpty {
-            let layout = dynamicTypeSize.isAccessibilitySize
+            // Stacked from XXL (the week list switches at the same size): "53h a week" never wraps.
+            let layout = dynamicTypeSize >= .xxLarge
                 ? AnyLayout(VStackLayout(spacing: 12))
                 : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
             layout {
