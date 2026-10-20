@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import AuthenticationServices
 
 // MARK: - Entry points
@@ -31,7 +32,7 @@ struct OnboardingView: View {
                 finish(completion)
             }, startAt: start)
             OnbDebugLaunch.apply(to: made)
-            OnbBackfill.flowActive = true
+            OnbBackfill.flowStarted()
             // A capture launch past Welcome needs a profile to write to.
             if (start ?? .welcome) != .welcome, !viewModel.isSignedIn { viewModel.continueWithoutAccount() }
             flow = made
@@ -40,6 +41,8 @@ struct OnboardingView: View {
         .onDisappear {
             viewModel.suppressCelebrations = false
             OnbStatusBar.set(.default)
+            // Left without finishing (sign-out, profile restore): never hold Today's reveal.
+            if OnbBackfill.flowActive { OnbBackfill.flowEnded(foundShown: false) }
         }
     }
 
@@ -77,7 +80,7 @@ struct OnbWhatsNewSheet: View {
                 OnbBackfill.flowEnded(foundShown: completion.foundShown)
                 onFinish(completion.openInbox)
             })
-            OnbBackfill.flowActive = true
+            OnbBackfill.flowStarted()
             made.upgradeHours = viewModel.houseCountableHours()
             made.upgradeGoal = viewModel.houseGoal
             made.goal = viewModel.houseGoal == .reps750 ? .reps750 : (viewModel.houseGoal == .mp500 ? .mp500 : .mp100)
@@ -118,22 +121,26 @@ extension OnbServices {
     }
 }
 
-/// The 90-day look-back, started from onboarding and running while the user answers. What it
-/// reports is read back from the profile's inbox, so the counts are the Inbox's.
+/// The 90-day look-back, started from onboarding and running while the user answers. It is
+/// WP-L's `BackfillJob` (streaming into the profile's inbox); what onboarding reports is read
+/// back from that inbox, so every count is the Inbox's own.
 @MainActor
 enum OnbBackfill {
-    /// An onboarding or What's new flow is on screen.
-    static var flowActive = false
-    private static var heldReveal: OnbFound?
+    /// An onboarding or What's new flow is on screen: Today's reveal waits for it to close.
+    static private(set) var flowActive = false
+    private static var observation: AnyCancellable?
 
-    /// The flow ended: hand Today the reveal it held, unless Staked already showed the count.
+    static func flowStarted() { flowActive = true }
+
+    /// The flow ended. Staked showed the count: the reveal never plays. Otherwise a reveal that
+    /// arrived during the flow is handed to Today again now that nothing covers it.
     static func flowEnded(foundShown: Bool) {
         flowActive = false
-        defer { heldReveal = nil }
+        let events = TodayHouseEvents.shared
         if foundShown {
-            TodayHouseEvents.shared.markBackfillShown()
-        } else if let found = heldReveal {
-            TodayHouseEvents.shared.backfillFinished(foundHours: found.hours, suggestionCount: found.count)
+            events.markBackfillShown()
+        } else if let held = events.pendingBackfill {
+            events.backfillFinished(foundHours: held.foundHours, suggestionCount: held.suggestionCount)
         }
     }
 
@@ -142,32 +149,33 @@ enum OnbBackfill {
             update(OnbScanUpdate(state: .blocked, found: .none))
             return
         }
-        let scanner = environment.makeScanner(app, store)
-        func current() -> OnbFound { OnbFound.from(store.suggestions, now: InboxClock.now()) }
-        update(OnbScanUpdate(state: .running, found: current()))
-        Task { @MainActor in
-            let outcome = await scanner.scan { progress in
-                Task { @MainActor in
-                    let fraction = progress.total > 0 ? Double(progress.completed) / Double(progress.total) : 0
-                    update(OnbScanUpdate(state: .running, found: current(), progress: fraction))
+        let job = BackfillJob.shared
+        job.start(environment.makeScanner(app, store))
+        observation = job.$phase
+            .combineLatest(job.$foundCount)
+            .receive(on: DispatchQueue.main)
+            .sink { phase, _ in
+                MainActor.assumeIsolated {
+                    let found = OnbFound.from(store.suggestions, now: InboxClock.now())
+                    update(OnbScanUpdate(state: state(phase), found: found, progress: progress(phase)))
                 }
             }
-            guard !outcome.cancelled, outcome.access == .fullAccess else {
-                update(OnbScanUpdate(state: .blocked, found: current()))
-                return
-            }
-            // Only a finished scan counts as the day-1 backfill.
-            CaptureOptIn.markBackfillCompleted()
-            NotificationCenter.default.post(name: .captureSuggestionsDidChange, object: nil)
-            let found = current()
-            // Today's reveal plays once, never over onboarding or What's new: held until the
-            // flow ends, and dropped if Staked already showed the count.
-            if flowActive {
-                heldReveal = found
-            } else {
-                TodayHouseEvents.shared.backfillFinished(foundHours: found.hours, suggestionCount: found.count)
-            }
-            update(OnbScanUpdate(state: .finished, found: found, progress: 1))
+    }
+
+    static func state(_ phase: BackfillJob.Phase) -> OnbScanState {
+        switch phase {
+        case .idle: return .idle
+        case .scanning: return .running
+        case .finished: return .finished
+        case .blocked, .cancelled: return .blocked
+        }
+    }
+
+    static func progress(_ phase: BackfillJob.Phase) -> Double {
+        switch phase {
+        case .scanning(let completed, let total): return total > 0 ? Double(completed) / Double(total) : 0
+        case .finished: return 1
+        default: return 0
         }
     }
 }

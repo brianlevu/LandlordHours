@@ -94,7 +94,7 @@ struct HouseHeroView: View {
         guard plan.beam else {
             apply(plan.keyframe, plan.target)
             onLand(plan)
-            if new > old { settleTick += 1 }
+            if new > old && animatesConfirms { settleTick += 1 }
             if let celebration { onCelebration(celebration) }
             return
         }
@@ -230,6 +230,16 @@ struct HouseHeroCard: View {
     var footer: HouseHeroFooter? = nil
     /// The first property's name on a stake in the lot, until the first hour is logged.
     var stakeName: String? = nil
+    /// WP-L: the hours aren't final yet (the first iCloud pull is still running). The number is a
+    /// soft placeholder bar and the house slot shows the drafting line sketching the house; when
+    /// it turns false the real house crossfades in and the number counts up.
+    var isLoading = false
+    /// False for changes the user didn't make (an iCloud merge, even after the loading cap): the
+    /// house and number update in place, with no beam, count-up or haptic.
+    var animatesChanges = true
+    /// WP-L: a 90-day look-back is running. The words say so instead of the stage and next
+    /// milestone ("An empty lot / Foundation at 100h" reads as final while hours are coming).
+    var isLookingBack = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shownHours: Double?
@@ -276,14 +286,24 @@ struct HouseHeroCard: View {
                 // Bottom lines stay clear of the lot's left tip (~6% into the camera at ~74% height).
                 let columnWidth = max(96, houseOrigin.x + houseSize * 0.04 - 24)
                 ZStack(alignment: .topLeading) {
-                    HouseHeroView(
-                        progress: progress,
-                        canvas: .blueprintHero,
-                        beamOrigin: CGPoint(x: 72 - houseOrigin.x, y: 92 - houseOrigin.y),
-                        onLand: { _ in countUp() },
-                        onCelebration: onCelebration,
-                        debugConfirmStill: debugConfirmStill
-                    )
+                    Group {
+                        if isLoading {
+                            DraftingLoader(sketch: .house, surface: .blueprint, subject: "your hours")
+                                .accessibilityHidden(true)
+                                .transition(.opacity)
+                        } else {
+                            HouseHeroView(
+                                progress: progress,
+                                canvas: .blueprintHero,
+                                animatesConfirms: animatesChanges,
+                                beamOrigin: CGPoint(x: 72 - houseOrigin.x, y: 92 - houseOrigin.y),
+                                onLand: { _ in countUp() },
+                                onCelebration: onCelebration,
+                                debugConfirmStill: debugConfirmStill
+                            )
+                            .transition(.opacity)
+                        }
+                    }
                     .frame(width: houseSize, height: houseSize)
                     .overlay {
                         if let stakeName {
@@ -302,26 +322,42 @@ struct HouseHeroCard: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                             .fixedSize(horizontal: true, vertical: false)
-                        Text("\(displayHours)")
-                            .font(.system(size: numberSize, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(HouseTokens.onHeroPrimary)
-                            .contentTransition(.identity)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
-                            .scaleEffect(pop ? HouseMotion.countPopScale : 1, anchor: .leading)
-                            .padding(.top, 2)
-                            .accessibilityLabel("\(progress.wholeHours) hours")
+                        ZStack(alignment: .leading) {
+                            // Keeps the number's line height so nothing moves when it lands.
+                            Text("\(displayHours)")
+                                .font(.system(size: numberSize, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(HouseTokens.onHeroPrimary)
+                                .contentTransition(.identity)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                                .scaleEffect(pop ? HouseMotion.countPopScale : 1, anchor: .leading)
+                                .opacity(isLoading ? 0 : 1)
+                            if isLoading {
+                                PlaceholderBar(width: numberSize * 1.7, height: numberSize * 0.62, surface: .blueprint)
+                                    .transition(.opacity)
+                            }
+                        }
+                        .padding(.top, 2)
+                        .accessibilityLabel(isLoading ? "Loading your hours" : "\(progress.wholeHours) hours")
                         Text("of \(Int(progress.goal.targetHours))h")
                             .font(.title3.weight(.medium))
                             .foregroundStyle(HouseTokens.onHeroSecondary)
                         Spacer(minLength: 8)
-                        if let footer {
+                        if isLoading {
+                            VStack(alignment: .leading, spacing: 8) {
+                                PlaceholderBar(width: min(columnWidth, 120), height: 12, surface: .blueprint)
+                                PlaceholderBar(width: min(columnWidth, 88), height: 12, surface: .blueprint)
+                            }
+                            .frame(width: columnWidth, alignment: .leading)
+                            .transition(.opacity)
+                        } else if let footer {
                             footerView(footer)
                                 // The lot's words share the card with the art: capped so they never
                                 // truncate or run into the house (VoiceOver reads the full words).
                                 .dynamicTypeSize(...DynamicTypeSize.large)
                                 .frame(width: columnWidth, alignment: .leading)
+                                .transition(.opacity)
                         } else {
                         Group {
                             if let status {
@@ -336,18 +372,31 @@ struct HouseHeroCard: View {
                                 .foregroundStyle(statusColor)
                                 .accessibilityIdentifier("today.hero.status")
                             }
-                            Text(progress.stage.spokenName)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(HouseTokens.onHeroPrimary)
-                                .lineLimit(2)
-                            if progress.nextStep != nil {
-                                Text(progress.nextMilestoneLabel)
+                            if isLookingBack {
+                                Text("Looking through your calendar")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(HouseTokens.onHeroPrimary)
+                                    .lineLimit(2)
+                                    .accessibilityIdentifier("today.hero.lookingBack")
+                                Text("Work we find waits in your Inbox")
                                     .font(.footnote)
                                     .foregroundStyle(HouseTokens.onHeroSecondary)
                                     .lineLimit(2)
+                            } else {
+                                Text(progress.stage.spokenName)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(HouseTokens.onHeroPrimary)
+                                    .lineLimit(2)
+                                if progress.nextStep != nil {
+                                    Text(progress.nextMilestoneLabel)
+                                        .font(.footnote)
+                                        .foregroundStyle(HouseTokens.onHeroSecondary)
+                                        .lineLimit(2)
+                                }
                             }
                         }
                         .frame(width: columnWidth, alignment: .leading)
+                        .transition(.opacity)
                         }
                     }
                     .padding(20)
@@ -359,7 +408,19 @@ struct HouseHeroCard: View {
         .frame(height: cardHeight)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: HouseTokens.blueprint.opacity(0.25), radius: 16, y: 8)
-        .onAppear { if shownHours == nil { shownHours = progress.hours } }
+        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .easeInOut(duration: HouseMotion.loadCrossfade), value: isLoading)
+        .onAppear { if shownHours == nil { shownHours = isLoading ? 0 : progress.hours } }
+        .onChange(of: isLoading) { _, loading in
+            if loading {
+                shownHours = 0
+            } else {
+                // The data landed: the house has crossfaded in; the number counts up to it.
+                shownHours = 0
+                DispatchQueue.main.asyncAfter(deadline: .now() + (reduceMotion ? 0 : HouseMotion.loadCrossfade * 0.5)) {
+                    countUp(over: HouseMotion.loadCountUp)
+                }
+            }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("house-hero-card")
     }
@@ -410,12 +471,12 @@ struct HouseHeroCard: View {
     }
 
     /// Whole-hour steps from the shown number to the new hours with a small spring pop.
-    private func countUp() {
+    private func countUp(over duration: Double = HouseMotion.countUpMax) {
         let from = shownHours ?? progress.hours
         let to = progress.hours
-        guard to > from, !reduceMotion else { shownHours = to; return }
+        guard to > from, !reduceMotion, animatesChanges else { shownHours = to; return }
         let steps = max(1, min(30, Int(to.rounded(.down)) - Int(from.rounded(.down))))
-        let stepTime = HouseMotion.countUpMax / Double(steps)
+        let stepTime = duration / Double(steps)
         Task { @MainActor in
             withAnimation(.spring(response: 0.18, dampingFraction: 0.5)) { pop = true }
             for i in 1...steps {

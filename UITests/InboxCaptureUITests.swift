@@ -104,7 +104,14 @@ final class InboxCaptureUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 2.0)
         shoot("whatsnew-calendar", scheme)
 
-        // 5. Backfill intro from the Inbox setup: results.
+        // 5. Backfill: streaming in the Inbox (held halfway), then the reveal and the list.
+        app.buttons["onb-primary"].tap()                       // Look at my calendar (fake allow, held scan)
+        XCTAssertTrue(app.buttons["onb-secondary"].waitForExistence(timeout: 5))
+        app.buttons["onb-secondary"].tap()                     // visit-end note: Not now → Today
+        app.buttons["tab.inbox"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["inbox.backfill.header"].waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 1.5)
+        shoot("backfill-scanning", scheme)
         launch(seed: "backfill", scheme: scheme, extra: ["-LHFakeCalendar", "granted"])
         let setup = app.buttons["inbox.empty.setup"]
         XCTAssertTrue(setup.waitForExistence(timeout: 20))
@@ -120,13 +127,8 @@ final class InboxCaptureUITests: XCTestCase {
             shoot("backfill-reveal", scheme)
             review.tap()
         }
-        XCTAssertTrue(app.staticTexts["backfill.headline"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.descendants(matching: .any)["inbox.backfillBanner"].waitForExistence(timeout: 20))
         shoot("backfill-results", scheme)
-        app.swipeUp()
-        app.swipeUp()
-        app.swipeUp()
-        XCTAssertTrue(app.buttons["backfill.showMore"].waitForExistence(timeout: 5))
-        shoot("backfill-results-showmore", scheme)
 
         // 6. Onboarding priming (new users).
         app.terminate()
