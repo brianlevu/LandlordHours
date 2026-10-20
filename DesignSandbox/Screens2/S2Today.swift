@@ -111,6 +111,8 @@ struct S2Today: View {
                         .background(Capsule().fill(LHB.actionSurface))
                         .contentTransition(.numericText(value: Double(pending)))
                     Spacer()
+                    // Second trailing slot, reserved for a batch action ("Log 5 likely"); empty for now.
+                    confirmAction
                     SeeAll()
                 }
             }
@@ -122,6 +124,8 @@ struct S2Today: View {
             }
         }
     }
+
+    @ViewBuilder private var confirmAction: some View { EmptyView() }
 
     private var confirmCard: some View {
         let shown = Array(items.prefix(3))
@@ -388,7 +392,7 @@ struct S2SuggestionRow: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 5) {
                 Image(systemName: s.symbol).font(.system(size: 11, weight: .semibold))
-                Text(s.source).lineLimit(dts.isAccessibilitySize ? 3 : 1)
+                Text(s.metaLine).lineLimit(dts.isAccessibilitySize ? 3 : 1)
             }
             .font(.subheadline).foregroundStyle(LHB.textSecondary)
             (s.place.map { Text("\(Text(s.title).fontWeight(.semibold)) at \(Text($0).fontWeight(.semibold))") } ?? Text(s.title).fontWeight(.semibold))
@@ -565,40 +569,53 @@ struct PaceCard: View {
 
 // MARK: - Timer card on Today (§3d draft card)
 
-struct TimerTodayCard: View {
-    var running: Bool
+/// One draft-card component (timer drafts today; receipt or contact drafts later): glyph, title,
+/// meta, a tinted primary action, an optional Discard and an optional "+N more".
+struct DraftCard<Title: View>: View {
+    var symbol: String
+    @ViewBuilder var title: () -> Title
+    var meta: String
+    var primary: String
+    var discard = true
+    var more: Int = 0
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: running ? "timer" : "clock.badge.checkmark")
+                Image(systemName: symbol)
                     .font(.system(size: 20, weight: .medium)).foregroundStyle(LHB.action)
                     .frame(width: 40, height: 40).background(Circle().fill(LHB.actionSurface))
                 VStack(alignment: .leading, spacing: 3) {
-                    if running {
-                        HStack(spacing: 0) {
-                            Text("Timer running · ").font(.headline)
-                            Text("0:42").font(.system(.headline, design: .rounded)).monospacedDigit()
-                        }
-                        .foregroundStyle(LHB.textPrimary)
-                        Text("Repairs at Pine Cabin · started 10:25").font(.subheadline).foregroundStyle(LHB.textSecondary)
-                    } else {
-                        Text("Timer ran 1h 12m at Pine Cabin").font(.headline).foregroundStyle(LHB.textPrimary)
-                        Text("Started 10:25. It stopped when you switched profiles at 11:40.")
-                            .font(.subheadline).foregroundStyle(LHB.textSecondary).fixedSize(horizontal: false, vertical: true)
-                    }
+                    title().foregroundStyle(LHB.textPrimary)
+                    Text(meta).font(.subheadline).foregroundStyle(LHB.textSecondary).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
             }
             HStack(spacing: 16) {
-                Button(running ? "Stop" : "Log 1h 12m") {}.buttonStyle(S2Tinted())
-                if !running {
-                    Button("Discard") {}.font(.subheadline).foregroundStyle(LHB.destructive)
-                    Spacer()
-                    Text("+1 more").font(.subheadline).foregroundStyle(LHB.textSecondary)
-                }
+                Button(primary) {}.buttonStyle(S2Tinted())
+                if discard { Button("Discard") {}.font(.subheadline).foregroundStyle(LHB.destructive) }
+                if more > 0 { Spacer(); Text("+\(more) more").font(.subheadline).foregroundStyle(LHB.textSecondary) }
             }
         }
         .padding(16)
         .s2Card()
+    }
+}
+
+/// The timer's two states, as DraftCard configurations.
+struct TimerTodayCard: View {
+    var running: Bool
+    var body: some View {
+        if running {
+            DraftCard(symbol: "timer", title: {
+                HStack(spacing: 0) {
+                    Text("Timer running · ").font(.headline)
+                    Text("0:42").font(.system(.headline, design: .rounded)).monospacedDigit()
+                }
+            }, meta: "Repairs at Pine Cabin · started 10:25", primary: "Stop", discard: false)
+        } else {
+            DraftCard(symbol: "clock.badge.checkmark", title: { Text("Timer ran 1h 12m at Pine Cabin").font(.headline) },
+                      meta: "Started 10:25. It stopped when you switched profiles at 11:40.", primary: "Log 1h 12m", more: 1)
+        }
     }
 }

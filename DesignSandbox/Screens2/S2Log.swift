@@ -3,7 +3,7 @@ import SwiftUI
 // §3 "+" Log time, voice, pickers and the timer.
 
 enum LogState: String {
-    case empty, quick, typed, filled, keyboard, invalid, voiceFirst, listening, voiceFilled, voiceDenied, voiceDemo, review
+    case empty, quick, notCounted, typed, filled, keyboard, invalid, voiceFirst, listening, voiceFilled, voiceDenied, voiceDemo, review
 }
 
 struct LogTimeSheet: View {
@@ -24,6 +24,8 @@ struct LogTimeSheet: View {
     @State private var flash = 0.0
     @State private var filledFromNote = false
     @State private var rememberedCat = false
+    /// What filled the fields: "your note" today; later "a receipt", "Mike's visit" (smart layer slot).
+    var fillSource: String = "your note"
     @State private var listening = false
     @State private var showPicker: PickerKind?
     @FocusState private var focused: Bool
@@ -42,7 +44,7 @@ struct LogTimeSheet: View {
                 if filledFromNote {
                     HStack(spacing: 4) {
                         Image(systemName: "sparkles").foregroundStyle(LHB.timberInk)
-                        Text("Filled from your note ·").foregroundStyle(LHB.textSecondary)
+                        Text("Filled from \(fillSource) ·").foregroundStyle(LHB.textSecondary)
                         Button("Undo") {}.foregroundStyle(LHB.action).fontWeight(.semibold)
                     }
                     .font(.footnote)
@@ -83,6 +85,8 @@ struct LogTimeSheet: View {
         switch state {
         case .quick:
             hours = 2
+        case .notCounted:
+            note = "Call with the lender about refinancing Pine Cabin"; cat = .financing; rememberedCat = false
         case .typed:
             note = sample
         case .filled, .voiceFilled:
@@ -250,6 +254,15 @@ struct LogTimeSheet: View {
                     }
                 }
                 .accessibilityIdentifier("log.category")
+            }
+            if let cat, !cat.counts {
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                    Text("\(cat.label) doesn’t count toward your hours or the house.")
+                }
+                .font(.footnote).foregroundStyle(LHB.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16).padding(.bottom, 10)
             }
             InsetDivider()
             valueRow("Date", flashOn: false) { Text("Today, Oct 19").foregroundStyle(LHB.textPrimary) }
@@ -453,19 +466,25 @@ struct CategoryPicker: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: 10) {
-                    S2Header("More")
+                    S2Header("Doesn’t count toward hours")
                     VStack(spacing: 0) {
                         ForEach(Array(S2Cat.more.enumerated()), id: \.element) { i, c in
                             HStack(spacing: 12) {
                                 ToolTile(cat: c, size: 36)
                                 Text(c.label).font(.body).foregroundStyle(LHB.textPrimary)
                                 Spacer()
+                                Text("Not counted").font(.footnote.weight(.semibold)).foregroundStyle(LHB.textSecondary)
+                                    .padding(.horizontal, 8).padding(.vertical, 3)
+                                    .background(Capsule().fill(LHB.tertiary))
                             }
                             .padding(.horizontal, 16).frame(minHeight: 60)
-                            if i < 3 { InsetDivider(leading: 64) }
+                            .accessibilityElement(children: .combine)
+                            if i < S2Cat.more.count - 1 { InsetDivider(leading: 64) }
                         }
                     }
                     .background(LHB.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    Text("Investor work. Log it for your records; it never counts toward the 750 or 500-hour tests or the house.")
+                        .font(.footnote).foregroundStyle(LHB.textSecondary).padding(.horizontal, 4)
                 }
             }
             .padding(20)

@@ -32,6 +32,11 @@ enum S2Data {
         var place: String?
         var badge: String? = nil
         var newPlace = false
+        /// A person the item came from (key contacts, later). nil today.
+        var person: String? = nil
+        /// The meta line: "{source} · {person} · {detail}". `source` already holds "Calendar · Today 12–2".
+        var metaLine: String { [source.components(separatedBy: " · ").first, person, source.components(separatedBy: " · ").dropFirst().joined(separator: " · ")]
+            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ") }
     }
 
     static let pending: [Suggestion] = [

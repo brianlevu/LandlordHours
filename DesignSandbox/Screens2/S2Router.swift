@@ -30,7 +30,7 @@ enum S2Route {
         // Log
         "log-empty", "log-typed", "log-filled", "log-keyboard", "log-invalid",
         "log-voice-first", "log-voice-listening", "log-voice-filled", "log-voice-denied", "log-voice-demo",
-        "log-picker-category", "log-picker-property", "log-picker-property-limit", "log-quick",
+        "log-picker-category", "log-picker-property", "log-picker-property-limit", "log-quick", "log-not-counted",
         // Timer
         "timer-idle", "timer-running", "timer-review",
         // Properties
@@ -147,6 +147,7 @@ struct S2Host: View {
         case "log-picker-property": LogTimeSheet(state: .filled, picker: .property)
         case "log-picker-property-limit": LogTimeSheet(state: .filled, picker: .property, limitPicker: true)
         case "log-quick": LogTimeSheet(state: .quick)
+        case "log-not-counted": LogTimeSheet(state: .notCounted)
         default: LogTimeSheet(state: .empty)
         }
     }

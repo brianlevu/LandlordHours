@@ -325,8 +325,27 @@ enum S2Cat: String, CaseIterable, Identifiable {
     case investing, financing, insurance, negotiation
     var id: String { rawValue }
 
-    static let grid: [S2Cat] = [.repairs, .renovations, .management, .leasing, .bookkeeping, .legal, .travel]
-    static let more: [S2Cat] = [.investing, .financing, .insurance, .negotiation]
+    /// Production's 11 ActivityCategory cases. The 8 that count toward the hour tests come first;
+    /// Investing, Financing and Contract Negotiation are investor work and never feed the house.
+    static let grid: [S2Cat] = [.repairs, .renovations, .management, .leasing, .bookkeeping, .legal, .travel, .insurance]
+    static let more: [S2Cat] = [.investing, .financing, .negotiation]
+    var counts: Bool { !S2Cat.more.contains(self) }
+    /// Production name (ActivityCategory.rawValue).
+    var fullName: String {
+        switch self {
+        case .repairs: "Repairs & Maintenance"
+        case .management: "Property Management"
+        case .leasing: "Leasing & Tenant Relations"
+        case .bookkeeping: "Bookkeeping & Financial"
+        case .legal: "Legal & Compliance"
+        case .insurance: "Insurance & Claims"
+        case .travel: "Travel to Property"
+        case .renovations: "Renovations & Improvements"
+        case .investing: "Investing Decisions"
+        case .financing: "Financing"
+        case .negotiation: "Contract Negotiation"
+        }
+    }
 
     var label: String {
         switch self {
@@ -839,8 +858,9 @@ struct UndoToast: View {
         }
         .padding(.horizontal, 18)
         .frame(minHeight: 48)
-        .background { if solid { Capsule().fill(LHB.card) } }
-        .glassEffect(solid ? .identity : .regular, in: Capsule())
+        .padding(.vertical, 6)
+        .background { if solid { RoundedRectangle(cornerRadius: 24, style: .continuous).fill(LHB.card) } }
+        .glassEffect(solid ? .identity : .regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }

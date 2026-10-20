@@ -183,7 +183,7 @@ struct S2PropertyRow: View {
         (ax ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))) {
             PropertySeal(p, size: 40)
             VStack(alignment: .leading, spacing: 3) {
-                Text(p.name).font(.body.weight(.semibold)).foregroundStyle(LHB.textPrimary).lineLimit(ax ? 5 : 2)
+                Text(p.name).font(.body.weight(.semibold)).foregroundStyle(LHB.textPrimary).lineLimit(ax ? 5 : (dts >= .xxLarge ? 4 : 2))
                     .allowsTightening(true)
                     .multilineTextAlignment(.leading)
                 Text("\(perPropertyGoal ? houseLine(p.hours) : "\(Int(p.hours))h this year") · \(p.kindMeta)").font(.subheadline).foregroundStyle(LHB.textSecondary)
