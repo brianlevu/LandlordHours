@@ -281,13 +281,28 @@ struct ContentView: View {
     // MARK: - Main Content with Tab Bar
     var mainContent: some View {
         ZStack(alignment: .bottom) {
-            selectedTabContent
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // WP-L: the export banner sits in its own row under the tab content (not over it), so
+            // the page ends above it and nothing is covered, scrolled or not.
+            VStack(spacing: 0) {
+                selectedTabContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if let banner = exportBanner {
+                    ExportReadyBanner(
+                        kind: banner,
+                        onOpen: { exportShare = exportJob.takeReadyForSharing() },
+                        onDismiss: { exportJob.dismissBanner() }
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                }
+            }
                 .safeAreaInset(edge: .bottom) {
                     if !isCustomTabBarHidden {
-                        // WP-L: room for the export banner too, so it never covers content.
+                        // With the banner showing, it takes the room the scroll content used to
+                        // fade under; the bar keeps its own space.
                         Color.clear
-                            .frame(height: AppSpacing.floatingTabBarReservedHeight + (exportBanner == nil ? 0 : Self.exportBannerReserve))
+                            .frame(height: exportBanner == nil ? AppSpacing.floatingTabBarReservedHeight : Self.tabBarHeight + 16)
                             .accessibilityHidden(true)
                     }
                 }
@@ -318,19 +333,6 @@ struct ContentView: View {
                     // Slides only: an opacity fade would let row text show through mid-transition.
                     .transition(reduceMotion ? .identity : .move(edge: .bottom))
                     .zIndex(5)
-            }
-
-            // WP-L: the export finished in the background while its sheet was closed.
-            if let banner = exportBanner {
-                ExportReadyBanner(
-                    kind: banner,
-                    onOpen: { exportShare = exportJob.takeReadyForSharing() },
-                    onDismiss: { exportJob.dismissBanner() }
-                )
-                .padding(.horizontal, 16)
-                .padding(.bottom, isCustomTabBarHidden ? 16 : Self.tabBarHeight + 8 + 12)
-                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-                .zIndex(6)
             }
 
             // Floating timer banner (visible on all tabs except Track)
@@ -429,8 +431,6 @@ struct ContentView: View {
             }
         }
     }
-
-    private static let exportBannerReserve: CGFloat = 72
 
     /// The export banner, hidden when the ready report no longer matches the records.
     private var exportBanner: ExportJob.Banner? {
