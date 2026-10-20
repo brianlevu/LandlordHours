@@ -203,7 +203,7 @@ struct DashboardView: View {
         guard isNewOwner else { return nil }
         if viewModel.properties.isEmpty { return .emptyLot(onAddProperty: { openAddPropertyFromHome() }) }
         // While the look-back runs, WP-L's "Looking through your calendar" words lead instead.
-        if !backfill.isScanning, foundInInbox.count > 0, foundInInbox.hours > 0 { return .found(hoursText: foundInInbox.hoursText) }
+        if !backfill.isScanning, foundInInbox.count > 0, foundInInbox.hasDisplayableHours { return .found(hoursText: foundInInbox.hoursText) }
         return nil
     }
 

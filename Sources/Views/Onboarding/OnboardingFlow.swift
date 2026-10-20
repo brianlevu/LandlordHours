@@ -125,14 +125,23 @@ struct OnbFound: Equatable {
     }
 
     var hoursText: String { OnbFormat.hours(hours) }
+
+    /// Whether the hours show as more than nothing ("5m", "1.5h"). The "found" moment is gated on
+    /// this, never on the raw sum, so a tiny total can't render "0h found".
+    var hasDisplayableHours: Bool { OnbFormat.isDisplayable(hours) }
 }
 
 enum OnbFormat {
-    /// "23h", "23.5h". Never rounds up past what the rows add to.
+    /// "23h", "23.5h"; under an hour in whole minutes ("5m", "45m"). Never rounds up past what
+    /// the rows add to.
     static func hours(_ h: Double) -> String {
+        if h < 1 { return "\(Int((h * 60).rounded(.down)))m" }
         let tenths = (h * 10).rounded(.down) / 10
         return tenths == tenths.rounded() ? "\(Int(tenths))h" : String(format: "%.1fh", tenths)
     }
+
+    /// At least one whole minute: what `hours(_:)` shows is not zero.
+    static func isDisplayable(_ h: Double) -> Bool { (h * 60).rounded(.down) >= 1 }
 
     static func suggestions(_ n: Int) -> String { n == 1 ? "1 suggestion" : "\(n) suggestions" }
 }
@@ -195,7 +204,7 @@ enum OnbStakedHeadline: Equatable {
         switch scan {
         case .finished:
             // "Nh found" only when the found work would count toward hours.
-            if found.count > 0 && found.hours > 0 { return .found(found) }
+            if found.count > 0 && found.hasDisplayableHours { return .found(found) }
             return found.count > 0 ? .nothingCountable(count: found.count) : .nothingFound
         case .running, .idle: return .lookingBack(found)
         case .blocked: return .plain

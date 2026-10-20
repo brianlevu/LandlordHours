@@ -239,4 +239,30 @@ final class OnboardingUITests: XCTestCase {
         tap(app.buttons["onb-today"])
         XCTAssertTrue(app.buttons["today-find-hours"].waitForExistence(timeout: 8), "Today keeps a way back to the calendar")
     }
+
+    // MARK: Only non-countable work found
+
+    func testOnlyNonCountableWorkFoundSaysSoInsteadOfHours() {
+        launchFresh(["-LHFakeCalendar", "granted", "-LHFakeNotifications", "granted", "-LHBackfillNonCountable"])
+        tap(app.buttons["onb-start"], timeout: 20)
+        tap(app.buttons["goal-750"])
+        tap(app.buttons["onb-primary"])                            // Build toward 750h
+        tap(app.buttons["onb-primary"])                            // Look at my calendar (fake allow)
+        tap(app.buttons["onb-primary"])                            // Who: Continue
+        let field = app.textFields["property-name"]
+        tap(field)
+        field.typeText("Oak")
+        tap(app.buttons["onb-primary"])                            // Save it
+        tap(app.buttons["onb-secondary"])                          // note: Not now
+        let line = app.staticTexts["staked-nothing-countable"]
+        XCTAssertTrue(line.waitForExistence(timeout: 10))
+        XCTAssertEqual(line.label.lowercased(), "we found 22 things, but none count toward your hours yet")
+        XCTAssertTrue(app.staticTexts["Your house is staked."].exists)
+        XCTAssertFalse(app.staticTexts["staked-found"].exists, "Never a found-hours headline")
+        XCTAssertEqual(app.buttons["onb-today"].label, "Review 22 suggestions", "They still wait in the Inbox")
+        tap(app.buttons["onb-today"])
+        tap(app.buttons["tab.today"])
+        XCTAssertFalse(app.staticTexts["today.hero.found"].waitForExistence(timeout: 3), "Today shows no found hours either")
+        XCTAssertFalse(app.buttons["backfill-review"].exists, "No reveal for work that never counts")
+    }
 }

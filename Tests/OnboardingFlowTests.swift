@@ -273,9 +273,34 @@ final class OnboardingFlowTests: XCTestCase {
     func testHoursTextNeverRoundsUp() {
         XCTAssertEqual(OnbFormat.hours(23), "23h")
         XCTAssertEqual(OnbFormat.hours(22.99), "22.9h")
-        XCTAssertEqual(OnbFormat.hours(0.25), "0.2h")
+        XCTAssertEqual(OnbFormat.hours(0.25), "15m")
+        XCTAssertEqual(OnbFormat.hours(1), "1h")
         XCTAssertEqual(OnbFormat.suggestions(1), "1 suggestion")
         XCTAssertEqual(OnbFormat.suggestions(14), "14 suggestions")
+    }
+
+    /// Probe: one 5-minute countable event must never render "0h found".
+    func testFiveMinuteEventNeverRendersZeroHoursFound() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let found = OnbFound.from([suggestion("call", hours: 5.0 / 60)], now: now)
+        XCTAssertEqual(found.hoursText, "5m")
+        let headline = OnbStakedHeadline.make(calendar: .allowed, scan: .finished, found: found)
+        XCTAssertEqual(headline, .found(found))
+        if case .found(let f) = headline {
+            XCTAssertEqual("\(f.hoursText) found", "5m found")
+            XCTAssertNotEqual("\(f.hoursText) found", "0h found")
+        }
+        // Under a minute shows nothing countable rather than "0m found" / "0h found".
+        let tiny = OnbFound(count: 1, hours: 0.5 / 60)
+        XCTAssertFalse(tiny.hasDisplayableHours)
+        XCTAssertEqual(OnbStakedHeadline.make(calendar: .allowed, scan: .finished, found: tiny), .nothingCountable(count: 1))
+        // Every value from 0 to 2h in 30-second steps: "found" never reads zero.
+        for halfMinutes in 0...240 {
+            let f = OnbFound(count: 1, hours: Double(halfMinutes) / 120)
+            if case .found(let shown) = OnbStakedHeadline.make(calendar: .allowed, scan: .finished, found: f) {
+                XCTAssertFalse(["0h", "0m", "0.0h"].contains(shown.hoursText), "\(f.hours)h rendered \(shown.hoursText)")
+            }
+        }
     }
 
     func testStakedHeadlineStates() {
