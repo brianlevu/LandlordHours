@@ -20,6 +20,11 @@ final class LogTimeUITests: XCTestCase {
 
     private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
+    /// Any element whose label contains `text`.
+    private func shows(_ text: String) -> Bool {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch.waitForExistence(timeout: 3)
+    }
+
     private func waitEnabled(_ element: XCUIElement, timeout: TimeInterval = 6) {
         expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: element)
         waitForExpectations(timeout: timeout)
@@ -38,8 +43,11 @@ final class LogTimeUITests: XCTestCase {
         note.typeText("Fixed the sink at Pine Cabin, 1 hour")
         let caption = element("log.fill.caption")
         XCTAssertTrue(caption.waitForExistence(timeout: 6), "the note fills the fields")
-        XCTAssertTrue(caption.label.contains("Filled from your note"), caption.label)
-        XCTAssertTrue(app.buttons["log.property"].label.contains("Pine Cabin"), app.buttons["log.property"].label)
+        XCTAssertTrue(shows("Filled from your note"), caption.label)
+        // The parser runs after each 600ms pause; wait for the read of the whole note.
+        let property = app.buttons["log.property"]
+        expectation(for: NSPredicate(format: "label CONTAINS %@", "Pine Cabin"), evaluatedWith: property)
+        waitForExpectations(timeout: 6)
         XCTAssertTrue(app.buttons["log.category"].label.contains("Repairs"), app.buttons["log.category"].label)
         let save = app.buttons["log.save"]
         XCTAssertEqual(save.label, "Log 1h")
@@ -117,7 +125,7 @@ final class LogTimeUITests: XCTestCase {
         todayStop.tap()
         let ran = element("log.timer.ran")
         XCTAssertTrue(ran.waitForExistence(timeout: 6))
-        XCTAssertTrue(ran.label.hasPrefix("Timer ran 1m"), ran.label)
+        XCTAssertTrue(shows("Timer ran 1m"), ran.label)
         XCTAssertEqual(app.buttons["log.save"].label, "Log 5m")
         app.buttons["log.save"].tap()
         XCTAssertTrue(element("shell.toast").waitForExistence(timeout: 5))
@@ -141,7 +149,7 @@ final class LogTimeUITests: XCTestCase {
         let primary = app.buttons["draft.primary"]
         XCTAssertTrue(primary.waitForExistence(timeout: 10))
         XCTAssertEqual(primary.label, "Log 1h 10m")
-        XCTAssertTrue(element("draft.summary").label.contains("Timer ran 1h 12m at Pine Cabin"), element("draft.summary").label)
+        XCTAssertTrue(shows("Timer ran 1h 12m at Pine Cabin"), element("draft.summary").label)
         primary.tap()
         XCTAssertTrue(app.staticTexts["Logged 1h 10m at Pine Cabin"].waitForExistence(timeout: 4))
         XCTAssertTrue(primary.waitForNonExistence(timeout: 3))
@@ -154,7 +162,7 @@ final class LogTimeUITests: XCTestCase {
         save.tap()
         let error = element("log.saveError")
         XCTAssertTrue(error.waitForExistence(timeout: 4))
-        XCTAssertTrue(error.label.contains("Couldn't save this"), error.label)
+        XCTAssertTrue(shows("Couldn't save this"), error.label)
         XCTAssertTrue(save.exists, "the sheet stays open with the note")
         XCTAssertFalse(element("shell.toast").exists)
         save.tap()   // the next try works
@@ -165,7 +173,7 @@ final class LogTimeUITests: XCTestCase {
         launch(seed: "four", extra: ["-LHOpenLog", "notCounted"])
         let line = element("log.notCounted")
         XCTAssertTrue(line.waitForExistence(timeout: 10))
-        XCTAssertTrue(line.label.contains("Financing doesn\u{2019}t count toward your hours or the house."), line.label)
+        XCTAssertTrue(shows("Financing doesn\u{2019}t count toward your hours or the house."), line.label)
         XCTAssertTrue(app.buttons["log.save"].isEnabled)
     }
 
@@ -209,7 +217,7 @@ final class LogTimeUITests: XCTestCase {
     }
 
     func testPlusRouteFromOtherSurfacesOpensTheSheet() {
-        launch(seed: "four", extra: ["-LHInitialTab", "2"])
+        launch(seed: "four", extra: [], tab: "2")
         XCTAssertTrue(app.buttons["log.close"].waitForExistence(timeout: 8), "the old Track tab index opens the sheet")
         app.buttons["log.close"].tap()
         XCTAssertTrue(app.buttons["tab.today"].isHittable)
@@ -266,11 +274,22 @@ final class LogTimeUITests: XCTestCase {
     }
 
     private func captureAll(scheme: String, size: String?) {
+        // One missing state must not cost the rest of the board.
+        continueAfterFailure = true
         for shot in shots {
             app.terminate()
             launch(seed: shot.seed, scheme: scheme, extra: shot.extra + sizeArgs(size))
             let target = element(shot.waitFor)
             XCTAssertTrue(target.waitForExistence(timeout: 15), "\(shot.name): \(shot.waitFor)")
+            if shot.name.hasPrefix("today-timer-") && shot.waitFor != "shell.toast" {
+                // The card sits under the hero: scroll it fully above the tab bar.
+                let bar = app.buttons["tab.today"]
+                var tries = 0
+                while target.frame.maxY > bar.frame.minY - 12 && tries < 4 {
+                    app.swipeUp(velocity: 300)
+                    tries += 1
+                }
+            }
             Thread.sleep(forTimeInterval: shot.settle)
             capture("\(shot.name)-\(scheme)\(size.map { "-\($0)" } ?? "")")
         }
@@ -278,12 +297,12 @@ final class LogTimeUITests: XCTestCase {
 
     // MARK: Helpers
 
-    private func launch(seed: String, scheme: String = "light", extra: [String]) {
+    private func launch(seed: String, scheme: String = "light", extra: [String], tab: String = "0") {
         app.launchArguments = [
             UITestIsolation.resetProfilesArgument,
             "-LHMockScenario", "occasional",
             "-LHPropertiesSeed", seed,
-            "-LHInitialTab", "0",
+            "-LHInitialTab", tab,
             "-LHColorScheme", scheme,
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US",

@@ -174,6 +174,7 @@ struct LogPropertyPicker: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var viewModel: AppViewModel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showPaywall = false
     @State private var pickTick = 0
 
@@ -251,7 +252,7 @@ struct LogPropertyPicker: View {
                         Text(property.address)
                             .font(.subheadline)
                             .foregroundStyle(colors.textSecondary)
-                            .lineLimit(1)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                     }
                 }
                 Spacer(minLength: 8)

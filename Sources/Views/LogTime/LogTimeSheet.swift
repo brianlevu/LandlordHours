@@ -37,7 +37,7 @@ struct LogTimeSheet: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @StateObject private var voice = VoiceEntryService.shared
+    @ObservedObject private var voice = VoiceEntryService.shared
     @ObservedObject private var taxProfile = TaxProfileManager.shared
 
     @State private var mode: Mode = .log
@@ -62,6 +62,8 @@ struct LogTimeSheet: View {
     /// DEBUG capture of the listening state (the simulator has no microphone input).
     @State private var debugListening = false
     private var isListening: Bool { voice.isRecording || debugListening }
+    /// Room under the live words for the "Listening… tap to stop" line.
+    @ScaledMetric(relativeTo: .footnote) private var listeningInset: CGFloat = 24
 
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     private var spouseTracking: Bool { taxProfile.spouseTracking }
@@ -109,7 +111,8 @@ struct LogTimeSheet: View {
                         onClose()
                         NotificationCenter.default.post(name: .switchToPropertiesAndOpenAddProperty, object: nil)
                     })
-                    .presentationDetents([.medium, .large])
+                    // At the free limit (the lock row) and at AX sizes the rows need the full height.
+                    .presentationDetents(isAX || !LogProGate.canAddProperty(viewModel) ? [.large] : [.medium, .large])
                 }
             }
             .environmentObject(viewModel)
@@ -294,7 +297,7 @@ struct LogTimeSheet: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
                 .padding(.trailing, 44)
-                .padding(.bottom, isListening ? 22 : 0)
+                .padding(.bottom, isListening ? listeningInset : 0)
                 .accessibilityLabel("Note")
                 .accessibilityHint(notePlaceholder)
                 .accessibilityIdentifier("log.note")
@@ -311,7 +314,9 @@ struct LogTimeSheet: View {
                 Text("Listening\u{2026} tap to stop")
                     .font(.footnote)
                     .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.leading, 16)
+                    .padding(.trailing, 56)
                     .padding(.bottom, 14)
                     .accessibilityIdentifier("log.listening")
             }
@@ -818,11 +823,10 @@ struct LogTimeSheet: View {
     // MARK: Note reading
 
     private func noteChanged(_ text: String) {
-        saveError = nil
         guard mode == .log else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { usedVoice = false }
-        guard !voice.isRecording else { return }
+        guard !isListening else { return }
         readNote(delay: 0.6, source: usedVoice ? .voice : .note)
     }
 
@@ -897,6 +901,7 @@ struct LogTimeSheet: View {
     private func save() {
         guard form.canLog(properties: properties), let propertyId = form.propertyId, let category = form.category, !isSaving else { return }
         isSaving = true
+        saveError = nil
         defer { isSaving = false }
         noteFocused = false
         let participant = form.participantToSave(spouseTracking: spouseTracking)
@@ -1090,6 +1095,8 @@ struct LogWhoPicker: View {
                 } label: {
                     Text(option == .spouse ? "Spouse" : "Me")
                         .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .fixedSize()
                         .foregroundStyle(selected ? colors.onAction : colors.textPrimary)
                         .padding(.horizontal, 16)
                         .frame(minWidth: 64, minHeight: 36)
@@ -1105,6 +1112,7 @@ struct LogWhoPicker: View {
         .padding(3)
         .background(Capsule().fill(colors.backgroundTertiary))
         .overlay(Capsule().strokeBorder(colors.border, lineWidth: 1))
+        .fixedSize()
         .accessibilityElement(children: .contain)
     }
 }
@@ -1126,6 +1134,7 @@ struct LogMicLevelRing: View {
 
 /// The Live Activity layout at full size, on theme-fixed blueprint. No dial, ring or pulse.
 struct LiveTimerCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let property: RentalProperty?
     let properties: [RentalProperty]
     let category: ActivityCategory
@@ -1146,13 +1155,16 @@ struct LiveTimerCard: View {
                         .foregroundStyle(OnBlueprint.primary)
                         .lineLimit(2)
                     Spacer(minLength: 8)
+                    if !dynamicTypeSize.isAccessibilitySize {
                     Text("LandlordHours")
                         .font(.caption2.monospaced().weight(.medium))
                         .textCase(.uppercase)
                         .tracking(1.5)
                         .foregroundStyle(HouseTokens.drafting)
                         .lineLimit(1)
+                        .fixedSize()
                         .accessibilityHidden(true)
+                    }
                 }
                 Text(LogTimeFormat.clock(elapsed))
                     .font(.system(size: 64, weight: .bold, design: .rounded))

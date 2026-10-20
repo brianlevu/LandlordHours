@@ -305,7 +305,7 @@ final class LogTimerTests: CaptureTestCase {
     func testReviewHoursRules() {
         XCTAssertEqual(TimerReviewMath.reviewHours(elapsed: 30), 0, "under a minute isn't logged")
         XCTAssertEqual(TimerReviewMath.reviewHours(elapsed: 90), 5.0 / 60, accuracy: 0.0001, "at least 5 minutes once it ran a minute")
-        XCTAssertEqual(TimerReviewMath.reviewHours(elapsed: 3600 + 12 * 60), 1.2, accuracy: 0.0001)
+        XCTAssertEqual(TimerReviewMath.reviewHours(elapsed: 3600 + 12 * 60), 70.0 / 60, accuracy: 0.0001, "1h 12m → 1h 10m")
         XCTAssertEqual(TimerReviewMath.reviewHours(elapsed: 30 * 3600), 24, "capped at a day")
         XCTAssertTrue(TimerReviewMath.wasCapped(elapsed: 30 * 3600))
         XCTAssertEqual(TimerReviewMath.ranCaption(elapsed: 20), "Timer ran under a minute")

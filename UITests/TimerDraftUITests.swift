@@ -32,12 +32,24 @@ final class TimerDraftUITests: XCTestCase {
 
     private var summary: XCUIElement { app.descendants(matching: .any)["draft.summary"].firstMatch }
 
+    /// Any element whose label contains `text` (combined rows read as one element).
+    /// The card sits under the hero; bring it on screen like a person would.
+    private func reveal(_ element: XCUIElement) {
+        var tries = 0
+        while !element.isHittable && tries < 3 { app.swipeUp(velocity: .slow); tries += 1 }
+    }
+
+    private func shows(_ text: String) -> Bool {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch.waitForExistence(timeout: 3)
+    }
+
     func testShortDraftLogsInOneTapAndDiscardIsSeparate() {
         launch("pausedShort")
         XCTAssertTrue(summary.waitForExistence(timeout: 12))
-        XCTAssertTrue(summary.label.contains("stopped when you switched profiles"), summary.label)
+        XCTAssertTrue(shows("stopped when you switched profiles"), summary.label)
         let log = app.buttons["draft.primary"]
         let discard = app.buttons["draft.discard"]
+        reveal(discard)
         XCTAssertTrue(log.isHittable)
         XCTAssertTrue(discard.isHittable)
         XCTAssertEqual(log.label, "Log 2m")
@@ -49,9 +61,10 @@ final class TimerDraftUITests: XCTestCase {
     func testDeletedPropertyAsksWhereItGoes() {
         launch("deletedProperty")
         XCTAssertTrue(summary.waitForExistence(timeout: 12))
-        XCTAssertTrue(summary.label.contains("pick where it goes"), summary.label)
+        XCTAssertTrue(shows("pick where it goes"), summary.label)
         let review = app.buttons["draft.primary"]
         XCTAssertEqual(review.label, "Review")
+        reveal(review)
         review.tap()
         let save = app.buttons["log.save"]
         XCTAssertTrue(save.waitForExistence(timeout: 6))
@@ -62,7 +75,8 @@ final class TimerDraftUITests: XCTestCase {
     func testNoPropertiesShowsTheRunTimeAndDiscard() {
         launch("noProperties")
         XCTAssertTrue(summary.waitForExistence(timeout: 12))
-        XCTAssertTrue(summary.label.contains("Timer ran 45 min"), summary.label)
+        XCTAssertTrue(shows("Timer ran 45 min"), summary.label)
+        reveal(app.buttons["draft.discard"])
         XCTAssertTrue(app.buttons["draft.discard"].isHittable)
         app.buttons["draft.discard"].tap()
         XCTAssertTrue(summary.waitForNonExistence(timeout: 5))
@@ -71,19 +85,20 @@ final class TimerDraftUITests: XCTestCase {
     func testCappedDraftOffersReviewNotOneTapLog() {
         launch("forgotten24h")
         XCTAssertTrue(summary.waitForExistence(timeout: 12))
-        XCTAssertTrue(summary.label.contains("We stopped counting at 24h"), summary.label)
+        XCTAssertTrue(shows("We stopped counting at 24h"), summary.label)
         let review = app.buttons["draft.primary"]
         XCTAssertEqual(review.label, "Review", "No one-tap log for a capped draft")
+        reveal(review)
         review.tap()
         let ran = app.descendants(matching: .any)["log.timer.ran"]
         XCTAssertTrue(ran.waitForExistence(timeout: 6))
-        XCTAssertTrue(ran.label.contains("We stopped counting at 24h"), ran.label)
+        XCTAssertTrue(shows("We stopped counting at 24h"), ran.label)
         XCTAssertTrue(app.buttons["log.save"].isEnabled)
     }
 
     func testTwoDraftsSayThereIsMore() {
         launch("twoPending")
         XCTAssertTrue(summary.waitForExistence(timeout: 12))
-        XCTAssertTrue(summary.label.contains("+1 more"), summary.label)
+        XCTAssertTrue(shows("+1 more"), summary.label)
     }
 }
