@@ -89,10 +89,10 @@ extension AppViewModel {
         PropertyLimit.isAtLimit(isPro: SubscriptionManager.shared.isPro, propertyCount: properties.count)
     }
 
-    /// True when the MP 500/100 test is measured per rental (no grouping election), so each row
-    /// can say "212h of 500h".
+    /// True for a material participation goal without a grouping election: each row can say
+    /// "212h of 500h".
     var propertyGoalIsPerProperty: Bool {
-        houseGoal != .reps750 && !TaxProfileManager.shared.groupingElection
+        PropertyMeta.isPerPropertyTest(goal: houseGoal, groupingElection: TaxProfileManager.shared.groupingElection)
     }
 }
 
@@ -115,22 +115,37 @@ struct PropertyFigures {
 
 // MARK: - The mini-house stage
 
-/// The property mini-house uses Today's one absolute scale (HouseProgress): slab at 100h,
-/// roof at 500h, finished above 750h, floor rule throughout.
+/// The property mini-house is pinned to the 500h line (owner decision, 2026-10-19): a rental's
+/// own house is complete with the roof on at 500h and never goes past it. Below that it uses
+/// Today's floor-rule keyframes (slab at 100h, framing between).
 enum PropertyHouseStage {
-    static func keyframe(for hours: Double) -> HouseKeyframe { HouseProgress.keyframe(for: hours) }
-    static func stage(for hours: Double) -> HouseStage { HouseProgress(hours: hours, goal: .reps750).stage }
+    static let completeHours: Double = 500
+
+    static func keyframe(for hours: Double) -> HouseKeyframe {
+        let h = hours.isFinite ? max(0, hours) : 0
+        return HouseProgress.keyframe(for: min(h, completeHours))
+    }
+
+    static func stage(for hours: Double) -> HouseStage {
+        let h = hours.isFinite ? max(0, hours) : 0
+        return HouseProgress(hours: min(h, completeHours), goal: .reps750).stage
+    }
 }
 
 enum PropertyMeta {
-    /// "212h this year", or for a per-property MP goal "212h of 500h" / "520h · roof’s on".
+    /// "212h this year". Only for a material participation goal WITHOUT a grouping election (the
+    /// 500h test then runs per rental): "212h of 500h", past the line "520h · roof’s on".
     /// Whole hours, rounded down so a row never runs ahead of the records.
-    static func hoursLine(_ hours: Double, goal: HouseGoal, perPropertyGoal: Bool) -> String {
+    static func hoursLine(_ hours: Double, goal: HouseGoal, groupingElection: Bool) -> String {
         let whole = Int(max(0, hours.isFinite ? hours : 0).rounded(.down))
-        guard perPropertyGoal, goal != .reps750 else { return "\(whole)h this year" }
-        let target = Int(goal.targetHours)
-        if hours < goal.targetHours { return "\(whole)h of \(target)h" }
-        return goal == .mp500 ? "\(whole)h · roof’s on" : "\(whole)h · past \(target)h"
+        guard isPerPropertyTest(goal: goal, groupingElection: groupingElection) else { return "\(whole)h this year" }
+        let target = Int(PropertyHouseStage.completeHours)
+        return hours < PropertyHouseStage.completeHours ? "\(whole)h of \(target)h" : "\(whole)h · roof’s on"
+    }
+
+    /// The per-rental 500h wording applies only to material participation without grouping.
+    static func isPerPropertyTest(goal: HouseGoal, groupingElection: Bool) -> Bool {
+        goal != .reps750 && !groupingElection
     }
 
     /// "Long stays" / "A few nights" (never LTR/STR).

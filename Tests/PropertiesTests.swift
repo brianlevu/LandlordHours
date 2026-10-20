@@ -97,6 +97,18 @@ final class PropertyCountableHoursTests: CaptureTestCase {
         XCTAssertEqual(vm.propertyCountableHours(oak), 15, accuracy: 0.001)
     }
 
+    func testPerRentalWordingFollowsTheGoalAndTheGroupingElection() {
+        let (vm, _, _) = twoProperties()
+        GoalManager.shared.globalGoalType = .str
+        TaxProfileManager.shared.groupingElection = false
+        XCTAssertTrue(vm.propertyGoalIsPerProperty)
+        TaxProfileManager.shared.groupingElection = true
+        XCTAssertFalse(vm.propertyGoalIsPerProperty)
+        GoalManager.shared.globalGoalType = .reps
+        TaxProfileManager.shared.groupingElection = false
+        XCTAssertFalse(vm.propertyGoalIsPerProperty)
+    }
+
     func testOtherYearsNeverCount() {
         let (vm, oak, _) = twoProperties()
         let lastYear = Calendar.current.date(byAdding: .year, value: -1, to: Date())!
@@ -143,38 +155,46 @@ final class PropertyCountableHoursTests: CaptureTestCase {
 // MARK: - The mini-house stage (same mapping as Today)
 
 final class PropertyHouseStageTests: XCTestCase {
-    func testBoundaries() {
+    func testBoundariesOnThe500hLadder() {
         XCTAssertEqual(PropertyHouseStage.keyframe(for: 0), .k00_lot)
         XCTAssertEqual(PropertyHouseStage.keyframe(for: 99), .k00_lot)
         XCTAssertEqual(PropertyHouseStage.keyframe(for: 100), .k01_slab, "slab at 100")
         XCTAssertEqual(PropertyHouseStage.keyframe(for: 499), .k10_frame090)
-        XCTAssertEqual(PropertyHouseStage.keyframe(for: 500), .k12_roof, "roof at 500")
-        XCTAssertEqual(PropertyHouseStage.keyframe(for: 750), .k17_siding100)
-        XCTAssertEqual(PropertyHouseStage.keyframe(for: 751), .k18_finished, "finished above 750")
+        XCTAssertEqual(PropertyHouseStage.keyframe(for: 500), .k12_roof, "complete with the roof on at 500")
+        XCTAssertEqual(PropertyHouseStage.keyframe(for: 501), .k12_roof, "never past the roof")
+        XCTAssertEqual(PropertyHouseStage.keyframe(for: 900), .k12_roof)
 
         XCTAssertEqual(PropertyHouseStage.stage(for: 0), .emptyLot)
         XCTAssertEqual(PropertyHouseStage.stage(for: 99), .groundwork)
         XCTAssertEqual(PropertyHouseStage.stage(for: 100), .slab)
         XCTAssertEqual(PropertyHouseStage.stage(for: 499), .framing)
         XCTAssertEqual(PropertyHouseStage.stage(for: 500), .roofed)
-        XCTAssertEqual(PropertyHouseStage.stage(for: 750), .siding)
-        XCTAssertEqual(PropertyHouseStage.stage(for: 751), .finished)
+        XCTAssertEqual(PropertyHouseStage.stage(for: 501), .roofed)
     }
 
-    func testMatchesTodaysMappingEverywhere() {
-        for h in stride(from: 0.0, through: 900, by: 0.5) {
+    func testBelow500ItMatchesTodaysKeyframes() {
+        for h in stride(from: 0.0, through: 500, by: 0.5) {
             XCTAssertEqual(PropertyHouseStage.keyframe(for: h), HouseProgress.keyframe(for: h), "\(h)h")
-            XCTAssertEqual(PropertyHouseStage.stage(for: h), HouseProgress(hours: h, goal: .reps750).stage, "\(h)h")
         }
         XCTAssertEqual(PropertyHouseStage.keyframe(for: -5), .k00_lot)
         XCTAssertEqual(PropertyHouseStage.keyframe(for: .nan), .k00_lot)
     }
 
-    func testPerPropertyGoalLine() {
-        XCTAssertEqual(PropertyMeta.hoursLine(212, goal: .mp500, perPropertyGoal: true), "212h of 500h")
-        XCTAssertEqual(PropertyMeta.hoursLine(520, goal: .mp500, perPropertyGoal: true), "520h · roof’s on")
-        XCTAssertEqual(PropertyMeta.hoursLine(80, goal: .mp100, perPropertyGoal: true), "80h of 100h")
-        XCTAssertEqual(PropertyMeta.hoursLine(212.9, goal: .reps750, perPropertyGoal: false), "212h this year", "never rounds up")
+    func testWordingPerGoalAndGrouping() {
+        // Material participation, no grouping election: the 500h test runs per rental.
+        for goal in [HouseGoal.mp500, .mp100] {
+            XCTAssertEqual(PropertyMeta.hoursLine(212, goal: goal, groupingElection: false), "212h of 500h")
+            XCTAssertEqual(PropertyMeta.hoursLine(499.9, goal: goal, groupingElection: false), "499h of 500h")
+            XCTAssertEqual(PropertyMeta.hoursLine(520, goal: goal, groupingElection: false), "520h · roof’s on")
+            // With a grouping election there is no per-rental test.
+            XCTAssertEqual(PropertyMeta.hoursLine(212, goal: goal, groupingElection: true), "212h this year")
+        }
+        // REPS never claims a per-property 500h test.
+        XCTAssertEqual(PropertyMeta.hoursLine(212.9, goal: .reps750, groupingElection: false), "212h this year", "never rounds up")
+        XCTAssertEqual(PropertyMeta.hoursLine(520, goal: .reps750, groupingElection: true), "520h this year")
+        XCTAssertTrue(PropertyMeta.isPerPropertyTest(goal: .mp500, groupingElection: false))
+        XCTAssertFalse(PropertyMeta.isPerPropertyTest(goal: .mp500, groupingElection: true))
+        XCTAssertFalse(PropertyMeta.isPerPropertyTest(goal: .reps750, groupingElection: false))
     }
 }
 

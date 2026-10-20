@@ -194,7 +194,7 @@ struct PropertiesView: View {
     }
 
     private var infoNote: some View {
-        Label("Each house builds like the one on Today: the slab at 100h, the roof at 500h, done after 750h.", systemImage: "info.circle")
+        Label("Each house shows that rental’s own hours: the slab at 100h, then the frame, and the roof on at 500h.", systemImage: "info.circle")
             .font(.subheadline)
             .foregroundStyle(colors.textSecondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -399,7 +399,7 @@ struct PropertyRow: View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
         let ax = dynamicTypeSize.isAccessibilitySize
         let kind = PropertyMeta.kindLabel(property.propertyType)
-        let line = PropertyMeta.hoursLine(hours, goal: goal, perPropertyGoal: perPropertyGoal)
+        let line = PropertyMeta.hoursLine(hours, goal: goal, groupingElection: !perPropertyGoal)
         (ax ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))) {
             PropertySeal(property, in: allProperties, size: 40)
             VStack(alignment: .leading, spacing: 3) {
