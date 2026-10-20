@@ -118,12 +118,14 @@ struct ClassifierChain: CaptureClassifier {
     /// `perItemBudget` seconds; past that the item keeps its rules result. Throws
     /// `CancellationError` when the calling task is cancelled, after in-flight items stop.
     /// `progress` is called from a background task after each item; hop to the main actor
-    /// before touching UI. Results are in input order.
+    /// before touching UI. Results are in input order. `onResult` (WP-L streaming) gets each
+    /// item's index and outcome as soon as it is classified, just before its progress call.
     func classifyBatch(
         _ candidates: [CaptureCandidate],
         properties: [RentalProperty],
         maxConcurrent: Int = 2,
         perItemBudget: TimeInterval = 4,
+        onResult: @escaping @Sendable (_ index: Int, _ outcome: ClassifierOutcome) -> Void = { _, _ in },
         progress: @escaping @Sendable (ClassifierBatchProgress) -> Void = { _ in }
     ) async throws -> [ClassifierOutcome] {
         let total = candidates.count
@@ -151,6 +153,7 @@ struct ClassifierChain: CaptureClassifier {
             while let (index, result) = try await group.next() {
                 results[index] = result
                 completed += 1
+                onResult(index, result)
                 progress(ClassifierBatchProgress(completed: completed, total: total))
                 try Task.checkCancellation()
                 addNext()

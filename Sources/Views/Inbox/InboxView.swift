@@ -12,12 +12,14 @@ struct InboxView: View {
     @State private var setupStartsAtBackfill = false
     @State private var logTick = 0
     @State private var dismissTick = 0
+    /// WP-L: the background 90-day look-back (header + streaming rows).
+    @ObservedObject private var backfill = BackfillJob.shared
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-                if model.visible.isEmpty {
+                if BackfillJob.showsEmptyState(visibleIsEmpty: model.visible.isEmpty, phase: backfill.phase) {
                     emptyState
                 } else {
                     list
@@ -43,7 +45,8 @@ struct InboxView: View {
             if phase == .active { model.reload() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .captureSuggestionsDidChange)) { _ in
-            model.reload()
+            // Streamed backfill items slide in softly.
+            model.reload(animated: true)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("inbox.screen")
@@ -58,7 +61,14 @@ struct InboxView: View {
                     .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 4, trailing: 20))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
-                if model.backfillCount > 0 {
+                if showsBackfillHeader {
+                    BackfillProgressHeader(job: backfill, found: model.backfillCount, onRetry: runBackfillAgain)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .transition(.opacity)
+                }
+                if model.backfillCount > 0 && !backfill.isScanning {
                     backfillBanner
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                         .listRowBackground(Color.clear)
@@ -86,6 +96,14 @@ struct InboxView: View {
         .contentMargins(.bottom, 96, for: .scrollContent)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("inbox.list")
+    }
+
+    private var showsBackfillHeader: Bool { BackfillJob.showsHeader(backfill.phase) }
+
+    /// Runs the look-back again in the background (after a stop, or when it never finished).
+    private func runBackfillAgain() {
+        guard let store = AppModelHost.shared.suggestionStore else { return }
+        BackfillJob.shared.start(CaptureSetupEnvironment.current.makeScanner(viewModel, store))
     }
 
     private var titleRow: some View {
@@ -179,6 +197,7 @@ struct InboxView: View {
             Spacer(minLength: 0)
         }
         .padding(16)
+        .frame(minHeight: BackfillProgressHeader.cardMinHeight)
         .background(InboxBlueprintPaper())
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("inbox.backfillBanner")
@@ -218,8 +237,7 @@ struct InboxView: View {
                     } else if !CaptureOptIn.backfillCompleted() {
                         // A cancelled or unfinished look-back can run again.
                         Button("Look back 90 days") {
-                            setupStartsAtBackfill = true
-                            showSetup = true
+                            runBackfillAgain()
                         }
                         .buttonStyle(InboxPrimaryButtonStyle())
                         .padding(.top, 12)

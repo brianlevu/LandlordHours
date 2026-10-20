@@ -59,20 +59,6 @@ final class InboxLogicTests: CaptureTestCase {
         XCTAssertEqual(ranked.map(\.title), ["top", "newer", "older", "flagged", "low"])
     }
 
-    func testBackfillShowsTopFifteenThenShowMore() {
-        let items = (0..<20).map { s("b\($0)", start: date(2026, 9, 1 + $0), confidence: Double($0) / 20, backfill: true) }
-            + [s("live", start: date(2026, 10, 15), confidence: 1)]
-        let model = BackfillIntroModel()
-        let preview = model.items(from: items)
-        XCTAssertEqual(preview.count, 15)
-        XCTAssertEqual(preview.first?.title, "b19", "Most confident first; live items are not backfill")
-        XCTAssertFalse(preview.contains { $0.title == "live" })
-        XCTAssertEqual(model.hiddenCount(from: items), 5)
-        model.showAll = true
-        XCTAssertEqual(model.items(from: items).count, 20)
-        XCTAssertEqual(model.hiddenCount(from: items), 0)
-    }
-
     func testBadges() {
         XCTAssertEqual(InboxLogic.badges(for: s("a", start: now, confidence: 0.6)),
                        SuggestionBadges(notSure: false, mightAlreadyBeLogged: false, needsHours: false))
@@ -377,68 +363,10 @@ final class CaptureOptInTests: CaptureTestCase {
     }
 }
 
-// MARK: - Backfill intro
-
-private struct FakeBackfillScanner: BackfillScanning {
-    var access: CalendarAccess = .fullAccess
-    var found = 3
-    var cancelled = false
-    func scan(progress: @escaping @Sendable (ClassifierBatchProgress) -> Void) async -> BackfillScanOutcome {
-        for i in 1...4 { progress(ClassifierBatchProgress(completed: i, total: 4)) }
-        return BackfillScanOutcome(access: access, foundCount: found, cancelled: cancelled)
-    }
-}
-
-/// Runs until cancelled (like a long 90-day scan).
-private struct SlowBackfillScanner: BackfillScanning {
-    func scan(progress: @escaping @Sendable (ClassifierBatchProgress) -> Void) async -> BackfillScanOutcome {
-        for _ in 0..<200 {
-            if Task.isCancelled { return BackfillScanOutcome(access: .fullAccess, foundCount: 0, cancelled: true) }
-            try? await Task.sleep(nanoseconds: 20_000_000)
-        }
-        return BackfillScanOutcome(access: .fullAccess, foundCount: 5)
-    }
-}
+// MARK: - Backfill scan (coordinator, streaming)
 
 @MainActor
-final class BackfillIntroTests: CalendarCaptureTestCase {
-    func testRunEndsInResultsAndMarksBackfillDone() async {
-        let model = BackfillIntroModel()
-        await model.run(FakeBackfillScanner(), revealAvailable: false)
-        XCTAssertEqual(model.phase, .results)
-        XCTAssertEqual(model.foundCount, 3)
-        XCTAssertTrue(CaptureOptIn.backfillCompleted())
-    }
-
-    func testRevealShowsFirstWhenWPHHookIsInstalled() async {
-        let model = BackfillIntroModel()
-        await model.run(FakeBackfillScanner(), revealAvailable: true)
-        XCTAssertEqual(model.phase, .reveal)
-        model.finishReveal()
-        XCTAssertEqual(model.phase, .results)
-        let empty = BackfillIntroModel()
-        await empty.run(FakeBackfillScanner(found: 0), revealAvailable: true)
-        XCTAssertEqual(empty.phase, .results, "Nothing found: no reveal")
-    }
-
-    func testCancelledScanIsNotMarkedComplete() async {
-        let model = BackfillIntroModel()
-        await model.run(FakeBackfillScanner(cancelled: true), revealAvailable: false)
-        XCTAssertEqual(model.phase, .cancelled)
-        XCTAssertFalse(CaptureOptIn.backfillCompleted(), "A cancelled look-back can run again")
-    }
-
-    func testCancelButtonStopsAScanInFlight() async {
-        let model = BackfillIntroModel()
-        let finished = expectation(description: "scan task ended")
-        model.start(SlowBackfillScanner(), revealAvailable: false) { finished.fulfill() }
-        try? await Task.sleep(nanoseconds: 50_000_000)
-        model.cancel()
-        await fulfillment(of: [finished], timeout: 5)
-        XCTAssertEqual(model.phase, .cancelled)
-        XCTAssertFalse(CaptureOptIn.backfillCompleted())
-    }
-
+final class BackfillCoordinatorStreamingTests: CalendarCaptureTestCase {
     func testCoordinatorReportsCancelledAndIngestsNothing() async {
         let (app, _) = makeViewModel()
         let store = makeStore()
@@ -453,38 +381,56 @@ final class BackfillIntroTests: CalendarCaptureTestCase {
         let result = await task.value
         XCTAssertTrue(result.cancelled)
         XCTAssertTrue(result.added.isEmpty)
-        XCTAssertTrue(store.suggestions.isEmpty, "Nothing ingested from a cancelled scan")
+        XCTAssertTrue(store.suggestions.isEmpty, "Nothing ingested from a scan cancelled before it began")
     }
 
-    func testDeniedCalendarIsBlocked() async {
-        let model = BackfillIntroModel()
-        await model.run(FakeBackfillScanner(access: .denied), revealAvailable: false)
-        XCTAssertEqual(model.phase, .blocked(.denied))
-        XCTAssertFalse(CaptureOptIn.backfillCompleted())
-    }
-
-    func testBatchedBackfillUsesTheChainAndKeepsNotSureItems() async {
+    func testBatchedBackfillStreamsEachItemIntoTheStoreAndKeepsNotSureItems() async {
         let (app, oak) = makeViewModel()
         let store = makeStore()
         let source = FakeCalendarSource(events: [
             event("PLUMB", start: date(2026, 5, 10, 9), hours: 2, title: "Plumber at Oak"),
             event("DENT", start: date(2026, 5, 11, 9), hours: 1, title: "Dentist"),
+            event("SHOW", start: date(2026, 5, 12, 9), hours: 1, title: "Showing - Oak St"),
         ])
         let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: UnavailableOnDeviceBackend(reason: .osTooOld)))
         let counter = ProgressCounter()
+        var streamed: [[String]] = []
+        var storeCountAtEachIngest: [Int] = []
         let result = await makeCoordinator(source, store: store).scanBackfillBatched(
-            chain: chain, properties: app.properties, entries: app.timeEntries
-        ) { counter.record($0) }
+            chain: chain, properties: app.properties, entries: app.timeEntries,
+            progress: { counter.record($0) },
+            onIngest: { items in
+                streamed.append(items.map(\.title))
+                storeCountAtEachIngest.append(store.pending.count)
+            }
+        )
         XCTAssertEqual(result.access, .fullAccess)
+        XCTAssertFalse(result.cancelled)
         let keys = store.pending.map(\.title)
         XCTAssertTrue(keys.contains("Plumber at Oak"))
         XCTAssertFalse(keys.contains("Dentist"), "No landlord signal: not suggested")
+        XCTAssertEqual(streamed.count, result.added.count, "One ingest per suggested item")
+        XCTAssertTrue(streamed.allSatisfy { $0.count == 1 })
+        XCTAssertEqual(storeCountAtEachIngest, Array(1...streamed.count), "Each item is in the store when it streams")
         let plumber = store.pending.first { $0.title == "Plumber at Oak" }!
         XCTAssertTrue(plumber.isBackfill)
         XCTAssertEqual(plumber.hoursBasis, .scheduled)
         XCTAssertEqual(plumber.proposedHours, 2)
         XCTAssertEqual(plumber.proposedPropertyId, oak)
-        XCTAssertEqual(counter.last, ClassifierBatchProgress(completed: 2, total: 2))
+        XCTAssertEqual(counter.last, ClassifierBatchProgress(completed: 3, total: 3))
+    }
+
+    func testRescanUpdatesStreamedItemsInPlace() async {
+        let (app, _) = makeViewModel()
+        let store = makeStore()
+        let source = FakeCalendarSource(events: [
+            event("PLUMB", start: date(2026, 5, 10, 9), hours: 2, title: "Plumber at Oak"),
+        ])
+        let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: UnavailableOnDeviceBackend(reason: .osTooOld)))
+        _ = await makeCoordinator(source, store: store).scanBackfillBatched(chain: chain, properties: app.properties, entries: app.timeEntries)
+        let again = await makeCoordinator(source, store: store).scanBackfillBatched(chain: chain, properties: app.properties, entries: app.timeEntries)
+        XCTAssertTrue(again.added.isEmpty, "A retry never duplicates what already streamed")
+        XCTAssertEqual(store.pending.count, 1)
     }
 }
 

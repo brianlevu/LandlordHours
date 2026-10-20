@@ -37,7 +37,8 @@ struct CalendarScanResult: Equatable {
     var added: [Suggestion]
     var skipped: CalendarSkipCounts
     /// The scan stopped before finishing (the user cancelled the backfill, or the task was
-    /// cancelled). Nothing from it was ingested; the backfill is NOT complete.
+    /// cancelled). The backfill is NOT complete. Items streamed before the stop stay pending in
+    /// the inbox (`added` lists them); nothing after the stop is ingested.
     var cancelled = false
 
     static func blocked(_ access: CalendarAccess) -> CalendarScanResult {
@@ -97,14 +98,18 @@ final class CalendarCaptureCoordinator {
         await scan(detector.upcomingInterval(now: clock(), calendar: calendar), properties: properties, entries: entries)
     }
 
-    /// Day-1 backfill through the WP2 chain's batch API, with progress (the backfill intro).
+    /// Day-1 backfill through the WP2 chain's batch API, with progress. WP-L: it streams. Each
+    /// item is put in the inbox store as soon as it is classified (on the main actor, in the
+    /// order they finish) and handed to `onIngest`, so the Inbox fills in while the scan runs.
     /// Likely and "Not sure" items are both kept (low confidence is shown, never hidden); muted
     /// and no-signal items are dropped. Hours and start stay 1.x's (see type comment).
+    /// Cancelled: stops classifying and ingests nothing more; items already streamed stay.
     func scanBackfillBatched(
         chain: ClassifierChain,
         properties: [RentalProperty],
         entries: [TimeEntry],
-        progress: @escaping @Sendable (ClassifierBatchProgress) -> Void = { _ in }
+        progress: @escaping @MainActor (ClassifierBatchProgress) -> Void = { _ in },
+        onIngest: @escaping @MainActor ([Suggestion]) -> Void = { _ in }
     ) async -> CalendarScanResult {
         let interval = detector.backfillInterval(now: clock(), calendar: calendar)
         let candidates: [CaptureCandidate]
@@ -115,22 +120,50 @@ final class CalendarCaptureCoordinator {
         } catch {
             return .blocked(detector.access)
         }
-        let outcomes: [ClassifierOutcome]
-        do {
-            outcomes = try await chain.classifyBatch(candidates, properties: properties, progress: progress)
-        } catch {
-            // classifyBatch throws only on cancellation.
-            return CalendarScanResult(access: .fullAccess, added: [], skipped: detector.lastSkipCounts, cancelled: true)
+
+        enum Event: Sendable {
+            case result(Int, ClassifierOutcome)
+            case progress(ClassifierBatchProgress)
         }
-        guard !Task.isCancelled else {
-            return CalendarScanResult(access: .fullAccess, added: [], skipped: detector.lastSkipCounts, cancelled: true)
+        let (events, continuation) = AsyncStream.makeStream(of: Event.self)
+        // Created on the main actor and cancelled below before this function first suspends,
+        // so a scan cancelled at once never classifies anything.
+        let batch = Task { () throws -> [ClassifierOutcome] in
+            defer { continuation.finish() }
+            return try await chain.classifyBatch(
+                candidates,
+                properties: properties,
+                onResult: { continuation.yield(.result($0, $1)) },
+                progress: { continuation.yield(.progress($0)) }
+            )
         }
-        var suggestions: [Suggestion] = []
-        for (candidate, outcome) in zip(candidates, outcomes) {
-            guard case .suggest(let classification) = outcome else { continue }
-            suggestions.append(prepared(Suggestion(candidate: candidate, classification: classification), candidate: candidate, properties: properties))
+        var added: [Suggestion] = []
+        await withTaskCancellationHandler {
+            for await event in events {
+                switch event {
+                case .result(let index, .suggest(let classification)):
+                    guard !Task.isCancelled, candidates.indices.contains(index) else { continue }
+                    let candidate = candidates[index]
+                    let suggestion = prepared(Suggestion(candidate: candidate, classification: classification), candidate: candidate, properties: properties)
+                    let new = store.ingest([suggestion], existingEntries: entries, calendar: calendar)
+                    if !new.isEmpty {
+                        added.append(contentsOf: new)
+                        onIngest(new)
+                    }
+                case .result:
+                    continue
+                case .progress(let value):
+                    guard !Task.isCancelled else { continue }
+                    progress(value)
+                }
+            }
+        } onCancel: {
+            batch.cancel()
         }
-        let added = store.ingest(suggestions, existingEntries: entries, calendar: calendar)
+        // classifyBatch throws only on cancellation.
+        guard (try? await batch.value) != nil, !Task.isCancelled else {
+            return CalendarScanResult(access: .fullAccess, added: added, skipped: detector.lastSkipCounts, cancelled: true)
+        }
         return CalendarScanResult(access: .fullAccess, added: added, skipped: detector.lastSkipCounts)
     }
 

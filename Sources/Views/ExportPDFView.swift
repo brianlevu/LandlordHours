@@ -11,10 +11,24 @@ struct ExportPDFView: View {
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var year: Int
-    @State private var shareItem: ExportShareItem?
-    @State private var exportError: String?
-    @State private var isGenerating = false
     @State private var sharing: ShareRequest?
+    /// WP-L: the report is made in the background; this sheet can close while it runs.
+    @ObservedObject private var job = ExportJob.shared
+
+    /// The records this sheet would export now; a ready report made from other records is stale.
+    private var fingerprint: String { ExportFingerprint.current(app: viewModel, year: year) }
+    private var shareItem: ExportShareItem? { job.readyFiles(for: year, fingerprint: fingerprint) }
+    private var reportIsStale: Bool { job.isStale(year: year, fingerprint: fingerprint) }
+    private var exportError: String? { job.failureMessage(for: year) }
+    private var isGenerating: Bool { job.isGenerating }
+    private var gate: ExportGate {
+        ExportGate.resolve(
+            hasEntries: canExport,
+            isGenerating: isGenerating,
+            hoursPlaceholderShowing: viewModel.isAwaitingInitialPull,
+            initialPullRunning: viewModel.isInitialPullRunning
+        )
+    }
     @State private var preview: UIImage?
     @State private var previewYear: Int?
 
@@ -58,6 +72,10 @@ struct ExportPDFView: View {
                 .padding(.bottom, 32)
             }
             .scrollIndicators(.hidden)
+            // Content scrolling up never shows through under the Close chip.
+            .modifier(HardTopScrollEdge())
+            .toolbarBackground(colors.background, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .background(colors.background.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -70,12 +88,10 @@ struct ExportPDFView: View {
         }
         .hidesAppTabBar()
         .task(id: year) { await renderPreview() }
-        .onChange(of: year) { _, _ in
-            shareItem = nil
-            exportError = nil
-        }
+        .onAppear { job.isSheetVisible = true }
+        .onDisappear { job.isSheetVisible = false }
         .sheet(item: $sharing) { request in
-            ActivityShareSheet(items: [request.url]) { completed in
+            ActivityShareSheet(items: [ExportShareFile(url: request.url)]) { completed in
                 sharing = nil
                 if completed { viewModel.exportShared(format: request.format) }
             }
@@ -212,21 +228,78 @@ struct ExportPDFView: View {
                 }
                 .buttonStyle(.lhPressable)
                 .accessibilityIdentifier("export.shareCSV")
-            } else {
-                Button {
-                    generateExports()
-                } label: {
-                    Text(generateButtonTitle)
-                }
-                .buttonStyle(InboxPrimaryButtonStyle())
-                .disabled(!canExport || isGenerating)
-                .accessibilityIdentifier("export.generatePDF")
 
-                if !canExport {
-                    Text("Log time in \(String(year)), then export it here.")
+                Button("Create again") { generateExports() }
+                    .font(AppTypography.button)
+                    .foregroundStyle(colors.action)
+                    .frame(minHeight: 44)
+                    .disabled(!gate.allowsCreate)
+                    .accessibilityHint("Makes a new report from your current records")
+                    .accessibilityIdentifier("export.createAgain")
+                if gate == .stillSyncing {
+                    createWithLocalButton
+                }
+            } else {
+                if reportIsStale && !isGenerating {
+                    Text("Your records changed since your last report. Create it again to include them.")
+                        .font(.footnote)
+                        .foregroundStyle(colors.caution)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityIdentifier("export.stale")
+                }
+                if isGenerating {
+                    // Busy: the drafting line runs inside a muted, non-tappable button.
+                    HStack(spacing: 10) {
+                        DraftingLoader(sketch: .chart, surface: .adaptive, lineWidth: 1.6)
+                            .frame(width: 34, height: 14)
+                            .accessibilityHidden(true)
+                        Text(generateButtonTitle)
+                    }
+                    .font(AppTypography.buttonLarge)
+                    .foregroundStyle(colors.action)
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 52)
+                    .background(Capsule().fill(colors.actionSurface))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("export.generatePDF")
+
+                    Text("You can close this. We'll let you know when it's ready.")
                         .font(.footnote)
                         .foregroundStyle(colors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityIdentifier("export.backgroundHint")
+                } else {
+                    Button {
+                        generateExports()
+                    } label: {
+                        Text(generateButtonTitle)
+                    }
+                    .buttonStyle(InboxPrimaryButtonStyle())
+                    .disabled(!gate.allowsCreate)
+                    .accessibilityIdentifier("export.generatePDF")
+
+                    if gate == .stillSyncing && canExport {
+                        createWithLocalButton
+                    }
+
+                    if !canExport && gate == .noEntries {
+                        Text("Log time in \(String(year)), then export it here.")
+                            .font(.footnote)
+                            .foregroundStyle(colors.textSecondary)
+                    }
                 }
+            }
+
+            if viewModel.initialPullFailed && gate.allowsCreate {
+                Label("Couldn't reach iCloud. This report may be missing hours from your other devices.",
+                      systemImage: "icloud.slash")
+                    .font(.footnote)
+                    .foregroundStyle(colors.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("export.pullFailedNote")
             }
 
             if let exportError {
@@ -236,6 +309,16 @@ struct ExportPDFView: View {
                     .multilineTextAlignment(.center)
             }
         }
+    }
+
+    /// The pull is slow, not failed: the report may miss hours from other devices. The user
+    /// chooses to go ahead anyway (the only way to create while syncing).
+    private var createWithLocalButton: some View {
+        Button("Create with what's on this device") { generateExports(force: true) }
+            .font(AppTypography.button)
+            .foregroundStyle(colors.action)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .accessibilityIdentifier("export.createLocal")
     }
 
     // MARK: Data
@@ -257,8 +340,7 @@ struct ExportPDFView: View {
     }
 
     private var generateButtonTitle: String {
-        if !canExport { return "No entries to export" }
-        return isGenerating ? "Creating report…" : "Create PDF and CSV"
+        gate.title(isStale: reportIsStale)
     }
 
     var repsQualifiedHours: Double {
@@ -294,26 +376,10 @@ struct ExportPDFView: View {
         previewYear = year
     }
 
-    private func generateExports() {
-        guard !isGenerating else { return }
-        isGenerating = true
-        exportError = nil
-        let report = makeReport()
-        let year = year
-        Task.detached(priority: .userInitiated) {
-            let result = AuditExportFiles.write(report: report, year: year)
-            await MainActor.run {
-                isGenerating = false
-                switch result {
-                case .success(let files):
-                    shareItem = files
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-                case .failure:
-                    exportError = "Couldn't create the report. Try again."
-                    RatingPromptCoordinator.shared.noteError()
-                }
-            }
-        }
+    /// `force`: the user chose to export what's on this device while the pull is still running.
+    private func generateExports(force: Bool = false) {
+        guard gate.allowsCreate || (force && gate == .stillSyncing && canExport) else { return }
+        job.start(report: makeReport(), year: year, fingerprint: fingerprint)
     }
 }
 
@@ -335,7 +401,7 @@ enum AuditExportFiles {
     }
 }
 
-struct ExportShareItem: Identifiable {
+struct ExportShareItem: Identifiable, Equatable {
     let id = UUID()
     let pdfURL: URL
     let csvURL: URL
@@ -368,4 +434,36 @@ struct ActivityShareSheet: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+
+/// WP-L: when the export's Create button may run. Waiting states come before "no entries", so a
+/// profile whose iCloud pull is still running never reads "No entries to export".
+enum ExportGate: Equatable {
+    case generating
+    /// Today's hours placeholder is showing (first seconds of the pull).
+    case waitingForHours
+    /// The placeholder cap passed but the pull is still running: the report could miss hours.
+    case stillSyncing
+    case noEntries
+    case ready
+
+    static func resolve(hasEntries: Bool, isGenerating: Bool, hoursPlaceholderShowing: Bool, initialPullRunning: Bool) -> ExportGate {
+        if isGenerating { return .generating }
+        if hoursPlaceholderShowing { return .waitingForHours }
+        if initialPullRunning { return .stillSyncing }
+        if !hasEntries { return .noEntries }
+        return .ready
+    }
+
+    var allowsCreate: Bool { self == .ready }
+
+    func title(isStale: Bool) -> String {
+        switch self {
+        case .generating: return "Creating report…"
+        case .waitingForHours: return "Getting your latest hours…"
+        case .stillSyncing: return "Still syncing from iCloud"
+        case .noEntries: return "No entries to export"
+        case .ready: return isStale ? "Create again" : "Create PDF and CSV"
+        }
+    }
 }
