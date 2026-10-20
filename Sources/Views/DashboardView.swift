@@ -211,6 +211,8 @@ struct DashboardView: View {
                         // The house leads Today in every state (approved r6 concept); a new
                         // owner's setup steps sit right under the empty lot.
                         houseHero
+                        // WP-Log: the timer card (only while a timer runs or a draft waits).
+                        TodayTimerSection()
                         if mode == .lookingBack {
                             BackfillProgressHeader(job: backfill, found: inboxBackfillCount, onRetry: {}, onOpen: {
                                 NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex)

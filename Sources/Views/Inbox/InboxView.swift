@@ -153,7 +153,7 @@ struct InboxView: View {
         .accessibilityAction(named: quick ? "Log \(InboxFormat.hours(suggestion.proposedHours ?? 0))" : "Review and log") {
             swipeLog(suggestion)
         }
-        .accessibilityAction(named: "Not landlord work") { dismiss(suggestion) }
+        .accessibilityAction(named: "Not rental work") { dismiss(suggestion) }
         .accessibilityIdentifier("inbox.row.\(suggestion.sourceKey)")
     }
 
@@ -167,7 +167,7 @@ struct InboxView: View {
     private func dismiss(_ suggestion: Suggestion) {
         model.dismiss(suggestion)
         dismissTick += 1
-        UIAccessibility.post(notification: .announcement, argument: "Marked not landlord work. Undo is available.")
+        UIAccessibility.post(notification: .announcement, argument: "Marked not rental work. Undo is available.")
     }
 
     // MARK: Banner
@@ -262,6 +262,9 @@ struct InboxView: View {
 struct InboxUndoToast: View {
     let toast: InboxToast
     var onUndo: () -> Void
+    /// The shell toast (Log time, timer) has its own Undo; nil follows `toast.undo`.
+    var showsUndo: Bool? = nil
+    var identifier = "inbox.toast"
     @Environment(\.colorScheme) private var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
@@ -292,7 +295,7 @@ struct InboxUndoToast: View {
                 .foregroundStyle(colors.textPrimary)
                 .lineLimit(2)
             Spacer(minLength: 8)
-            if toast.undo != nil {
+            if showsUndo ?? (toast.undo != nil) {
                 Button("Undo", action: onUndo)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(colors.action)
@@ -311,6 +314,6 @@ struct InboxUndoToast: View {
         .overlay(Capsule().strokeBorder(colors.border, lineWidth: 1))
         .compositingGroup()
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("inbox.toast")
+        .accessibilityIdentifier(identifier)
     }
 }

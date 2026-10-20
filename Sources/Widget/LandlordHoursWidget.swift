@@ -515,7 +515,7 @@ private struct LiveTimerLockScreenView: View {
                 .frame(width: 36, height: 36)
 
             VStack(alignment: .leading, spacing: 5) {
-                Text(state.isReviewNeeded ? "Open to review timer" : "Tracking landlord work")
+                Text(state.isReviewNeeded ? "Open to review timer" : "Tracking rental work")
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(WidgetColor.textPrimary)
                     .lineLimit(1)

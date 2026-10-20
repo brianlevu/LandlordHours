@@ -52,12 +52,12 @@ enum ClassifierThresholds {
 /// How an inbox card presents a classification.
 enum ConfidenceBand: String, Equatable {
     case likely
-    /// "Not sure this is landlord work" — visible, never pre-selected.
+    /// "Not sure this is rental work" — visible, never pre-selected.
     case notSure
     /// No landlord signal at all: not suggested.
     case unlikely
 
-    static let notSureLabel = "Not sure this is landlord work"
+    static let notSureLabel = "Not sure this is rental work"
 }
 
 extension ClassifierThresholds {

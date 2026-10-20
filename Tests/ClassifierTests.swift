@@ -345,7 +345,7 @@ final class ClassifierTests: XCTestCase {
         let outcome = await chain.evaluate(candidate("Check for mold"), properties: properties)
         guard case .suggest(let c) = outcome else { return XCTFail("expected suggest, got \(outcome)") }
         XCTAssertEqual(c.band, .notSure)
-        XCTAssertEqual(ConfidenceBand.notSureLabel, "Not sure this is landlord work")
+        XCTAssertEqual(ConfidenceBand.notSureLabel, "Not sure this is rental work")
 
         let noise = await chain.evaluate(candidate("Kids soccer practice"), properties: properties)
         guard case .skip = noise else { return XCTFail("expected skip, got \(noise)") }

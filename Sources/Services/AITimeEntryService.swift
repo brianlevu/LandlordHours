@@ -65,11 +65,13 @@ class AITimeEntryService {
         let lower = text.lowercased()
 
         // Match category by keywords
-        let category = matchCategory(from: lower)
+        let matchedCategory = matchCategoryIfAny(from: lower)
+        let category = matchedCategory ?? .management
 
         // Extract or estimate hours after category detection, so short natural notes
         // still produce a useful draft instead of a generic 1.0h default.
-        let hours = extractExplicitHours(from: lower) ?? estimateHours(for: category, text: lower)
+        let explicitHours = extractExplicitHours(from: lower)
+        let hours = explicitHours ?? estimateHours(for: category, text: lower)
 
         // Match property by name
         let property = matchProperty(from: lower, properties: properties)
@@ -83,7 +85,9 @@ class AITimeEntryService {
             category: category,
             hours: hours,
             participant: participant,
-            notes: text
+            notes: text,
+            hoursAreExplicit: explicitHours != nil,
+            categoryMatched: matchedCategory != nil
         )
     }
 
@@ -217,14 +221,14 @@ class AITimeEntryService {
         }
     }
 
-    private func matchCategory(from text: String) -> ActivityCategory {
+    private func matchCategoryIfAny(from text: String) -> ActivityCategory? {
         let range = NSRange(text.startIndex..., in: text)
         for (category, regex) in categoryPatterns {
             if regex.firstMatch(in: text, range: range) != nil {
                 return category
             }
         }
-        return .management // Default
+        return nil
     }
 
     private func matchProperty(from text: String, properties: [RentalProperty]) -> RentalProperty? {
@@ -293,4 +297,9 @@ struct ParsedTimeEntry {
     var hours: Double
     var participant: Participant
     var notes: String
+    /// True when the note said how long ("1 hour", "45 min"). Estimated hours are a guess and are
+    /// never written into a log form on their own.
+    var hoursAreExplicit = false
+    /// True when a keyword matched; otherwise `category` is the .management fallback.
+    var categoryMatched = false
 }

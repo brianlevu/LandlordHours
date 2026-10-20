@@ -127,7 +127,7 @@ extension CloudKitSyncService: InitialPullGating {
 // MARK: - Follow-ups
 //
 // A background action can't open the app. When "Log it" can't save safely, or after
-// "Not landlord work", the user gets one short follow-up instead of silence.
+// "Not rental work", the user gets one short follow-up instead of silence.
 
 enum CaptureFollowUp: Equatable {
     /// Might already be logged: tap to check.
@@ -140,7 +140,7 @@ enum CaptureFollowUp: Equatable {
     case cannotVerify
     /// Property, category or hours missing: tap to finish.
     case needsInput
-    /// After "Not landlord work": offer to stop suggesting events like it.
+    /// After "Not rental work": offer to stop suggesting events like it.
     case offerMute
     /// A queued "Log it" waited over a week (iCloud never finished): back in the inbox.
     case queuedTooLong

@@ -119,7 +119,7 @@ extension AppViewModel {
         return .created(entryId: entry.id)
     }
 
-    /// Dismisses a suggestion ("Not landlord work"). Never touches entries. Safe to repeat.
+    /// Dismisses a suggestion ("Not rental work"). Never touches entries. Safe to repeat.
     func dismiss(_ suggestion: Suggestion, reason: Suggestion.DismissReason = .notLandlordWork, store: SuggestionStore) {
         store.dismiss(key: suggestion.sourceKey, reason: reason)
     }

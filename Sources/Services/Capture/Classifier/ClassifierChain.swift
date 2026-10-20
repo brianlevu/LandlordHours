@@ -5,7 +5,7 @@ import Foundation
 // Rules first (always), then Apple's on-device model when it is available and the rules
 // result is not already decisive. Mute rules apply on EVERY entry point (classify, evaluate,
 // batch): a muted item never reaches the model. Items with a landlord signal are never hidden:
-// below the "likely" line they show as "Not sure this is landlord work", even when the model
+// below the "likely" line they show as "Not sure this is rental work", even when the model
 // says no. Only items with no landlord signal at all are dropped.
 //
 // PCC is not part of this chain: it is receipts-only (PCCReceiptReader, 2.1). Calendar titles

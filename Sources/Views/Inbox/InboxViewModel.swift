@@ -164,13 +164,13 @@ final class InboxViewModel: ObservableObject {
         return nil
     }
 
-    /// Swipe left / "Not landlord work".
+    /// Swipe left / "Not rental work".
     func dismiss(_ suggestion: Suggestion) {
         let current = latest(suggestion)
         if sheetSuggestion?.sourceKey == current.sourceKey { sheetSuggestion = nil }
         guard let store else { return showProblem(Self.noProfileMessage) }
         store.dismiss(key: current.sourceKey, reason: .notLandlordWork)
-        finish(InboxToast(message: "Marked not landlord work", kind: .neutral, undo: .dismissed(current)))
+        finish(InboxToast(message: "Marked not rental work", kind: .neutral, undo: .dismissed(current)))
     }
 
     /// "Don't suggest events like this": hides every matching pending item.
