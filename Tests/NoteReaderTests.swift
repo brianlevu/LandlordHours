@@ -758,3 +758,214 @@ final class LanguageModelErrorMappingTests: XCTestCase {
         #endif
     }
 }
+
+// MARK: - Round 5: nothing the 1.x keyword parser caught is lost (activation journey regression)
+
+final class LegacyKeywordCoverageTests: XCTestCase {
+    /// Every keyword of AITimeEntryService's 1.x table, with the 1.x category.
+    static let legacy: [(String, ActivityCategory)] = [
+        ("repair", .repairs),
+        ("fix", .repairs),
+        ("broke", .repairs),
+        ("broken", .repairs),
+        ("leak", .repairs),
+        ("plumb", .repairs),
+        ("faucet", .repairs),
+        ("hvac", .repairs),
+        ("heater", .repairs),
+        ("furnace", .repairs),
+        ("ac ", .repairs),
+        ("a/c", .repairs),
+        ("air condition", .repairs),
+        ("appliance", .repairs),
+        ("toilet", .repairs),
+        ("sink", .repairs),
+        ("pipe", .repairs),
+        ("drain", .repairs),
+        ("roof", .repairs),
+        ("gutter", .repairs),
+        ("paint", .repairs),
+        ("patch", .repairs),
+        ("drywall", .repairs),
+        ("electrical", .repairs),
+        ("wiring", .repairs),
+        ("outlet", .repairs),
+        ("light fixture", .repairs),
+        ("renovate", .renovations),
+        ("renovation", .renovations),
+        ("remodel", .renovations),
+        ("upgrade", .renovations),
+        ("install", .renovations),
+        ("replace", .renovations),
+        ("flooring", .renovations),
+        ("tile", .renovations),
+        ("cabinet", .renovations),
+        ("countertop", .renovations),
+        ("bathroom remodel", .renovations),
+        ("kitchen remodel", .renovations),
+        ("addition", .renovations),
+        ("demolition", .renovations),
+        ("lease", .leasing),
+        ("leas", .leasing),
+        ("tenant", .leasing),
+        ("showing", .leasing),
+        ("screen", .leasing),
+        ("application", .leasing),
+        ("move-in", .leasing),
+        ("move in", .leasing),
+        ("move-out", .leasing),
+        ("move out", .leasing),
+        ("evict", .leasing),
+        ("vacancy", .leasing),
+        ("listing", .leasing),
+        ("advertise", .leasing),
+        ("rental agreement", .leasing),
+        ("renew", .leasing),
+        ("rent", .leasing),
+        ("manage", .management),
+        ("inspect", .management),
+        ("clean", .management),
+        ("maintenance", .management),
+        ("mow", .management),
+        ("landscape", .management),
+        ("lawn", .management),
+        ("snow", .management),
+        ("trash", .management),
+        ("pest", .management),
+        ("exterminator", .management),
+        ("vendor", .management),
+        ("coordinate", .management),
+        ("supervise", .management),
+        ("check on", .management),
+        ("visit", .management),
+        ("walk-through", .management),
+        ("schedule", .management),
+        ("organize", .management),
+        ("meet with", .management),
+        ("property check", .management),
+        ("bookkeep", .bookkeeping),
+        ("accounting", .bookkeeping),
+        ("tax", .bookkeeping),
+        ("receipt", .bookkeeping),
+        ("invoice", .bookkeeping),
+        ("expense", .bookkeeping),
+        ("budget", .bookkeeping),
+        ("financial", .bookkeeping),
+        ("quickbooks", .bookkeeping),
+        ("spreadsheet", .bookkeeping),
+        ("record keep", .bookkeeping),
+        ("bank", .bookkeeping),
+        ("payment", .bookkeeping),
+        ("billing", .bookkeeping),
+        ("ledger", .bookkeeping),
+        ("legal", .legal),
+        ("lawyer", .legal),
+        ("attorney", .legal),
+        ("court", .legal),
+        ("compliance", .legal),
+        ("permit", .legal),
+        ("license", .legal),
+        ("zoning", .legal),
+        ("code", .legal),
+        ("regulation", .legal),
+        ("contract", .legal),
+        ("lawsuit", .legal),
+        ("dispute", .legal),
+        ("filing", .legal),
+        ("lien", .legal),
+        ("insurance", .insurance),
+        ("claim", .insurance),
+        ("policy", .insurance),
+        ("coverage", .insurance),
+        ("adjuster", .insurance),
+        ("premium", .insurance),
+        ("deductible", .insurance),
+        ("liability", .insurance),
+        ("travel", .travel),
+        ("drive", .travel),
+        ("drove", .travel),
+        ("commute", .travel),
+        ("mileage", .travel),
+        ("trip to", .travel),
+        ("went to", .travel),
+        ("visit property", .travel),
+        ("gas", .travel),
+        ("fuel", .travel),
+        ("invest", .investing),
+        ("research", .investing),
+        ("analyze", .investing),
+        ("market", .investing),
+        ("deal", .investing),
+        ("acquisition", .investing),
+        ("due diligence", .investing),
+        ("offer", .investing),
+        ("negotiate price", .investing),
+        ("property search", .investing),
+        ("real estate search", .investing),
+        ("financ", .financing),
+        ("mortgage", .financing),
+        ("loan", .financing),
+        ("refinanc", .financing),
+        ("bank meeting", .financing),
+        ("lender", .financing),
+        ("interest rate", .financing),
+        ("appraisal", .financing),
+        ("closing", .financing),
+        ("contract", .contractNegotiation),
+        ("negotiat", .contractNegotiation),
+        ("agreement", .contractNegotiation),
+        ("terms", .contractNegotiation),
+        ("bid", .contractNegotiation),
+        ("proposal", .contractNegotiation),
+        ("scope of work", .contractNegotiation),
+        ("contractor", .contractNegotiation)
+    ]
+
+    /// Deliberate differences from 1.x (first-match quirks there), all still filled.
+    static let moved: [String: ActivityCategory] = [
+        "evict": .legal, "rent": .management, "visit property": .management, "negotiate price": .contractNegotiation,
+        "bank meeting": .bookkeeping, "contract": .legal, "scope of work": .renovations, "contractor": .repairs,
+    ]
+
+    func testEveryLegacyKeywordStillFillsACategory() {
+        for (keyword, legacyCategory) in Self.legacy {
+            for note in [keyword, "did the \(keyword) today"] {
+                let got = NoteRules.category(normalized: RulesEngine.normalize(note))
+                XCTAssertNotNil(got, "\"\(note)\" lost its category")
+                XCTAssertEqual(got, Self.moved[keyword] ?? legacyCategory, "\"\(note)\"")
+            }
+        }
+    }
+
+    func testTheActivationJourneyNoteFillsEverything() {
+        let r = NoteRules.read(request("Reviewed tenant message at Oak Street Duplex for 1 hour"))
+        XCTAssertEqual(r.category, .management)
+        XCTAssertEqual(r.propertyId, oak.id)
+        XCTAssertEqual(r.hours, 1)
+    }
+
+    func testTalkingWithATenantIsManagement() {
+        for note in ["Reviewed tenant message", "phone call with the tenant about noise", "emailed the tenants about the water shutoff",
+                     "texted tenant re parking", "tenant called about the noise", "answered tenant questions"] {
+            XCTAssertEqual(NoteRules.category(normalized: RulesEngine.normalize(note)), .management, note)
+        }
+        // A specific signal still wins.
+        XCTAssertEqual(NoteRules.category(normalized: RulesEngine.normalize("called the tenant about the lease renewal")), .leasing)
+        XCTAssertEqual(NoteRules.category(normalized: RulesEngine.normalize("tenant called about a leak")), .repairs)
+    }
+
+    func testGenericLegacyWordsNeverOutrankASpecificSignal() {
+        XCTAssertEqual(NoteRules.category(normalized: RulesEngine.normalize("offered the tenant a new lease")), .leasing)
+        XCTAssertEqual(NoteRules.category(normalized: RulesEngine.normalize("signed the rental agreement")), .leasing)
+        XCTAssertEqual(NoteRules.category(normalized: RulesEngine.normalize("met the contractor to fix the roof")), .repairs)
+        XCTAssertEqual(NoteRules.category(normalized: RulesEngine.normalize("showing at the cabin")), .leasing)
+    }
+
+    func testWithoutACategoryLogSaysWhatIsMissing() {
+        var f = LogForm()
+        f.setProperty(oak.id)
+        f.setHours(1)
+        XCTAssertFalse(f.canLog(properties: [oak]))
+        XCTAssertEqual(f.missingMessage(properties: [oak]), "Pick the kind of work to log this.")
+    }
+}

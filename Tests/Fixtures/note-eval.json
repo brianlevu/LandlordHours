@@ -1,7 +1,7 @@
 {
  "now": "2026-10-20T15:00:00-07:00",
  "timeZone": "America/Los_Angeles",
- "note": "Hand-labelled landlord notes for the Log time note reader. null = the field must stay empty (the honest answer). categoryAnyOf lists every defensible category. nonCountable = every allowed answer is a non-countable category (hard rule). n67-n69 (2026-10-21): notes naming two rentals; the honest property is empty.",
+ "note": "Hand-labelled landlord notes for the Log time note reader. null = the field must stay empty (the honest answer). categoryAnyOf lists every defensible category. nonCountable = every allowed answer is a non-countable category (hard rule). n67-n69 (2026-10-21): notes naming two rentals; the honest property is empty. n70-n81 (2026-10-21): phrases the 1.x keyword parser caught (tenant messages/calls/emails, showing, mowing, budget, wiring, contractor, demolition, advertising, renewal).",
  "properties": [
   {
    "ref": "pine",
@@ -960,6 +960,164 @@
     "leasing"
    ],
    "hours": 3,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "n70",
+   "note": "Reviewed tenant message at Oak Street Duplex for 1 hour",
+   "spouseTracking": false,
+   "property": "oak",
+   "categoryAnyOf": [
+    "management"
+   ],
+   "hours": 1,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "n71",
+   "note": "phone call with the tenant at Maple Court about noise, 20 min",
+   "spouseTracking": false,
+   "property": "maple",
+   "categoryAnyOf": [
+    "management"
+   ],
+   "hours": 0.3333,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "n72",
+   "note": "emailed the tenants at the lofts about the water shutoff",
+   "spouseTracking": false,
+   "property": "lofts",
+   "categoryAnyOf": [
+    "management"
+   ],
+   "hours": null,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "n73",
+   "note": "texted tenant re late rent",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": [
+    "management",
+    "bookkeeping"
+   ],
+   "hours": null,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "n74",
+   "note": "showing at harbor view 45 min",
+   "spouseTracking": false,
+   "property": "harbor",
+   "categoryAnyOf": [
+    "leasing"
+   ],
+   "hours": 0.75,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "n75",
+   "note": "mowed the front lawn at Pine Cabin 1h",
+   "spouseTracking": false,
+   "property": "pine",
+   "categoryAnyOf": [
+    "management"
+   ],
+   "hours": 1,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "n76",
+   "note": "worked on the annual budget for the rentals",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": [
+    "bookkeeping"
+   ],
+   "hours": null,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "n77",
+   "note": "electrician redid the wiring in the duplex, 3 hours",
+   "spouseTracking": false,
+   "property": "oak",
+   "categoryAnyOf": [
+    "repairs"
+   ],
+   "hours": 3,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "n78",
+   "note": "met the contractor at maple court about the deck",
+   "spouseTracking": false,
+   "property": "maple",
+   "categoryAnyOf": [
+    "repairs",
+    "renovations"
+   ],
+   "hours": null,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "n79",
+   "note": "demolition of the old shed at the cabin, 5 hours",
+   "spouseTracking": false,
+   "property": "pine",
+   "categoryAnyOf": [
+    "renovations"
+   ],
+   "hours": 5,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "n80",
+   "note": "advertised the vacancy for the lofts",
+   "spouseTracking": false,
+   "property": "lofts",
+   "categoryAnyOf": [
+    "leasing"
+   ],
+   "hours": null,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "n81",
+   "note": "renewed the lease for Oak St",
+   "spouseTracking": false,
+   "property": "oak",
+   "categoryAnyOf": [
+    "leasing"
+   ],
+   "hours": null,
    "date": null,
    "participant": null,
    "nonCountable": false
