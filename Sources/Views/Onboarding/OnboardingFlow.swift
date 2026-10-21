@@ -277,6 +277,9 @@ enum OnbEvent: Equatable {
 struct OnbServices {
     /// Welcome's "Start building": a local profile when none is signed in.
     var ensureProfile: () -> Void = {}
+    /// Welcome's Sign in with Apple for a NEW Apple user: makes their profile (returning users
+    /// and Restore never come through here; they open on Today).
+    var signUpWithApple: () -> Void = {}
     var saveGoal: (OnbGoal) -> Void = { _ in }
     var saveWho: (OnbWho) -> Void = { _ in }
     var addProperty: (_ name: String, _ address: String) -> Void = { _, _ in }
@@ -289,6 +292,20 @@ struct OnbServices {
     var setEventPrompts: (Bool) -> Void = { _ in }
     var complete: (OnbCompletion) -> Void = { _ in }
     var track: (OnbEvent) -> Void = { _ in }
+}
+
+extension OnbServices {
+    /// ContentView shows onboarding while `!isSignedIn || showOnboarding`. Making a profile
+    /// flips isSignedIn, so unless showOnboarding is already true the shell mounts for a frame,
+    /// onboarding is torn down and its flow restarts on Welcome (the first tap looks ignored).
+    /// Runs `keepShown` before every profile this flow creates.
+    func holdingOnboarding(_ keepShown: @escaping () -> Void) -> OnbServices {
+        var s = self
+        let makeProfile = ensureProfile, appleSignUp = signUpWithApple
+        s.ensureProfile = { keepShown(); makeProfile() }
+        s.signUpWithApple = { keepShown(); appleSignUp() }
+        return s
+    }
 }
 
 // MARK: - The flow
@@ -386,6 +403,12 @@ final class OnbFlow {
     /// 0 · "Start building".
     func start(_ animation: Animation? = nil) {
         services.ensureProfile()
+        next(animation)
+    }
+
+    /// 0 · Sign in with Apple, new Apple user: their profile, then on like "Start building".
+    func signUpWithApple(_ animation: Animation? = nil) {
+        services.signUpWithApple()
         next(animation)
     }
 

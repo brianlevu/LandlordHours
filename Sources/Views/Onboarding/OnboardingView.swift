@@ -28,13 +28,20 @@ struct OnboardingView: View {
             guard flow == nil else { return }
             viewModel.suppressCelebrations = true
             let start = OnbDebugLaunch.startStep
-            let made = OnbFlow(cohort: .new, services: .live(app: viewModel, environment: .current) { completion in
+            var services = OnbServices.live(app: viewModel, environment: .current) { completion in
                 finish(completion)
-            }, startAt: start)
+            }
+            // Hold the flow on screen before any new profile exists (see `holdingOnboarding`).
+            let keepShown = $showOnboarding
+            services = services.holdingOnboarding { keepShown.wrappedValue = true }
+            let made = OnbFlow(cohort: .new, services: services, startAt: start)
             OnbDebugLaunch.apply(to: made)
             OnbBackfill.flowStarted()
             // A capture launch past Welcome needs a profile to write to.
-            if (start ?? .welcome) != .welcome, !viewModel.isSignedIn { viewModel.continueWithoutAccount() }
+            if (start ?? .welcome) != .welcome, !viewModel.isSignedIn {
+                showOnboarding = true
+                viewModel.continueWithoutAccount()
+            }
             flow = made
             made.appeared()
         }
@@ -99,6 +106,7 @@ extension OnbServices {
     static func live(app: AppViewModel, environment: CaptureSetupEnvironment, complete: @escaping (OnbCompletion) -> Void) -> OnbServices {
         var s = OnbServices()
         s.ensureProfile = { if !app.isSignedIn { app.continueWithoutAccount() } }
+        s.signUpWithApple = { app.signUp() }
         s.saveGoal = { goal in GoalManager.shared.setGoalChoice(goal.goalChoice) }
         s.saveWho = { who in TaxProfileManager.shared.spouseTracking = (who == .both) }
         s.addProperty = { name, address in
@@ -487,8 +495,7 @@ struct OnbWelcomeContent: View {
             switch AppleSignInFlow.complete(result) {
             case .signedIn(let isNewUser):
                 if isNewUser {
-                    viewModel.signUp()
-                    flow.next(OnbMotion.morph(reduce))
+                    flow.signUpWithApple(OnbMotion.morph(reduce))
                 } else {
                     // Returning: their profile already finished setup, so the app opens on Today.
                     viewModel.signIn()
