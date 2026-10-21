@@ -212,7 +212,9 @@ struct WidgetSurfaceDisplay: Equatable {
         case .timer: return "Timer \(elapsed) · \(timerPropertyName)"
         case .met: return "\(goalNumber)h reached"
         case .empty: return "0 of \(goalNumber)h so far"
-        case .onPace, .behind:
+        case .onPace:
+            return pendingCount > 0 ? "\(number) of \(goalNumber)h · \(pendingCount) to confirm" : "\(number) of \(goalNumber)h · on pace"
+        case .behind:
             return pendingCount > 0 ? "\(number) of \(goalNumber)h · \(pendingCount) to confirm" : "\(number) of \(goalNumber)h"
         }
     }

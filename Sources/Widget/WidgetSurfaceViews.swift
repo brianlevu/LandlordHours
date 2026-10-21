@@ -181,9 +181,10 @@ struct WidgetSmallView: View {
     }
 
     private func statusLine(_ s: WidgetSurfaceDisplay.Status) -> some View {
-        HStack(spacing: 4) {
+        // Two lines allowed: "Nothing confirmed yet" doesn't fit one line of a small widget.
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
             Image(systemName: s.symbol).font(.system(size: 11, weight: .bold))
-            Text(s.text).lineLimit(1).minimumScaleFactor(0.8)
+            Text(s.text).lineLimit(2).minimumScaleFactor(0.9).fixedSize(horizontal: false, vertical: true)
         }
         .font(.system(size: 13, weight: .semibold))
         .foregroundStyle(look == .accented ? WidgetInk.primary : WidgetInk.tone(s.tone))

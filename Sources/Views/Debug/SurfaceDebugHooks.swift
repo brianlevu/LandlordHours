@@ -44,6 +44,7 @@ enum SurfaceDebugHooks {
         let center = UNUserNotificationCenter.current()
         guard (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) == true else { return }
         center.setNotificationCategories(CaptureNotificationCategories.all)
+        center.removeAllDeliveredNotifications()
         let samples: [(String, NotificationText, String)] = [
             ("sample.yearEnd", NotificationCopy.yearEnd(hours: 212.5, year: 2026), "LANDLORDHOURS_EXPORT"),
             ("sample.quiet", NotificationCopy.inactive(days: 9), "LANDLORDHOURS_TRACK"),

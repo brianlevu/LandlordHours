@@ -55,6 +55,11 @@ final class AppModelHost {
         self.backgroundTasks = backgroundTasks
         self.suggestionBaseDirectory = suggestionBaseDirectory ?? SuggestionStore.defaultBaseDirectory
         self.viewModel.queuesCelebrations = true
+        // The widget's to-confirm count reads this host's store. Wired here, after init, because
+        // AppViewModel.init writes the widget snapshot while `AppModelHost.shared` is still being
+        // created (touching `shared` from there deadlocks dispatch_once).
+        AppViewModel.widgetSuggestionsProvider = { [weak self] in self?.suggestionStore?.suggestions ?? [] }
+        self.viewModel.refreshWidgetSurface()
     }
 
     /// The active profile's capture inbox, or nil when no profile is signed in. Re-opened when

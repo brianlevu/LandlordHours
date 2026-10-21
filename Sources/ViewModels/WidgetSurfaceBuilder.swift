@@ -10,6 +10,10 @@ import WidgetKit
 // Today agree.
 
 extension AppViewModel {
+    /// The Inbox's suggestions for the to-confirm count. Set by `AppModelHost` once it exists;
+    /// empty before that (never touch `AppModelHost.shared` from AppViewModel.init).
+    static var widgetSuggestionsProvider: @MainActor () -> [Suggestion] = { [] }
+
     /// The snapshot the widget draws. `suggestions` defaults to the active profile's store.
     func widgetSurfaceSnapshot(now: Date = Date(), suggestions: [Suggestion]? = nil) -> WidgetSurfaceSnapshot {
         let year = Calendar.current.component(.year, from: now)
@@ -17,7 +21,7 @@ extension AppViewModel {
         let hours = houseCountableHours(goal: goal, year: year)
         let progress = HouseProgress(hours: hours, goal: goal)
         let engagement = EngagementIntelligenceService.shared.snapshot(for: engagementContext(now: now, taxYear: year))
-        let pending = InboxLogic.visible(suggestions ?? AppModelHost.shared.suggestionStore?.suggestions ?? [], now: now).count
+        let pending = InboxLogic.visible(suggestions ?? Self.widgetSuggestionsProvider(), now: now).count
         let timerName = isTimerRunning ? properties.first { $0.id == timerPropertyId }?.name : nil
 
         return WidgetSurfaceSnapshot(
