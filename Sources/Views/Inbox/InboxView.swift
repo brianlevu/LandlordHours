@@ -232,8 +232,8 @@ struct InboxView: View {
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(colors.textPrimary)
                     Text(model.store != nil && viewModel.calendarSuggestionsEnabled
-                         ? "We'll put work here when your calendar looks like rental work. Nothing counts until you say so."
-                         : "Turn on calendar suggestions and we'll put likely rental work here for you to confirm.")
+                         ? "We’ll put work here when your calendar looks like rental work. Nothing counts until you say so."
+                         : "Turn on calendar suggestions and we’ll put likely rental work here for you to confirm.")
                         .font(.subheadline)
                         .foregroundStyle(colors.textSecondary)
                         .multilineTextAlignment(.center)

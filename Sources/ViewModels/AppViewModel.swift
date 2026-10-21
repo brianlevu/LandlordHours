@@ -447,7 +447,7 @@ class AppViewModel: ObservableObject {
         var errorDescription: String? {
             switch self {
             case .iCloudUnavailable:
-                return "iCloud is off, so copies saved there can't be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?"
+                return "iCloud is off, so copies saved there can’t be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?"
             }
         }
     }

@@ -223,7 +223,7 @@ final class InboxViewModel: ObservableObject {
         return missing
     }
 
-    static let noProfileMessage = "Couldn't save. Sign in to a profile and try again."
+    static let noProfileMessage = "Couldn’t save. Sign in to a profile and try again."
 
     // MARK: Private
 

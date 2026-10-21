@@ -60,6 +60,7 @@ enum AppColors {
         static let copper = "8F4A22"             // financing (key)
         static let darkCopper = "E9A27B"
         static let brassInk = "7A5E1E"           // property seal (brass)
+        static let sealTerracottaInk = "8A3220"  // terracotta seal initials: 6.5:1 on its #F2E2DF wash (B4432E was 4.42)
         static let darkBrassInk = "E8C877"
     }
 
@@ -68,7 +69,7 @@ enum AppColors {
         switch palette {
         case .blueprint: return (actionLightHex, actionDarkHex)
         case .timber: return (Hex.timberInk, Hex.darkTimberInk)
-        case .terracotta: return (CategoryHex.terracottaInk, CategoryHex.darkTerracottaInk)
+        case .terracotta: return (CategoryHex.sealTerracottaInk, CategoryHex.darkTerracottaInk)
         case .brass: return (CategoryHex.brassInk, CategoryHex.darkBrassInk)
         case .slate: return (Hex.informational, Hex.darkInformational)
         }

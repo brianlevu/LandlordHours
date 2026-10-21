@@ -83,7 +83,7 @@ struct SuggestionConfirmSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .sensoryFeedback(.selection, trigger: stepTick)
-        .confirmationDialog("Don't suggest events like this", isPresented: $showMuteOptions, titleVisibility: .visible) {
+        .confirmationDialog("Don’t suggest events like this", isPresented: $showMuteOptions, titleVisibility: .visible) {
             if let rule = InboxLogic.muteRule(forTitleOf: suggestion) {
                 Button("Events named \u{201C}\(suggestion.title)\u{201D}") { mute(rule) }
             }
@@ -152,7 +152,7 @@ struct SuggestionConfirmSheet: View {
             if badges.needsHours {
                 band(
                     title: Text("How long did it take?"),
-                    body: "We can't tell the hours from this, so add them below.",
+                    body: "We can’t tell the hours from this, so add them below.",
                     wash: colors.cautionSurface
                 )
             } else if let scheduled = suggestion.proposedHours {
@@ -173,7 +173,7 @@ struct SuggestionConfirmSheet: View {
             if badges.mightAlreadyBeLogged {
                 band(
                     title: Text("Might already be logged"),
-                    body: "You have hours around this time. Check Records so it isn't counted twice.",
+                    body: "You have hours around this time. Check Records so it isn’t counted twice.",
                     wash: colors.informationalSurface
                 )
                 .accessibilityIdentifier("confirm.mightAlreadyBeLogged")
@@ -428,7 +428,7 @@ struct SuggestionConfirmSheet: View {
     private var secondaryActions: some View {
         VStack(spacing: 4) {
             if InboxLogic.muteRule(forTitleOf: suggestion) != nil || InboxLogic.muteRule(forCalendarOf: suggestion) != nil {
-                Button("Don't suggest events like this") { showMuteOptions = true }
+                Button("Don’t suggest events like this") { showMuteOptions = true }
                     .font(.subheadline)
                     .foregroundStyle(colors.action)
                     .frame(minHeight: 44)
