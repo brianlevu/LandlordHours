@@ -38,7 +38,7 @@ final class InboxCaptureUITests: XCTestCase {
         XCTAssertTrue(showing.waitForExistence(timeout: 5), "Undo brought it back")
         Thread.sleep(forTimeInterval: 1.8)
 
-        // Swipe left: not landlord work.
+        // Swipe left: not rental work.
         let sam = app.descendants(matching: .any)["inbox.row.cal:debug-call-sam"]
         XCTAssertTrue(sam.waitForExistence(timeout: 5))
         drag(sam, right: false)

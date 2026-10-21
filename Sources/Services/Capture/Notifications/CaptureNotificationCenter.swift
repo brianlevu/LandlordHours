@@ -62,12 +62,12 @@ enum CaptureNotificationCategories {
             identifier: CaptureNotificationAction.categoryIdentifier,
             actions: [
                 // Writes a tax record from the lock screen, so the device must be unlocked.
-                UNNotificationAction(identifier: CaptureNotificationAction.logIt, title: "Log it",
-                                     options: [.authenticationRequired]),
-                UNNotificationAction(identifier: CaptureNotificationAction.edit, title: "Edit…",
-                                     options: [.foreground]),
-                UNNotificationAction(identifier: CaptureNotificationAction.notLandlordWork, title: "Not rental work",
-                                     options: [])
+                UNNotificationAction(identifier: CaptureNotificationAction.logIt, title: NotificationCopy.Action.logIt.title,
+                                     options: [.authenticationRequired], icon: NotificationCopy.Action.logIt.icon),
+                UNNotificationAction(identifier: CaptureNotificationAction.edit, title: NotificationCopy.Action.edit.title,
+                                     options: [.foreground], icon: NotificationCopy.Action.edit.icon),
+                UNNotificationAction(identifier: CaptureNotificationAction.notLandlordWork, title: NotificationCopy.Action.notRentalWork.title,
+                                     options: [], icon: NotificationCopy.Action.notRentalWork.icon)
             ],
             intentIdentifiers: [],
             options: []
@@ -80,7 +80,7 @@ enum CaptureNotificationCategories {
             identifier: CaptureNotificationAction.reviewCategoryIdentifier,
             actions: [
                 UNNotificationAction(identifier: CaptureNotificationAction.edit, title: "Review",
-                                     options: [.foreground])
+                                     options: [.foreground], icon: UNNotificationActionIcon(systemImageName: "pencil"))
             ],
             intentIdentifiers: [],
             options: []

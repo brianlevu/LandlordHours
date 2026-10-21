@@ -223,7 +223,7 @@ final class InboxViewModel: ObservableObject {
         hidden.insert(current.sourceKey)
         store.addMuteRule(rule)
         store.dismiss(key: current.sourceKey, reason: .muted)
-        finish(InboxToast(message: "We won't suggest events like this", kind: .neutral,
+        finish(InboxToast(message: "We won’t suggest events like this", kind: .neutral,
                           undo: .muted(current, rule, hiddenKeys: hidden)))
     }
 
@@ -264,7 +264,7 @@ final class InboxViewModel: ObservableObject {
         return missing
     }
 
-    static let noProfileMessage = "Couldn't save. Sign in to a profile and try again."
+    static let noProfileMessage = "Couldn’t save. Sign in to a profile and try again."
 
     // MARK: Private
 

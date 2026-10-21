@@ -59,7 +59,7 @@ final class EngagementSpouseSettingTests: XCTestCase {
             snapshot: service.snapshot(for: ctx, calendar: calendar),
             recommendation: service.recommendation(for: ctx, calendar: calendar)
         )
-        XCTAssertTrue(text.contains("You have 300.0 hours toward 100 this year"), text)
+        XCTAssertTrue(text.contains("You have 300 hours for 2026, past your 100-hour goal"), text)
     }
 
     func testDefaultContextKeepsTheJointTotal() {

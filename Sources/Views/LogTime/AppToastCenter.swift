@@ -1,58 +1,50 @@
 import SwiftUI
 
-// MARK: - The shell toast for Log time and the timer
+// MARK: - Log time and timer toasts → the one toast
 //
-// Cross-lane decision (2026-10-19): one full-width Inbox-style toast app-wide. The r4 "Timer
-// discarded" capsule is superseded. The shell draws it just above the tab bar with the same view
-// as the Inbox's (`InboxUndoToast`), so the two can never drift apart.
+// Build 2 integration: Log time, the timer and Today show their toasts through the app's one toast
+// system (`LHToastCenter` + `LHToast`, surfaces lane). This type keeps the build-1 call sites
+// (`show(_:kind:undo:)`, `undo()`, `dismiss()`) and forwards them; it draws nothing itself.
+// Identifiers stay `shell.toast` / `inbox.undo` so the build-1 UI tests keep finding them.
 
 @MainActor
-final class AppToastCenter: ObservableObject {
+final class AppToastCenter {
     static let shared = AppToastCenter()
 
-    struct Toast: Identifiable, Equatable {
-        let id = UUID()
-        let message: String
-        let kind: InboxToast.Kind
-        let hasUndo: Bool
-
-        static func == (a: Toast, b: Toast) -> Bool { a.id == b.id }
-    }
-
-    @Published private(set) var toast: Toast?
-    /// Seconds a toast (and its Undo) stays (spec §0: 4s).
-    var undoWindow: TimeInterval = 4
-    private var undoAction: (() -> Void)?
-    private var task: Task<Void, Never>?
+    /// The shared queue (tests may inject their own).
+    var center: LHToastCenter = .shared
+    /// DEBUG capture hooks set this to hold a toast on screen; nil uses the toast's own timing.
+    var undoWindow: TimeInterval?
+    /// The toast this facade last queued (so `dismiss()` never closes someone else's toast).
+    private(set) var lastSpecId: UUID?
 
     func show(_ message: String, kind: InboxToast.Kind = .success, undo: (() -> Void)? = nil) {
-        task?.cancel()
-        undoAction = undo
-        toast = Toast(message: message, kind: kind, hasUndo: undo != nil)
-        let window = undoWindow
-        task = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(window))
-            guard !Task.isCancelled else { return }
-            self?.dismiss()
+        let mapped: LHToastSpec.Kind
+        switch kind {
+        case .success: mapped = .success
+        case .neutral: mapped = .neutral
+        case .problem: mapped = .problem
         }
-        UIAccessibility.post(notification: .announcement, argument: undo == nil ? message : "\(message). Undo is available.")
+        let spec = LHToastSpec(
+            kind: mapped,
+            message: message,
+            actionTitle: undo == nil ? nil : String(localized: "Undo"),
+            identifier: "shell.toast",
+            actionIdentifier: "inbox.undo",
+            holdSeconds: undoWindow
+        )
+        lastSpecId = center.show(spec, action: undo).id
     }
 
+    /// Runs the Undo of the toast on screen, if it is ours.
     func undo() {
-        let action = undoAction
-        dismiss()
-        action?()
+        guard let id = lastSpecId, center.current?.id == id else { return }
+        center.performAction()
     }
 
+    /// Closes our toast if it is on screen.
     func dismiss() {
-        task?.cancel()
-        task = nil
-        undoAction = nil
-        toast = nil
-    }
-
-    /// The Inbox toast view, fed from this center.
-    var inboxToast: InboxToast? {
-        toast.map { InboxToast(message: $0.message, kind: $0.kind, undo: nil) }
+        guard let id = lastSpecId, center.current?.id == id else { return }
+        center.dismissCurrent()
     }
 }

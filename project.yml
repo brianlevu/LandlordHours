@@ -37,9 +37,13 @@ targets:
       - path: Sources
         excludes:
           - "**/Info.plist"
-          - "Widget/**"
+          # The widget's entry point (@main WidgetBundle) builds only in the extension. Its views
+          # (Widget/WidgetSurfaceViews.swift) and house art also build into the app for the DEBUG
+          # capture board (WidgetCaptureBoard).
+          - "Widget/LandlordHoursWidget.swift"
       - path: Assets.xcassets
     dependencies:
+      - target: LandlordHoursWidget
       - package: LucideIcons
       - package: PostHog
       - package: RevenueCat
@@ -84,6 +88,36 @@ targets:
         # this as a public, client-embeddable key (same category as the PostHog key already
         # inlined in Analytics.swift).
         REVENUECAT_API_KEY: "appl_nekSXCuphljAxqntEkeFUyDJFrY"
+  # Home and Lock Screen widgets. RESTORED (2.0 surfaces lane): 1.0.x shipped this extension
+  # (LandlordHoursWidgetExtension.appex, com.openclaw.landlordhours.widget; 703e349); the Jul 30
+  # xcodegen regeneration (9677c49) dropped it without meaning to. Same bundle id, product name and
+  # widget kind, so the existing App ID and any widget a 1.0.x user placed keep working.
+  # Reads the App Group snapshot the app writes
+  # (Sources/Shared/WidgetSurface.swift); shares the brand palette and mark B with the app.
+  LandlordHoursWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Sources/Widget
+        excludes:
+          - "Info.plist"
+      - path: Sources/Shared
+    entitlements:
+      path: LandlordHoursWidget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.openclaw.landlordhours
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.openclaw.landlordhours.widget
+        PRODUCT_NAME: LandlordHoursWidgetExtension
+        DEVELOPMENT_TEAM: G68NLC3DA3
+        INFOPLIST_FILE: Sources/Widget/Info.plist
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "Apple Development"
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) WIDGET_EXTENSION"
   LandlordHoursTests:
     type: bundle.unit-test
     platform: iOS

@@ -40,6 +40,8 @@ enum AppDestination: String, CaseIterable {
     init(legacy destination: LandlordHoursIntentDestination) {
         switch destination {
         case .home: self = .today
+        case .inbox: self = .inbox
+        case .records: self = .records
         case .properties: self = .properties
         case .track: self = .logTime
         case .reports: self = .records
