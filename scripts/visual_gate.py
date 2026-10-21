@@ -4,7 +4,8 @@ visual_gate.py — Visual QA review gate for the LandlordHours iOS app (ported f
 
 Sends one or more app-frame screenshots to multiple vision-capable LLMs via
 the OpenRouter REST API and asks each one to critique the frame against
-LandlordHours' design system rules (see repo CLAUDE.md).
+the 2.0 Blueprint rubric in scripts/qa/gate_rubric.md (from docs/design/2.0-brand-system.md).
+`--print-prompt` prints that rubric. The in-house visual-gate agent is the primary gate; this OpenRouter mode is legacy.
 
 Usage:
     python3 scripts/visual_gate.py IMAGE [IMAGE ...] \
@@ -105,43 +106,27 @@ TIER_MODELS = {
 MAX_TOKENS = 1200
 TEMPERATURE = 0.2
 
-REVIEWER_PROMPT = (
-    "You are a strict visual QA reviewer for 'LandlordHours', an iOS app that helps "
-    "landlords track hours toward IRS Real Estate Professional Status (REPS) and "
-    "Material Participation qualification. Design language: Tiimo-inspired, soft, "
-    "rounded, friendly, modern; DM Serif Display for headers/titles, DM Sans for body. "
-    "Supports light and dark themes via AdaptiveColors — a dark background is a "
-    "legitimate theme variant on a dark-theme frame, never a violation on its own. "
-    "Color-intent rules (violations of these ARE findings): violet/action "
-    "(~#7C6FF7 light / ~#9D8FF5 dark) is the primary action/brand color for CTAs, "
-    "toggles-on, links, selected nav; sage/positive/green (~#34D399 / #059669) is "
-    "reserved ONLY for success, qualified, complete, goal-met, active-Pro states — "
-    "never for ordinary continue/add/save/toggle actions; honey/caution (~#FBBF24) "
-    "means warning/needs-attention; coral/destructive (~#F472B6) means delete/error; "
-    "sky/informational (~#60A5FA) means imports/sync/neutral info. Cards use white "
-    "(light) or near-black secondary surface (dark) backgrounds with rounded corners "
-    "(8/12/16/20pt scale) and generous padding (~20px). Review this app frame for: "
-    "(a) layout defects — overlapping elements, clipped or truncated text, "
-    "collapsed/tiny text, elements colliding with screen edges or each other, "
-    "misalignment, inconsistent row heights/padding/corner radii vs adjacent "
-    "sections in the same frame; (b) legibility — insufficient contrast on the "
-    "given theme's background, type too small, caption text hard to read; "
-    "(c) hierarchy — competing focal points, primary action/toggle state unclear; "
-    "(d) consistency — components that break the design system (wrong radius, "
-    "stray hardcoded colors, wrong icon style, a toggle or badge using the wrong "
-    "semantic color per the intent rules above); (e) dark-mode correctness — any "
-    "light-theme token bleeding into a dark frame (e.g. light-mode surface color, "
-    "wrong text contrast); (f) anything reading as unfinished, placeholder, or "
-    "broken. For each finding give: element, location in frame, why it violates, "
-    "severity (BLOCKER / MINOR / NIT). Simulator status bars and device bezels are "
-    "not findings. End with exactly one line: 'VERDICT: PASS' or "
+RUBRIC_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qa", "gate_rubric.md")
+# 2.0 Blueprint rubric (docs/design/2.0-brand-system.md). The 1.x violet/Tiimo rubric that used to be
+# embedded here is retired; edit scripts/qa/gate_rubric.md, not this file. `--print-prompt` prints it.
+REVIEWER_OUTPUT_FORMAT = (
+    "\n\nFor each finding give: element, location in frame, why it violates, measurement, "
+    "severity (BLOCKER / MINOR / NIT). End with exactly one line: 'VERDICT: PASS' or "
     "'VERDICT: FLAG — <one-line reason>'."
 )
+
+
+def load_reviewer_prompt():
+    with open(RUBRIC_PATH, encoding="utf-8") as fh:
+        return fh.read().strip() + REVIEWER_OUTPUT_FORMAT
+
+
+REVIEWER_PROMPT = load_reviewer_prompt()
 # Bump this whenever REVIEWER_PROMPT's substantive content changes (not for
 # typo fixes). Persisted/cached verdicts are only comparable to each other
 # within the same promptVersion — the JSONL and cache both key on it so a
 # prompt change can never silently reuse a verdict judged under old rules.
-PROMPT_VERSION = "landlordhours-visual-gate-v1"
+PROMPT_VERSION = "landlordhours-visual-gate-v2-blueprint"
 
 # --- Fail-closed cost/budget knobs -----------------------------------------
 # Conservative per-model-call estimate used only for the pre-flight budget
@@ -691,6 +676,11 @@ def build_arg_parser():
              "frame's content SHA has been judged before, otherwise new. "
              "Ignored when --models is passed.",
     )
+    parser.add_argument(
+        "--print-prompt", action="store_true",
+        help="Print the 2.0 reviewer rubric (scripts/qa/gate_rubric.md) and exit. No model calls. "
+             "The in-house visual-gate agent uses this as its design bar.",
+    )
     parser.add_argument("--context", default=None, help="Extra scene context to append to the reviewer prompt.")
     parser.add_argument(
         "--history", metavar="FRAME_NAME", default=None,
@@ -715,6 +705,10 @@ def build_arg_parser():
 def main():
     parser = build_arg_parser()
     args = parser.parse_args()
+
+    if args.print_prompt:
+        print(REVIEWER_PROMPT)
+        sys.exit(0)
 
     if args.history:
         print_history(args.history)

@@ -11,10 +11,17 @@ Per frame:
   text         glyph clusters (edge-density line boxes): glyph colour vs local background contrast;
                flags < 4.5:1, or < 3:1 for big text (box height >= 22pt)
 Writes frame_check.json (everything) and frame_check.md (ONLY flagged frames and regions).
+Suppression (defaults in DEFAULTS, override with --config JSON, disable with --no-suppress):
+  skip frames   names matching `*midfade*` (mid-animation) get no checks and are listed under Skipped
+  iOS-drawn     lock-screen / wallpaper frames: only the duplicate check runs
+  theme-fixed   Welcome frames: dark/light byte-identical pairs are expected; Welcome and paywall-* frames may have blueprint blue as canvas
+  bands         text is ignored inside the status bar, home indicator, tab bar and the scroll fade above it
+  allowed       per-region token allow-list (blueprint #1E3FA6, hero gradient #1D3EA4>#19358E)
+  glyph size    clusters smaller than --min-cluster-pt, or small square-ish blobs (card corners), are not text
 Exit 0 clean, 1 flagged. Python 3 stdlib + Pillow. Heuristics: confirm every flag by eye.
 Tokens come from docs/design/2.0-brand-system.md.
 """
-import argparse, colorsys, hashlib, json, math, sys
+import argparse, colorsys, fnmatch, hashlib, json, math, sys
 from collections import deque
 from pathlib import Path
 from PIL import Image, ImageChops, ImageFilter
@@ -29,6 +36,43 @@ TOKENS = {  # docs/design/2.0-brand-system.md
     "actionSurface": {"light": "#E3E9FA", "dark": "#182A5C"},
     "brand": {"light": "#1E3FA6", "dark": "#1E3FA6"},  # theme-fixed blueprint hero
 }
+# Everything a gate has repeatedly rejected as a false positive lives here. Override with --config FILE.json.
+DEFAULTS = {
+    "bands_pt": {"status_bar": 54, "home_indicator": 34, "tab_bar": 112, "scroll_fade": 28},  # heights; tab_bar includes the home indicator
+    "skip_frame_globs": ["*midfade*"],
+    "ios_drawn_globs": ["*lockscreen*", "*lock-screen*", "*lock_screen*", "*wallpaper*"],
+    "theme_fixed_globs": ["*welcome*"],  # dark/light byte-identical pairs are expected (not paywalls: identical AX3 states are a real defect)
+    "blueprint_canvas_globs": ["*welcome*", "*paywall-*"],  # full-bleed blueprint screens: blueprint blue is the canvas
+    "min_cluster_pt": [16, 8],       # (width, height) of a glyph cluster, in points
+    "corner_blob_max_pt": [24, 1.6],  # clusters narrower than this AND with width/height below the ratio are card corners
+    "allowed_tokens": {  # region -> [{"color": "#hex" | "#a>#b" gradient, "tol": dE, "frames": optional glob}]
+        "card": [{"color": "#1E3FA6", "tol": 8}, {"color": "#1D3EA4>#19358E", "tol": 10}],
+        "action": [{"color": "#1E3FA6", "tol": 8}, {"color": "#1D3EA4>#19358E", "tol": 10}],
+        "canvas": [{"color": "#1E3FA6", "tol": 10, "frames": "@blueprint_canvas"},
+                   {"color": "#1D3EA4>#19358E", "tol": 12, "frames": "@blueprint_canvas"}],
+    },
+}
+CFG = DEFAULTS
+
+
+def seg_dist(c, a, b):
+    """Smallest dE from colour c to the RGB segment a-b (sampled; gradients are linear in RGB)."""
+    return min(dE(c, tuple(a[i] + (b[i] - a[i]) * t / 20 for i in range(3))) for t in range(21))
+
+
+def allowed(region, rgb, fname):
+    for e in CFG["allowed_tokens"].get(region, []):
+        fr = e.get("frames")
+        if fr and not (matches(fname, CFG["blueprint_canvas_globs"]) if fr == "@blueprint_canvas" else fnmatch.fnmatch(fname, fr)): continue
+        a, _, b = e["color"].partition(">")
+        d = seg_dist(rgb, hex2rgb(a), hex2rgb(b)) if b else dE(rgb, hex2rgb(a))
+        if d <= e.get("tol", 8): return e["color"]
+    return None
+
+
+def matches(name, globs): return any(fnmatch.fnmatch(name, g) for g in globs)
+
+
 DELTA_E_FLAG = {"canvas": 8.0, "card": 8.0, "action": 16.0}
 
 
@@ -114,7 +158,7 @@ def status_bar(im):
     return out
 
 
-def sample_tokens(im):
+def sample_tokens(im, fname="", suppress=True):
     W, H = im.size
     res = {}
     # canvas: gutter strip x = 3..9pt, four heights
@@ -147,12 +191,15 @@ def sample_tokens(im):
             for theme, hx in TOKENS[tn].items():
                 d = dE(rgb, hex2rgb(hx))
                 if best is None or d < best[0]: best = (d, tn, theme, hx)
+        flag = best[0] > DELTA_E_FLAG[name]
+        ok = allowed(name, rgb, fname) if (flag and suppress) else None
         out[name] = {"sampled": rgb2hex(rgb), "nearest": f"{best[1]}/{best[2]} {best[3]}", "deltaE": round(best[0], 1),
-                     "flag": best[0] > DELTA_E_FLAG[name]}
+                     "flag": flag and not ok}
+        if ok: out[name]["allowed_by"] = ok
     return out
 
 
-def text_regions(im, min_ratio):
+def text_regions(im, min_ratio, suppress=True, stats=None):
     """Find line boxes by edge density, measure glyph-vs-background contrast in each."""
     W, H = im.size
     g = im.convert("L").resize((W // 3, H // 3), Image.LANCZOS)
@@ -162,7 +209,12 @@ def text_regions(im, min_ratio):
     data = e.load()
     seen = bytearray(w * h)
     boxes = []
-    top = STATUS_PT  # status bar handled separately
+    b = CFG["bands_pt"]
+    top = STATUS_PT if not suppress else b["status_bar"]  # status bar handled separately
+    ph = H / SCALE
+    bottom_cut = ph - b["tab_bar"] - b["scroll_fade"]  # tab bar, home indicator and the fade above it
+    stats = stats if stats is not None else {}
+    def bump(k): stats[k] = stats.get(k, 0) + 1
     for y0 in range(top, h):
         for x0 in range(w):
             if data[x0, y0] and not seen[y0 * w + x0]:
@@ -187,6 +239,13 @@ def text_regions(im, min_ratio):
         if not r: continue
         ink, bg, cr = r
         height_pt = (box[3] - box[1]) / SCALE
+        width_pt = (box[2] - box[0]) / SCALE
+        if suppress:
+            if (box[1] / SCALE + height_pt / 2) >= bottom_cut: bump("band: tab bar / home indicator / scroll fade"); continue
+            mw, mh = CFG["min_cluster_pt"]
+            if width_pt < mw or height_pt < mh: bump("glyph cluster too small"); continue
+            cw, cr_ = CFG["corner_blob_max_pt"]
+            if width_pt < cw and width_pt / max(height_pt, 1) < cr_: bump("corner-like blob"); continue
         big = height_pt >= 22
         need = 3.0 if big else min_ratio
         out.append({"box_pt": [round(box[0] / SCALE), round(box[1] / SCALE), round(box[2] / SCALE), round(box[3] / SCALE)],
@@ -204,15 +263,40 @@ def main():
     ap.add_argument("--crops", action="store_true", help="save a crop of every flagged text region")
     ap.add_argument("--min-ratio", type=float, default=4.5)
     ap.add_argument("--violet-max", type=float, default=0.05, help="flag when violet pixels exceed this percent")
+    ap.add_argument("--config", help="JSON file overriding DEFAULTS (bands_pt, skip_frame_globs, allowed_tokens, ...)")
+    ap.add_argument("--skip-glob", action="append", default=[], help="extra frame-name glob to skip (repeatable)")
+    ap.add_argument("--exclude-top", type=float, help="status bar band height in pt (text ignored above it)")
+    ap.add_argument("--exclude-bottom", type=float, help="tab bar band height in pt, home indicator included")
+    ap.add_argument("--min-cluster-pt", help="WxH minimum glyph cluster in pt, e.g. 16x8")
+    ap.add_argument("--no-suppress", action="store_true", help="old behaviour: every raw flag, no suppression rules")
     a = ap.parse_args()
+    global CFG
+    CFG = json.loads(json.dumps(DEFAULTS))
+    if a.config:
+        for k, v in json.loads(Path(a.config).read_text()).items():
+            CFG[k].update(v) if isinstance(CFG.get(k), dict) else CFG.__setitem__(k, v)
+    CFG["skip_frame_globs"] += a.skip_glob
+    if a.exclude_top is not None: CFG["bands_pt"]["status_bar"] = a.exclude_top
+    if a.exclude_bottom is not None: CFG["bands_pt"]["tab_bar"] = a.exclude_bottom
+    if a.min_cluster_pt: CFG["min_cluster_pt"] = [float(x) for x in a.min_cluster_pt.lower().split("x")]
+    sup = not a.no_suppress
+    suppressed = {}
     root = Path(a.dir)
     files = sorted(root.rglob("*.png") if a.recursive else root.glob("*.png"))
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     frames, skipped, hashes = [], [], {}
     for f in files:
         hashes.setdefault(hashlib.sha256(f.read_bytes()).hexdigest(), []).append(f.name)
-    dups = [v for v in hashes.values() if len(v) > 1]
+    def dup_exempt(n): return sup and (matches(n, CFG["skip_frame_globs"]) or matches(n, CFG["theme_fixed_globs"]))
+    dups = []
+    for v in hashes.values():
+        v = [n for n in v if not (sup and matches(n, CFG["skip_frame_globs"]))]
+        if len(v) > 1 and not (all(dup_exempt(n) for n in v)):
+            dups.append(v)
+        elif len(v) > 1: suppressed["theme-fixed identical pair"] = suppressed.get("theme-fixed identical pair", 0) + 1
     for f in files:
+        if sup and matches(f.name, CFG["skip_frame_globs"]):
+            skipped.append((f.name, "mid-animation frame (skip glob)")); continue
         try:
             im = Image.open(f).convert("RGB")
         except Exception as e:
@@ -220,16 +304,19 @@ def main():
         if im.width < 1000 or not (0.40 <= im.width / im.height <= 0.80):
             skipped.append((f.name, f"not a 3x phone/tablet frame ({im.width}x{im.height})")); continue
         rec = {"file": f.name, "size": [im.width, im.height], "flags": []}
+        ios = sup and matches(f.name, CFG["ios_drawn_globs"])
+        if ios:
+            skipped.append((f.name, "iOS-drawn frame: only the duplicate check applies")); frames.append(rec); continue
         v = violet_pct(im); rec["violet_pct"] = round(v, 3)
         if v > a.violet_max: rec["flags"].append(f"violet {v:.2f}% of pixels")
         rec["status_bar"] = status_bar(im)
         for s in rec["status_bar"]:
             need = 4.5
             if s["ratio"] < need: rec["flags"].append(f"status bar {s['part']} {s['ratio']}:1 ({s['ink']} on {s['bg']})")
-        rec["tokens"] = sample_tokens(im)
+        rec["tokens"] = sample_tokens(im, f.name, sup)
         for k, t in rec["tokens"].items():
             if t["flag"]: rec["flags"].append(f"token {k} {t['sampled']} is dE {t['deltaE']} from {t['nearest']}")
-        tr = text_regions(im, a.min_ratio)
+        tr = text_regions(im, a.min_ratio, sup, suppressed)
         rec["text_regions"] = [{k: v for k, v in t.items() if k != "_box"} for t in tr]
         for i, t in enumerate(tr):
             if t["flag"]:
@@ -245,11 +332,13 @@ def main():
         if r["file"] in dup_names:
             grp = next(g for g in dups if r["file"] in g)
             r["flags"].insert(0, "byte-identical to " + ", ".join(n for n in grp if n != r["file"]))
-    rep = {"dir": str(root), "frames": len(frames), "duplicates": dups, "skipped": skipped, "results": frames}
+    rep = {"dir": str(root), "frames": len(frames), "duplicates": dups, "skipped": skipped, "suppressed": suppressed, "results": frames}
     (out / "frame_check.json").write_text(json.dumps(rep, indent=1))
     L = [f"# frame_check: {root}", "",
          f"{len(frames)} frames, {sum(1 for r in frames if r['flags'])} flagged, {len(dups)} duplicate group(s), "
          f"{len(skipped)} skipped. Heuristics: confirm each flag by eye. Only flagged items are listed.", ""]
+    if suppressed:
+        L += ["Suppressed (not flagged): " + "; ".join(f"{k} x{v}" for k, v in sorted(suppressed.items())), ""]
     if dups:
         L += ["## Byte-identical files", ""] + ["- " + ", ".join(g) for g in dups] + [""]
     flagged = [r for r in frames if r["flags"]]
