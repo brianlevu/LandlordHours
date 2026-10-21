@@ -423,6 +423,17 @@ final class InboxAtLimitViewModelTests: CaptureTestCase {
 // MARK: - StoreKit test configuration: real purchase, Ask to Buy, failure, restore
 
 #if canImport(StoreKitTest)
+/// The test process's single StoreKit test session (see ProPurchaseStoreKitTests.setUp).
+enum SharedStoreKitTestSession {
+    nonisolated(unsafe) private static var shared: SKTestSession?
+    static func session() throws -> SKTestSession {
+        if let shared { return shared }
+        let made = try SKTestSession(configurationFileNamed: "LandlordHours")
+        shared = made
+        return made
+    }
+}
+
 @MainActor
 final class ProPurchaseStoreKitTests: XCTestCase {
     private var session: SKTestSession!
@@ -430,7 +441,10 @@ final class ProPurchaseStoreKitTests: XCTestCase {
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        session = try SKTestSession(configurationFileNamed: "LandlordHours")
+        // One shared session for the whole test process: a second SKTestSession, or a released
+        // one, detaches the StoreKit test environment, so later purchases come back empty
+        // (transaction id 0) and the suite turned order-dependent.
+        session = try SharedStoreKitTestSession.session()
         session.resetToDefaultState()
         session.disableDialogs = true
         session.clearTransactions()
@@ -442,7 +456,6 @@ final class ProPurchaseStoreKitTests: XCTestCase {
         session.failTransactionsEnabled = false
         session.clearTransactions()
         resetScoped()
-        session = nil
         try super.tearDownWithError()
     }
 
