@@ -267,9 +267,9 @@ final class AuditReportBuilderTests: XCTestCase {
         let me = report.qualifications.first { $0.participant == .selfParticipant }!
         XCTAssertNil(me.meetsMoreThanHalfTest, "0 other work hours must not pass the more-than-half test")
         XCTAssertNil(me.isQualified)
-        XCTAssertEqual(me.moreThanHalfText, "Not evaluated — add your other work hours")
+        XCTAssertEqual(me.moreThanHalfText, "Not checked. Add your other work hours")
         let spouse = report.qualifications.first { $0.participant == .spouse }!
-        XCTAssertTrue(spouse.moreThanHalfText.contains("spouse work hours aren't tracked"))
+        XCTAssertTrue(spouse.moreThanHalfText.contains("Spouse work hours aren’t tracked"))
 
         let entered = AuditReportBuilder.build(AuditReportBuilder.inputFromTaxProfile(
             entries: entries, properties: [F.oak], taxYear: 2026,
@@ -288,8 +288,8 @@ final class AuditReportBuilderTests: XCTestCase {
         ]
         let report = build(entries, nonRE: [.selfParticipant: 100])
         let lines = report.qualifications.map(\.coverLine)
-        XCTAssertEqual(lines[0], "You: 412.00 hours. The 750-hour test needs more than 750 hours.")
-        XCTAssertEqual(lines[1], "Spouse: 760.00 hours. Meets the 750-hour test; more-than-half test not evaluated.")
+        XCTAssertEqual(lines[0], "You: 412.00 hours. That is not yet over 750.")
+        XCTAssertEqual(lines[1], "Spouse: 760.00 hours. Over 750. Half of work hours not checked.")
         for line in lines {
             XCTAssertFalse(line.lowercased().contains("qualifies"))
             XCTAssertFalse(line.lowercased().contains("guarantee"))
@@ -300,7 +300,7 @@ final class AuditReportBuilderTests: XCTestCase {
         let report = build([F.entry(property: F.oak, hours: 750, date: F.date(2026, 3, 1))], participants: [.selfParticipant])
         let me = report.qualifications[0]
         XCTAssertFalse(me.meets750HourTest, "IRS test is more than 750 hours")
-        XCTAssertEqual(me.coverLine, "You: 750.00 hours. The 750-hour test needs more than 750 hours.")
+        XCTAssertEqual(me.coverLine, "You: 750.00 hours. That is not yet over 750.")
     }
 
     func testSpouseIncludedWhenTheyLoggedTimeEvenIfNotRequested() {
@@ -693,7 +693,7 @@ final class AuditReportPDFTests: XCTestCase {
             XCTAssertTrue(text.contains("not tax advice"), "page \(index + 1) disclaimer")
         }
         let all = document.string ?? ""
-        for expected in ["Qualification by participant", "Hours by property", "Hours by category", "Hours by participant",
+        for expected in ["REPS hours by participant", "Hours by property", "Hours by category", "Hours by participant",
                          "Time entries (chronological)", "Appendix: photos and receipts", "Oak Street Duplex", "Pine Cabin",
                          "water-heater-receipt.jpg", "Calendar", "Timer", "Voice", "E46"] {
             XCTAssertTrue(all.contains(expected), "missing \(expected)")

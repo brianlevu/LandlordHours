@@ -201,7 +201,7 @@ struct AddEditCategoryView: View {
                 .padding(.bottom, 32)
             }
             .background { LHMobileCanvas() }
-            .navigationTitle(editingCategory == nil ? "Add Category" : "Edit Category")
+            .navigationTitle(editingCategory == nil ? "Add category" : "Edit category")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -296,10 +296,10 @@ struct AddEditCategoryView: View {
     }
 
     private var repsCard: some View {
-        categoryEditCard(title: "Qualification") {
+        categoryEditCard(title: "Real estate hours") {
             Toggle("Count for REPS", isOn: $countsForREPS)
                 .font(AppTypography.body)
-            Text("Only qualifying real estate work counts toward the 750-hour REPS goal.")
+            Text("Turn this off for investor work, like financing. It won’t count toward your 750 hours.")
                 .font(AppTypography.caption)
                 .foregroundStyle(colors.textSecondary)
         }

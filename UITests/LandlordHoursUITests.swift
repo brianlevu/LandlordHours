@@ -255,7 +255,7 @@ final class LandlordHoursUITests: XCTestCase {
         // 2.0: an owner with no property sees the empty lot; its "Add property" is the one action.
         let addProperty = app.buttons["today.hero.addProperty"].firstMatch
         XCTAssertTrue(addProperty.waitForExistence(timeout: 8))
-        XCTAssertFalse(app.staticTexts["Finish your tax-ready setup"].exists, "Setup card follows the first property")
+        XCTAssertFalse(app.staticTexts["Finish setting up"].exists, "Setup card follows the first property")
         let propertyName = app.textFields["property.name"]
         // The launch splash fades over ~1s and can swallow the first tap.
         for _ in 0..<3 where !propertyName.exists {
@@ -301,7 +301,7 @@ final class LandlordHoursUITests: XCTestCase {
 
         XCTAssertTrue(app.descendants(matching: .any)["shell.toast"].waitForExistence(timeout: 5))
 
-        XCTAssertFalse(app.staticTexts["Finish your tax-ready setup"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["Finish setting up"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["home.activation.firstHour"].exists)
     }
 

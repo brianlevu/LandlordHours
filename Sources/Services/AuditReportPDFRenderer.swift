@@ -163,7 +163,7 @@ private final class Composer {
     }
 
     private func drawQualification() {
-        sectionTitle("Qualification by participant (REPS)")
+        sectionTitle("REPS hours by participant")
         let rows = report.qualifications.map { q -> [String] in
             [
                 q.participant.rawValue,
@@ -184,7 +184,7 @@ private final class Composer {
                 Column(title: "Result", width: 210),
             ],
             rows: rows,
-            trailingNote: "REPS is tested for each spouse separately; spouse hours are not combined for the 750-hour test. Investor-level tasks (investing, financing, purchase negotiation) are excluded. Non-real-estate work hours come from the Tax Profile in the app; spouse work hours aren't tracked in the app yet, so the spouse's more-than-half test is not evaluated."
+            trailingNote: "REPS is tested for each spouse separately; spouse hours are not combined for the 750-hour test. Investor-level tasks (investing, financing, purchase negotiation) are excluded. Non-real-estate work hours come from the Tax Profile in the app; spouse work hours aren’t tracked in the app yet, so the spouse’s more-than-half test is not evaluated."
         )
 
         if !report.materialParticipation.isEmpty {

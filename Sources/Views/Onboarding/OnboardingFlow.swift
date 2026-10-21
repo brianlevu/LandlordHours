@@ -80,8 +80,8 @@ enum OnbGoal: String, CaseIterable {
     static func spouseNote(for goal: OnbGoal?) -> String {
         switch goal {
         case .mp500, .mp100: return "Your hours count together for material participation."
-        case .record: return "You'll each have your own count."
-        case .reps750, nil: return "You'll each have your own count. For the 750-hour test, one of you has to get there alone."
+        case .record: return "You’ll each have your own count."
+        case .reps750, nil: return "You’ll each have your own count. For the 750-hour test, one of you has to get there alone."
         }
     }
 }

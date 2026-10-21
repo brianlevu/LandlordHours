@@ -85,7 +85,7 @@ class CalendarImportService {
             results.append(DetectedCalendarEntry(
                 sourceExternalId: event.eventIdentifier,
                 sourceCalendarId: event.calendar.calendarIdentifier,
-                eventTitle: event.title ?? "Calendar Event",
+                eventTitle: event.title ?? "Calendar event",
                 eventDate: start,
                 propertyId: matchedProperty?.id,
                 category: categorizeEvent(title: title),

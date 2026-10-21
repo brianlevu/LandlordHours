@@ -242,7 +242,7 @@ final class CalendarDetectorTests: CalendarCaptureTestCase {
     func testMissingTitleUsesSame1xFallback() async throws {
         let found = try await makeDetector(FakeCalendarSource(events: [event(start: date(2026, 5, 4, 10), title: nil)]))
             .detect(in: DateInterval(start: date(2026, 5, 1), end: now))
-        XCTAssertEqual(found.first?.title, "Calendar Event")
+        XCTAssertEqual(found.first?.title, "Calendar event")
     }
 
     // MARK: Permissions

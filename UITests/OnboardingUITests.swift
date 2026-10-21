@@ -138,7 +138,7 @@ final class OnboardingUITests: XCTestCase {
         tap(app.buttons["onb-primary"])                            // 3 Build toward 750h
         tap(app.buttons["onb-link"])                               // 4 Not now
         tap(app.buttons["onb-primary"])                            // 5 Continue
-        tap(app.buttons["onb-link"])                               // 6 I'll add it later
+        tap(app.buttons["onb-link"])                               // 6 I’ll add it later
         XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["today.hero.addProperty"].waitForExistence(timeout: 5), "The empty lot carries Add property")
         XCTAssertTrue(app.buttons["today-find-hours"].exists, "Look at my calendar waits on Today")

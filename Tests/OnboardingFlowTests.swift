@@ -117,7 +117,7 @@ final class OnboardingFlowTests: XCTestCase {
         XCTAssertEqual(flow.step, .who)
         flow.confirmWho(); taps += 1                  // Continue (just me)
         XCTAssertEqual(flow.step, .property)
-        flow.skipProperty(); taps += 1                // I'll add it later
+        flow.skipProperty(); taps += 1                // I’ll add it later
         XCTAssertEqual(taps, 6)
         XCTAssertEqual(r.completion, OnbCompletion(cohort: .new, openInbox: false, foundShown: false,
                                                    skippedProperty: true, calendar: .notNow))

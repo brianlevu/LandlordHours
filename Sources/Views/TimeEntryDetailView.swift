@@ -108,10 +108,10 @@ struct TimeEntryDetailView: View {
                 dismiss()
             }
         } message: {
-            Text("It comes off your hours and your export. This can't be undone.")
+            Text("It comes off your hours and your export. This can’t be undone.")
         }
         .alert("Discard changes?", isPresented: $showingDiscardAlert) {
-            Button("Keep Editing", role: .cancel) {}
+            Button("Keep editing", role: .cancel) {}
             Button("Discard", role: .destructive) { discardChanges() }
         } message: {
             Text("Your edits to this record will be lost.")

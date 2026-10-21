@@ -13,7 +13,7 @@ enum LogSaveResult: Equatable {
     /// Nothing was saved; the message says why, in plain words.
     case failed(String)
 
-    static let writeFailedMessage = "Couldn't save this. Free up some space on your iPhone and try again."
+    static let writeFailedMessage = "Couldn’t save this. Free up some space on your iPhone and try again."
     static let missingPropertyMessage = "Pick a property to log this."
     static let missingHoursMessage = "Add how long it took to log this."
 

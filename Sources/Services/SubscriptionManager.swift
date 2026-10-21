@@ -109,7 +109,7 @@ class SubscriptionManager: ObservableObject {
 
             // Find the pro product
             guard let product = products.first(where: { $0.id == proProductID }) else {
-                purchaseError = "We couldn't reach the App Store to load Pro. Check your connection and try again."
+                purchaseError = "We couldn’t reach the App Store to load Pro. Check your connection and try again."
                 isLoading = false
                 return .failed
             }
@@ -125,7 +125,7 @@ class SubscriptionManager: ObservableObject {
                     await transaction.finish()
                     outcome = .purchased
                 } else {
-                    purchaseError = "The App Store couldn't confirm this purchase. Please try again."
+                    purchaseError = "The App Store couldn’t confirm this purchase. Please try again."
                 }
                 
             case .userCancelled:
@@ -133,7 +133,7 @@ class SubscriptionManager: ObservableObject {
                 outcome = .cancelled
                 
             case .pending:
-                purchaseError = "Purchase is pending approval. We'll unlock Pro after it is approved."
+                purchaseError = "Purchase is pending approval. We’ll unlock Pro after it is approved."
                 outcome = .pending
                 
             @unknown default:
@@ -165,7 +165,7 @@ class SubscriptionManager: ObservableObject {
                 return true
             }
 
-            purchaseError = "We didn't find an earlier Pro purchase for this Apple Account."
+            purchaseError = "We didn’t find an earlier Pro purchase for this Apple Account."
         } catch {
             purchaseError = "Restore failed: \(error.localizedDescription)"
         }

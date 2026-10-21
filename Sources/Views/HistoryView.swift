@@ -137,7 +137,7 @@ private struct RecordsScreen: View {
                 entryToDelete = nil
             }
         } message: {
-            Text("It comes off your hours and your export. This can't be undone.")
+            Text("It comes off your hours and your export. This can’t be undone.")
         }
         .sheet(isPresented: $showExport) {
             ExportPDFView(year: filter.year)

@@ -369,7 +369,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "lifetime")).firstMatch.exists)
         XCTAssertTrue(app.buttons["onb-link"].waitForExistence(timeout: 6))
         settleAndCapture("onboarding-last-step", scheme: scheme, waitFor: app.buttons["onb-link"])
-        tap(app.buttons["onb-link"])                           // I'll add it later
+        tap(app.buttons["onb-link"])                           // I’ll add it later
         XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 10), "Onboarding lands on the app, not a paywall")
         XCTAssertFalse(app.descendants(matching: .any)["paywall.title"].exists)
         settleAndCapture("onboarding-finished-home", scheme: scheme, waitFor: app.buttons["tab.today"])

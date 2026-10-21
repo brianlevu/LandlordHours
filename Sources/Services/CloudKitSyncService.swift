@@ -122,7 +122,7 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     /// Instrumentation for tests: held pushes flushed after a successful initial pull.
     private(set) var flushedHeldPushCount = 0
 
-    static let heldChangesMessage = "Couldn't reach iCloud. Your changes are safe on this iPhone and will sync when iCloud is back."
+    static let heldChangesMessage = "Couldn’t reach iCloud. Your changes are safe on this iPhone and will sync when iCloud is back."
 
     private var liveOperations: InitialSyncOperations {
         InitialSyncOperations(
