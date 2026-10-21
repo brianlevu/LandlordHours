@@ -572,7 +572,30 @@ private struct AutoCaptureSettingsSection: View {
     @State private var blockedMessage: String?
     @State private var isAsking = false
 
-    static let aiDisclosure = "Suggestions use Apple's on-device model. Nothing is sent to us or any third party."
+    @State private var pccOn = PCCSettings().isEnabled
+
+    /// Must stay true to the code: calendar titles only ever reach the on-device model
+    /// (ClassifierChain); a Log time note goes to the on-device model first and to Private
+    /// Cloud Compute only when the phone's model can't answer and the toggle below is on
+    /// (NoteReaderChain + PCCGate). Nothing is saved until the user taps Log.
+    /// PCC is offered (toggle + disclosure) only on iOS 27 in a build that carries the PCC
+    /// entitlement (PCCEntitlement). Otherwise notes never leave the phone, and the copy says so.
+    static var offersPCC: Bool {
+        guard #available(iOS 27.0, *) else { return false }
+        #if DEBUG
+        // Captures of the entitled variant only; the gate itself never reads this.
+        if ProcessInfo.processInfo.arguments.contains("-LHShowPCCSetting") { return true }
+        #endif
+        return PCCEntitlement.isConfigured
+    }
+
+    static var aiDisclosure: String { offersPCC ? aiDisclosureWithPCC : aiDisclosureOnDevice }
+
+    static let aiDisclosureWithPCC = "Calendar suggestions use Apple\u{2019}s on-device model. When you type or say a note in Log time, that model reads it to fill in the form. If it can\u{2019}t, Apple\u{2019}s Private Cloud Compute may read it instead (turn that off above). Private Cloud Compute doesn\u{2019}t keep your note. Nothing goes to us or anyone else, and nothing is saved until you tap Log."
+
+    static let aiDisclosureOnDevice = "Calendar suggestions and the notes you type or say in Log time are read by Apple\u{2019}s on-device model, on your iPhone, to fill in the form. Nothing goes to us or anyone else, and nothing is saved until you tap Log."
+
+    static let pccSubtitle = "Lets Apple\u{2019}s private cloud read a Log time note when your iPhone\u{2019}s model can\u{2019}t. Off keeps every note on your iPhone."
 
     var body: some View {
         Section {
@@ -593,6 +616,19 @@ private struct AutoCaptureSettingsSection: View {
             )
             .disabled(!calendarOn || isAsking || UserScope.userId == nil)
             .accessibilityIdentifier("settings.capture.prompts")
+
+            if Self.offersPCC {
+                SettingToggleRow(
+                    symbol: "lock.icloud",
+                    title: "Private Cloud Compute",
+                    subtitle: Self.pccSubtitle,
+                    isOn: Binding(get: { pccOn }, set: { on in
+                        pccOn = on
+                        PCCSettings().isEnabled = on
+                    })
+                )
+                .accessibilityIdentifier("settings.capture.pcc")
+            }
 
             Button(action: onOpenMuted) {
                 SettingRow(
@@ -649,6 +685,7 @@ private struct AutoCaptureSettingsSection: View {
     private func reload() {
         calendarOn = CaptureOptIn.calendarSuggestionsEnabled()
         promptsOn = EventPromptsConsent.isEnabled()
+        pccOn = PCCSettings().isEnabled
         muteCount = AppModelHost.shared.suggestionStore?.muteRules.count ?? 0
     }
 

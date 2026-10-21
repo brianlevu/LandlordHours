@@ -30,4 +30,9 @@ enum ModelUnavailableReason: Equatable {
     case disabledByFlag
     /// The interface exists but the feature ships later (PCC receipts: 2.1).
     case notYetSupported
+    /// PCC: the app isn't signed with com.apple.developer.private-cloud-compute (calling it
+    /// would trap), see `PCCEntitlement`.
+    case notEntitled
+    /// The model asked us to slow down; skipped until the cool-down ends (NoteModelCooldown).
+    case coolingDown
 }

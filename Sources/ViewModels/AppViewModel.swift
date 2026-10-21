@@ -820,7 +820,8 @@ class AppViewModel: ObservableObject {
         date: Date,
         notes: String,
         attachments: [TimeAttachment] = [],
-        source: EntrySource = .manual
+        source: EntrySource = .manual,
+        recordDescription: String? = nil
     ) -> LogSaveResult {
         guard properties.contains(where: { $0.id == propertyId }) else {
             return .failed(LogSaveResult.missingPropertyMessage)
@@ -835,7 +836,8 @@ class AppViewModel: ObservableObject {
             date: date,
             notes: notes,
             attachments: attachments,
-            importSource: source.storedValue
+            importSource: source.storedValue,
+            recordDescription: recordDescription
         )
         timeEntries.append(entry)
         guard writePersistentStore() else {

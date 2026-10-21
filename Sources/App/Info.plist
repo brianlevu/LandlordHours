@@ -84,5 +84,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>LHPrivateCloudComputeEntitled</key>
+	<string>$(LH_PCC_ENTITLED)</string>
 </dict>
 </plist>
