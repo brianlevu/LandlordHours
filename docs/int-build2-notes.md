@@ -120,3 +120,20 @@ Command: `copy_gate.py check --baseline release-2.0.json`
   - "{} calendar events look like rental work.": tax claim 0.31, just over the 0.30 threshold.
 
 Report: `~/AgentScratch/landlordhours/2026-10-20/int2/copy-gate/int-build2-final.md`.
+
+## Round 2 (targeted): wp-ai-log 345ad0f + wp-polish2 9b8c640
+
+Both merges exited 0 with no conflicts. xcodegen made no changes, and the grep found no markers. Simulator build passed.
+
+Three slim iPhone 17 Pro sims on iOS 27.0, with store, pim and iCloud kept on (simslim doctor 4/4):
+- **Unit:** 893 run, 3 skipped, 0 failed. This excludes `ProPurchaseStoreKitTests`, which ran alone and passed 4/4.
+  - In the full run, that class failed `testPurchaseUnlocksProAndThePaywallShowsSuccess` (ProGateTests.swift:510).
+  - Then `testRestoreFindsAnEarlierPurchase` hung until the 20-minute guard stopped it.
+  - That's 2 of 3 full runs so far. It's order-dependent in the shared SKTestSession. Needs a fix before the final full run, or it will stall it.
+- **UI, 56 tests, 0 failures:**
+  - First-time activation, settings and appearance: 3/3. Activation is fixed by 345ad0f.
+  - LogTime: 17/17. Timer draft: 5/5.
+  - TodayConfirm: 8/8. The in-suite flake from round 1 did not recur.
+  - TodayHouse: 6/6. TodayLoading: 3/3.
+  - Records/Reports/Settings: 6/6.
+  - Properties: 4/4. Property alias: 4/4.
