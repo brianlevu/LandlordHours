@@ -195,9 +195,25 @@ def extract_all(root):
         items += extract_file(p, rel, skipped)
     for p in sorted((root / "Sources").rglob("Info.plist")):
         items += extract_plist(p, str(p.relative_to(root)))
-    for p in sorted((root / "Sources").rglob("*.xcstrings")):  # none today; reported if they appear
-        skipped_files.append(str(p.relative_to(root)) + " (xcstrings not parsed)")
+    for p in sorted((root / "Sources").rglob("*.xcstrings")):
+        items += extract_xcstrings(p, str(p.relative_to(root)))
     return items, skipped, skipped_files
+
+
+def extract_xcstrings(path, rel):
+    """Source-language values of a String Catalog (e.g. the Learning center's article text)."""
+    out = []
+    raw = path.read_text(errors="replace")
+    data = json.loads(raw)
+    src = data.get("sourceLanguage", "en")
+    for key, entry in data.get("strings", {}).items():
+        unit = (entry.get("localizations", {}).get(src, {}) or {}).get("stringUnit", {})
+        text = unit.get("value") or key
+        if not re.search(r"[A-Za-z]{2}", text):
+            continue
+        line = raw.count("\n", 0, max(0, raw.find(json.dumps(key)))) + 1
+        out.append({"file": rel, "line": line, "text": re.sub(r"\s+", " ", text).strip(), "kind": "catalog"})
+    return out
 
 
 # ------------------------------------------------------------ deterministic
@@ -528,7 +544,7 @@ def render_md(rep, has_base):
           ", ".join(f"{k}: {v}" for k, v in sorted(rep["skipped_counts"].items())) or "none"]
     if rep["skipped_files"]:
         L += ["", "Files skipped whole: " + ", ".join(rep["skipped_files"])]
-    L += ["", "Not covered: strings built at runtime from non-literals, localised .strings/.xcstrings catalogs "
+    L += ["", "Not covered: strings built at runtime from non-literals, localised .strings files (.xcstrings source values are read) "
           "(none present), and App Store metadata (see scripts/copy-gate)."]
     j = rep["jev"]
     L += ["", f"Jev: model {j['model']}, {j['calls']} calls (+{j['cached']} cached), {j['input_tokens']} input tokens, "

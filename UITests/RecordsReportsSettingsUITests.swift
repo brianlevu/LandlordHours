@@ -229,9 +229,8 @@ final class RecordsReportsSettingsUITests: XCTestCase {
 
         launch(tab: 4, scheme: scheme)
         tapWhenReady(element("settings.deleteData"), maxSwipes: 12)
-        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(element("delete.screen").waitForExistence(timeout: 5))
         settleAndCapture("settings-delete-data-\(scheme)")
-        app.alerts.firstMatch.buttons["Cancel"].tap()
 
         launch(tab: 4, scheme: scheme)
         tapWhenReady(element("settings.profile"))

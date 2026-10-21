@@ -650,9 +650,12 @@ struct OnbWhatsNewHouseStep: View {
     @Bindable var flow: OnbFlow
     @Environment(\.accessibilityReduceMotion) private var reduce
 
-    private var stageLine: String {
-        let progress = HouseProgress(hours: flow.upgradeHours, goal: flow.upgradeGoal)
-        var parts = ["\(Int(flow.upgradeHours.rounded(.down)))h", progress.stage.spokenName.lowercased()]
+    private var stageLine: String { Self.stageLine(hours: flow.upgradeHours, goal: flow.upgradeGoal) }
+
+    /// "312h · frame going up · roof at 500h": the upgrader's real total, as the house stage.
+    static func stageLine(hours: Double, goal: HouseGoal) -> String {
+        let progress = HouseProgress(hours: hours, goal: goal)
+        var parts = ["\(Int(progress.hours.rounded(.down)))h", progress.stage.spokenName.lowercased()]
         if progress.nextStep != nil { parts.append(progress.nextMilestoneLabel.lowercased()) }
         return parts.joined(separator: " · ")
     }

@@ -957,12 +957,20 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         recordIDs.append(contentsOf: entries.map { CKRecord.ID(recordName: $0.id.uuidString, zoneID: zoneID) })
         recordIDs.append(contentsOf: categories.map { CKRecord.ID(recordName: $0.id.uuidString, zoneID: zoneID) })
         for recordType in ["Property", "TimeEntry", "CustomCategory"] {
-            recordIDs.append(contentsOf: try await fetchRecordIDs(recordType: recordType, userId: userId))
+            do {
+                recordIDs.append(contentsOf: try await fetchRecordIDs(recordType: recordType, userId: userId))
+            } catch let error as CKError where error.code == .unknownItem {
+                // "Did not find record type": the type was never created in this container (for
+                // example no custom category was ever saved), so it holds nothing to delete.
+                continue
+            }
         }
         recordIDs.append(CKRecord.ID(recordName: "GoalSettings-\(userId)", zoneID: zoneID))
         recordIDs.append(CKRecord.ID(recordName: "TaxProfile-\(userId)", zoneID: zoneID))
 
-        let uniqueRecordIDs = Array(Dictionary(uniqueKeysWithValues: recordIDs.map { ($0.recordName, $0) }).values)
+        // Local ids and the ids fetched from iCloud overlap for every synced record: de-duplicate
+        // (uniqueKeysWithValues traps on the first duplicate, which crashed every iCloud delete).
+        let uniqueRecordIDs = Array(Dictionary(recordIDs.map { ($0.recordName, $0) }, uniquingKeysWith: { first, _ in first }).values)
         let batchSize = 400
         for offset in stride(from: 0, to: uniqueRecordIDs.count, by: batchSize) {
             let batch = Array(uniqueRecordIDs[offset..<min(offset + batchSize, uniqueRecordIDs.count)])

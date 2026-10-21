@@ -1,0 +1,655 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "learn.disclaimer": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "General information, not tax advice. Your tax pro has the final word."
+          }
+        }
+      }
+    },
+    "learn.driving.p1": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time spent driving to and from a rental for real work on it usually counts as real estate time."
+          }
+        }
+      }
+    },
+    "learn.driving.p2": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log the drive with the work it was for, or as its own entry. A drive to meet a plumber at the property is part of that repair."
+          }
+        }
+      }
+    },
+    "learn.driving.p3": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A drive that was mostly for something else, like a family visit that passed the rental, shouldn’t be logged."
+          }
+        }
+      }
+    },
+    "learn.driving.p4": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep the miles too. Your tax pro may use them for a separate deduction."
+          }
+        }
+      }
+    },
+    "learn.driving.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Driving to your rentals"
+          }
+        }
+      }
+    },
+    "learn.fifty-percent.p1": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The 50% rule is the second test for being a real estate professional. More than half of all the hours you work in the year have to be in real estate work you take part in."
+          }
+        }
+      }
+    },
+    "learn.fifty-percent.p2": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add up every working hour: your job, any side business, and your rentals. Your real estate hours need to be more than half of that total."
+          }
+        }
+      }
+    },
+    "learn.fifty-percent.p3": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For example, if you work 1,500 hours in total, more than 750 of them need to be real estate. If you also work a full-time job of about 2,000 hours, you’d need more than 2,000 hours of real estate work as well."
+          }
+        }
+      }
+    },
+    "learn.fifty-percent.p4": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hours you work as an employee only count as real estate work if you own more than 5% of the company you work for."
+          }
+        }
+      }
+    },
+    "learn.fifty-percent.p5": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add your other work hours in Tax profile and the app keeps the ratio up to date as you log."
+          }
+        }
+      }
+    },
+    "learn.fifty-percent.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The 50% rule"
+          }
+        }
+      }
+    },
+    "learn.goal-750.p1": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you work in real estate, the tax rules can treat your rentals differently. The IRS calls this being a real estate professional, and it has two tests."
+          }
+        }
+      }
+    },
+    "learn.goal-750.p2": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The first test asks for more than 750 hours in a year on real estate work you take part in. Repairs, showings, tenant calls, bookkeeping and the drive to the property all count when they’re real work on a rental."
+          }
+        }
+      }
+    },
+    "learn.goal-750.p3": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The second test is the 50% rule. Your real estate work has to be more than half of all the work you do in the year, your day job included."
+          }
+        }
+      }
+    },
+    "learn.goal-750.p4": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Both tests run on the calendar year. Hours don’t carry over, so each January starts at zero."
+          }
+        }
+      }
+    },
+    "learn.goal-750.p5": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you’re married, one of you has to pass both tests alone. You can’t add your hours together for this. LandlordHours counts your own hours toward 750 for that reason."
+          }
+        }
+      }
+    },
+    "learn.goal-750.p6": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every hour you confirm here goes on your count. Keep the entries plain and honest: what you did, where, and for how long. That’s the record your tax pro wants to see."
+          }
+        }
+      }
+    },
+    "learn.goal-750.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What the 750-hour goal means"
+          }
+        }
+      }
+    },
+    "learn.good-entry.p1": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A good entry answers four questions: when, which rental, what you did, and how long it took."
+          }
+        }
+      }
+    },
+    "learn.good-entry.p2": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Write it close to the time you did the work. A note made the same day is far easier to rely on than one pieced together months later."
+          }
+        }
+      }
+    },
+    "learn.good-entry.p3": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Be specific. “Fixed the kitchen faucet at Oak Street, 1h 30m” says much more than “Maintenance, 2h”."
+          }
+        }
+      }
+    },
+    "learn.good-entry.p4": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log the time you actually spent. If a task took 20 minutes, log 20 minutes. Rounding up adds hours that aren’t real."
+          }
+        }
+      }
+    },
+    "learn.good-entry.p5": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attach a photo when you have one: a receipt, a work order, a picture of the repair. It ties the entry to something you can show."
+          }
+        }
+      }
+    },
+    "learn.good-entry.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What makes a good entry"
+          }
+        }
+      }
+    },
+    "learn.grouping.p1": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you meet the real estate professional tests, you can choose to treat all your rental real estate as one activity."
+          }
+        }
+      }
+    },
+    "learn.grouping.p2": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Then you show material participation once, for the whole group, instead of property by property. A rental where you spent 80 hours can count together with the others."
+          }
+        }
+      }
+    },
+    "learn.grouping.p3": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You make the choice with a statement attached to your tax return. Once made, it generally keeps applying in later years."
+          }
+        }
+      }
+    },
+    "learn.grouping.p4": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is a decision to make with your tax pro. They’ll know whether it fits your rentals and how to word the statement."
+          }
+        }
+      }
+    },
+    "learn.grouping.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grouping your rentals"
+          }
+        }
+      }
+    },
+    "learn.hero.eyebrow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The rules, in plain words"
+          }
+        }
+      }
+    },
+    "learn.hero.line": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What counts, how much, and what your tax pro will ask for."
+          }
+        }
+      }
+    },
+    "learn.material-participation.p1": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Material participation decides whether a rental’s losses are passive. It’s a separate question from being a real estate professional."
+          }
+        }
+      }
+    },
+    "learn.material-participation.p2": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The IRS has seven tests, and passing any one is enough. The three landlords use most are: more than 500 hours in the year, doing nearly all the work yourself, or more than 100 hours and more than anyone else."
+          }
+        }
+      }
+    },
+    "learn.material-participation.p3": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you file jointly, both spouses’ hours count together for these tests."
+          }
+        }
+      }
+    },
+    "learn.material-participation.p4": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Real estate professionals still need material participation in their rentals to use the losses against other income. Each rental is checked on its own unless you group them."
+          }
+        }
+      }
+    },
+    "learn.material-participation.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Material participation"
+          }
+        }
+      }
+    },
+    "learn.receipts.p1": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Take a photo of a receipt the day you get it. Many receipts are printed on paper that fades within months."
+          }
+        }
+      }
+    },
+    "learn.receipts.p2": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attach the photo to the entry for that work, so the cost and the time sit together."
+          }
+        }
+      }
+    },
+    "learn.receipts.p3": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep materials, contractor invoices and mileage notes. For small costs without a receipt, a note with the amount, date and purpose helps."
+          }
+        }
+      }
+    },
+    "learn.receipts.p4": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The IRS asks you to keep records for at least three years after you file, and longer in some cases. Records about the property itself, like what you paid for it and improvements, stay until a few years after you sell it."
+          }
+        }
+      }
+    },
+    "learn.receipts.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keeping receipts"
+          }
+        }
+      }
+    },
+    "learn.sources": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sources: IRS Publications 925 and 527."
+          }
+        }
+      }
+    },
+    "learn.spouse-hours.p1": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The rules for spouse hours depend on the test."
+          }
+        }
+      }
+    },
+    "learn.spouse-hours.p2": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For the real estate professional tests, one spouse has to pass both alone: more than 750 hours, and more than half of their own working time. You can’t combine your hours to reach 750."
+          }
+        }
+      }
+    },
+    "learn.spouse-hours.p3": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For material participation, it’s different. If you file jointly, both spouses’ hours on a rental count together."
+          }
+        }
+      }
+    },
+    "learn.spouse-hours.p4": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you log time, choose who did the work. LandlordHours counts your own hours toward 750 and adds your spouse’s hours only where the rules allow it."
+          }
+        }
+      }
+    },
+    "learn.spouse-hours.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spouse hours"
+          }
+        }
+      }
+    },
+    "learn.stays.p1": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How long guests usually stay changes which tax rules apply to a rental."
+          }
+        }
+      }
+    },
+    "learn.stays.p2": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If the average stay is seven days or less, the usual rental rules don’t apply. Whether its losses count against your other income then depends on material participation: for example, 100 hours of work and more than anyone else, or 500 hours."
+          }
+        }
+      }
+    },
+    "learn.stays.p3": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If the average stay is longer, the rental follows the usual rules. Its losses are usually passive, which means they can only offset other passive income."
+          }
+        }
+      }
+    },
+    "learn.stays.p4": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "There are two common exceptions for long stays. Real estate professionals who also materially participate can use the losses against other income. And owners who actively take part can often use up to $25,000 of losses, an amount that shrinks as income goes from $100,000 to $150,000."
+          }
+        }
+      }
+    },
+    "learn.stays.p5": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you have both kinds of rental, log each property’s hours separately. Your tax pro will want to see them apart."
+          }
+        }
+      }
+    },
+    "learn.stays.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Short stays and long stays"
+          }
+        }
+      }
+    },
+    "learn.tax-pro.p1": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LandlordHours keeps a clean record of your hours. Your tax pro decides how the rules apply to you."
+          }
+        }
+      }
+    },
+    "learn.tax-pro.p2": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before you meet, export your year as a PDF. It lists each entry by date, property, work and time, with totals for you and your spouse."
+          }
+        }
+      }
+    },
+    "learn.tax-pro.p3": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bring your other work hours for the year too. The 50% rule needs them."
+          }
+        }
+      }
+    },
+    "learn.tax-pro.p4": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask them about the choices only they can help with: grouping your rentals, short-stay rentals, and which tests apply to you."
+          }
+        }
+      }
+    },
+    "learn.tax-pro.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Working with your tax pro"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

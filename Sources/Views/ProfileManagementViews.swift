@@ -1,9 +1,12 @@
 import SwiftUI
 
 // MARK: - Restore sheet (welcome screen + Settings)
+//
+// Sandbox `S2Restore` (spec §5, frames restore / restore-confirm): a sheet with a glass close,
+// the plain promise, and one card of earlier profiles, each with an initial seal. From Settings a
+// tap asks "Open these records?" first; from Welcome it opens straight away. Nothing is merged or
+// deleted either way.
 
-/// Lists earlier profiles found on this device or in iCloud. Picking one opens it;
-/// nothing is merged or deleted.
 struct ProfileRestoreSheet: View {
     enum Context {
         case welcome
@@ -17,30 +20,47 @@ struct ProfileRestoreSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var pendingSwitch: DiscoveredProfile?
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(context == .welcome ? "Restore earlier data" : "Restore other data")
-                            .lhDisplayFont(.largeTitle)
-                            .foregroundStyle(colors.textPrimary)
-                            .accessibilityAddTraits(.isHeader)
-                        Text(context == .welcome
-                             ? "Pick a profile to open its records. Nothing is merged or deleted."
-                             : "Open another profile's records. Your current data stays on this iPhone, and you can switch back anytime.")
-                            .font(.subheadline)
-                            .foregroundStyle(colors.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack(alignment: .top, spacing: 12) {
+                    Group {
+                        if context == .welcome { Text("Your earlier records") } else { Text("Your other records") }
                     }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 4, trailing: 4))
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(colors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                    Spacer(minLength: 8)
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(colors.textPrimary)
+                            .frame(width: 44, height: 44)
+                            .background(Circle().fill(colors.backgroundSecondary))
+                            .overlay(Circle().strokeBorder(colors.border, lineWidth: 0.5))
+                    }
+                    .buttonStyle(.lhPressable)
+                    .accessibilityLabel(Text("Close"))
+                    .accessibilityIdentifier("restore.close")
                 }
 
-                Section {
-                    ForEach(profiles) { profile in
+                Group {
+                    if context == .welcome {
+                        Text("Records from an earlier sign-in on this iPhone. Pick one to open it. Nothing is merged or deleted.")
+                    } else {
+                        Text("Records from another sign-in on this iPhone. Yours stay put, and you can switch back any time.")
+                    }
+                }
+                .font(.body)
+                .foregroundStyle(colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+                VStack(spacing: 0) {
+                    ForEach(Array(profiles.enumerated()), id: \.element.id) { index, profile in
                         Button {
                             if context == .settings {
                                 pendingSwitch = profile
@@ -48,78 +68,79 @@ struct ProfileRestoreSheet: View {
                                 onRestore(profile)
                             }
                         } label: {
-                            ProfileCandidateRow(profile: profile)
+                            ProfileCandidateRow(profile: profile, palette: Self.palette(at: index))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.lhPressable)
                         .accessibilityIdentifier("restore.profile.\(profile.id)")
-                    }
-                } footer: {
-                    if profiles.contains(where: \.isICloudOnly) {
-                        Label("Photos weren't saved to iCloud, so profiles restored from iCloud come back without them. Hours, properties and settings come back in full.", systemImage: "info.circle")
-                            .font(.footnote)
-                            .foregroundStyle(colors.textSecondary)
-                            .accessibilityIdentifier("restore.photosNote")
+                        if index < profiles.count - 1 { PropertyInsetDivider(leading: 68) }
                     }
                 }
-                .listRowBackground(colors.backgroundSecondary)
-            }
-            .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
-            .background(colors.background.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundStyle(colors.action)
+                .propertyCard()
+
+                if profiles.contains(where: \.isICloudOnly) {
+                    Text("Photos weren’t saved to iCloud, so profiles restored from iCloud come back without them. Hours, properties and settings come back in full.")
+                        .font(.footnote)
+                        .foregroundStyle(colors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 4)
+                        .accessibilityIdentifier("restore.photosNote")
                 }
             }
-            .sheet(item: $pendingSwitch) { profile in
-                ProfileSwitchConfirmSheet(
-                    title: "Switch to this profile?",
-                    message: "Your current data stays on this iPhone. You can come back to it from Restore other data.",
-                    onConfirm: {
-                        pendingSwitch = nil
-                        onRestore(profile)
-                    },
-                    onCancel: { pendingSwitch = nil }
-                )
-            }
+            .padding(20)
         }
+        .background(colors.background.ignoresSafeArea())
+        .presentationBackground(colors.background)
+        .presentationDetents(dynamicTypeSize.isAccessibilitySize || profiles.count > 3 ? [.large] : [.medium, .large])
+        .presentationDragIndicator(.visible)
+        .accessibilityIdentifier("restore.sheet")
+        .alert("Open these records?", isPresented: Binding(
+            get: { pendingSwitch != nil },
+            set: { if !$0 { pendingSwitch = nil } }
+        ), presenting: pendingSwitch) { profile in
+            Button("Cancel", role: .cancel) { pendingSwitch = nil }
+            Button("Open") {
+                pendingSwitch = nil
+                onRestore(profile)
+            }
+        } message: { profile in
+            Text("You’ll see the records for \(profile.displayLabel). Your own records stay put, and you can switch back from Settings.")
+        }
+    }
+
+    /// Seals cycle through the identity palette that isn't blueprint (blueprint is the action).
+    static func palette(at index: Int) -> SealPalette {
+        let cycle: [SealPalette] = [.slate, .brass, .timber, .terracotta]
+        return cycle[index % cycle.count]
     }
 }
 
 private struct ProfileCandidateRow: View {
     let profile: DiscoveredProfile
+    let palette: SealPalette
 
     @Environment(\.colorScheme) private var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "person.crop.circle")
-                .font(.system(size: 26))
-                .foregroundStyle(colors.textSecondary)
-                .accessibilityHidden(true)
+        HStack(spacing: 12) {
+            PropertySeal(monogram: initial, palette: palette, size: 40)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(profile.displayLabel)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: profile.displayLabel)
                     .font(.body.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Text(countsLine)
+                countsLine
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
                     .monospacedDigit()
-                // Glyph sits flush with the text column above (a Label centres it in a wider
-                // icon slot, which pushed it 6pt in).
-                HStack(spacing: 6) {
-                    Image(systemName: profile.sources.contains(.iCloud) ? "icloud" : "iphone")
-                        .accessibilityHidden(true)
-                    Text(sourceLine)
+                    .fixedSize(horizontal: false, vertical: true)
+                if profile.isICloudOnly {
+                    Text("In iCloud")
+                        .font(.footnote)
+                        .foregroundStyle(colors.textSecondary)
                 }
-                .font(.footnote)
-                .foregroundStyle(colors.informational)
             }
 
             Spacer(minLength: 0)
@@ -129,28 +150,41 @@ private struct ProfileCandidateRow: View {
                 .foregroundStyle(colors.textTertiary)
                 .accessibilityHidden(true)
         }
-        .padding(.vertical, 6)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(minHeight: 72)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
 
-    private var countsLine: String {
-        var parts: [String] = []
-        parts.append(profile.entryCount == 1 ? "1 entry" : "\(profile.entryCount) entries")
-        if profile.propertyCount > 0 {
-            parts.append(profile.propertyCount == 1 ? "1 property" : "\(profile.propertyCount) properties")
-        }
-        if let last = profile.lastEntryDate {
-            parts.append("last \(last.formatted(.dateTime.month(.abbreviated).day().year()))")
-        }
-        return parts.joined(separator: " · ")
+    private var initial: String {
+        let letter = profile.displayLabel.first { $0.isLetter || $0.isNumber }
+        return letter.map { String($0).uppercased() } ?? "?"
     }
 
-    private var sourceLine: String {
-        switch (profile.sources.contains(.device), profile.sources.contains(.iCloud)) {
-        case (true, true): return "On this iPhone and in iCloud"
-        case (true, false): return "On this iPhone"
-        default: return "In iCloud"
+    private var entries: String {
+        profile.entryCount == 1 ? String(localized: "1 entry") : String(localized: "\(profile.entryCount) entries")
+    }
+
+    private var propertiesPart: String {
+        profile.propertyCount == 1 ? String(localized: "1 property") : String(localized: "\(profile.propertyCount) properties")
+    }
+
+    private var lastDate: String? {
+        guard let last = profile.lastEntryDate else { return nil }
+        let sameYear = Calendar.current.isDate(last, equalTo: Date(), toGranularity: .year)
+        return sameYear
+            ? last.formatted(.dateTime.month(.abbreviated).day())
+            : last.formatted(.dateTime.month(.abbreviated).day().year())
+    }
+
+    /// One localized format per shape, so translators can reorder the parts.
+    private var countsLine: Text {
+        switch (profile.propertyCount > 0, lastDate) {
+        case (true, let date?): return Text("\(entries) · \(propertiesPart) · last \(date)")
+        case (true, nil): return Text("\(entries) · \(propertiesPart)")
+        case (false, let date?): return Text("\(entries) · last \(date)")
+        case (false, nil): return Text(verbatim: entries)
         }
     }
 }
@@ -158,19 +192,17 @@ private struct ProfileCandidateRow: View {
 // MARK: - Settings › Account (switch profile / sign out / delete)
 
 struct SettingsAccountSection: View {
+    /// Pushes the hold-to-delete page (`DeleteAllDataView`), which owns the deletion and its alerts.
+    var onDeleteData: () -> Void = {}
+
     @EnvironmentObject var viewModel: AppViewModel
     @ObservedObject private var signInManager = AppleSignInManager.shared
     @Environment(\.colorScheme) private var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var showSwitchConfirm = false
-    @State private var showDeleteConfirm = false
-    @State private var showICloudOffPrompt = false
-    @State private var isDeleting = false
-    @State private var deleteError: String?
 
     private var isAppleProfile: Bool { signInManager.loginType == .apple }
-    private var deleteTitle: String { isAppleProfile ? "Delete account and data" : "Delete all data" }
 
     var body: some View {
         Section {
@@ -204,58 +236,24 @@ struct SettingsAccountSection: View {
             }
 
             Button {
-                showDeleteConfirm = true
+                onDeleteData()
             } label: {
                 SettingRow(
                     symbol: "trash",
-                    title: isDeleting ? "Deleting…" : deleteTitle,
+                    title: isAppleProfile ? "Delete account and data" : "Delete all data",
                     subtitle: isAppleProfile
-                        ? "Permanently remove this account and its records"
-                        : "Permanently remove this profile's records",
+                        ? "Remove this account and everything in it"
+                        : "Remove everything in this profile",
+                    showsChevron: true,
                     isDestructive: true
                 )
             }
             .buttonStyle(.plain)
-            .disabled(isDeleting)
             .accessibilityIdentifier("settings.deleteData")
-            .alert("\(deleteTitle)?", isPresented: $showDeleteConfirm) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete", role: .destructive) { runDelete(allowLocalOnly: false) }
-            } message: {
-                Text("This permanently deletes this profile's properties, time entries, photos, categories, goals and tax profile from this iPhone and from iCloud. This cannot be undone.")
-            }
-            .alert("iCloud is off", isPresented: $showICloudOffPrompt) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete from this iPhone", role: .destructive) { runDelete(allowLocalOnly: true) }
-            } message: {
-                Text("Copies saved in iCloud can't be removed right now. Delete from this iPhone anyway, or turn on iCloud and try again.")
-            }
-            .alert("Couldn't delete", isPresented: Binding(
-                get: { deleteError != nil },
-                set: { if !$0 { deleteError = nil } }
-            )) {
-                Button("OK", role: .cancel) { deleteError = nil }
-            } message: {
-                Text(deleteError ?? "")
-            }
         } header: {
             BPSectionHeader(title: "Account")
         }
         .listRowBackground(colors.backgroundSecondary)
-    }
-
-    private func runDelete(allowLocalOnly: Bool) {
-        Task {
-            isDeleting = true
-            defer { isDeleting = false }
-            do {
-                try await viewModel.deleteAccountAndData(allowLocalOnly: allowLocalOnly)
-            } catch AppViewModel.ProfileDeletionError.iCloudUnavailable {
-                showICloudOffPrompt = true
-            } catch {
-                deleteError = error.localizedDescription
-            }
-        }
     }
 }
 
