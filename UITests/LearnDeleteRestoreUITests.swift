@@ -148,6 +148,16 @@ final class LearnDeleteRestoreUITests: XCTestCase {
             }
         }
 
+        if wants("deletefail"), size != "xxl" {
+            // iCloud lost mid-delete: the honest failure, with nothing deleted.
+            launch(["-LHMockScenario", "frequent", "-LHInitialTab", "4", "-LHOpenDeleteData", "-LHDeleteFailurePreview"],
+                   scheme: scheme, size: size)
+            let alert = app.alerts["Couldn’t delete"]
+            XCTAssertTrue(alert.waitForExistence(timeout: 20))
+            XCTAssertTrue(alert.staticTexts["Couldn’t reach iCloud. Your data hasn’t been deleted. Try again when you’re online."].exists)
+            settleAndCapture("delete-failed-\(suffix)")
+        }
+
         if wants("restore") {
             launch(["-LHSeedLegacyEmailProfile", "-LHInitialTab", "4", "-LHOpenRestoreSheet"], scheme: scheme, size: size)
             let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "restore.profile.")).firstMatch

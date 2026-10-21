@@ -24,7 +24,7 @@ struct DeleteAllDataView: View {
     @State private var showICloudOffPrompt = false
     @State private var isDeleting = HoldToDeleteButton.debugShowsDeleting
     @ScaledMetric(relativeTo: .body) private var iconColumn: CGFloat = 24
-    @State private var deleteError: String?
+    @State private var deleteError: String? = Self.debugFailure
 
     private var isAppleProfile: Bool { signInManager.loginType == .apple }
 
@@ -167,6 +167,17 @@ struct DeleteAllDataView: View {
         .padding(.vertical, 10)
         .frame(minHeight: 52)
         .accessibilityElement(children: .combine)
+    }
+
+    /// DEBUG: `-LHDeleteFailurePreview` opens on the honest failure (iCloud lost mid-delete) for
+    /// the visual gate. Nothing is deleted.
+    private static var debugFailure: String? {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-LHDeleteFailurePreview") {
+            return CloudKitSyncService.AccountDeleteICloudUnreachableError().localizedDescription
+        }
+        #endif
+        return nil
     }
 
     private func runDelete(allowLocalOnly: Bool) {

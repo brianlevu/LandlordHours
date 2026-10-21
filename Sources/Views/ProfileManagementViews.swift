@@ -127,7 +127,10 @@ private struct ProfileCandidateRow: View {
             PropertySeal(monogram: initial, palette: palette, size: 40)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: profile.displayLabel)
+                // Zero-width break opportunities between characters: a long address breaks
+                // anywhere without the hyphen SwiftUI adds inside a word ("exam-ple.com").
+                Text(verbatim: Self.breakAnywhere(profile.displayLabel))
+                    .accessibilityLabel(Text(verbatim: profile.displayLabel))
                     .font(.body.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
                     // Long relay addresses wrap to a second line instead of losing their middle.
@@ -158,6 +161,10 @@ private struct ProfileCandidateRow: View {
         .frame(minHeight: 72)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+    }
+
+    static func breakAnywhere(_ text: String) -> String {
+        text.map(String.init).joined(separator: "\u{200B}")
     }
 
     private var initial: String {
