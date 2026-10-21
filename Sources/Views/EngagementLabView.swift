@@ -663,7 +663,7 @@ struct EngagementLabView: View {
     private var liveActivityMessage: String {
         recommendation.reason == .timerSafety
             ? recommendation.message
-            : "Live Activity should stay unused until landlord work is actively being timed."
+            : "Live Activity should stay unused until rental work is actively being timed."
     }
 
     private var liveActivityTime: String {

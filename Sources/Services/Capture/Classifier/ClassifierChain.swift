@@ -55,7 +55,7 @@ struct ClassifierChain: CaptureClassifier {
 
     // MARK: CaptureClassifier
 
-    /// Goes through the mute rules: a muted item comes back as "not landlord work" with
+    /// Goes through the mute rules: a muted item comes back as "not rental work" with
     /// evidence "muted", and no model runs.
     func classify(_ candidate: CaptureCandidate, properties: [RentalProperty]) async -> CaptureClassification {
         let mutes = await muteRuleProvider()

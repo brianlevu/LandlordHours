@@ -71,7 +71,7 @@ struct CaptureClassification: Equatable {
     var evidence: [String]
 }
 
-/// Decides whether a candidate is landlord work and proposes property, category and hours.
+/// Decides whether a candidate is rental work and proposes property, category and hours.
 protocol CaptureClassifier {
     func classify(_ candidate: CaptureCandidate, properties: [RentalProperty]) async -> CaptureClassification
 }

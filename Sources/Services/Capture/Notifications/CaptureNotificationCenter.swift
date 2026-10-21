@@ -56,7 +56,7 @@ final class SystemCaptureNotificationCenter: CaptureNotificationCenter {
 // in `CaptureNotificationAction` (NotificationActionRouter.swift).
 
 enum CaptureNotificationCategories {
-    /// End-of-event prompt: Log it / Edit… / Not landlord work.
+    /// End-of-event prompt: Log it / Edit… / Not rental work.
     static var suggestion: UNNotificationCategory {
         UNNotificationCategory(
             identifier: CaptureNotificationAction.categoryIdentifier,
