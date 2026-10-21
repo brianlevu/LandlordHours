@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Launch hand-off (2.0 surfaces lane)
 //
@@ -40,6 +41,9 @@ struct LaunchHandoffOverlay: View {
     }
 
     private func start() {
+        // The storyboard's status bar is white (UIStatusBarStyleLightContent); keep it white on the
+        // blueprint until the hand-off ends, whatever the app's own scheme.
+        LaunchStatusBarWindow.show()
         #if DEBUG
         if let frozen = Self.frozenProgress {
             progress = frozen
@@ -51,6 +55,7 @@ struct LaunchHandoffOverlay: View {
             withAnimation(reduceMotion ? .linear(duration: 0.2) : .easeOut(duration: 0.3)) {
                 progress = 1
             } completion: {
+                LaunchStatusBarWindow.hide()
                 isFinished = true
             }
         }
@@ -64,4 +69,39 @@ struct LaunchHandoffOverlay: View {
         return CGFloat(min(max(value, 0), 1))
     }()
     #endif
+}
+
+/// A transparent, non-interactive window above the app whose only job is a light status bar while
+/// the blueprint hand-off is on screen (black on #1E3FA6 is 2.32:1; white is 9.06:1).
+@MainActor
+enum LaunchStatusBarWindow {
+    private static var window: UIWindow?
+
+    private final class LightStatusBarController: UIViewController {
+        override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
+        override func loadView() {
+            view = UIView()
+            view.backgroundColor = .clear
+            view.isUserInteractionEnabled = false
+        }
+    }
+
+    static func show() {
+        guard window == nil,
+              let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState != .unattached }) else { return }
+        let w = UIWindow(windowScene: scene)
+        w.windowLevel = .normal + 1
+        w.backgroundColor = .clear
+        w.isUserInteractionEnabled = false
+        w.rootViewController = LightStatusBarController()
+        w.isHidden = false
+        window = w
+    }
+
+    static func hide() {
+        window?.isHidden = true
+        window = nil
+    }
 }

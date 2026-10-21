@@ -215,7 +215,7 @@ private enum LandlordHoursIntentStore {
 }
 
 enum LandlordHoursIntentCopy {
-    /// "You have 212 of your 750 hours for 2026. You’re 388 behind pace, and 3 visits are waiting
+    /// "You have 212 of your 750 hours for 2026. You’re 388 hours behind pace, and 3 visits are waiting
     /// for you to confirm." The hours follow Today's rule (REPS: your own hours only).
     static func summaryDialog(
         year: Int,
@@ -239,7 +239,7 @@ enum LandlordHoursIntentCopy {
 
         let lead = "You have \(hours) of your \(target) hours for \(year)."
         let gap = Int(max(0, snapshot.requiredHoursToDate - snapshot.yearHours).rounded(.up))
-        let pace = snapshot.isBehindPace ? "You’re \(gap) behind pace" : "You’re on pace"
+        let pace = snapshot.isBehindPace ? "You’re \(gap) \(gap == 1 ? "hour" : "hours") behind pace" : "You’re on pace"
         if pendingCount > 0 {
             return "\(lead) \(pace), and \(waiting)."
         }

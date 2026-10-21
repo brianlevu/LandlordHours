@@ -441,7 +441,7 @@ final class SiriCopyTests: XCTestCase {
             year: 2026, context: context(properties: 2), snapshot: snapshot(hours: 212, required: 600),
             recommendation: .doNothing, pendingCount: 3
         )
-        XCTAssertEqual(text, "You have 212 of your 750 hours for 2026. You’re 388 behind pace, and 3 visits are waiting for you to confirm.")
+        XCTAssertEqual(text, "You have 212 of your 750 hours for 2026. You’re 388 hours behind pace, and 3 visits are waiting for you to confirm.")
         XCTAssertEqual(
             LandlordHoursIntentCopy.summaryDialog(year: 2026, context: context(properties: 1), snapshot: snapshot(hours: 640, required: 600), recommendation: .doNothing),
             "You have 640 of your 750 hours for 2026. You’re on pace."

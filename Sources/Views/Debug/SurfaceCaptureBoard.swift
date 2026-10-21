@@ -83,6 +83,7 @@ struct SurfaceCaptureRoot: View {
         case "widgets-tinted": WallpaperBoard(scheme: launch.scheme, dim: true) { HomeWidgetsA(look: .accented) }
         case "widgets-lock": WallpaperBoard(scheme: launch.scheme) { LockStatesBoard() }
         case "launch-storyboard": LaunchStoryboardView().ignoresSafeArea().preferredColorScheme(launch.scheme)
+            .onAppear { LaunchStatusBarWindow.show() }
         case "siri": SiriBoard().preferredColorScheme(launch.scheme)
         case "toast-board": ToastBoard().preferredColorScheme(launch.scheme)
         default: Text("Unknown board \(launch.name)")
@@ -274,7 +275,7 @@ private struct SiriBoard: View {
         let display = WidgetSurfaceDisplay(snapshot: SurfaceSamples.behind)
         ScrollView {
             VStack(spacing: 10) {
-                Text("You have 212 of your 750 hours for 2026. You’re 388 behind pace, and 3 visits are waiting for you to confirm.")
+                Text("You have 212 of your 750 hours for 2026. You’re 388 hours behind pace, and 3 visits are waiting for you to confirm.")
                     .font(.body.weight(.medium))
                     .foregroundStyle(scheme == .dark ? Color.white : Color(brandHex: BrandHex.textPrimary))
                     .fixedSize(horizontal: false, vertical: true)

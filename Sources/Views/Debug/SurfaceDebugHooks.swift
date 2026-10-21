@@ -23,7 +23,9 @@ enum SurfaceDebugHooks {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { showToast(args[i + 1], center: toasts, app: app) }
         }
         if args.contains("-LHDebugPostSampleNotifications") {
-            Task { await postSampleNotifications() }
+            var delay: TimeInterval = 3
+            if let i = args.firstIndex(of: "-LHDebugNotificationDelay"), args.indices.contains(i + 1), let d = Double(args[i + 1]) { delay = d }
+            Task { await postSampleNotifications(delay: delay) }
         }
     }
 
@@ -40,7 +42,7 @@ enum SurfaceDebugHooks {
         }
     }
 
-    static func postSampleNotifications() async {
+    static func postSampleNotifications(delay: TimeInterval = 3) async {
         let center = UNUserNotificationCenter.current()
         guard (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) == true else { return }
         center.setNotificationCategories(CaptureNotificationCategories.all)
@@ -59,7 +61,7 @@ enum SurfaceDebugHooks {
             content.body = sample.1.body
             content.categoryIdentifier = sample.2
             content.threadIdentifier = "sample.\(sample.0)"
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 3 + Double(offset) * 0.6, repeats: false)
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay + Double(offset) * 0.6, repeats: false)
             try? await center.add(UNNotificationRequest(identifier: sample.0, content: content, trigger: trigger))
         }
     }
