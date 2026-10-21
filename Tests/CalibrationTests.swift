@@ -203,9 +203,18 @@ final class CalibrationTests: XCTestCase {
         print(String(format: "CALIBRATION model-only answered=%d/%d acc=%.3f category=%.3f",
                      answered, fixture.items.count, Double(modelCorrect) / Double(max(answered, 1)), Double(modelCategory) / Double(max(landlord, 1))))
 
+        // The chain only asks the model about calendar events and visits (Gmail stays rules-only),
+        // so score it as calendar events: that is the production path. Category there is the 1.x
+        // value by design, so read landlord/not and property from these lines.
+        var chainHoldout = CalibrationScore()
         for split in ["tuning", "holdout", nil] as [String?] {
-            let s = await score(fixture, split: split) { await chain.classify($0, properties: $1) }
-            print("CALIBRATION chain split=\(split ?? "all") \(s.summary)")
+            let s = await score(fixture, split: split) { c, props in
+                var cal = c
+                cal.kind = .calendar
+                return await chain.classify(cal, properties: props)
+            }
+            if split == "holdout" { chainHoldout = s }
+            print("CALIBRATION chain(calendar) split=\(split ?? "all") \(s.summary)")
         }
         // A slim simulator can report the model available while the host model service is
         // unreachable (every call fails). The chain then fell back to rules above; report it.
@@ -223,5 +232,14 @@ final class CalibrationTests: XCTestCase {
         let heldAccuracy = Double(heldCategory) / Double(max(heldLandlord, 1))
         print(String(format: "CALIBRATION model-only holdout category=%.3f", heldAccuracy))
         XCTAssertGreaterThanOrEqual(heldAccuracy, ClassifierThresholds.targetModelCategoryHoldout)
+        // The model must not make shipped calendar suggestions worse than rules alone.
+        let rulesHoldout = await score(fixture, split: "holdout") { c, props in
+            var cal = c
+            cal.kind = .calendar
+            return await RulesClassifier().classify(cal, properties: props)
+        }
+        XCTAssertGreaterThanOrEqual(chainHoldout.precision, rulesHoldout.precision, "chain precision vs rules, held-out")
+        XCTAssertGreaterThanOrEqual(chainHoldout.propertyAccuracy, rulesHoldout.propertyAccuracy - 0.05, "chain property vs rules, held-out")
+        XCTAssertGreaterThanOrEqual(chainHoldout.visibleRecall, ClassifierThresholds.targetVisibleRecall)
     }
 }

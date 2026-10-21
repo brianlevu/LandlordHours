@@ -311,9 +311,32 @@ final class ClassifierTests: XCTestCase {
     func testModelPropertyRefMapsToId() async {
         let backend = FakeOnDeviceBackend(answer: answer(true, 0.9, category: .repairs, ref: "p2"))
         let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
-        let result = await chain.classify(candidate("Mold remediation"), properties: properties)
-        XCTAssertEqual(result.propertyId, maple.id)
+        _ = await chain.classify(candidate("Mold remediation"), properties: properties)
         XCTAssertEqual(backend.requests.first?.properties.map(\.ref), ["P1", "P2", "P3"])
+        // A grounded pick ("the cottage" names nothing, "maple" does) maps case-insensitively.
+        let request = OnDeviceClassifier.request(for: candidate("Mold remediation, maple cottage"), properties: properties)
+        let mapped = OnDeviceClassifier.map(answer(true, 0.9, category: .repairs, ref: "p2"), request: request, properties: properties)
+        XCTAssertEqual(mapped.propertyId, maple.id)
+    }
+
+    /// 2026-10-21 calibration: the model picked P1 for 12 of 25 held-out items that named no
+    /// property. A pick is kept only when the title or location names that property.
+    func testModelPropertyPickMustBeNamedInTheItem() async {
+        let backend = FakeOnDeviceBackend(answer: answer(true, 0.9, category: .repairs, ref: "P1"))
+        let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
+        let ungrounded = await chain.classify(candidate("Mold remediation"), properties: properties)
+        XCTAssertNil(ungrounded.propertyId, "model defaulted to P1 with no property named")
+
+        func pick(_ title: String, location: String? = nil, ref: String, in props: [RentalProperty]) -> UUID? {
+            let request = OnDeviceClassifier.request(for: candidate(title, location: location), properties: props)
+            return OnDeviceClassifier.map(answer(true, 0.9, ref: ref), request: request, properties: props).propertyId
+        }
+        XCTAssertEqual(pick("Fix sink at Oak", ref: "P1", in: properties), oak.id)
+        XCTAssertEqual(pick("Fix sink", location: "1500 Lakeshore Blvd", ref: "P3", in: properties), lakeview.id)
+        XCTAssertNil(pick("Clean gutters at the duplex", ref: "P1", in: properties), "generic type word is not a name")
+        XCTAssertNil(pick("Late fee notice to unit 2", ref: "P2", in: properties))
+        let aliased = RentalProperty(name: "Birch House", address: "9 Elm Rd, Austin, TX", propertyType: .str, aliases: ["Cozy Loft by the Lake"])
+        XCTAssertEqual(pick("Inquiry for Cozy Loft by the Lake", ref: "P1", in: [aliased]), aliased.id)
     }
 
     func testModelNoIsCappedAndCleansAnswer() {
