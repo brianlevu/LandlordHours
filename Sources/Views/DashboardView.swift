@@ -1,5 +1,4 @@
 import SwiftUI
-import LucideIcons
 
 /// WP-L: what Today says while things are still arriving. Loading (the first iCloud pull) never
 /// reads as a brand-new user, and a running 90-day look-back gets its own state instead of
@@ -305,6 +304,7 @@ struct DashboardView: View {
                             .id("today.section.confirm")
                             if shouldShowActivationCard {
                                 homeActivationCard
+                                    .id("today.section.setup")
                             }
                             if !viewModel.properties.isEmpty {
                                 VStack(alignment: .leading, spacing: 12) {
@@ -573,7 +573,7 @@ struct DashboardView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text(dashboardSubtitle)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
                     .foregroundStyle(colors.textSecondary)
                     .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -671,7 +671,7 @@ struct DashboardView: View {
             let name = viewModel.properties.first?.name ?? "Your rental"
             return foundInInbox.count > 0
                 ? "\(name) is staked. Confirm what we found, or log something new."
-                : "\(name) is staked. Log your first hour while it's fresh."
+                : String(localized: "\(name) is staked. Log your first hour while it’s fresh.")
         }
         return "\(AppFormat.hours(headerHours)) counted toward \(Int(targetHours)) hours this year."
     }
@@ -789,13 +789,7 @@ struct DashboardView: View {
     private var homeActivationCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 12) {
-                LHIconTile(
-                    icon: Lucide.listChecks,
-                    color: colors.action,
-                    wash: colors.actionSurface,
-                    size: 42,
-                    isActive: true
-                )
+                SetupHeaderTile(symbol: "checklist")
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Finish your tax-ready setup")
@@ -825,7 +819,7 @@ struct DashboardView: View {
                 activationActionTile(
                     title: "Property",
                     subtitle: viewModel.properties.isEmpty ? "Add first" : "\(viewModel.properties.count) ready",
-                    icon: Lucide.building2,
+                    symbol: "building.2",
                     isComplete: !viewModel.properties.isEmpty,
                     accessibilityIdentifier: "home.activation.property",
                     action: {
@@ -836,7 +830,7 @@ struct DashboardView: View {
                 activationActionTile(
                     title: "First hour",
                     subtitle: viewModel.timeEntries.isEmpty ? "Log now" : AppFormat.hours(totalHours),
-                    icon: Lucide.clock,
+                    symbol: "clock",
                     isComplete: !viewModel.timeEntries.isEmpty,
                     accessibilityIdentifier: "home.activation.firstHour",
                     action: {
@@ -849,7 +843,7 @@ struct DashboardView: View {
                 activationActionTile(
                     title: "Learn",
                     subtitle: "What counts",
-                    icon: Lucide.bookOpenText,
+                    symbol: "book",
                     isComplete: false,
                     accessibilityIdentifier: "home.activation.learn",
                     action: {
@@ -860,7 +854,7 @@ struct DashboardView: View {
                 activationActionTile(
                     title: "Report",
                     subtitle: "Check pace",
-                    icon: Lucide.chartColumnIncreasing,
+                    symbol: "chart.bar",
                     isComplete: false,
                     accessibilityIdentifier: "home.activation.report",
                     action: {
@@ -895,7 +889,7 @@ struct DashboardView: View {
     private func activationActionTile(
         title: String,
         subtitle: String,
-        icon: UIImage,
+        symbol: String,
         isComplete: Bool,
         accessibilityIdentifier: String,
         action: @escaping () -> Void
@@ -907,8 +901,10 @@ struct DashboardView: View {
                         .fill(isComplete ? colors.positiveSurface : colors.backgroundTertiary)
                         .frame(width: 40, height: 40)
 
-                    LucideIcon(image: isComplete ? Lucide.circleCheck : icon, size: 19)
+                    Image(systemName: isComplete ? "checkmark.circle" : symbol)
+                        .font(.system(size: 19, weight: .regular))
                         .foregroundStyle(isComplete ? colors.positive : colors.textPrimary)
+                        .accessibilityHidden(true)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -991,7 +987,9 @@ struct EntryListRow: View {
                 HStack(spacing: 4) {
                     if entry.isCalendarImport {
                         HStack(spacing: 2) {
-                            LucideIcon(image: Lucide.calendar, size: 9)
+                            Image(systemName: "calendar")
+                                .font(.system(size: 9, weight: .medium))
+                                .accessibilityHidden(true)
                             Text("Cal")
                                 .font(.system(size: 9, weight: .medium, design: .rounded))
                         }
@@ -1124,5 +1122,24 @@ struct TodayRecordLockCard: View {
         guard page == nil else { return }
         page = await RecordPageModel.load(entries: viewModel.timeEntries, properties: viewModel.properties,
                                           owner: viewModel.userName, year: year)
+    }
+}
+
+
+/// The setup card's header tile: a blueprint action tile with an SF Symbol (brand system §4:
+/// function icons are symbols; the 3D tool renders are for categories).
+private struct SetupHeaderTile: View {
+    let symbol: String
+    @Environment(\.colorScheme) private var colorScheme
+    @ScaledMetric(relativeTo: .headline) private var side: CGFloat = 42
+
+    var body: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        Image(systemName: symbol)
+            .font(.system(size: side * 0.45, weight: .regular))
+            .foregroundStyle(colors.action)
+            .frame(width: side, height: side)
+            .background(colors.actionSurface, in: RoundedRectangle(cornerRadius: side * 0.28, style: .continuous))
+            .accessibilityHidden(true)
     }
 }

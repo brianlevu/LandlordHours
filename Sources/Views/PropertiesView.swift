@@ -926,8 +926,9 @@ struct PropertyEditSheet: View {
                 }
             }
             .padding(20)
-            // Clear the pinned footer (its 16pt fade + the 52pt button + 8pt), plus 12pt of air.
-            .padding(.bottom, 44)
+            // Clear the pinned footer (its 32pt scrim + the 52pt button + 8pt), plus 12pt of air,
+            // so "Delete property" at the end of the scroll sits clear of the fade.
+            .padding(.bottom, 76)
             Color.clear.frame(height: 1).id("propertySheet.bottom")
         }
 #if DEBUG
