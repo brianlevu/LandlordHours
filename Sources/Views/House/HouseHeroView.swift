@@ -281,19 +281,30 @@ struct HouseHeroCard: View {
 
     private var footerIsNil: Bool { if case .none = footer { return true }; return false }
 
-    /// The caption and the pace are one line (it wraps in the column): "of 500 hours · on pace for Dec 31".
+    /// The caption and the pace are two lines: "of 500 hours", then "On pace for Dec 31" across the card's width.
+    /// (The house sits lower to make room.) VoiceOver reads them as one: "of 500 hours · on pace for Dec 31".
     private var usesCombinedCaption: Bool {
         heroCopy?.phrase != nil && footerIsNil && !isLookingBack && !isLoading
     }
 
     private func captionLine(_ copy: TodayHeroCopy) -> some View {
         let glyph = statusSymbol.map { Text(Image(systemName: $0)) + Text(" ") } ?? Text("")
-        return (Text(copy.caption).font(.title3.weight(.medium)).foregroundColor(HouseTokens.onHeroSecondary)
-            + Text(" · ").font(.title3.weight(.medium)).foregroundColor(HouseTokens.onHeroSecondary)
-            + (glyph + Text(copy.phrase ?? "")).font(.subheadline.weight(.semibold)).foregroundColor(statusColor))
-            .lineLimit(7)
-            // The column is ~130pt wide: past Large the words stop growing (as the empty-lot words do) and wrap instead (VoiceOver reads them in full).
-            .dynamicTypeSize(...DynamicTypeSize.large)
+        return VStack(alignment: .leading, spacing: 2) {
+            Text(copy.caption)
+                .font(.title3.weight(.medium))
+                .foregroundStyle(HouseTokens.onHeroSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            (glyph + Text(copy.status ?? ""))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(statusColor)
+                .lineLimit(5)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("today.hero.status")
+        }
+        // Past Large the words stop growing (as the empty-lot words do) and wrap; VoiceOver reads them in full.
+        .dynamicTypeSize(...DynamicTypeSize.large)
     }
 
     private var displayHours: Int { Int((shownHours ?? progress.hours).rounded(.down)) }
@@ -308,7 +319,7 @@ struct HouseHeroCard: View {
                 // A staked lot leaves room on the right for the name flag (approved onboarding landing).
                 // The empty lot is smaller too, so its words and button keep a clear column.
                 let staked = stakeName != nil
-                let shrink: CGFloat = staked ? 0.86 : (footerIsWide ? 0.8 : 1)
+                let shrink: CGFloat = staked ? 0.86 : ((footerIsWide || usesCombinedCaption) ? 0.8 : 1)
                 let houseSize = min(g.size.height * 0.84, g.size.width * 0.62) * shrink
                 let houseCenter = CGPoint(x: g.size.width - 4 - houseSize * 0.44 - (staked ? 40 : 0), y: g.size.height - 6 - houseSize * 0.417)
                 let houseOrigin = CGPoint(x: houseCenter.x - houseSize / 2, y: houseCenter.y - houseSize / 2)
@@ -394,7 +405,6 @@ struct HouseHeroCard: View {
                         .accessibilityLabel(isLoading ? "Loading your hours" : "\(progress.wholeHours) hours")
                         if usesCombinedCaption, let copy = heroCopy {
                             captionLine(copy)
-                                .frame(width: columnWidth, alignment: .leading)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .accessibilityIdentifier("today.hero.caption")
                         } else {
@@ -456,7 +466,8 @@ struct HouseHeroCard: View {
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(HouseTokens.onHeroPrimary)
                                     .lineLimit(2)
-                                if progress.nextStep != nil {
+                                // A record has no target, so no "Roof at 500h" line: the stage name alone.
+                                if progress.nextStep != nil, heroCopy?.targetHours != nil || heroCopy == nil {
                                     Text(progress.nextMilestoneLabel)
                                         .font(.footnote)
                                         .foregroundStyle(HouseTokens.onHeroSecondary)
