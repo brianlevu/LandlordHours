@@ -153,6 +153,8 @@ final class PaywallFlowTests: XCTestCase {
         XCTAssertEqual(PaywallFlow.afterPurchase(.cancelled), .ready, "Cancelled: nothing changes")
         XCTAssertEqual(PaywallFlow.afterPurchase(.pending), .askToBuy)
         XCTAssertEqual(PaywallFlow.afterPurchase(.failed), .failed)
+        XCTAssertEqual(PaywallFlow.afterPurchase(.timedOut), .failed)
+        XCTAssertNil(PaywallFlow.failureReason(.timedOut), "a timeout logs purchase_timeout, not purchase_failed")
     }
 
     func testRestore() {
@@ -187,12 +189,21 @@ private final class FakeStore: ProPurchasing {
     var purchaseOutcome: SubscriptionManager.PurchaseOutcome = .purchased
     var restoreFinds = false
     var purchases = 0
+    var isPurchaseInFlight = false
+    /// For `.timedOut`: the late outcome the test delivers with `finishLate(_:)`.
+    private var late: (@MainActor (SubscriptionManager.PurchaseOutcome) -> Void)?
 
     func loadProducts() async { proDisplayPrice = priceAfterLoad }
-    func purchasePro() async -> SubscriptionManager.PurchaseOutcome {
+    func purchasePro(lateOutcome: @escaping @MainActor (SubscriptionManager.PurchaseOutcome) -> Void) async -> SubscriptionManager.PurchaseOutcome {
         purchases += 1
         if purchaseOutcome == .purchased { isPro = true }
+        if purchaseOutcome == .timedOut { isPurchaseInFlight = true; late = lateOutcome }
         return purchaseOutcome
+    }
+    @MainActor func finishLate(_ outcome: SubscriptionManager.PurchaseOutcome) {
+        isPurchaseInFlight = false
+        if outcome == .purchased { isPro = true }
+        late?(outcome)
     }
     func restorePurchases() async -> Bool {
         if restoreFinds { isPro = true }
@@ -246,6 +257,36 @@ final class PaywallModelTests: XCTestCase {
         XCTAssertEqual(model.phase, .success)
         XCTAssertEqual(events.map(\.0), ["paywall_cta_tapped", "purchase_completed", "purchase_succeeded"])
         XCTAssertEqual(events.last?.1["context"] as? String, "secondProperty")
+    }
+
+    func testTimedOutPurchaseLogsTimeoutThenTheLateCompletion() async {
+        let store = FakeStore()
+        store.purchaseOutcome = .timedOut
+        let model = PaywallModel(context: .export, entry: .exportPage, store: store)
+        await model.start()
+        await model.buy()
+        XCTAssertEqual(model.phase, .failed)
+        XCTAssertTrue(model.isFinishingPurchase)
+        XCTAssertFalse(model.canBuy, "no second purchase while the first is still in flight")
+        XCTAssertEqual(events.map(\.0), ["paywall_cta_tapped", "purchase_timeout"])
+        store.finishLate(.purchased)
+        XCTAssertEqual(events.map(\.0), ["paywall_cta_tapped", "purchase_timeout", "purchase_completed", "purchase_succeeded"])
+        XCTAssertEqual(events.last?.1["context"] as? String, "export")
+        model.entitlementChanged(isPro: store.isPro)
+        XCTAssertEqual(model.phase, .success)
+    }
+
+    func testTimedOutPurchaseThatFailsLateCanBeRetried() async {
+        let store = FakeStore()
+        store.purchaseOutcome = .timedOut
+        let model = PaywallModel(context: .export, entry: .exportPage, store: store)
+        await model.start()
+        await model.buy()
+        store.finishLate(.cancelled)
+        XCTAssertEqual(events.last?.0, "purchase_failed")
+        XCTAssertEqual(events.last?.1["outcome"] as? String, "cancelled")
+        XCTAssertFalse(model.isFinishingPurchase)
+        XCTAssertTrue(model.canBuy, "Buy comes back once the App Store answers")
     }
 
     func testAskToBuyWaitsThenUnlocksOnApproval() async {
@@ -588,7 +629,7 @@ final class ProPurchaseStoreKitTests: XCTestCase {
         XCTAssertLessThan(Date().timeIntervalSince(started), 5)
         XCTAssertEqual(model.phase, .restoreNone)
         XCTAssertFalse(manager.isLoading, "the restore button must come back")
-        XCTAssertEqual(manager.restoreFailureMessage, "The App Store didn't answer. Check your connection and Apple Account, then try again.")
+        XCTAssertEqual(manager.restoreFailureMessage, "The App Store didn't answer. Try again in a moment.")
     }
 
     func testRestoreErrorIsShownAsAFailureNotAsNothingFound() async throws {
@@ -597,7 +638,7 @@ final class ProPurchaseStoreKitTests: XCTestCase {
         let found = await manager.restorePurchases()
         XCTAssertFalse(found)
         XCTAssertFalse(manager.isLoading)
-        XCTAssertTrue(manager.restoreFailureMessage?.hasPrefix("Restore failed:") == true)
+        XCTAssertEqual(manager.restoreFailureMessage, "Couldn't reach the App Store. Check your connection and try again.")
     }
 
     func testRestoreFindsAPurchaseOnThisDeviceWithoutAskingTheAppStore() async throws {
@@ -612,12 +653,15 @@ final class ProPurchaseStoreKitTests: XCTestCase {
         XCTAssertTrue(manager.isPro)
     }
 
-    func testPurchaseThatNeverHearsBackTimesOutAndCanBeRetried() async throws {
+    func testPurchaseThatHearsBackLateKeepsBuyOffUntilItAnswers() async throws {
         let manager = SubscriptionManager.shared
         await manager.loadProducts()
         SubscriptionManager.purchaseTimeout = 0.3
+        let gate = ReleaseGate()
+        var appStoreCalls = 0
         manager.purchaseProduct = { _ in
-            try await Task.sleep(nanoseconds: 3_600_000_000_000)
+            appStoreCalls += 1
+            await gate.wait()
             return .userCancelled
         }
         let model = PaywallModel(context: .export, entry: .exportPage, store: manager)
@@ -627,9 +671,43 @@ final class ProPurchaseStoreKitTests: XCTestCase {
         XCTAssertFalse(bought)
         XCTAssertLessThan(Date().timeIntervalSince(started), 5)
         XCTAssertEqual(model.phase, .failed)
+        XCTAssertFalse(manager.isLoading, "the paywall stops spinning")
+        XCTAssertTrue(manager.isPurchaseInFlight)
+        XCTAssertTrue(model.isFinishingPurchase)
+        XCTAssertFalse(model.canBuy, "no second purchase while the first is in flight")
+        XCTAssertEqual(manager.purchaseError, "Still finishing your purchase…")
+
+        // A direct second purchase is refused without reaching the App Store.
+        let second = await manager.purchasePro()
+        XCTAssertEqual(second, .failed)
+        XCTAssertEqual(appStoreCalls, 1)
+
+        // The App Store answers: Buy comes back.
+        gate.release()
+        let deadline = Date().addingTimeInterval(5)
+        while manager.isPurchaseInFlight && Date() < deadline { try await Task.sleep(nanoseconds: 50_000_000) }
+        XCTAssertFalse(manager.isPurchaseInFlight)
+        XCTAssertFalse(model.isFinishingPurchase)
         XCTAssertTrue(model.canBuy, "the user can try again")
-        XCTAssertFalse(manager.isLoading)
-        XCTAssertEqual(manager.purchaseError, "The App Store didn't answer. If you finish the purchase, Pro unlocks on its own.")
+    }
+
+    func testALateCompletionReportsTheRealOutcome() async throws {
+        let manager = SubscriptionManager.shared
+        await manager.loadProducts()
+        SubscriptionManager.purchaseTimeout = 0.2
+        let gate = ReleaseGate()
+        manager.purchaseProduct = { _ in
+            await gate.wait()
+            return .userCancelled
+        }
+        var late: [SubscriptionManager.PurchaseOutcome] = []
+        let first = await manager.purchasePro(lateOutcome: { late.append($0) })
+        XCTAssertEqual(first, .timedOut)
+        XCTAssertTrue(late.isEmpty)
+        gate.release()
+        let deadline = Date().addingTimeInterval(5)
+        while late.isEmpty && Date() < deadline { try await Task.sleep(nanoseconds: 50_000_000) }
+        XCTAssertEqual(late, [.cancelled])
     }
 
     func testListenerStartsOnceAndStops() {
@@ -641,8 +719,37 @@ final class ProPurchaseStoreKitTests: XCTestCase {
     }
 }
 
+/// A call that waits until the test lets it go, so no test leaves a purchase in flight.
+@MainActor
+final class ReleaseGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var isOpen = false
+    func wait() async {
+        if isOpen { return }
+        await withCheckedContinuation { continuation = $0 }
+    }
+    func release() {
+        isOpen = true
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
 @MainActor
 final class StoreDeadlineTests: XCTestCase {
+    func testOnLateGetsTheValueOnlyWhenTheDeadlinePassed() async throws {
+        var lateValues: [Int] = []
+        let onTime = await StoreDeadline.run(seconds: 5, onLate: { lateValues.append($0) }) { 1 }
+        XCTAssertEqual(onTime, 1)
+        let missed: Int? = await StoreDeadline.run(seconds: 0.1, onLate: { lateValues.append($0) }) {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            return 2
+        }
+        XCTAssertNil(missed)
+        try await Task.sleep(nanoseconds: 800_000_000)
+        XCTAssertEqual(lateValues, [2])
+    }
+
     func testReturnsTheValueWhenTheCallFinishesInTime() async {
         let value = await StoreDeadline.run(seconds: 5) { 42 }
         XCTAssertEqual(value, 42)

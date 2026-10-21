@@ -14,23 +14,33 @@ class SubscriptionManager: ObservableObject {
     @Published var purchaseError: String? {
         didSet { if purchaseError != nil { RatingPromptCoordinator.shared.noteError() } }
     }
+    /// True from the moment a purchase starts until the App Store answers, even after the
+    /// purchase deadline: the paywall keeps Buy off so a second purchase can't start meanwhile.
+    @Published private(set) var isPurchaseInFlight = false
     
     private let proProductID = "com.openclaw.landlordhours.pro"
     private var isProKey: String { UserScope.key("isProUser") }
     private var hasPurchasedKey: String { UserScope.key("hasPurchasedPro") }
     private var transactionListener: Task<Void, Never>?
 
+    #if DEBUG
     /// Longest a restore waits on `AppStore.sync()` (it can sit on an Apple Account sign-in that
-    /// never comes back). Tests shorten it.
+    /// never comes back). Tests and the DEBUG `-LHRestoreOutcome` hook shorten it.
     static var restoreSyncTimeout: TimeInterval = 90
     /// Longest a purchase waits on the App Store. A purchase that completes after this still
-    /// unlocks Pro and is finished; the paywall just stops spinning and says so.
+    /// unlocks Pro and is finished; the paywall stops spinning and says it's still finishing.
     static var purchaseTimeout: TimeInterval = 300
 
-    /// Seams for the two App Store calls that put up system UI. Tests swap in a call that never
-    /// returns to prove restore and purchase still end.
+    /// DEBUG-only seams for the two App Store calls that put up system UI. Tests swap in a call
+    /// that never returns to prove restore and purchase still end. Release can't reassign them.
     var syncWithAppStore: @MainActor () async throws -> Void = { try await AppStore.sync() }
     var purchaseProduct: @MainActor (Product) async throws -> Product.PurchaseResult = { try await $0.purchase() }
+    #else
+    static let restoreSyncTimeout: TimeInterval = 90
+    static let purchaseTimeout: TimeInterval = 300
+    private let syncWithAppStore: @MainActor () async throws -> Void = { try await AppStore.sync() }
+    private let purchaseProduct: @MainActor (Product) async throws -> Product.PurchaseResult = { try await $0.purchase() }
+    #endif
 
     /// Message for a restore that failed (error or timeout), as opposed to one that found nothing.
     @Published private(set) var restoreFailureMessage: String?
@@ -39,7 +49,11 @@ class SubscriptionManager: ObservableObject {
     /// session (`attachStoreKit()`). StoreKit picks a process's environment on its first call:
     /// a call made before the session exists binds the whole process to the Sandbox store, so the
     /// session's purchases never reach the app and `AppStore.sync()` waits on a sign-in forever.
+    #if DEBUG
     private(set) var isStoreKitAttached = !SubscriptionManager.isUnitTestHost
+    #else
+    let isStoreKitAttached = true
+    #endif
 
     private init() {
         // Load purchased status
@@ -48,7 +62,7 @@ class SubscriptionManager: ObservableObject {
 
         guard isStoreKitAttached else { return }
         // Listen for unfinished/pending transactions (e.g. interrupted purchases, Ask to Buy)
-        startTransactionListener()
+        startListenerIfNeeded()
 
         // Load products from App Store
         Task {
@@ -63,21 +77,28 @@ class SubscriptionManager: ObservableObject {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 
+    #if DEBUG
     /// Unit tests: call once the StoreKit test session exists. Later StoreKit calls go to it.
     func attachStoreKit() {
         isStoreKitAttached = true
     }
 
-    /// Starts the Transaction.updates listener. Idempotent, so it can never run twice.
+    /// Tests: start the listener (idempotent).
     func startTransactionListener() {
-        guard isStoreKitAttached, transactionListener == nil else { return }
-        transactionListener = listenForTransactions()
+        startListenerIfNeeded()
     }
 
     /// Tests: stop the listener so a transaction from one test can't land in the next.
     func stopTransactionListener() {
         transactionListener?.cancel()
         transactionListener = nil
+    }
+    #endif
+
+    /// Starts the Transaction.updates listener. Idempotent, so it can never run twice.
+    private func startListenerIfNeeded() {
+        guard isStoreKitAttached, transactionListener == nil else { return }
+        transactionListener = listenForTransactions()
     }
 
     private func listenForTransactions() -> Task<Void, Never> {
@@ -138,11 +159,26 @@ class SubscriptionManager: ObservableObject {
         case cancelled
         case pending
         case failed
+        /// The App Store hadn't answered by the deadline. The purchase may still finish; its
+        /// real outcome goes to `lateOutcome`.
+        case timedOut
     }
 
     @MainActor
     @discardableResult
     func purchasePro() async -> PurchaseOutcome {
+        await purchasePro(lateOutcome: { _ in })
+    }
+
+    /// `lateOutcome` gets the real outcome of a purchase that answered after the deadline.
+    @MainActor
+    @discardableResult
+    func purchasePro(lateOutcome: @escaping @MainActor (PurchaseOutcome) -> Void) async -> PurchaseOutcome {
+        guard isStoreKitAttached else { return .failed }
+        guard !isPurchaseInFlight else {
+            purchaseError = "Still finishing your purchase…"
+            return .failed
+        }
         var outcome: PurchaseOutcome = .failed
         isLoading = true
         purchaseError = nil
@@ -162,7 +198,15 @@ class SubscriptionManager: ObservableObject {
             // Purchase the product. The handling runs inside the deadline's operation so a
             // purchase that completes after the deadline still unlocks Pro and is finished.
             let purchase = purchaseProduct
-            let finished: (PurchaseOutcome, String?)? = await StoreDeadline.run(seconds: Self.purchaseTimeout) { [self] in
+            isPurchaseInFlight = true
+            let finished: (PurchaseOutcome, String?)? = await StoreDeadline.run(
+                seconds: Self.purchaseTimeout,
+                onLate: { [self] late in
+                    if late.0 == .purchased { purchaseError = nil }
+                    lateOutcome(late.0)
+                }
+            ) { [self] in
+                defer { isPurchaseInFlight = false }
                 do {
                     let result = try await purchase(product)
                     switch result {
@@ -189,7 +233,8 @@ class SubscriptionManager: ObservableObject {
                 outcome = finished.0
                 purchaseError = finished.1
             } else {
-                purchaseError = "The App Store didn't answer. If you finish the purchase, Pro unlocks on its own."
+                outcome = .timedOut
+                purchaseError = "Still finishing your purchase…"
             }
         }
 
@@ -201,6 +246,7 @@ class SubscriptionManager: ObservableObject {
     @MainActor
     @discardableResult
     func restorePurchases() async -> Bool {
+        guard isStoreKitAttached else { return false }
         isLoading = true
         purchaseError = nil
         restoreFailureMessage = nil
@@ -221,12 +267,15 @@ class SubscriptionManager: ObservableObject {
         }
         switch synced {
         case nil:
-            let message = "The App Store didn't answer. Check your connection and Apple Account, then try again."
+            let message = Self.restoreTimedOutMessage
             purchaseError = message
             restoreFailureMessage = message
             return false
         case .failure(let error)?:
-            let message = "Restore failed: \(error.localizedDescription)"
+            // Fixed, plain copy: a system error string can be technical ("StoreKitError 1").
+            var cancelled = false
+            if case .userCancelled? = error as? StoreKitError { cancelled = true }
+            let message = cancelled ? Self.restoreCancelledMessage : Self.restoreFailedMessage
             purchaseError = message
             restoreFailureMessage = message
             return false
@@ -242,6 +291,10 @@ class SubscriptionManager: ObservableObject {
         purchaseError = "We didn't find an earlier Pro purchase for this Apple Account."
         return false
     }
+
+    static let restoreTimedOutMessage = "The App Store didn't answer. Try again in a moment."
+    static let restoreFailedMessage = "Couldn't reach the App Store. Check your connection and try again."
+    static let restoreCancelledMessage = "Restore was cancelled."
 
     @MainActor
     func unlockPro() {
@@ -297,8 +350,14 @@ class SubscriptionManager: ObservableObject {
 /// cancelled on timeout: it keeps running so a late purchase is still unlocked and finished.
 /// Exactly one of the two paths resumes the continuation, so it can't leak or double-resume.
 enum StoreDeadline {
+    /// `onLate` gets the value when the operation finishes after the deadline (decided under the
+    /// same lock as the resume, so a finish can't be both on time and late, or neither).
     @MainActor
-    static func run<T>(seconds: TimeInterval, _ operation: @escaping @MainActor () async -> T) async -> T? {
+    static func run<T>(
+        seconds: TimeInterval,
+        onLate: (@MainActor (T) -> Void)? = nil,
+        _ operation: @escaping @MainActor () async -> T
+    ) async -> T? {
         let once = ResumeOnce<T?>()
         return await withCheckedContinuation { continuation in
             once.install(continuation)
@@ -309,7 +368,7 @@ enum StoreDeadline {
             Task { @MainActor in
                 let value = await operation()
                 timer.cancel()
-                once.resume(value)
+                if !once.resume(value) { onLate?(value) }
             }
         }
     }
@@ -324,11 +383,14 @@ private final class ResumeOnce<T>: @unchecked Sendable {
         self.continuation = continuation
     }
 
-    func resume(_ value: T) {
+    /// Returns false when the continuation was already resumed (this call came too late).
+    @discardableResult
+    func resume(_ value: T) -> Bool {
         lock.lock()
         let pending = continuation
         continuation = nil
         lock.unlock()
         pending?.resume(returning: value)
+        return pending != nil
     }
 }

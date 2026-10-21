@@ -14,6 +14,9 @@ struct LandlordHoursApp: App {
     @State private var launchHandoffFinished = false
 
     init() {
+        #if DEBUG
+        RestoreFailureLaunch.prepare()   // -LHRestoreOutcome timeout|failure (captures only)
+        #endif
         // Tab bar: soft but legible. Keep content from visually bleeding through the controls.
         let tabBar = UITabBarAppearance()
         tabBar.configureWithOpaqueBackground()

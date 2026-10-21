@@ -248,6 +248,7 @@ enum PaywallFlow {
         case .cancelled: return .ready     // Cancelled: nothing changes.
         case .pending: return .askToBuy
         case .failed: return .failed
+        case .timedOut: return .failed   // Buy stays off while the purchase is still in flight.
         }
     }
 
@@ -265,6 +266,7 @@ enum PaywallFlow {
         case .pending: return "pending"
         case .cancelled: return "cancelled"
         case .purchased: return nil
+        case .timedOut: return nil      // purchase_timeout, its own event
         }
     }
 }

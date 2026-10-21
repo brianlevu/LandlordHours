@@ -214,6 +214,12 @@ enum Analytics {
         capture("purchase_failed", properties: ["context": context.rawValue, "outcome": outcome])
     }
 
+    /// The App Store hadn't answered a purchase by the deadline. Its real outcome is logged later
+    /// as purchase_completed / purchase_failed if it ever arrives.
+    static func purchaseTimeout(context: PaywallContext) {
+        capture("purchase_timeout", properties: ["context": context.rawValue])
+    }
+
     /// A free user saw a locked preview at an entry point. Once per appearance.
     static func lockPreviewShown(entry: LockEntry) {
         capture("lock_preview_shown", properties: ["entry": entry.rawValue])
