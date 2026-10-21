@@ -2047,6 +2047,188 @@
    "category": "bookkeeping",
    "property": "maple",
    "split": "deals"
+  },
+  {
+   "title": "Escrow walkthrough for the Birch duplex purchase",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Draft LOI for the 6-unit on 3rd St",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Inspection contingency call with buyer's agent",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Earnest money wire due Friday - Pine St duplex",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Review inspection period extension with the seller",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Due diligence checklist for the Eastside fourplex",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Final walk-through for the Walnut Ave purchase",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Put the Maple Cottage on the market",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "property": "maple",
+   "split": "deals"
+  },
+  {
+   "title": "Meet broker to sell the Lakeview house",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "property": "lakeview",
+   "split": "deals"
+  },
+  {
+   "title": "Counter on PSA for the Elm Ave fourplex",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Sign broker agreement for the sale of Pine St",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Loan application documents for the 8-unit",
+   "landlord": true,
+   "category": "financing",
+   "split": "deals"
+  },
+  {
+   "title": "Call mortgage broker about pre-approval",
+   "landlord": true,
+   "category": "financing",
+   "split": "deals"
+  },
+  {
+   "title": "Appraisal ordered by lender for Oak Street Duplex",
+   "landlord": true,
+   "category": "financing",
+   "property": "oak",
+   "split": "deals"
+  },
+  {
+   "title": "Cash-out refi quote for Lakeview",
+   "landlord": true,
+   "category": "financing",
+   "property": "lakeview",
+   "split": "deals"
+  },
+  {
+   "title": "Build pro forma for the 12-unit acquisition",
+   "landlord": true,
+   "category": "investing",
+   "split": "deals"
+  },
+  {
+   "title": "Underwriting the Hamilton St deal with partners",
+   "landlord": true,
+   "category": "investing",
+   "split": "deals"
+  },
+  {
+   "title": "Intro call with buyer's agent about Eastside duplexes",
+   "landlord": true,
+   "category": "investing",
+   "split": "deals"
+  },
+  {
+   "title": "Tenant lease renewal negotiation for Oak Street Duplex",
+   "landlord": true,
+   "category": "leasing",
+   "property": "oak",
+   "split": "deals"
+  },
+  {
+   "title": "Offer lease renewal to tenant at Maple Cottage",
+   "landlord": true,
+   "category": "leasing",
+   "property": "maple",
+   "split": "deals"
+  },
+  {
+   "title": "Collect rent from tenants - Lakeview",
+   "landlord": true,
+   "category": "management",
+   "property": "lakeview",
+   "split": "deals"
+  },
+  {
+   "title": "Return deposit from tenant - Oak Street Duplex",
+   "landlord": true,
+   "category": "leasing",
+   "property": "oak",
+   "split": "deals"
+  },
+  {
+   "title": "Pay property tax bill for Cedar Flats",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": "cedar",
+   "split": "deals"
+  },
+  {
+   "title": "Closing up the pool for winter - Maple Cottage",
+   "landlord": true,
+   "category": "management",
+   "property": "maple",
+   "split": "deals"
+  },
+  {
+   "title": "Closing the gate and checking locks at Lakeview",
+   "landlord": true,
+   "category": "management",
+   "property": "lakeview",
+   "split": "deals"
+  },
+  {
+   "title": "Autopay for the mortgage on Oak Street Duplex",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": "oak",
+   "split": "deals"
+  },
+  {
+   "title": "Review contingency fund for repairs at Lakeview",
+   "landlord": true,
+   "category": "repairs",
+   "property": "lakeview",
+   "split": "deals"
+  },
+  {
+   "title": "Move-out walkthrough with tenant at Maple Cottage",
+   "landlord": true,
+   "category": "leasing",
+   "property": "maple",
+   "split": "deals"
   }
  ]
 }

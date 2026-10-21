@@ -233,6 +233,24 @@ final class ClassifierTests: XCTestCase {
             ("Sign listing agreement for Cedar Flats", .contractNegotiation),
             ("Closing at the title company at 9am", .financing),
             ("Escrow closing call for the Pine St duplex", .financing),
+            ("Escrow walkthrough for the Birch duplex purchase", .contractNegotiation),
+            ("Draft LOI for the 6-unit on 3rd St", .contractNegotiation),
+            ("Inspection contingency call with buyer's agent", .contractNegotiation),
+            ("Earnest money wire due Friday - Pine St duplex", .contractNegotiation),
+            ("Review inspection period extension with the seller", .contractNegotiation),
+            ("Due diligence checklist for the Eastside fourplex", .contractNegotiation),
+            ("Final walk-through for the Walnut Ave purchase", .contractNegotiation),
+            ("Put the Maple Cottage on the market", .contractNegotiation),
+            ("Meet broker to sell the Lakeview house", .contractNegotiation),
+            ("Counter on PSA for the Elm Ave fourplex", .contractNegotiation),
+            ("Sign broker agreement for the sale of Pine St", .contractNegotiation),
+            ("Loan application documents for the 8-unit", .financing),
+            ("Call mortgage broker about pre-approval", .financing),
+            ("Appraisal ordered by lender for Oak Street Duplex", .financing),
+            ("Cash-out refi quote for Lakeview", .financing),
+            ("Build pro forma for the 12-unit acquisition", .investing),
+            ("Underwriting the Hamilton St deal with partners", .investing),
+            ("Intro call with buyer's agent about Eastside duplexes", .investing),
         ]
         let backend = FakeOnDeviceBackend(answer: answer(true, 0.9, category: .management, ref: "P1"))
         let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
@@ -249,7 +267,8 @@ final class ClassifierTests: XCTestCase {
         for title in ["Post listing on Zillow", "Vacancy - update rental listing photos", "Mortgage payment for Oak Street Duplex",
                       "Loan payment autopay - Maple", "Virtual tour video for listing", "Fix sink at Oak",
                       "Negotiate lease renewal with tenant", "Negotiation with tenant over late rent", "Closing the gate at Maple",
-                      "Closing up the pool for winter"] {
+                      "Closing up the pool for winter",
+                      "Tenant lease renewal negotiation for Oak Street Duplex", "Offer lease renewal to tenant at Maple Cottage", "Collect rent from tenants - Lakeview", "Return deposit from tenant - Oak Street Duplex", "Pay property tax bill for Cedar Flats", "Closing up the pool for winter - Maple Cottage", "Closing the gate and checking locks at Lakeview", "Autopay for the mortgage on Oak Street Duplex", "Review contingency fund for repairs at Lakeview", "Move-out walkthrough with tenant at Maple Cottage"] {
             XCTAssertNil(DealSignal.category(forTitle: title), title)
         }
     }

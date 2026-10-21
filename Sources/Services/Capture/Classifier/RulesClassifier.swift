@@ -92,24 +92,58 @@ enum DealSignal {
         "refinance", "refinancing", "refi", "heloc", "lender", "lenders", "loan", "loans", "dscr",
         "pre approval", "preapproval", "rate lock", "cash out", "underwriting", "underwriter",
         "mortgage broker", "mortgage application", "closing on", "closing docs", "closing date",
-        "closing documents", "appraisal", "appraiser",
+        "closing documents", "appraisal", "appraisals", "appraiser", "loan application", "loan applications",
+        "pre approved", "cash out refi", "mortgage preapproval", "mortgage pre approval", "mortgage quote", "mortgage rate",
+        "mortgage rates",
     ]
     static let investing = [
         "deal analysis", "analyze deal", "new deal", "cap rate", "comps", "1031", "investment property",
-        "potential rental", "potential property", "replacement property", "property to buy",
+        "potential rental", "potential property", "replacement property", "property to buy", "broker for the sale",
+        "broker for a sale", "broker opinion", "bpo", "exchange accommodator", "qualified intermediary",
     ]
 
     /// Words that put a bare "closing" in a purchase or sale ("Closing at the title company"),
     /// not "Closing the gate".
     static let closingContext = [
-        "title company", "escrow", "sale", "purchase", "buyer", "buyers", "seller", "sellers", "attorney",
+        "title company", "title", "escrow", "sale", "purchase", "buyer", "buyers", "seller", "sellers", "attorney",
         "lender", "docs", "documents", "disclosure", "costs", "date", "table", "settlement",
     ]
     /// Who a purchase or sale negotiation is with. A tenant or lease negotiation stays Leasing.
     static let negotiationContext = [
         "seller", "sellers", "buyer", "buyers", "agent", "broker", "realtor", "purchase", "sale", "price", "offer",
     ]
-    static let tenantContext = ["tenant", "tenants", "lease", "renewal", "rent", "guest", "applicant"]
+    static let tenantContext = ["tenant", "tenants", "lease", "leases", "renewal", "rent", "guest", "applicant", "deposit"]
+
+    // Vocabulary by concept (matched whole-word or whole-phrase after normalize; apostrophes and
+    // hyphens become spaces, so "buyer's agent" is "buyer s agent"). Every group below is
+    // guarded by `tenantContext`: "Offer lease renewal to tenant" stays Leasing.
+
+    /// Offers and documents of a purchase or sale.
+    static let offersAndDocuments = [
+        "offer", "offers", "loi", "letter of intent", "psa", "listing agreement", "list for sale",
+        "listing for sale", "put on the market", "put it on the market", "put the house on the market",
+        "on the market", "sell", "selling", "sale of", "sell the", "sell my",
+    ]
+    /// Stages of a transaction.
+    static let transactionStages = [
+        "escrow", "earnest money", "under contract", "contingency", "contingencies", "due diligence",
+        "inspection period", "final walk through", "final walkthrough", "title search", "title commitment",
+    ]
+    /// Words that need a purchase or sale around them to be a deal ("Walkthrough for the purchase").
+    static let weakStages = ["walk through", "walkthrough", "inspection", "inspections", "survey", "appraisal review"]
+    static let transactionContext = [
+        "purchase", "buy", "buying", "buyer", "buyers", "seller", "sellers", "sale", "sell", "selling", "escrow",
+        "offer", "acquisition", "closing", "listing", "contingency", "lender", "loan",
+    ]
+    /// Agents and brokers of a deal.
+    static let dealAgents = [
+        "buyer s agent", "seller s agent", "buyers agent", "sellers agent", "listing agent", "selling agent",
+        "buyer agent", "seller agent", "buyer s broker", "seller s broker",
+    ]
+    /// Phrases that void a "contingency" ("contingency fund") or similar.
+    static let notDeal = ["contingency fund", "contingency plan", "contingency budget", "contingency reserve", "tax appraisal", "tax appraisals"]
+    /// More underwriting and investing vocabulary.
+    static let investingExtra = ["acquisition", "acquisitions", "pro forma", "proforma", "underwrite", "underwriting a deal", "off market deal"]
 
     /// The non-countable category a title's deal signal forces, or nil.
     static func category(forTitle title: String) -> ActivityCategory? {
@@ -117,6 +151,7 @@ enum DealSignal {
         func has(_ phrase: String) -> Bool { padded.contains(" \(phrase) ") }
         let isPayment = isLoanPayment(padded)
         let isTenantMatter = tenantContext.contains(where: has)
+        let voided = notDeal.contains(where: has)
         if contractNegotiation.contains(where: has) { return .contractNegotiation }
         let negotiates = ["negotiate", "negotiation", "negotiations", "negotiating"].contains(where: has)
         if negotiates, !isTenantMatter, negotiationContext.contains(where: has) { return .contractNegotiation }
@@ -124,9 +159,18 @@ enum DealSignal {
         let looks = has("look at") || has("tour") || has("view")
         // Listing the user's own property for sale is selling; looking at a listing is buying.
         if has("listing agreement") || (lists && has("for sale") && !looks) { return .contractNegotiation }
-        if !isPayment, financing.contains(where: has) { return .financing }
+        if has("underwriting") || has("underwrite"), has("deal") || has("deals") { return .investing }
+        if !isPayment, !(voided && (has("appraisal") || has("appraisals"))), financing.contains(where: has) { return .financing }
         if has("closing"), closingContext.contains(where: has) { return .financing }
+        if !isTenantMatter {
+            // "Contingency fund" and "contingency plan" are budgeting, not a purchase contingency.
+            let stages = voided ? transactionStages.filter { !$0.hasPrefix("contingenc") } : transactionStages
+            if stages.contains(where: has) || (!voided && offersAndDocuments.contains(where: has)) { return .contractNegotiation }
+            if weakStages.contains(where: has), transactionContext.contains(where: has) { return .contractNegotiation }
+        }
+        if !isTenantMatter, dealAgents.contains(where: has) { return .investing }
         if investing.contains(where: has) { return .investing }
+        if !isTenantMatter, investingExtra.contains(where: has) { return .investing }
         if lists, has("look at") || has("for sale") { return .investing }
         return nil
     }
@@ -144,7 +188,11 @@ enum DealSignal {
     /// or mortgage payment that came out as Financing (keyword table or model) is Bookkeeping.
     static func apply(_ category: ActivityCategory?, title: String) -> ActivityCategory? {
         if let deal = Self.category(forTitle: title) { return deal }
-        if category == .financing, isLoanPayment(" \(RulesEngine.normalize(title)) ") { return .bookkeeping }
+        let padded = " \(RulesEngine.normalize(title)) "
+        if category == .financing, isLoanPayment(padded) { return .bookkeeping }
+        // The keyword table reads any "closing" as Financing; with no deal word beside it
+        // ("closing the pool", "closing up for winter") it is ordinary upkeep.
+        if category == .financing, padded.contains(" closing ") { return .management }
         return category
     }
 }
