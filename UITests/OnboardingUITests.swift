@@ -43,6 +43,43 @@ final class OnboardingUITests: XCTestCase {
         return (element.value as? String) == value
     }
 
+    // MARK: One tap on Welcome
+
+    /// Regression (fix/onb-start): making the profile flipped isSignedIn before showOnboarding,
+    /// so the shell mounted for a frame and onboarding restarted on Welcome. The first tap
+    /// looked ignored in about 3 of 4 launches. One tap, no retry, on three fresh launches.
+    func testOneStartBuildingTapLeavesWelcome() {
+        for attempt in 1...3 {
+            launchFresh()
+            let start = app.buttons["onb-start"]
+            XCTAssertTrue(start.waitForExistence(timeout: 20), "launch \(attempt): Welcome")
+            start.tap()                                            // exactly one tap
+            XCTAssertTrue(app.buttons["goal-750"].waitForExistence(timeout: 8),
+                          "launch \(attempt): one Start building tap reaches the goal step")
+            XCTAssertFalse(start.exists, "launch \(attempt): Welcome never comes back")
+        }
+    }
+
+    /// iCloud never answers (signed out, restricted, hung daemon): Start still proceeds at once
+    /// and the flow reaches Staked on local data.
+    func testStartProceedsWhenICloudNeverAnswers() {
+        launchFresh(["-LHFakeICloudHang", "-LHFakeCalendar", "denied", "-LHFakeNotifications", "denied"])
+        let start = app.buttons["onb-start"]
+        XCTAssertTrue(start.waitForExistence(timeout: 20))
+        start.tap()                                                // exactly one tap
+        XCTAssertTrue(app.buttons["goal-750"].waitForExistence(timeout: 8), "Start never waits on iCloud")
+        tap(app.buttons["goal-750"])
+        tap(app.buttons["onb-primary"])                            // Build toward 750h
+        tap(app.buttons["onb-primary"])                            // Look at my calendar (fake deny)
+        XCTAssertTrue(app.buttons["who-me"].waitForExistence(timeout: 8))
+        tap(app.buttons["onb-primary"])                            // Who: Continue
+        let field = app.textFields["property-name"]
+        tap(field)
+        field.typeText("Elm")
+        tap(app.buttons["onb-primary"])                            // Save it
+        XCTAssertTrue(app.staticTexts["Your house is staked."].waitForExistence(timeout: 10))
+    }
+
     // MARK: Happy path
 
     func testHappyPathFindsHoursAndReviewOpensTheInbox() {
