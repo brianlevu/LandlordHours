@@ -348,16 +348,17 @@ enum NoteDateResolver {
 enum NoteFactGuard {
     static let maxLength = 140
 
-    /// Words that restate or connect without adding a fact.
+    /// Words that restate or connect without adding a fact. Never an outcome: "completed" and
+    /// "done" claim a result the note may not state (caught by the Jev cross-check, 2026-10-20).
     static let framing: Set<String> = [
         "a", "an", "the", "at", "on", "in", "for", "with", "of", "to", "from", "and", "or", "about",
         "regarding", "re", "by", "via", "per", "after", "before", "during", "into", "over", "this",
         "that", "its", "their", "his", "her", "them", "it", "was", "were", "is", "be", "been",
         "work", "worked", "task", "tasks", "activity", "activities", "property", "properties",
-        "rental", "rentals", "owner", "landlord", "performed", "completed", "handled", "conducted",
+        "rental", "rentals", "owner", "landlord", "performed", "handled", "conducted",
         "attended", "met", "meeting", "meet", "call", "called", "phone", "discussed", "discussion",
         "reviewed", "review", "coordinated", "coordinate", "visited", "visit", "spoke", "related",
-        "matters", "matter", "general", "several", "all", "both", "time", "spent", "did", "done",
+        "matters", "matter", "general", "several", "all", "both", "time", "spent", "did",
         "unit", "units", "home", "house",
     ]
 

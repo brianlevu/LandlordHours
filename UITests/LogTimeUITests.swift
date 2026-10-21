@@ -288,6 +288,8 @@ final class LogTimeUITests: XCTestCase {
         /// Tapped after `waitFor` appears (e.g. Undo), then `then` is awaited.
         var tap: String? = nil
         var then: String? = nil
+        /// Scrolled fully into view instead of `waitFor` (e.g. the Date row below the description).
+        var scrollTo: String? = nil
     }
 
     private let shots: [Shot] = [
@@ -312,7 +314,8 @@ final class LogTimeUITests: XCTestCase {
         Shot(name: "timer-review", seed: "four", extra: ["-LHOpenLog", "timerReview"], waitFor: "log.timer.ran"),
         // Apple's model filling the note (scripted model tier, the real reader and form).
         Shot(name: "ai-thinking", seed: "four", extra: ["-LHOpenLog", "aiNote", "-LHNoteModel", "thinking"], waitFor: "log.reading", settle: 1.5),
-        Shot(name: "ai-filled", seed: "four", extra: ["-LHOpenLog", "aiNote", "-LHNoteModel", "fake"], waitFor: "log.description", settle: 1.5),
+        Shot(name: "ai-filled", seed: "four", extra: ["-LHOpenLog", "aiNote", "-LHNoteModel", "fake"], waitFor: "log.description", settle: 1.5,
+             scrollTo: "log.date"),
         Shot(name: "ai-undone", seed: "four", extra: ["-LHOpenLog", "aiNote", "-LHNoteModel", "fake"], waitFor: "log.description", settle: 1.0,
              tap: "log.fill.undo", then: "log.property"),
         Shot(name: "ai-partial", seed: "four", extra: ["-LHOpenLog", "aiPartial", "-LHNoteModel", "fake"], waitFor: "log.fill.caption", settle: 1.5),
@@ -346,6 +349,14 @@ final class LogTimeUITests: XCTestCase {
     }
 
     /// Apple's model filling the note: thinking, filled, Undo, partial, no model → rules.
+    /// Frames changed by the 44pt Undo target and the Date-row scroll (round 2).
+    func testCaptureAIFillFixups() {
+        let names: Set<String> = ["ai-filled", "ai-partial", "ai-rules-only"]
+        for scheme in ["light", "dark"] {
+            for size in [nil, "xxl", "ax3"] as [String?] { captureAll(scheme: scheme, size: size, prefix: "ai-", names: names) }
+        }
+    }
+
     func testCaptureAIFillStates() {
         for scheme in ["light", "dark"] {
             for size in [nil, "xxl", "ax3"] as [String?] { captureAll(scheme: scheme, size: size, prefix: "ai-") }
@@ -377,11 +388,19 @@ final class LogTimeUITests: XCTestCase {
                 // The waited-for element may be gone after the tap: scroll to the result instead.
                 target = element(shot.then ?? "log.property")
             }
+            if let scrollTo = shot.scrollTo {
+                // The fill lands after ~1 s; scroll once the row is final.
+                Thread.sleep(forTimeInterval: 1.2)
+                target = element(scrollTo)
+            }
             if shot.waitFor != "shell.toast" && shot.waitFor != "log.done" {
                 // Today's card sits under the hero, and at AX sizes a sheet's state (the Who row,
                 // the save error) can sit below the fold: scroll it fully into view.
                 let today = app.buttons["tab.today"]
-                let bottom = shot.name.hasPrefix("today-") ? today.frame.minY : app.windows.firstMatch.frame.maxY - 24
+                var bottom = shot.name.hasPrefix("today-") ? today.frame.minY : app.windows.firstMatch.frame.maxY - 24
+                // A row the pinned Log button would fade over must clear the button.
+                let save = app.buttons["log.save"]
+                if shot.scrollTo != nil, save.exists { bottom = min(bottom, save.frame.minY - 48) }
                 let bar = (bottom: bottom, minY: bottom)
                 // Short drags from mid-screen (never from an edge, which would leave the app)
                 // until the card sits fully above the tab bar.

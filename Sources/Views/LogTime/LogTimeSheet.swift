@@ -437,7 +437,7 @@ struct LogTimeSheet: View {
                 }
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(colors.action)
-                .frame(minWidth: 44, minHeight: 32)
+                .frame(minWidth: 44, minHeight: 44)
                 .accessibilityLabel("Undo the fill")
                 .accessibilityIdentifier("log.fill.undo")
                 Spacer(minLength: 0)

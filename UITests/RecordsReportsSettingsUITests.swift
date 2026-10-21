@@ -65,10 +65,60 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         let calendarSwitch = element("settings.capture.calendar")
         XCTAssertTrue(scrollTo(calendarSwitch), "Auto-capture section is in Settings")
         XCTAssertTrue(element("settings.capture.prompts").exists)
-        let disclosure = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Apple's on-device model. Nothing is sent to us or any third party.")).firstMatch
+        // iOS 27: the note may go to Private Cloud Compute, so the disclosure says so and the
+        // toggle sits in the section (NoteReaderChain + PCCGate).
+        let disclosure = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Private Cloud Compute doesn\u{2019}t keep your note")).firstMatch
         XCTAssertTrue(scrollTo(disclosure), "Apple AI disclosure is shown")
+        XCTAssertTrue(disclosure.label.contains("nothing is saved until you tap Log"), disclosure.label)
+        XCTAssertTrue(element("settings.capture.pcc").exists, "the Private Cloud Compute toggle")
         element("settings.capture.muted").tap()
         XCTAssertTrue(element("settings.muted.screen").waitForExistence(timeout: 5))
+    }
+
+    /// The Auto-capture section with the PCC toggle and the AI disclosure: light and dark, default
+    /// and AX3 (frames to LH_CAPTURE_DIR).
+    func testCaptureSettingsAIDisclosure() {
+        continueAfterFailure = true
+        for scheme in ["light", "dark"] {
+            for ax3 in [false, true] {
+                launch(tab: 4, scheme: scheme, extra: ax3 ? ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL"] : [])
+                let toggle = element("settings.capture.pcc")
+                XCTAssertTrue(toggle.waitForExistence(timeout: 20) || scrollTo(toggle, maxSwipes: 14))
+                XCTAssertTrue(scrollTo(toggle, maxSwipes: 14), "PCC toggle")
+                let suffix = "\(scheme)\(ax3 ? "-ax3" : "")"
+                // Frame 1: the toggle near the top of the screen.
+                var tries = 0
+                while toggle.frame.minY > 260 && tries < 8 {
+                    app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+                        .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)), withVelocity: .slow, thenHoldForDuration: 0.3)
+                    tries += 1
+                }
+                // At the default size the toggle and the disclosure share one screen: one frame.
+                if ax3 { settleAndCapture("settings-pcc-toggle-\(suffix)", wait: 1.5) }
+                // Frame 2: the whole disclosure above the tab bar.
+                let disclosure = element("settings.capture.aiDisclosure")
+                let tabBar = app.buttons["tab.today"]
+                func drag() {
+                    app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+                        .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)), withVelocity: .slow, thenHoldForDuration: 0.3)
+                }
+                // Lazy list: the footer only exists once scrolled near. Stop when it fits above
+                // the tab bar, or its top reaches the top of the screen (AX3: taller than a screen).
+                tries = 0
+                while tries < 16 && (!disclosure.exists || (disclosure.frame.maxY > tabBar.frame.minY - 12 && disclosure.frame.minY > 160)) {
+                    drag()
+                    tries += 1
+                }
+                XCTAssertTrue(disclosure.exists, "disclosure \(suffix)")
+                settleAndCapture("settings-ai-disclosure-\(suffix)", wait: 1.5)
+                if disclosure.exists, disclosure.frame.maxY > tabBar.frame.minY - 12 {
+                    // The rest of a long (AX3) disclosure.
+                    tries = 0
+                    while tries < 10 && disclosure.frame.maxY > tabBar.frame.minY - 12 { drag(); tries += 1 }
+                    settleAndCapture("settings-ai-disclosure-\(suffix)-2", wait: 1.5)
+                }
+            }
+        }
     }
 
     func testReportsAndSettingsLeadBackToToday() {
