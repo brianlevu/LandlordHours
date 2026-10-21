@@ -4,6 +4,7 @@
   copy_gate.py check  [--root DIR] [--label NAME] [--out DIR] [--baseline REPORT.json] [--no-ai]
   copy_gate.py calibrate [--rerun]     score scripts/qa/copy_gate_calibration.json, write thresholds
   copy_gate.py extract [--root DIR]    print the extracted strings and what was skipped
+  copy_gate.py l10n   [--root DIR] [--out DIR] [--show N]   non-localizable string patterns (deterministic, flag only)
 
 Layer 1 is deterministic (banned words, straight apostrophes, Title Case labels). No AI.
 Layer 2 asks TypeSafe Jev three things per string, in one request:
@@ -536,6 +537,89 @@ def render_md(rep, has_base):
     return "\n".join(L) + "\n"
 
 
+# ------------------------------------------------- non-localizable strings (l10n)
+
+L10N_UI = r"(?:Text|Label|Button|Toggle|Section|Link|Picker|TextField|SecureField|Stepper|DatePicker|Menu|" \
+          r"ShareLink|LabeledContent|ContentUnavailableView|navigationTitle|navigationBarTitle|alert|" \
+          r"confirmationDialog|accessibilityLabel|accessibilityHint|accessibilityValue|badge|help|prompt)"
+L10N_CALL = re.compile(r"\b" + L10N_UI + r"\s*\(")
+L10N_VAR_DECL = re.compile(r'^\s*(?:(?:private|fileprivate|static|public|internal)\s+)*(?:let|var)\s+(\w+)\s*(?::\s*String)?\s*=\s*"((?:[^"\\]|\\.)*)"\s*$')
+L10N_CONCAT = re.compile(r'"(?:[^"\\]|\\.)*"\s*\+\s*[\w(\[\.]|[\w)\]\.]\s*\+\s*"(?:[^"\\]|\\.)*"')
+L10N_VERBATIM = re.compile(r'Text\(\s*verbatim:\s*"((?:[^"\\]|\\.)*)"')
+L10N_TEXT_STRING = re.compile(r'Text\(\s*(?:String\(\s*(?:format:|describing:|localized:)?|"(?:[^"\\]|\\.)*"\s+as\s+String)')
+PLIST_UI_KEYS = ("CFBundleDisplayName", "CFBundleName", "NSHumanReadableCopyright", "UIApplicationShortcutItemTitle",
+                 "UIApplicationShortcutItemSubtitle", "CFBundleSpokenName")
+PLIST_PAIR = re.compile(r"<key>(\w+)</key>\s*<string>([^<]*)</string>")
+
+
+def has_words(t): return bool(re.search(r"[A-Za-z]{2,}", re.sub(r"\\\([^)]*\)", "", t)))
+
+
+def l10n_scan(root):
+    root = Path(root)
+    items = []
+    swift = [f for f in sorted((root / "Sources").rglob("*.swift")) if not SKIP_FILE_RE.search(str(f))]
+    for f in swift:
+        rel = str(f.relative_to(root))
+        try: lines = f.read_text(errors="replace").splitlines()
+        except OSError: continue
+        text = "\n".join(lines)
+        for i, L in enumerate(lines, 1):
+            code = L.split("//")[0] if '"' not in L.split("//")[0][-1:] else L
+            if "//" in L and L.strip().startswith("//"): continue
+            m = L10N_VAR_DECL.match(code)
+            if m and has_words(m.group(2)) and not IDENT_RE.match(m.group(2)) and " " in m.group(2).strip():
+                name = m.group(1)
+                used = re.search(r"\b" + L10N_UI + r"\s*\([^)\n]*(?<![\w.])" + re.escape(name) + r"\b(?!\s*:)", text)
+                if used: items.append((rel, i, "string-var-in-ui", L.strip()[:110]))
+            if L10N_CALL.search(code) and L10N_CONCAT.search(code):
+                items.append((rel, i, "concatenation", L.strip()[:110]))
+            m = L10N_VERBATIM.search(code)
+            if m and has_words(m.group(1)) and not re.fullmatch(r"[\s\d\W]*(\\\([^)]*\)[\s\d\W]*)*", m.group(1)):
+                items.append((rel, i, "text-verbatim-words", L.strip()[:110]))
+            elif L10N_TEXT_STRING.search(code):
+                items.append((rel, i, "text-from-String", L.strip()[:110]))
+    for plist in sorted(root.rglob("Info.plist")):
+        if any(x in plist.parts for x in ("build", ".build", "Pods", "DerivedData")): continue
+        rel = str(plist.relative_to(root))
+        xc = list(plist.parent.glob("InfoPlist.xcstrings")) + list(plist.parent.rglob("InfoPlist.strings"))
+        txt = plist.read_text(errors="replace")
+        for m in PLIST_PAIR.finditer(txt):
+            k, v = m.groups()
+            if (k.endswith("UsageDescription") or k in PLIST_UI_KEYS) and has_words(v) and not v.startswith("$("):
+                ln = txt[:m.start()].count("\n") + 1
+                items.append((rel, ln, "plist-literal" + ("" if not xc else "-has-xcstrings"), f"{k} = {v[:80]}"))
+    return items
+
+
+def l10n_main(root, out, show):
+    items = l10n_scan(root)
+    per = {}
+    for rel, ln, kind, t in items: per.setdefault(rel, {}).setdefault(kind, []).append((ln, t))
+    kinds = sorted({k for d in per.values() for k in d})
+    has_xc = bool(list(Path(root).rglob("InfoPlist.xcstrings")))
+    L = [f"# copy_gate l10n: {root}", "",
+         f"{len(items)} non-localizable pattern(s) in {len(per)} file(s). InfoPlist.xcstrings present: {'yes' if has_xc else 'NO'}. "
+         "Flags only; nothing rewritten. Regex heuristics: confirm each by eye.", "",
+         "| file | total | " + " | ".join(kinds) + " |", "|---|---|" + "---|" * len(kinds)]
+    for rel, d in sorted(per.items(), key=lambda kv: -sum(len(v) for v in kv[1].values())):
+        L.append(f"| {rel} | {sum(len(v) for v in d.values())} | " + " | ".join(str(len(d.get(k, []))) for k in kinds) + " |")
+    L += ["", "Totals by pattern: " + ", ".join(f"{k} {sum(len(d.get(k, [])) for d in per.values())}" for k in kinds), ""]
+    if show:
+        for rel, d in sorted(per.items(), key=lambda kv: -sum(len(v) for v in kv[1].values())):
+            L.append(f"## {rel}")
+            for k, v in d.items():
+                for ln, t in v[:show]: L.append(f"- {k} :{ln}  `{t}`")
+            L.append("")
+    md = "\n".join(L) + "\n"
+    outd = Path(out); outd.mkdir(parents=True, exist_ok=True)
+    (outd / "l10n_report.md").write_text(md)
+    (outd / "l10n_report.json").write_text(json.dumps([dict(file=r, line=l, kind=k, text=t) for r, l, k, t in items], indent=1))
+    print("\n".join(L[:len(per) + 9 if not show else 12 + len(per)]))
+    print(f"-> {outd}/l10n_report.md")
+    return 1 if items else 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -544,9 +628,13 @@ def main():
     c.add_argument("--out", default="."); c.add_argument("--baseline"); c.add_argument("--no-ai", action="store_true")
     c.add_argument("--strict", action="store_true", help="unchecked strings fail the run (exit 1)")
     sub.add_parser("calibrate")
+    l = sub.add_parser("l10n")
+    l.add_argument("--root", default=str(REPO)); l.add_argument("--out", default=".")
+    l.add_argument("--show", type=int, default=0, help="list up to N example lines per file and pattern")
     e = sub.add_parser("extract"); e.add_argument("--root", default=str(REPO))
     a = ap.parse_args()
     if a.cmd == "calibrate": return calibrate()
+    if a.cmd == "l10n": return l10n_main(a.root, a.out, a.show)
     if a.cmd == "extract":
         items, skipped, sf = extract_all(a.root)
         for i in items: print(f"{i['file']}:{i['line']}\t{i['kind']}\t{i['text']}")

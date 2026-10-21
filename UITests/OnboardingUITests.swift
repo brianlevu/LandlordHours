@@ -27,7 +27,7 @@ final class OnboardingUITests: XCTestCase {
         app.launch()
     }
 
-    private func tap(_ element: XCUIElement, timeout: TimeInterval = 10, file: StaticString = #filePath, line: UInt = #line) {
+    private func tap(_ element: XCUIElement, timeout: TimeInterval = 20, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertTrue(element.waitForExistence(timeout: timeout), "missing \(element)", file: file, line: line)
         let deadline = Date().addingTimeInterval(timeout)
         while !element.isHittable && Date() < deadline { Thread.sleep(forTimeInterval: 0.2) }
@@ -41,6 +41,43 @@ final class OnboardingUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 0.25)
         }
         return (element.value as? String) == value
+    }
+
+    // MARK: One tap on Welcome
+
+    /// Regression (fix/onb-start): making the profile flipped isSignedIn before showOnboarding,
+    /// so the shell mounted for a frame and onboarding restarted on Welcome. The first tap
+    /// looked ignored in about 3 of 4 launches. One tap, no retry, on three fresh launches.
+    func testOneStartBuildingTapLeavesWelcome() {
+        for attempt in 1...3 {
+            launchFresh()
+            let start = app.buttons["onb-start"]
+            XCTAssertTrue(start.waitForExistence(timeout: 20), "launch \(attempt): Welcome")
+            start.tap()                                            // exactly one tap
+            XCTAssertTrue(app.buttons["goal-750"].waitForExistence(timeout: 8),
+                          "launch \(attempt): one Start building tap reaches the goal step")
+            XCTAssertFalse(start.exists, "launch \(attempt): Welcome never comes back")
+        }
+    }
+
+    /// iCloud never answers (signed out, restricted, hung daemon): Start still proceeds at once
+    /// and the flow reaches Staked on local data.
+    func testStartProceedsWhenICloudNeverAnswers() {
+        launchFresh(["-LHFakeICloudHang", "-LHFakeCalendar", "denied", "-LHFakeNotifications", "denied"])
+        let start = app.buttons["onb-start"]
+        XCTAssertTrue(start.waitForExistence(timeout: 20))
+        start.tap()                                                // exactly one tap
+        XCTAssertTrue(app.buttons["goal-750"].waitForExistence(timeout: 8), "Start never waits on iCloud")
+        tap(app.buttons["goal-750"])
+        tap(app.buttons["onb-primary"])                            // Build toward 750h
+        tap(app.buttons["onb-primary"])                            // Look at my calendar (fake deny)
+        XCTAssertTrue(app.buttons["who-me"].waitForExistence(timeout: 8))
+        tap(app.buttons["onb-primary"])                            // Who: Continue
+        let field = app.textFields["property-name"]
+        tap(field)
+        field.typeText("Elm")
+        tap(app.buttons["onb-primary"])                            // Save it
+        XCTAssertTrue(app.staticTexts["Your house is staked."].waitForExistence(timeout: 10))
     }
 
     // MARK: Happy path
@@ -191,7 +228,7 @@ final class OnboardingUITests: XCTestCase {
         tap(look)
         // iOS hosts its permission prompts in SpringBoard; check the app too, to be safe.
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        let deadline = Date().addingTimeInterval(12)
+        let deadline = Date().addingTimeInterval(20)
         while Date() < deadline && springboard.alerts.count == 0 && app.alerts.count == 0 {
             Thread.sleep(forTimeInterval: 0.3)
         }

@@ -430,6 +430,14 @@ enum LogSheetRoute: Identifiable, Equatable {
         case .recovery(let id): return "recovery-\(id.uuidString)"
         }
     }
+
+    /// The "+" route (tab 2: Review timer notification or widget, intents, 1.x posts): a running
+    /// timer opens its card, a stopped timer waiting for its note opens that review, else a new log.
+    static func forPlusRoute(isTimerRunning: Bool, stoppedDraft: StoppedTimerDraft?) -> LogSheetRoute {
+        if isTimerRunning { return .timer }
+        if stoppedDraft != nil { return .timerReview }
+        return .log
+    }
 }
 
 // MARK: - Category groups (the picker)

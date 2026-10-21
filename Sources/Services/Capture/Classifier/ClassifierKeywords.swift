@@ -9,7 +9,7 @@ import Foundation
 // 2.0 classifier reads.
 //
 // Each signal has:
-// - `landlord`: how much it moves the "is this landlord work?" score (negative = noise);
+// - `landlord`: how much it moves the "is this rental work?" score (negative = noise);
 // - `category` + `categoryWeight`: which ActivityCategory it votes for, and how hard.
 // Matching runs on normalized text (lowercased, diacritics folded, punctuation → spaces) and is
 // word-prefix by default ("plumb" matches "plumber"), or whole-word when `wholeWord` is set

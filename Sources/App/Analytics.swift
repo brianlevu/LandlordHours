@@ -192,6 +192,33 @@ enum Analytics {
         capture("purchase_completed", properties: ["context": context.rawValue])
     }
 
+    // MARK: - Free-to-paid (WP-P). Fixed enums only: context, entry, outcome.
+
+    /// The redesigned paywall appeared. Fires alongside `paywall_viewed` (kept for 1.x funnels).
+    static func paywallShown(context: PaywallContext, entry: LockEntry) {
+        capture("paywall_shown", properties: ["context": context.rawValue, "entry": entry.rawValue])
+    }
+
+    /// The paywall's buy button was tapped.
+    static func paywallCtaTapped(context: PaywallContext) {
+        capture("paywall_cta_tapped", properties: ["context": context.rawValue])
+    }
+
+    /// A purchase went through (alongside the 1.x `purchase_completed`).
+    static func purchaseSucceeded(context: PaywallContext) {
+        capture("purchase_succeeded", properties: ["context": context.rawValue])
+    }
+
+    /// A purchase didn't complete. `outcome`: failed, pending (Ask to Buy) or cancelled.
+    static func purchaseFailed(context: PaywallContext, outcome: String) {
+        capture("purchase_failed", properties: ["context": context.rawValue, "outcome": outcome])
+    }
+
+    /// A free user saw a locked preview at an entry point. Once per appearance.
+    static func lockPreviewShown(entry: LockEntry) {
+        capture("lock_preview_shown", properties: ["entry": entry.rawValue])
+    }
+
     /// Restore found and re-applied an earlier Pro purchase.
     static func purchaseRestored() {
         capture("purchase_restored")

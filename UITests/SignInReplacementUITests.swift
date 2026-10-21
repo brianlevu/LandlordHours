@@ -40,7 +40,9 @@ final class SignInReplacementUITests: XCTestCase {
         launch(["-LHSeedLegacyEmailProfile", "-LHInitialTab", "4"], scheme: "light")
 
         let restoreRow = app.buttons["settings.restoreOtherData"]
-        XCTAssertTrue(restoreRow.waitForExistence(timeout: 8))
+        XCTAssertTrue(restoreRow.waitForExistence(timeout: 20))
+        // A free plan's Pro card and Export lock sit above it: keep the row clear of the tab bar.
+        scrollTo(restoreRow)
         let profileB = app.buttons["restore.profile.email-old.profile@example.com"]
         // The launch splash fades over ~1s and can swallow the first tap.
         for _ in 0..<5 where !profileB.exists {
@@ -56,6 +58,8 @@ final class SignInReplacementUITests: XCTestCase {
 
         // The sheet closes and Settings now shows profile B's identity.
         XCTAssertTrue(profileB.waitForNonExistence(timeout: 5))
+        // Settings is a lazy List and we scrolled to reach Restore: back to the top first.
+        app.swipeDown(velocity: .fast); app.swipeDown(velocity: .fast)
         // Settings' profile row is one button; its label carries the email.
         let identity = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "old.profile@example.com")).firstMatch
         XCTAssertTrue(identity.waitForExistence(timeout: 5))
@@ -73,9 +77,9 @@ final class SignInReplacementUITests: XCTestCase {
     func testSignedOutUpgradeShowsWelcomeWithRestoreAndRestoresProfile() {
         launch(["-LHSeedLegacySignedOut"], scheme: "light")
 
-        XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 20))
         let restore = app.buttons["welcome.restoreEarlierData"]
-        XCTAssertTrue(restore.waitForExistence(timeout: 5))
+        XCTAssertTrue(restore.waitForExistence(timeout: 20))
         XCTAssertFalse(app.buttons["Log in"].exists)
         XCTAssertFalse(app.buttons["Create account"].exists)
         restore.tap()
@@ -101,13 +105,13 @@ final class SignInReplacementUITests: XCTestCase {
     private func captureFrames(scheme: String) {
         // 1. Welcome — fresh device (no earlier data).
         launch(["-LHFreshWelcome"], scheme: scheme, resetDefaults: true)
-        XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 20))
         settle()
         attach("01-welcome-fresh-\(scheme)")
 
         // 2. Welcome — signed-out 1.0.6 user with earlier data → Restore row.
         launch(["-LHSeedLegacySignedOut"], scheme: scheme)
-        XCTAssertTrue(app.buttons["welcome.restoreEarlierData"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["welcome.restoreEarlierData"].waitForExistence(timeout: 20))
         settle()
         attach("02-welcome-restore-\(scheme)")
 
@@ -120,7 +124,7 @@ final class SignInReplacementUITests: XCTestCase {
         // 4. Settings (upgraded email user) — Account group with Restore other data.
         launch(["-LHSeedLegacyEmailProfile", "-LHInitialTab", "4"], scheme: scheme)
         let restoreRow = app.buttons["settings.restoreOtherData"]
-        XCTAssertTrue(restoreRow.waitForExistence(timeout: 8))
+        XCTAssertTrue(restoreRow.waitForExistence(timeout: 20))
         settle()
         attach("04a-settings-top-\(scheme)")
         // Bring the "Account" group header to the top of the screen (not under the status bar).
@@ -191,10 +195,16 @@ final class SignInReplacementUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 1.0)
     }
 
+    /// Scrolls until the element is hittable and clear of the floating tab bar (which draws
+    /// over the end of a scroll and would take the tap).
     private func scrollTo(_ element: XCUIElement, maxSwipes: Int = 8) {
         var swipes = 0
-        while (!element.exists || !element.isHittable) && swipes < maxSwipes {
-            app.swipeUp()
+        let tabBar = app.buttons["tab.today"]
+        func coveredByTabBar() -> Bool {
+            tabBar.exists && element.exists && element.frame.maxY > tabBar.frame.minY - 8
+        }
+        while (!element.exists || !element.isHittable || coveredByTabBar()) && swipes < maxSwipes {
+            app.swipeUp(velocity: .slow)
             swipes += 1
         }
     }

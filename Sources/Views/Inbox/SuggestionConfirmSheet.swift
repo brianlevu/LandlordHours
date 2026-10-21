@@ -9,6 +9,7 @@ struct SuggestionConfirmSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var hours: Double
     @State private var propertyId: UUID?
     @State private var category: ActivityCategory?
@@ -16,6 +17,10 @@ struct SuggestionConfirmSheet: View {
     @State private var notes: String
     @State private var showMuteOptions = false
     @State private var stepTick = 0
+    /// WP-P: the free plan is full and this item is at a new rental.
+    @State private var showRentalPicker = false
+    @State private var paywall: ProPaywallRequest?
+    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     /// Hours stepper bounds and step (15 minutes).
@@ -49,6 +54,10 @@ struct SuggestionConfirmSheet: View {
 
     private var missing: Set<CaptureConfirmField> { model.missingFields(suggestion, edits: edits) }
 
+    /// Free plan full, item at a new rental, and the user hasn't said it was at their rental.
+    private var atLimit: Bool { model.needsNewRental(suggestion) && !model.properties.contains { $0.id == propertyId } }
+    private var limitedToPicker: Bool { model.needsNewRental(suggestion) }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -67,6 +76,16 @@ struct SuggestionConfirmSheet: View {
                 notesField
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
+                if limitActionsInline {
+                    // Accessibility sizes: the explanation and the two ways out scroll with the
+                    // sheet; only "Unlock Pro" stays pinned, so the Property row stays reachable.
+                    limitExplanation
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+                    limitWaysOut
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
+                }
                 secondaryActions
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
@@ -94,8 +113,34 @@ struct SuggestionConfirmSheet: View {
         } message: {
             Text("We stop suggesting them. Hours you already logged stay.")
         }
+        .sheet(isPresented: $showRentalPicker) {
+            LimitRentalPicker(
+                properties: model.properties,
+                selected: propertyId,
+                onPick: { id in propertyId = id; showRentalPicker = false },
+                onUnlock: { showRentalPicker = false; DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { openPaywall() } }
+            )
+            // Accessibility sizes open full height so the locked row's "Unlock Pro" is reachable.
+            .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large])
+            .presentationBackground(colors.background)
+        }
+        .proPaywall($paywall)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("confirm.sheet")
+    }
+
+    // MARK: Free plan at its limit (WP-P)
+
+    /// The paywall about adding a rental. After a purchase the sheet closes and Add Property
+    /// opens; the item stays in the inbox, ready to log at the new rental.
+    private func openPaywall() {
+        paywall = model.paywallForNewRental(onUnlocked: { [model] in
+            model.waitList.remove(suggestion.sourceKey)
+            dismiss()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                NotificationCenter.default.post(name: .switchToPropertiesAndOpenAddProperty, object: nil)
+            }
+        })
     }
 
     // MARK: Header
@@ -276,6 +321,13 @@ struct SuggestionConfirmSheet: View {
     private var valueRows: some View {
         VStack(spacing: 0) {
             valueRow("Property") {
+                if limitedToPicker {
+                    Button { showRentalPicker = true } label: {
+                        menuLabel(model.properties.first(where: { $0.id == propertyId })?.name ?? "Choose", isPlaceholder: propertyId == nil)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("confirm.property")
+                } else {
                 Menu {
                     ForEach(model.properties) { property in
                         Button(property.name) { propertyId = property.id }
@@ -284,6 +336,7 @@ struct SuggestionConfirmSheet: View {
                     menuLabel(model.properties.first(where: { $0.id == propertyId })?.name ?? "Choose", isPlaceholder: propertyId == nil)
                 }
                 .accessibilityIdentifier("confirm.property")
+                }
             }
             if model.showsSpousePicker {
                 divider
@@ -350,11 +403,15 @@ struct SuggestionConfirmSheet: View {
     }
 
     private func valueRow<Trailing: View>(_ label: String, @ViewBuilder trailing: () -> Trailing) -> some View {
-        HStack(spacing: 12) {
+        // Accessibility sizes: the value drops under its label so "Choose" never truncates.
+        let stacked = dynamicTypeSize.isAccessibilitySize
+        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(spacing: 12))
+        return layout {
             Text(label).foregroundStyle(colors.textSecondary)
-            Spacer(minLength: 8)
+            if !stacked { Spacer(minLength: 8) }
             trailing()
         }
+        .padding(.vertical, stacked ? 8 : 0)
         .font(.body)
         .padding(.horizontal, 16)
         .frame(minHeight: 52)
@@ -385,7 +442,95 @@ struct SuggestionConfirmSheet: View {
 
     // MARK: Footer
 
-    private var pinnedActions: some View {
+    private var limitActionsInline: Bool { atLimit && dynamicTypeSize.isAccessibilitySize }
+
+    @ViewBuilder private var pinnedActions: some View {
+        if limitActionsInline {
+            pinnedFooter { unlockButton }
+        } else if atLimit {
+            limitActions
+        } else {
+            regularActions
+        }
+    }
+
+    /// The free plan is full: say what's locked and what stays, one "Unlock Pro", and two ways
+    /// out that lose nothing.
+    private var limitActions: some View {
+        pinnedFooter {
+            VStack(spacing: 10) {
+                limitExplanation
+                unlockButton
+                limitWaysOut
+            }
+        }
+    }
+
+    private var limitExplanation: some View {
+        VStack(spacing: 2) {
+            Text(InboxProLimit.sheetLine)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(colors.textPrimary)
+            Text(ProGate.keepsLine(.inboxLimit, firstPropertyName: model.properties.first?.name))
+                .font(.footnote)
+                .foregroundStyle(colors.textSecondary)
+        }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("confirm.limitLine")
+        .onAppear { Analytics.lockPreviewShown(entry: .inboxLimit) }
+    }
+
+    private var unlockButton: some View {
+        UnlockProButton(entry: .inboxLimit, title: "Unlock Pro to add a rental", fullWidth: true, action: openPaywall)
+            .accessibilityIdentifier("confirm.unlockPro")
+    }
+
+    private var limitWaysOut: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 24) { keepButton; notWorkButton }
+            VStack(spacing: 0) { keepButton; notWorkButton }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func pinnedFooter<C: View>(@ViewBuilder _ content: () -> C) -> some View {
+        content()
+            .padding(.horizontal, 20)
+            .padding(.top, 14)
+            .padding(.bottom, 4)
+            .background(
+                colors.background
+                    .overlay(alignment: .top) { Rectangle().fill(colors.border).frame(height: 0.5) }
+                    .ignoresSafeArea(edges: .bottom)
+            )
+    }
+
+    private var keepButton: some View {
+        Button("Keep it in my inbox") {
+            model.keepForPro(suggestion)
+            dismiss()
+        }
+        .font(.body)
+        .foregroundStyle(colors.action)
+        .frame(minHeight: 44)
+        .accessibilityIdentifier("confirm.keepForPro")
+    }
+
+    private var notWorkButton: some View {
+        Button("Not rental work") {
+            model.dismiss(suggestion)
+            dismiss()
+        }
+        .font(.body)
+        .foregroundStyle(colors.textSecondary)
+        .frame(minHeight: 44)
+        .accessibilityIdentifier("confirm.dismiss")
+    }
+
+    private var regularActions: some View {
         VStack(spacing: 4) {
             if let reason = missingReason {
                 Text(reason)
@@ -397,7 +542,12 @@ struct SuggestionConfirmSheet: View {
                     .accessibilityIdentifier("confirm.missing")
             }
             Button {
-                if model.log(suggestion, edits: edits) == nil { dismiss() }
+                let result = model.log(suggestion, edits: edits)
+                if result.entryId != nil {
+                    dismiss()
+                } else if case .needsInput(let missing) = result, missing.contains(.plan) {
+                    openPaywall()
+                }
             } label: {
                 Text(hours > 0 ? "Log \(InboxFormat.hours(hours))" : "Log")
                     .contentTransition(.numericText(value: hours))
@@ -454,5 +604,95 @@ struct SuggestionConfirmSheet: View {
     private func mute(_ rule: CaptureMuteRule) {
         model.mute(suggestion, rule: rule)
         dismiss()
+    }
+}
+
+/// "Which rental?" while the free plan is full: the user's rental, then the `.row` lock for a new
+/// one. Picking the rental they have logs it there; "Unlock Pro" opens the paywall.
+struct LimitRentalPicker: View {
+    let properties: [RentalProperty]
+    let selected: UUID?
+    var onPick: (UUID) -> Void
+    var onUnlock: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dismiss) private var dismiss
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack {
+                    Text("Which rental?").font(.title2.weight(.semibold)).foregroundStyle(colors.textPrimary)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(colors.textPrimary)
+                            .frame(width: 44, height: 44)
+                            .background(Circle().fill(colors.backgroundSecondary))
+                            .overlay(Circle().strokeBorder(colors.border, lineWidth: 0.5))
+                    }
+                    .buttonStyle(.lhPressable)
+                    .accessibilityLabel("Close")
+                }
+                VStack(spacing: 0) {
+                    ForEach(properties) { property in
+                        Button { onPick(property.id) } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "house.fill")
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(colors.action)
+                                    .frame(width: 32, height: 32)
+                                    .background(Circle().fill(colors.actionSurface))
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(property.name).font(.body.weight(.semibold)).foregroundStyle(colors.textPrimary)
+                                    if !property.address.isEmpty {
+                                        Text(property.address).font(.subheadline).foregroundStyle(colors.textSecondary).lineLimit(1)
+                                    }
+                                }
+                                Spacer()
+                                if property.id == selected {
+                                    Image(systemName: "checkmark").foregroundStyle(colors.action).accessibilityHidden(true)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(minHeight: 60)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(property.id == selected ? .isSelected : [])
+                        .accessibilityIdentifier("limitPicker.property")
+                        Rectangle().fill(colors.border.opacity(0.7)).frame(height: 0.5).padding(.leading, 60)
+                    }
+                    LockedPreview(
+                        size: .row,
+                        entry: .inboxLimit,
+                        line: ProGate.lockLine(.inboxLimit),
+                        keeps: ProGate.keepsLine(.inboxLimit, firstPropertyName: properties.first?.name),
+                        onUnlock: onUnlock
+                    ) {
+                        HStack(spacing: 12) {
+                            Circle()
+                                .strokeBorder(colors.textSecondary, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                                .frame(width: 32, height: 32)
+                                .overlay(Image(systemName: "plus").font(.system(size: 13, weight: .semibold)).foregroundStyle(colors.textSecondary))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Add a new rental").font(.body.weight(.semibold)).foregroundStyle(colors.textPrimary)
+                                Text("From your calendar").font(.subheadline).foregroundStyle(colors.textSecondary)
+                            }
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 60)
+                    }
+                }
+                .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            .padding(20)
+        }
+        .background(colors.background.ignoresSafeArea())
+        .accessibilityIdentifier("limitPicker")
     }
 }

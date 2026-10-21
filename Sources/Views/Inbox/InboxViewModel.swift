@@ -56,12 +56,16 @@ final class InboxViewModel: ObservableObject {
     @Published private(set) var toast: InboxToast?
     /// The suggestion the confirm sheet shows.
     @Published var sheetSuggestion: Suggestion?
+    /// WP-P: the paywall to open from the list (a swipe that hit the free plan's limit).
+    @Published var paywallRequest: ProPaywallRequest?
 
     private weak var app: AppViewModel?
     private let storeProvider: () -> SuggestionStore?
     private let now: () -> Date
     private let calendar: Calendar
     private let spouseTracking: () -> Bool
+    private let isPro: () -> Bool
+    let waitList: ProWaitList
     /// Seconds the toast (and its Undo) stays.
     var undoWindow: TimeInterval
     private var toastTask: Task<Void, Never>?
@@ -72,6 +76,8 @@ final class InboxViewModel: ObservableObject {
         now: @escaping () -> Date = Date.init,
         calendar: Calendar = .current,
         spouseTracking: @escaping () -> Bool = { TaxProfileManager.shared.spouseTracking },
+        isPro: @escaping () -> Bool = { SubscriptionManager.shared.isPro },
+        waitList: ProWaitList = .shared,
         undoWindow: TimeInterval = 5
     ) {
         self.app = app
@@ -79,6 +85,8 @@ final class InboxViewModel: ObservableObject {
         self.now = now
         self.calendar = calendar
         self.spouseTracking = spouseTracking
+        self.isPro = isPro
+        self.waitList = waitList
         self.undoWindow = undoWindow
     }
 
@@ -111,6 +119,36 @@ final class InboxViewModel: ObservableObject {
     }
 
     func badges(for suggestion: Suggestion) -> SuggestionBadges { InboxLogic.badges(for: suggestion) }
+
+    // MARK: Free plan at its limit (WP-P)
+
+    /// The free plan is full (one rental) and this item is at a rental the user doesn't have.
+    func needsNewRental(_ suggestion: Suggestion) -> Bool {
+        InboxProLimit.needsNewRental(suggestion, propertyIds: Set(properties.map(\.id)), isPro: isPro())
+    }
+
+    /// The user kept this item for later with "Keep it in my inbox".
+    func isWaitingOnPro(_ suggestion: Suggestion) -> Bool {
+        needsNewRental(suggestion) && waitList.contains(suggestion.sourceKey)
+    }
+
+    var limitCounts: InboxProLimit.Counts {
+        InboxProLimit.counts(suggestions, propertyIds: Set(properties.map(\.id)), isPro: isPro(), waitingKeys: waitList.keys)
+    }
+
+    /// "Keep it in my inbox": the item stays, marked "Waiting on Pro". It never expires silently
+    /// and is never logged to the wrong place.
+    func keepForPro(_ suggestion: Suggestion) {
+        if sheetSuggestion?.sourceKey == suggestion.sourceKey { sheetSuggestion = nil }
+        waitList.add(suggestion.sourceKey)
+        changed()
+        present(InboxToast(message: "Kept in your inbox", kind: .neutral, undo: nil))
+    }
+
+    /// The paywall about adding a rental, opened from the Inbox.
+    func paywallForNewRental(onUnlocked: (() -> Void)? = nil) -> ProPaywallRequest {
+        ProPaywallRequest(context: .secondProperty, entry: .inboxLimit, onUnlocked: onUnlocked)
+    }
 
     func canQuickLog(_ suggestion: Suggestion) -> Bool {
         InboxLogic.canQuickLog(suggestion, propertyIds: Set(properties.map(\.id)))
@@ -150,18 +188,20 @@ final class InboxViewModel: ObservableObject {
             sheetSuggestion = current
             return .needsSheet
         }
-        return save(current, edits: SuggestionEdits()) ? .logged : .failed
+        return save(current, edits: SuggestionEdits()).entryId != nil ? .logged : .failed
     }
 
-    /// The confirm sheet's "Log Xh". Missing values come back as `.needsInput` and nothing is
-    /// saved; nil means saved (or already recorded).
+    /// The confirm sheet's "Log Xh". Returns what happened: `.created` / `.alreadyRecorded` mean
+    /// saved; `.needsInput` means nothing was saved (missing values, no profile, or the plan's
+    /// limit) and the sheet must stay open. (WP-P fix: this used to return nil on failure too, so
+    /// the sheet closed as if the entry was logged.)
     @discardableResult
-    func log(_ suggestion: Suggestion, edits: SuggestionEdits) -> CaptureConfirmResult? {
+    func log(_ suggestion: Suggestion, edits: SuggestionEdits) -> CaptureConfirmResult {
         let missing = missingFields(suggestion, edits: edits)
         guard missing.isEmpty else { return .needsInput(missing: missing) }
-        if sheetSuggestion?.sourceKey == suggestion.sourceKey { sheetSuggestion = nil }
-        _ = save(latest(suggestion), edits: edits)
-        return nil
+        let result = save(latest(suggestion), edits: edits)
+        if result.entryId != nil, sheetSuggestion?.sourceKey == suggestion.sourceKey { sheetSuggestion = nil }
+        return result
     }
 
     /// Swipe left / "Not rental work".
@@ -170,6 +210,7 @@ final class InboxViewModel: ObservableObject {
         if sheetSuggestion?.sourceKey == current.sourceKey { sheetSuggestion = nil }
         guard let store else { return showProblem(Self.noProfileMessage) }
         store.dismiss(key: current.sourceKey, reason: .notLandlordWork)
+        waitList.remove(current.sourceKey)
         finish(InboxToast(message: "Marked not rental work", kind: .neutral, undo: .dismissed(current)))
     }
 
@@ -229,32 +270,38 @@ final class InboxViewModel: ObservableObject {
 
     /// Saves through `confirm()` and checks the result. Anything but created/already recorded
     /// leaves the item in the inbox and says why.
-    private func save(_ suggestion: Suggestion, edits: SuggestionEdits) -> Bool {
+    @discardableResult
+    private func save(_ suggestion: Suggestion, edits: SuggestionEdits) -> CaptureConfirmResult {
         guard let store, let app else {
             showProblem(Self.noProfileMessage)
-            return false
+            return .needsInput(missing: [.profile])
         }
         let result = app.confirm(suggestion, edits: edits, store: store)
         switch result {
         case .created(let entryId):
+            waitList.remove(suggestion.sourceKey)
             let hours = edits.hours ?? suggestion.proposedHours ?? 0
             finish(InboxToast(message: "Logged \(InboxFormat.hours(hours))", kind: .success,
                               undo: .logged(suggestion, entryId: entryId, hours: hours)))
-            return true
         case .alreadyRecorded:
+            waitList.remove(suggestion.sourceKey)
             finish(InboxToast(message: "Already in your records", kind: .neutral, undo: nil))
-            return true
         case .needsInput(let missing):
             reload()
             showProblem(Self.message(for: missing))
-            sheetSuggestion = latest(suggestion)
-            return false
+            if missing.contains(.plan) {
+                // The plan's limit: route to the paywall instead of a dead end.
+                if sheetSuggestion == nil { paywallRequest = paywallForNewRental() }
+            } else {
+                sheetSuggestion = latest(suggestion)
+            }
         }
+        return result
     }
 
     static func message(for missing: Set<CaptureConfirmField>) -> String {
         if missing.contains(.profile) { return noProfileMessage }
-        if missing.contains(.plan) { return "Not saved. Your plan has reached its limit." }
+        if missing.contains(.plan) { return "Not saved. This one needs Pro." }
         if missing.contains(.property) { return "Not saved. Pick a property for this one." }
         if missing.contains(.hours) { return "Not saved. Add the hours for this one." }
         return "Not saved. Add a category for this one."

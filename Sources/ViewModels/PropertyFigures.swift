@@ -86,7 +86,7 @@ extension AppViewModel {
 
     /// Free plan: one rental. True when adding another needs Pro.
     var propertiesAtFreeLimit: Bool {
-        PropertyLimit.isAtLimit(isPro: SubscriptionManager.shared.isPro, propertyCount: properties.count)
+        ProGate.isAtPropertyLimit(isPro: SubscriptionManager.shared.isPro, propertyCount: properties.count)
     }
 
     /// True for a material participation goal without a grouping election: each row can say
@@ -156,22 +156,22 @@ enum PropertyMeta {
 
 // MARK: - Free limit
 
+/// Properties' names for the free-limit rules. ProGate is the single source (WP-P).
 enum PropertyLimit {
-    static let freeProperties = 1
+    static let freeProperties = ProGate.freeRentals
 
     static func isAtLimit(isPro: Bool, propertyCount: Int) -> Bool {
-        !isPro && propertyCount >= freeProperties
+        ProGate.isAtPropertyLimit(isPro: isPro, propertyCount: propertyCount)
     }
 
-    static let lockLine = "Free covers one rental."
+    static let lockLine = ProGate.lockLine(.propertiesLimit)
 
     /// What stays active while previewing (the paywall law): the rental they have keeps working.
     static func keepsLine(firstPropertyName: String?) -> String {
-        let name = firstPropertyName?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return "\((name?.isEmpty == false ? name! : "Your rental")) keeps tracking. Nothing is lost."
+        ProGate.keepsLine(.propertiesLimit, firstPropertyName: firstPropertyName)
     }
 
-    static let paywallContext: PaywallContext = .secondProperty
+    static let paywallContext: PaywallContext = ProGate.context(for: .propertiesLimit)
 }
 
 // MARK: - Seal

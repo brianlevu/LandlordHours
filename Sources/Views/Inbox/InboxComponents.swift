@@ -273,7 +273,7 @@ struct InboxEmptyArt: View {
 }
 
 
-/// Confirm (44pt action capsule) and Not work, under each Inbox row's words. One line when it
+/// Confirm (44pt action capsule) and Not rental work, under each Inbox row's words. One line when it
 /// fits; stacked at large text sizes so nothing is pushed past the card's edges.
 struct InboxRowActions: View {
     let key: String

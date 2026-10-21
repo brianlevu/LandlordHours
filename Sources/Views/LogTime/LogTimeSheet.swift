@@ -8,7 +8,7 @@ import PhotosUI
 // The note is read by NoteReaderChain (rules → Apple's on-device model → Private Cloud Compute;
 // Services/NoteReading). Wiring kept from 1.x TimeLogView: VoiceEntryService dictation
 // (permission + denied path), the AppViewModel timer + Live Activity, the stopped-timer draft,
-// Self/Spouse honouring spouse tracking, the property limit (LogProGate), analytics (inside
+// Self/Spouse honouring spouse tracking, the property limit (ProGate), analytics (inside
 // AppViewModel.logTimeEntry) and the iCloud push (saveData path).
 
 struct LogTimeSheet: View {

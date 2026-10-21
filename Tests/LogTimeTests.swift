@@ -326,3 +326,25 @@ final class LogTimerTests: CaptureTestCase {
         XCTAssertEqual(StoppedTimerDraftStore.load()?.reviewHours, 1.5)
     }
 }
+
+// MARK: - The "+" route (Review timer notification / widget → tab 2)
+
+final class LogPlusRouteTests: XCTestCase {
+    private let draft = StoppedTimerDraft(elapsed: 4447, propertyId: UUID(), category: .repairs,
+                                          startDate: Date(timeIntervalSince1970: 1_790_000_000),
+                                          participant: .selfParticipant, notes: "")
+
+    func testARunningTimerOpensTheTimer() {
+        XCTAssertEqual(LogSheetRoute.forPlusRoute(isTimerRunning: true, stoppedDraft: nil), .timer)
+        XCTAssertEqual(LogSheetRoute.forPlusRoute(isTimerRunning: true, stoppedDraft: draft), .timer,
+                       "a running timer wins over an older stopped draft")
+    }
+
+    func testAStoppedDraftOpensItsReviewNotABlankLog() {
+        XCTAssertEqual(LogSheetRoute.forPlusRoute(isTimerRunning: false, stoppedDraft: draft), .timerReview)
+    }
+
+    func testNothingWaitingOpensANewLog() {
+        XCTAssertEqual(LogSheetRoute.forPlusRoute(isTimerRunning: false, stoppedDraft: nil), .log)
+    }
+}

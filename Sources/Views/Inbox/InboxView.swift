@@ -31,6 +31,7 @@ struct InboxView: View {
         .sheet(item: $model.sheetSuggestion) { suggestion in
             SuggestionConfirmSheet(suggestion: suggestion, model: model)
         }
+        .proPaywall($model.paywallRequest)
         .sheet(isPresented: $showSetup, onDismiss: { model.reload() }) {
             CaptureSetupFlow(mode: .whatsNew, environment: .current, startAtBackfill: setupStartsAtBackfill) { _ in
                 showSetup = false
@@ -117,15 +118,16 @@ struct InboxView: View {
         let propertyName = model.propertyName(for: suggestion)
         let badges = model.badges(for: suggestion)
         let quick = model.canQuickLog(suggestion)
+        let limit: InboxRowLimit = model.isWaitingOnPro(suggestion) ? .waiting : (model.needsNewRental(suggestion) ? .newPlace : .none)
         return VStack(alignment: .leading, spacing: 0) {
             Button {
                 model.sheetSuggestion = suggestion
             } label: {
-                SuggestionRowView(suggestion: suggestion, propertyName: propertyName, badges: badges)
+                SuggestionRowView(suggestion: suggestion, propertyName: propertyName, badges: badges, limit: limit)
             }
             .buttonStyle(.borderless)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(SuggestionRowView.accessibilityLabel(for: suggestion, propertyName: propertyName, badges: badges, now: InboxClock.now()))
+            .accessibilityLabel(SuggestionRowView.accessibilityLabel(for: suggestion, propertyName: propertyName, badges: badges, now: InboxClock.now(), limit: limit))
             .accessibilityHint("Opens the details to confirm")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction(named: quick ? "Log \(InboxFormat.hours(suggestion.proposedHours ?? 0))" : "Review and log") {

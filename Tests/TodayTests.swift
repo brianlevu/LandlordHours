@@ -1,0 +1,334 @@
+import XCTest
+@testable import LandlordHours
+
+// MARK: - Today, below the house (redesign-specs §2): rules
+
+@MainActor
+final class TodayConfirmLogicTests: CaptureTestCase {
+    private func s(_ key: String, confidence: Double = 0.9, flagged: Bool = false, start: Date? = nil,
+                   detectedAt: Date? = nil) -> Suggestion {
+        let start = start ?? date(2026, 10, 14, 9)
+        return Suggestion(sourceKey: "cal:\(key)", kind: .calendar, detectedAt: detectedAt ?? start, start: start,
+                          end: start.addingTimeInterval(3600), title: key, containerId: "CAL",
+                          proposedPropertyId: UUID(), proposedCategory: .repairs, proposedHours: 1,
+                          hoursBasis: .scheduled, confidence: confidence, mightAlreadyBeLogged: flagged)
+    }
+
+    func testStateHiddenWithoutAProperty() {
+        XCTAssertEqual(TodayConfirm.state(hasProperties: false, pendingCount: 4, backfillScanning: true, captureOn: true), .hidden)
+    }
+
+    func testRowsWheneverAnythingIsPendingEvenWhileScanning() {
+        XCTAssertEqual(TodayConfirm.state(hasProperties: true, pendingCount: 1, backfillScanning: false, captureOn: true), .rows)
+        XCTAssertEqual(TodayConfirm.state(hasProperties: true, pendingCount: 3, backfillScanning: true, captureOn: true), .rows)
+    }
+
+    func testLoadingOnlyWhileScanningWithNothingFoundYet() {
+        XCTAssertEqual(TodayConfirm.state(hasProperties: true, pendingCount: 0, backfillScanning: true, captureOn: true), .loading)
+    }
+
+    func testCaughtUpSaysWhetherSuggestionsAreOn() {
+        XCTAssertEqual(TodayConfirm.state(hasProperties: true, pendingCount: 0, backfillScanning: false, captureOn: true),
+                       .caughtUp(captureOn: true))
+        XCTAssertEqual(TodayConfirm.state(hasProperties: true, pendingCount: 0, backfillScanning: false, captureOn: false),
+                       .caughtUp(captureOn: false))
+    }
+
+    func testCountIsEveryVisibleItemAndRowsAreTheTopThreeMostLikely() {
+        let items = [s("low", confidence: 0.4), s("top", confidence: 0.97), s("flag", confidence: 0.9, flagged: true),
+                     s("mid", confidence: 0.9), s("ok", confidence: 0.8)]
+        XCTAssertEqual(TodayConfirm.count(visible: items), 5)
+        XCTAssertEqual(TodayConfirm.rows(visible: items).map(\.title), ["top", "mid", "flag"])
+        XCTAssertTrue(TodayConfirm.showsReviewAll(count: 5))
+        XCTAssertFalse(TodayConfirm.showsReviewAll(count: 3))
+        XCTAssertEqual(TodayConfirm.rows(visible: []).count, 0)
+    }
+}
+
+// MARK: - Today ⇄ Inbox: one list, one count, one write path
+
+@MainActor
+final class TodayInboxConsistencyTests: CaptureTestCase {
+    private var app: AppViewModel!
+    private var propertyId: UUID!
+    private var store: SuggestionStore!
+    private var now: Date!
+    private var year: Int!
+
+    override func setUp() async throws {
+        try await super.setUp()
+        (app, propertyId) = makeViewModel()
+        store = makeStore()
+        now = Date()
+        year = Calendar.current.component(.year, from: now)
+    }
+
+    private func model() -> InboxViewModel {
+        let store = self.store
+        let model = InboxViewModel(app: app, storeProvider: { store }, now: { [now] in now! },
+                                   calendar: calendar, spouseTracking: { false }, undoWindow: .infinity)
+        model.reload()
+        return model
+    }
+
+    private func seed(_ count: Int) -> [Suggestion] {
+        // Same day as `now` (minus a few hours) keeps every item in this tax year.
+        let items = (0..<count).map { i in
+            calendarSuggestion(externalId: "T\(i)", start: now.addingTimeInterval(-Double(i + 2) * 3600 - 7200),
+                               title: "Plumber \(i)", propertyId: propertyId, hours: 2, category: .repairs)
+        }
+        store.ingest(items, existingEntries: app.timeEntries, calendar: calendar)
+        return items
+    }
+
+    /// What Today shows and what the Inbox badge shows, read from the shared model.
+    private func assertOneCount(_ today: InboxViewModel, inboxTab: InboxViewModel, file: StaticString = #filePath, line: UInt = #line) {
+        inboxTab.reload()
+        XCTAssertEqual(TodayConfirm.count(visible: today.visible), today.badgeCount, "Today's capsule is the badge", file: file, line: line)
+        XCTAssertEqual(today.badgeCount, inboxTab.badgeCount, "The Inbox sees the same list", file: file, line: line)
+        XCTAssertEqual(Set(TodayConfirm.rows(visible: today.visible).map(\.sourceKey))
+                        .isSubset(of: Set(inboxTab.visible.map(\.sourceKey))), true, file: file, line: line)
+    }
+
+    func testConfirmFromTodayUpdatesTheHouseTheInboxAndTheBadgeTogether() {
+        let items = seed(5)
+        let today = model()
+        let inboxTab = model()
+        assertOneCount(today, inboxTab: inboxTab)
+        XCTAssertEqual(today.badgeCount, 5)
+        let houseBefore = app.houseCountableHours(goal: .reps750, year: year)
+
+        let first = TodayConfirm.rows(visible: today.visible)[0]
+        XCTAssertEqual(today.swipeLog(first), .logged)
+
+        XCTAssertEqual(app.houseCountableHours(goal: .reps750, year: year), houseBefore + 2, accuracy: 0.0001,
+                       "The house counts the confirmed hours at once")
+        XCTAssertEqual(today.badgeCount, 4)
+        XCTAssertFalse(today.visible.contains { $0.sourceKey == first.sourceKey })
+        assertOneCount(today, inboxTab: inboxTab)
+        XCTAssertTrue(items.contains { $0.sourceKey == first.sourceKey })
+        XCTAssertEqual(store.suggestion(forKey: first.sourceKey)?.state,
+                       .confirmed(entryId: first.entryId(profileId: profileId)))
+    }
+
+    func testNotRentalWorkFromTodayLeavesTheHouseAndDropsTheBadge() {
+        _ = seed(2)
+        let today = model()
+        let inboxTab = model()
+        let houseBefore = app.houseCountableHours(goal: .reps750, year: year)
+        let row = TodayConfirm.rows(visible: today.visible)[0]
+
+        today.dismiss(row)
+
+        XCTAssertEqual(app.houseCountableHours(goal: .reps750, year: year), houseBefore, "Not rental work never counts")
+        XCTAssertTrue(store.isDismissed(row.sourceKey))
+        XCTAssertEqual(today.toast?.message, "Marked not rental work")
+        XCTAssertEqual(today.badgeCount, 1)
+        assertOneCount(today, inboxTab: inboxTab)
+
+        today.undo()
+        XCTAssertEqual(today.badgeCount, 2, "Undo puts it back on Today and in the Inbox")
+        assertOneCount(today, inboxTab: inboxTab)
+    }
+
+    func testConfirmFromTheInboxShowsOnTodayToo() {
+        _ = seed(4)
+        let today = model()
+        let inboxTab = model()
+        XCTAssertTrue(TodayConfirm.showsReviewAll(count: today.badgeCount))
+        let any = inboxTab.visible[0]
+        XCTAssertEqual(inboxTab.swipeLog(any), .logged)
+        today.reload()
+        XCTAssertEqual(today.badgeCount, 3)
+        XCTAssertFalse(TodayConfirm.showsReviewAll(count: today.badgeCount), "Three fit in the card: no Review all")
+        assertOneCount(today, inboxTab: inboxTab)
+    }
+
+    func testCaughtUpOnceTheLastItemIsConfirmed() {
+        _ = seed(1)
+        let today = model()
+        XCTAssertEqual(TodayConfirm.state(hasProperties: true, pendingCount: today.badgeCount, backfillScanning: false, captureOn: true), .rows)
+        today.swipeLog(today.visible[0])
+        XCTAssertEqual(TodayConfirm.state(hasProperties: true, pendingCount: today.badgeCount, backfillScanning: false, captureOn: true),
+                       .caughtUp(captureOn: true))
+    }
+}
+
+// MARK: - This week
+
+final class TodayWeekTests: XCTestCase {
+    private func calendar(_ zone: String, firstWeekday: Int = 1) -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: zone)!
+        calendar.firstWeekday = firstWeekday
+        return calendar
+    }
+
+    private func at(_ calendar: Calendar, _ y: Int, _ m: Int, _ d: Int, _ h: Int, _ min: Int = 0) -> Date {
+        calendar.date(from: DateComponents(year: y, month: m, day: d, hour: h, minute: min))!
+    }
+
+    private func entry(_ date: Date, _ hours: Double, _ who: Participant = .selfParticipant,
+                       _ category: ActivityCategory = .repairs) -> TimeEntry {
+        TimeEntry(propertyId: UUID(), participant: who, category: category, hours: hours, date: date, notes: "")
+    }
+
+    func testWeekStartsMondayEvenWhenTheLocaleStartsSunday() {
+        let la = calendar("America/Los_Angeles", firstWeekday: 1)
+        let now = at(la, 2026, 10, 21, 10)   // Wednesday
+        let days = TodayWeek.days(entries: [], goal: .reps750, includeSpouse: false, now: now, calendar: la)
+        XCTAssertEqual(days.count, 7)
+        XCTAssertEqual(days.map(\.letter), ["M", "T", "W", "T", "F", "S", "S"])
+        XCTAssertEqual(days[0].date, at(la, 2026, 10, 19, 0))
+        XCTAssertEqual(days.firstIndex(where: \.isToday), 2)
+        XCTAssertEqual(days.map(\.isFuture), [false, false, false, true, true, true, true])
+        XCTAssertEqual(days[0].hours, 0, "A past day with nothing is 0 (a dot), not 'not yet'")
+    }
+
+    func testSundayIsTheLastDayOfItsOwnWeek() {
+        let la = calendar("America/Los_Angeles")
+        let sunday = at(la, 2026, 10, 25, 20)
+        let days = TodayWeek.days(entries: [], goal: .reps750, includeSpouse: false, now: sunday, calendar: la)
+        XCTAssertEqual(days[0].date, at(la, 2026, 10, 19, 0), "Sunday belongs to the week that started Monday the 19th")
+        XCTAssertTrue(days[6].isToday)
+        XCTAssertFalse(days.contains(where: \.isFuture))
+    }
+
+    func testEntriesLandOnTheirLocalDayAndOutsideTheWeekAreIgnored() {
+        let la = calendar("America/Los_Angeles")
+        let now = at(la, 2026, 10, 21, 18)
+        let entries = [
+            entry(at(la, 2026, 10, 18, 23, 30), 5),   // Sunday before: last week (Monday in UTC)
+            entry(at(la, 2026, 10, 19, 0, 10), 1.5),  // Monday just after midnight
+            entry(at(la, 2026, 10, 19, 23, 50), 1),   // Monday late (Tuesday in UTC)
+            entry(at(la, 2026, 10, 21, 9), 3),        // today
+            entry(at(la, 2026, 10, 23, 9), 4),        // Friday: future, never shown
+        ]
+        let days = TodayWeek.days(entries: entries, goal: .reps750, includeSpouse: false, now: now, calendar: la)
+        XCTAssertEqual(days.map(\.hours), [2.5, 0, 3, nil, nil, nil, nil])
+        XCTAssertEqual(TodayWeek.total(days), 5.5)
+
+        // The same instants seen from Tokyo split into different days.
+        let tokyo = calendar("Asia/Tokyo")
+        let tokyoDays = TodayWeek.days(entries: entries, goal: .reps750, includeSpouse: false, now: now, calendar: tokyo)
+        XCTAssertNotEqual(tokyoDays.map(\.hours), days.map(\.hours))
+    }
+
+    func testDaylightSavingWeekKeepsSevenWholeDays() {
+        let la = calendar("America/Los_Angeles")
+        // US DST ends Sunday Nov 1, 2026 (25-hour day).
+        let now = at(la, 2026, 11, 1, 22)
+        let entries = [entry(at(la, 2026, 11, 1, 0, 30), 1), entry(at(la, 2026, 11, 1, 23, 30), 2),
+                       entry(at(la, 2026, 10, 26, 0, 30), 1)]
+        let days = TodayWeek.days(entries: entries, goal: .reps750, includeSpouse: false, now: now, calendar: la)
+        XCTAssertEqual(days.first?.date, at(la, 2026, 10, 26, 0))
+        XCTAssertEqual(days.last?.date, at(la, 2026, 11, 1, 0))
+        XCTAssertEqual(days[6].hours, 3)
+        XCTAssertEqual(days[0].hours, 1)
+        XCTAssertTrue(days[6].isToday)
+
+        // Spring forward: Sunday Mar 8, 2026 (23-hour day).
+        let spring = at(la, 2026, 3, 9, 12)
+        let springDays = TodayWeek.days(entries: [entry(at(la, 2026, 3, 9, 0, 15), 2)], goal: .reps750,
+                                        includeSpouse: false, now: spring, calendar: la)
+        XCTAssertEqual(springDays[0].date, at(la, 2026, 3, 9, 0))
+        XCTAssertEqual(springDays[0].hours, 2)
+    }
+
+    // MARK: Spouse rule (the house's rule, applied per day)
+
+    func testREPSCountsYourOwnHoursOnlyEvenWhenSpouseIsTrackedJointly() {
+        let la = calendar("America/Los_Angeles")
+        let now = at(la, 2026, 10, 21, 18)
+        let entries = [entry(at(la, 2026, 10, 20, 9), 2), entry(at(la, 2026, 10, 20, 11), 3, .spouse)]
+        let days = TodayWeek.days(entries: entries, goal: .reps750, includeSpouse: true, now: now, calendar: la)
+        XCTAssertEqual(days[1].hours, 2, "Spouse hours never count toward your 750 (IRC 469(c)(7)(B))")
+    }
+
+    func testMaterialParticipationAddsSpouseHoursOnlyWhenTrackedJointly() {
+        let la = calendar("America/Los_Angeles")
+        let now = at(la, 2026, 10, 21, 18)
+        let entries = [entry(at(la, 2026, 10, 20, 9), 2), entry(at(la, 2026, 10, 20, 11), 3, .spouse)]
+        XCTAssertEqual(TodayWeek.days(entries: entries, goal: .mp500, includeSpouse: true, now: now, calendar: la)[1].hours, 5)
+        XCTAssertEqual(TodayWeek.days(entries: entries, goal: .mp500, includeSpouse: false, now: now, calendar: la)[1].hours, 2)
+        XCTAssertEqual(TodayWeek.days(entries: entries, goal: .mp100, includeSpouse: true, now: now, calendar: la)[1].hours, 5)
+    }
+
+    func testInvestorOnlyWorkNeverCounts() {
+        let la = calendar("America/Los_Angeles")
+        let now = at(la, 2026, 10, 21, 18)
+        let entries = [entry(at(la, 2026, 10, 20, 9), 2, .selfParticipant, .investing),
+                       entry(at(la, 2026, 10, 20, 10), 1, .selfParticipant, .financing),
+                       entry(at(la, 2026, 10, 20, 11), 1, .selfParticipant, .contractNegotiation),
+                       entry(at(la, 2026, 10, 20, 12), 1.5, .selfParticipant, .leasing)]
+        let days = TodayWeek.days(entries: entries, goal: .reps750, includeSpouse: false, now: now, calendar: la)
+        XCTAssertEqual(days[1].hours, 1.5)
+    }
+
+    func testWeekDayTotalsMatchTheHouseRuleForTheSameEntries() {
+        // Every entry this week, summed per day, equals the REPS engine over the same entries.
+        let la = calendar("America/Los_Angeles")
+        let now = at(la, 2026, 10, 21, 18)
+        let entries = [entry(at(la, 2026, 10, 19, 9), 2), entry(at(la, 2026, 10, 20, 9), 3, .spouse),
+                       entry(at(la, 2026, 10, 21, 9), 1, .selfParticipant, .investing),
+                       entry(at(la, 2026, 10, 21, 10), 4)]
+        let days = TodayWeek.days(entries: entries, goal: .reps750, includeSpouse: true, now: now, calendar: la)
+        let engine = entries.filter { $0.participant == .selfParticipant && $0.countsForREPS }.reduce(0) { $0 + $1.hours }
+        XCTAssertEqual(TodayWeek.total(days), engine)
+    }
+
+    // MARK: Bars
+
+    func testOnlyTheTallestBarIsLabelledAndBarsScaleToIt() {
+        let la = calendar("America/Los_Angeles")
+        let now = at(la, 2026, 10, 25, 20)
+        let entries = [entry(at(la, 2026, 10, 19, 9), 1), entry(at(la, 2026, 10, 21, 9), 3), entry(at(la, 2026, 10, 24, 9), 3)]
+        let days = TodayWeek.days(entries: entries, goal: .reps750, includeSpouse: false, now: now, calendar: la)
+        XCTAssertEqual(TodayWeek.labelledIndex(days), 2, "Earliest of the tied tallest")
+        XCTAssertEqual(TodayWeek.barHeight(hours: 3, peak: 3), 56)
+        XCTAssertEqual(TodayWeek.barHeight(hours: 1, peak: 3), 56.0 / 3, accuracy: 0.001)
+        XCTAssertEqual(TodayWeek.barHeight(hours: 0.1, peak: 3), 10, "Floor keeps a short day a capsule")
+        XCTAssertEqual(TodayWeek.barHeight(hours: 0, peak: 3), 0)
+        XCTAssertNil(TodayWeek.labelledIndex(TodayWeek.days(entries: [], goal: .reps750, includeSpouse: false, now: now, calendar: la)))
+    }
+
+    func testVoiceOverWords() {
+        let la = calendar("America/Los_Angeles")
+        let now = at(la, 2026, 10, 21, 18)
+        let days = TodayWeek.days(entries: [entry(at(la, 2026, 10, 21, 9), 1.5)], goal: .reps750, includeSpouse: false, now: now, calendar: la)
+        XCTAssertEqual(TodayWeek.spoken(days[0]), "Monday, no hours")
+        XCTAssertEqual(TodayWeek.spoken(days[2]), "Wednesday, today, 1 hour 30 minutes")
+        XCTAssertEqual(TodayWeek.spoken(days[6]), "Sunday, not yet")
+    }
+}
+
+// MARK: - Pace cards and the record slot
+
+final class TodayPaceAndRecordTests: XCTestCase {
+    func testFinishCardIsCautionOnlyWhenBehind() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 10, day: 19, hour: 12))!
+        let behind = TodayPaceCards.finish(hours: 212, goal: .reps750, pace: TodayPace(text: "Behind by 388h", tone: .caution), now: now, calendar: calendar)
+        XCTAssertEqual(behind.label, "To finish by Dec 31")
+        XCTAssertEqual(behind.tone, .caution)
+        XCTAssertEqual(behind.status, "Behind pace")
+        // 538h left over 73 days (10.43 weeks) → 52h a week, rounded up.
+        XCTAssertEqual(behind.value, "52h a week")
+
+        let ahead = TodayPaceCards.finish(hours: 700, goal: .reps750, pace: TodayPace(text: "On pace", tone: .positive), now: now, calendar: calendar)
+        XCTAssertEqual(ahead.tone, .neutral)
+        XCTAssertEqual(ahead.status, "On pace")
+
+        let met = TodayPaceCards.finish(hours: 751, goal: .reps750, pace: TodayPace(text: "Goal hours met", tone: .positive), now: now, calendar: calendar)
+        XCTAssertEqual(met.value, "Reached")
+        XCTAssertEqual(met.tone, .positive)
+    }
+
+    func testRecordSlotOnlyForFreeUsersFromTenHours() {
+        XCTAssertFalse(TodayRecordSlot.isShown(isPro: false, confirmedHours: 9.9))
+        XCTAssertTrue(TodayRecordSlot.isShown(isPro: false, confirmedHours: 10))
+        XCTAssertFalse(TodayRecordSlot.isShown(isPro: true, confirmedHours: 500))
+        XCTAssertFalse(TodayRecordSlot.isShown(isPro: false, confirmedHours: .nan))
+    }
+}

@@ -304,6 +304,14 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
             syncError = "iCloud sync is unavailable in this build."
             return
         }
+        #if DEBUG
+        // UI tests: an iCloud account check that never answers (no daemon, MDM, a hung cloudd).
+        // Onboarding and Today must never wait on it.
+        if ProcessInfo.processInfo.arguments.contains("-LHFakeICloudHang") {
+            try? await Task.sleep(for: .seconds(3600))
+            return
+        }
+        #endif
         do {
             let status = try await container.accountStatus()
             let wasAvailable = accountAvailable
