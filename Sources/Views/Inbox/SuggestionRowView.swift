@@ -79,7 +79,7 @@ struct SuggestionRowView: View {
             title
                 .font(.body)
                 .foregroundStyle(colors.textPrimary)
-                .lineLimit(2)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)   // AX: the whole title wraps
                 .fixedSize(horizontal: false, vertical: true)
 
             detailLine
