@@ -803,6 +803,54 @@ class AppViewModel: ObservableObject {
         RatingPromptCoordinator.shared.consider(.entriesMilestone, entryCount: timeEntries.count)
     }
     
+    /// The Log time sheet's save. Unlike `addTimeEntry`, it reports a failed write: the entry is
+    /// taken back out (nothing half-saved), `persistenceError` is set, and the sheet stays open
+    /// with the reason. On success it runs the same house, analytics and iCloud path.
+    @discardableResult
+    func logTimeEntry(
+        propertyId: UUID,
+        participant: Participant,
+        category: ActivityCategory,
+        hours: Double,
+        date: Date,
+        notes: String,
+        attachments: [TimeAttachment] = [],
+        source: EntrySource = .manual
+    ) -> LogSaveResult {
+        guard properties.contains(where: { $0.id == propertyId }) else {
+            return .failed(LogSaveResult.missingPropertyMessage)
+        }
+        guard hours > 0 else { return .failed(LogSaveResult.missingHoursMessage) }
+        let houseHoursBefore = houseCountableHours()
+        let entry = TimeEntry(
+            propertyId: propertyId,
+            participant: participant,
+            category: category,
+            hours: min(hours, 24),
+            date: date,
+            notes: notes,
+            attachments: attachments,
+            importSource: source.storedValue
+        )
+        timeEntries.append(entry)
+        guard writePersistentStore() else {
+            timeEntries.removeAll { $0.id == entry.id }
+            return .failed(LogSaveResult.writeFailedMessage)
+        }
+        refreshWidgetSnapshot()
+        syncService.schedulePush()
+        reportHouseSave(previousHours: houseHoursBefore)
+        Analytics.sessionLogged(category: category, participant: participant)
+        Analytics.entryLogged(source: source)
+        RatingPromptCoordinator.shared.consider(.entriesMilestone, entryCount: timeEntries.count)
+        return .saved(entry.id)
+    }
+
+#if DEBUG
+    /// DEBUG: the next persistent write fails (unit tests and the `-LHFailNextSave` capture).
+    static var debugFailNextWrite = false
+#endif
+
     func updateTimeEntry(_ entry: TimeEntry) {
         if let index = timeEntries.firstIndex(where: { $0.id == entry.id }) {
             timeEntries[index] = entry
@@ -947,6 +995,17 @@ class AppViewModel: ObservableObject {
         timerPropertyId = nil
         endTimerLiveActivity(propertyId: endingPropertyId, category: endingCategory, startDate: endingStartDate, needsReview: false)
         saveTimerState()
+    }
+
+    /// Puts a discarded running timer back exactly as it was (the "Timer discarded · Undo" toast).
+    func restoreTimer(propertyId: UUID, category: ActivityCategory, startTime: Date) {
+        guard !isTimerRunning, properties.contains(where: { $0.id == propertyId }) else { return }
+        isTimerRunning = true
+        timerStartTime = startTime
+        timerPropertyId = propertyId
+        timerCategory = category
+        saveTimerState()
+        startOrUpdateTimerLiveActivity()
     }
 
     /// Saves ONE timer draft as an entry. Pass the id of the draft the user is looking at:
@@ -1144,6 +1203,12 @@ class AppViewModel: ObservableObject {
     @discardableResult
     private func writePersistentStore() -> Bool {
         do {
+#if DEBUG
+            if Self.debugFailNextWrite {
+                Self.debugFailNextWrite = false
+                throw CocoaError(.fileWriteOutOfSpace)
+            }
+#endif
             // Write attachment files first so the encoded blob never carries photo
             // bytes and files are verified before any inline copy is dropped.
             try persistPendingAttachments()

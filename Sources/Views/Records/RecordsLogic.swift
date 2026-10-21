@@ -38,10 +38,10 @@ enum RecordSourceBadge: String, CaseIterable, Equatable {
 
     var title: String {
         switch self {
-        case .manual: return "Manual"
-        case .timer: return "Timer"
-        case .voice: return "Voice"
-        case .calendarImport: return "Calendar import"
+        case .manual: return EntrySource.manual.displayName
+        case .timer: return EntrySource.timer.displayName
+        case .voice: return EntrySource.voice.displayName
+        case .calendarImport: return EntrySource.calendar.displayName
         case .suggested: return "Suggested"
         case .receipt: return EntrySource.receipt.displayName
         case .location: return EntrySource.location.displayName

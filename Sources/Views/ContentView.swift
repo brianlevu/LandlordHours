@@ -54,6 +54,10 @@ struct ContentView: View {
     @StateObject private var inboxModel = InboxViewModel.live(app: AppModelHost.shared.viewModel)
     /// WP3: one-time "What's new" auto-capture opt-in for people updating from 1.x.
     @State private var showCaptureWhatsNew = false
+    /// 2.0: "+" opens Log time / the timer as a sheet (it covers the tab bar). Tab index 2 is
+    /// kept as a route: anything that selects it opens this sheet instead.
+    @State private var logRoute: LogSheetRoute?
+    @ObservedObject private var shellToasts = AppToastCenter.shared
 
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
@@ -259,15 +263,16 @@ struct ContentView: View {
                     .zIndex(5)
             }
 
-            // Floating timer banner (visible on all tabs except Track)
-            if viewModel.isTimerRunning && selectedTab != 2 && !isCustomTabBarHidden {
-                FloatingTimerBanner(viewModel: viewModel) {
-                    selectedTab = 2
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .padding(.bottom, 52) // above tab bar
+            // Log time and timer toasts ("Logged 1h 30m at Pine Cabin · Undo"): the Inbox toast,
+            // full width, just above the tab bar.
+            if let toast = shellToasts.inboxToast, inboxModel.toast == nil, !isCustomTabBarHidden {
+                InboxUndoToast(toast: toast, onUndo: { shellToasts.undo() },
+                               showsUndo: shellToasts.toast?.hasUndo ?? false, identifier: "shell.toast")
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, Self.tabBarHeight + 8 + 12)
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(5)
             }
-
         }
         .onAppear {
             #if DEBUG
@@ -275,11 +280,38 @@ struct ContentView: View {
             #endif
             inboxModel.reload()
             presentCaptureWhatsNewIfNeeded()
+            if selectedTab == ShellTab.logTimeIndex {
+                selectedTab = ShellTab.todayIndex
+                openLog(.log)
+            }
+            #if DEBUG
+            LogShellDebug.applyIfNeeded(app: viewModel) { route in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { openLog(route) }
+            }
+            #endif
         }
-        .onChange(of: selectedTab) { _, _ in
+        .onChange(of: selectedTab) { oldTab, newTab in
+            // Index 2 is the "+" route (widgets, intents, notifications, 1.x posts): open the sheet
+            // over the tab the user was on.
+            if newTab == ShellTab.logTimeIndex {
+                selectedTab = oldTab == ShellTab.logTimeIndex ? ShellTab.todayIndex : oldTab
+                openLog(viewModel.isTimerRunning ? .timer : .log)
+                return
+            }
             inboxModel.dismissToast()
             inboxModel.reload()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openLogSheet)) { note in
+            openLog((note.object as? LogSheetRoute) ?? .log)
+        }
+        .sheet(item: $logRoute) { route in
+            LogTimeSheet(route: route) { logRoute = nil }
+                .environmentObject(viewModel)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
+                .presentationBackground(colors.background)
+        }
+        .lhMotion(AppAnimation.reveal, value: shellToasts.toast)
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { inboxModel.reload() }
         }
@@ -364,8 +396,6 @@ struct ContentView: View {
             DashboardView(inboxBackfillCount: inboxModel.backfillCount)
         case 1:
             PropertiesView()
-        case 2:
-            TimeLogView()
         case 3:
             ReportsView()
         case 4:
@@ -401,12 +431,16 @@ struct ContentView: View {
 
     private static let tabBarHeight: CGFloat = 62
 
+    private func openLog(_ route: LogSheetRoute) {
+        shellToasts.dismiss()
+        guard logRoute == nil else { return }
+        logRoute = route
+    }
+
     private var logTimeButton: some View {
-        let isSelected = selectedTab == ShellTab.logTimeIndex
+        let isSelected = logRoute != nil
         return Button {
-            animate(AppAnimation.quick) {
-                selectedTab = ShellTab.logTimeIndex
-            }
+            openLog(viewModel.isTimerRunning ? .timer : .log)
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 24, weight: .semibold))
@@ -419,7 +453,12 @@ struct ContentView: View {
         }
         .buttonStyle(.lhPressable)
         .floatingGlass(in: Circle(), colors: colors, colorScheme: colorScheme)
+        .contextMenu {
+            Button { openLog(.log) } label: { Label("Log time", systemImage: "square.and.pencil") }
+            Button { openLog(.timer) } label: { Label(viewModel.isTimerRunning ? "Show the timer" : "Start a timer", systemImage: "timer") }
+        }
         .accessibilityLabel("Log time")
+        .accessibilityHint("Touch and hold for the timer")
         .accessibilityIdentifier("tab.logTime")
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
@@ -545,63 +584,6 @@ private extension View {
                     shape.stroke(colors.border.opacity(colorScheme == .dark ? 0.9 : 0.7), lineWidth: 1)
                 )
                 .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.24 : 0.10), radius: 16, y: 4)
-        }
-    }
-}
-
-// MARK: - Floating Timer Banner
-
-struct FloatingTimerBanner: View {
-    @ObservedObject var viewModel: AppViewModel
-    let onTap: () -> Void
-
-    @State private var elapsed: TimeInterval = 0
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
-    private var propertyName: String {
-        guard let id = viewModel.timerPropertyId else { return "" }
-        return viewModel.properties.first { $0.id == id }?.name ?? "Unknown"
-    }
-
-    private var formattedTime: String {
-        let h = Int(elapsed) / 3600
-        let m = (Int(elapsed) % 3600) / 60
-        let s = Int(elapsed) % 60
-        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
-        return String(format: "%d:%02d", m, s)
-    }
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 10) {
-                Circle()
-                    .fill(AppColors.coral)
-                    .frame(width: 8, height: 8)
-                Text(formattedTime)
-                    .font(.system(size: 14, weight: .bold, design: .monospaced))
-                    .foregroundStyle(AppColors.onAction)
-                Text(propertyName)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(AppColors.onAction.opacity(0.8))
-                    .lineLimit(1)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(AppColors.onAction.opacity(0.7))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(AppColors.primary)
-            .clipShape(Capsule())
-            .shadow(color: AppColors.primary.opacity(0.18), radius: 8, y: 3)
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 20)
-        .onReceive(timer) { _ in
-            elapsed = viewModel.timerElapsedTime
-        }
-        .onAppear {
-            elapsed = viewModel.timerElapsedTime
         }
     }
 }

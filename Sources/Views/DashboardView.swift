@@ -288,6 +288,8 @@ struct DashboardView: View {
                         // The house leads Today in every state (approved r6 concept); a new
                         // owner's setup steps sit right under the empty lot.
                         houseHero
+                        // WP-Log: the timer card (only while a timer runs or a draft waits).
+                        TodayTimerSection()
                         if isNewOwner && !calendarSuggestionsOn {
                             findHoursCard
                         }

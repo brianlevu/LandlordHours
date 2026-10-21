@@ -213,8 +213,8 @@ final class EngagementIntelligenceService {
             surface: .homeNudge,
             reason: .calendarDraftsReady,
             destination: .calendarReview,
-            title: "Review likely landlord work",
-            message: "\(count) calendar item\(count == 1 ? "" : "s") may be landlord work.",
+            title: "Review likely rental work",
+            message: "\(count) calendar item\(count == 1 ? "" : "s") may be rental work.",
             cooldownDays: 3
         )
     }
@@ -224,7 +224,7 @@ final class EngagementIntelligenceService {
             surface: .notification,
             reason: .inactiveLogging,
             destination: .track,
-            title: "Log recent landlord work",
+            title: "Log recent rental work",
             message: "No hours saved in \(days) days. Log anything you handled recently.",
             cooldownDays: 7
         )

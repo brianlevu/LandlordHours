@@ -123,21 +123,25 @@ final class TodayHouseUITests: XCTestCase {
         XCTAssertTrue(hero.label.contains("212 of 750 hours"), hero.label)
 
         app.buttons["tab.logTime"].tap()
-        let notes = app.textViews["track.entryNotes"]
+        let notes = app.descendants(matching: .any)["log.note"].firstMatch
         XCTAssertTrue(notes.waitForExistence(timeout: 8))
         notes.tap()
         notes.typeText("Fixed the porch steps for 2 hours")
-        let logTime = app.buttons["track.logTime"]
-        if !logTime.waitForExistence(timeout: 6) {
-            let review = app.buttons["track.reviewEvidence"]
-            XCTAssertTrue(review.waitForExistence(timeout: 3))
-            review.tap()
-        }
+        let logTime = app.buttons["log.save"]
         XCTAssertTrue(logTime.waitForExistence(timeout: 5))
+        if !logTime.isEnabled {
+            // More than one rental: pick the first.
+            app.buttons["log.property"].tap()
+            let first = app.buttons["picker.property.0"]
+            XCTAssertTrue(first.waitForExistence(timeout: 5))
+            first.tap()
+        }
+        let enabled = NSPredicate(format: "isEnabled == true")
+        expectation(for: enabled, evaluatedWith: logTime)
+        waitForExpectations(timeout: 5)
         logTime.tap()
-        XCTAssertTrue(app.staticTexts["Time logged"].waitForExistence(timeout: 6))
+        XCTAssertTrue(app.descendants(matching: .any)["shell.toast"].waitForExistence(timeout: 6))
 
-        app.buttons["tab.today"].tap()
         // No loading skeleton: the real hero is there at once, building from 212.
         XCTAssertTrue(hero.waitForExistence(timeout: 1.5), "Today renders its hero without a skeleton")
         XCTAssertTrue(waitForHeroLabel(containing: "214 of 750 hours"), hero.label)

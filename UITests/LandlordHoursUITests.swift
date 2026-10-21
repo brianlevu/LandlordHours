@@ -43,33 +43,29 @@ final class LandlordHoursUITests: XCTestCase {
         XCTAssertTrue(app.textFields["property-address"].waitForExistence(timeout: 3))
     }
 
+    /// 2.0: the old Track tab index opens the Log time sheet; every detail row is right there.
     func testTrackManualDetailsFlowIsReachable() {
         launch(scenario: "frequent", tab: 2)
 
-        XCTAssertTrue(app.staticTexts["Log your time"].waitForExistence(timeout: 8))
-        let manualButton = app.buttons["Set details manually, Property, category, hours"]
-        XCTAssertTrue(manualButton.waitForExistence(timeout: 5))
-        manualButton.tap()
-
-        XCTAssertTrue(app.staticTexts["Set details"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Category"].exists)
-        XCTAssertTrue(app.staticTexts["Property"].exists)
-        XCTAssertTrue(app.staticTexts["Hours"].exists)
+        XCTAssertTrue(app.buttons["log.close"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["log.property"].exists)
+        XCTAssertTrue(app.buttons["log.category"].exists)
+        XCTAssertTrue(app.buttons["log.date"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["log.hours.value"].exists)
     }
 
     func testTrackNoteTypingStaysInComposer() {
         launch(scenario: "occasional", tab: 2)
 
-        XCTAssertTrue(app.staticTexts["Log your time"].waitForExistence(timeout: 8))
-        let noteEditor = app.textViews.firstMatch
-        XCTAssertTrue(noteEditor.waitForExistence(timeout: 5))
+        let noteEditor = app.descendants(matching: .any)["log.note"].firstMatch
+        XCTAssertTrue(noteEditor.waitForExistence(timeout: 8))
 
         noteEditor.tap()
         noteEditor.typeText("painted porch for 1 hour")
 
         XCTAssertFalse(app.staticTexts["Top Hit"].exists)
-        XCTAssertTrue(noteEditor.value as? String == "painted porch for 1 hour")
-        XCTAssertTrue(app.staticTexts["Evidence draft"].waitForExistence(timeout: 5))
+        XCTAssertEqual(noteEditor.value as? String, "painted porch for 1 hour")
+        XCTAssertTrue(app.descendants(matching: .any)["log.fill.caption"].waitForExistence(timeout: 5))
     }
 
     func testReportsExportGeneratesShareablePDFState() {
@@ -176,17 +172,17 @@ final class LandlordHoursUITests: XCTestCase {
         let matrix: [(scenario: String, tab: Int, expectedText: String, attachment: String)] = [
             ("emptyMainTabs", 0, "Add your first property", "empty-home"),
             ("emptyMainTabs", 1, "Once we know where your rentals are", "empty-properties"),
-            ("emptyMainTabs", 2, "Add a property first", "empty-track"),
+            ("emptyMainTabs", 2, "Add a property to log this.", "empty-track"),
             ("emptyMainTabs", 3, "Reports", "empty-reports"),
             ("emptyMainTabs", 4, "LandlordHours\u{00A0}Pro", "empty-settings"),
             ("occasional", 0, "Today’s work", "occasional-home"),
             ("occasional", 1, "1 rental ·", "occasional-properties"),
-            ("occasional", 2, "Log your time", "occasional-track"),
+            ("occasional", 2, "Log time", "occasional-track"),
             ("occasional", 3, "Reports", "occasional-reports"),
             ("occasional", 4, "Settings", "occasional-settings"),
             ("frequent", 0, "counted toward 750 hours", "frequent-home"),
             ("frequent", 1, "3 rentals ·", "frequent-properties"),
-            ("frequent", 2, "Log your time", "frequent-track"),
+            ("frequent", 2, "Log time", "frequent-track"),
             ("frequent", 3, "Reports", "frequent-reports"),
             ("frequent", 4, "Pro is active", "frequent-settings")
         ]
@@ -205,10 +201,9 @@ final class LandlordHoursUITests: XCTestCase {
     func testTrackEmptyStateAddPropertyCTAOpensPropertySheet() {
         launch(scenario: "emptyMainTabs", tab: 2)
 
-        assertVisibleText("Add a property first", timeout: 8)
-        assertVisibleText("Why this comes first")
-
-        let addProperty = app.buttons["Add first property"]
+        assertVisibleText("Add a property to log this.", timeout: 8)
+        app.buttons["log.property"].tap()
+        let addProperty = app.buttons["picker.addProperty"]
         XCTAssertTrue(addProperty.waitForExistence(timeout: 5))
         addProperty.tap()
 
@@ -219,22 +214,19 @@ final class LandlordHoursUITests: XCTestCase {
     }
 
     func testTimerLaunchStatesRemainReviewable() {
-        launch(scenario: "frequent", tab: 2, extraArguments: ["-LHInitialTrackMode", "timer"])
-
-        assertVisibleText("Timer")
-        XCTAssertTrue(app.buttons["track.timer.start"].waitForExistence(timeout: 5))
+        launch(scenario: "frequent", tab: 0, extraArguments: ["-LHOpenLog", "timerIdle"])
+        XCTAssertTrue(app.buttons["timer.start"].waitForExistence(timeout: 8))
         attachScreenshot(named: "timer-idle-state")
 
         app.terminate()
-        launch(scenario: "frequent", tab: 2, extraArguments: ["-LHInitialTrackMode", "timer", "-LHStartTimer"])
-        XCTAssertTrue(app.buttons["track.timer.stop"].waitForExistence(timeout: 8))
-        assertVisibleText("Evidence in progress")
+        launch(scenario: "frequent", tab: 0, extraArguments: ["-LHOpenLog", "timerRunning"])
+        XCTAssertTrue(app.buttons["timer.stop"].waitForExistence(timeout: 8))
         attachScreenshot(named: "timer-running-state")
 
         app.terminate()
-        launch(scenario: "frequent", tab: 2, extraArguments: ["-LHInitialTrackMode", "timer", "-LHShowTimerReview"])
-        XCTAssertTrue(app.buttons["track.timer.save"].waitForExistence(timeout: 8))
-        assertVisibleText("Notes")
+        launch(scenario: "frequent", tab: 0, extraArguments: ["-LHOpenLog", "timerReview"])
+        XCTAssertTrue(app.buttons["log.save"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["log.timer.ran"].exists)
         attachScreenshot(named: "timer-review-state")
     }
 
@@ -295,25 +287,20 @@ final class LandlordHoursUITests: XCTestCase {
         scrollToElement(firstHourTile)
         tapWhenHittable(firstHourTile, scrollIfNeeded: true)
 
-        XCTAssertTrue(app.staticTexts["Log your time"].waitForExistence(timeout: 5))
-        let noteEditor = app.textViews["track.entryNotes"]
+        let noteEditor = app.descendants(matching: .any)["log.note"].firstMatch
         XCTAssertTrue(noteEditor.waitForExistence(timeout: 5))
         noteEditor.tap()
-        noteEditor.typeText("Reviewed tenant message for 1 hour")
+        noteEditor.typeText("Reviewed tenant message at Oak Street Duplex for 1 hour")
 
-        let logTime = app.buttons["track.logTime"]
-        if !logTime.waitForExistence(timeout: 6) {
-            let reviewButton = app.buttons["track.reviewEvidence"]
-            XCTAssertTrue(reviewButton.waitForExistence(timeout: 2))
-            reviewButton.tap()
-        }
+        let logTime = app.buttons["log.save"]
         XCTAssertTrue(logTime.waitForExistence(timeout: 5))
-        XCTAssertTrue(logTime.isEnabled)
+        let enabled = NSPredicate(format: "isEnabled == true")
+        expectation(for: enabled, evaluatedWith: logTime)
+        waitForExpectations(timeout: 5)
         logTime.tap()
 
-        XCTAssertTrue(app.staticTexts["Time logged"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["shell.toast"].waitForExistence(timeout: 5))
 
-        app.buttons["tab.today"].tap()
         XCTAssertFalse(app.staticTexts["Finish your tax-ready setup"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["home.activation.firstHour"].exists)
     }

@@ -163,7 +163,7 @@ struct InboxView: View {
             Button {
                 dismiss(suggestion)
             } label: {
-                Label("Not work", systemImage: "xmark")
+                Label("Not rental work", systemImage: "xmark")
                     .labelStyle(.iconOnly)
             }
             .tint(Color(hex: AppColors.Hex.textSecondary))
@@ -276,6 +276,9 @@ struct InboxView: View {
 struct InboxUndoToast: View {
     let toast: InboxToast
     var onUndo: () -> Void
+    /// The shell toast (Log time, timer) has its own Undo; nil follows `toast.undo`.
+    var showsUndo: Bool? = nil
+    var identifier = "inbox.toast"
     @Environment(\.colorScheme) private var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
@@ -306,7 +309,7 @@ struct InboxUndoToast: View {
                 .foregroundStyle(colors.textPrimary)
                 .lineLimit(2)
             Spacer(minLength: 8)
-            if toast.undo != nil {
+            if showsUndo ?? (toast.undo != nil) {
                 Button("Undo", action: onUndo)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(colors.action)
@@ -325,6 +328,6 @@ struct InboxUndoToast: View {
         .overlay(Capsule().strokeBorder(colors.border, lineWidth: 1))
         .compositingGroup()
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("inbox.toast")
+        .accessibilityIdentifier(identifier)
     }
 }

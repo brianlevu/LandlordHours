@@ -209,7 +209,7 @@ struct SuggestionConfirmSheet: View {
             }
             if badges.notSure {
                 band(
-                    title: Text("Not sure this is landlord work"),
+                    title: Text("Not sure this is rental work"),
                     body: "Log it only if it was work on a rental.",
                     wash: colors.cautionSurface
                 )

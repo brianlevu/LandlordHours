@@ -314,7 +314,7 @@ struct InboxRowActions: View {
 
     private var notWork: some View {
         Button(action: onNotWork) {
-            Text("Not work")
+            Text("Not rental work")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(colors.textSecondary)
                 .lineLimit(1)
