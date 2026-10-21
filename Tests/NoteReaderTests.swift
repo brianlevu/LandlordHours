@@ -682,3 +682,79 @@ final class NoteGuardRound3Tests: XCTestCase {
         XCTAssertNil(NoteFactGuard.accept("Gutters completed at Oak Street Duplex", request: req, propertyId: oak.id, category: .repairs))
     }
 }
+
+// MARK: - Round 4: the REAL iOS 27 error type (LanguageModelError), not a stand-in
+
+#if canImport(FoundationModels)
+@available(iOS 27.0, *)
+private struct ThrowingBackend: NoteModelBackend {
+    var tier: Suggestion.Tier = .onDevice
+    var availability: ModelAvailability { .available }
+    let error: Error
+    let calls = CallCounter()
+    func draft(_ prompt: NoteModelPrompt) async throws -> NoteModelDraft {
+        calls.count += 1
+        throw error
+    }
+}
+#endif
+
+final class LanguageModelErrorMappingTests: XCTestCase {
+    func testEveryIOS27ErrorCaseIsClassified() throws {
+        #if canImport(FoundationModels)
+        guard #available(iOS 27.0, *) else { throw XCTSkip("LanguageModelError is iOS 27") }
+        let cases: [(Error, NoteReaderChain.Attempt)] = [
+            (LanguageModelError.rateLimited(.init(resetDate: nil, debugDescription: "Request has been rate limited")), .rateLimited),
+            (LanguageModelError.guardrailViolation(.init(debugDescription: "May contain sensitive content")), .refused),
+            (LanguageModelError.refusal(.init(explanation: "no", debugDescription: "refused")), .refused),
+            (LanguageModelError.timeout(.init(debugDescription: "slow")), .timedOut),
+            (LanguageModelError.contextSizeExceeded(.init(contextSize: 4096, tokenCount: 5000, debugDescription: "long")), .cannotRead),
+            (LanguageModelError.unsupportedLanguageOrLocale(.init(languageCode: .init("xx"), debugDescription: "lang")), .cannotRead),
+            (LanguageModelError.unsupportedGenerationGuide(.init(schemaName: nil, debugDescription: "guide")), .cannotRead),
+        ]
+        for (error, expected) in cases {
+            XCTAssertEqual(NoteReaderChain.generationFailure(error), expected, "\(error)")
+        }
+        #else
+        throw XCTSkip("FoundationModels not in this SDK")
+        #endif
+    }
+
+    /// The device bug: a real rate limit must engage the cool-down (it didn't at 9851e24).
+    func testARealRateLimitCoolsTheTierDown() async throws {
+        #if canImport(FoundationModels)
+        guard #available(iOS 27.0, *) else { throw XCTSkip("LanguageModelError is iOS 27") }
+        let cooldown = NoteModelCooldown()
+        let backend = ThrowingBackend(error: LanguageModelError.rateLimited(.init(resetDate: nil, debugDescription: "Request has been rate limited")))
+        let gate = PCCGate(settings: PCCSettings(defaults: UserDefaults(suiteName: "r4-\(UUID().uuidString)")!), isFlagEnabled: { false })
+        let chain = NoteReaderChain(onDevice: backend, pcc: UnavailableNoteBackend(tier: .pcc, reason: .notEntitled), pccGate: gate, cooldown: cooldown)
+        let first = await chain.read(request("fixed the sink at Oak St, 2 hours"))
+        XCTAssertEqual(first.onDevice, .rateLimited)
+        XCTAssertTrue(cooldown.isCoolingDown(.onDevice))
+        let second = await chain.read(request("showed the cabin"))
+        XCTAssertEqual(second.onDevice, .unavailable(.coolingDown))
+        XCTAssertEqual(backend.calls.count, 1, "never hammers the model")
+        #else
+        throw XCTSkip("FoundationModels not in this SDK")
+        #endif
+    }
+
+    /// The device bug: a real guardrail refusal must make the note rules-only (it didn't).
+    func testARealGuardrailRefusalIsRulesOnly() async throws {
+        #if canImport(FoundationModels)
+        guard #available(iOS 27.0, *) else { throw XCTSkip("LanguageModelError is iOS 27") }
+        let backend = ThrowingBackend(error: LanguageModelError.guardrailViolation(.init(debugDescription: "May contain sensitive content")))
+        let gate = PCCGate(settings: PCCSettings(defaults: UserDefaults(suiteName: "r4b-\(UUID().uuidString)")!), isFlagEnabled: { false })
+        let chain = NoteReaderChain(onDevice: backend, pcc: UnavailableNoteBackend(tier: .pcc, reason: .notEntitled), pccGate: gate)
+        let note = request("Spoke to my CPA about the REPS election and the 50% rule, 1 hour")
+        let first = await chain.read(note)
+        XCTAssertEqual(first.onDevice, .refused)
+        XCTAssertEqual(first.reading, NoteRules.read(note))
+        let again = await chain.read(note)
+        XCTAssertEqual(again.onDevice, .refused)
+        XCTAssertEqual(backend.calls.count, 1)
+        #else
+        throw XCTSkip("FoundationModels not in this SDK")
+        #endif
+    }
+}
