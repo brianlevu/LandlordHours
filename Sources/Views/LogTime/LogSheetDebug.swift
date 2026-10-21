@@ -42,7 +42,12 @@ enum LogSheetDebug {
 
     #if DEBUG
     static let sample = "Fixed the sink at Pine Cabin, 1 hour"
-    static let aiSample = "fixed the sink at Oak St with Mike, about 2 hours yesterday"
+    /// Screenshot hook: `-LHLogNote "<text>"` replaces the sample note (default: the Oak St sink).
+    static var aiSample: String {
+        let a = ProcessInfo.processInfo.arguments
+        if let i = a.firstIndex(of: "-LHLogNote"), a.indices.contains(i + 1) { return a[i + 1] }
+        return "fixed the sink at Oak St with Mike, about 2 hours yesterday"
+    }
     static let aiPartialSample = "Fixed the sink, about an hour"
     static let aiTwoRentalsSample = "Fixed the sink at Pine Cabin and mowed at Maple Court, 2 hours"
 
