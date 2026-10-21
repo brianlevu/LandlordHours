@@ -609,11 +609,11 @@ private struct AutoCaptureSettingsSection: View {
 
     static var aiDisclosure: String { offersPCC ? aiDisclosureWithPCC : aiDisclosureOnDevice }
 
-    static let aiDisclosureWithPCC = "Calendar suggestions use Apple\u{2019}s on-device model. When you type or say a note in Log time, that model reads it to fill in the form. If it can\u{2019}t, Apple\u{2019}s Private Cloud Compute may read it instead (turn that off above). Private Cloud Compute doesn\u{2019}t keep your note. Nothing goes to us or anyone else, and nothing is saved until you tap Log."
+    static let aiDisclosureWithPCC = "Calendar suggestions use Apple\u{2019}s on-device model. When you type or say a note in Log time, that model reads it to fill in the form. If it can\u{2019}t, Apple\u{2019}s Private Cloud Compute may read it instead (turn that off above). Apple runs Private Cloud Compute, and it doesn\u{2019}t keep your note. Nothing goes to us or anyone else, and nothing is saved until you tap Log."
 
     static let aiDisclosureOnDevice = "Calendar suggestions and the notes you type or say in Log time are read by Apple\u{2019}s on-device model, on your iPhone, to fill in the form. Nothing goes to us or anyone else, and nothing is saved until you tap Log."
 
-    static let pccSubtitle = "Lets Apple\u{2019}s private cloud read a Log time note when your iPhone\u{2019}s model can\u{2019}t. Off keeps every note on your iPhone."
+    static let pccSubtitle = "Lets Apple\u{2019}s Private Cloud Compute read a Log time note when your iPhone\u{2019}s model can\u{2019}t. Apple runs it and keeps nothing. Off keeps every note on your iPhone."
 
     var body: some View {
         Section {

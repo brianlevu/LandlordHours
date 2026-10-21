@@ -28,7 +28,7 @@ enum CaptureFlag: String, CaseIterable {
     var defaultValue: Bool {
         switch self {
         case .autoCapture, .noteModel: return true
-        // PCC is off until the entitlement ships and the owner turns the flag on remotely.
+        // PCC stays off by default: the owner tests it first (DEBUG -LHForcePCC), then turns the flag on remotely.
         case .privateCloudCompute, .locationBeta, .gmailReader: return false
         }
     }

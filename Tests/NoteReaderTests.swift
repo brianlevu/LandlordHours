@@ -491,14 +491,12 @@ final class LogDescriptionSaveTests: XCTestCase {
 
 final class PCCEntitlementTests: XCTestCase {
     /// The crash on BLV-Phone: availability said .available but the binary had no entitlement.
-    func testThisBuildIsNotEntitledSoPCCNeverOpens() {
-        XCTAssertFalse(PCCEntitlement.isConfigured, "LH_PCC_ENTITLED is NO until the entitlement ships")
-        XCTAssertEqual(SystemPCCStatus().status(), .unavailable(.notEntitled))
-        XCTAssertEqual(NoteModelBackends.privateCloudCompute().availability, .unavailable(.notEntitled))
-        XCTAssertEqual(PCCGate(settings: PCCSettings(defaults: UserDefaults(suiteName: "pcc-ent-\(UUID().uuidString)")!),
-                               isFlagEnabled: { true }).availability(), .unavailable(.notEntitled),
-                       "user toggle on + flag on still can't open PCC without the entitlement")
-        XCTAssertFalse(NoteReaderChain.live().pccAvailability().isAvailable)
+    func testThisBuildIsEntitledButTheRemoteFlagKeepsPCCClosed() {
+        XCTAssertTrue(PCCEntitlement.isConfigured, "LH_PCC_ENTITLED is YES with the entitlement")
+        let settings = PCCSettings(defaults: UserDefaults(suiteName: "pcc-ent-\(UUID().uuidString)")!)
+        XCTAssertEqual(PCCGate(settings: settings, isFlagEnabled: { false }, system: FixedPCCStatus(value: .available)).availability(),
+                       .unavailable(.disabledByFlag), "flag off keeps PCC closed even when entitled")
+        XCTAssertTrue(PCCGate(settings: settings, isFlagEnabled: { true }, system: FixedPCCStatus(value: .available)).availability().isAvailable)
     }
 
     func testTheRemoteFlagDefaultsOff() {
