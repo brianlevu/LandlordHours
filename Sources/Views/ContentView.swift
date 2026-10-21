@@ -282,7 +282,7 @@ struct ContentView: View {
             presentCaptureWhatsNewIfNeeded()
             if selectedTab == ShellTab.logTimeIndex {
                 selectedTab = ShellTab.todayIndex
-                openLog(.log)
+                openLog(plusRoute)
             }
             #if DEBUG
             LogShellDebug.applyIfNeeded(app: viewModel) { route in
@@ -295,7 +295,7 @@ struct ContentView: View {
             // over the tab the user was on.
             if newTab == ShellTab.logTimeIndex {
                 selectedTab = oldTab == ShellTab.logTimeIndex ? ShellTab.todayIndex : oldTab
-                openLog(viewModel.isTimerRunning ? .timer : .log)
+                openLog(plusRoute)
                 return
             }
             inboxModel.dismissToast()
@@ -430,6 +430,11 @@ struct ContentView: View {
     }
 
     private static let tabBarHeight: CGFloat = 62
+
+    /// Tab 2 (Review timer notification/widget, intents, 1.x posts): see `LogSheetRoute.forPlusRoute`.
+    private var plusRoute: LogSheetRoute {
+        LogSheetRoute.forPlusRoute(isTimerRunning: viewModel.isTimerRunning, stoppedDraft: StoppedTimerDraftStore.load())
+    }
 
     private func openLog(_ route: LogSheetRoute) {
         shellToasts.dismiss()
