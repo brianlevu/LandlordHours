@@ -144,8 +144,17 @@ final class TodayCaptureUITests: XCTestCase {
                 app.buttons["tab.properties"].tap()
                 Thread.sleep(forTimeInterval: 2.0)
                 write("properties-rows-\(scheme)\(size.rawValue)")
+                if size == .ax3 {
+                    app.swipeUp(velocity: .slow)
+                    Thread.sleep(forTimeInterval: 1.0)
+                    write("properties-rows-scrolled-\(scheme)\(size.rawValue)")
+                }
             }
         }
+    }
+
+    func testCaptureHero100() {
+        for state in ["hero-100-confirm", "hero-100-str", "hero-100-str-long"] { capture(state) }
     }
 
     func testCaptureHeroGoalFirst() {
