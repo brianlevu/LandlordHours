@@ -190,7 +190,8 @@ final class LogTimeUITests: XCTestCase {
 
     func testAtTheFreeLimitThePropertyPickerShowsTheLock() {
         launch(seed: "limit", extra: ["-LHOpenLog", "pickerPropertyLimit"])
-        let unlock = app.buttons["lock.unlock"]
+        // Scoped to the picker: with ProGate merged, Today's "Your record" lock under the sheet has its own Unlock Pro.
+        let unlock = element("picker.property").buttons["lock.unlock"].firstMatch
         XCTAssertTrue(unlock.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Pine Cabin keeps tracking. Nothing is lost."].exists)
         unlock.tap()
