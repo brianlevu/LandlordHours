@@ -28,7 +28,7 @@ enum CaptureNotificationAction {
     static let notLandlordWork = "LANDLORDHOURS_ACTION_CAPTURE_DISMISS"
     /// Follow-up after "Log it" couldn't save safely; tapping it opens the confirm sheet.
     static let reviewCategoryIdentifier = "LANDLORDHOURS_CAPTURE_REVIEW"
-    /// Follow-up after "Not landlord work": offers to mute events like it.
+    /// Follow-up after "Not rental work": offers to mute events like it.
     static let muteOfferCategoryIdentifier = "LANDLORDHOURS_CAPTURE_MUTE_OFFER"
     static let mute = "LANDLORDHOURS_ACTION_CAPTURE_MUTE"
 
@@ -286,7 +286,7 @@ final class NotificationActionRouter {
 
     // MARK: Queued actions
 
-    /// Replays queued "Log it" / "Not landlord work" taps for the active profile. Run when the
+    /// Replays queued "Log it" / "Not rental work" taps for the active profile. Run when the
     /// initial iCloud pull completes and when the app comes to the foreground. A confirm whose
     /// pull is still pending stays queued. Returns each key's outcome.
     @discardableResult

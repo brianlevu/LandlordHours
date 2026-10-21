@@ -373,15 +373,18 @@ struct HouseHeroCard: View {
                                 .accessibilityIdentifier("today.hero.status")
                             }
                             if isLookingBack {
+                                // Wraps to three lines at large sizes instead of truncating.
                                 Text("Looking through your calendar")
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(HouseTokens.onHeroPrimary)
-                                    .lineLimit(2)
+                                    .lineLimit(3)
+                                    .fixedSize(horizontal: false, vertical: true)
                                     .accessibilityIdentifier("today.hero.lookingBack")
                                 Text("Rental work we find waits in your Inbox")
                                     .font(.footnote)
                                     .foregroundStyle(HouseTokens.onHeroSecondary)
-                                    .lineLimit(2)
+                                    .lineLimit(3)
+                                    .fixedSize(horizontal: false, vertical: true)
                             } else {
                                 Text(progress.stage.spokenName)
                                     .font(.subheadline.weight(.semibold))

@@ -180,7 +180,7 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(scrollTo(turnover))
         swipeDismiss(turnover)
         XCTAssertTrue(undo.waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["Marked not landlord work"].exists)
+        XCTAssertTrue(app.staticTexts["Marked not rental work"].exists)
         XCTAssertFalse(row("turnover").exists)
     }
 
@@ -221,7 +221,7 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(scrollTo(sam))
         sam.tap()
         XCTAssertTrue(app.descendants(matching: .any)["confirm.notSure"].waitForExistence(timeout: 5))
-        // The mute link scrolls under the pinned Log / Not landlord work bar: bring it clear first.
+        // The mute link scrolls under the pinned Log / Not rental work bar: bring it clear first.
         let mute = app.buttons["confirm.mute"]
         let pinnedTop = app.buttons["confirm.log"].frame.minY
         var swipes = 0
@@ -356,6 +356,9 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["today.lookingBack"].waitForExistence(timeout: 5),
                       "Today says the look-back is running, not \"Log your first hour\"")
         app.buttons["tab.logTime"].tap()
+        let close = app.buttons["log.close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        close.tap()
         XCTAssertTrue(app.buttons["tab.logTime"].waitForExistence(timeout: 3))
 
         // Come back: the same run, still streaming, with what it found so far.

@@ -53,7 +53,7 @@ struct ReportsView: View {
     @State private var selectedYear: Int = Calendar.current.component(.year, from: Date())
     @State private var selectedGoal: GoalMode = .reps750
     @State private var showingExportSheet = false
-    @State private var showingPaywall = false
+    @State private var paywall: ProPaywallRequest?
     @State private var showingParticipationSheet = false
 
     // MARK: Data
@@ -144,14 +144,7 @@ struct ReportsView: View {
             .sheet(isPresented: $showingExportSheet) {
                 ExportPDFView(year: selectedYear)
             }
-            .sheet(isPresented: $showingPaywall) {
-                PaywallView(
-                    context: .export,
-                    year: selectedYear,
-                    onUnlocked: { showingExportSheet = true },
-                    onClose: { showingPaywall = false }
-                )
-            }
+            .proPaywall($paywall)
             .sheet(isPresented: $showingParticipationSheet) {
                 ParticipationConfirmationSheet(
                     year: selectedYear,
@@ -182,11 +175,11 @@ struct ReportsView: View {
                 Button(action: exportAction) {
                     BPCapsuleButtonLabel(
                         title: "Export",
-                        symbol: subscriptionManager.isPro ? "square.and.arrow.up" : "lock.fill"
+                        symbol: "square.and.arrow.up"
                     )
                 }
                 .buttonStyle(.lhPressable)
-                .accessibilityLabel(subscriptionManager.isPro ? "Export report" : "Unlock export")
+                .accessibilityLabel("Export report")
                 .accessibilityIdentifier("reports.export")
             }
 
@@ -402,46 +395,66 @@ struct ReportsView: View {
 
     // MARK: Export
 
+    /// Free: the card is a `.row` locked preview (the Reports free preview); every report above
+    /// stays free. Pro: a plain link to the export.
+    @ViewBuilder
     private var exportCard: some View {
-        Button(action: exportAction) {
-            HStack(spacing: 14) {
-                Image(systemName: "doc.richtext")
-                    .font(.system(size: 22))
-                    .foregroundStyle(colors.action)
-                    .frame(width: 44, height: 44)
-                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(colors.actionSurface))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("The record your accountant gets")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(colors.textPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(subscriptionManager.isPro
-                         ? "PDF and CSV of every \(String(selectedYear)) entry, with where it came from."
-                         : "PDF and CSV export comes with Pro. Pay once.")
-                        .font(.subheadline)
-                        .foregroundStyle(colors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
-                Image(systemName: subscriptionManager.isPro ? "chevron.right" : "lock.fill")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(colors.textTertiary)
-                    .accessibilityHidden(true)
+        if ProGate.isExportLocked(isPro: subscriptionManager.isPro) {
+            LockedPreview(
+                size: .row,
+                entry: .reportsExport,
+                line: ProGate.lockLine(.reportsExport),
+                keeps: ProGate.keepsLine(.reportsExport),
+                onUnlock: openExportPaywall
+            ) {
+                exportCardRow.padding(16)
             }
-            .padding(16)
             .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
+        } else {
+            Button(action: exportAction) {
+                exportCardRow
+                    .padding(16)
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
+            }
+            .buttonStyle(.lhPressable)
+            .accessibilityIdentifier("reports.exportCard")
         }
-        .buttonStyle(.lhPressable)
-        .accessibilityIdentifier("reports.exportCard")
     }
 
-    private func exportAction() {
-        if viewModel.canExportPDF() {
-            showingExportSheet = true
-        } else {
-            showingPaywall = true
+    private var exportCardRow: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "doc.richtext")
+                .font(.system(size: 22))
+                .foregroundStyle(colors.action)
+                .frame(width: 44, height: 44)
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(colors.actionSurface))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("The record your accountant gets")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(colors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("PDF and CSV of every \(String(selectedYear)) entry, with where it came from.")
+                    .font(.subheadline)
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(colors.textTertiary)
+                .accessibilityHidden(true)
         }
+    }
+
+    /// Export always opens the Export page; a free user sees it as a locked preview there.
+    private func exportAction() {
+        showingExportSheet = true
+    }
+
+    private func openExportPaywall() {
+        paywall = ProPaywallRequest(context: .export, entry: .reportsExport, year: selectedYear,
+                                    onUnlocked: { showingExportSheet = true })
     }
 }
 

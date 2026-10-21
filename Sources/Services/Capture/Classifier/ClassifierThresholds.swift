@@ -23,10 +23,10 @@ import Foundation
 // fix precision (false positives were single strong signals at 0.82).
 
 enum ClassifierThresholds {
-    /// At or above: "landlord work" — a normal inbox card.
+    /// At or above: "rental work" — a normal inbox card.
     static let likely = 0.60
     /// Confidence floor for items with a landlord signal: they show as "Not sure this is
-    /// landlord work" (never hidden) and their confidence never drops below this.
+    /// rental work" (never hidden) and their confidence never drops below this.
     static let notSure = 0.30
     /// Classifier v2 "Not sure" band: an item shows as "Not sure" only with a rules score of at
     /// least `RulesEngine.notSureMinScore` (1.5), a property or alias match, or a model "yes"
@@ -52,12 +52,12 @@ enum ClassifierThresholds {
 /// How an inbox card presents a classification.
 enum ConfidenceBand: String, Equatable {
     case likely
-    /// "Not sure this is landlord work" — visible, never pre-selected.
+    /// "Not sure this is rental work" — visible, never pre-selected.
     case notSure
     /// No landlord signal at all: not suggested.
     case unlikely
 
-    static let notSureLabel = "Not sure this is landlord work"
+    static let notSureLabel = "Not sure this is rental work"
 }
 
 extension ClassifierThresholds {

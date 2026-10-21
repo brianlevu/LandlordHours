@@ -152,7 +152,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             )
         ]
 
-        // 2.0 end-of-event capture categories (Log it / Edit… / Not landlord work, follow-ups).
+        // 2.0 end-of-event capture categories (Log it / Edit… / Not rental work, follow-ups).
         center.setNotificationCategories(categories.union(CaptureNotificationCategories.all))
     }
 

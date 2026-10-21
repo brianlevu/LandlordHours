@@ -31,6 +31,7 @@ struct InboxView: View {
         .sheet(item: $model.sheetSuggestion) { suggestion in
             SuggestionConfirmSheet(suggestion: suggestion, model: model)
         }
+        .proPaywall($model.paywallRequest)
         .sheet(isPresented: $showSetup, onDismiss: { model.reload() }) {
             CaptureSetupFlow(mode: .whatsNew, environment: .current, startAtBackfill: setupStartsAtBackfill) { _ in
                 showSetup = false
@@ -117,21 +118,22 @@ struct InboxView: View {
         let propertyName = model.propertyName(for: suggestion)
         let badges = model.badges(for: suggestion)
         let quick = model.canQuickLog(suggestion)
+        let limit: InboxRowLimit = model.isWaitingOnPro(suggestion) ? .waiting : (model.needsNewRental(suggestion) ? .newPlace : .none)
         return VStack(alignment: .leading, spacing: 0) {
             Button {
                 model.sheetSuggestion = suggestion
             } label: {
-                SuggestionRowView(suggestion: suggestion, propertyName: propertyName, badges: badges)
+                SuggestionRowView(suggestion: suggestion, propertyName: propertyName, badges: badges, limit: limit)
             }
             .buttonStyle(.borderless)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(SuggestionRowView.accessibilityLabel(for: suggestion, propertyName: propertyName, badges: badges, now: InboxClock.now()))
+            .accessibilityLabel(SuggestionRowView.accessibilityLabel(for: suggestion, propertyName: propertyName, badges: badges, now: InboxClock.now(), limit: limit))
             .accessibilityHint("Opens the details to confirm")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction(named: quick ? "Log \(InboxFormat.hours(suggestion.proposedHours ?? 0))" : "Review and log") {
                 swipeLog(suggestion)
             }
-            .accessibilityAction(named: "Not landlord work") { dismiss(suggestion) }
+            .accessibilityAction(named: "Not rental work") { dismiss(suggestion) }
             .accessibilityIdentifier("inbox.row.\(suggestion.sourceKey)")
             // The visible next action on every row (2.0 onboarding: "Confirm the ones that were
             // rental work"). Confirm logs at once when everything is known; otherwise the sheet
@@ -161,7 +163,7 @@ struct InboxView: View {
             Button {
                 dismiss(suggestion)
             } label: {
-                Label("Not work", systemImage: "xmark")
+                Label("Not rental work", systemImage: "xmark")
                     .labelStyle(.iconOnly)
             }
             .tint(Color(hex: AppColors.Hex.textSecondary))
@@ -179,7 +181,7 @@ struct InboxView: View {
     private func dismiss(_ suggestion: Suggestion) {
         model.dismiss(suggestion)
         dismissTick += 1
-        UIAccessibility.post(notification: .announcement, argument: "Marked not landlord work. Undo is available.")
+        UIAccessibility.post(notification: .announcement, argument: "Marked not rental work. Undo is available.")
     }
 
     // MARK: Banner
@@ -274,6 +276,9 @@ struct InboxView: View {
 struct InboxUndoToast: View {
     let toast: InboxToast
     var onUndo: () -> Void
+    /// The shell toast (Log time, timer) has its own Undo; nil follows `toast.undo`.
+    var showsUndo: Bool? = nil
+    var identifier = "inbox.toast"
     @Environment(\.colorScheme) private var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
@@ -304,7 +309,7 @@ struct InboxUndoToast: View {
                 .foregroundStyle(colors.textPrimary)
                 .lineLimit(2)
             Spacer(minLength: 8)
-            if toast.undo != nil {
+            if showsUndo ?? (toast.undo != nil) {
                 Button("Undo", action: onUndo)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(colors.action)
@@ -323,6 +328,6 @@ struct InboxUndoToast: View {
         .overlay(Capsule().strokeBorder(colors.border, lineWidth: 1))
         .compositingGroup()
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("inbox.toast")
+        .accessibilityIdentifier(identifier)
     }
 }

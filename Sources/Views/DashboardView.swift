@@ -58,7 +58,11 @@ struct DashboardView: View {
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+    /// The Inbox's model (shell-owned): Today's To confirm reads and writes the same list, so the
+    /// count here, the Inbox and its tab badge are one number.
+    @ObservedObject var inbox: InboxViewModel
 
     private var currentYear: Int { Calendar.current.component(.year, from: Date()) }
     private var repsStatus: TaxQualificationEngine.REPSResult {
@@ -72,8 +76,6 @@ struct DashboardView: View {
     private var totalHours: Double { viewModel.houseCountableHours(goal: houseGoal, year: currentYear) }
     private var targetHours: Double { houseGoal.targetHours }
     private var isGoalMet: Bool { HouseProgress(hours: totalHours, goal: houseGoal).isGoalMet }
-    /// Hours still to log. The tests are "more than" the target, so exactly 750 still needs a bit.
-    private var remainingHours: Double { isGoalMet ? 0 : max(targetHours - totalHours, 0.01) }
     private var pace: TodayPace { TodayPace.resolve(hours: totalHours, goal: houseGoal) }
 
     /// What the hero draws: the live hours, or the pre-save hours while a confirm build waits to play.
@@ -117,47 +119,7 @@ struct DashboardView: View {
         return max(remaining, 1)
     }
 
-    private var weeksLeftInYear: Double {
-        max(Double(daysLeftInYear) / 7.0, 1.0)
-    }
-
-    private var hoursPerWeekNeeded: Double {
-        remainingHours / weeksLeftInYear
-    }
-
-    // This week hours by day
-    private var thisWeekHours: [Double] {
-        let cal = Calendar.current
-        let today = Date()
-        guard let weekStart = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: today)) else {
-            return Array(repeating: 0, count: 7)
-        }
-        var result: [Double] = []
-        for dayOffset in 0..<7 {
-            guard let day = cal.date(byAdding: .day, value: dayOffset, to: weekStart) else {
-                result.append(0)
-                continue
-            }
-            let dayHours = viewModel.timeEntries
-                .filter { cal.isDate($0.date, inSameDayAs: day) }
-                .reduce(0) { $0 + $1.hours }
-            result.append(dayHours)
-        }
-        return result
-    }
-
-    private var thisWeekTotal: Double {
-        thisWeekHours.reduce(0, +)
-    }
-
-    private var todayWeekdayIndex: Int {
-        let cal = Calendar.current
-        let weekday = cal.component(.weekday, from: Date())
-        // Convert Sunday=1 to Monday-first: Mon=0, Tue=1, ... Sun=6
-        return weekday == 1 ? 6 : weekday - 2
-    }
-
-    @State private var showPaywall = false
+    @State private var showRecordExport = false
     // The header line follows the hero: it keeps the pre-save total until the count-up lands.
     @State private var subtitleHoursOverride: Double?
     private var headerHours: Double { subtitleHoursOverride ?? totalHours }
@@ -178,7 +140,33 @@ struct DashboardView: View {
 
     @ObservedObject private var backfill = BackfillJob.shared
     /// Backfill items in the Inbox (the same count as its tab badge), for the look-back card.
-    var inboxBackfillCount = 0
+    private var inboxBackfillCount: Int { inbox.backfillCount }
+    @State private var showCaptureSetup = false
+
+    // MARK: Below the house
+
+    /// To confirm. A new owner who said "Not now" to the calendar already has "Find hours in my
+    /// calendar" under the hero, so the block stays out of the way until they turn it on.
+    private var confirmState: TodayConfirm.State {
+        if isNewOwner && !calendarSuggestionsOn && inbox.badgeCount == 0 { return .hidden }
+        return TodayConfirm.state(
+            hasProperties: !viewModel.properties.isEmpty,
+            pendingCount: inbox.badgeCount,
+            backfillScanning: backfill.isScanning,
+            captureOn: calendarSuggestionsOn
+        )
+    }
+
+    /// This week's countable hours, Monday first, with the house's spouse rule.
+    private var weekDays: [TodayWeekDay] {
+        TodayWeek.days(entries: viewModel.timeEntries, goal: houseGoal,
+                       includeSpouse: viewModel.tracksSpouseJointly, now: InboxClock.now())
+    }
+
+    private var showsRecordSlot: Bool {
+        !hoursPending && !viewModel.timeEntries.isEmpty
+            && TodayRecordSlot.isShown(isPro: subscriptionManager.isPro, confirmedHours: totalHours)
+    }
 
     private var mode: TodayPresentation.Mode {
         TodayPresentation.mode(
@@ -273,6 +261,7 @@ struct DashboardView: View {
             ZStack {
                 LHMobileCanvas()
 
+                ScrollViewReader { scroller in
                 ScrollView(showsIndicators: false) {
                     GeometryReader { proxy in
                         Color.clear
@@ -291,21 +280,47 @@ struct DashboardView: View {
                         if isNewOwner && !calendarSuggestionsOn {
                             findHoursCard
                         }
-                        if mode == .lookingBack {
-                            BackfillProgressHeader(job: backfill, found: inboxBackfillCount, onRetry: {}, onOpen: {
-                                NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex)
-                            })
-                            .accessibilityAddTraits(.isButton)
-                            .accessibilityHint("Opens your Inbox")
-                            .accessibilityIdentifier("today.lookingBack")
-                        } else if shouldShowActivationCard {
-                            homeActivationCard
-                        } else if !isNewOwner {
-                            learningShortcutCard
+                        // Below the house (redesign-specs §2): timer/draft slot → To confirm →
+                        // This week → pace cards → Your record (free only).
+                        VStack(alignment: .leading, spacing: 32) {
+                            TodayTimerSlot()
+                                .id("today.section.draft")
+                            if mode == .lookingBack && viewModel.properties.isEmpty {
+                                // No property yet: the To confirm block is hidden, so WP-L's
+                                // look-back card says the scan is running.
+                                BackfillProgressHeader(job: backfill, found: inboxBackfillCount, onRetry: {}, onOpen: {
+                                    NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex)
+                                })
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityHint("Opens your Inbox")
+                                .accessibilityIdentifier("today.lookingBack")
+                            }
+                            TodayConfirmSection(
+                                inbox: inbox,
+                                state: confirmState,
+                                isScanning: backfill.isScanning,
+                                onSeeAll: { NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex) },
+                                onTurnOn: { showCaptureSetup = true }
+                            )
+                            .id("today.section.confirm")
+                            if shouldShowActivationCard {
+                                homeActivationCard
+                            }
+                            if !viewModel.properties.isEmpty {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    TodayWeekSection(days: weekDays) { _ in
+                                        NotificationCenter.default.post(name: .switchToTab, object: ShellTab.recordsIndex)
+                                    }
+                                    paceCards
+                                }
+                                .id("today.section.week")
+                            }
+                            if showsRecordSlot {
+                                TodayRecordSlot(year: currentYear, confirmedHours: totalHours) { showRecordExport = true }
+                                    .id("today.section.record")
+                            }
                         }
-                        recentEntriesSection
-                        thisWeekCard
-                        trialStatusNudge
+                        .padding(.top, 10)
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 8)
@@ -314,9 +329,22 @@ struct DashboardView: View {
                     .lhMotion(AppAnimation.standard, value: hoursPending)
                 }
                 .coordinateSpace(name: "dashboardScroll")
+                #if DEBUG
+                .task {
+                    TodayDebugSeed.applyIfNeeded(app: viewModel)
+                    inbox.reload()
+                    refreshNewOwnerState()
+                    guard let target = TodayDebugSeed.scrollTarget else { return }
+                    try? await Task.sleep(nanoseconds: 700_000_000)
+                    scroller.scrollTo("today.section.\(target)", anchor: target == "week" ? .top : .center)
+                }
+                #endif
+                }
                 .onPreferenceChange(DashboardScrollOffsetPreferenceKey.self) { value in
                     scrollOffset = value
                 }
+                // The hero never scrolls under the status bar (the sandbox's top edge).
+                .overlay(alignment: .top) { TodayTopEdgeFade() }
                 .overlay(alignment: .top) {
                     if isCompactHeaderVisible {
                         compactDashboardBar
@@ -327,8 +355,22 @@ struct DashboardView: View {
                 }
             }
             .navigationBarHidden(true)
-            .sheet(isPresented: $showPaywall) {
-                PaywallView(context: .dashboardUnlock, onClose: { showPaywall = false })
+            .sheet(isPresented: $showRecordExport) {
+                ExportPDFView(year: currentYear)
+            }
+            // Tapping a To confirm row (or a confirm that needs a decision) opens the Inbox's own
+            // confirm sheet, on the Inbox's own model.
+            .sheet(item: $inbox.sheetSuggestion) { suggestion in
+                SuggestionConfirmSheet(suggestion: suggestion, model: inbox)
+            }
+            .sheet(isPresented: $showCaptureSetup, onDismiss: {
+                refreshNewOwnerState()
+                inbox.reload()
+            }) {
+                CaptureSetupFlow(mode: .whatsNew, environment: .current, startAtBackfill: false) { _ in
+                    showCaptureSetup = false
+                }
+                .environmentObject(viewModel)
             }
             .navigationDestination(isPresented: $showLearningCenter) {
                 LearningCenterView()
@@ -490,7 +532,8 @@ struct DashboardView: View {
                                 .fill(colors.backgroundSecondary)
                                 .frame(width: 22, height: 22)
                                 .overlay {
-                                    LucideIcon(image: Lucide.settings, size: 12)
+                                    Image(systemName: "gearshape.fill")
+                                        .font(.system(size: 11, weight: .semibold))
                                         .foregroundStyle(colors.textSecondary)
                                 }
                                 .overlay {
@@ -508,7 +551,8 @@ struct DashboardView: View {
                 Button {
                     NotificationCenter.default.post(name: .switchToTab, object: 3)
                 } label: {
-                    LucideIcon(image: Lucide.chartColumnIncreasing, size: 22)
+                    Image(systemName: "chart.bar")
+                        .font(.system(size: 19, weight: .semibold))
                         .foregroundStyle(colors.textPrimary)
                         .frame(width: 48, height: 48)
                         .background(colors.backgroundTertiary)
@@ -535,8 +579,7 @@ struct DashboardView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            // The empty lot's own "Add property" is the one action until a property exists.
-            if !viewModel.properties.isEmpty { quickActionsRow }
+            // 2.0: the action chips are gone (redesign-specs §2); "+" in the tab bar logs time.
         }
     }
 
@@ -572,7 +615,8 @@ struct DashboardView: View {
                 NotificationCenter.default.post(name: .switchToTab, object: 2)
             } label: {
                 HStack(spacing: 6) {
-                    LucideIcon(image: Lucide.plus, size: 14)
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .bold))
                     Text("Log")
                         .font(.system(size: 13, weight: .black, design: .rounded))
                 }
@@ -655,123 +699,6 @@ struct DashboardView: View {
         return String(source.prefix(2)).uppercased()
     }
 
-    // MARK: - Home Commands
-    @ViewBuilder
-    private var quickActionsRow: some View {
-        if viewModel.properties.isEmpty {
-            HStack(spacing: 10) {
-                dashboardPrimaryPill("Add property", icon: Lucide.building2) {
-                    openAddPropertyFromHome()
-                }
-                dashboardSecondaryPill("What counts", icon: Lucide.bookOpenText, width: 138) {
-                    showLearningCenter = true
-                }
-            }
-        } else if viewModel.timeEntries.isEmpty {
-            HStack(spacing: 10) {
-                dashboardPrimaryPill("Log time", icon: Lucide.clock) {
-                    NotificationCenter.default.post(name: .switchToTab, object: 2)
-                }
-                dashboardSecondaryPill("Learn", icon: Lucide.bookOpenText, width: 92) {
-                    showLearningCenter = true
-                }
-                dashboardSecondaryPill("Property", icon: Lucide.building2, width: 104) {
-                    NotificationCenter.default.post(name: .switchToTab, object: 1)
-                }
-            }
-        } else {
-            HStack(spacing: 10) {
-                dashboardPrimaryPill("Log time", icon: Lucide.clock) {
-                    NotificationCenter.default.post(name: .switchToTab, object: 2)
-                }
-                dashboardSecondaryPill("Entries", icon: Lucide.list, width: 98) {
-                    showHistory = true
-                }
-                dashboardSecondaryPill("Reports", icon: Lucide.chartColumnIncreasing, width: 100) {
-                    NotificationCenter.default.post(name: .switchToTab, object: 3)
-                }
-            }
-        }
-    }
-
-    private func dashboardPrimaryPill(_ title: String, icon: UIImage, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                LucideIcon(image: icon, size: 17)
-                Text(title)
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-            }
-            .foregroundStyle(AppColors.onAction)
-            .frame(maxWidth: .infinity)
-            .frame(height: 50)
-            .background(colors.action)
-            .clipShape(Capsule())
-        }
-        .buttonStyle(.lhPressable)
-        .accessibilityLabel(title)
-    }
-
-    private func dashboardSecondaryPill(_ title: String, icon: UIImage, width: CGFloat, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                LucideIcon(image: icon, size: 15)
-                Text(title)
-                    .font(.system(size: 14, weight: .black, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-            }
-            .foregroundStyle(colors.textPrimary)
-            .frame(width: width)
-            .frame(height: 50)
-            .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.72 : 1))
-            .clipShape(Capsule())
-            .overlay {
-                Capsule()
-                    .strokeBorder(colors.border.opacity(0.35), lineWidth: 1)
-            }
-        }
-        .buttonStyle(.lhPressable)
-        .accessibilityLabel(title)
-    }
-
-    // MARK: - Pro Status Nudge
-    @ViewBuilder
-    private var trialStatusNudge: some View {
-        if !subscriptionManager.isPro && shouldShowProNudge {
-            Button { showPaywall = true } label: {
-                HStack(spacing: 12) {
-                    LHIconTile(icon: Lucide.sparkles, color: AppColors.primary, wash: colors.primarySurface, size: 44, isActive: true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Unlock Pro")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(colors.textPrimary)
-                        Text("Buy lifetime access for exports and unlimited properties.")
-                            .font(.system(size: 11, design: .rounded))
-                            .foregroundStyle(colors.textSecondary)
-                    }
-                    Spacer()
-                    Text("Upgrade")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppColors.onAction)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(AppColors.action)
-                        .clipShape(Capsule())
-                }
-                .padding(14)
-                .lhSurfaceCard(cornerRadius: 20)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("dashboard.unlockPro")
-        }
-    }
-
-    private var shouldShowProNudge: Bool {
-        !viewModel.properties.isEmpty && !viewModel.timeEntries.isEmpty
-    }
-
     // MARK: - House hero
     private var houseHero: some View {
         VStack(spacing: 12) {
@@ -795,32 +722,42 @@ struct DashboardView: View {
             .accessibilityLabel(heroAccessibilityLabel)
             .accessibilityIdentifier("today.hero")
 
-            // The empty lot (no property yet) shows no pace maths: nothing can be counted.
-            if !viewModel.properties.isEmpty {
-            HStack(alignment: .top, spacing: 12) {
-                if isREPS {
-                    dashboardMiniMetric(
-                        title: "50% rule",
-                        value: fiftyPercentValue,
-                        detail: fiftyPercentDetail,
-                        isPending: hoursPending
-                    )
-                    .accessibilityIdentifier("dashboard.fiftyPercent")
-                } else {
-                    dashboardMiniMetric(title: "Days left", value: "\(daysLeftInYear)")
-                }
-                if isGoalMet && !hoursPending {
-                    dashboardMiniMetric(title: "Goal hours", value: "Reached")
-                } else {
-                    dashboardMiniMetric(
-                        title: "To finish on time",
-                        value: "\(Int(hoursPerWeekNeeded.rounded(.up)))h a week",
-                        isPending: hoursPending
-                    )
-                }
-            }
+        }
+    }
+
+    // MARK: - Pace cards (2-up; stacked from XXL)
+
+    /// The empty lot (no property yet) shows no pace maths: nothing can be counted.
+    @ViewBuilder
+    private var paceCards: some View {
+        if !viewModel.properties.isEmpty {
+            // Stacked from XXL (the week list switches at the same size): "53h a week" never wraps.
+            let layout = dynamicTypeSize >= .xxLarge
+                ? AnyLayout(VStackLayout(spacing: 12))
+                : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+            layout {
+                TodayPaceCard(model: ruleCard, isPending: hoursPending)
+                    .accessibilityIdentifier(isREPS ? "dashboard.fiftyPercent" : "dashboard.daysLeft")
+                TodayPaceCard(model: TodayPaceCards.finish(hours: totalHours, goal: houseGoal, pace: pace, now: Date()),
+                              isPending: hoursPending)
+                    .accessibilityIdentifier("dashboard.finishPace")
             }
         }
+    }
+
+    /// REPS: the 50% rule (never checked until other work hours exist). Material participation:
+    /// days left in the year.
+    private var ruleCard: TodayPaceCardModel {
+        guard isREPS else {
+            return TodayPaceCardModel(label: "Days left", value: "\(daysLeftInYear)", status: "in \(currentYear)", tone: .neutral)
+        }
+        let tone: TodayPaceCardModel.Tone
+        switch repsStatus.moreThanHalfStatus {
+        case .notMet: tone = .caution
+        case .met: tone = .positive
+        case .notEntered: tone = .neutral
+        }
+        return TodayPaceCardModel(label: "50% rule", value: fiftyPercentValue, status: fiftyPercentDetail ?? "Met: over half your work hours", tone: tone)
     }
 
     private var heroStatusTone: HouseStatusTone {
@@ -845,52 +782,6 @@ struct DashboardView: View {
             return "\(currentYear). \(live.accessibilityLabel) \(hours) found in your calendar, not counted until you confirm."
         case nil:
             return "\(currentYear). \(live.accessibilityLabel) \(pace.text)."
-        }
-    }
-
-    private func dashboardMiniMetric(title: String, value: String, detail: String? = nil, isPending: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.system(.caption, design: .rounded, weight: .bold))
-                .foregroundStyle(colors.textSecondary)
-            Text(value)
-                .font(.system(.callout, design: .rounded, weight: .black))
-                .monospacedDigit()
-                .foregroundStyle(colors.textPrimary)
-                .opacity(isPending ? 0 : 1)
-                .overlay(alignment: .leading) {
-                    if isPending {
-                        PlaceholderBar(width: 72, height: 14)
-                            .transition(.opacity)
-                    }
-                }
-                .accessibilityLabel(isPending ? "Loading" : value)
-            if let detail {
-                // While pending the words are laid out but hidden, so the card already has its
-                // settled height and nothing below it moves when the hours land.
-                Text(detail)
-                    .font(.system(.caption, design: .rounded, weight: .medium))
-                    .foregroundStyle(colors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .opacity(isPending ? 0 : 1)
-                    .overlay(alignment: .topLeading) {
-                        if isPending {
-                            PlaceholderBar(width: 96, height: 10)
-                                .padding(.top, 3)
-                                .transition(.opacity)
-                        }
-                    }
-                    .accessibilityHidden(isPending)
-            }
-        }
-        .accessibilityElement(children: .combine)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(colors.border.opacity(0.28), lineWidth: 1)
         }
     }
 
@@ -1049,183 +940,6 @@ struct DashboardView: View {
         .accessibilityIdentifier(accessibilityIdentifier)
     }
 
-    // MARK: - This Week Card
-    private var thisWeekCard: some View {
-        VStack(spacing: 14) {
-            // Header
-            HStack {
-                Text("This Week")
-                    .font(.system(size: 19, weight: .black, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                Spacer()
-                Text(String(format: "%.1fh", thisWeekTotal))
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-            }
-
-            // Day grid
-            let dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-            HStack(spacing: 0) {
-                ForEach(0..<7, id: \.self) { i in
-                    VStack(spacing: 6) {
-                        let hours = thisWeekHours[i]
-                        let isToday = i == todayWeekdayIndex
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(
-                                    isToday ? colors.action :
-                                    hours > 0 ? AppColors.sageWash :
-                                    colors.backgroundTertiary
-                                )
-                                .frame(width: 30, height: 30)
-
-                            if hours > 0 {
-                                Text(String(format: "%.0f", hours))
-                                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .foregroundStyle(isToday ? colors.onAction : colors.textPrimary)
-                            } else {
-                                Text("\u{2013}")
-                                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .foregroundStyle(isToday ? colors.onAction : colors.textSecondary)
-                            }
-                        }
-                        Text(dayLabels[i])
-                            .font(.system(size: 10, design: .rounded))
-                            .foregroundStyle(colors.textTertiary)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-            }
-        }
-        .padding(20)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .stroke(colors.border.opacity(0.28), lineWidth: 1)
-        }
-    }
-
-    // MARK: - Recent Entries
-    private var recentEntriesSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            // Section header
-            HStack {
-                Text("Recent Activity")
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                Spacer()
-                if !recentEntries.isEmpty {
-                    NavigationLink {
-                        HistoryView()
-                    } label: {
-                        HStack(spacing: 2) {
-                            Text("See all")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(colors.actionText)
-                            LucideIcon(image: Lucide.chevronRight, size: 14)
-                                .foregroundStyle(colors.actionText)
-                        }
-                    }
-                }
-            }
-
-            if recentEntries.isEmpty {
-                emptyRecentCard
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(recentEntries.enumerated()), id: \.element.id) { index, entry in
-                        NavigationLink {
-                            TimeEntryDetailView(entry: entry)
-                        } label: {
-                            EntryListRow(
-                                entry: entry,
-                                propertyName: viewModel.properties.first { $0.id == entry.propertyId }?.name ?? "Unknown"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        if index < recentEntries.count - 1 {
-                            Divider()
-                                .padding(.leading, 72)
-                        }
-                    }
-                }
-                .background(colors.backgroundSecondary)
-                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 26, style: .continuous)
-                        .stroke(colors.border.opacity(0.28), lineWidth: 1)
-                }
-            }
-        }
-    }
-
-    private var emptyRecentCard: some View {
-        VStack(spacing: 12) {
-            JellyBadge(systemName: "clock", color: AppColors.primary, wash: colors.primarySurface, size: 56)
-            Text("No entries yet")
-                .font(AppTypography.subheadline)
-                .foregroundStyle(colors.textPrimary)
-            Text("Tap Track to log your first hours")
-                .font(AppTypography.body)
-                .foregroundStyle(colors.textSecondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.xl))
-    }
-
-    // MARK: - Learning Shortcut
-    private var learningShortcutCard: some View {
-        NavigationLink {
-            LearningCenterView()
-        } label: {
-            HStack(alignment: .center, spacing: 14) {
-                LHIconTile(
-                    icon: Lucide.bookOpenText,
-                    color: AppColors.primary,
-                    wash: colors.primarySurface,
-                    size: 46,
-                    isActive: true
-                )
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Learn what counts")
-                        .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-
-                    Text("REPS, STR rules, and audit-ready logs.")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                        .lineSpacing(2)
-                        .multilineTextAlignment(.leading)
-                }
-
-                Spacer(minLength: 8)
-
-                LucideIcon(image: Lucide.chevronRight, size: 18)
-                    .foregroundStyle(colors.textTertiary)
-                    .frame(width: 32, height: 32)
-                    .background(colors.backgroundTertiary)
-                    .clipShape(Circle())
-            }
-            .padding(18)
-            .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(colors.border.opacity(0.28), lineWidth: 1)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Open learning center. Learn what counts for rental tax tracking.")
-    }
-
-    // MARK: - Computed
-    private var recentEntries: [TimeEntry] {
-        Array(viewModel.timeEntries.sorted { $0.date > $1.date }.prefix(5))
-    }
 }
 
 // MARK: - Shared Entry Row (used in Dashboard & History)
@@ -1326,7 +1040,89 @@ private struct DashboardScrollOffsetPreferenceKey: PreferenceKey {
 }
 
 #Preview {
-    DashboardView()
+    DashboardView(inbox: InboxViewModel(app: nil, storeProvider: { nil }))
         .environmentObject(AppViewModel())
         .environmentObject(GoalManager.shared)
+}
+
+/// Today's "Your record" card for a free user: a page thumbnail with its top third sharp, the rest
+/// under the lock. "Unlock Pro" opens the paywall about the user's own hours; afterwards it opens
+/// the export.
+struct TodayRecordLockCard: View {
+    let year: Int
+    let confirmedHours: Double
+    /// Runs after a purchase. The card itself disappears once Pro is on, so Today owns what comes next.
+    var onUnlocked: () -> Void
+    @EnvironmentObject private var viewModel: AppViewModel
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var page: RecordPageModel?
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    private static let pageHeight: CGFloat = 300
+    private static let sharpPage: CGFloat = 104
+
+    var body: some View {
+        LockedPreview(
+            size: .card,
+            entry: .todayRecord,
+            line: ProGate.lockLine(.todayRecord, confirmedHours: confirmedHours),
+            keeps: ProGate.keepsLine(.todayRecord),
+            surface: colors.backgroundSecondary,
+            onUnlock: {
+                ProPaywallPresenter.shared.present(entry: .todayRecord, confirmedHours: confirmedHours, onUnlocked: onUnlocked)
+            }
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    Image(systemName: "doc.richtext").font(.system(size: 20)).foregroundStyle(colors.action)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Your \(String(year)) record").font(.headline).foregroundStyle(colors.textPrimary)
+                        Text("PDF and spreadsheet · \(entryCount) \(entryCount == 1 ? "entry" : "entries")")
+                            .font(.subheadline).foregroundStyle(colors.textSecondary)
+                    }
+                }
+                pageView
+                    .frame(height: Self.sharpPage, alignment: .top)
+                    .clipShape(UnevenRoundedRectangle(topLeadingRadius: 10, topTrailingRadius: 10, style: .continuous))
+            }
+            .padding([.horizontal, .top], 16)
+        } locked: {
+            pageView
+                .offset(y: -Self.sharpPage)
+                .frame(height: Self.pageHeight - Self.sharpPage, alignment: .top)
+                .clipped()
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+        }
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(colors.backgroundSecondary))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("today.yourRecord")
+        .task { await load() }
+    }
+
+    private var entryCount: Int {
+        viewModel.timeEntries.filter { Calendar.current.component(.year, from: $0.date) == year }.count
+    }
+
+    @ViewBuilder private var pageView: some View {
+        Group {
+            if let page {
+                RecordPagePreview(model: page)
+            } else {
+                DraftingLoader(sketch: .document, surface: .adaptive, subject: "your record")
+                    .padding(40)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .frame(height: Self.pageHeight, alignment: .top)
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(colors.border, lineWidth: 0.5))
+    }
+
+    private func load() async {
+        guard page == nil else { return }
+        page = await RecordPageModel.load(entries: viewModel.timeEntries, properties: viewModel.properties,
+                                          owner: viewModel.userName, year: year)
+    }
 }

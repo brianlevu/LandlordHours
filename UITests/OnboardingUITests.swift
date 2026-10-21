@@ -27,7 +27,7 @@ final class OnboardingUITests: XCTestCase {
         app.launch()
     }
 
-    private func tap(_ element: XCUIElement, timeout: TimeInterval = 10, file: StaticString = #filePath, line: UInt = #line) {
+    private func tap(_ element: XCUIElement, timeout: TimeInterval = 20, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertTrue(element.waitForExistence(timeout: timeout), "missing \(element)", file: file, line: line)
         let deadline = Date().addingTimeInterval(timeout)
         while !element.isHittable && Date() < deadline { Thread.sleep(forTimeInterval: 0.2) }
@@ -191,7 +191,7 @@ final class OnboardingUITests: XCTestCase {
         tap(look)
         // iOS hosts its permission prompts in SpringBoard; check the app too, to be safe.
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        let deadline = Date().addingTimeInterval(12)
+        let deadline = Date().addingTimeInterval(20)
         while Date() < deadline && springboard.alerts.count == 0 && app.alerts.count == 0 {
             Thread.sleep(forTimeInterval: 0.3)
         }

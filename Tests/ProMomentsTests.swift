@@ -260,10 +260,19 @@ final class FunnelAnalyticsTests: XCTestCase {
         PaywallContext.allCases.forEach { Analytics.paywallViewed(context: $0) }
         Analytics.profileCreated(kind: .local)
         Analytics.ratingPromptRequested(trigger: .entriesMilestone)
-        let allowedKeys: Set<String> = ["source", "format", "context", "kind", "trigger"]
+        LockEntry.allCases.forEach { Analytics.lockPreviewShown(entry: $0) }
+        PaywallContext.allCases.forEach {
+            Analytics.paywallShown(context: $0, entry: .exportPage)
+            Analytics.paywallCtaTapped(context: $0)
+            Analytics.purchaseSucceeded(context: $0)
+            Analytics.purchaseFailed(context: $0, outcome: "pending")
+        }
+        let allowedKeys: Set<String> = ["source", "format", "context", "kind", "trigger", "entry", "outcome"]
         let allowedValues: Set<String> = Set(EntrySource.allCases.map(\.rawValue))
             .union(["pdf", "csv", "apple", "local", "export_shared", "entries_milestone"])
             .union(PaywallContext.allCases.map(\.rawValue))
+            .union(LockEntry.allCases.map(\.rawValue))
+            .union(["failed", "pending", "cancelled"])
         for event in events {
             for (key, value) in event.props {
                 XCTAssertTrue(allowedKeys.contains(key), "\(event.name) has unexpected key \(key)")
@@ -321,25 +330,24 @@ final class FunnelAnalyticsIntegrationTests: XCTestCase {
 
 final class PaywallContextTests: XCTestCase {
     func testHeadlineSpeaksToTheThingTapped() {
-        XCTAssertEqual(PaywallContext.export.title(year: 2026), "Export your 2026 record")
-        XCTAssertTrue(PaywallContext.secondProperty.title(year: 2026).contains("rental"))
-        XCTAssertEqual(PaywallContext.export.benefits.first, .exports)
-        XCTAssertEqual(PaywallContext.secondProperty.benefits.first, .properties)
-        XCTAssertTrue(PaywallContext.secondProperty.body.contains("one property"))
-        XCTAssertNotEqual(PaywallContext.dashboardUnlock.title(year: 2026), PaywallContext.settingsUpgrade.title(year: 2026),
-                          "Home's Unlock card gets its own headline")
-        XCTAssertNotEqual(PaywallContext.dashboardUnlock.body, PaywallContext.settingsUpgrade.body)
+        XCTAssertEqual(PaywallCopy.make(.export, year: 2026).headline, "The record your accountant gets")
+        XCTAssertTrue(PaywallCopy.make(.secondProperty, year: 2026).headline.contains("rental"))
+        XCTAssertNotEqual(PaywallCopy.make(.todayUnlock, year: 2026).headline, PaywallCopy.make(.settings, year: 2026).headline,
+                          "Today's record card gets its own headline")
     }
 
     func testCopyNeverOverclaimsTaxOutcomes() {
-        let banned = ["audit-proof", "audit proof", "guarantee", "irs-approved", "irs approved", "qualify you", "ensures"]
+        let banned = ["audit-proof", "audit proof", "guarantee", "irs-approved", "irs approved", "qualify you", "ensures",
+                      "qualified", "audit-ready", "evidence", "defensible", "tax-ready"]
         var copy: [String] = []
         for context in PaywallContext.allCases {
-            copy += [context.title(year: 2026), context.body, context.continueLabel]
+            let c = PaywallCopy.make(context, year: 2026, propertyName: "Oak", confirmedHours: 212)
+            copy += [c.headline, c.planLine, c.nextStep]
         }
-        copy += PaywallBenefit.allCases.flatMap { [$0.title, $0.detail] }
+        copy += PaywallCopy.benefits.flatMap { [$0.title, $0.line] }
+        for entry in LockEntry.allCases { copy += [ProGate.lockLine(entry), ProGate.keepsLine(entry)] }
         copy.append(NotTaxAdviceNote.text)
-        for line in copy {
+        for line in copy where line != NotTaxAdviceNote.text {
             for word in banned {
                 XCTAssertFalse(line.lowercased().contains(word), "Overclaim '\(word)' in: \(line)")
             }

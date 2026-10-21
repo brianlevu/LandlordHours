@@ -56,7 +56,7 @@ final class SystemCaptureNotificationCenter: CaptureNotificationCenter {
 // in `CaptureNotificationAction` (NotificationActionRouter.swift).
 
 enum CaptureNotificationCategories {
-    /// End-of-event prompt: Log it / Edit… / Not landlord work.
+    /// End-of-event prompt: Log it / Edit… / Not rental work.
     static var suggestion: UNNotificationCategory {
         UNNotificationCategory(
             identifier: CaptureNotificationAction.categoryIdentifier,
@@ -66,7 +66,7 @@ enum CaptureNotificationCategories {
                                      options: [.authenticationRequired]),
                 UNNotificationAction(identifier: CaptureNotificationAction.edit, title: "Edit…",
                                      options: [.foreground]),
-                UNNotificationAction(identifier: CaptureNotificationAction.notLandlordWork, title: "Not landlord work",
+                UNNotificationAction(identifier: CaptureNotificationAction.notLandlordWork, title: "Not rental work",
                                      options: [])
             ],
             intentIdentifiers: [],
@@ -87,7 +87,7 @@ enum CaptureNotificationCategories {
         )
     }
 
-    /// Follow-up after "Not landlord work": offers to stop suggesting events like it.
+    /// Follow-up after "Not rental work": offers to stop suggesting events like it.
     static var muteOffer: UNNotificationCategory {
         UNNotificationCategory(
             identifier: CaptureNotificationAction.muteOfferCategoryIdentifier,

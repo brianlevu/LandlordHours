@@ -409,7 +409,7 @@ final class EndOfEventSchedulerTests: XCTestCase {
     func testCategoriesHaveTheThreeActions() {
         let category = CaptureNotificationCategories.suggestion
         XCTAssertEqual(category.identifier, CaptureNotificationAction.categoryIdentifier)
-        XCTAssertEqual(category.actions.map(\.title), ["Log it", "Edit…", "Not landlord work"])
+        XCTAssertEqual(category.actions.map(\.title), ["Log it", "Edit…", "Not rental work"])
         let logIt = category.actions[0]
         XCTAssertTrue(logIt.options.contains(.authenticationRequired))
         XCTAssertFalse(logIt.options.contains(.foreground), "Log it runs in the background")
