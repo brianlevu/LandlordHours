@@ -52,7 +52,7 @@ final class SignInReplacementUITests: XCTestCase {
         XCTAssertTrue(profileB.waitForExistence(timeout: 5))
         profileB.tap()
 
-        let confirm = app.buttons["switchConfirm.switch"]
+        let confirm = app.alerts["Open these records?"].buttons["Open"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         confirm.tap()
 
@@ -144,7 +144,7 @@ final class SignInReplacementUITests: XCTestCase {
         XCTAssertTrue(app.buttons["restore.profile.email-old.profile@example.com"].waitForExistence(timeout: 5))
         settle()
         attach("05-settings-restore-sheet-\(scheme)")
-        app.buttons["Cancel"].firstMatch.tap()
+        app.buttons["restore.close"].firstMatch.tap()
 
         // 6. Settings › Switch profile + Delete all data rows.
         let switchRow = app.buttons["settings.switchProfile"]

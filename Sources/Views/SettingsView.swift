@@ -9,6 +9,9 @@ import PhotosUI
 // docs/design/2.0-hifi-reference-spec.md §j.
 
 struct SettingsView: View {
+    #if DEBUG
+    @MainActor private static var didApplyDebugRoute = false
+    #endif
     @EnvironmentObject var viewModel: AppViewModel
     @EnvironmentObject var categoryManager: CategoryManager
     @StateObject private var subscriptionManager = SubscriptionManager.shared
@@ -75,7 +78,7 @@ struct SettingsView: View {
                 appSection
                 privacySection
                 supportSection
-                SettingsAccountSection()
+                SettingsAccountSection(onDeleteData: { route = .deleteData })
 
                 Section {
                     VStack(alignment: .leading, spacing: 12) {
@@ -108,6 +111,7 @@ struct SettingsView: View {
                 case .learningCenter: LearningCenterView()
                 case .contactSupport: ContactSupportView()
                 case .muted: MutedSuggestionsView()
+                case .deleteData: DeleteAllDataView()
                 }
             }
             .alert("Restore purchase", isPresented: Binding(
@@ -133,6 +137,20 @@ struct SettingsView: View {
                 }
             }
             .task(id: viewModel.isSignedIn) {
+                #if DEBUG
+                // Before the profile discovery below, which can wait on iCloud for a long time on
+                // a signed-in device. `.task` re-runs when Settings reappears after a pop, so the
+                // page opens once per launch.
+                if !Self.didApplyDebugRoute {
+                    if ProcessInfo.processInfo.arguments.contains("-LHOpenDeleteData") {
+                        Self.didApplyDebugRoute = true
+                        route = .deleteData
+                    } else if ProcessInfo.processInfo.arguments.contains("-LHOpenLearningCenterFromSettings") {
+                        Self.didApplyDebugRoute = true
+                        route = .learningCenter
+                    }
+                }
+                #endif
                 restorableProfiles = await viewModel.discoverRestorableProfiles()
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("-LHOpenRestoreSheet"), !restorableProfiles.isEmpty {
@@ -556,7 +574,7 @@ struct ProfileAvatar: View {
 /// Settings' pushed screens. Buttons + one destination (not NavigationLinks in the List), so
 /// each row is a plain button for VoiceOver and UI tests, with its own chevron.
 enum SettingsRoute: Hashable {
-    case taxProfile, learningCenter, contactSupport, muted
+    case taxProfile, learningCenter, contactSupport, muted, deleteData
 }
 
 private struct AutoCaptureSettingsSection: View {

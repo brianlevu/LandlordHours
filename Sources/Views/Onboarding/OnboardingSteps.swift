@@ -39,7 +39,8 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
             }
             .padding(.horizontal, 24)
             .padding(.top, 22)
-            .padding(.bottom, 36)
+            // Room for the last line to scroll clear of the fade above the pinned actions.
+            .padding(.bottom, typeSize.isAccessibilitySize ? 80 : 36)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .onChange(of: scrollTarget) { _, target in
@@ -71,12 +72,15 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
             .background(alignment: .top) {
                 // Clear for the first part, so a control resting just above the pinned area keeps
                 // full contrast; only words actually sliding under it fade.
+                // At accessibility sizes one line is ~40pt, so a 28pt fade would still hard-cut it:
+                // the fade grows and starts at once, so the next line visibly runs on under it.
+                let fade: CGFloat = typeSize.isAccessibilitySize ? 72 : 28
                 LinearGradient(stops: [.init(color: OnbColor.card.opacity(0), location: 0),
-                                       .init(color: OnbColor.card.opacity(0), location: 0.45),
+                                       .init(color: OnbColor.card.opacity(0), location: typeSize.isAccessibilitySize ? 0.1 : 0.45),
                                        .init(color: OnbColor.card, location: 1)],
                                startPoint: .top, endPoint: .bottom)
-                    .frame(height: 28)
-                    .offset(y: -28)
+                    .frame(height: fade)
+                    .offset(y: -fade)
                     .allowsHitTesting(false)
             }
         }
@@ -650,9 +654,12 @@ struct OnbWhatsNewHouseStep: View {
     @Bindable var flow: OnbFlow
     @Environment(\.accessibilityReduceMotion) private var reduce
 
-    private var stageLine: String {
-        let progress = HouseProgress(hours: flow.upgradeHours, goal: flow.upgradeGoal)
-        var parts = ["\(Int(flow.upgradeHours.rounded(.down)))h", progress.stage.spokenName.lowercased()]
+    private var stageLine: String { Self.stageLine(hours: flow.upgradeHours, goal: flow.upgradeGoal) }
+
+    /// "312h · frame going up · roof at 500h": the upgrader's real total, as the house stage.
+    static func stageLine(hours: Double, goal: HouseGoal) -> String {
+        let progress = HouseProgress(hours: hours, goal: goal)
+        var parts = ["\(Int(progress.hours.rounded(.down)))h", progress.stage.spokenName.lowercased()]
         if progress.nextStep != nil { parts.append(progress.nextMilestoneLabel.lowercased()) }
         return parts.joined(separator: " · ")
     }

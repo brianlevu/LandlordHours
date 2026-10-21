@@ -88,13 +88,21 @@ struct OnbWhatsNewSheet: View {
                 onFinish(completion.openInbox)
             })
             OnbBackfill.flowStarted()
-            made.upgradeHours = viewModel.houseCountableHours()
-            made.upgradeGoal = viewModel.houseGoal
+            let input = Self.houseInput(for: viewModel)
+            made.upgradeHours = input.hours
+            made.upgradeGoal = input.goal
             made.goal = viewModel.houseGoal == .reps750 ? .reps750 : (viewModel.houseGoal == .mp500 ? .mp500 : .mp100)
             OnbDebugLaunch.apply(to: made)
             flow = made
             made.appeared()
         }
+    }
+
+    /// The house the upgrader sees first: this year's countable hours for their goal, the same
+    /// number Today's house uses (REPS: your own hours only; material participation adds a
+    /// spouse only when tracked jointly).
+    static func houseInput(for app: AppViewModel) -> (hours: Double, goal: HouseGoal) {
+        (app.houseCountableHours(), app.houseGoal)
     }
 }
 
