@@ -13,7 +13,7 @@ final class StoreKitLocalIntegrationTests: XCTestCase {
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        session = try SKTestSession(configurationFileNamed: "LandlordHours")
+        session = try SharedStoreKitTestSession.session()
         session.disableDialogs = true
         session.clearTransactions()
         resetScopedStoreKitState()
@@ -22,7 +22,6 @@ final class StoreKitLocalIntegrationTests: XCTestCase {
     override func tearDownWithError() throws {
         session.clearTransactions()
         resetScopedStoreKitState()
-        session = nil
         try super.tearDownWithError()
     }
 
