@@ -138,11 +138,21 @@ enum NoteRules {
     ]
 
     /// Phrases that end a word ("ac", "a c") must match whole words; the rest are word-prefix.
-    private static let wholeWord: Set<String> = ["ac", "a c", "tax", "rent", "books", "demo", "keys", "yard", "loan", "refi", "comps", "claim"]
+    private static let wholeWord: Set<String> = ["ac", "a c", "tax", "rent", "books", "demo", "keys", "yard", "loan", "refi", "comps", "claim", "gas", "code", "bid", "deal", "lien", "terms"]
 
     static func category(normalized: String) -> ActivityCategory? {
         let padded = " \(normalized) "
-        for (category, phrases) in categoryKeywords {
+        if let hit = firstHit(in: padded, lists: categoryKeywords) { return hit }
+        // Talking with a tenant (message, call, email, text) is day-to-day management.
+        let words = Set(RulesEngine.words(normalized))
+        if !words.isDisjoint(with: ["tenant", "tenants"]) && !words.isDisjoint(with: tenantContactWords) { return .management }
+        // Everything the 1.x keyword parser caught, last, so its generic words ("offer",
+        // "agreement", "bank") never outrank a specific signal but nothing it filled is lost.
+        return firstHit(in: padded, lists: legacyFallbackKeywords)
+    }
+
+    private static func firstHit(in padded: String, lists: [(ActivityCategory, [String])]) -> ActivityCategory? {
+        for (category, phrases) in lists {
             for phrase in phrases {
                 let needle = " " + phrase + (wholeWord.contains(phrase) ? " " : "")
                 if padded.contains(needle) { return category }
@@ -152,6 +162,30 @@ enum NoteRules {
         }
         return nil
     }
+
+    static let tenantContactWords: Set<String> = [
+        "message", "messages", "messaged", "messaging", "call", "calls", "called", "calling", "email", "emails",
+        "emailed", "text", "texts", "texted", "texting", "phone", "phoned", "spoke", "talked", "talk", "chat",
+        "chatted", "replied", "reply", "voicemail", "complaint", "request", "requests", "question", "questions",
+    ]
+
+    /// The 1.x parser's keywords (AITimeEntryService) that the lists above don't already cover,
+    /// in its order. Two deliberate moves: "contractor" is repairs (1.x filed it under legal via
+    /// "contract"), and "scope of work" is renovations (1.x: non-countable negotiation).
+    static let legacyFallbackKeywords: [(ActivityCategory, [String])] = [
+        (.repairs, ["air condition", "patch", "wiring", "contractor"]),
+        (.renovations, ["replace", "tile", "demolition", "scope of work"]),
+        (.leasing, ["leas", "rental agreement", "advertise", "renew", "tenant"]),
+        (.management, ["manage", "maintenance", "mow", "exterminator", "coordinate", "supervise", "visit", "schedule",
+                       "organize", "meet with", "property check"]),
+        (.bookkeeping, ["accounting", "expense", "budget", "financial", "record keep", "bank", "payment", "billing"]),
+        (.legal, ["court", "code", "regulation", "contract", "dispute", "filing", "lien"]),
+        (.insurance, ["coverage", "liability"]),
+        (.travel, ["travel", "commute", "went to", "visit property", "gas", "fuel"]),
+        (.investing, ["research", "analyze", "market", "deal", "offer", "property search", "real estate search"]),
+        (.financing, ["financ", "bank meeting", "closing"]),
+        (.contractNegotiation, ["agreement", "terms", "bid", "proposal"]),
+    ]
 
     static let spouseWords: Set<String> = ["wife", "husband", "spouse", "hubby"]
 
