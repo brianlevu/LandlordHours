@@ -71,13 +71,14 @@ enum GoalChoice: String, CaseIterable, Identifiable {
 
     var targetHours: Double { houseGoal.targetHours }
 
-    /// Settings picker words (the same four options as onboarding).
+    /// Settings picker words (the same four options as onboarding). The 750 line says what it
+    /// counts: the rental hours logged in this app.
     var title: String {
         switch self {
-        case .reps750: return "750 hours · Real estate professional"
-        case .mp500: return "500 hours · Material participation"
-        case .mp100: return "100 hours · Material participation"
-        case .record: return "Just keep a record"
+        case .reps750: return String(localized: "750 hours · Rental hours you log here")
+        case .mp500: return String(localized: "500 hours · Material participation")
+        case .mp100: return String(localized: "100 hours · More than anyone else")
+        case .record: return String(localized: "Just keep a record")
         }
     }
 
@@ -90,6 +91,21 @@ enum GoalChoice: String, CaseIterable, Identifiable {
         case .record: return ("750h REPS + STR", "750h")
         }
     }
+}
+
+// MARK: - Goal setup answers (2.0 goal-first onboarding)
+
+/// What the owner rents out. Short stays means guests stay 7 days or less, on average.
+enum RentalMix: String, CaseIterable, Codable {
+    case shortStays, longTerm, both
+
+    /// Whether any rental is a short-term one (the 100 and 500 hour tests are counted per rental).
+    var hasShortStays: Bool { self != .longTerm }
+}
+
+/// Who does real estate as a main job: the owner, the spouse, or nobody.
+enum RealEstatePro: String, CaseIterable, Codable {
+    case me, spouse, nobody
 }
 
 // MARK: - Property Goal
@@ -169,6 +185,8 @@ class GoalManager: ObservableObject {
         let ud = UserDefaults.standard
         ud.removeObject(forKey: goalsKey)
         ud.removeObject(forKey: globalGoalKey)
+        ud.removeObject(forKey: rentalMixKey)
+        ud.removeObject(forKey: proKey)
         onDidChange?()
     }
 
@@ -211,6 +229,33 @@ class GoalManager: ObservableObject {
         applyMaterialParticipationTarget(choice.materialParticipationTarget)
         saveGoals()
     }
+
+    // MARK: Goal setup answers (what the target was suggested from)
+
+    private var rentalMixKey: String { UserScope.key("goalSetup.rentalMix") }
+    private var proKey: String { UserScope.key("goalSetup.realEstatePro") }
+
+    /// The owner's answer to "What do you rent out?". nil for profiles that never answered
+    /// (1.x and upgraders). On this device only: nothing in iCloud changes.
+    var rentalMix: RentalMix? {
+        UserDefaults.standard.string(forKey: rentalMixKey).flatMap(RentalMix.init(rawValue:))
+    }
+
+    /// The owner's answer to "who does real estate as a main job". nil when never answered.
+    var realEstatePro: RealEstatePro? {
+        UserDefaults.standard.string(forKey: proKey).flatMap(RealEstatePro.init(rawValue:))
+    }
+
+    func setGoalSetup(rental: RentalMix?, pro: RealEstatePro?) {
+        let ud = UserDefaults.standard
+        if let rental { ud.set(rental.rawValue, forKey: rentalMixKey) } else { ud.removeObject(forKey: rentalMixKey) }
+        if let pro { ud.set(pro.rawValue, forKey: proKey) } else { ud.removeObject(forKey: proKey) }
+        objectWillChange.send()
+    }
+
+    /// Whose own hours the 750 count follows: the spouse's when the spouse is the real estate
+    /// professional (one spouse alone must reach it), otherwise the owner's.
+    var repsParticipant: Participant { realEstatePro == .spouse ? .spouse : .selfParticipant }
 
     /// Saves a house goal (REPS, MP 500 or MP 100).
     func setHouseGoal(_ goal: HouseGoal) {

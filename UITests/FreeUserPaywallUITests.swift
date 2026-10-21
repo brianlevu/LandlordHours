@@ -360,8 +360,8 @@ final class FreeUserPaywallUITests: XCTestCase {
     /// 2.0 onboarding, the quickest way through: no calendar, no property (six taps to Today).
     private func walkOnboarding(captureScheme scheme: String) {
         tap(app.buttons["onb-start"])
-        tap(app.buttons["goal-750"])
-        tap(app.buttons["onb-primary"])                        // Build toward 750h
+        UITestIsolation.answerGoalQuestions(app)
+        tap(app.buttons["onb-primary"])                        // Aim for 750 hours
         tap(app.buttons["onb-link"])                           // Calendar: Not now
         tap(app.buttons["onb-primary"])                        // Who: Continue
         // No paywall step anywhere in onboarding.

@@ -203,7 +203,7 @@ struct InboxView: View {
                 Text(total == 1 ? "1 thing to confirm" : "\(total) things to confirm")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(OnBlueprint.primary)
-                Text("\(fromBackfill) from the last 90 days. Confirm the ones that were rental work and they go up on the house.")
+                Text("\(fromBackfill) from the last 90 days. Confirm the ones that were rental work and they count toward your hours.")
                     .font(.subheadline)
                     .foregroundStyle(OnBlueprint.secondary)
                     .fixedSize(horizontal: false, vertical: true)

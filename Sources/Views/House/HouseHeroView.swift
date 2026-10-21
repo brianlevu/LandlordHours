@@ -224,6 +224,8 @@ struct HouseHeroCard: View {
     /// Pace words from the caller ("On pace, 18h ahead"); nil hides the line.
     var status: String? = nil
     var statusTone: HouseStatusTone = .positive
+    /// The target-first words (eyebrow, whose count, caption). nil keeps the plain "of 750h" caption.
+    var heroCopy: TodayHeroCopy? = nil
     var onCelebration: (HouseCelebration) -> Void = { _ in }
     var debugConfirmStill: Int? = nil
     /// New-owner states (onboarding landing); nil keeps the pace and stage lines.
@@ -242,6 +244,7 @@ struct HouseHeroCard: View {
     var isLookingBack = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var shownHours: Double?
     @State private var pop = false
     // Dynamic Type: the number, eyebrow and card grow with the text size (the house art keeps
@@ -265,6 +268,32 @@ struct HouseHeroCard: View {
         case .caution: return "exclamationmark.circle.fill"
         case .neutral: return nil
         }
+    }
+
+    /// One piece of the eyebrow: mono capitals, drafting colour.
+    private func eyebrowText(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: heroCopy == nil ? eyebrowSize : min(eyebrowSize, 14), weight: .medium, design: .monospaced))
+            .textCase(.uppercase)
+            .tracking(1.3)
+            .foregroundStyle(HouseTokens.drafting)
+    }
+
+    private var footerIsNil: Bool { if case .none = footer { return true }; return false }
+
+    /// The caption and the pace are one line (it wraps in the column): "of 500 hours · on pace for Dec 31".
+    private var usesCombinedCaption: Bool {
+        heroCopy?.phrase != nil && footerIsNil && !isLookingBack && !isLoading
+    }
+
+    private func captionLine(_ copy: TodayHeroCopy) -> some View {
+        let glyph = statusSymbol.map { Text(Image(systemName: $0)) + Text(" ") } ?? Text("")
+        return (Text(copy.caption).font(.title3.weight(.medium)).foregroundColor(HouseTokens.onHeroSecondary)
+            + Text(" · ").font(.title3.weight(.medium)).foregroundColor(HouseTokens.onHeroSecondary)
+            + (glyph + Text(copy.phrase ?? "")).font(.subheadline.weight(.semibold)).foregroundColor(statusColor))
+            .lineLimit(7)
+            // The column is ~130pt wide: past Large the words stop growing (as the empty-lot words do) and wrap instead (VoiceOver reads them in full).
+            .dynamicTypeSize(...DynamicTypeSize.large)
     }
 
     private var displayHours: Int { Int((shownHours ?? progress.hours).rounded(.down)) }
@@ -314,14 +343,37 @@ struct HouseHeroCard: View {
                     .position(houseCenter)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("\(String(year)) · \(progress.goal.eyebrow)")
-                            .font(.system(size: eyebrowSize, weight: .medium, design: .monospaced))
-                            .textCase(.uppercase)
-                            .tracking(1.3)
-                            .foregroundStyle(HouseTokens.drafting)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                            .fixedSize(horizontal: true, vertical: false)
+                        VStack(alignment: .leading, spacing: 1) {
+                            if let copy = heroCopy, let name = copy.propertyName {
+                                // One rental's count: its name sits in the eyebrow and shortens with an
+                                // ellipsis (never wraps mid-word); the year and the target stay whole.
+                                HStack(spacing: 0) {
+                                    eyebrowText("\(copy.eyebrowYear) · ").fixedSize()
+                                    eyebrowText(name).lineLimit(1).truncationMode(.tail).layoutPriority(-1)
+                                    eyebrowText(" · \(copy.eyebrowTarget)").fixedSize()
+                                }
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(copy.eyebrow)
+                                .accessibilityIdentifier("today.hero.eyebrow")
+                            } else {
+                                eyebrowText(heroCopy?.eyebrow ?? "\(String(year)) · \(progress.goal.eyebrow)")
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.8)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .accessibilityIdentifier("today.hero.eyebrow")
+                            }
+                            if let qualifier = heroCopy?.qualifier {
+                                Text(qualifier)
+                                    .font(.system(size: heroCopy == nil ? eyebrowSize : min(eyebrowSize, 14), weight: .medium, design: .monospaced))
+                                    .textCase(.uppercase)
+                                    .tracking(1.3)
+                                    .foregroundStyle(HouseTokens.onHeroSecondary)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.8)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .accessibilityIdentifier("today.hero.qualifier")
+                            }
+                        }
                         ZStack(alignment: .leading) {
                             // Keeps the number's line height so nothing moves when it lands.
                             Text("\(displayHours)")
@@ -340,10 +392,23 @@ struct HouseHeroCard: View {
                         }
                         .padding(.top, 2)
                         .accessibilityLabel(isLoading ? "Loading your hours" : "\(progress.wholeHours) hours")
-                        Text("of \(Int(progress.goal.targetHours))h")
-                            .font(.title3.weight(.medium))
-                            .foregroundStyle(HouseTokens.onHeroSecondary)
-                        Spacer(minLength: 8)
+                        if usesCombinedCaption, let copy = heroCopy {
+                            captionLine(copy)
+                                .frame(width: columnWidth, alignment: .leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("today.hero.caption")
+                        } else {
+                            Text(heroCopy?.caption ?? "of \(Int(progress.goal.targetHours))h")
+                                .font(.title3.weight(.medium))
+                                .foregroundStyle(HouseTokens.onHeroSecondary)
+                                .accessibilityIdentifier("today.hero.caption")
+                        }
+                        if heroCopy != nil && typeSize.isAccessibilitySize {
+                            // Large text: the words follow the number at once, so the status never ends under the tab bar.
+                            Color.clear.frame(height: 10)
+                        } else {
+                            Spacer(minLength: 8)
+                        }
                         if isLoading {
                             VStack(alignment: .leading, spacing: 8) {
                                 PlaceholderBar(width: min(columnWidth, 120), height: 12, surface: .blueprint)
@@ -360,14 +425,14 @@ struct HouseHeroCard: View {
                                 .transition(.opacity)
                         } else {
                         Group {
-                            if let status {
+                            if let status, !usesCombinedCaption {
                                 // Glyph inline with the words so the line wraps as one sentence;
                                 // one line at subheadline, else one line at footnote, else wrapped.
                                 let line = statusSymbol.map { Text(Image(systemName: $0)) + Text(" ") + Text(status) } ?? Text(status)
                                 ViewThatFits(in: .horizontal) {
                                     line.font(.subheadline.weight(.semibold)).lineLimit(1)
                                     line.font(.footnote.weight(.semibold)).lineLimit(1)
-                                    line.font(.subheadline.weight(.semibold)).lineLimit(3)
+                                    line.font(.subheadline.weight(.semibold)).lineLimit(5)
                                 }
                                 .foregroundStyle(statusColor)
                                 .accessibilityIdentifier("today.hero.status")
@@ -385,7 +450,8 @@ struct HouseHeroCard: View {
                                     .foregroundStyle(HouseTokens.onHeroSecondary)
                                     .lineLimit(3)
                                     .fixedSize(horizontal: false, vertical: true)
-                            } else {
+                            } else if !(heroCopy != nil && typeSize.isAccessibilitySize) {
+                                // At accessibility sizes the target words take the room; the stage is in the VoiceOver label.
                                 Text(progress.stage.spokenName)
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(HouseTokens.onHeroPrimary)
@@ -444,7 +510,7 @@ struct HouseHeroCard: View {
                 Text("An empty lot.")
                     .font(.headline)
                     .foregroundStyle(HouseTokens.onHeroPrimary)
-                Text("Add a property. Every hour you confirm builds on it.")
+                Text(TodayHeroCopy.emptyLotLine(target: heroCopy?.targetHours))
                     .font(.footnote)
                     .foregroundStyle(HouseTokens.onHeroSecondary)
                     .fixedSize(horizontal: false, vertical: true)

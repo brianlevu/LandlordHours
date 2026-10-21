@@ -532,7 +532,7 @@ struct LogTimeSheet: View {
             if !form.countsTowardHours, let category = form.category {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Image(systemName: "info.circle").accessibilityHidden(true)
-                    Text("\(category.inboxLabel) doesn\u{2019}t count toward your hours or the house.")
+                    Text("\(category.inboxLabel) doesn\u{2019}t count toward your hours.")
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .font(.footnote)

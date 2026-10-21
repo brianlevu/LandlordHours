@@ -23,7 +23,7 @@ struct OnbScene: View {
                 houseLayers
                 if step == .goal { scale(s).transition(.opacity) }
                 if step == .welcome && !upgrade {
-                    Text("Here's what you'll build")
+                    Text("Your hours, this year")
                         .onbDrafting(HouseTokens.drafting)
                         .fixedSize()
                         .position(x: s * 0.5, y: s * 0.885)

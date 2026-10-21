@@ -595,7 +595,9 @@ struct TaxQualificationEngine {
 
     /// Single source of truth for the material participation figure shown on
     /// Dashboard, Reports, widget and Siri. With a grouping election all properties
-    /// count as one activity; without it, the best single property counts.
+    /// count as one activity; without it, the best single property counts. Owners with BOTH
+    /// kinds of rental get their short-term rental's own count: the 100 and 500 hour tests
+    /// are counted per rental, and a long-term rental's hours never stand in for it.
     static func materialParticipationOverview(
         entries: [TimeEntry],
         properties: [RentalProperty],
@@ -613,7 +615,9 @@ struct TaxQualificationEngine {
             )
         }
         if groupingElection { return status(nil) }
-        return properties
+        let shortStays = properties.filter { $0.propertyType == .str }
+        let candidates = (!shortStays.isEmpty && shortStays.count < properties.count) ? shortStays : properties
+        return candidates
             .map { status($0.id) }
             .max { $0.ownerAndSpouseHours < $1.ownerAndSpouseHours }
             ?? status(nil)

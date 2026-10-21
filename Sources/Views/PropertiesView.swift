@@ -269,7 +269,7 @@ struct PropertiesView: View {
                 .foregroundStyle(colors.textPrimary)
                 .multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
-            Text("Once we know where your rentals are, every hour you confirm goes up on the house.")
+            Text("Once we know where your rentals are, every hour you confirm counts toward your goal.")
                 .font(.subheadline)
                 .foregroundStyle(colors.textSecondary)
                 .multilineTextAlignment(.center)
@@ -721,7 +721,7 @@ struct PropertyDetailView: View {
     }
 
     private func nothingYet(_ property: RentalProperty) -> some View {
-        Text("Nothing logged at \(property.name) yet. Hours you confirm here go up on its house.")
+        Text("Nothing logged at \(property.name) yet. Hours you confirm here count toward your goal.")
             .font(.subheadline)
             .foregroundStyle(colors.textSecondary)
             .fixedSize(horizontal: false, vertical: true)

@@ -174,7 +174,7 @@ final class LearnDeleteRestoreUITests: XCTestCase {
             settleAndCapture("whatsnew-house-\(suffix)", wait: 2.0)
             if size == "ax3" {
                 // The body scrolls under the pinned Continue: show the rest of it.
-                let last = app.staticTexts["Each hour you confirm from now on adds to the house."]
+                let last = app.staticTexts["Same hours, same PDF. Today now shows your count against your target, and the house shows how far along you are."]
                 XCTAssertTrue(last.waitForExistence(timeout: 5))
                 element("onb.whatsNew").swipeUp()
                 XCTAssertTrue(last.isHittable, "The last line scrolls fully into view above Continue")

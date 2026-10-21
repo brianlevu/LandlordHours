@@ -292,7 +292,7 @@ struct LandlordHoursSiriSnippet: View {
                 .foregroundStyle(WidgetInk.drafting)
                 .fixedSize(horizontal: false, vertical: true)
             if display.state == .noProperty {
-                Text("Add a property to start the house.")
+                Text("Add a rental to start counting.")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(WidgetInk.primary)
                     .fixedSize(horizontal: false, vertical: true)
