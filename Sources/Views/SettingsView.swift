@@ -114,14 +114,6 @@ struct SettingsView: View {
                 case .deleteData: DeleteAllDataView()
                 }
             }
-            .alert("Restore purchase", isPresented: Binding(
-                get: { restoreStatusMessage != nil },
-                set: { if !$0 { restoreStatusMessage = nil } }
-            )) {
-                Button("OK", role: .cancel) { restoreStatusMessage = nil }
-            } message: {
-                Text(restoreStatusMessage ?? "")
-            }
             .sheet(isPresented: $showingProfileEdit) {
                 ProfileEditView(userName: $userName, userEmail: $userEmail, profileImage: $profileImage)
             }
@@ -254,15 +246,19 @@ struct SettingsView: View {
 
             Button {
                 Task {
+                    restoreStatusMessage = nil
                     await subscriptionManager.restorePurchases()
                     restoreStatusMessage = subscriptionManager.hasPurchased
-                        ? "Your Pro purchase has been restored."
-                        : (subscriptionManager.purchaseError ?? "No previous purchase was found.")
+                        ? String(localized: "Your Pro purchase has been restored.")
+                        : (subscriptionManager.restoreFailureMessage ?? subscriptionManager.purchaseError ?? String(localized: "No previous purchase was found."))
                 }
             } label: {
+                // The result shows inline under the row (not a system alert, whose message text
+                // iOS draws below AA); the row stays tappable to try again.
                 SettingRow(
                     symbol: "arrow.clockwise",
-                    title: subscriptionManager.isLoading ? "Restoring purchase…" : "Restore purchase"
+                    title: subscriptionManager.isLoading ? "Restoring purchase…" : "Restore purchase",
+                    subtitle: subscriptionManager.isLoading ? nil : restoreStatusMessage
                 )
             }
             .buttonStyle(.plain)

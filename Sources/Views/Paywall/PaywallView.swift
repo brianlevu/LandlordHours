@@ -16,11 +16,13 @@ import StoreKit
 @MainActor
 protocol ProPurchasing: AnyObject {
     var isPro: Bool { get }
+    /// A purchase is still waiting on the App Store (also after the purchase deadline).
+    var isPurchaseInFlight: Bool { get }
     /// The App Store's localized price for Pro, or nil until products load.
     var proDisplayPrice: String? { get }
     var proIsFamilyShareable: Bool { get }
     func loadProducts() async
-    func purchasePro() async -> SubscriptionManager.PurchaseOutcome
+    func purchasePro(lateOutcome: @escaping @MainActor (SubscriptionManager.PurchaseOutcome) -> Void) async -> SubscriptionManager.PurchaseOutcome
     func restorePurchases() async -> Bool
 }
 
@@ -52,7 +54,9 @@ final class PaywallModel: ObservableObject {
     }
 
     var priceDisplay: PriceDisplay? { price.map { PriceDisplay(billed: $0, intro: nil) } }
-    var canBuy: Bool { PaywallFlow.canBuy(phase) && price != nil }
+    var canBuy: Bool { PaywallFlow.canBuy(phase) && price != nil && !store.isPurchaseInFlight }
+    /// The purchase deadline passed but the App Store may still answer.
+    var isFinishingPurchase: Bool { phase == .failed && store.isPurchaseInFlight }
     var canRestore: Bool { PaywallFlow.canRestore(phase) }
 
     func start() async {
@@ -83,15 +87,28 @@ final class PaywallModel: ObservableObject {
         guard !pinned, canBuy else { return false }
         Analytics.paywallCtaTapped(context: context)
         phase = .buying
-        let outcome = await store.purchasePro()
+        let context = context
+        let outcome = await store.purchasePro(lateOutcome: { late in
+            // The App Store answered after the deadline: log what really happened. Captures the
+            // context, not the model, so it still logs if the paywall was closed meanwhile.
+            Self.logPurchase(late, context: context)
+        })
         phase = PaywallFlow.afterPurchase(outcome)
+        if outcome == .timedOut {
+            Analytics.purchaseTimeout(context: context)
+        } else {
+            Self.logPurchase(outcome, context: context)
+        }
+        return outcome == .purchased
+    }
+
+    private static func logPurchase(_ outcome: SubscriptionManager.PurchaseOutcome, context: PaywallContext) {
         if outcome == .purchased {
             Analytics.purchaseCompleted(context: context)
             Analytics.purchaseSucceeded(context: context)
         } else if let reason = PaywallFlow.failureReason(outcome) {
             Analytics.purchaseFailed(context: context, outcome: reason)
         }
-        return outcome == .purchased
     }
 
     @discardableResult
@@ -251,8 +268,13 @@ struct PaywallView: View {
             .overlay(alignment: .top) {
                 // A solid band behind the status bar: blueprint while the hero is under it, canvas
                 // once scrolled past, so the clock always reads (white on blue, dark on canvas).
+                // Once the plan card reaches the close button the band also covers the button's
+                // row, so text scrolls under a full-width bar, never beside the button mid-word.
                 (overHero ? AppColors.brand : colors.background)
-                    .frame(height: g.safeAreaInsets.top)
+                    .frame(height: g.safeAreaInsets.top + (overHero ? 0 : Self.closeRowHeight))
+                    .overlay(alignment: .bottom) {
+                        if !overHero { Rectangle().fill(colors.border).frame(height: 0.5) }
+                    }
                     .frame(maxWidth: .infinity)
                     .offset(y: -g.safeAreaInsets.top)
                     .allowsHitTesting(false)
@@ -270,9 +292,14 @@ struct PaywallView: View {
         .background(colors.background.ignoresSafeArea())
     }
 
-    /// The blue band (and the dark window) only while the hero is under the status bar.
+    /// Close button row: 4 pt above, the 44 pt button, 4 pt below.
+    static let closeRowHeight: CGFloat = 52
+
+    /// The blue band (and the dark window) only while the hero is under the status bar and the
+    /// close button's row. The plan card starts 40 pt above the hero's bottom, so it reaches the
+    /// close row once `heroH - 40 - y < top + closeRowHeight`.
     private func updateOverHero(offset y: CGFloat, heroH: CGFloat, top: CGFloat) {
-        let over = y < heroH - top - 8
+        let over = y < heroH - 40 - top - Self.closeRowHeight
         if overHero != over { overHero = over }
     }
 
@@ -375,7 +402,9 @@ struct PaywallView: View {
                 .accessibilityIdentifier("paywall.restore")
             }
             if model.phase == .restoreNone {
-                Text("No purchase found on this Apple Account.")
+                // A restore that errored or timed out says so; "no purchase" only when the App
+                // Store answered and found nothing.
+                Text(subscriptionManager.restoreFailureMessage ?? "No purchase found on this Apple Account.")
                     .font(.footnote).foregroundStyle(colors.textSecondary).frame(maxWidth: .infinity)
                     .multilineTextAlignment(.center)
                     .accessibilityIdentifier("paywall.restoreNone")
@@ -486,7 +515,7 @@ struct PaywallView: View {
             .animation(.easeOut(duration: 0.2), value: model.phase)
             .accessibilityIdentifier(model.phase == .success ? "paywall.continue" : "paywall.buy")
             if model.phase == .failed {
-                Text("That didn’t go through. Try again in a moment.")
+                Text(model.isFinishingPurchase ? "Still finishing your purchase…" : "That didn’t go through. Try again in a moment.")
                     .font(.subheadline).foregroundStyle(colors.caution).multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
                     .accessibilityIdentifier("paywall.failed")
