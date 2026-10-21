@@ -158,6 +158,7 @@ struct SettingToggleRow: View {
     @Binding var isOn: Bool
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
@@ -165,7 +166,7 @@ struct SettingToggleRow: View {
             HStack(alignment: .top, spacing: 14) {
                 Image(systemName: symbol)
                     .font(.system(size: 19, weight: .regular))
-                    .foregroundStyle(colors.textSecondary)
+                    .foregroundStyle(isEnabled ? colors.textSecondary : colors.textTertiary)
                     .frame(width: 28)
                     .padding(.top, 1)
                     .accessibilityHidden(true)
@@ -173,7 +174,7 @@ struct SettingToggleRow: View {
                     HStack(spacing: 6) {
                         Text(title)
                             .font(.body)
-                            .foregroundStyle(colors.textPrimary)
+                            .foregroundStyle(isEnabled ? colors.textPrimary : colors.textSecondary)
                         if let badge {
                             Text(badge)
                                 .font(.caption.weight(.semibold))
@@ -186,7 +187,7 @@ struct SettingToggleRow: View {
                     if let subtitle {
                         Text(subtitle)
                             .font(.subheadline)
-                            .foregroundStyle(colors.textSecondary)
+                            .foregroundStyle(isEnabled ? colors.textSecondary : colors.textTertiary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }

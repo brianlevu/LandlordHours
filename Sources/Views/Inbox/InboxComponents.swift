@@ -166,6 +166,14 @@ struct OnBlueprintButtonStyle: ButtonStyle {
 struct InboxSwitchStyle: ToggleStyle {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var isEnabled
+
+    /// A plain style that, unlike `.plain`, does not fade the label when the row is disabled:
+    /// the system fade put the row at 2.4 to 3.3:1. The disabled look is drawn with tokens by
+    /// `SettingToggleRow` (calmer text colours that stay at 4.5:1 or better) and a paler switch.
+    private struct NoFadeStyle: ButtonStyle {
+        func makeBody(configuration: Configuration) -> some View { configuration.label }
+    }
 
     func makeBody(configuration: Configuration) -> some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
@@ -188,12 +196,13 @@ struct InboxSwitchStyle: ToggleStyle {
                         .frame(width: 27, height: 27)
                         .padding(2)
                 }
+                .opacity(isEnabled ? 1 : 0.5)
                 .animation(reduceMotion ? nil : AppAnimation.quick, value: configuration.isOn)
                 .accessibilityHidden(true)
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(NoFadeStyle())
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isToggle)
         .accessibilityValue(configuration.isOn ? "On" : "Off")
