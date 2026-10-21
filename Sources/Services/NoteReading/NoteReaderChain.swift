@@ -36,6 +36,9 @@ struct NoteReaderChain {
         case rateLimited
         /// The model declined the note (guardrail/refusal): rules only for this note.
         case refused
+        /// The model can't take this note (too long, unsupported language, guide or content):
+        /// rules only for this note, like a refusal.
+        case cannotRead
         /// Same note as before: the earlier answer, no new model call.
         case cached
     }
@@ -128,7 +131,7 @@ struct NoteReaderChain {
             case .failure(let attempt):
                 result.onDevice = attempt
                 if attempt == .rateLimited { cooldown.rateLimited(.onDevice) }
-                if attempt == .refused {
+                if attempt == .refused || attempt == .cannotRead {
                     // The model won't read this note: rules only, and never sent elsewhere.
                     cache.markRulesOnly(key)
                     return result
@@ -164,7 +167,7 @@ struct NoteReaderChain {
         case .failure(let attempt):
             result.pcc = attempt
             if attempt == .rateLimited { cooldown.rateLimited(.pcc) }
-            if attempt == .refused { cache.markRulesOnly(key) }
+            if attempt == .refused || attempt == .cannotRead { cache.markRulesOnly(key) }
             if let onDeviceReading, attempt != .timedOut { cache.store(onDeviceReading, for: key) }
         }
         return result
@@ -214,11 +217,16 @@ struct NoteReaderChain {
     }
 
     /// Rate limits and refusals from FoundationModels (both models share these errors).
+    /// iOS 27 throws `LanguageModelError` (verified on an iPhone 16 Pro Max, iOS 27); iOS 26
+    /// throws the older `LanguageModelSession.GenerationError`. Both are mapped.
     static func generationFailure(_ error: Error) -> Attempt? {
         if let scripted = error as? NoteModelScriptedError {
             return scripted == .rateLimited ? .rateLimited : .refused
         }
         #if canImport(FoundationModels)
+        if #available(iOS 27.0, *), let modelError = error as? LanguageModelError {
+            return generationFailure(modelError)
+        }
         if #available(iOS 26.0, *), let generation = error as? LanguageModelSession.GenerationError {
             switch generation {
             case .rateLimited, .concurrentRequests: return .rateLimited
@@ -229,6 +237,21 @@ struct NoteReaderChain {
         #endif
         return nil
     }
+
+    #if canImport(FoundationModels)
+    @available(iOS 27.0, *)
+    static func generationFailure(_ error: LanguageModelError) -> Attempt {
+        switch error {
+        case .rateLimited: return .rateLimited
+        case .guardrailViolation, .refusal: return .refused
+        case .timeout: return .timedOut
+        case .contextSizeExceeded, .unsupportedCapability, .unsupportedTranscriptContent,
+             .unsupportedGenerationGuide, .unsupportedLanguageOrLocale:
+            return .cannotRead
+        @unknown default: return .failed
+        }
+    }
+    #endif
 
     /// A PCC quota or service error, or an availability error from a backend.
     static func unavailableReason(for error: Error) -> ModelUnavailableReason? {
