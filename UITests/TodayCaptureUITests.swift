@@ -55,19 +55,27 @@ final class TodayCaptureUITests: XCTestCase {
     ]
 
     private func capture(_ state: String, then action: ((XCUIApplication) -> String?)? = nil, as name: String? = nil) {
-        guard let (_, args, anchor) = Self.states.first(where: { $0.0 == state }) else { return XCTFail("No state \(state)") }
+        guard let (_, stateArgs, anchor) = Self.states.first(where: { $0.0 == state }) else { return XCTFail("No state \(state)") }
+        let env = ProcessInfo.processInfo.environment
+        // `LH_CAPTURE_REST=1`: the screen at rest (scroll top: header, hero and subtitle), named "-rest".
+        let rest = env["LH_CAPTURE_REST"] == "1"
+        var args = stateArgs
+        if rest, let i = args.firstIndex(of: "-LHTodayScrollTo") { args.removeSubrange(i...(i + 1)) }
+        let suffix = rest ? "-rest" : ""
+        // `LH_CAPTURE_SIZES=ax3` (comma list of standard,xxl,ax3) limits the sizes.
+        let sizes = env["LH_CAPTURE_SIZES"].map { list in Size.allCases.filter { list.split(separator: ",").contains(Substring($0 == .standard ? "standard" : String($0.rawValue.dropFirst()))) } } ?? Size.allCases
         // `LH_CAPTURE_SCHEMES=light` re-shoots one theme only (a fix round that changed one).
         let schemes = (ProcessInfo.processInfo.environment["LH_CAPTURE_SCHEMES"] ?? "light,dark")
             .split(separator: ",").map(String.init)
         for scheme in schemes {
-            for size in Size.allCases {
+            for size in sizes {
                 app.terminate()
                 var arguments = [UITestIsolation.resetProfilesArgument, "-LHNoSwipePeek", "-LHInitialTab", "0",
                                  "-LHColorScheme", scheme, "-AppleLanguages", "(en)", "-AppleLocale", "en_US"] + args
                 if let category = size.category { arguments += ["-UIPreferredContentSizeCategoryName", category] }
                 app.launchArguments = arguments
                 app.launch()
-                let element = app.descendants(matching: .any)[anchor]
+                let element = app.descendants(matching: .any)[rest ? "today.hero" : anchor]
                 XCTAssertTrue(element.waitForExistence(timeout: 25), "\(state) \(scheme)\(size.rawValue): \(anchor)")
                 Thread.sleep(forTimeInterval: 2.2)   // scroll hook (0.7s) + entrance motion settle
                 if let action {
@@ -75,7 +83,7 @@ final class TodayCaptureUITests: XCTestCase {
                     XCTAssertTrue(app.descendants(matching: .any)[waitFor].waitForExistence(timeout: 5), "\(name ?? state): \(waitFor)")
                     Thread.sleep(forTimeInterval: 0.6)
                 }
-                write("today-\(name ?? state)-\(scheme)\(size.rawValue)")
+                write("today-\(name ?? state)\(suffix)-\(scheme)\(size.rawValue)")
             }
         }
     }
