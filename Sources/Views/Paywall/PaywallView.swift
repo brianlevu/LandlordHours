@@ -375,7 +375,9 @@ struct PaywallView: View {
                 .accessibilityIdentifier("paywall.restore")
             }
             if model.phase == .restoreNone {
-                Text("No purchase found on this Apple Account.")
+                // A restore that errored or timed out says so; "no purchase" only when the App
+                // Store answered and found nothing.
+                Text(subscriptionManager.restoreFailureMessage ?? "No purchase found on this Apple Account.")
                     .font(.footnote).foregroundStyle(colors.textSecondary).frame(maxWidth: .infinity)
                     .multilineTextAlignment(.center)
                     .accessibilityIdentifier("paywall.restoreNone")

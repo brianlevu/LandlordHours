@@ -424,12 +424,20 @@ final class InboxAtLimitViewModelTests: CaptureTestCase {
 
 #if canImport(StoreKitTest)
 /// The test process's single StoreKit test session (see ProPurchaseStoreKitTests.setUp).
+///
+/// StoreKit binds a process to a store on its first call. In a unit-test host the app keeps
+/// StoreKit untouched until this session exists (`SubscriptionManager.attachStoreKit()`);
+/// otherwise, on a freshly created simulator, the host app's launch-time calls bound it to the
+/// Sandbox store, `buyProduct` came back as transaction 0 that never reached the app, and
+/// `AppStore.sync()` waited on a sign-in forever.
 enum SharedStoreKitTestSession {
     nonisolated(unsafe) private static var shared: SKTestSession?
+    @MainActor
     static func session() throws -> SKTestSession {
         if let shared { return shared }
         let made = try SKTestSession(configurationFileNamed: "LandlordHours")
         shared = made
+        SubscriptionManager.shared.attachStoreKit()
         return made
     }
 }
@@ -449,15 +457,29 @@ final class ProPurchaseStoreKitTests: XCTestCase {
         session.disableDialogs = true
         session.clearTransactions()
         resetScoped()
+        // One listener per test, cancelled in tearDown, so no update from an earlier test lands here.
+        SubscriptionManager.shared.startTransactionListener()
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
+        let manager = SubscriptionManager.shared
+        manager.stopTransactionListener()
+        for await result in Transaction.unfinished {
+            if case .verified(let transaction) = result { await transaction.finish() }
+        }
+        manager.syncWithAppStore = { try await AppStore.sync() }
+        manager.purchaseProduct = { try await $0.purchase() }
+        SubscriptionManager.restoreSyncTimeout = Self.defaultSyncTimeout
+        SubscriptionManager.purchaseTimeout = Self.defaultPurchaseTimeout
         session.askToBuyEnabled = false
         session.failTransactionsEnabled = false
         session.clearTransactions()
         resetScoped()
-        try super.tearDownWithError()
+        try await super.tearDown()
     }
+
+    private static let defaultSyncTimeout = SubscriptionManager.restoreSyncTimeout
+    private static let defaultPurchaseTimeout = SubscriptionManager.purchaseTimeout
 
     private func waitForPro(_ manager: SubscriptionManager) async {
         let deadline = Date().addingTimeInterval(5)
@@ -540,6 +562,112 @@ final class ProPurchaseStoreKitTests: XCTestCase {
         await model.restore()
         XCTAssertEqual(model.phase, .restoreNone)
         XCTAssertFalse(manager.isPro)
+        XCTAssertNil(manager.restoreFailureMessage, "nothing found is not a failure")
+    }
+
+    // MARK: Restore and purchase always end
+
+    func testTheTestSessionReachesTheApp() async throws {
+        // Guards the root cause: a purchase in the test session must be a real transaction the
+        // app sees, not the id-0 placeholder a Sandbox-bound process gets.
+        let bought = try await session.buyProduct(identifier: "com.openclaw.landlordhours.pro")
+        XCTAssertNotEqual(bought.id, 0)
+        XCTAssertTrue(SubscriptionManager.shared.isStoreKitAttached)
+    }
+
+    func testRestoreThatNeverHearsBackTimesOutWithAClearError() async throws {
+        let manager = SubscriptionManager.shared
+        await manager.loadProducts()
+        SubscriptionManager.restoreSyncTimeout = 0.3
+        manager.syncWithAppStore = { try await Task.sleep(nanoseconds: 3_600_000_000_000) }
+        let model = PaywallModel(context: .settings, entry: .settingsPro, store: manager)
+        await model.start()
+        let started = Date()
+        let found = await model.restore()
+        XCTAssertFalse(found)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 5)
+        XCTAssertEqual(model.phase, .restoreNone)
+        XCTAssertFalse(manager.isLoading, "the restore button must come back")
+        XCTAssertEqual(manager.restoreFailureMessage, "The App Store didn't answer. Check your connection and Apple Account, then try again.")
+    }
+
+    func testRestoreErrorIsShownAsAFailureNotAsNothingFound() async throws {
+        let manager = SubscriptionManager.shared
+        manager.syncWithAppStore = { throw StoreKitError.networkError(URLError(.notConnectedToInternet)) }
+        let found = await manager.restorePurchases()
+        XCTAssertFalse(found)
+        XCTAssertFalse(manager.isLoading)
+        XCTAssertTrue(manager.restoreFailureMessage?.hasPrefix("Restore failed:") == true)
+    }
+
+    func testRestoreFindsAPurchaseOnThisDeviceWithoutAskingTheAppStore() async throws {
+        let manager = SubscriptionManager.shared
+        _ = try await session.buyProduct(identifier: "com.openclaw.landlordhours.pro")
+        resetScoped()
+        var synced = false
+        manager.syncWithAppStore = { synced = true }
+        let found = await manager.restorePurchases()
+        XCTAssertTrue(found)
+        XCTAssertFalse(synced, "no Apple Account sign-in when the purchase is already here")
+        XCTAssertTrue(manager.isPro)
+    }
+
+    func testPurchaseThatNeverHearsBackTimesOutAndCanBeRetried() async throws {
+        let manager = SubscriptionManager.shared
+        await manager.loadProducts()
+        SubscriptionManager.purchaseTimeout = 0.3
+        manager.purchaseProduct = { _ in
+            try await Task.sleep(nanoseconds: 3_600_000_000_000)
+            return .userCancelled
+        }
+        let model = PaywallModel(context: .export, entry: .exportPage, store: manager)
+        await model.start()
+        let started = Date()
+        let bought = await model.buy()
+        XCTAssertFalse(bought)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 5)
+        XCTAssertEqual(model.phase, .failed)
+        XCTAssertTrue(model.canBuy, "the user can try again")
+        XCTAssertFalse(manager.isLoading)
+        XCTAssertEqual(manager.purchaseError, "The App Store didn't answer. If you finish the purchase, Pro unlocks on its own.")
+    }
+
+    func testListenerStartsOnceAndStops() {
+        let manager = SubscriptionManager.shared
+        manager.startTransactionListener()
+        manager.startTransactionListener()   // idempotent: still one listener
+        manager.stopTransactionListener()
+        manager.stopTransactionListener()
+    }
+}
+
+@MainActor
+final class StoreDeadlineTests: XCTestCase {
+    func testReturnsTheValueWhenTheCallFinishesInTime() async {
+        let value = await StoreDeadline.run(seconds: 5) { 42 }
+        XCTAssertEqual(value, 42)
+    }
+
+    func testReturnsNilWhenTheCallNeverFinishes() async {
+        let started = Date()
+        let value: Int? = await StoreDeadline.run(seconds: 0.2) {
+            try? await Task.sleep(nanoseconds: 3_600_000_000_000)
+            return 1
+        }
+        XCTAssertNil(value)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 5)
+    }
+
+    func testALateFinishStillRunsItsWork() async throws {
+        var ranToEnd = false
+        let value: Int? = await StoreDeadline.run(seconds: 0.1) {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            ranToEnd = true
+            return 1
+        }
+        XCTAssertNil(value)
+        try await Task.sleep(nanoseconds: 800_000_000)
+        XCTAssertTrue(ranToEnd, "a purchase that lands late must still be unlocked and finished")
     }
 }
 #endif
