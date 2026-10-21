@@ -152,7 +152,10 @@ final class NoteMergeHardRuleTests: XCTestCase {
 
     func testPropertyIsAlwaysOneOfTheUsers() {
         XCTAssertNil(merge("fixed the fence", NoteModelDraft(propertyOption: "Sunset Villa")).propertyId)
-        XCTAssertEqual(merge("fixed the fence", NoteModelDraft(propertyOption: "maple court")).propertyId, maple.id)
+        XCTAssertNil(merge("fixed the fence", NoteModelDraft(propertyOption: "maple court")).propertyId,
+                     "a pick the note doesn't name (\"all the rentals\") is dropped")
+        XCTAssertEqual(merge("fixed the fence at mapel", NoteModelDraft(propertyOption: "maple court")).propertyId, maple.id,
+                       "a typo the rules miss, named by the model and grounded in the note")
         // A rules match on an alias wins over a different model pick.
         XCTAssertEqual(merge("fixed the fence at Oak St", NoteModelDraft(propertyOption: "Pine Cabin")).propertyId, oak.id)
     }

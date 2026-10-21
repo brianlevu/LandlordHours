@@ -365,7 +365,7 @@ final class LogTimeUITests: XCTestCase {
         for shot in shots where shot.name.hasPrefix(prefix) && (names?.contains(shot.name) ?? true) {
             app.terminate()
             launch(seed: shot.seed, scheme: scheme, extra: shot.extra + sizeArgs(size))
-            let target = element(shot.waitFor)
+            var target = element(shot.waitFor)
             XCTAssertTrue(target.waitForExistence(timeout: 15), "\(shot.name): \(shot.waitFor)")
             if let tap = shot.tap {
                 // Let the fill settle, then tap (Undo) and wait for the result.
@@ -374,6 +374,8 @@ final class LogTimeUITests: XCTestCase {
                 if button.waitForExistence(timeout: 6) { button.tap() }
                 if let then = shot.then { XCTAssertTrue(element(then).waitForExistence(timeout: 6), "\(shot.name): \(then)") }
                 XCTAssertFalse(element("log.description").exists, "\(shot.name): Undo cleared the description")
+                // The waited-for element may be gone after the tap: scroll to the result instead.
+                target = element(shot.then ?? "log.property")
             }
             if shot.waitFor != "shell.toast" && shot.waitFor != "log.done" {
                 // Today's card sits under the hero, and at AX sizes a sheet's state (the Who row,

@@ -16,6 +16,8 @@ struct NoteEvalHost {
         var rules = NoteEvalSet.TierReport(name: "rules")
         for c in set.fixture.cases { set.record(&rules, c, NoteRules.read(set.request(c))) }
         print(rules.line)
+        print("NOTE-EVAL rules misses: \(rules.misses.joined(separator: " "))")
+        if args.contains("--rules-only") { return }
 
         var chainReport = NoteEvalSet.TierReport(name: "chain")
         for (name, backend) in tiers {

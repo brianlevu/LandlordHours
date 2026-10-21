@@ -92,7 +92,7 @@ enum NoteRules {
         (.financing, ["lender", "refinanc", "refi", "mortgage", "heloc", "loan", "rate lock", "interest rate", "appraisal"]),
         (.contractNegotiation, ["negotiat", "purchase agreement", "purchase contract", "sale of", "buyer", "seller", "counteroffer", "counter offer"]),
         (.investing, ["invest", "1031", "comps", "might buy", "want to buy", "for sale", "acquisition", "due diligence", "ran numbers", "run numbers", "running numbers", "sell or keep", "market research"]),
-        (.legal, ["attorney", "lawyer", "evict", "court", "permit", "license", "compliance", "zoning", "code enforcement", "lawsuit", "small claims", "legal"]),
+        (.legal, ["attorney", "lawyer", "evict", "courthouse", "court date", "in court", "permit", "license", "compliance", "zoning", "code enforcement", "lawsuit", "small claims", "legal"]),
         (.insurance, ["insurance", "insurer", "adjuster", "claim", "policy", "premium", "deductible", "state farm", "allstate", "underwrit"]),
         (.leasing, ["showing", "showed", "lease", "leasing", "screen", "applica", "credit check", "move in", "move out", "movein", "moveout", "listing", "zillow", "inquir", "guest message", "vacanc", "new tenant", "prospective tenant"]),
         (.bookkeeping, ["books", "bookkeep", "quickbooks", "tax", "1099", "cpa", "accountant", "cost seg", "ledger", "invoice", "receipt", "categoriz", "spreadsheet", "depreciation", "schedule e", "rent check", "deposit"]),
@@ -103,7 +103,7 @@ enum NoteRules {
     ]
 
     /// Phrases that end a word ("ac", "a c") must match whole words; the rest are word-prefix.
-    private static let wholeWord: Set<String> = ["ac", "a c", "tax", "rent", "books", "demo", "keys", "yard", "court", "loan", "refi", "comps", "claim"]
+    private static let wholeWord: Set<String> = ["ac", "a c", "tax", "rent", "books", "demo", "keys", "yard", "loan", "refi", "comps", "claim"]
 
     static func category(normalized: String) -> ActivityCategory? {
         let padded = " \(normalized) "

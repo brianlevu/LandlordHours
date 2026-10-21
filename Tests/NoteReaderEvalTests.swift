@@ -124,6 +124,12 @@ final class NoteReaderEvalTests: XCTestCase {
                 rawViolations.append("\(c.id): call failed \(error)")
             }
         }
+        if failures == set.fixture.cases.count {
+            // The model says it's available but every call failed (a slimmed simulator answers
+            // ModelManagerError 1008): that's "unavailable here", not a score.
+            print("NOTE-EVAL \(name): every call failed (\(rawViolations.first ?? "")); the chain fell back to rules on each")
+            throw XCTSkip("\(name): the model failed on every call here")
+        }
         latencies.sort()
         let median = latencies.isEmpty ? 0 : latencies[latencies.count / 2]
         print(report.line)
