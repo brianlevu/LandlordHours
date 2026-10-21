@@ -268,8 +268,13 @@ struct PaywallView: View {
             .overlay(alignment: .top) {
                 // A solid band behind the status bar: blueprint while the hero is under it, canvas
                 // once scrolled past, so the clock always reads (white on blue, dark on canvas).
+                // Once the plan card reaches the close button the band also covers the button's
+                // row, so text scrolls under a full-width bar, never beside the button mid-word.
                 (overHero ? AppColors.brand : colors.background)
-                    .frame(height: g.safeAreaInsets.top)
+                    .frame(height: g.safeAreaInsets.top + (overHero ? 0 : Self.closeRowHeight))
+                    .overlay(alignment: .bottom) {
+                        if !overHero { Rectangle().fill(colors.border).frame(height: 0.5) }
+                    }
                     .frame(maxWidth: .infinity)
                     .offset(y: -g.safeAreaInsets.top)
                     .allowsHitTesting(false)
@@ -287,9 +292,14 @@ struct PaywallView: View {
         .background(colors.background.ignoresSafeArea())
     }
 
-    /// The blue band (and the dark window) only while the hero is under the status bar.
+    /// Close button row: 4 pt above, the 44 pt button, 4 pt below.
+    static let closeRowHeight: CGFloat = 52
+
+    /// The blue band (and the dark window) only while the hero is under the status bar and the
+    /// close button's row. The plan card starts 40 pt above the hero's bottom, so it reaches the
+    /// close row once `heroH - 40 - y < top + closeRowHeight`.
     private func updateOverHero(offset y: CGFloat, heroH: CGFloat, top: CGFloat) {
-        let over = y < heroH - top - 8
+        let over = y < heroH - 40 - top - Self.closeRowHeight
         if overHero != over { overHero = over }
     }
 

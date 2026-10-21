@@ -266,7 +266,7 @@ final class PaywallCaptureUITests: XCTestCase {
         let home = ProcessInfo.processInfo.environment["SIMULATOR_HOST_HOME"] ?? NSHomeDirectory()
         let date = ProcessInfo.processInfo.environment["LH_CAPTURE_DATE"] ?? "2026-10-22"
         let url = URL(fileURLWithPath: home)
-            .appendingPathComponent("AgentScratch/landlordhours/\(date)/storekit-frames", isDirectory: true)
+            .appendingPathComponent("AgentScratch/landlordhours/\(date)/storekit-frames-r2", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
@@ -296,6 +296,10 @@ final class PaywallCaptureUITests: XCTestCase {
                     XCTAssertTrue(message.label.hasPrefix(outcome == "timeout" ? "The App Store didn't answer" : "Couldn't reach the App Store"),
                                   "\(suffix): wrong message '\(message.label)'")
                     save("paywall-restore-\(suffix)")
+                    // Scrolled: body text passes the close button's row; nothing may sit under it.
+                    app.swipeUp(velocity: .slow); app.swipeUp(velocity: .slow)
+                    Thread.sleep(forTimeInterval: 0.6)
+                    save("paywall-restore-\(suffix)-scrolled")
 
                     // Settings.
                     launch(scenario: "occasional", scheme: scheme, size: size, extra: ["-LHRestoreOutcome", outcome])
@@ -314,13 +318,19 @@ final class PaywallCaptureUITests: XCTestCase {
                         app.swipeUp(velocity: .slow); lifts += 1
                     }
                     row.tap()
-                    let alert = app.alerts["Restore purchase"].firstMatch
-                    XCTAssertTrue(alert.waitForExistence(timeout: 10), "\(suffix): no Settings alert")
+                    // The result shows inline under the row; the row stays tappable to retry.
+                    let expected = outcome == "timeout" ? "The App Store didn't answer" : "Couldn't reach the App Store"
+                    let shown = NSPredicate(format: "label CONTAINS %@", expected)
+                    XCTAssertTrue(app.descendants(matching: .any).matching(shown).firstMatch.waitForExistence(timeout: 10),
+                                  "\(suffix): no inline restore message")
+                    XCTAssertFalse(app.alerts.firstMatch.exists, "\(suffix): no system alert")
+                    var settle = 0
+                    while tabBar.exists && row.frame.maxY > tabBar.frame.minY - 12 && settle < 4 {
+                        app.swipeUp(velocity: .slow); settle += 1
+                    }
                     Thread.sleep(forTimeInterval: 0.8)
+                    XCTAssertTrue(row.isEnabled, "\(suffix): Restore can be tried again")
                     save("settings-restore-\(suffix)")
-                    guard alert.exists else { continue }
-                    alert.buttons["OK"].tap()
-                    XCTAssertTrue(row.waitForExistence(timeout: 3) && row.isEnabled, "\(suffix): Restore can be tried again")
                 }
             }
         }

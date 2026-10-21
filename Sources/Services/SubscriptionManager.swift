@@ -292,9 +292,9 @@ class SubscriptionManager: ObservableObject {
         return false
     }
 
-    static let restoreTimedOutMessage = "The App Store didn't answer. Try again in a moment."
-    static let restoreFailedMessage = "Couldn't reach the App Store. Check your connection and try again."
-    static let restoreCancelledMessage = "Restore was cancelled."
+    static let restoreTimedOutMessage = String(localized: "The App Store didn't answer. Try again in a moment.")
+    static let restoreFailedMessage = String(localized: "Couldn't reach the App Store. Check your connection and try again.")
+    static let restoreCancelledMessage = String(localized: "Restore was cancelled.")
 
     @MainActor
     func unlockPro() {
