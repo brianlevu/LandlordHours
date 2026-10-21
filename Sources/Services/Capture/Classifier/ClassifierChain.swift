@@ -213,7 +213,8 @@ struct ClassifierChain: CaptureClassifier {
 
     /// Rules and model each get half the vote on confidence; an item with a landlord signal
     /// never drops below the "Not sure" floor. A property the rules matched by name or
-    /// address wins over the model's pick. Calendar categories always stay on the 1.x value.
+    /// address wins over the model's pick. Calendar categories stay on the 1.x value, except
+    /// that a deal title (buy, sell, finance, negotiate) always gets its non-countable category.
     func merge(
         rules base: CaptureClassification,
         model: OnDeviceClassifier.OnDeviceResult,
@@ -245,6 +246,8 @@ struct ClassifierChain: CaptureClassifier {
         if !RulesClassifier.usesLegacyCategory(candidate.kind), let category = model.category {
             result.category = category
         }
+        // A deal title is never countable, whatever the model said (calendar included).
+        result.category = DealSignal.apply(result.category, title: candidate.title)
 
         // Only a confident model "yes" (>= modelYesNotSure) can keep an item visible on its own.
         let reason = model.reason.isEmpty ? "" : " – \(model.reason)"
