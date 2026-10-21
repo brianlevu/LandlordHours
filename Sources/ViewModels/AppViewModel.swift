@@ -428,6 +428,7 @@ class AppViewModel: ObservableObject {
         isSignedIn = false
         userName = ""
         EngagementWidgetSnapshotStore.save(.empty)
+        WidgetSurfaceStore.save(.empty)
         WidgetCenter.shared.reloadTimelines(ofKind: EngagementWidgetSnapshotStore.widgetKind)
 
         // Reset singleton managers in memory
@@ -511,6 +512,7 @@ class AppViewModel: ObservableObject {
         timerCategory = .repairs
         staleTimerRecovery = nil
         EngagementWidgetSnapshotStore.save(.empty)
+        WidgetSurfaceStore.save(.empty)
         WidgetCenter.shared.reloadTimelines(ofKind: EngagementWidgetSnapshotStore.widgetKind)
 
         saveTimerState()
@@ -746,7 +748,10 @@ class AppViewModel: ObservableObject {
         let property = RentalProperty(name: name, address: address, propertyType: type)
         properties.append(property)
         saveData()
-        triggerCelebration(.propertyAdded)
+        // 2.0: a toast, not the 1.x full-screen confetti (CelebrationType.propertyAdded is retired).
+        if !suppressCelebrations && persistenceError == nil {
+            LHToastCenter.shared.show(.success, "Added \(property.name)")
+        }
         Analytics.propertyAdded()
     }
     
@@ -1126,10 +1131,15 @@ class AppViewModel: ObservableObject {
 
     private static let persistenceLogger = Logger(subsystem: "com.openclaw.landlordhours", category: "Persistence")
 
-    private static let saveFailureMessage =
-        "Couldn't save your latest changes — free up space and try again."
-    private static let loadFailureMessage =
-        "Couldn't open your saved records. They're still on your device — reopen the app, and contact support if this keeps happening."
+    /// Shown in the one toast with "Retry" (copy sheet §6).
+    static let saveFailureMessage = "Couldn’t save your last change. Your iPhone may be out of space."
+    /// Shown in the one toast with "Help" (opens Get help).
+    static let loadFailureMessage = "Couldn’t open your records. They’re still safe on this iPhone."
+
+    /// The toast's "Retry": writes everything again (clears the error on success).
+    func retrySave() {
+        saveData()
+    }
 
     func saveData() {
         writePersistentStore()
@@ -1291,7 +1301,8 @@ class AppViewModel: ObservableObject {
                 recommendationMessage: recommendation.message
             )
         )
-        WidgetCenter.shared.reloadTimelines(ofKind: EngagementWidgetSnapshotStore.widgetKind)
+        // 2.0 surfaces: the widget draws WidgetSurfaceSnapshot (and reloads the same kind).
+        refreshWidgetSurface(now: now)
     }
 
     private func widgetGoalContext() -> (targetHours: Double, label: String, shortLabel: String) {

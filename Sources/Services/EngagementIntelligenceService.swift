@@ -169,7 +169,7 @@ final class EngagementIntelligenceService {
         } else if context.calendarDraftCount > 0 {
             candidate = calendarDraftRecommendation(count: context.calendarDraftCount)
         } else if shouldSuggestYearEndExport(context: context, snapshot: snapshot, calendar: calendar) {
-            candidate = yearEndExportRecommendation(hours: snapshot.yearHours)
+            candidate = yearEndExportRecommendation(hours: snapshot.yearHours, year: context.taxYear)
         } else if shouldSuggestInactivity(snapshot: snapshot) {
             candidate = inactivityRecommendation(days: snapshot.daysSinceLastLog ?? inactivityThresholdDays)
         } else if shouldSuggestBehindPace(snapshot: snapshot, calendar: calendar, now: context.now) {
@@ -189,8 +189,8 @@ final class EngagementIntelligenceService {
             surface: .homeNudge,
             reason: .setupProperty,
             destination: .addProperty,
-            title: "Create your first evidence file",
-            message: "Add a property before reminders or pace checks begin.",
+            title: "Add your first property",
+            message: "Then we can start finding your rental work.",
             cooldownDays: 0
         )
     }
@@ -200,8 +200,8 @@ final class EngagementIntelligenceService {
             surface: .liveActivity,
             reason: .timerSafety,
             destination: .timerReview,
-            title: "Timer still running",
-            message: "Review this \(String(format: "%.1f", hours))h timer before saving.",
+            title: "Your timer’s still going",
+            message: "It’s been running \(Self.durationText(hours: hours)). Stop it and check the time before saving.",
             cooldownDays: 1
         )
     }
@@ -213,8 +213,8 @@ final class EngagementIntelligenceService {
             surface: .homeNudge,
             reason: .calendarDraftsReady,
             destination: .calendarReview,
-            title: "Review likely landlord work",
-            message: "\(count) calendar item\(count == 1 ? "" : "s") may be landlord work.",
+            title: "\(count) to confirm",
+            message: count == 1 ? "1 calendar event looks like rental work." : "\(count) calendar events look like rental work.",
             cooldownDays: 3
         )
     }
@@ -224,8 +224,8 @@ final class EngagementIntelligenceService {
             surface: .notification,
             reason: .inactiveLogging,
             destination: .track,
-            title: "Log recent landlord work",
-            message: "No hours saved in \(days) days. Log anything you handled recently.",
+            title: NotificationCopy.inactive(days: days).title,
+            message: NotificationCopy.inactive(days: days).body,
             cooldownDays: 7
         )
     }
@@ -236,19 +236,19 @@ final class EngagementIntelligenceService {
             surface: .widget,
             reason: .behindPace,
             destination: .reports,
-            title: targetHours >= REPSRequirements.annualHourThreshold ? "Behind REPS pace" : "Behind pace",
-            message: "\(String(format: "%.0f", gap))h behind today's \(String(format: "%.0f", targetHours))h pace.",
+            title: "Behind by \(Int(gap.rounded(.up)))h",
+            message: "To reach \(String(format: "%.0f", targetHours))h by Dec 31, you’d be at \(String(format: "%.0f", snapshot.requiredHoursToDate))h today.",
             cooldownDays: 7
         )
     }
 
-    private func yearEndExportRecommendation(hours: Double) -> EngagementRecommendation {
+    private func yearEndExportRecommendation(hours: Double, year: Int) -> EngagementRecommendation {
         EngagementRecommendation(
             surface: .notification,
             reason: .yearEndExport,
             destination: .export,
-            title: "Prepare tax-year records",
-            message: "\(String(format: "%.1f", hours))h are ready for tax-year review.",
+            title: NotificationCopy.yearEnd(hours: hours, year: year).title,
+            message: NotificationCopy.yearEnd(hours: hours, year: year).body,
             cooldownDays: 14
         )
     }
@@ -258,10 +258,16 @@ final class EngagementIntelligenceService {
             surface: .widget,
             reason: .portfolioSummary,
             destination: .reports,
-            title: "Portfolio evidence summary",
-            message: "\(propertyCount) properties, \(String(format: "%.1f", hours))h logged this year.",
+            title: "\(propertyCount) properties",
+            message: "\(Int(hours.rounded(.down)))h of your hours this year.",
             cooldownDays: 7
         )
+    }
+
+    /// 4.2 → "4h 12m", 0.5 → "30m".
+    static func durationText(hours: Double) -> String {
+        let minutes = max(0, Int((hours * 60).rounded()))
+        return minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes)m"
     }
 
     private func shouldSuggestInactivity(snapshot: EngagementSnapshot) -> Bool {

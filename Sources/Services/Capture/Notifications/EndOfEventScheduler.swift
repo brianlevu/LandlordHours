@@ -213,7 +213,9 @@ final class EndOfEventScheduler: CaptureNotifier {
     func makeRequest(_ item: Planned, profileId: String, now: Date) -> UNNotificationRequest {
         let suggestion = item.suggestion
         let content = UNMutableNotificationContent()
-        content.body = body(for: suggestion, fireDate: item.fireDate, deferred: item.deferred)
+        let text = self.content(for: suggestion, fireDate: item.fireDate, deferred: item.deferred)
+        content.title = text.title
+        content.body = text.body
         content.categoryIdentifier = CaptureNotificationAction.categoryIdentifier
         content.threadIdentifier = Self.threadIdentifier
         var info = CaptureNotificationAction.userInfo(profileId: profileId, sourceKey: suggestion.sourceKey)
@@ -229,49 +231,28 @@ final class EndOfEventScheduler: CaptureNotifier {
         return UNNotificationRequest(identifier: Self.identifier(forSourceKey: suggestion.sourceKey), content: content, trigger: trigger)
     }
 
-    /// "Plumber visit just ended. Log 2h at Pine Cabin?" Plain words, no tax claims.
-    func body(for suggestion: Suggestion, fireDate: Date, deferred: Bool) -> String {
-        let title = Self.shortTitle(suggestion.title)
-        let when: String
+    /// Title "Plumber visit just ended", body "Log 2h at Pine Cabin?" (NotificationCopy).
+    func content(for suggestion: Suggestion, fireDate: Date, deferred: Bool) -> NotificationText {
+        let timing: NotificationCopy.Timing
         if !deferred {
-            when = "just ended"
+            timing = .justEnded
         } else if let end = suggestion.end, calendar.isDate(end, inSameDayAs: fireDate) {
-            when = "ended earlier today"
+            timing = .earlierToday
         } else {
-            when = "ended yesterday"
+            timing = .yesterday
         }
-        var ask = "Log it?"
-        if let hours = suggestion.proposedHours, hours > 0 {
-            ask = "Log \(Self.hoursText(hours))"
-            if let id = suggestion.proposedPropertyId, let name = propertyNames()[id], !name.isEmpty {
-                ask += " at \(name)"
-            }
-            ask += "?"
-        }
-        return "\(title) \(when). \(ask)"
+        let name = suggestion.proposedPropertyId.flatMap { propertyNames()[$0] }
+        return NotificationCopy.endOfVisit(eventTitle: suggestion.title, timing: timing, hours: suggestion.proposedHours, propertyName: name)
     }
 
-    nonisolated static func shortTitle(_ raw: String) -> String {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        let title = trimmed.isEmpty ? "Your event" : trimmed
-        guard title.count > 60 else { return title }
-        return String(title.prefix(59)).trimmingCharacters(in: .whitespaces) + "…"
-    }
+    nonisolated static func shortTitle(_ raw: String) -> String { NotificationCopy.shortTitle(raw) }
 
     /// 2 → "2h", 1.5 → "1.5h", 1.25 → "1.25h", 0.75 → "45 min".
-    nonisolated static func hoursText(_ hours: Double) -> String {
-        if hours < 1 {
-            return "\(max(1, Int((hours * 60).rounded()))) min"
-        }
-        let rounded = (hours * 100).rounded() / 100
-        if rounded == rounded.rounded() { return "\(Int(rounded))h" }
-        var text = String(format: "%.2f", rounded)
-        while text.hasSuffix("0") { text.removeLast() }
-        return text + "h"
-    }
+    nonisolated static func hoursText(_ hours: Double) -> String { NotificationCopy.hoursText(hours) }
 
     private static func isSame(_ a: UNNotificationRequest, _ b: UNNotificationRequest) -> Bool {
-        a.content.body == b.content.body
+        a.content.title == b.content.title
+            && a.content.body == b.content.body
             && (a.content.userInfo[fireAtKey] as? TimeInterval) == (b.content.userInfo[fireAtKey] as? TimeInterval)
             && (a.content.userInfo[timeZoneKey] as? String) == (b.content.userInfo[timeZoneKey] as? String)
             && (a.content.userInfo[NotificationPayload.profileIdKey] as? String) == (b.content.userInfo[NotificationPayload.profileIdKey] as? String)

@@ -1234,7 +1234,7 @@ final class EngagementIntelligenceServiceTests: XCTestCase {
             recommendation: service.recommendation(for: context)
         )
 
-        XCTAssertTrue(text.contains("You have 300.0 hours toward 750 this year"), text)
+        XCTAssertTrue(text.contains("You have 300 of your 750 hours for 2026"), text)
         XCTAssertFalse(text.contains("900"), text)
     }
 
@@ -1248,7 +1248,7 @@ final class EngagementIntelligenceServiceTests: XCTestCase {
             recommendation: service.recommendation(for: context)
         )
 
-        XCTAssertTrue(text.contains("You have 900.0 hours toward 100 this year"), text)
+        XCTAssertTrue(text.contains("You have 900 hours for 2026, past your 100-hour goal"), text)
     }
 
     func testWidgetSnapshotProgressUsesSelfHoursForReps() {

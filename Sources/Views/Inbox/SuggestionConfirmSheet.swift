@@ -74,7 +74,7 @@ struct SuggestionConfirmSheet: View {
             }
         }
         .scrollBounceBehavior(.basedOnSize)
-        // Log and "Not landlord work" stay pinned above the home indicator, so the decline is
+        // Log and "Not rental work" stay pinned above the home indicator, so the decline is
         // always visible, however long the sheet is (not-sure items carry an extra band).
         .safeAreaInset(edge: .bottom, spacing: 0) {
             pinnedActions
@@ -164,7 +164,7 @@ struct SuggestionConfirmSheet: View {
             }
             if badges.notSure {
                 band(
-                    title: Text("Not sure this is landlord work"),
+                    title: Text("Not sure this is rental work"),
                     body: "Log it only if it was work on a rental.",
                     wash: colors.cautionSurface
                 )
@@ -406,7 +406,7 @@ struct SuggestionConfirmSheet: View {
             .disabled(!missing.isEmpty)
             .accessibilityIdentifier("confirm.log")
 
-            Button("Not landlord work") {
+            Button("Not rental work") {
                 model.dismiss(suggestion)
                 dismiss()
             }

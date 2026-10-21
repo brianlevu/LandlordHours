@@ -75,7 +75,11 @@ final class AppModelHost {
     func sceneDidChange(isActive: Bool) {
         isSceneActive = isActive
         viewModel.queuesCelebrations = !isActive
-        if isActive { viewModel.presentPendingCelebrationIfAny() }
+        if isActive {
+            viewModel.presentPendingCelebrationIfAny()
+            // The Inbox may have grown in the background (end-of-visit detection): redraw the widget.
+            viewModel.refreshWidgetSurface()
+        }
     }
 
     /// Runs a write against the single model while holding a background-task assertion. The

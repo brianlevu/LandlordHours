@@ -56,18 +56,18 @@ final class SystemCaptureNotificationCenter: CaptureNotificationCenter {
 // in `CaptureNotificationAction` (NotificationActionRouter.swift).
 
 enum CaptureNotificationCategories {
-    /// End-of-event prompt: Log it / Edit… / Not landlord work.
+    /// End-of-event prompt: Log it / Edit… / Not rental work.
     static var suggestion: UNNotificationCategory {
         UNNotificationCategory(
             identifier: CaptureNotificationAction.categoryIdentifier,
             actions: [
                 // Writes a tax record from the lock screen, so the device must be unlocked.
-                UNNotificationAction(identifier: CaptureNotificationAction.logIt, title: "Log it",
-                                     options: [.authenticationRequired]),
-                UNNotificationAction(identifier: CaptureNotificationAction.edit, title: "Edit…",
-                                     options: [.foreground]),
-                UNNotificationAction(identifier: CaptureNotificationAction.notLandlordWork, title: "Not landlord work",
-                                     options: [])
+                UNNotificationAction(identifier: CaptureNotificationAction.logIt, title: NotificationCopy.Action.logIt.title,
+                                     options: [.authenticationRequired], icon: NotificationCopy.Action.logIt.icon),
+                UNNotificationAction(identifier: CaptureNotificationAction.edit, title: NotificationCopy.Action.edit.title,
+                                     options: [.foreground], icon: NotificationCopy.Action.edit.icon),
+                UNNotificationAction(identifier: CaptureNotificationAction.notLandlordWork, title: NotificationCopy.Action.notRentalWork.title,
+                                     options: [], icon: NotificationCopy.Action.notRentalWork.icon)
             ],
             intentIdentifiers: [],
             options: []
@@ -80,14 +80,14 @@ enum CaptureNotificationCategories {
             identifier: CaptureNotificationAction.reviewCategoryIdentifier,
             actions: [
                 UNNotificationAction(identifier: CaptureNotificationAction.edit, title: "Review",
-                                     options: [.foreground])
+                                     options: [.foreground], icon: UNNotificationActionIcon(systemImageName: "pencil"))
             ],
             intentIdentifiers: [],
             options: []
         )
     }
 
-    /// Follow-up after "Not landlord work": offers to stop suggesting events like it.
+    /// Follow-up after "Not rental work": offers to stop suggesting events like it.
     static var muteOffer: UNNotificationCategory {
         UNNotificationCategory(
             identifier: CaptureNotificationAction.muteOfferCategoryIdentifier,

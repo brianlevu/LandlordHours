@@ -131,7 +131,7 @@ struct InboxView: View {
             .accessibilityAction(named: quick ? "Log \(InboxFormat.hours(suggestion.proposedHours ?? 0))" : "Review and log") {
                 swipeLog(suggestion)
             }
-            .accessibilityAction(named: "Not landlord work") { dismiss(suggestion) }
+            .accessibilityAction(named: "Not rental work") { dismiss(suggestion) }
             .accessibilityIdentifier("inbox.row.\(suggestion.sourceKey)")
             // The visible next action on every row (2.0 onboarding: "Confirm the ones that were
             // rental work"). Confirm logs at once when everything is known; otherwise the sheet
@@ -179,7 +179,7 @@ struct InboxView: View {
     private func dismiss(_ suggestion: Suggestion) {
         model.dismiss(suggestion)
         dismissTick += 1
-        UIAccessibility.post(notification: .announcement, argument: "Marked not landlord work. Undo is available.")
+        UIAccessibility.post(notification: .announcement, argument: "Marked not rental work. Undo is available.")
     }
 
     // MARK: Banner
@@ -270,59 +270,26 @@ struct InboxView: View {
 }
 
 /// "Logged 2h · Undo". Shown by the shell just above the floating tab bar (the tab bar draws
-/// over tab content, so the toast can't live inside the Inbox's own safe area).
+/// over tab content, so the toast can't live inside the Inbox's own safe area). It is the app's one
+/// toast (`LHToast`), fed from the Inbox model.
 struct InboxUndoToast: View {
     let toast: InboxToast
     var onUndo: () -> Void
-    @Environment(\.colorScheme) private var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    private var symbol: String {
-        switch toast.kind {
-        case .success: return "checkmark.circle.fill"
-        case .neutral: return "xmark.circle.fill"
-        case .problem: return "exclamationmark.triangle.fill"
-        }
-    }
-
-    private var tint: Color {
-        switch toast.kind {
-        case .success: return colors.positive
-        case .neutral: return colors.textSecondary
-        case .problem: return colors.caution
-        }
-    }
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: symbol)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(tint)
-                .accessibilityHidden(true)
-            Text(toast.message)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(colors.textPrimary)
-                .lineLimit(2)
-            Spacer(minLength: 8)
-            if toast.undo != nil {
-                Button("Undo", action: onUndo)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(colors.action)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .accessibilityIdentifier("inbox.undo")
-            }
+        LHToast(spec: toast.spec, onAction: onUndo, identifier: "inbox.toast", actionIdentifier: "inbox.undo")
+    }
+}
+
+extension InboxToast {
+    /// The one toast's spec for this Inbox toast (same id, so transitions key on it).
+    var spec: LHToastSpec {
+        let kind: LHToastSpec.Kind
+        switch self.kind {
+        case .success: kind = .success
+        case .neutral: kind = .neutral
+        case .problem: kind = .problem
         }
-        .padding(.leading, 16)
-        .padding(.trailing, 8)
-        .frame(minHeight: 52)
-        .background(
-            Capsule()
-                .fill(colors.backgroundSecondary)
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.12), radius: 16, y: 4)
-        )
-        .overlay(Capsule().strokeBorder(colors.border, lineWidth: 1))
-        .compositingGroup()
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("inbox.toast")
+        return LHToastSpec(id: id, kind: kind, message: message, actionTitle: undo == nil ? nil : "Undo")
     }
 }

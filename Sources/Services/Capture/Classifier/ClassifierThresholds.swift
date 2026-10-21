@@ -57,7 +57,7 @@ enum ConfidenceBand: String, Equatable {
     /// No landlord signal at all: not suggested.
     case unlikely
 
-    static let notSureLabel = "Not sure this is landlord work"
+    static let notSureLabel = "Not sure this is rental work"
 }
 
 extension ClassifierThresholds {
