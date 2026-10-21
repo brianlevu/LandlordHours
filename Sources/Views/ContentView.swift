@@ -393,7 +393,7 @@ struct ContentView: View {
     private var selectedTabContent: some View {
         switch selectedTab {
         case 0:
-            DashboardView(inboxBackfillCount: inboxModel.backfillCount)
+            DashboardView(inbox: inboxModel)
         case 1:
             PropertiesView()
         case 3:
@@ -405,7 +405,7 @@ struct ContentView: View {
         case ShellTab.recordsIndex:
             HistoryView()
         default:
-            DashboardView(inboxBackfillCount: inboxModel.backfillCount)
+            DashboardView(inbox: inboxModel)
         }
     }
 

@@ -67,7 +67,7 @@ struct SuggestionRowView: View {
 
     private var textColumn: some View {
         VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 5) {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
                 Image(systemName: InboxFormat.kindSymbol(suggestion.kind))
                     // Scales with Dynamic Type (AX3: it sat tiny beside 2-line labels).
                     .font(.caption2.weight(.semibold))

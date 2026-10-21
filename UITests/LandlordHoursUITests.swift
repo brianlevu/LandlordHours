@@ -307,11 +307,11 @@ final class LandlordHoursUITests: XCTestCase {
 
     func testAttachmentPhotoSurvivesForceQuitAndRelaunch() {
         // Launch 1: seed an entry that carries a real, file-backed attachment.
-        launch(scenario: "occasional", tab: 0, extraArguments: ["-LHSeedAttachment"])
+        // 2.0: Today no longer lists recent entries (Records owns them), so open Records.
+        launch(scenario: "occasional", tab: 6, extraArguments: ["-LHSeedAttachment"])
 
-        // Recent Activity sits below the fold on the redesigned Home, and the splash
-        // can still be fading: scroll until the row is hittable before tapping.
-        let entryRow = app.staticTexts["Property Management"]
+        // Scroll until the row is hittable before tapping.
+        let entryRow = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Called tenant")).firstMatch
         XCTAssertTrue(entryRow.waitForExistence(timeout: 20))
         tapWhenHittable(entryRow, scrollIfNeeded: true)
 
@@ -323,13 +323,13 @@ final class LandlordHoursUITests: XCTestCase {
         // load from disk (the user stays signed in via the persisted scope keys).
         app.terminate()
         app.launchArguments = [
-            "-LHInitialTab", "0",
+            "-LHInitialTab", "6",
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US"
         ]
         app.launch()
 
-        let entryRowAgain = app.staticTexts["Property Management"]
+        let entryRowAgain = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Called tenant")).firstMatch
         XCTAssertTrue(entryRowAgain.waitForExistence(timeout: 20),
                       "Persisted entry should still be present after relaunch")
         tapWhenHittable(entryRowAgain, scrollIfNeeded: true)

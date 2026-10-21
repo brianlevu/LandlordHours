@@ -175,7 +175,7 @@ struct LogPropertyPicker: View {
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var viewModel: AppViewModel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var showPaywall = false
+    @State private var paywall: ProPaywallRequest?
     @State private var pickTick = 0
 
     var body: some View {
@@ -195,7 +195,7 @@ struct LogPropertyPicker: View {
                         row(property, index: index, colors: colors)
                         Rectangle().fill(colors.border.opacity(0.7)).frame(height: 0.5).padding(.leading, 60)
                     }
-                    if LogProGate.canAddProperty(viewModel) {
+                    if viewModel.canAddProperty() {
                         Button {
                             dismiss()
                             onAddProperty()
@@ -218,7 +218,7 @@ struct LogPropertyPicker: View {
                         .buttonStyle(.lhPressable)
                         .accessibilityIdentifier("picker.addProperty")
                     } else {
-                        PropertiesAtLimitRow(firstPropertyName: properties.first?.name) { showPaywall = true }
+                        PropertiesAtLimitRow(firstPropertyName: properties.first?.name) { openPaywall() }
                     }
                 }
                 .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -227,10 +227,16 @@ struct LogPropertyPicker: View {
         }
         .background(colors.background.ignoresSafeArea())
         .sensoryFeedback(.impact(weight: .light), trigger: pickTick)
-        .sheet(isPresented: $showPaywall) {
-            PaywallView(context: LogProGate.paywallContext, onClose: { showPaywall = false })
-        }
+        .proPaywall($paywall)
         .accessibilityIdentifier("picker.property")
+    }
+
+    /// ProGate's at-limit paywall (`.secondProperty`); after a purchase, go straight to adding the rental.
+    private func openPaywall() {
+        paywall = ProPaywallRequest(context: ProGate.context(for: .propertiesLimit), entry: .propertiesLimit, onUnlocked: {
+            dismiss()
+            onAddProperty()
+        })
     }
 
     private func row(_ property: RentalProperty, index: Int, colors: AdaptiveColors) -> some View {
@@ -273,12 +279,4 @@ struct LogPropertyPicker: View {
         .accessibilityAddTraits(on ? [.isSelected, .isButton] : [.isButton])
         .accessibilityIdentifier("picker.property.\(index)")
     }
-}
-
-/// The one seam to the Pro gate for Log time.
-/// INTEGRATION (wp-paywall): when `ProGate` lands on release/2.0, swap these two lines for it;
-/// callers keep asking `canAddProperty` and opening `paywallContext`.
-enum LogProGate {
-    @MainActor static func canAddProperty(_ viewModel: AppViewModel) -> Bool { viewModel.canAddProperty() }
-    static let paywallContext: PaywallContext = PropertyLimit.paywallContext
 }

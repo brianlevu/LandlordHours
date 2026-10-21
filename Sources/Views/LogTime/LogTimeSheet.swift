@@ -7,7 +7,7 @@ import PhotosUI
 // It moves between Log, the timer (idle / running) and the timer's review in place.
 // Wiring kept from 1.x TimeLogView: AITimeEntryService note parsing, VoiceEntryService dictation
 // (permission + denied path), the AppViewModel timer + Live Activity, the stopped-timer draft,
-// Self/Spouse honouring spouse tracking, the property limit (LogProGate), analytics (inside
+// Self/Spouse honouring spouse tracking, the property limit (ProGate), analytics (inside
 // AppViewModel.logTimeEntry) and the iCloud push (saveData path).
 
 struct LogTimeSheet: View {
