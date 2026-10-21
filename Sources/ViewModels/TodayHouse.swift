@@ -10,7 +10,8 @@ import Foundation
 //     reveal once.
 //
 // Countable hours (docs/2.0-auto-capture-plan.md, "the house counts the goal's countable hours"):
-//   - REPS: your own real-estate hours, exactly `repsStatus(.selfParticipant).realEstateHours`.
+//   - REPS: the real estate professional's own real-estate hours (yours, or your spouse's when
+//     they answered that their spouse is the pro), exactly `repsStatus(participant).realEstateHours`.
 //     Investor-only tasks never count. Spouse hours never count toward YOUR 750 (the IRS tests
 //     REPS for each spouse separately, as the audit export already says), so the REPS house
 //     never includes them, joint tracking or not.
@@ -33,7 +34,7 @@ extension AppViewModel {
     ) -> Double {
         switch goal ?? houseGoal {
         case .reps750:
-            return repsStatus(participant: .selfParticipant, year: year).realEstateHours
+            return repsStatus(participant: GoalManager.shared.repsParticipant, year: year).realEstateHours
         case .mp500, .mp100:
             return materialParticipationOverview(year: year, includeSpouse: includeSpouse ?? tracksSpouseJointly)
                 .ownerAndSpouseHours
@@ -269,6 +270,11 @@ final class TodayHouseEvents: ObservableObject, HouseMilestoneQueue {
 //   -LHTodayConfirmHours <h>   then log h more hours through addTimeEntry (the real save path),
 //                              so Today plays the confirm build and any milestone on appear
 //   -LHTodayBackfill <h> <n>   then report a finished Day-1 backfill (h hours in n suggestions)
+//   -LHGoalChoice <reps750|mp500|mp100|record>   set the goal before Today draws
+//   -LHGoalPro <me|spouse|nobody>                who does real estate as a main job (750 follows them)
+//   -LHTodayStrHours <h>       add a short-term rental ("Tahoe cabin") with h hours of its own
+//   -LHTodayNoOneMore <yes|no|unanswered>   this year's "did anyone else do more?" answer
+//   -LHTodaySpouseHours <h>    h spouse hours on the first rental (never joins your 750)
 // Compiled out of Release.
 extension AppViewModel {
     func applyTodayHoursSeedIfNeeded(arguments: [String] = ProcessInfo.processInfo.arguments) {
@@ -276,8 +282,24 @@ extension AppViewModel {
             guard let i = arguments.firstIndex(of: flag), arguments.indices.contains(i + offset) else { return nil }
             return arguments[i + offset]
         }
+        if let raw = value("-LHGoalChoice"), let choice = GoalChoice(rawValue: raw) {
+            GoalManager.shared.setGoalChoice(choice)
+        }
+        if let raw = value("-LHGoalPro"), let pro = RealEstatePro(rawValue: raw == "none" ? "nobody" : raw) {
+            GoalManager.shared.setGoalSetup(rental: GoalManager.shared.rentalMix, pro: pro)
+        }
         if let raw = value("-LHTodayHours"), let total = Double(raw) {
             seedTodayHours(total)
+        }
+        if let raw = value("-LHTodayStrHours"), let hours = Double(raw) { seedShortStayHours(hours) }
+        if let raw = value("-LHTodaySpouseHours"), let hours = Double(raw), let property = properties.first {
+            timeEntries.append(TimeEntry(propertyId: property.id, participant: .spouse, category: .management,
+                                         hours: hours, date: Date().addingTimeInterval(-86_400 * 2), notes: ""))
+            saveData()
+        }
+        if let raw = value("-LHTodayNoOneMore") {
+            let year = Calendar.current.component(.year, from: Date())
+            TaxProfileManager.shared.setNoOneParticipatedMore(raw == "yes" ? true : (raw == "no" ? false : nil), forYear: year)
         }
         if let raw = value("-LHTodayConfirmHours"), let hours = Double(raw), hours > 0,
            let property = properties.first {
@@ -294,6 +316,30 @@ extension AppViewModel {
            let rawCount = value("-LHTodayBackfill", offset: 2), let count = Int(rawCount) {
             TodayHouseEvents.shared.backfillFinished(foundHours: hours, suggestionCount: count)
         }
+    }
+
+    /// A short-term rental with `hours` of its own this year (8h days, before today).
+    private func seedShortStayHours(_ hours: Double) {
+        let wasSuppressed = suppressCelebrations
+        suppressCelebrations = true
+        defer { suppressCelebrations = wasSuppressed }
+        if !properties.contains(where: { $0.propertyType == .str }) {
+            addProperty(name: "Tahoe cabin", address: "", type: .str)
+        }
+        guard let cabin = properties.first(where: { $0.propertyType == .str }) else { return }
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: Date())
+        var remaining = max(0, hours), daysBack = 3
+        while remaining > 0.0001 {
+            let h = min(8, remaining)
+            guard let day = calendar.date(byAdding: .day, value: -daysBack, to: startOfToday),
+                  let date = calendar.date(byAdding: .hour, value: 10, to: day) else { break }
+            timeEntries.append(TimeEntry(propertyId: cabin.id, participant: .selfParticipant, category: .management,
+                                         hours: h, date: date, notes: ""))
+            remaining -= h
+            daysBack += 1
+        }
+        saveData()
     }
 
     private func seedTodayHours(_ total: Double) {

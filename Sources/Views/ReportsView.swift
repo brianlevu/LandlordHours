@@ -597,7 +597,7 @@ struct ParticipationConfirmationSheet: View {
                             .tracking(1.3)
                             .foregroundStyle(colors.draftingInk)
 
-                        Text("Did anyone else, like a property manager or contractor, spend more time on this property than you and your spouse this year?")
+                        Text("Did anyone else, like a property manager or contractor, spend more time on any of your rentals than you and your spouse this year?")
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(colors.textPrimary)
                             .fixedSize(horizontal: false, vertical: true)

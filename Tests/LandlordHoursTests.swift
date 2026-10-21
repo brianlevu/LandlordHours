@@ -1218,10 +1218,21 @@ final class EngagementIntelligenceServiceTests: XCTestCase {
         context.goalType = .str
         context.targetHours = 100
 
+        // Both kinds of rental (Oak is long-term, Elm is short-term): the 100 and 500 hour tests are
+        // counted per rental, so ungrouped owners get the short-term rental's own count (Elm's
+        // 100), never the long-term rental's 525 standing in for it.
         context.groupingElection = false
-        XCTAssertEqual(service.snapshot(for: context, calendar: calendar).yearHours, 525, accuracy: 0.001)
+        XCTAssertEqual(service.snapshot(for: context, calendar: calendar).yearHours, 100, accuracy: 0.001)
         context.groupingElection = true
         XCTAssertEqual(service.snapshot(for: context, calendar: calendar).yearHours, 625, accuracy: 0.001)
+        // Two long-term rentals: the best single property, as before.
+        let c = RentalProperty(name: "Birch", address: "3 Birch", propertyType: .ltr)
+        var ltrOnly = makeContext(now: date(year: 2026, month: 10, day: 1), properties: [a, c],
+                                  entries: [e(a, .selfParticipant, 300), e(a, .spouse, 225), e(c, .selfParticipant, 100)])
+        ltrOnly.goalType = .str
+        ltrOnly.targetHours = 100
+        ltrOnly.groupingElection = false
+        XCTAssertEqual(service.snapshot(for: ltrOnly, calendar: calendar).yearHours, 525, accuracy: 0.001)
     }
 
     func testIntentSummaryShowsSelfHoursTowardRepsTarget() {

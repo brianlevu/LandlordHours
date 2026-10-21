@@ -68,20 +68,82 @@ enum OnbGoal: String, CaseIterable {
 
     /// The primary button names the choice (design: "Commitment is a button").
     var callToAction: String {
-        switch self {
-        case .reps750: return "Build toward 750h"
-        case .mp500: return "Build toward 500h"
-        case .mp100: return "Build toward 100h"
-        case .record: return "Keep a record"
+        guard let hours = targetHours else { return String(localized: "Keep a record") }
+        return String(localized: "Aim for \(hours) hours")
+    }
+
+    /// The spouse note on "Who puts in the hours?" (REPS: one spouse must reach 750 alone).
+    static func spouseNote(for goal: OnbGoal?) -> String {
+        switch goal {
+        case .mp500, .mp100: return String(localized: "Your hours count together for this target.")
+        case .record: return String(localized: "You’ll each have your own count.")
+        case .reps750, nil: return String(localized: "You’ll each have your own count. The 750 follows one of you, never both added together.")
+        }
+    }
+}
+
+// MARK: - The goal step: two questions, then a suggested target (pure)
+
+/// Q1 "What do you rent out?" and Q2 "Do you or your spouse do real estate as a main job?"
+/// pick the suggested target. Nothing here says what most owners do: the suggestion is only
+/// "based on your answers".
+struct OnbGoalSuggestion: Equatable {
+    let suggested: OnbGoal
+    /// The other targets, in the order shown. "Just keep a record" is not here: it is always last.
+    let alternatives: [OnbGoal]
+
+    /// Every card in order: the suggestion, the other targets, then the record.
+    var ordered: [OnbGoal] { [suggested] + alternatives + [.record] }
+
+    /// - Real estate is your main job, or your spouse's: 750 (on that person's own count).
+    /// - Nobody, short stays (or both kinds): 100 and more than anyone else; 500 is the safer one.
+    /// - Nobody, long-term only: 500.
+    static func make(rental: RentalMix, pro: RealEstatePro) -> OnbGoalSuggestion {
+        switch pro {
+        case .me, .spouse:
+            return OnbGoalSuggestion(suggested: .reps750, alternatives: [.mp500, .mp100])
+        case .nobody:
+            return rental.hasShortStays
+                ? OnbGoalSuggestion(suggested: .mp100, alternatives: [.mp500, .reps750])
+                : OnbGoalSuggestion(suggested: .mp500, alternatives: [.mp100, .reps750])
+        }
+    }
+}
+
+/// Where the goal step is: the two questions, then the target.
+enum OnbGoalPhase: Equatable { case rental, pro, target }
+
+/// The words on the target cards. Every 750 card says what it counts.
+enum OnbGoalCopy {
+    static func title(_ goal: OnbGoal, pro: RealEstatePro?) -> String {
+        switch goal {
+        case .reps750:
+            switch pro {
+            case .me?: return String(localized: "750 hours, on your own count")
+            case .spouse?: return String(localized: "750 hours, your spouse’s own count")
+            default: return String(localized: "750 hours")
+            }
+        case .mp500: return String(localized: "500 hours")
+        case .mp100: return String(localized: "100 hours, and more than anyone else")
+        case .record: return String(localized: "Just keep a record")
         }
     }
 
-    /// The spouse note on "Who does the work?" (REPS: one spouse must qualify alone).
-    static func spouseNote(for goal: OnbGoal?) -> String {
+    static func detail(_ goal: OnbGoal, pro: RealEstatePro?, isSuggested: Bool, rental: RentalMix?) -> String {
         switch goal {
-        case .mp500, .mp100: return "Your hours count together for material participation."
-        case .record: return "You'll each have your own count."
-        case .reps750, nil: return "You'll each have your own count. For the 750-hour test, one of you has to get there alone."
+        case .reps750:
+            switch pro {
+            case .me?: return String(localized: "Counts the rental hours you log here. Your other work hours go in Settings.")
+            case .spouse?: return String(localized: "Counts the rental hours you log here. Your spouse’s hours are counted on their own. Yours are tracked too.")
+            default: return String(localized: "Counts the rental hours you log here. Other work hours go in Settings.")
+            }
+        case .mp500:
+            if isSuggested { return String(localized: "Counts the hours you put in yourself. Ask your CPA what it means for long-term rentals.") }
+            return String(localized: "Safer: no comparison with anyone else needed.")
+        case .mp100:
+            if isSuggested { return String(localized: "You’ll also confirm that no one else did more, cleaners and managers included.") }
+            return String(localized: "You’ll also confirm that no one else did more, cleaners and managers included.")
+        case .record: return String(localized: "No target. Dated entries for your CPA.")
         }
     }
 }
@@ -143,7 +205,24 @@ enum OnbFormat {
     /// At least one whole minute: what `hours(_:)` shows is not zero.
     static func isDisplayable(_ h: Double) -> Bool { (h * 60).rounded(.down) >= 1 }
 
-    static func suggestions(_ n: Int) -> String { n == 1 ? "1 suggestion" : "\(n) suggestions" }
+    static func suggestions(_ n: Int) -> String {
+        n == 1 ? String(localized: "1 suggestion") : String(localized: "\(n) suggestions")
+    }
+
+    /// "23 hours", "23.5 hours", "1 hour"; under an hour in whole minutes ("45 minutes"). Never
+    /// rounds up past what the rows add to.
+    static func hoursInWords(_ h: Double) -> String {
+        if h < 1 {
+            let minutes = Int((h * 60).rounded(.down))
+            return minutes == 1 ? String(localized: "1 minute") : String(localized: "\(minutes) minutes")
+        }
+        let tenths = (h * 10).rounded(.down) / 10
+        if tenths == tenths.rounded() {
+            let whole = Int(tenths)
+            return whole == 1 ? String(localized: "1 hour") : String(localized: "\(whole) hours")
+        }
+        return String(localized: "\(String(format: "%.1f", tenths)) hours")
+    }
 }
 
 // MARK: - Placing what was found (pure)
@@ -222,7 +301,9 @@ enum OnbStakedHeadline: Equatable {
 
     /// The drafting line under "Your house is staked." when nothing found counts.
     static func nothingCountableLine(_ count: Int) -> String {
-        "We found \(count == 1 ? "1 thing" : "\(count) things"), but none count toward your hours yet"
+        count == 1
+            ? String(localized: "We found 1 thing, but none count toward your hours yet.")
+            : String(localized: "We found \(count) things, but none count toward your hours yet.")
     }
 }
 
@@ -231,17 +312,65 @@ enum OnbCopy {
     static func propertyHint(calendar: OnbCalendar, scan: OnbScanState, found: OnbFound) -> String? {
         guard calendar == .allowed, found.count > 0 else { return nil }
         switch scan {
-        case .finished: return "\(OnbFormat.suggestions(found.count)) waiting"
-        case .running, .idle: return "\(OnbFormat.suggestions(found.count)) so far · still looking"
+        case .finished: return String(localized: "\(OnbFormat.suggestions(found.count)) waiting")
+        case .running, .idle: return String(localized: "\(OnbFormat.suggestions(found.count)) so far · still looking")
         case .blocked: return nil
         }
     }
 
-    /// The drafting line on Staked ("0 of 750h", "0h in the book").
+    /// The drafting line on Staked ("0 of 750 hours", "0 hours in the book").
     static func countLine(goal: OnbGoal?) -> String {
-        if let h = goal?.targetHours { return "0 of \(h)h" }
-        return "0h in the book"
+        if let h = goal?.targetHours { return String(localized: "0 of \(h) hours") }
+        return String(localized: "0 hours in the book")
     }
+
+    /// Staked, when the look-back found countable hours: "23 hours found. 0 counted." Found hours
+    /// are never counted until the owner confirms them, so the second number is what is
+    /// confirmed so far (nothing, in a new profile).
+    static func foundHeadline(_ found: OnbFound, counted: Double = 0) -> String {
+        String(localized: "\(OnbFormat.hoursInWords(found.hours)) found. \(Int(counted.rounded(.down))) counted.")
+    }
+
+    /// The line under the found headline: where the hours came from and what confirming does.
+    static func foundBody(count: Int, goal: OnbGoal?) -> String {
+        switch (count == 1, goal?.targetHours) {
+        case (true, let h?): return String(localized: "From 1 calendar event in the last 90 days. If it was rental work, confirm it and it counts toward your \(h) hours.")
+        case (false, let h?): return String(localized: "From \(count) calendar events in the last 90 days. Confirm the ones that were rental work and they count toward your \(h) hours.")
+        case (true, nil): return String(localized: "From 1 calendar event in the last 90 days. If it was rental work, confirm it and it goes in your record.")
+        case (false, nil): return String(localized: "From \(count) calendar events in the last 90 days. Confirm the ones that were rental work and they go in your record.")
+        }
+    }
+
+    /// Staked, with no found hours: "You’re set up for 100 hours."
+    static func setUpHeadline(goal: OnbGoal?) -> String {
+        if let h = goal?.targetHours { return String(localized: "You’re set up for \(h) hours.") }
+        return String(localized: "You’re set up to keep a record.")
+    }
+
+    static func setUpBody(goal: OnbGoal?) -> String {
+        goal?.targetHours == nil
+            ? String(localized: "Every hour you log from here goes in your record, dated the day it happened.")
+            : String(localized: "Every hour you log from here counts toward it, dated the day it happened.")
+    }
+
+    /// Upgraders, first screen: "Your 312 hours, on the way to 750."
+    static func upgradeHeadline(hours: Double, goal: HouseGoal, isRecord: Bool) -> String {
+        let whole = Int(hours.rounded(.down))
+        if isRecord {
+            return whole >= 1 ? String(localized: "Your \(whole) hours, safe in your record.") : String(localized: "Your records, safe where they are.")
+        }
+        let target = Int(goal.targetHours)
+        return whole >= 1 ? String(localized: "Your \(whole) hours, on the way to \(target).") : String(localized: "Your hours, on the way to \(target).")
+    }
+
+    static func upgradeBody(isRecord: Bool) -> String {
+        isRecord
+            ? String(localized: "Same hours, same PDF. Today now shows your hours, and the house shows how far along you are.")
+            : String(localized: "Same hours, same PDF. Today now shows your count against your target, and the house shows how far along you are.")
+    }
+
+    /// Only the 750 target: what it counts.
+    static let upgradeRepsNote = String(localized: "The 750 counts the rental hours you log here.")
 }
 
 // MARK: - Side effects (live wiring in OnboardingServices+Live; fakes in tests)
@@ -267,6 +396,7 @@ struct OnbCompletion: Equatable {
 enum OnbEvent: Equatable {
     case stepViewed(OnbStep, OnbCohort)
     case goalSelected(OnbGoal)
+    case goalAnswered(rental: RentalMix, pro: RealEstatePro)
     case calendarResult(OnbCalendar)
     case whoSelected(OnbWho)
     case propertyAdded(hasAddress: Bool, skipped: Bool)
@@ -281,8 +411,10 @@ struct OnbServices {
     /// and Restore never come through here; they open on Today).
     var signUpWithApple: () -> Void = {}
     var saveGoal: (OnbGoal) -> Void = { _ in }
+    /// What the target was suggested from: the kind of rental and who works in real estate.
+    var saveGoalAnswers: (_ rental: RentalMix, _ pro: RealEstatePro) -> Void = { _, _ in }
     var saveWho: (OnbWho) -> Void = { _ in }
-    var addProperty: (_ name: String, _ address: String) -> Void = { _, _ in }
+    var addProperty: (_ name: String, _ address: String, _ type: PropertyType) -> Void = { _, _, _ in }
     /// The real system prompt (or the DEBUG fake). Never called for "Not now".
     var requestCalendar: () async -> CalendarAccess = { .denied }
     var setCalendarSuggestions: (Bool) -> Void = { _ in }
@@ -319,6 +451,12 @@ final class OnbFlow {
     var finished = false
 
     var goal: OnbGoal?
+    /// The goal step's answers. The target is suggested from both.
+    var goalPhase: OnbGoalPhase = .rental
+    var rental: RentalMix?
+    var pro: RealEstatePro?
+    /// Which kind of rental the first property is (asked only when the owner has both kinds).
+    var firstPropertyIsShortStay = true
     var who: OnbWho = .me
     var name = ""
     var address = ""
@@ -344,6 +482,8 @@ final class OnbFlow {
     /// Upgraders: their real countable hours (the house at its real stage).
     var upgradeHours: Double = 0
     var upgradeGoal: HouseGoal = .reps750
+    /// Upgraders who chose "keep a record" have no target to be "on the way to".
+    var upgradeIsRecord = false
 
     @ObservationIgnored let services: OnbServices
 
@@ -360,10 +500,23 @@ final class OnbFlow {
     var progressTotal: Int { cohort == .new ? sequence.count - 1 : sequence.count }
     var progressValue: Int { cohort == .new ? index : index + 1 }
     var goalHours: Int? { goal?.targetHours }
+    var suggestion: OnbGoalSuggestion? {
+        guard let rental, let pro else { return nil }
+        return .make(rental: rental, pro: pro)
+    }
+    /// The kind the first property is saved as.
+    var firstPropertyType: PropertyType {
+        switch rental {
+        case .longTerm?: return .ltr
+        case .shortStays?: return .str
+        case .both?: return firstPropertyIsShortStay ? .str : .ltr
+        case nil: return .ltr
+        }
+    }
     var stakedHeadline: OnbStakedHeadline { .make(calendar: calendar, scan: scan, found: found) }
     var propertyHint: String? { OnbCopy.propertyHint(calendar: calendar, scan: scan, found: found) }
     var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
-    var displayName: String { trimmedName.isEmpty ? "Your rental" : trimmedName }
+    var displayName: String { trimmedName.isEmpty ? String(localized: "Your rental") : trimmedName }
 
     /// Fires the first step's view event (the init sets `index` without `didSet`).
     func appeared() { services.track(.stepViewed(step, cohort)) }
@@ -383,6 +536,12 @@ final class OnbFlow {
     }
 
     func back(_ animation: Animation? = nil) {
+        // Inside the goal step, back goes to the earlier question first.
+        if step == .goal, cohort == .new, goalPhase != .rental {
+            forward = false
+            withAnimation(animation) { goalPhase = goalPhase == .target ? .pro : .rental }
+            return
+        }
         guard let p = OnbRouting.back(from: index, in: sequence, calendar: calendar) else { return }
         forward = false
         withAnimation(animation) {
@@ -412,11 +571,30 @@ final class OnbFlow {
         next(animation)
     }
 
-    /// 1 · The goal button (disabled until a card is tapped).
+    /// 1a · "What do you rent out?": one tap moves on to the next question.
+    func answerRental(_ answer: RentalMix, _ animation: Animation? = nil) {
+        rental = answer
+        forward = true
+        withAnimation(animation) { goalPhase = .pro }
+    }
+
+    /// 1b · "Do you or your spouse do real estate as a main job?": one tap shows the suggested
+    /// target, already selected. The spouse path starts "Who puts in the hours?" on both of you.
+    func answerPro(_ answer: RealEstatePro, _ animation: Animation? = nil) {
+        pro = answer
+        if let rental { goal = OnbGoalSuggestion.make(rental: rental, pro: answer).suggested }
+        who = answer == .spouse ? .both : .me
+        forward = true
+        withAnimation(animation) { goalPhase = .target }
+    }
+
+    /// 1c · The goal button (disabled until a card is tapped).
     func confirmGoal(_ animation: Animation? = nil) {
         guard let goal else { return }
         services.saveGoal(goal)
+        if let rental, let pro { services.saveGoalAnswers(rental, pro) }
         services.track(.goalSelected(goal))
+        if let rental, let pro { services.track(.goalAnswered(rental: rental, pro: pro)) }
         next(animation)
     }
 
@@ -465,7 +643,7 @@ final class OnbFlow {
     func saveProperty() -> Bool {
         guard !trimmedName.isEmpty, !stakeDropped else { return false }
         let address = addressOpen ? self.address.trimmingCharacters(in: .whitespacesAndNewlines) : ""
-        services.addProperty(trimmedName, address)
+        services.addProperty(trimmedName, address, firstPropertyType)
         services.track(.propertyAdded(hasAddress: !address.isEmpty, skipped: false))
         return true
     }

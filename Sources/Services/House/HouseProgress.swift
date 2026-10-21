@@ -369,11 +369,15 @@ struct HouseProgress: Equatable, Sendable {
 
     /// VoiceOver: hours, goal and next milestone in words.
     /// "House built to 212 of 750 hours, REPS goal. Frame going up. Next, roof at 500 hours, 288 hours to go."
-    var accessibilityLabel: String {
+    var accessibilityLabel: String { accessibilityLabel(claimsGoalReached: true) }
+
+    /// `claimsGoalReached: false` leaves out "Goal hours reached" while a test still has an open
+    /// question (the 100-hour test before "did anyone do more?" is answered, the 750 before the half test).
+    func accessibilityLabel(claimsGoalReached: Bool) -> String {
         var parts: [String] = []
         parts.append("House built to \(wholeHours) of \(Int(goal.targetHours)) hours, \(goal.spokenName) goal.")
         parts.append("\(stage.spokenName).")
-        if isGoalMet {
+        if isGoalMet && claimsGoalReached {
             parts.append("Goal hours reached, based on your records.")
         }
         if let next = nextStep, let toGo = hoursToNextMilestone {

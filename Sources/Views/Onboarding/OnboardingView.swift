@@ -91,6 +91,7 @@ struct OnbWhatsNewSheet: View {
             let input = Self.houseInput(for: viewModel)
             made.upgradeHours = input.hours
             made.upgradeGoal = input.goal
+            made.upgradeIsRecord = GoalManager.shared.goalChoice == .record
             made.goal = viewModel.houseGoal == .reps750 ? .reps750 : (viewModel.houseGoal == .mp500 ? .mp500 : .mp100)
             OnbDebugLaunch.apply(to: made)
             flow = made
@@ -117,8 +118,9 @@ extension OnbServices {
         s.signUpWithApple = { app.signUp() }
         s.saveGoal = { goal in GoalManager.shared.setGoalChoice(goal.goalChoice) }
         s.saveWho = { who in TaxProfileManager.shared.spouseTracking = (who == .both) }
-        s.addProperty = { name, address in
-            app.addProperty(name: name, address: address, type: .ltr)
+        s.saveGoalAnswers = { rental, pro in GoalManager.shared.setGoalSetup(rental: rental, pro: pro) }
+        s.addProperty = { name, address, type in
+            app.addProperty(name: name, address: address, type: type)
             OnbBackfill.placeUnplaced(app: app)
         }
         s.requestCalendar = { await environment.requestCalendar() }
@@ -407,12 +409,12 @@ struct OnbWelcomeContent: View {
             Color.clear.frame(height: max(0, houseBottom))
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("Every hour builds the house.")
+                    Text("Know where you stand on your hours.")
                         .lhDisplayFont(.display)
                         .foregroundStyle(HouseTokens.onHeroPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.isHeader)
-                    Text("We find the hours you already spend on your rentals. Each one you confirm adds to the house.")
+                    Text("Pick the hour target you’re aiming for: 100, 500 or 750. We find the hours you already spend on your rentals. You confirm them, and the house shows how close you are.")
                         .font(.body)
                         .foregroundStyle(HouseTokens.onHeroSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -439,7 +441,7 @@ struct OnbWelcomeContent: View {
                     .allowsHitTesting(false)
             }
             VStack(spacing: 10) {
-                Button("Start building") { flow.start(OnbMotion.morph(reduce)) }
+                Button("Get started") { flow.start(OnbMotion.morph(reduce)) }
                     .buttonStyle(OnbHeroPill())
                     .accessibilityIdentifier("onb-start")
                 if account == .shown {
@@ -450,7 +452,7 @@ struct OnbWelcomeContent: View {
                     }
                     .padding(.top, 4)
                     if !restorable.isEmpty {
-                        Button(restorable.count == 1 ? "Restore earlier data" : "Restore earlier data (\(restorable.count))") { showRestore = true }
+                        Button(restorable.count == 1 ? String(localized: "Restore earlier data") : String(localized: "Restore earlier data (\(restorable.count))")) { showRestore = true }
                             .buttonStyle(OnbLink(color: HouseTokens.onHeroPrimary))
                             .font(.footnote.weight(.semibold))
                             .accessibilityIdentifier("welcome.restoreEarlierData")
@@ -554,47 +556,46 @@ struct OnbStakedContent: View {
                     switch headline {
                     case .found(let found):
                         // The aha leads: what we found, then that it is theirs to confirm.
-                        Text("\(flow.displayName) is staked").onbDrafting(HouseTokens.drafting)
-                        Text("\(found.hoursText) found")
+                        Text(String(localized: "\(flow.displayName) is staked")).onbDrafting(HouseTokens.drafting)
+                        Text(OnbCopy.foundHeadline(found))
                             .lhDisplayFont(.display)
                             .foregroundStyle(HouseTokens.onHeroPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 6)
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityIdentifier("staked-found")
                             .onAppear { flow.foundShown = true }
-                        Text("From \(found.count) calendar \(found.count == 1 ? "event" : "events") in the last 90 days. Confirm the ones that were rental work.")
+                        Text(OnbCopy.foundBody(count: found.count, goal: flow.goal))
                             .font(.body)
                             .foregroundStyle(HouseTokens.onHeroSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 8)
-                        Text("\(OnbCopy.countLine(goal: flow.goal)) counted so far").onbDrafting(HouseTokens.drafting).padding(.top, 14)
                     default:
                         Text(OnbCopy.countLine(goal: flow.goal)).onbDrafting(HouseTokens.drafting)
-                        Text("Your house is staked.")
+                        Text(OnbCopy.setUpHeadline(goal: flow.goal))
                             .lhDisplayFont(.display)
                             .foregroundStyle(HouseTokens.onHeroPrimary)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 8)
                             .accessibilityAddTraits(.isHeader)
+                            .accessibilityIdentifier("staked-setup")
                         if case .nothingCountable(let count) = headline {
                             // Right under the headline, so it's seen at every text size.
                             // A sentence, so body text (mono caps are for short eyebrows only).
-                            Text(OnbStakedHeadline.nothingCountableLine(count) + ".")
+                            Text(OnbStakedHeadline.nothingCountableLine(count))
                                 .font(.body.weight(.semibold))
                                 .foregroundStyle(HouseTokens.onHeroPrimary)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .padding(.top, 10)
                                 .accessibilityIdentifier("staked-nothing-countable")
                         }
-                        Text(flow.goal == .record
-                             ? "Every hour you confirm from here is saved to your record."
-                             : "Every hour you confirm from here adds to your house.")
+                        Text(OnbCopy.setUpBody(goal: flow.goal))
                             .font(.body)
                             .foregroundStyle(HouseTokens.onHeroSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 10)
                         if case .lookingBack(let found) = headline {
-                            Text(found.hours > 0 ? "Looking back 90 days · \(found.hoursText) so far" : "Looking back 90 days")
+                            Text(found.hours > 0 ? String(localized: "Looking back 90 days · \(found.hoursText) so far") : String(localized: "Looking back 90 days"))
                                 .onbDrafting(HouseTokens.drafting)
                                 .padding(.top, 16)
                                 .accessibilityIdentifier("staked-looking")
@@ -618,7 +619,7 @@ struct OnbStakedContent: View {
                     .frame(height: 44)
                     .allowsHitTesting(false)
             }
-            Button(headline.reviewCount.map { "Review \(OnbFormat.suggestions($0))" } ?? "Go to Today") {
+            Button(headline.reviewCount.map { String(localized: "Review \(OnbFormat.suggestions($0))") } ?? String(localized: "Go to Today")) {
                 flow.leaveStaked()
             }
             .buttonStyle(OnbHeroPill())

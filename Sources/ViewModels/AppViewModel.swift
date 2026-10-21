@@ -1870,6 +1870,8 @@ extension AppViewModel: CloudKitSyncDelegate {
         let goalManager = GoalManager.shared
         goalManager.propertyGoals = []
         goalManager.globalGoalType = scenario == .occasional ? .str : .reps
+        goalManager.setGoalSetup(rental: nil, pro: nil)          // a mock launch starts with no onboarding answers
+        TaxProfileManager.shared.setNoOneParticipatedMore(nil, forYear: Calendar.current.component(.year, from: Date()))
 
         switch scenario {
         case .firstTime:

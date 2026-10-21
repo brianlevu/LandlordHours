@@ -62,10 +62,14 @@ struct DashboardView: View {
     /// The Inbox's model (shell-owned): Today's To confirm reads and writes the same list, so the
     /// count here, the Inbox and its tab badge are one number.
     @ObservedObject var inbox: InboxViewModel
+    /// The "did anyone else do more?" answer lives here; the hero's words follow it.
+    @ObservedObject private var taxProfile = TaxProfileManager.shared
 
     private var currentYear: Int { Calendar.current.component(.year, from: Date()) }
+    /// The real estate professional's own count: yours, or your spouse's when they answered that
+    /// their spouse is the pro.
     private var repsStatus: TaxQualificationEngine.REPSResult {
-        viewModel.repsStatus(participant: .selfParticipant, year: currentYear)
+        viewModel.repsStatus(participant: goalManager.repsParticipant, year: currentYear)
     }
 
     // MARK: House inputs
@@ -76,6 +80,20 @@ struct DashboardView: View {
     private var targetHours: Double { houseGoal.targetHours }
     private var isGoalMet: Bool { HouseProgress(hours: totalHours, goal: houseGoal).isGoalMet }
     private var pace: TodayPace { TodayPace.resolve(hours: totalHours, goal: houseGoal) }
+
+    /// The hero's words: target, whose count, and where you stand against Dec 31.
+    private var heroCopy: TodayHeroCopy {
+        TodayHeroCopy.make(.init(
+            goal: houseGoal,
+            isRecord: goalManager.goalChoice == .record,
+            hours: totalHours,
+            year: currentYear,
+            now: InboxClock.now(),
+            repsParticipant: goalManager.repsParticipant,
+            halfTest: repsStatus.moreThanHalfStatus,
+            noOneParticipatedMore: taxProfile.noOneParticipatedMore(forYear: currentYear)))
+    }
+    @State private var showParticipationSheet = false
 
     /// What the hero draws: the live hours, or the pre-save hours while a confirm build waits to play.
     private var heroProgress: HouseProgress {
@@ -159,7 +177,8 @@ struct DashboardView: View {
     /// This week's countable hours, Monday first, with the house's spouse rule.
     private var weekDays: [TodayWeekDay] {
         TodayWeek.days(entries: viewModel.timeEntries, goal: houseGoal,
-                       includeSpouse: viewModel.tracksSpouseJointly, now: InboxClock.now())
+                       includeSpouse: viewModel.tracksSpouseJointly,
+                       repsParticipant: goalManager.repsParticipant, now: InboxClock.now())
     }
 
     private var showsRecordSlot: Bool {
@@ -687,7 +706,7 @@ struct DashboardView: View {
         if shouldShowActivationCard {
             return "\(completedActivationSteps)/2 essentials complete"
         }
-        return pace.text
+        return heroCopy.status ?? pace.text
     }
 
     private var userInitials: String {
@@ -705,8 +724,9 @@ struct DashboardView: View {
             HouseHeroCard(
                 progress: heroProgress,
                 year: currentYear,
-                status: pace.text,
-                statusTone: heroStatusTone,
+                status: heroCopy.status,
+                statusTone: heroCopy.tone,
+                heroCopy: heroCopy,
                 onCelebration: { _ in presentNextCelebration() },
                 footer: heroFooter,
                 stakeName: heroStakeName,
@@ -721,6 +741,18 @@ struct DashboardView: View {
             .accessibilityElement(children: viewModel.properties.isEmpty && isNewOwner ? .contain : .ignore)
             .accessibilityLabel(heroAccessibilityLabel)
             .accessibilityIdentifier("today.hero")
+            // Over 100 hours with "did anyone do more?" unanswered: the hero opens that question.
+            .onTapGesture { if heroCopy.needsConfirmation && !hoursPending { showParticipationSheet = true } }
+            .accessibilityAddTraits(heroCopy.needsConfirmation ? .isButton : [])
+            .accessibilityHint(heroCopy.needsConfirmation ? "Opens the question about anyone else’s hours" : "")
+            .sheet(isPresented: $showParticipationSheet) {
+                ParticipationConfirmationSheet(
+                    year: currentYear,
+                    currentAnswer: taxProfile.noOneParticipatedMore(forYear: currentYear)
+                ) { answer in
+                    taxProfile.setNoOneParticipatedMore(answer, forYear: currentYear)
+                }
+            }
 
         }
     }
@@ -781,7 +813,7 @@ struct DashboardView: View {
         case .found(let hours):
             return "\(currentYear). \(live.accessibilityLabel) \(hours) found in your calendar, not counted until you confirm."
         case nil:
-            return "\(currentYear). \(live.accessibilityLabel) \(pace.text)."
+            return "\(currentYear). \(live.accessibilityLabel(claimsGoalReached: heroCopy.claimsReached)) \(heroCopy.qualifier.map { "\($0). " } ?? "")\(heroCopy.spoken)."
         }
     }
 

@@ -37,6 +37,7 @@ enum OnbStatusBar {
 //   -LHOnbStaked 1        step 4 after the stake dropped (the flag is up)
 //   -LHOnbHoldStake 1     after "Save it", stay on step 4 (stake-moment captures)
 //   -LHOnbFocus 1         focus the name field (keyboard frames)
+//   -LHOnbRental short|long|both · -LHOnbPro me|spouse|none · -LHOnbGoalPhase rental|pro|target
 //   -LHOnbScrollBottom 1  scroll step content to the end (AX3 frames)
 //   -LHOnbUpgradeHours <h> What's new house at h hours
 enum OnbDebugLaunch {
@@ -58,6 +59,20 @@ enum OnbDebugLaunch {
             flow.goal = raw == "none" ? nil : OnbGoal(rawValue: raw)
         } else if startStep != nil, flow.cohort == .new, (startStep ?? .welcome) != .welcome {
             flow.goal = .reps750
+        }
+        // The goal step: -LHOnbRental short|long|both, -LHOnbPro me|spouse|none, -LHOnbGoalPhase rental|pro|target.
+        if let raw = value("-LHOnbRental") {
+            flow.rental = ["short": RentalMix.shortStays, "long": .longTerm, "both": .both][raw]
+        }
+        if let raw = value("-LHOnbPro") {
+            flow.pro = ["me": RealEstatePro.me, "spouse": .spouse, "none": .nobody][raw]
+        }
+        if let rental = flow.rental, let pro = flow.pro, value("-LHOnbGoal") == nil {
+            flow.goal = OnbGoalSuggestion.make(rental: rental, pro: pro).suggested
+        }
+        if let raw = value("-LHOnbGoalPhase") {
+            flow.goalPhase = ["rental": OnbGoalPhase.rental, "pro": .pro, "target": .target][raw] ?? .rental
+            if flow.goalPhase != .target, value("-LHOnbGoal") == nil { flow.goal = nil }
         }
         if let raw = value("-LHOnbWho"), let who = OnbWho(rawValue: raw) { flow.who = who }
         if let name = value("-LHOnbName") { flow.name = name }

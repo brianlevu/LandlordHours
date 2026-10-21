@@ -55,7 +55,7 @@ final class TodayHouseUITests: XCTestCase {
         XCTAssertTrue(hero.waitForExistence(timeout: 20))
         XCTAssertTrue(hero.label.contains("House built to 0 of 750 hours"), hero.label)
         XCTAssertTrue(hero.label.contains("An empty lot"), hero.label)
-        XCTAssertTrue(hero.label.contains("No hours logged yet"), hero.label)
+        XCTAssertTrue(hero.label.contains("a week to finish by Dec 31"), "No hours yet: the weekly number, not a scolding. \(hero.label)")
         let rule = app.descendants(matching: .any)["dashboard.fiftyPercent"]
         XCTAssertTrue(rule.waitForExistence(timeout: 5))
         XCTAssertTrue(rule.label.contains("Not checked"), rule.label)
@@ -68,7 +68,7 @@ final class TodayHouseUITests: XCTestCase {
         XCTAssertTrue(hero.label.contains("212 of 750 hours"), hero.label)
         XCTAssertTrue(hero.label.contains("Frame going up"), hero.label)
         XCTAssertTrue(hero.label.contains("roof at 500 hours"), hero.label)
-        XCTAssertTrue(hero.label.contains("Behind by") || hero.label.contains("On pace"), hero.label)
+        XCTAssertTrue(hero.label.contains("a week to finish by Dec 31") || hero.label.contains("on pace for Dec 31"), hero.label)
         XCTAssertTrue(app.descendants(matching: .any)["dashboard.fiftyPercent"].label.contains("Not checked"))
         XCTAssertFalse(app.buttons["milestone-continue"].waitForExistence(timeout: 3), "No milestone at 212h")
         attach("today-212h")
@@ -96,7 +96,8 @@ final class TodayHouseUITests: XCTestCase {
         XCTAssertTrue(hero.waitForExistence(timeout: 20))
         XCTAssertTrue(hero.label.contains("751 of 750 hours"), hero.label)
         XCTAssertTrue(hero.label.contains("House finished"), hero.label)
-        XCTAssertTrue(hero.label.contains("Goal hours reached"), hero.label)
+        XCTAssertTrue(hero.label.contains("reached · add other work hours"), hero.label)
+        XCTAssertFalse(hero.label.contains("Goal hours reached"), "The half test is still open, so the hero does not claim it. \(hero.label)")
         // Hours alone never claim REPS: the 50% rule is still "Not checked".
         XCTAssertTrue(app.descendants(matching: .any)["dashboard.fiftyPercent"].label.contains("Not checked"))
         attach("today-751h")
@@ -150,5 +151,46 @@ final class TodayHouseUITests: XCTestCase {
         _ = XCTWaiter.wait(for: [XCTestExpectation(description: "settle")], timeout: 5)
         XCTAssertFalse(app.buttons["milestone-continue"].exists, "214h crosses no milestone")
         attach("today-after-log")
+    }
+
+    // MARK: Goal-first hero words (2.0 messaging)
+
+    private static let pinned = ["-LHFixedNow", "2026-10-20T15:00"]
+
+    func testHeroSaysTheTargetAndThatYouAreOnPace() {
+        launch(hours: "420", extra: ["-LHGoalChoice", "mp500"] + Self.pinned)
+        XCTAssertTrue(waitForHeroLabel(containing: "of 500 hours · on pace for Dec 31"), hero.label)
+    }
+
+    func testHeroBehindSaysTheHoursAWeek() {
+        launch(hours: "210", extra: ["-LHGoalChoice", "mp500"] + Self.pinned)
+        XCTAssertTrue(waitForHeroLabel(containing: "of 500 hours · 29h a week to finish by Dec 31"), hero.label)
+    }
+
+    func test750SaysWhoseCountItIs() {
+        launch(hours: "212", extra: ["-LHGoalChoice", "reps750", "-LHGoalPro", "spouse", "-LHTodaySpouseHours", "300"] + Self.pinned)
+        XCTAssertTrue(waitForHeroLabel(containing: "spouse’s own count"), hero.label)
+        XCTAssertTrue(hero.label.contains("House built to 300 of 750 hours"), "The spouse is the pro: their own hours, not ours. \(hero.label)")
+        launch(hours: "212", extra: ["-LHGoalChoice", "reps750", "-LHGoalPro", "me", "-LHTodaySpouseHours", "300"] + Self.pinned)
+        XCTAssertTrue(waitForHeroLabel(containing: "your own count"), hero.label)
+        XCTAssertTrue(hero.label.contains("House built to 212 of 750 hours"), "Spouse hours never join your 750. \(hero.label)")
+    }
+
+    func testShortStayHeroShowsTheCabinsOwnCount() {
+        launch(hours: "212", extra: ["-LHGoalChoice", "mp100", "-LHTodayStrHours", "86", "-LHTodayNoOneMore", "unanswered"] + Self.pinned)
+        XCTAssertTrue(waitForHeroLabel(containing: "House built to 86 of 100 hours"),
+                      "Both kinds of rental: the short-term rental's own count, not the duplex's 212. \(hero.label)")
+        XCTAssertTrue(hero.label.contains("more than anyone else"), hero.label)
+    }
+
+    func testOver100HoursAsksWhetherAnyoneDidMoreBeforeSayingReached() {
+        launch(hours: "104", extra: ["-LHGoalChoice", "mp100", "-LHTodayNoOneMore", "unanswered"] + Self.pinned)
+        XCTAssertTrue(waitForHeroLabel(containing: "of 100 hours · confirm no one did more"), hero.label)
+        XCTAssertFalse(hero.label.contains("reached"), "Never reached until it is confirmed. \(hero.label)")
+        hero.tap()
+        let yes = app.buttons["participation.answer.yes"]
+        XCTAssertTrue(yes.waitForExistence(timeout: 8), "The hero opens the existing question")
+        yes.tap()
+        XCTAssertTrue(waitForHeroLabel(containing: "reached · no one did more, based on your records"), hero.label)
     }
 }

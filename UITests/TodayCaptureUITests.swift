@@ -52,7 +52,18 @@ final class TodayCaptureUITests: XCTestCase {
         ("draft", tuesday + ["-LHSeedTimerDraft", "twoPending", "-LHTodayWeekSample", "2,1",
                              "-LHTodayScrollTo", "draft"], "draft.card"),
         ("noproperty", ["-LHMockScenario", "emptyMainTabs"], "today.hero"),
+        // Goal-first hero (2.0 messaging): target in the eyebrow, whose count, and where you stand.
+        ("hero-500-pace", base + tuesday + ["-LHGoalChoice", "mp500", "-LHTodayHours", "420"], "today.hero"),
+        ("hero-500-behind", base + tuesday + ["-LHGoalChoice", "mp500", "-LHTodayHours", "212"], "today.hero"),
+        ("hero-750-own", base + tuesday + ["-LHGoalChoice", "reps750", "-LHGoalPro", "me", "-LHTodayHours", "212"], "today.hero"),
+        ("hero-750-spouse", base + tuesday + ["-LHGoalChoice", "reps750", "-LHGoalPro", "spouse", "-LHTodayHours", "212",
+                                              "-LHTodaySpouseHours", "300"], "today.hero"),
+        ("hero-750-reached", base + tuesday + ["-LHGoalChoice", "reps750", "-LHGoalPro", "me", "-LHTodayHours", "760"], "today.hero"),
+        ("hero-100-confirm", base + tuesday + ["-LHGoalChoice", "mp100", "-LHTodayHours", "104", "-LHTodayNoOneMore", "unanswered"], "today.hero"),
+        ("hero-100-str", base + tuesday + ["-LHGoalChoice", "mp100", "-LHTodayHours", "212", "-LHTodayStrHours", "86"], "today.hero"),
+        ("hero-record", base + tuesday + ["-LHGoalChoice", "record", "-LHTodayHours", "212"], "today.hero"),
     ]
+    private static let base = ["-LHMockScenario", "emptyMainTabs", "-LHSeedSuggestions", "empty"]
 
     private func capture(_ state: String, then action: ((XCUIApplication) -> String?)? = nil, as name: String? = nil) {
         guard let (_, stateArgs, anchor) = Self.states.first(where: { $0.0 == state }) else { return XCTFail("No state \(state)") }
@@ -108,6 +119,10 @@ final class TodayCaptureUITests: XCTestCase {
     func testCaptureRecord() { capture("record") }
     func testCaptureDraft() { capture("draft") }
     func testCaptureNoProperty() { capture("noproperty") }
+    func testCaptureHeroGoalFirst() {
+        for state in ["hero-500-pace", "hero-500-behind", "hero-750-own", "hero-750-spouse", "hero-750-reached",
+                      "hero-100-confirm", "hero-100-str", "hero-record"] { capture(state) }
+    }
 
     /// The shared full-width Inbox toast after a confirm from Today (Undo showing).
     func testCaptureToast() {

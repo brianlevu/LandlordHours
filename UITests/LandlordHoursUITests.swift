@@ -19,12 +19,14 @@ final class LandlordHoursUITests: XCTestCase {
     func testFirstRunPropertyNeedsOnlyAName() {
         launch(scenario: "firstTime", tab: 0)
         waitAndTap(app.buttons["onb-start"])
-        XCTAssertTrue(app.staticTexts["What are you building toward?"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["What do you rent out?"].waitForExistence(timeout: 8))
+        waitAndTap(app.buttons["rental-both"])
+        waitAndTap(app.buttons["pro-none"])
         let goalCTA = app.buttons["onb-primary"]
-        XCTAssertFalse(goalCTA.isEnabled, "The goal button waits for a choice")
-        waitAndTap(app.buttons["goal-mp"])
-        XCTAssertTrue(app.buttons["goal-mp100"].waitForExistence(timeout: 3), "500 or 100 reveals its two chips")
-        XCTAssertEqual(goalCTA.label, "Build toward 500h")
+        XCTAssertTrue(goalCTA.waitForExistence(timeout: 5))
+        XCTAssertEqual(goalCTA.label, "Aim for 100 hours", "Both kinds, no real estate pro: 100 hours is suggested and selected")
+        waitAndTap(app.buttons["goal-500"])
+        XCTAssertEqual(goalCTA.label, "Aim for 500 hours")
         waitAndTap(goalCTA)
         waitAndTap(app.buttons["onb-link"])                    // Calendar: Not now
         waitAndTap(app.buttons["who-both"])
@@ -32,7 +34,7 @@ final class LandlordHoursUITests: XCTestCase {
         waitAndTap(app.buttons["onb-primary"])
 
         let save = app.buttons["onb-primary"]
-        XCTAssertTrue(app.staticTexts["Name your first rental."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Which rental first?"].waitForExistence(timeout: 5))
         XCTAssertFalse(save.isEnabled, "Save waits for a name")
         XCTAssertFalse(app.textFields["property-address"].exists, "Address folded away")
         let nameField = app.textFields["property-name"]

@@ -247,6 +247,8 @@ enum Analytics {
             capture("onboarding_step_viewed", properties: ["step": step.analyticsKey, "cohort": cohort.rawValue])
         case .goalSelected(let goal):
             capture("onboarding_goal_selected", properties: ["goal": goal.rawValue])
+        case .goalAnswered(let rental, let pro):
+            capture("onboarding_goal_answered", properties: ["rental": rental.rawValue, "pro": pro.rawValue])
         case .calendarResult(let answer):
             capture("calendar_permission_result", properties: ["result": answer.analyticsKey, "context": "onboarding"])
         case .whoSelected(let who):

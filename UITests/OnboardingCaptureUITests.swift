@@ -86,23 +86,26 @@ final class OnboardingCaptureUITests: XCTestCase {
         XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 20))
         shot("00-welcome", scheme, suffix)
         tap(app.buttons["onb-start"])
-        XCTAssertTrue(app.buttons["goal-750"].waitForExistence(timeout: 5))
-        shot("01a-goal-empty", scheme, suffix)
-        tap(app.buttons["goal-750"])
-        shot("01-goal", scheme, suffix)
-        // Large text: the 500 or 100 card sits below the fold; scroll to it first.
-        let mpCard = app.buttons["goal-mp"]
+        XCTAssertTrue(app.buttons["rental-short"].waitForExistence(timeout: 5))
+        shot("01a-goal-rent", scheme, suffix)
+        tap(app.buttons["rental-both"])
+        XCTAssertTrue(app.buttons["pro-none"].waitForExistence(timeout: 5))
+        shot("01b-goal-pro", scheme, suffix)
+        tap(app.buttons["pro-none"])
+        XCTAssertTrue(app.buttons["goal-100"].waitForExistence(timeout: 5))
+        shot("01c-goal-target-100", scheme, suffix)
+        // The other targets: 500 selected, then the 750 (which says what it counts).
         let pinnedTop = app.buttons["onb-primary"].frame.minY
-        // Clear of the pinned button (a tap there would land on the pinned area, not the card).
-        for _ in 0..<5 where !mpCard.exists || mpCard.frame.minY + 60 > pinnedTop { app.swipeUp(velocity: .slow) }
-        mpCard.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.0)).withOffset(CGVector(dx: 0, dy: 30)).tap()
-        let mp500 = app.buttons["goal-mp500"]
-        for _ in 0..<3 where !(mp500.exists && mp500.isHittable) { app.swipeUp(velocity: .slow) }
-        XCTAssertEqual(app.buttons["onb-primary"].label, "Build toward 500h", "The 500h goal is selected")
-        shot("01b-goal-mp", scheme, suffix)
+        let c500 = app.buttons["goal-500"]
+        for _ in 0..<5 where !c500.exists || !c500.isHittable || c500.frame.maxY > pinnedTop { app.swipeUp(velocity: .slow) }
+        tap(c500)
+        XCTAssertEqual(app.buttons["onb-primary"].label, "Aim for 500 hours")
+        shot("01d-goal-target-500", scheme, suffix)
         let repsCard = app.buttons["goal-750"]
-        for _ in 0..<4 where !repsCard.isHittable { app.swipeDown(velocity: .slow) }
+        for _ in 0..<5 where !repsCard.exists || !repsCard.isHittable || repsCard.frame.maxY > pinnedTop { app.swipeUp(velocity: .slow) }
         tap(repsCard)
+        shot("01e-goal-target-750", scheme, suffix)
+        for _ in 0..<6 { app.swipeDown(velocity: .fast) }
         tap(app.buttons["onb-primary"])
         XCTAssertTrue(app.buttons["onb-link"].waitForExistence(timeout: 5))
         Thread.sleep(forTimeInterval: 1.6)                      // rows + hatched storeys
@@ -121,7 +124,7 @@ final class OnboardingCaptureUITests: XCTestCase {
         field.typeText("Oak Street duplex")
         shot("04d-property-keyboard", scheme, suffix)
         tap(app.buttons["onb-primary"])                         // Save it
-        XCTAssertTrue(app.staticTexts["Want a note when a visit ends?"].waitForExistence(timeout: 6))
+        XCTAssertTrue(app.staticTexts["Want a nudge to log it while it’s fresh?"].waitForExistence(timeout: 6))
         shot("05-notify", scheme, suffix)
         tap(app.buttons["onb-primary"])                         // fake Allow
         XCTAssertTrue(app.staticTexts["staked-found"].waitForExistence(timeout: 10))
@@ -140,7 +143,7 @@ final class OnboardingCaptureUITests: XCTestCase {
         // A look-back that finds only work that never counts: no "0h found", the honest words.
         launch(scheme: scheme, size: size, perms + ["-LHBackfillNonCountable"])
         tap(app.buttons["onb-start"], timeout: 20)
-        tap(app.buttons["goal-750"])
+        UITestIsolation.answerGoalQuestions(app)
         tap(app.buttons["onb-primary"])
         tap(app.buttons["onb-primary"])                         // fake Allow
         tap(app.buttons["onb-primary"])                         // Who: Continue
@@ -163,7 +166,7 @@ final class OnboardingCaptureUITests: XCTestCase {
         // Skip path → Today's empty lot.
         launch(scheme: scheme, size: size, [])
         tap(app.buttons["onb-start"], timeout: 20)
-        tap(app.buttons["goal-750"])
+        UITestIsolation.answerGoalQuestions(app)
         tap(app.buttons["onb-primary"])
         tap(app.buttons["onb-link"])
         tap(app.buttons["onb-primary"])
