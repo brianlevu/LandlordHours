@@ -56,6 +56,7 @@ struct ExportPDFView: View {
                     line: ProGate.lockLine(.exportPage),
                     keeps: ProGate.keepsLine(.exportPage),
                     unlocked: !ProGate.isExportLocked(isPro: subscriptionManager.isPro),
+                    stamp: "PREVIEW",
                     onUnlock: openPaywall
                 ) {
                     VStack(alignment: .leading, spacing: 24) {

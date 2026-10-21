@@ -104,7 +104,18 @@ struct RecordPagePreview: View {
             HStack {
                 Text("LANDLORDHOURS").font(.system(size: 6.5, weight: .semibold, design: .monospaced)).tracking(0.8).foregroundStyle(AppColors.brand)
                 Spacer()
-                Text("Page 1").font(.system(size: 6)).foregroundStyle(grey)
+                if model.isSample {
+                    // The stamp sits in the header's own slot, so it never covers the title.
+                    Text("SAMPLE")
+                        .font(.system(size: 8, weight: .bold, design: .monospaced)).tracking(1.2)
+                        .foregroundStyle(draftingInk)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(draftingInk, lineWidth: 1.2))
+                        .rotationEffect(.degrees(-4))
+                        .accessibilityIdentifier("paywall.sampleStamp")
+                } else {
+                    Text("Page 1").font(.system(size: 6)).foregroundStyle(grey)
+                }
             }
             Text("\(String(model.year)) hours record").font(.system(size: 13, weight: .semibold, design: .serif)).foregroundStyle(ink)
             Text("\(model.owner) · \(model.range)").font(.system(size: 6.5)).foregroundStyle(grey).lineLimit(1)
@@ -158,19 +169,6 @@ struct RecordPagePreview: View {
         .padding(.top, 18)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Color.white)
-        .overlay(alignment: .topTrailing) {
-            if model.isSample {
-                // Full draftingInk: 5.6:1 on the white page (r4 gate: the 55% stamp was 2.34:1).
-                Text("SAMPLE")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced)).tracking(1.5)
-                    .foregroundStyle(draftingInk)
-                    .padding(.horizontal, 10).padding(.vertical, 4)
-                    .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(draftingInk, lineWidth: 1.5))
-                    .rotationEffect(.degrees(-6))
-                    .padding(.top, 52).padding(.trailing, 14)
-                    .accessibilityIdentifier("paywall.sampleStamp")
-            }
-        }
         .environment(\.colorScheme, .light)
         .dynamicTypeSize(.large)
     }

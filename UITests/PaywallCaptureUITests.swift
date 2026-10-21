@@ -2,7 +2,7 @@ import XCTest
 
 /// Frames for the visual gate: every paywall state and every lock, light and dark, at the
 /// default text size, XXL and AX3. PNGs go straight to the host's
-/// `~/AgentScratch/landlordhours/<LH_CAPTURE_DATE or 2026-10-19>/paywall-prod-frames-r2/raw/`.
+/// `~/AgentScratch/landlordhours/<LH_CAPTURE_DATE or 2026-10-19>/paywall-prod-frames-r3/raw/`.
 /// Run with `-only-testing:LandlordHoursUITests/PaywallCaptureUITests`.
 final class PaywallCaptureUITests: XCTestCase {
     private var app: XCUIApplication!
@@ -25,7 +25,7 @@ final class PaywallCaptureUITests: XCTestCase {
         let home = ProcessInfo.processInfo.environment["SIMULATOR_HOST_HOME"] ?? NSHomeDirectory()
         let date = ProcessInfo.processInfo.environment["LH_CAPTURE_DATE"] ?? "2026-10-19"
         let url = URL(fileURLWithPath: home)
-            .appendingPathComponent("AgentScratch/landlordhours/\(date)/paywall-prod-frames-r2/raw", isDirectory: true)
+            .appendingPathComponent("AgentScratch/landlordhours/\(date)/paywall-prod-frames-r3/raw", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
@@ -93,6 +93,64 @@ final class PaywallCaptureUITests: XCTestCase {
                 tapButton("Properties")
                 scrollTo("lock.properties_limit")
                 save("lock-properties-\(scheme)-\(sizeName)")
+            }
+        }
+    }
+
+    // MARK: r3: only the frames whose states changed
+
+    /// The lock's "Unlock Pro" must end fully above the floating tab bar (or the sheet's bottom
+    /// edge) at full opacity: scroll until it does, assert it, then capture.
+    private func scrollUnlockClear(_ lockID: String) {
+        let unlock = app.descendants(matching: .any)[lockID].firstMatch.buttons["lock.unlock"].firstMatch
+        let tabBar = app.buttons["tab.today"]
+        func clearLine() -> CGFloat {
+            tabBar.exists && tabBar.isHittable ? tabBar.frame.minY - 12 : app.frame.maxY - 40
+        }
+        var swipes = 0
+        while (!unlock.exists || !unlock.isHittable || unlock.frame.maxY > clearLine()) && swipes < 14 {
+            app.swipeUp(velocity: .slow)
+            swipes += 1
+        }
+        Thread.sleep(forTimeInterval: 1.0)
+        XCTAssertTrue(unlock.exists && unlock.frame.maxY <= clearLine(), "\(lockID): Unlock Pro clears the tab bar / sheet edge")
+    }
+
+    func testCaptureR3ChangedFrames() {
+        for scheme in Self.schemes {
+            // AX3: each lock scrolled so its Unlock Pro sits clear and at full opacity.
+            let ax3 = "UICTContentSizeCategoryAccessibilityXL"
+            launch(scenario: "occasional", scheme: scheme, size: ax3)
+            tapButton("Properties")
+            scrollUnlockClear("lock.properties_limit")
+            save("lock-properties-\(scheme)-ax3")
+
+            launch(scenario: "occasional", scheme: scheme, size: ax3)
+            scrollUnlockClear("lock.today_record")
+            save("lock-today-record-\(scheme)-ax3")
+
+            launch(scenario: "occasional", scheme: scheme, size: ax3)
+            tapButton("Open reports")
+            scrollUnlockClear("lock.reports_export")
+            save("lock-reports-\(scheme)-ax3")
+
+            for (sizeName, size) in Self.sizes {
+                // Export page: the PREVIEW stamp over the blur; at AX3 also scrolled to the CTA.
+                launch(scenario: "occasional", scheme: scheme, size: size)
+                tapButton("Open reports")
+                tapButton("reports.export")
+                waitFor("lock.export_page")
+                save("lock-export-\(scheme)-\(sizeName)")
+                if sizeName == "ax3" {
+                    scrollUnlockClear("lock.export_page")
+                    save("lock-export-\(scheme)-ax3-bottom")
+                }
+
+                // Sample page: the stamp sits in the page header.
+                launch(scenario: "occasional", scheme: scheme, size: size, extra: ["-LHPaywallPreview", "export", "-LHPaywallSample"])
+                XCTAssertTrue(app.staticTexts["paywall.title"].waitForExistence(timeout: 12))
+                Thread.sleep(forTimeInterval: 1.4)
+                save("paywall-sample-\(scheme)-\(sizeName)")
             }
         }
     }

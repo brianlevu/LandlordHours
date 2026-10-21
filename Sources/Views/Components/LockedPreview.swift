@@ -22,6 +22,8 @@ struct LockedPreview<Sharp: View, Locked: View>: View {
     var unlocked = false
     /// The fade's target colour: the canvas for pages, the card for cards.
     var surface: Color? = nil
+    /// A stamp drawn on top of the blur (e.g. "PREVIEW" over a blurred page), never blurred.
+    var stamp: String? = nil
     /// Side inset of a `.row` lock's line and button (0 inside a List row, which insets already).
     var rowInset: CGFloat = 16
     var onUnlock: () -> Void
@@ -73,6 +75,13 @@ struct LockedPreview<Sharp: View, Locked: View>: View {
                     cta
                         .padding(.top, size == .page ? 72 : 40)
                         .transition(.opacity)
+                    if let stamp {
+                        LockStamp(text: stamp)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .padding(.top, 14)
+                            .padding(.trailing, 18)
+                            .transition(.opacity)
+                    }
                 }
             }
             .clipped()
@@ -261,5 +270,23 @@ private struct LocalPaywallCover: ViewModifier {
             )
             .environmentObject(viewModel)
         }
+    }
+}
+
+/// A drafting-ink stamp, unblurred, on top of a locked preview (≥5:1 on the canvas and card).
+struct LockStamp: View {
+    let text: String
+    @Environment(\.colorScheme) private var colorScheme
+    var body: some View {
+        let ink = AdaptiveColors(colorScheme: colorScheme).draftingInk
+        Text(text)
+            .font(.system(size: 11, weight: .bold, design: .monospaced)).tracking(1.5)
+            .foregroundStyle(ink)
+            .padding(.horizontal, 10).padding(.vertical, 4)
+            .background(RoundedRectangle(cornerRadius: 4).fill(AdaptiveColors(colorScheme: colorScheme).backgroundSecondary))
+            .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(ink, lineWidth: 1.5))
+            .rotationEffect(.degrees(-6))
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .accessibilityIdentifier("lock.stamp")
     }
 }
