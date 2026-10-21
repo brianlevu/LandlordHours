@@ -77,8 +77,8 @@ enum NoteRules {
         reading.propertyId = mentioned.count >= 2 ? nil : property(normalized: normalized, properties: request.properties)?.id
         reading.category = category(normalized: normalized)
         reading.hours = NoteDuration.hours(in: text)
-        // "20 min each" across two rentals is not 20 min for one of them.
-        if mentioned.count >= 2, RulesEngine.words(normalized).contains("each") { reading.hours = nil }
+        // "20 min each" is a per-item time, not the total, and not 20 min for one of two rentals.
+        if NoteDuration.isPerItem(text) { reading.hours = nil }
         reading.date = NoteDateResolver.resolve(text, now: request.now, calendar: request.calendar)
         reading.participant = participant(normalized: normalized, spouseTracking: request.spouseTracking)
         reading.tier = .rules
@@ -249,6 +249,12 @@ enum NoteDuration {
 
     /// True when the note says how long, loosely (a model's hours are only kept with this).
     static func hasEvidence(_ text: String) -> Bool { hours(in: text) != nil }
+
+    /// "20 min each", "10 minutes apiece": the time is per item, so it is never the log's total.
+    /// Checked on the note itself, so every tier (rules, merge guard) agrees.
+    static func isPerItem(_ text: String) -> Bool {
+        !Set(RulesEngine.words(RulesEngine.normalize(text))).isDisjoint(with: ["each", "apiece"])
+    }
 
     private static func firstMatch(_ pattern: String, in t: String) -> [String?]? {
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
@@ -658,7 +664,9 @@ enum NoteReadMerge {
 
         // Hours: the deterministic parse first; a model's number only when the note states a
         // duration at all.
-        if let hours = rules.hours {
+        if NoteDuration.isPerItem(request.text) {
+            out.hours = nil   // "20 min each": per item, in every tier, whatever the model said
+        } else if let hours = rules.hours {
             out.hours = hours
         } else if rules.mentionedPropertyCount >= 2 {
             out.hours = nil   // split across rentals: the user says how long each took

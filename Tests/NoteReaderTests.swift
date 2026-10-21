@@ -499,8 +499,8 @@ final class PCCEntitlementTests: XCTestCase {
         XCTAssertTrue(PCCGate(settings: settings, isFlagEnabled: { true }, system: FixedPCCStatus(value: .available)).availability().isAvailable)
     }
 
-    func testTheRemoteFlagDefaultsOff() {
-        XCTAssertFalse(CaptureFlag.privateCloudCompute.defaultValue)
+    func testTheRemoteFlagDefaults() {
+        XCTAssertTrue(CaptureFlag.privateCloudCompute.defaultValue, "PCC ships on; the remote flag is its kill switch")
         XCTAssertTrue(CaptureFlag.noteModel.defaultValue, "on-device note reading has its own kill switch, default on")
     }
 
@@ -616,6 +616,26 @@ final class NoteTwoRentalsTests: XCTestCase {
         let r = NoteRules.read(request("Maple + Oak: collected rent, 20 min each"))
         XCTAssertEqual(r.mentionedPropertyCount, 2)
         XCTAssertNil(r.hours, "20 min each is not 20 min for one rental")
+    }
+
+    /// Real-phone miss (adversarial v23): a model's hours must not survive "each", in any tier.
+    func testEachDurationIsDroppedEvenWhenAModelGivesHours() {
+        for text in ["Maple + Oak: collected rent, 20 min each", "fixed 3 doors at Oak, 10 min each"] {
+            let req = request(text)
+            let rules = NoteRules.read(req)
+            XCTAssertNil(rules.hours, text)
+            for tier in [Suggestion.Tier.onDevice, .pcc] {
+                let merged = NoteReadMerge.merge(rules: rules, draft: NoteModelDraft(propertyOption: "Oak Street Duplex", hours: 0.33),
+                                                 prompt: NoteModelPrompt(req), tier: tier)
+                XCTAssertNil(merged.hours, "\(text) / \(tier)")
+            }
+        }
+        // Two rentals named: property empty too, with the hint count.
+        let two = request("Maple + Oak: collected rent, 20 min each")
+        let merged = NoteReadMerge.merge(rules: NoteRules.read(two), draft: NoteModelDraft(propertyOption: "Oak Street Duplex", hours: 0.33),
+                                         prompt: NoteModelPrompt(two), tier: .pcc)
+        XCTAssertNil(merged.propertyId)
+        XCTAssertEqual(merged.mentionedPropertyCount, 2)
     }
 
     func testOneRentalNamedTwoWaysIsStillOne() {
