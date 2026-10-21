@@ -788,79 +788,52 @@ struct DashboardView: View {
     // MARK: - Activation
     private var homeActivationCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 12) {
-                SetupHeaderTile(symbol: "checklist")
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Finish your tax-ready setup")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                    Text("A few quick steps make every hour easier to review later.")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                        .lineSpacing(2)
-                }
-
-                Spacer(minLength: 8)
-
-                Text("\(completedActivationSteps)/2")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+            let isLarge = dynamicTypeSize.isAccessibilitySize
+            let badge = Text("\(completedActivationSteps)/2")
+                .font(.system(.caption, design: .rounded, weight: .black))
+                .foregroundStyle(colors.textSecondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(colors.backgroundTertiary)
+                .clipShape(Capsule())
+            let words = VStack(alignment: .leading, spacing: 4) {
+                Text("Finish your tax-ready setup")
+                    .font(.system(.headline, design: .rounded, weight: .black))
+                    .foregroundStyle(colors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("A few quick steps make every hour easier to review later.")
+                    .font(.system(.footnote, design: .rounded, weight: .medium))
                     .foregroundStyle(colors.textSecondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(colors.backgroundTertiary)
-                    .clipShape(Capsule())
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if isLarge {
+                // Past the accessibility sizes the words take the full width; tile and count share a row above.
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack { SetupHeaderTile(symbol: "checklist"); Spacer(minLength: 8); badge }
+                    words
+                }
+            } else {
+                HStack(alignment: .top, spacing: 12) {
+                    SetupHeaderTile(symbol: "checklist")
+                    words
+                    Spacer(minLength: 8)
+                    badge
+                }
             }
 
             // A plain Grid, not LazyVGrid: four tiles need no laziness, and since WP-L removed the
             // launch splash the lazy grid left its first row out of the accessibility tree.
-            Grid(horizontalSpacing: 10, verticalSpacing: 10) {
-                GridRow {
-                activationActionTile(
-                    title: "Property",
-                    subtitle: viewModel.properties.isEmpty ? "Add first" : "\(viewModel.properties.count) ready",
-                    symbol: "building.2",
-                    isComplete: !viewModel.properties.isEmpty,
-                    accessibilityIdentifier: "home.activation.property",
-                    action: {
-                        openAddPropertyFromHome()
-                    }
-                )
-
-                activationActionTile(
-                    title: "First hour",
-                    subtitle: viewModel.timeEntries.isEmpty ? "Log now" : AppFormat.hours(totalHours),
-                    symbol: "clock",
-                    isComplete: !viewModel.timeEntries.isEmpty,
-                    accessibilityIdentifier: "home.activation.firstHour",
-                    action: {
-                        NotificationCenter.default.post(name: .switchToTab, object: 2)
-                    }
-                )
-
+            // At accessibility sizes the 2x2 grid becomes one column, so the scaled words fit.
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: 10) {
+                    ForEach(activationTiles, id: \.identifier) { activationActionTile($0) }
                 }
-                GridRow {
-                activationActionTile(
-                    title: "Learn",
-                    subtitle: "What counts",
-                    symbol: "book",
-                    isComplete: false,
-                    accessibilityIdentifier: "home.activation.learn",
-                    action: {
-                        showLearningCenter = true
-                    }
-                )
-
-                activationActionTile(
-                    title: "Report",
-                    subtitle: "Check pace",
-                    symbol: "chart.bar",
-                    isComplete: false,
-                    accessibilityIdentifier: "home.activation.report",
-                    action: {
-                        NotificationCenter.default.post(name: .switchToTab, object: 3)
-                    }
-                )
+            } else {
+                let tiles = activationTiles
+                Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                    GridRow { activationActionTile(tiles[0]); activationActionTile(tiles[1]) }
+                    GridRow { activationActionTile(tiles[2]); activationActionTile(tiles[3]) }
                 }
             }
         }
@@ -886,54 +859,43 @@ struct DashboardView: View {
         }
     }
 
-    private func activationActionTile(
-        title: String,
-        subtitle: String,
-        symbol: String,
-        isComplete: Bool,
-        accessibilityIdentifier: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(isComplete ? colors.positiveSurface : colors.backgroundTertiary)
-                        .frame(width: 40, height: 40)
+    private struct ActivationTile {
+        let title: String
+        let subtitle: String
+        let symbol: String
+        let isComplete: Bool
+        let identifier: String
+        let action: () -> Void
+    }
 
-                    Image(systemName: isComplete ? "checkmark.circle" : symbol)
-                        .font(.system(size: 19, weight: .regular))
-                        .foregroundStyle(isComplete ? colors.positive : colors.textPrimary)
-                        .accessibilityHidden(true)
-                }
+    private var activationTiles: [ActivationTile] {
+        [
+            ActivationTile(
+                title: String(localized: "Property"),
+                subtitle: viewModel.properties.isEmpty ? String(localized: "Add first") : String(localized: "\(viewModel.properties.count) ready"),
+                symbol: "building.2", isComplete: !viewModel.properties.isEmpty,
+                identifier: "home.activation.property", action: { openAddPropertyFromHome() }),
+            ActivationTile(
+                title: String(localized: "First hour"),
+                subtitle: viewModel.timeEntries.isEmpty ? String(localized: "Log now") : AppFormat.hours(totalHours),
+                symbol: "clock", isComplete: !viewModel.timeEntries.isEmpty,
+                identifier: "home.activation.firstHour",
+                action: { NotificationCenter.default.post(name: .switchToTab, object: 2) }),
+            ActivationTile(
+                title: String(localized: "Learn"), subtitle: String(localized: "What counts"),
+                symbol: "book", isComplete: false,
+                identifier: "home.activation.learn", action: { showLearningCenter = true }),
+            ActivationTile(
+                title: String(localized: "Report"), subtitle: String(localized: "Check pace"),
+                symbol: "chart.bar", isComplete: false,
+                identifier: "home.activation.report",
+                action: { NotificationCenter.default.post(name: .switchToTab, object: 3) }),
+        ]
+    }
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-
-                    Text(subtitle)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.82)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: 92)
-            .padding(12)
-            .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.72 : 0.9))
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(colors.border.opacity(0.22), lineWidth: 1)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(title). \(subtitle)")
-        .accessibilityIdentifier(accessibilityIdentifier)
+    private func activationActionTile(_ tile: ActivationTile) -> some View {
+        ActivationTileView(tile: tile.title, subtitle: tile.subtitle, symbol: tile.symbol,
+                           isComplete: tile.isComplete, identifier: tile.identifier, action: tile.action)
     }
 
 }
@@ -1141,5 +1103,65 @@ private struct SetupHeaderTile: View {
             .frame(width: side, height: side)
             .background(colors.actionSurface, in: RoundedRectangle(cornerRadius: side * 0.28, style: .continuous))
             .accessibilityHidden(true)
+    }
+}
+
+
+/// One setup tile. Fonts are text styles and the glyph box is a scaled metric, so the tile grows
+/// with Dynamic Type; at accessibility sizes the icon sits beside the words instead of above.
+private struct ActivationTileView: View {
+    let tile: String
+    let subtitle: String
+    let symbol: String
+    let isComplete: Bool
+    let identifier: String
+    let action: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .body) private var box: CGFloat = 40
+    @ScaledMetric(relativeTo: .body) private var minHeight: CGFloat = 92
+
+    var body: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(HStackLayout(alignment: .center, spacing: 14))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
+        Button(action: action) {
+            layout {
+                ZStack {
+                    RoundedRectangle(cornerRadius: box * 0.35, style: .continuous)
+                        .fill(isComplete ? colors.positiveSurface : colors.backgroundTertiary)
+                    Image(systemName: isComplete ? "checkmark.circle" : symbol)
+                        .font(.system(size: box * 0.47, weight: .regular))
+                        .foregroundStyle(isComplete ? colors.positive : colors.textPrimary)
+                        .accessibilityHidden(true)
+                }
+                .frame(width: box, height: box)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(tile)
+                        .font(.system(.subheadline, design: .rounded, weight: .bold))
+                        .foregroundStyle(colors.textPrimary)
+                    Text(subtitle)
+                        .font(.system(.footnote, design: .rounded, weight: .medium))
+                        .foregroundStyle(colors.textSecondary)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                if dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 0 : minHeight, alignment: .topLeading)
+            .padding(12)
+            .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.72 : 0.9))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(colors.border.opacity(0.22), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(tile). \(subtitle)")
+        .accessibilityIdentifier(identifier)
     }
 }

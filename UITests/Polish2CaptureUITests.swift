@@ -46,7 +46,8 @@ final class Polish2CaptureUITests: XCTestCase {
             let row = app.descendants(matching: .any)["settings.capture.prompts"].firstMatch
             XCTAssertTrue(app.descendants(matching: .any)["settings.profile"].waitForExistence(timeout: 25))
             var n = 0
-            while !(row.exists && row.isHittable) && n < 16 { app.swipeUp(velocity: .slow); n += 1 }
+            let screenH = app.frame.height
+            while !(row.exists && row.isHittable && row.frame.maxY < screenH - 240 && row.frame.minY > 160) && n < 24 { app.swipeUp(velocity: .slow); n += 1 }
             write("settings-calendar-off-\(scheme)\(suffix)")
         }
     }
@@ -64,6 +65,20 @@ final class Polish2CaptureUITests: XCTestCase {
             write("today-setup-card-\(scheme)\(suffix)")
             for _ in 0..<12 { app.swipeUp() }
             write("today-setup-bottom-\(scheme)\(suffix)")
+        }
+    }
+
+    func testTodaySetupCardOnly() {
+        each { scheme, suffix, extra in
+            let args = ["-LHMockScenario", "emptyMainTabs", "-LHTodayHours", "0", "-LHSeedSuggestions", "empty"] + extra
+            launch(scheme, tab: 0, args + ["-LHTodayScrollTo", "setup"])
+            XCTAssertTrue(app.descendants(matching: .any)["home.activation.learn"].waitForExistence(timeout: 25))
+            Thread.sleep(forTimeInterval: 1.5)
+            write("today-setup-card-\(scheme)\(suffix)")
+            if !suffix.isEmpty {
+                app.swipeUp(velocity: .slow)
+                write("today-setup-card-b-\(scheme)\(suffix)")
+            }
         }
     }
 
