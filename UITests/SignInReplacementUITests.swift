@@ -41,6 +41,8 @@ final class SignInReplacementUITests: XCTestCase {
 
         let restoreRow = app.buttons["settings.restoreOtherData"]
         XCTAssertTrue(restoreRow.waitForExistence(timeout: 8))
+        // A free plan's Pro card and Export lock sit above it: keep the row clear of the tab bar.
+        scrollTo(restoreRow)
         let profileB = app.buttons["restore.profile.email-old.profile@example.com"]
         // The launch splash fades over ~1s and can swallow the first tap.
         for _ in 0..<5 where !profileB.exists {
@@ -56,6 +58,8 @@ final class SignInReplacementUITests: XCTestCase {
 
         // The sheet closes and Settings now shows profile B's identity.
         XCTAssertTrue(profileB.waitForNonExistence(timeout: 5))
+        // Settings is a lazy List and we scrolled to reach Restore: back to the top first.
+        app.swipeDown(velocity: .fast); app.swipeDown(velocity: .fast)
         // Settings' profile row is one button; its label carries the email.
         let identity = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "old.profile@example.com")).firstMatch
         XCTAssertTrue(identity.waitForExistence(timeout: 5))
@@ -191,10 +195,16 @@ final class SignInReplacementUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 1.0)
     }
 
+    /// Scrolls until the element is hittable and clear of the floating tab bar (which draws
+    /// over the end of a scroll and would take the tap).
     private func scrollTo(_ element: XCUIElement, maxSwipes: Int = 8) {
         var swipes = 0
-        while (!element.exists || !element.isHittable) && swipes < maxSwipes {
-            app.swipeUp()
+        let tabBar = app.buttons["tab.today"]
+        func coveredByTabBar() -> Bool {
+            tabBar.exists && element.exists && element.frame.maxY > tabBar.frame.minY - 8
+        }
+        while (!element.exists || !element.isHittable || coveredByTabBar()) && swipes < maxSwipes {
+            app.swipeUp(velocity: .slow)
             swipes += 1
         }
     }

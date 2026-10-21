@@ -105,6 +105,12 @@ final class PaywallCopyTests: XCTestCase {
         XCTAssertEqual(RecordPageHighlight.forContext(.export, propertyName: nil), .none)
     }
 
+    func testLegalLinksAreRealDocuments() {
+        XCTAssertEqual(PaywallView.termsURL.absoluteString, "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/",
+                       "Terms of Use is Apple's standard EULA")
+        XCTAssertTrue(PaywallView.privacyURL.absoluteString.contains("privacy"), "Privacy points at the app's privacy policy")
+    }
+
     func testSamplePageIsMarkedSample() {
         XCTAssertTrue(RecordPageModel.sample(year: 2026).isSample)
     }
