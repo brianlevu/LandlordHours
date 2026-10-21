@@ -27,9 +27,9 @@ enum CaptureFlag: String, CaseIterable {
     /// Value when nothing remote has ever been seen and the build passes the minimum gate.
     var defaultValue: Bool {
         switch self {
-        case .autoCapture, .noteModel: return true
-        // PCC is off until the entitlement ships and the owner turns the flag on remotely.
-        case .privateCloudCompute, .locationBeta, .gmailReader: return false
+        case .autoCapture, .noteModel, .privateCloudCompute: return true
+        // PCC is on by default (device-tested 2026-10-21). The remote flag stays the kill switch; the entitlement and the user's toggle still gate it.
+        case .locationBeta, .gmailReader: return false
         }
     }
 }

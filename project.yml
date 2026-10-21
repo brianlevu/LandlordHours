@@ -62,6 +62,9 @@ targets:
         com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)com.openclaw.landlordhours
         com.apple.developer.applesignin:
           - Default
+        # Private Cloud Compute (Developer Portal capability "Access to models on Private Cloud
+        # Compute"). Keep in step with LH_PCC_ENTITLED below.
+        com.apple.developer.private-cloud-compute: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.openclaw.landlordhours
@@ -75,7 +78,7 @@ targets:
         # Private Cloud Compute needs the com.apple.developer.private-cloud-compute entitlement;
         # without it FoundationModels traps ("Missing entitlement"). Set YES only together with
         # that key in LandlordHours.entitlements (a unit test keeps them in step).
-        LH_PCC_ENTITLED: "NO"
+        LH_PCC_ENTITLED: "YES"
         SWIFT_EMIT_LOC_STRINGS: YES
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "Apple Development"

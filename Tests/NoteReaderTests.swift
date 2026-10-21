@@ -491,18 +491,16 @@ final class LogDescriptionSaveTests: XCTestCase {
 
 final class PCCEntitlementTests: XCTestCase {
     /// The crash on BLV-Phone: availability said .available but the binary had no entitlement.
-    func testThisBuildIsNotEntitledSoPCCNeverOpens() {
-        XCTAssertFalse(PCCEntitlement.isConfigured, "LH_PCC_ENTITLED is NO until the entitlement ships")
-        XCTAssertEqual(SystemPCCStatus().status(), .unavailable(.notEntitled))
-        XCTAssertEqual(NoteModelBackends.privateCloudCompute().availability, .unavailable(.notEntitled))
-        XCTAssertEqual(PCCGate(settings: PCCSettings(defaults: UserDefaults(suiteName: "pcc-ent-\(UUID().uuidString)")!),
-                               isFlagEnabled: { true }).availability(), .unavailable(.notEntitled),
-                       "user toggle on + flag on still can't open PCC without the entitlement")
-        XCTAssertFalse(NoteReaderChain.live().pccAvailability().isAvailable)
+    func testThisBuildIsEntitledButTheRemoteFlagKeepsPCCClosed() {
+        XCTAssertTrue(PCCEntitlement.isConfigured, "LH_PCC_ENTITLED is YES with the entitlement")
+        let settings = PCCSettings(defaults: UserDefaults(suiteName: "pcc-ent-\(UUID().uuidString)")!)
+        XCTAssertEqual(PCCGate(settings: settings, isFlagEnabled: { false }, system: FixedPCCStatus(value: .available)).availability(),
+                       .unavailable(.disabledByFlag), "flag off keeps PCC closed even when entitled")
+        XCTAssertTrue(PCCGate(settings: settings, isFlagEnabled: { true }, system: FixedPCCStatus(value: .available)).availability().isAvailable)
     }
 
-    func testTheRemoteFlagDefaultsOff() {
-        XCTAssertFalse(CaptureFlag.privateCloudCompute.defaultValue)
+    func testTheRemoteFlagDefaults() {
+        XCTAssertTrue(CaptureFlag.privateCloudCompute.defaultValue, "PCC ships on; the remote flag is its kill switch")
         XCTAssertTrue(CaptureFlag.noteModel.defaultValue, "on-device note reading has its own kill switch, default on")
     }
 
@@ -618,6 +616,26 @@ final class NoteTwoRentalsTests: XCTestCase {
         let r = NoteRules.read(request("Maple + Oak: collected rent, 20 min each"))
         XCTAssertEqual(r.mentionedPropertyCount, 2)
         XCTAssertNil(r.hours, "20 min each is not 20 min for one rental")
+    }
+
+    /// Real-phone miss (adversarial v23): a model's hours must not survive "each", in any tier.
+    func testEachDurationIsDroppedEvenWhenAModelGivesHours() {
+        for text in ["Maple + Oak: collected rent, 20 min each", "fixed 3 doors at Oak, 10 min each"] {
+            let req = request(text)
+            let rules = NoteRules.read(req)
+            XCTAssertNil(rules.hours, text)
+            for tier in [Suggestion.Tier.onDevice, .pcc] {
+                let merged = NoteReadMerge.merge(rules: rules, draft: NoteModelDraft(propertyOption: "Oak Street Duplex", hours: 0.33),
+                                                 prompt: NoteModelPrompt(req), tier: tier)
+                XCTAssertNil(merged.hours, "\(text) / \(tier)")
+            }
+        }
+        // Two rentals named: property empty too, with the hint count.
+        let two = request("Maple + Oak: collected rent, 20 min each")
+        let merged = NoteReadMerge.merge(rules: NoteRules.read(two), draft: NoteModelDraft(propertyOption: "Oak Street Duplex", hours: 0.33),
+                                         prompt: NoteModelPrompt(two), tier: .pcc)
+        XCTAssertNil(merged.propertyId)
+        XCTAssertEqual(merged.mentionedPropertyCount, 2)
     }
 
     func testOneRentalNamedTwoWaysIsStillOne() {

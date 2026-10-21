@@ -6,10 +6,6 @@
 	<array>
 		<string>Default</string>
 	</array>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.com.openclaw.landlordhours</string>
-	</array>
 	<key>com.apple.developer.icloud-container-identifiers</key>
 	<array>
 		<string>iCloud.com.openclaw.landlordhours</string>
@@ -18,7 +14,13 @@
 	<array>
 		<string>CloudKit</string>
 	</array>
+	<key>com.apple.developer.private-cloud-compute</key>
+	<true/>
 	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
 	<string>$(TeamIdentifierPrefix)com.openclaw.landlordhours</string>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.openclaw.landlordhours</string>
+	</array>
 </dict>
 </plist>

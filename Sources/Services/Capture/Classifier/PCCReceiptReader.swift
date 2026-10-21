@@ -119,6 +119,9 @@ struct SystemPCCStatus: PCCSystemStatusProviding {
 /// The one place that decides whether PCC may run now: the user's setting, the remote kill
 /// switch, then the system (OS, eligibility, readiness, quota).
 struct PCCGate {
+    /// DEBUG launch argument that opens the remote-flag gate for on-device PCC testing.
+    static let forceLaunchArgument = "-LHForcePCC"
+
     let settings: PCCSettings
     let isFlagEnabled: () -> Bool
     let system: PCCSystemStatusProviding
@@ -135,6 +138,10 @@ struct PCCGate {
 
     func availability() -> ModelAvailability {
         guard settings.isEnabled else { return .unavailable(.disabledByUser) }
+        #if DEBUG
+        // Owner testing: forces the remote flag open (the entitlement and the user toggle still apply).
+        if ProcessInfo.processInfo.arguments.contains(PCCGate.forceLaunchArgument) { return system.status() }
+        #endif
         guard isFlagEnabled() else { return .unavailable(.disabledByFlag) }
         return system.status()
     }
