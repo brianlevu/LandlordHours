@@ -469,3 +469,26 @@ final class SiriCopyTests: XCTestCase {
         XCTAssertEqual(LandlordHoursShortcuts.shortcutTileColor, .navy)
     }
 }
+
+// MARK: Launch hand-off status bar
+
+final class LaunchStatusBarContrastTests: XCTestCase {
+    private func lum(_ c: (Double, Double, Double)) -> Double {
+        func l(_ v: Double) -> Double { let x = v / 255; return x <= 0.03928 ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4) }
+        return 0.2126 * l(c.0) + 0.7152 * l(c.1) + 0.0722 * l(c.2)
+    }
+
+    /// Light Today: at every phase the status-bar ink (white before the switch, black after) is at
+    /// least 4.5:1 against the blueprint #1E3FA6 fading over the canvas #EEF2FA.
+    func testStatusBarInkStaysAAAcrossTheLightTodayFade() {
+        for i in 0...200 {
+            let p = CGFloat(i) / 200
+            let a = LaunchHandoffOverlay.overlayOpacity(.today, p)
+            let mix = (a * 0x1E + (1 - a) * 0xEE, a * 0x3F + (1 - a) * 0xF2, a * 0xA6 + (1 - a) * 0xFA)
+            let l = lum(mix)
+            let dark = p >= LaunchHandoffOverlay.statusBarSwitchPhase
+            let ratio = dark ? (l + 0.05) / 0.05 : 1.05 / (l + 0.05)
+            XCTAssertGreaterThanOrEqual(ratio, 4.5, "phase \(p): \(dark ? "black" : "white") ink \(ratio)")
+        }
+    }
+}
