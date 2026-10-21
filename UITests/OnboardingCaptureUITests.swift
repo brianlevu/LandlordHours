@@ -87,13 +87,13 @@ final class OnboardingCaptureUITests: XCTestCase {
         shot("00-welcome", scheme, suffix)
         tap(app.buttons["onb-start"])
         XCTAssertTrue(app.buttons["rental-short"].waitForExistence(timeout: 5))
-        shot("01a-goal-rent", scheme, suffix)
+        shot("01a-goal-rent", scheme, suffix); shotScrolled("01a-goal-rent", scheme, suffix)
         tap(app.buttons["rental-both"])
         XCTAssertTrue(app.buttons["pro-none"].waitForExistence(timeout: 5))
-        shot("01b-goal-pro", scheme, suffix)
+        shot("01b-goal-pro", scheme, suffix); shotScrolled("01b-goal-pro", scheme, suffix)
         tap(app.buttons["pro-none"])
         XCTAssertTrue(app.buttons["goal-100"].waitForExistence(timeout: 5))
-        shot("01c-goal-target-100", scheme, suffix)
+        shot("01c-goal-target-100", scheme, suffix); shotScrolled("01c-goal-target-100", scheme, suffix)
         // The other targets: 500 selected, then the 750 (which says what it counts).
         let pinnedTop = app.buttons["onb-primary"].frame.minY
         let c500 = app.buttons["goal-500"]
@@ -163,6 +163,15 @@ final class OnboardingCaptureUITests: XCTestCase {
         XCTAssertTrue(app.buttons["onb-today"].waitForExistence(timeout: 20))
         shot("06b-staked-record", scheme, suffix)
 
+        // The goal screen with each suggestion first: 500 (long-term, no pro), 750 (me, spouse).
+        for (name, rental, pro, first) in [("01f-goal-500-first", "long", "none", "goal-500"),
+                                           ("01g-goal-750-me-first", "short", "me", "goal-750"),
+                                           ("01h-goal-750-spouse-first", "both", "spouse", "goal-750")] {
+            launch(scheme: scheme, size: size, ["-LHOnboardingStep", "goal", "-LHOnbRental", rental, "-LHOnbPro", pro, "-LHOnbGoalPhase", "target"])
+            XCTAssertTrue(app.buttons[first].waitForExistence(timeout: 20), name)
+            shot(name, scheme, suffix); shotScrolled(name, scheme, suffix)
+        }
+
         // Skip path → Today's empty lot.
         launch(scheme: scheme, size: size, [])
         tap(app.buttons["onb-start"], timeout: 20)
@@ -194,6 +203,17 @@ final class OnboardingCaptureUITests: XCTestCase {
         let deadline = Date().addingTimeInterval(timeout)
         while !element.isHittable && Date() < deadline { Thread.sleep(forTimeInterval: 0.2) }
         element.tap()
+    }
+
+    /// Large text: the cards scroll. Scroll to the end and shoot again so every line is seen.
+    private func shotScrolled(_ name: String, _ scheme: String, _ suffix: String?) {
+        guard suffix == "ax3" else { return }
+        // Three looks down the page, so no card falls between the first screen and the last.
+        for step in 1...3 {
+            for _ in 0..<2 { app.swipeUp(velocity: .slow) }
+            shot("\(name)-scrolled\(step)", scheme, suffix)
+        }
+        for _ in 0..<8 { app.swipeDown(velocity: .fast) }
     }
 
     private func shot(_ name: String, _ scheme: String, _ suffix: String?) {

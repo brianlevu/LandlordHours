@@ -55,7 +55,8 @@ final class TodayHouseUITests: XCTestCase {
         XCTAssertTrue(hero.waitForExistence(timeout: 20))
         XCTAssertTrue(hero.label.contains("House built to 0 of 750 hours"), hero.label)
         XCTAssertTrue(hero.label.contains("An empty lot"), hero.label)
-        XCTAssertTrue(hero.label.contains("a week to finish by Dec 31"), "No hours yet: the weekly number, not a scolding. \(hero.label)")
+        XCTAssertTrue(hero.label.contains("Log a few weeks to see your pace") || hero.label.contains("Confirm your found hours to see your pace"), "No hours yet: no pace, and no \"74h a week\". \(hero.label)")
+        XCTAssertFalse(hero.label.contains("a week to finish"), hero.label)
         let rule = app.descendants(matching: .any)["dashboard.fiftyPercent"]
         XCTAssertTrue(rule.waitForExistence(timeout: 5))
         XCTAssertTrue(rule.label.contains("Not checked"), rule.label)
@@ -96,7 +97,7 @@ final class TodayHouseUITests: XCTestCase {
         XCTAssertTrue(hero.waitForExistence(timeout: 20))
         XCTAssertTrue(hero.label.contains("751 of 750 hours"), hero.label)
         XCTAssertTrue(hero.label.contains("House finished"), hero.label)
-        XCTAssertTrue(hero.label.contains("reached · add other work hours"), hero.label)
+        XCTAssertTrue(hero.label.contains("750 reached. Add your other work hours to check the half rule."), hero.label)
         XCTAssertFalse(hero.label.contains("Goal hours reached"), "The half test is still open, so the hero does not claim it. \(hero.label)")
         // Hours alone never claim REPS: the 50% rule is still "Not checked".
         XCTAssertTrue(app.descendants(matching: .any)["dashboard.fiftyPercent"].label.contains("Not checked"))
@@ -181,6 +182,7 @@ final class TodayHouseUITests: XCTestCase {
         XCTAssertTrue(waitForHeroLabel(containing: "House built to 86 of 100 hours"),
                       "Both kinds of rental: the short-term rental's own count, not the duplex's 212. \(hero.label)")
         XCTAssertTrue(hero.label.contains("more than anyone else"), hero.label)
+        XCTAssertTrue(hero.label.contains("2026 · Tahoe cabin · 100-hour target"), "The hero says which rental it counts. \(hero.label)")
     }
 
     func testOver100HoursAsksWhetherAnyoneDidMoreBeforeSayingReached() {

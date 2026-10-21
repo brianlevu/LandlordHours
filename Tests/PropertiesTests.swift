@@ -186,7 +186,7 @@ final class PropertyHouseStageTests: XCTestCase {
         for goal in [HouseGoal.mp500, .mp100] {
             XCTAssertEqual(PropertyMeta.hoursLine(212, goal: goal, groupingElection: false), "212h of 500h")
             XCTAssertEqual(PropertyMeta.hoursLine(499.9, goal: goal, groupingElection: false), "499h of 500h")
-            XCTAssertEqual(PropertyMeta.hoursLine(520, goal: goal, groupingElection: false), "520h · roof’s on")
+            XCTAssertEqual(PropertyMeta.hoursLine(520, goal: goal, groupingElection: false), "520h this year")
             // With a grouping election there is no per-rental test.
             XCTAssertEqual(PropertyMeta.hoursLine(212, goal: goal, groupingElection: true), "212h this year")
         }

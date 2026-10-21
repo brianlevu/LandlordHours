@@ -77,7 +77,7 @@ enum OnbGoal: String, CaseIterable {
         switch goal {
         case .mp500, .mp100: return String(localized: "Your hours count together for this target.")
         case .record: return String(localized: "You’ll each have your own count.")
-        case .reps750, nil: return String(localized: "You’ll each have your own count. The 750 follows one of you, never both added together.")
+        case .reps750, nil: return String(localized: "You’ll each have your own count. For 750, one of you has to get there alone.")
         }
     }
 }
@@ -133,13 +133,13 @@ enum OnbGoalCopy {
         switch goal {
         case .reps750:
             switch pro {
-            case .me?: return String(localized: "Counts the rental hours you log here. Your other work hours go in Settings.")
-            case .spouse?: return String(localized: "Counts the rental hours you log here. Your spouse’s hours are counted on their own. Yours are tracked too.")
-            default: return String(localized: "Counts the rental hours you log here. Other work hours go in Settings.")
+            case .me?: return String(localized: "Counts rental hours you log here. Brokerage and other real-estate work aren’t tracked yet.")
+            case .spouse?: return String(localized: "Counts rental hours you log here. Brokerage and other real-estate work aren’t tracked yet. Only your spouse’s own hours count.")
+            default: return String(localized: "Counts rental hours you log here. Brokerage and other real-estate work aren’t tracked yet.")
             }
         case .mp500:
             if isSuggested { return String(localized: "Counts the hours you put in yourself. Ask your CPA what it means for long-term rentals.") }
-            return String(localized: "Safer: no comparison with anyone else needed.")
+            return String(localized: "No comparison with anyone else needed.")
         case .mp100:
             if isSuggested { return String(localized: "You’ll also confirm that no one else did more, cleaners and managers included.") }
             return String(localized: "You’ll also confirm that no one else did more, cleaners and managers included.")
@@ -370,7 +370,7 @@ enum OnbCopy {
     }
 
     /// Only the 750 target: what it counts.
-    static let upgradeRepsNote = String(localized: "The 750 counts the rental hours you log here.")
+    static let upgradeRepsNote = String(localized: "The 750 counts rental hours you log here. Brokerage and other real-estate work aren’t tracked yet.")
 }
 
 // MARK: - Side effects (live wiring in OnboardingServices+Live; fakes in tests)

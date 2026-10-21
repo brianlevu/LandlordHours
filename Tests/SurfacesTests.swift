@@ -75,7 +75,7 @@ final class WidgetSurfaceDisplayTests: XCTestCase {
         XCTAssertNil(d.status)
         XCTAssertEqual(d.pill?.text, "Add property")
         XCTAssertEqual(d.inlineText(elapsed: ""), "Add a property")
-        XCTAssertEqual(d.rectangularLine, "to start the house")
+        XCTAssertEqual(d.rectangularLine, "to start counting")
         XCTAssertEqual(d.pendingFace.text, "Add")
         XCTAssertEqual(d.hoursFace.symbol, "plus")
         XCTAssertEqual(d.url, WidgetLinks.addProperty)

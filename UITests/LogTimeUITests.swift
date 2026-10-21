@@ -239,7 +239,7 @@ final class LogTimeUITests: XCTestCase {
         launch(seed: "four", extra: ["-LHOpenLog", "notCounted"])
         let line = element("log.notCounted")
         XCTAssertTrue(line.waitForExistence(timeout: 10))
-        XCTAssertTrue(shows("Financing doesn\u{2019}t count toward your hours or the house."), line.label)
+        XCTAssertTrue(shows("Financing doesn\u{2019}t count toward your hours."), line.label)
         XCTAssertTrue(app.buttons["log.save"].isEnabled)
     }
 

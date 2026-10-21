@@ -61,6 +61,11 @@ final class TodayCaptureUITests: XCTestCase {
         ("hero-750-reached", base + tuesday + ["-LHGoalChoice", "reps750", "-LHGoalPro", "me", "-LHTodayHours", "760"], "today.hero"),
         ("hero-100-confirm", base + tuesday + ["-LHGoalChoice", "mp100", "-LHTodayHours", "104", "-LHTodayNoOneMore", "unanswered"], "today.hero"),
         ("hero-100-str", base + tuesday + ["-LHGoalChoice", "mp100", "-LHTodayHours", "212", "-LHTodayStrHours", "86"], "today.hero"),
+        ("hero-day1", base + tuesday + ["-LHGoalChoice", "reps750", "-LHTodayHours", "1"], "today.hero"),
+        ("hero-day1-pending", ["-LHMockScenario", "emptyMainTabs", "-LHSeedSuggestions", "inbox"] + tuesday
+            + ["-LHGoalChoice", "reps750", "-LHTodayHours", "1"], "today.hero"),
+        ("hero-100-str-long", base + tuesday + ["-LHGoalChoice", "mp100", "-LHTodayHours", "212", "-LHTodayStrHours", "86",
+                                                "-LHTodayStrName", "Lakefront Tahoe Cabin and Guest House"], "today.hero"),
         ("hero-record", base + tuesday + ["-LHGoalChoice", "record", "-LHTodayHours", "212"], "today.hero"),
     ]
     private static let base = ["-LHMockScenario", "emptyMainTabs", "-LHSeedSuggestions", "empty"]
@@ -119,9 +124,34 @@ final class TodayCaptureUITests: XCTestCase {
     func testCaptureRecord() { capture("record") }
     func testCaptureDraft() { capture("draft") }
     func testCaptureNoProperty() { capture("noproperty") }
+    /// The Inbox banner ("…count toward your hours") and the Properties rows ("520h this year · Long stays",
+    /// "212h of 500h · A few nights"), light and dark, default and AX3.
+    func testCaptureInboxAndProperties() {
+        let args = ["-LHMockScenario", "emptyMainTabs", "-LHSeedSuggestions", "inbox"] + Self.tuesday
+            + ["-LHGoalChoice", "mp500", "-LHTodayHours", "520", "-LHTodayStrHours", "212"]
+        for scheme in ["light", "dark"] {
+            for size in [Size.standard, Size.ax3] {
+                app.terminate()
+                var arguments = [UITestIsolation.resetProfilesArgument, "-LHNoSwipePeek", "-LHInitialTab", "0",
+                                 "-LHColorScheme", scheme, "-AppleLanguages", "(en)", "-AppleLocale", "en_US"] + args
+                if let category = size.category { arguments += ["-UIPreferredContentSizeCategoryName", category] }
+                app.launchArguments = arguments
+                app.launch()
+                XCTAssertTrue(app.buttons["tab.inbox"].waitForExistence(timeout: 25))
+                app.buttons["tab.inbox"].tap()
+                Thread.sleep(forTimeInterval: 2.0)
+                write("inbox-banner-\(scheme)\(size.rawValue)")
+                app.buttons["tab.properties"].tap()
+                Thread.sleep(forTimeInterval: 2.0)
+                write("properties-rows-\(scheme)\(size.rawValue)")
+            }
+        }
+    }
+
     func testCaptureHeroGoalFirst() {
         for state in ["hero-500-pace", "hero-500-behind", "hero-750-own", "hero-750-spouse", "hero-750-reached",
-                      "hero-100-confirm", "hero-100-str", "hero-record"] { capture(state) }
+                      "hero-100-confirm", "hero-100-str", "hero-100-str-long", "hero-day1", "hero-day1-pending",
+                      "hero-record", "noproperty"] { capture(state) }
     }
 
     /// The shared full-width Inbox toast after a confirm from Today (Undo showing).

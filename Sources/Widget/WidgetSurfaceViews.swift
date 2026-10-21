@@ -149,7 +149,7 @@ struct WidgetSmallView: View {
         switch display.state {
         case .noProperty:
             Spacer(minLength: 0)
-            Text("Add a property to start the house.")
+            Text("Add a rental to start counting.")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(WidgetInk.primary)
                 .lineLimit(3)
@@ -226,7 +226,7 @@ struct WidgetMediumView: View {
 
     @ViewBuilder private var content: some View {
         if display.state == .noProperty {
-            Text("Add a property to start the house.")
+            Text("Add a rental to start counting.")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(WidgetInk.primary)
                 .fixedSize(horizontal: false, vertical: true)

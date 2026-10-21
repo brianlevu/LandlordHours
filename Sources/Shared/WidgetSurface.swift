@@ -231,7 +231,7 @@ struct WidgetSurfaceDisplay: Equatable {
 
     var rectangularLine: String {
         switch state {
-        case .noProperty: return "to start the house"
+        case .noProperty: return "to start counting"
         case .timer: return "Stop it to review"
         case .empty: return pendingCount > 0 ? "\(pendingCount) to confirm" : "Nothing confirmed yet"
         case .behind(let gap): return pendingCount > 0 ? "\(pendingCount) to confirm" : "Behind by \(gap)h"
@@ -279,7 +279,7 @@ struct WidgetSurfaceDisplay: Equatable {
 
     var accessibilityLabel: String {
         switch state {
-        case .noProperty: return "LandlordHours. Add a property to start the house."
+        case .noProperty: return "LandlordHours. Add a rental to start counting."
         case .timer: return "Timer running at \(timerPropertyName)."
         default:
             var parts = ["\(number) of your \(goalNumber) hours."]

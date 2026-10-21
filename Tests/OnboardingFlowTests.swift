@@ -395,7 +395,7 @@ final class OnboardingFlowTests: XCTestCase {
     }
 
     func testSpouseNoteFollowsTheGoal() {
-        XCTAssertTrue(OnbGoal.spouseNote(for: .reps750).contains("follows one of you, never both added together"))
+        XCTAssertTrue(OnbGoal.spouseNote(for: .reps750).contains("one of you has to get there alone"))
         XCTAssertTrue(OnbGoal.spouseNote(for: .mp100).contains("count together"))
         XCTAssertTrue(OnbGoal.spouseNote(for: .mp500).contains("count together for this target"))
         XCTAssertFalse(OnbGoal.spouseNote(for: .record).contains("750"))
@@ -655,7 +655,7 @@ final class GoalFirstMessagingTests: XCTestCase {
     func testCardWordsSayWhatThe750CountsAndNeverClaimFrequency() {
         for pro in [RealEstatePro.me, .spouse, .nobody] {
             XCTAssertTrue(OnbGoalCopy.detail(.reps750, pro: pro, isSuggested: false, rental: .both)
-                .contains("Counts the rental hours you log here"), "\(pro)")
+                .contains("Counts rental hours you log here. Brokerage and other real-estate work aren’t tracked yet"), "\(pro)")
         }
         XCTAssertEqual(OnbGoalCopy.title(.reps750, pro: .spouse), "750 hours, your spouse’s own count")
         XCTAssertEqual(OnbGoalCopy.title(.mp100, pro: .nobody), "100 hours, and more than anyone else")
@@ -730,9 +730,11 @@ final class GoalFirstMessagingTests: XCTestCase {
     private var oct21: Date { cal.date(from: DateComponents(year: 2026, month: 10, day: 21, hour: 12))! }
 
     private func copy(_ goal: HouseGoal, hours: Double, record: Bool = false, participant: Participant = .selfParticipant,
-                      half: TaxQualificationEngine.MoreThanHalfStatus = .notEntered, noOneMore: Bool? = nil) -> TodayHeroCopy {
+                      half: TaxQualificationEngine.MoreThanHalfStatus = .notEntered, noOneMore: Bool? = nil,
+                      property: String? = nil, days: Int = 60, pending: Bool = false) -> TodayHeroCopy {
         TodayHeroCopy.make(.init(goal: goal, isRecord: record, hours: hours, year: 2026, now: oct21, calendar: cal,
-                                 repsParticipant: participant, halfTest: half, noOneParticipatedMore: noOneMore))
+                                 repsParticipant: participant, halfTest: half, noOneParticipatedMore: noOneMore,
+                                 propertyName: property, daysOfData: days, hasPendingToConfirm: pending))
     }
 
     func testHeroOnPace() {
@@ -751,10 +753,8 @@ final class GoalFirstMessagingTests: XCTestCase {
         XCTAssertEqual(c.spoken, "of 500 hours · 29h a week to finish by Dec 31")
         XCTAssertEqual(c.tone, .caution)
         XCTAssertEqual(copy(.mp100, hours: 20).spoken, "of 100 hours · 8h a week to finish by Dec 31")
-        // No hours yet: the weekly number, not a scolding.
-        let none = copy(.mp100, hours: 0)
-        XCTAssertEqual(none.phrase, "10h a week to finish by Dec 31")
-        XCTAssertEqual(none.tone, .neutral)
+        // 60 days in with no hours: behind, and honest about it.
+        XCTAssertEqual(copy(.mp100, hours: 0).phrase, "10h a week to finish by Dec 31")
     }
 
     func testHeroMetStates() {
@@ -805,8 +805,8 @@ final class GoalFirstMessagingTests: XCTestCase {
         let open = copy(.reps750, hours: 760, half: .notEntered)
         XCTAssertEqual(open.tone, .caution)
         XCTAssertFalse(open.claimsReached, "750 hours alone is not the whole test")
-        XCTAssertTrue(open.phrase?.contains("add other work hours") ?? false)
-        XCTAssertTrue(copy(.reps750, hours: 760, half: .notMet).phrase?.contains("half test not met") ?? false)
+        XCTAssertEqual(open.phrase, "750 reached. Add your other work hours to check the half rule.")
+        XCTAssertEqual(copy(.reps750, hours: 760, half: .notMet).phrase, "750 reached. The half rule isn’t met yet.")
         let met = copy(.reps750, hours: 760, half: .met)
         XCTAssertEqual(met.tone, .positive)
         XCTAssertTrue(met.claimsReached)
@@ -819,6 +819,54 @@ final class GoalFirstMessagingTests: XCTestCase {
         XCTAssertEqual(c.caption, "hours logged in 2026")
         XCTAssertNil(c.phrase)
         XCTAssertNil(c.qualifier)
+    }
+
+    // MARK: Day one: no pace until there is something to pace
+
+    func testPaceWaitsForTwoWeeksOrTenHours() {
+        // One hour on day one: never "74h a week".
+        let dayOne = copy(.reps750, hours: 1, days: 0, pending: true)
+        XCTAssertEqual(dayOne.phrase, "Confirm your found hours to see your pace.")
+        XCTAssertEqual(dayOne.tone, .neutral)
+        XCTAssertFalse(dayOne.spoken.contains("a week"))
+        XCTAssertEqual(copy(.reps750, hours: 1, days: 0, pending: false).phrase, "Log a few weeks to see your pace.")
+        XCTAssertEqual(copy(.reps750, hours: 0, days: 0, pending: false).phrase, "Log a few weeks to see your pace.")
+        // Ten confirmed hours is enough, even on day one; so is a 14th day with fewer hours.
+        XCTAssertTrue(copy(.reps750, hours: 10, days: 0).phrase?.contains("a week to finish by Dec 31") ?? false)
+        XCTAssertTrue(copy(.reps750, hours: 3, days: 14).phrase?.contains("a week to finish by Dec 31") ?? false)
+        XCTAssertEqual(copy(.reps750, hours: 9.9, days: 13).phrase, "Log a few weeks to see your pace.")
+        XCTAssertTrue(TodayHeroCopy.paceIsReady(hours: 0, daysOfData: 14))
+        XCTAssertFalse(TodayHeroCopy.paceIsReady(hours: 9.99, daysOfData: 13))
+        // A reached target never waits on the pace.
+        XCTAssertEqual(copy(.mp500, hours: 501, days: 0).phrase, "reached, based on your records")
+        // The finish card waits too.
+        let card = TodayPaceCards.finish(hours: 1, goal: .reps750, pace: TodayPace(text: "x", tone: .neutral), now: oct21, calendar: cal, paceReady: false)
+        XCTAssertEqual(card.value, "Not yet")
+        XCTAssertEqual(TodayPaceCards.finish(hours: 100, goal: .reps750, pace: TodayPace(text: "x", tone: .neutral), now: oct21, calendar: cal).value, "65h a week")
+    }
+
+    func testHeaderLineDropsTheDotZeroAndHasNoTargetForARecord() {
+        XCTAssertEqual(TodayHeroCopy.headerLine(hours: 212, target: 750, isRecord: false, year: 2026), "212h toward 750 this year.")
+        XCTAssertEqual(TodayHeroCopy.headerLine(hours: 212.5, target: 100, isRecord: false, year: 2026), "212.5h toward 100 this year.")
+        XCTAssertEqual(TodayHeroCopy.headerLine(hours: 212, target: 750, isRecord: true, year: 2026), "212 hours logged in 2026.")
+        XCTAssertFalse(TodayHeroCopy.headerLine(hours: 212, target: 750, isRecord: true, year: 2026).contains("750"), "A record has no target")
+    }
+
+    func testEyebrowNamesTheRentalWhenTheCountIsOneRentals() {
+        let c = copy(.mp100, hours: 86, property: "Tahoe cabin")
+        XCTAssertEqual(c.eyebrow, "2026 · Tahoe cabin · 100-hour target")
+        XCTAssertEqual(c.propertyName, "Tahoe cabin")
+        XCTAssertEqual(c.eyebrowTarget, "100-hour target")
+        XCTAssertEqual(copy(.mp500, hours: 86).eyebrow, "2026 · 500-hour target")
+        XCTAssertNil(copy(.mp500, hours: 86, property: "   ").propertyName, "A blank name is no name")
+    }
+
+    func testEmptyLotLineUsesThePersonsOwnTarget() {
+        XCTAssertEqual(TodayHeroCopy.emptyLotLine(target: 750), "Add a rental. Hours you confirm count toward your 750.")
+        XCTAssertEqual(TodayHeroCopy.emptyLotLine(target: 100), "Add a rental. Hours you confirm count toward your 100.")
+        XCTAssertEqual(TodayHeroCopy.emptyLotLine(target: nil), "Add a rental. Hours you confirm count toward your goal.")
+        XCTAssertEqual(copy(.mp500, hours: 0, days: 0).targetHours, 500)
+        XCTAssertNil(copy(.reps750, hours: 0, record: true).targetHours)
     }
 
     func testHeroYearIsNeverGrouped() {

@@ -274,6 +274,7 @@ final class TodayHouseEvents: ObservableObject, HouseMilestoneQueue {
 //   -LHGoalPro <me|spouse|nobody>                who does real estate as a main job (750 follows them)
 //   -LHTodayStrHours <h>       add a short-term rental ("Tahoe cabin") with h hours of its own
 //   -LHTodayNoOneMore <yes|no|unanswered>   this year's "did anyone else do more?" answer
+//   -LHTodayStrName "<name>"   the short-term rental's name (a long one checks the eyebrow truncation)
 //   -LHTodaySpouseHours <h>    h spouse hours on the first rental (never joins your 750)
 // Compiled out of Release.
 extension AppViewModel {
@@ -324,7 +325,9 @@ extension AppViewModel {
         suppressCelebrations = true
         defer { suppressCelebrations = wasSuppressed }
         if !properties.contains(where: { $0.propertyType == .str }) {
-            addProperty(name: "Tahoe cabin", address: "", type: .str)
+            let name = ProcessInfo.processInfo.arguments.firstIndex(of: "-LHTodayStrName")
+                .flatMap { i -> String? in let a = ProcessInfo.processInfo.arguments; return a.indices.contains(i + 1) ? a[i + 1] : nil } ?? "Tahoe cabin"
+            addProperty(name: name, address: "", type: .str)
         }
         guard let cabin = properties.first(where: { $0.propertyType == .str }) else { return }
         let calendar = Calendar.current

@@ -12,6 +12,8 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
     /// Scrolls this id into view whenever it changes (the property step keeps "Add address"
     /// above the keyboard).
     var scrollTarget: String? = nil
+    /// False for the question steps (a tap answers): no pinned bar, so nothing fades over the last card.
+    var showsActions = true
     @ViewBuilder var content: Content
     @ViewBuilder var actions: Actions
     @Environment(\.onbBottomInset) private var bottomInset
@@ -60,6 +62,9 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
         .scrollIndicatorsFlash(onAppear: true)
         .defaultScrollAnchor(OnbDebugLaunch.scrollToBottom ? .bottom : .top)
         .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !showsActions {
+                Color.clear.frame(height: bottomInset)
+            } else {
             VStack(spacing: 6) {
                 if pinNote, let note { note.padding(.bottom, 6) }
                 actions
@@ -82,6 +87,7 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
                     .frame(height: fade)
                     .offset(y: -fade)
                     .allowsHitTesting(false)
+            }
             }
         }
         }
@@ -152,7 +158,7 @@ struct OnbOptionCard<Extra: View>: View {
                     Spacer(minLength: 4)
                     Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 22))
-                        .foregroundStyle(selected ? OnbColor.action : OnbColor.border)
+                        .foregroundStyle(selected ? OnbColor.action : OnbColor.textTertiary)   // 3:1 or better; the hairline border is decorative
                         .accessibilityHidden(true)
                 }
                 extra
@@ -210,7 +216,7 @@ struct OnbGoalStep: View {
     // MARK: Q1 · What do you rent out?
 
     private var rentalQuestion: some View {
-        OnbStepScaffold(title: String(localized: "What do you rent out?")) {
+        OnbStepScaffold(title: String(localized: "What do you rent out?"), showsActions: false) {
             VStack(alignment: .leading, spacing: 12) {
                 OnbOptionCard(symbol: "calendar", title: String(localized: "Short stays"),
                               detail: String(localized: "Guests stay 7 days or less, on average."),
@@ -234,7 +240,8 @@ struct OnbGoalStep: View {
 
     private var proQuestion: some View {
         OnbStepScaffold(title: String(localized: "Do you or your spouse do real estate as a main job?"),
-                        subtitle: String(localized: "Main job means most of your working hours, all year, running your own business or as a contractor.")) {
+                        subtitle: String(localized: "Main job means most of your working hours, all year, running your own business or as a contractor."),
+                        showsActions: false) {
             VStack(alignment: .leading, spacing: 12) {
                 OnbOptionCard(symbol: "person.fill", title: String(localized: "Me"), detail: String(localized: "Real estate is my main job."),
                               selected: flow.pro == .me) { flow.answerPro(.me, OnbMotion.morph(reduce)) }
@@ -470,7 +477,7 @@ struct OnbSourceStep: View {
                 .frame(width: 18)
                 .accessibilityHidden(true)
             (Text(line.lead).fontWeight(.semibold).foregroundColor(OnbColor.textPrimary)
-             + Text(" " + line.rest).foregroundColor(OnbColor.textSecondary))
+             + Text(" \(line.rest)").foregroundColor(OnbColor.textSecondary))
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
         }
