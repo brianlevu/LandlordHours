@@ -46,12 +46,12 @@ enum ClassifierThresholds {
     /// Model floor: the first real run (2026-10-21, slim sim with Siri & Intelligence kept on,
     /// and the host Mac's model via scripts/clf-eval-host) scored 0.44 with the old prompt; the
     /// 0.85 bar had never run before and was a placeholder. With category definitions in the
-    /// prompt the model scores 0.80-0.84 (20-21/25: 0.80 in the simulator, where the test asks
-    /// about each title as an email; 0.84 on the host as a calendar event). One item moves this
-    /// by 0.04, so the floor sits one item under the lowest run. The old prompt fails it badly.
+    /// prompt the model scores 0.84 (host) to 0.88 (simulator, where the test asks about each
+    /// title as an email), 21-22/25. One item moves this by 0.04, so the floor sits one item
+    /// under the lowest run. The old prompt fails it badly.
     static let targetRulesCategoryTuning = 0.95
     static let targetRulesCategoryHoldout = 0.45
-    static let targetModelCategoryHoldout = 0.76
+    static let targetModelCategoryHoldout = 0.80
 }
 
 /// How an inbox card presents a classification.

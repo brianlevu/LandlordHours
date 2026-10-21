@@ -187,7 +187,9 @@ final class ClassifierTests: XCTestCase {
     }
 
     /// WP1 constraint: for calendar sources the chain never changes the 1.x category, even when
-    /// the on-device model proposes another one, for every calibration title.
+    /// the on-device model proposes another one, for every calibration title. One exception: a
+    /// deal title (buy, sell, finance, negotiate) gets its non-countable category, so investor
+    /// hours never count toward REPS (verifier, 2026-10-21).
     func testCalendarCategoryEquals1xThroughTheChainForEveryCalibrationTitle() async throws {
         let fixture = try CalibrationFixture.load()
         let service = CalendarImportService.shared
@@ -195,13 +197,74 @@ final class ClassifierTests: XCTestCase {
         let withModel = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
         let rulesOnly = ClassifierChain(onDevice: OnDeviceClassifier(backend: UnavailableOnDeviceBackend(reason: .osTooOld)))
         for item in fixture.items {
-            let expected = service.categorizeEvent(title: item.title.lowercased())
+            let expected = DealSignal.category(forTitle: item.title) ?? service.categorizeEvent(title: item.title.lowercased())
             let a = await withModel.classify(candidate(item.title), properties: properties)
             let b = await rulesOnly.classify(candidate(item.title), properties: properties)
             XCTAssertEqual(a.category, expected, "chain+model: \(item.title)")
             XCTAssertEqual(b.category, expected, "rules: \(item.title)")
         }
         XCTAssertFalse(backend.requests.isEmpty, "the model must have run on some titles")
+    }
+
+    /// Deal titles must never carry a countable category on any source, whatever the model
+    /// answers (it is asked here to say Property Management for P1).
+    func testDealTitlesAlwaysGetANonCountableCategory() async {
+        let deals: [(String, ActivityCategory)] = [
+            ("Counteroffer on the Elm fourplex", .contractNegotiation),
+            ("Counter-offer on the Birch Rd triplex", .contractNegotiation),
+            ("Submit offer on 22 Pine St duplex", .contractNegotiation),
+            ("Review purchase agreement with seller's agent", .contractNegotiation),
+            ("Negotiate sale price for Maple Cottage", .contractNegotiation),
+            ("Refinance call with lender - duplex", .financing),
+            ("Refi call with Chase - Maple Cottage", .financing),
+            ("HELOC application for Oak Street Duplex", .financing),
+            ("Rate lock deadline - Lakeview refinance", .financing),
+            ("Send bank statements to lender for DSCR loan", .financing),
+            ("Closing on Elm fourplex", .financing),
+            ("Closing docs signing - Pine St duplex", .financing),
+            ("Run cap rate on Birch Rd triplex", .investing),
+            ("Pull comps for 22 Pine St", .investing),
+            ("1031 exchange - identify replacement property", .investing),
+            ("Tour potential rental on Walnut Ave", .investing),
+            ("Look at duplex listing in Eastside", .investing),
+        ]
+        let backend = FakeOnDeviceBackend(answer: answer(true, 0.9, category: .management, ref: "P1"))
+        let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
+        for (title, expected) in deals {
+            for kind in [Suggestion.Kind.calendar, .location, .gmail] {
+                let c = await chain.classify(candidate(title, kind: kind), properties: properties)
+                XCTAssertEqual(c.category, expected, "\(kind): \(title)")
+                XCTAssertEqual(c.category?.countsForREPS, false, "\(kind): \(title) must not count")
+            }
+        }
+    }
+
+    func testCountableTitlesWithDealLikeWordsKeepTheirCategory() {
+        for title in ["Post listing on Zillow", "Vacancy - update rental listing photos", "Mortgage payment for Oak Street Duplex",
+                      "Loan payment autopay - Maple", "Virtual tour video for listing", "Fix sink at Oak"] {
+            XCTAssertNil(DealSignal.category(forTitle: title), title)
+        }
+    }
+
+    func testAliasGroundingMatchesWholeWordsOnly() {
+        let oakAlias = RentalProperty(name: "Birch House", address: "9 Elm Rd, Austin, TX", propertyType: .ltr, aliases: ["Oak"])
+        func pick(_ title: String) -> UUID? {
+            let request = OnDeviceClassifier.request(for: candidate(title), properties: [oakAlias])
+            return OnDeviceClassifier.map(answer(true, 0.9, ref: "P1"), request: request, properties: [oakAlias]).propertyId
+        }
+        XCTAssertNil(pick("Flight from Oakland airport"))
+        XCTAssertEqual(pick("Oak: gutters"), oakAlias.id)
+    }
+
+    func testDecoratedPropertyRefsAreNormalized() {
+        XCTAssertEqual(OnDeviceClassifier.normalizedRef("P3: Lakeview Condo (1500 Lakeshore Blvd)"), "P3")
+        XCTAssertEqual(OnDeviceClassifier.normalizedRef(" p2 "), "P2")
+        XCTAssertEqual(OnDeviceClassifier.normalizedRef("Property P1"), "P1")
+        XCTAssertNil(OnDeviceClassifier.normalizedRef("none"))
+        XCTAssertNil(OnDeviceClassifier.normalizedRef("APT12"))
+        let request = OnDeviceClassifier.request(for: candidate("AC not cooling at Lakeview"), properties: properties)
+        let mapped = OnDeviceClassifier.map(answer(true, 0.9, ref: "P3: Lakeview Condo…"), request: request, properties: properties)
+        XCTAssertEqual(mapped.propertyId, lakeview.id)
     }
 
     func testLegacyCategoryMatches1xForEveryCalibrationTitle() throws {

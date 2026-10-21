@@ -46,13 +46,14 @@ struct RulesClassifier: CaptureClassifier {
         } else {
             category = verdict.category ?? (verdict.hasLandlordSignal ? .management : nil)
         }
+        let finalCategory = DealSignal.apply(category, title: candidate.title)
 
         let (hours, basis) = Self.hours(for: candidate)
         return CaptureClassification(
             isLandlordWork: isLandlordWork,
             confidence: confidence,
             propertyId: propertyId,
-            category: category,
+            category: finalCategory,
             hours: hours,
             hoursBasis: basis,
             tier: .rules,
@@ -67,5 +68,56 @@ struct RulesClassifier: CaptureClassifier {
         let hours = end.timeIntervalSince(candidate.start) / 3600
         guard hours > 0, hours < 24 else { return (nil, .none) }
         return (hours, candidate.kind == .location ? .dwellCap : .scheduled)
+    }
+}
+
+// MARK: - Deal signals (non-countable categories)
+//
+// Buying, selling, financing and negotiating a property are investor activities: they never
+// count toward the 750-hour/REPS tests or material participation (`ActivityCategory.countsForREPS`).
+// A suggestion for one must never carry a countable category, so a deal signal in the title
+// wins over the 1.x calendar category, the keyword table and the model (verifier 2026-10-21:
+// "Counteroffer on the Elm fourplex" and refinance/closing titles came out as Property
+// Management, which counts). Calendar parity with 1.x is deliberately broken for these titles
+// only: a 1.1 device may re-import such an event once as Management, which is the lesser harm.
+enum DealSignal {
+    /// Checked in this order; the first hit wins.
+    static let contractNegotiation = [
+        "counteroffer", "counter offer", "offer on", "make an offer", "submit offer", "submit an offer",
+        "purchase agreement", "purchase contract", "sale agreement", "sales agreement", "sale contract",
+        "sales contract", "purchase and sale", "earnest money", "negotiate purchase", "negotiate sale",
+        "negotiate the purchase", "negotiate the sale", "sale price", "purchase price", "under contract",
+    ]
+    static let financing = [
+        "refinance", "refinancing", "refi", "heloc", "lender", "lenders", "loan", "loans", "dscr",
+        "pre approval", "preapproval", "rate lock", "cash out", "underwriting", "underwriter",
+        "mortgage broker", "mortgage application", "closing on", "closing docs", "closing date",
+        "closing documents", "appraisal", "appraiser",
+    ]
+    static let investing = [
+        "deal analysis", "analyze deal", "new deal", "cap rate", "comps", "1031", "investment property",
+        "potential rental", "potential property", "replacement property", "property to buy",
+    ]
+
+    /// The non-countable category a title's deal signal forces, or nil.
+    static func category(forTitle title: String) -> ActivityCategory? {
+        let text = RulesEngine.normalize(title)
+        let padded = " \(text) "
+        func has(_ phrase: String) -> Bool { padded.contains(" \(phrase) ") }
+        // Paying a loan or mortgage is bookkeeping, not a financing decision.
+        let isPayment = has("payment") || has("pay") || has("autopay")
+        if contractNegotiation.contains(where: has) { return .contractNegotiation }
+        if !isPayment, financing.contains(where: has) { return .financing }
+        if investing.contains(where: has) { return .investing }
+        // Looking at a listing (not posting or refreshing one) is weighing a purchase.
+        if has("listing") || has("listings"), has("look at") || has("for sale") {
+            return .investing
+        }
+        return nil
+    }
+
+    /// The category to propose: a deal signal's non-countable category, else `category`.
+    static func apply(_ category: ActivityCategory?, title: String) -> ActivityCategory? {
+        Self.category(forTitle: title) ?? category
     }
 }

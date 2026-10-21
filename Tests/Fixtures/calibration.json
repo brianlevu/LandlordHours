@@ -1900,6 +1900,94 @@
    "property": "cedar",
    "split": "realworld",
    "kind": "calendar"
+  },
+  {
+   "title": "Counter-offer on the Birch Rd triplex",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Submit offer on 22 Pine St duplex",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Review purchase agreement with seller's agent",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Negotiate sale price for Cedar Flats",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "property": "cedar",
+   "split": "deals"
+  },
+  {
+   "title": "Refi call with Chase - Maple Cottage",
+   "landlord": true,
+   "category": "financing",
+   "property": "maple",
+   "split": "deals"
+  },
+  {
+   "title": "HELOC application for Oak Street Duplex",
+   "landlord": true,
+   "category": "financing",
+   "property": "oak",
+   "split": "deals"
+  },
+  {
+   "title": "Rate lock deadline - Lakeview refinance",
+   "landlord": true,
+   "category": "financing",
+   "property": "lakeview",
+   "split": "deals"
+  },
+  {
+   "title": "Send bank statements to lender for DSCR loan",
+   "landlord": true,
+   "category": "financing",
+   "split": "deals"
+  },
+  {
+   "title": "Closing docs signing - Pine St duplex",
+   "landlord": true,
+   "category": "financing",
+   "split": "deals"
+  },
+  {
+   "title": "Run cap rate on Birch Rd triplex",
+   "landlord": true,
+   "category": "investing",
+   "split": "deals"
+  },
+  {
+   "title": "Tour potential rental on Walnut Ave",
+   "landlord": true,
+   "category": "investing",
+   "split": "deals"
+  },
+  {
+   "title": "Pull comps for 22 Pine St",
+   "landlord": true,
+   "category": "investing",
+   "split": "deals"
+  },
+  {
+   "title": "1031 exchange - identify replacement property",
+   "landlord": true,
+   "category": "investing",
+   "split": "deals"
+  },
+  {
+   "title": "Look at duplex listing in Eastside",
+   "landlord": true,
+   "category": "investing",
+   "split": "deals"
   }
  ]
 }

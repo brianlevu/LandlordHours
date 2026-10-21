@@ -171,6 +171,11 @@ final class CalibrationTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(realworld.precision, ClassifierThresholds.targetPrecisionAtLikely, "real-world patterns precision")
         XCTAssertGreaterThanOrEqual(realworld.visibleRecall, ClassifierThresholds.targetVisibleRecall, "real-world patterns visible recall")
         XCTAssertGreaterThanOrEqual(realworld.propertyAccuracy, 0.9, "real-world patterns property")
+        // Deal titles (buy, sell, finance, negotiate): every one gets its non-countable category.
+        // (Two of the 14 have no landlord keyword and stay hidden; that is a recall gap, not a
+        // counting error.)
+        let deals = await score(fixture, split: "deals", classify: classify)
+        XCTAssertEqual(deals.categoryAccuracy, 1, "deal titles get their non-countable category")
         // The committed value must sit within 0.02 of the best accuracy on the sweep.
         XCTAssertGreaterThanOrEqual(all.accuracy, best.accuracy - 0.02)
         XCTAssertLessThan(ClassifierThresholds.notSure, ClassifierThresholds.likely)

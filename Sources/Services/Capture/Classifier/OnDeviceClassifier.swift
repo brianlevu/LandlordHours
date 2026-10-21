@@ -114,6 +114,8 @@ struct OnDeviceClassifier {
     - investing: evaluating a property to buy.
     - financing: loans, lenders, refinancing.
     - contractNegotiation: offers and purchase or sale contracts for a property.
+    The user's own work to buy, sell, finance or negotiate a rental property IS rental work: \
+    answer true, with category investing, financing or contractNegotiation, never management.
     Property: answer a reference from the list (like P1) only when the item names that \
     property, its street or address, or one of its other names. Otherwise answer empty. Never \
     pick the first property by default.
@@ -194,6 +196,14 @@ struct OnDeviceClassifier {
         var reason: String
     }
 
+    /// "P3", " p3 ", "P3: Lakeview Condo", "Property P3" → "P3". The model sometimes decorates
+    /// the reference with the property's name; the first P-number token is the answer.
+    static func normalizedRef(_ raw: String) -> String? {
+        let upper = raw.uppercased()
+        guard let range = upper.range(of: #"(?<![A-Z0-9])P[0-9]+(?![0-9])"#, options: .regularExpression) else { return nil }
+        return String(upper[range])
+    }
+
     /// Words too generic to tie an item to one property ("unit", "duplex", "street").
     static let genericPropertyWords: Set<String> = [
         "the", "and", "unit", "units", "apt", "apartment", "suite", "condo", "duplex", "triplex", "fourplex",
@@ -207,11 +217,13 @@ struct OnDeviceClassifier {
     /// title). Its pick is kept only when the item's title or location names the property: a
     /// distinctive word of its name or address, or a whole alias.
     static func isGrounded(_ property: OnDeviceRequest.PropertyRef, in request: OnDeviceRequest) -> Bool {
-        let text = [request.title, request.location ?? ""].joined(separator: " ").lowercased()
-        let words = Set(text.split { !$0.isLetter && !$0.isNumber }.map(String.init))
+        let text = RulesEngine.normalize([request.title, request.location ?? ""].joined(separator: " "))
+        let padded = " \(text) "
+        let words = Set(text.split(separator: " ").map(String.init))
+        // Whole words only: alias "Oak" must not ground "Oakland airport".
         for alias in property.aliases {
-            let a = alias.trimmingCharacters(in: .whitespaces).lowercased()
-            if a.count >= 3, text.contains(a) { return true }
+            let a = RulesEngine.normalize(alias)
+            if a.count >= 3, padded.contains(" \(a) ") { return true }
         }
         let distinctive = (property.name + " " + property.shortAddress).lowercased()
             .split { !$0.isLetter && !$0.isNumber }.map(String.init)
@@ -224,7 +236,7 @@ struct OnDeviceClassifier {
         // A "no" can't be a confident landlord item.
         if !answer.isRentalWork { confidence = min(confidence, 0.4) }
         var propertyId: UUID?
-        if let ref = answer.propertyRef?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased(),
+        if let ref = answer.propertyRef.flatMap(normalizedRef),
            let index = request.properties.firstIndex(where: { $0.ref == ref }),
            properties.indices.contains(index),
            isGrounded(request.properties[index], in: request) {
