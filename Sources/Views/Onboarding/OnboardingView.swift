@@ -28,13 +28,27 @@ struct OnboardingView: View {
             guard flow == nil else { return }
             viewModel.suppressCelebrations = true
             let start = OnbDebugLaunch.startStep
-            let made = OnbFlow(cohort: .new, services: .live(app: viewModel, environment: .current) { completion in
+            var services = OnbServices.live(app: viewModel, environment: .current) { completion in
                 finish(completion)
-            }, startAt: start)
+            }
+            // ContentView shows this view while `!isSignedIn || showOnboarding`. Making the
+            // profile flips isSignedIn first, so without this the shell mounts for a frame,
+            // this view is torn down and its flow restarts on Welcome: the first "Start
+            // building" tap looks ignored. Hold the flow on screen before the profile exists.
+            let keepShown = $showOnboarding
+            let makeProfile = services.ensureProfile
+            services.ensureProfile = {
+                keepShown.wrappedValue = true
+                makeProfile()
+            }
+            let made = OnbFlow(cohort: .new, services: services, startAt: start)
             OnbDebugLaunch.apply(to: made)
             OnbBackfill.flowStarted()
             // A capture launch past Welcome needs a profile to write to.
-            if (start ?? .welcome) != .welcome, !viewModel.isSignedIn { viewModel.continueWithoutAccount() }
+            if (start ?? .welcome) != .welcome, !viewModel.isSignedIn {
+                showOnboarding = true
+                viewModel.continueWithoutAccount()
+            }
             flow = made
             made.appeared()
         }
