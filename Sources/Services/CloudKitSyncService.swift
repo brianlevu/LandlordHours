@@ -941,58 +941,103 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
         }
     }
 
-    private func deleteCurrentUserRecordsQuiesced(
-        properties: [RentalProperty],
-        entries: [TimeEntry],
-        categories: [CustomCategory],
-        userId: String
-    ) async throws {
-        guard let database else { throw CloudKitSyncUnavailableError() }
+    /// What an account delete does against iCloud. Production uses CloudKit; tests inject fakes
+    /// (`accountDeleteOverride`) to drive the id collection and batching without a container.
+    struct AccountDeleteOperations {
+        var accountAvailable: () async -> Bool
+        var fetchRecordIDs: (_ recordType: String) async throws -> [CKRecord.ID]
+        var deleteBatch: (_ ids: [CKRecord.ID]) async throws -> Void
+    }
 
-        await checkAccountStatus()
-        guard accountAvailable else { return }
-        await ensureZoneExists()
+    /// Test seam for `deleteCurrentUserRecords`.
+    var accountDeleteOverride: AccountDeleteOperations?
 
-        var recordIDs = properties.map { CKRecord.ID(recordName: $0.id.uuidString, zoneID: zoneID) }
-        recordIDs.append(contentsOf: entries.map { CKRecord.ID(recordName: $0.id.uuidString, zoneID: zoneID) })
-        recordIDs.append(contentsOf: categories.map { CKRecord.ID(recordName: $0.id.uuidString, zoneID: zoneID) })
-        for recordType in ["Property", "TimeEntry", "CustomCategory"] {
+    /// The account delete could not reach iCloud. Nothing was deleted, here or there.
+    struct AccountDeleteICloudUnreachableError: LocalizedError, Equatable {
+        var errorDescription: String? {
+            String(localized: "Couldn’t reach iCloud. Your data hasn’t been deleted. Try again when you’re online.")
+        }
+    }
+
+    static let accountDeleteRecordTypes = ["Property", "TimeEntry", "CustomCategory"]
+
+    /// Collects every id to delete (local ids plus whatever iCloud holds for the profile), skips
+    /// record types the container has never seen, de-duplicates, and deletes in batches of 400.
+    /// Throws, before deleting anything, when iCloud can't be reached: the caller must then keep
+    /// the local data, so the person is never told their data is gone while iCloud still has it.
+    static func runAccountDelete(localIDs: [CKRecord.ID], fixedIDs: [CKRecord.ID],
+                                 operations: AccountDeleteOperations, batchSize: Int = 400) async throws {
+        guard await operations.accountAvailable() else { throw AccountDeleteICloudUnreachableError() }
+
+        var recordIDs = localIDs
+        for recordType in accountDeleteRecordTypes {
             do {
-                recordIDs.append(contentsOf: try await fetchRecordIDs(recordType: recordType, userId: userId))
+                recordIDs.append(contentsOf: try await operations.fetchRecordIDs(recordType))
             } catch let error as CKError where error.code == .unknownItem {
                 // "Did not find record type": the type was never created in this container (for
                 // example no custom category was ever saved), so it holds nothing to delete.
                 continue
             }
         }
-        recordIDs.append(CKRecord.ID(recordName: "GoalSettings-\(userId)", zoneID: zoneID))
-        recordIDs.append(CKRecord.ID(recordName: "TaxProfile-\(userId)", zoneID: zoneID))
+        recordIDs.append(contentsOf: fixedIDs)
 
         // Local ids and the ids fetched from iCloud overlap for every synced record: de-duplicate
         // (uniqueKeysWithValues traps on the first duplicate, which crashed every iCloud delete).
-        let uniqueRecordIDs = Array(Dictionary(recordIDs.map { ($0.recordName, $0) }, uniquingKeysWith: { first, _ in first }).values)
-        let batchSize = 400
-        for offset in stride(from: 0, to: uniqueRecordIDs.count, by: batchSize) {
-            let batch = Array(uniqueRecordIDs[offset..<min(offset + batchSize, uniqueRecordIDs.count)])
-            let op = CKModifyRecordsOperation(recordsToSave: nil, recordIDsToDelete: batch)
-            op.qualityOfService = .userInitiated
-
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                op.modifyRecordsResultBlock = { result in
-                    switch result {
-                    case .success:
-                        continuation.resume()
-                    case .failure(let error):
-                        if Self.isDeleteMissingRecordsOnly(error) {
-                            continuation.resume()
-                            return
-                        }
-                        continuation.resume(throwing: error)
-                    }
-                }
-                database.add(op)
-            }
+        var seen = Set<String>()
+        let unique = recordIDs.filter { seen.insert($0.recordName).inserted }
+        for offset in stride(from: 0, to: unique.count, by: batchSize) {
+            try await operations.deleteBatch(Array(unique[offset..<min(offset + batchSize, unique.count)]))
         }
+    }
+
+    private func liveAccountDeleteOperations(userId: String) throws -> AccountDeleteOperations {
+        guard let database else { throw CloudKitSyncUnavailableError() }
+        return AccountDeleteOperations(
+            accountAvailable: { [weak self] in
+                guard let self else { return false }
+                await self.checkAccountStatus()
+                guard self.accountAvailable else { return false }
+                await self.ensureZoneExists()
+                return true
+            },
+            fetchRecordIDs: { [weak self] recordType in
+                try await self?.fetchRecordIDs(recordType: recordType, userId: userId) ?? []
+            },
+            deleteBatch: { batch in
+                let op = CKModifyRecordsOperation(recordsToSave: nil, recordIDsToDelete: batch)
+                op.qualityOfService = .userInitiated
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    op.modifyRecordsResultBlock = { result in
+                        switch result {
+                        case .success:
+                            continuation.resume()
+                        case .failure(let error):
+                            if Self.isDeleteMissingRecordsOnly(error) {
+                                continuation.resume()
+                                return
+                            }
+                            continuation.resume(throwing: error)
+                        }
+                    }
+                    database.add(op)
+                }
+            }
+        )
+    }
+
+    private func deleteCurrentUserRecordsQuiesced(
+        properties: [RentalProperty],
+        entries: [TimeEntry],
+        categories: [CustomCategory],
+        userId: String
+    ) async throws {
+        let operations = try accountDeleteOverride ?? liveAccountDeleteOperations(userId: userId)
+        var localIDs = properties.map { CKRecord.ID(recordName: $0.id.uuidString, zoneID: zoneID) }
+        localIDs.append(contentsOf: entries.map { CKRecord.ID(recordName: $0.id.uuidString, zoneID: zoneID) })
+        localIDs.append(contentsOf: categories.map { CKRecord.ID(recordName: $0.id.uuidString, zoneID: zoneID) })
+        let fixedIDs = [CKRecord.ID(recordName: "GoalSettings-\(userId)", zoneID: zoneID),
+                        CKRecord.ID(recordName: "TaxProfile-\(userId)", zoneID: zoneID)]
+        try await Self.runAccountDelete(localIDs: localIDs, fixedIDs: fixedIDs, operations: operations)
 
         UserDefaults.standard.removeObject(forKey: changeTokenKey)
         UserDefaults.standard.removeObject(forKey: zoneTokenKey)

@@ -100,51 +100,77 @@ final class LearnDeleteRestoreUITests: XCTestCase {
     func testCaptureLightAX3() { captureAll(scheme: "light", size: "ax3") }
     func testCaptureDarkAX3() { captureAll(scheme: "dark", size: "ax3") }
 
+    /// `TEST_RUNNER_LH_CAPTURE_GROUPS=delete,restore,whatsnew` limits a run to those groups
+    /// (re-gates recapture only what changed). Default: every group.
+    private func wants(_ group: String) -> Bool {
+        guard let raw = ProcessInfo.processInfo.environment["LH_CAPTURE_GROUPS"], !raw.isEmpty else { return true }
+        return raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.contains(group)
+    }
+
     private func captureAll(scheme: String, size: String?) {
         let suffix = "\(scheme)" + (size.map { "-\($0)" } ?? "")
 
-        launch(["-LHMockScenario", "frequent", "-LHInitialTab", "4", "-LHOpenLearningCenterFromSettings"], scheme: scheme, size: size)
-        XCTAssertTrue(element("learn.screen").waitForExistence(timeout: 20))
-        settleAndCapture("learn-\(suffix)")
-        app.swipeUp()
-        app.swipeUp()
-        settleAndCapture("learn-end-\(suffix)")
-
-        launch(["-LHMockScenario", "frequent", "-LHInitialTab", "4", "-LHOpenLearningCenterFromSettings",
-                "-LHOpenLearningArticle", "goal-750"], scheme: scheme, size: size)
-        XCTAssertTrue(element("learn.article.goal-750").waitForExistence(timeout: 20))
-        settleAndCapture("learn-article-\(suffix)")
-
-        launch(["-LHMockScenario", "frequent", "-LHInitialTab", "4", "-LHOpenLearningCenterFromSettings",
-                "-LHOpenLearningArticle", "spouse-hours"], scheme: scheme, size: size)
-        XCTAssertTrue(element("learn.article.spouse-hours").waitForExistence(timeout: 20))
-        settleAndCapture("learn-article-topic-\(suffix)")
-
-        launch(["-LHMockScenario", "frequent", "-LHInitialTab", "4", "-LHOpenDeleteData"], scheme: scheme, size: size)
-        XCTAssertTrue(element("delete.screen").waitForExistence(timeout: 20))
-        settleAndCapture("delete-hold-\(suffix)")
-        if size != nil {
+        if wants("learn") {
+            launch(["-LHMockScenario", "frequent", "-LHInitialTab", "4", "-LHOpenLearningCenterFromSettings"], scheme: scheme, size: size)
+            XCTAssertTrue(element("learn.screen").waitForExistence(timeout: 20))
+            settleAndCapture("learn-\(suffix)")
             app.swipeUp()
-            settleAndCapture("delete-hold-end-\(suffix)")
+            app.swipeUp()
+            settleAndCapture("learn-end-\(suffix)")
+
+            launch(["-LHMockScenario", "frequent", "-LHInitialTab", "4", "-LHOpenLearningCenterFromSettings",
+                    "-LHOpenLearningArticle", "goal-750"], scheme: scheme, size: size)
+            XCTAssertTrue(element("learn.article.goal-750").waitForExistence(timeout: 20))
+            settleAndCapture("learn-article-\(suffix)")
+
+            launch(["-LHMockScenario", "frequent", "-LHInitialTab", "4", "-LHOpenLearningCenterFromSettings",
+                    "-LHOpenLearningArticle", "spouse-hours"], scheme: scheme, size: size)
+            XCTAssertTrue(element("learn.article.spouse-hours").waitForExistence(timeout: 20))
+            settleAndCapture("learn-article-topic-\(suffix)")
         }
 
-        launch(["-LHMockScenario", "frequent", "-LHInitialTab", "4", "-LHOpenDeleteData", "-LHDeleteHoldPreview", "0.55"],
-               scheme: scheme, size: size)
-        XCTAssertTrue(element("delete.screen").waitForExistence(timeout: 20))
-        if size != nil { _ = scrollTo(element("delete.hold")) }
-        settleAndCapture("delete-hold-mid-\(suffix)")
+        if wants("delete") {
+            // Idle, then a frozen mid-hold, then the finished hold ("Deleting…", full fill).
+            launch(["-LHMockScenario", "frequent", "-LHInitialTab", "4", "-LHOpenDeleteData"], scheme: scheme, size: size)
+            XCTAssertTrue(element("delete.screen").waitForExistence(timeout: 20))
+            settleAndCapture("delete-hold-\(suffix)")
 
-        launch(["-LHSeedLegacyEmailProfile", "-LHInitialTab", "4", "-LHOpenRestoreSheet"], scheme: scheme, size: size)
-        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "restore.profile.")).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 20))
-        settleAndCapture("restore-\(suffix)")
-        row.tap()
-        XCTAssertTrue(app.alerts["Open these records?"].waitForExistence(timeout: 5))
-        settleAndCapture("restore-confirm-\(suffix)")
+            for (name, progress) in [("delete-hold-mid", "0.55"), ("delete-hold-done", "1")] {
+                launch(["-LHMockScenario", "frequent", "-LHInitialTab", "4", "-LHOpenDeleteData", "-LHDeleteHoldPreview", progress],
+                       scheme: scheme, size: size)
+                let hold = element("delete.hold")
+                XCTAssertTrue(hold.waitForExistence(timeout: 20))
+                // At large sizes the button sits below the fold: bring it and Cancel into view.
+                if size != nil { _ = scrollTo(app.buttons["delete.cancel"]) }
+                XCTAssertTrue(hold.isHittable, "\(name): the hold button is on screen")
+                if progress == "1" { XCTAssertTrue(app.staticTexts["Deleting…"].firstMatch.exists, "The finished hold shows Deleting…") }
+                settleAndCapture("\(name)-\(suffix)")
+            }
+        }
 
-        launch(["-LHMockScenario", "occasional", "-LHShowWhatsNew", "-LHInitialTab", "0"], scheme: scheme, size: size)
-        XCTAssertTrue(element("onb.whatsNew").waitForExistence(timeout: 20))
-        settleAndCapture("whatsnew-house-\(suffix)", wait: 2.0)
+        if wants("restore") {
+            launch(["-LHSeedLegacyEmailProfile", "-LHInitialTab", "4", "-LHOpenRestoreSheet"], scheme: scheme, size: size)
+            let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "restore.profile.")).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 20))
+            settleAndCapture("restore-\(suffix)")
+            row.tap()
+            XCTAssertTrue(app.alerts["Open these records?"].waitForExistence(timeout: 5))
+            settleAndCapture("restore-confirm-\(suffix)")
+        }
+
+        if wants("whatsnew") {
+            launch(["-LHMockScenario", "occasional", "-LHShowWhatsNew", "-LHInitialTab", "0"], scheme: scheme, size: size)
+            XCTAssertTrue(element("onb.whatsNew").waitForExistence(timeout: 20))
+            settleAndCapture("whatsnew-house-\(suffix)", wait: 2.0)
+            if size == "ax3" {
+                // The body scrolls under the pinned Continue: show the rest of it.
+                let last = app.staticTexts["Each hour you confirm from now on adds to the house."]
+                XCTAssertTrue(last.waitForExistence(timeout: 5))
+                element("onb.whatsNew").swipeUp()
+                XCTAssertTrue(last.isHittable, "The last line scrolls fully into view above Continue")
+                settleAndCapture("whatsnew-house-scrolled-\(suffix)")
+            }
+        }
     }
 
     // MARK: Helpers

@@ -137,12 +137,10 @@ struct SettingsView: View {
                 }
             }
             .task(id: viewModel.isSignedIn) {
-                restorableProfiles = await viewModel.discoverRestorableProfiles()
                 #if DEBUG
-                if ProcessInfo.processInfo.arguments.contains("-LHOpenRestoreSheet"), !restorableProfiles.isEmpty {
-                    showRestoreSheet = true
-                }
-                // `.task` re-runs when Settings reappears after a pop: open these once per launch.
+                // Before the profile discovery below, which can wait on iCloud for a long time on
+                // a signed-in device. `.task` re-runs when Settings reappears after a pop, so the
+                // page opens once per launch.
                 if !Self.didApplyDebugRoute {
                     if ProcessInfo.processInfo.arguments.contains("-LHOpenDeleteData") {
                         Self.didApplyDebugRoute = true
@@ -151,6 +149,12 @@ struct SettingsView: View {
                         Self.didApplyDebugRoute = true
                         route = .learningCenter
                     }
+                }
+                #endif
+                restorableProfiles = await viewModel.discoverRestorableProfiles()
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("-LHOpenRestoreSheet"), !restorableProfiles.isEmpty {
+                    showRestoreSheet = true
                 }
                 #endif
             }

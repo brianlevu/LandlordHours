@@ -25,6 +25,7 @@
 		13B70E45F6EC9C686901E6BB /* OnboardingCaptureUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57343B4D218F75B37CA7F147 /* OnboardingCaptureUITests.swift */; };
 		1424FAA16D7E9B48091EBE67 /* StoreKitLocalIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22F2A5256E57CEBACC7BDAAC /* StoreKitLocalIntegrationTests.swift */; };
 		14BA0EDED0F47074CB5C1684 /* ClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD4B4980260EB2F39906C0E9 /* ClassifierTests.swift */; };
+		1539492816642BB459E815B2 /* AccountDeleteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F84A3F04EEF266FD5B4AB3E8 /* AccountDeleteTests.swift */; };
 		170DCB2FCEE6FFB6A5EEB29E /* LogTimeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C7095428AF6E20B6D84218E /* LogTimeSheet.swift */; };
 		183917104B86E5DC6FAFB97A /* TimeEntryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61F1A37F861D056973D6EC70 /* TimeEntryDetailView.swift */; };
 		193BCE81F0A72913CDD84B64 /* SuggestionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C656628C13179C2DDFDF9762 /* SuggestionStore.swift */; };
@@ -393,6 +394,7 @@
 		F4FBBCE8DA693BAC7640B104 /* MilestoneCelebrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MilestoneCelebrationView.swift; sourceTree = "<group>"; };
 		F63814CFFD3A0284AC85988D /* AITimeEntryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITimeEntryService.swift; sourceTree = "<group>"; };
 		F8184EBDA079A1EDCB5D9208 /* CaptureNotificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureNotificationTests.swift; sourceTree = "<group>"; };
+		F84A3F04EEF266FD5B4AB3E8 /* AccountDeleteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeleteTests.swift; sourceTree = "<group>"; };
 		FF70C30146DF1981684327FB /* ProGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProGateTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -590,6 +592,7 @@
 		A9B21080B278EBA44EB8A4E8 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				F84A3F04EEF266FD5B4AB3E8 /* AccountDeleteTests.swift */,
 				DA55F7A788AAB40693166F60 /* AuditReportTests.swift */,
 				1D59E5BD8B45AF17ABFDFFAD /* BrandTypographyTests.swift */,
 				7B4B3AC0F459D7FC09BE5961 /* CalendarDetectorTests.swift */,
@@ -1109,6 +1112,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1539492816642BB459E815B2 /* AccountDeleteTests.swift in Sources */,
 				41608B6514C2E6C81B7359F2 /* AuditReportTests.swift in Sources */,
 				1E98FE6A65B4761018872153 /* BrandTypographyTests.swift in Sources */,
 				E57066D892140F0329FFD63C /* CalendarDetectorTests.swift in Sources */,

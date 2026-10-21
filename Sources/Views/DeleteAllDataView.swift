@@ -22,7 +22,8 @@ struct DeleteAllDataView: View {
     @State private var showExport = false
     @State private var showVoiceOverConfirm = false
     @State private var showICloudOffPrompt = false
-    @State private var isDeleting = false
+    @State private var isDeleting = HoldToDeleteButton.debugShowsDeleting
+    @ScaledMetric(relativeTo: .body) private var iconColumn: CGFloat = 24
     @State private var deleteError: String?
 
     private var isAppleProfile: Bool { signInManager.loginType == .apple }
@@ -41,14 +42,14 @@ struct DeleteAllDataView: View {
 
                 VStack(spacing: 0) {
                     item("house") { propertiesText }
-                    PropertyInsetDivider(leading: 52)
+                    PropertyInsetDivider(leading: 28 + iconColumn)
                     item("list.bullet.rectangle") { entriesText }
-                    PropertyInsetDivider(leading: 52)
+                    PropertyInsetDivider(leading: 28 + iconColumn)
                     item("photo") { photosText }
-                    PropertyInsetDivider(leading: 52)
+                    PropertyInsetDivider(leading: 28 + iconColumn)
                     item("target") { Text("Your goal and tax details") }
                     if isAppleProfile {
-                        PropertyInsetDivider(leading: 52)
+                        PropertyInsetDivider(leading: 28 + iconColumn)
                         item("person.crop.circle") { Text("Your account") }
                     }
                 }
@@ -153,7 +154,7 @@ struct DeleteAllDataView: View {
             Image(systemName: symbol)
                 .font(.body)
                 .foregroundStyle(colors.textSecondary)
-                .frame(width: 24)
+                .frame(width: iconColumn)
                 .accessibilityHidden(true)
             label()
                 .font(.body)
@@ -236,7 +237,7 @@ struct HoldToDeleteButton: View {
         .fixedSize(horizontal: false, vertical: true)
         .scaleEffect(holding && !reduceMotion ? 0.98 : 1)
         .contentShape(Capsule())
-        .opacity(isDeleting ? 0.7 : 1)
+        // No dimming while deleting: the label must keep AA on the full fill.
         .onLongPressGesture(minimumDuration: DeleteAllDataView.holdDuration, maximumDistance: 40) {
             finishHold()
         } onPressingChanged: { pressing in
@@ -286,8 +287,12 @@ struct HoldToDeleteButton: View {
         onComplete()
     }
 
+    /// DEBUG: a finished hold (`-LHDeleteHoldPreview 1`) shows the page as it is right after the
+    /// hold completes: full fill, "Deleting…". Nothing is deleted.
+    static var debugShowsDeleting: Bool { frozenProgress >= 1 }
+
     /// DEBUG: a still mid-hold frame for the visual gate (`-LHDeleteHoldPreview 0.55`).
-    private static var frozenProgress: CGFloat {
+    static var frozenProgress: CGFloat {
         #if DEBUG
         let args = ProcessInfo.processInfo.arguments
         if let i = args.firstIndex(of: "-LHDeleteHoldPreview"), args.indices.contains(i + 1),

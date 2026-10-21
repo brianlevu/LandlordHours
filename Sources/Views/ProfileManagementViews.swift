@@ -119,6 +119,7 @@ private struct ProfileCandidateRow: View {
     let palette: SealPalette
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
@@ -129,8 +130,10 @@ private struct ProfileCandidateRow: View {
                 Text(verbatim: profile.displayLabel)
                     .font(.body.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
-                    .lineLimit(1)
+                    // Long relay addresses wrap to a second line instead of losing their middle.
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 2)
                     .truncationMode(.middle)
+                    .fixedSize(horizontal: false, vertical: true)
                 countsLine
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
