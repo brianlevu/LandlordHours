@@ -300,7 +300,7 @@ final class ReportsLogicTests: XCTestCase {
 
     func testBothTestsMetIsPositive() {
         let standing = ReportsLogic.repsStanding(person: .you, rep: rep(hours: 800, other: 400), year: 2026, now: midOctober, calendar: calendar)
-        XCTAssertEqual(standing.status, "Both tests met")
+        XCTAssertEqual(standing.status, "Past both marks")
         XCTAssertEqual(standing.tone, .positive)
     }
 

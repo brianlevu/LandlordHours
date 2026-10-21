@@ -57,7 +57,7 @@ final class BackfillJobFixRoundTests: XCTestCase {
         spoken = []
         job.start(NothingNewScanner(access: .denied))
         await job.waitUntilDone()
-        XCTAssertEqual(spoken, ["Couldn't read your calendar. Turn on calendar access in Settings."])
+        XCTAssertEqual(spoken, ["Couldn’t read your calendar. Turn on calendar access in Settings."])
     }
 
     func testCancelIsAnnounced() async {

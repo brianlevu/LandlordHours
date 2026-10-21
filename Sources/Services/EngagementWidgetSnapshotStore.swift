@@ -59,7 +59,7 @@ struct EngagementWidgetSnapshot: Codable, Equatable {
         recommendationReason: .setupProperty,
         recommendationDestination: .addProperty,
         recommendationTitle: "Set up LandlordHours",
-        recommendationMessage: "Add your first property to start tracking evidence."
+        recommendationMessage: "Add your first property to start your record."
     )
 
     init(

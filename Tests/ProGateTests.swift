@@ -629,7 +629,7 @@ final class ProPurchaseStoreKitTests: XCTestCase {
         XCTAssertLessThan(Date().timeIntervalSince(started), 5)
         XCTAssertEqual(model.phase, .restoreNone)
         XCTAssertFalse(manager.isLoading, "the restore button must come back")
-        XCTAssertEqual(manager.restoreFailureMessage, "The App Store didn't answer. Try again in a moment.")
+        XCTAssertEqual(manager.restoreFailureMessage, "The App Store didn’t answer. Try again in a moment.")
     }
 
     func testRestoreErrorIsShownAsAFailureNotAsNothingFound() async throws {
@@ -638,7 +638,7 @@ final class ProPurchaseStoreKitTests: XCTestCase {
         let found = await manager.restorePurchases()
         XCTAssertFalse(found)
         XCTAssertFalse(manager.isLoading)
-        XCTAssertEqual(manager.restoreFailureMessage, "Couldn't reach the App Store. Check your connection and try again.")
+        XCTAssertEqual(manager.restoreFailureMessage, "Couldn’t reach the App Store. Check your connection and try again.")
     }
 
     func testRestoreFindsAPurchaseOnThisDeviceWithoutAskingTheAppStore() async throws {

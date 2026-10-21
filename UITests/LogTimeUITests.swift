@@ -228,7 +228,7 @@ final class LogTimeUITests: XCTestCase {
         save.tap()
         let error = element("log.saveError")
         XCTAssertTrue(error.waitForExistence(timeout: 4))
-        XCTAssertTrue(shows("Couldn't save this"), error.label)
+        XCTAssertTrue(shows("Couldn’t save this"), error.label)
         XCTAssertTrue(save.exists, "the sheet stays open with the note")
         XCTAssertFalse(element("shell.toast").exists)
         save.tap()   // the next try works

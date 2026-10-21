@@ -356,7 +356,7 @@ final class PaywallContextTests: XCTestCase {
 
     func testNotTaxAdviceWording() {
         XCTAssertEqual(NotTaxAdviceNote.text,
-                       "LandlordHours keeps your records. It doesn't give tax advice. Check your qualification with a tax professional.")
+                       "LandlordHours keeps your records. It doesn’t give tax advice. Ask a tax professional what your hours mean for you.")
     }
 
     func testOnboardingHasNoPaywallStep() {

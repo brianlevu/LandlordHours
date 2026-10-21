@@ -129,7 +129,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             UNNotificationCategory(
                 identifier: "LANDLORDHOURS_REPORTS",
                 actions: [
-                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_REPORTS", title: "Open Reports", options: foreground)
+                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_REPORTS", title: "Open reports", options: foreground)
                 ],
                 intentIdentifiers: [],
                 options: []

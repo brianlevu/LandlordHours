@@ -141,7 +141,7 @@ struct BackfillProgressHeader: View {
     private var blocked: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("We can't read your calendar")
+                Text("We can’t read your calendar")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(OnBlueprint.primary)
                 Text("Turn on Full Access for LandlordHours in Settings, then run it again.")

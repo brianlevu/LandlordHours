@@ -81,7 +81,7 @@ enum ReportsLogic {
         if rep.isQualified {
             return ReportStanding(
                 person: person, goal: .reps750, hours: hours, target: 750,
-                status: "Both tests met", tone: .positive,
+                status: "Past both marks", tone: .positive,
                 detail: "More than 750 hours, and more than half your working time."
             )
         }
@@ -130,7 +130,7 @@ enum ReportsLogic {
             return ReportStanding(
                 person: person, goal: goal, hours: hours, target: goal.targetHours,
                 status: "Over 500 hours", tone: .positive,
-                detail: "The 500-hour test is met, so the 100-hour question doesn't apply."
+                detail: "You’re past 500 hours, so who else did more doesn’t come up."
             )
         }
         if goal == .mp100, result.ownerAndSpouseHours > 100 {
@@ -139,13 +139,13 @@ enum ReportsLogic {
                 return ReportStanding(
                     person: person, goal: goal, hours: hours, target: goal.targetHours,
                     status: "100 hours reached", tone: .positive,
-                    detail: "Confirm no one else spent more time on it to pass this test."
+                    detail: "Confirm no one else spent more time on it."
                 )
             case .some(false):
                 return ReportStanding(
                     person: person, goal: goal, hours: hours, target: goal.targetHours,
                     status: "Someone else did more", tone: .caution,
-                    detail: "The 100-hour test isn't met. The 500-hour test still counts."
+                    detail: "Someone else did more, so the 100-hour route is out. The 500-hour route is still open."
                 )
             case .some(true):
                 break
@@ -155,7 +155,7 @@ enum ReportsLogic {
         return ReportStanding(
             person: person, goal: goal, hours: hours, target: goal.targetHours,
             status: pace.text, tone: pace.tone,
-            detail: includesSpouse ? "Your hours and your spouse's count together for this test." : "Your hours only. Turn on spouse hours in Tax profile to count both."
+            detail: includesSpouse ? "Your hours and your spouse’s count together for this test." : "Your hours only. Turn on spouse hours in Tax profile to count both."
         )
     }
 

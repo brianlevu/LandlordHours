@@ -89,7 +89,7 @@ struct GetLandlordHoursSummaryIntent: AppIntent {
     static var title: LocalizedStringResource = "Check my hours"
     static var description = IntentDescription("Your hours this year, your pace, and what’s waiting to confirm.")
 
-    @Parameter(title: "Tax Year")
+    @Parameter(title: "Tax year")
     var taxYear: Int?
 
     init() {

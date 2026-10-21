@@ -849,7 +849,7 @@ struct DashboardView: View {
                 .background(colors.backgroundTertiary)
                 .clipShape(Capsule())
             let words = VStack(alignment: .leading, spacing: 4) {
-                Text("Finish your tax-ready setup")
+                Text("Finish setting up")
                     .font(.system(.headline, design: .rounded, weight: .black))
                     .foregroundStyle(colors.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1014,7 +1014,7 @@ struct EntryListRow: View {
                         .clipShape(Capsule())
                     }
                     if !entry.countsForREPS {
-                        Text("Non-REPS")
+                        Text("Not counted")
                             .font(.system(size: 10, weight: .medium, design: .rounded))
                             .foregroundStyle(AppColors.coral)
                             .padding(.horizontal, 6)

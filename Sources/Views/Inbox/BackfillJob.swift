@@ -207,7 +207,7 @@ final class BackfillJob: ObservableObject {
         }
         guard outcome.access == .fullAccess else {
             phase = .blocked(outcome.access)
-            announce("Couldn't read your calendar. Turn on calendar access in Settings.")
+            announce("Couldn’t read your calendar. Turn on calendar access in Settings.")
             return
         }
         // Only a finished scan counts as the day-1 backfill.

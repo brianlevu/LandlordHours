@@ -295,8 +295,8 @@ struct MilestoneCelebrationView: View {
 
     static func title(for celebration: HouseCelebration) -> String {
         switch celebration {
-        case .stage(.foundation100): return "Foundation's poured."
-        case .stage(.roof500): return "Roof's on."
+        case .stage(.foundation100): return "Foundation’s poured."
+        case .stage(.roof500): return "Roof’s on."
         case .stage(.keys750): return "Every stage is built."
         case .goalMet: return "Keys in the door."
         }
@@ -317,11 +317,11 @@ struct MilestoneCelebrationView: View {
         case .stage(.foundation100):
             return hours > 100
                 ? "Past 100 hours for material participation test 3, based on your records."
-                : "Material participation test 3 needs more than 100 hours. You're at the line."
+                : "Material participation test 3 needs more than 100 hours. You’re at the line."
         case .stage(.roof500):
             return hours > 500
                 ? "Material participation test 1 met, based on your records."
-                : "Material participation test 1 needs more than 500 hours. You're at the line."
+                : "Material participation test 1 needs more than 500 hours. You’re at the line."
         case .stage(.keys750):
             return "More than 750 hours, based on your records. The house keeps your count."
         case .goalMet(.reps750):

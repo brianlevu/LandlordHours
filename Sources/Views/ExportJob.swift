@@ -208,7 +208,7 @@ struct ExportReadyBanner: View {
         }
         .onAppear {
             UIAccessibility.post(notification: .announcement,
-                                 argument: kind == .ready ? "Your report is ready" : "Couldn't create your report")
+                                 argument: kind == .ready ? "Your report is ready" : "Couldn’t create your report")
             guard kind == .ready else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + collapseAfter) {
                 if reduceMotion { collapsed = true } else { withAnimation(.easeOut(duration: 0.24)) { collapsed = true } }
@@ -296,7 +296,7 @@ struct ExportReadyBanner: View {
                         .frame(width: 36, height: 36)
                         .background(Circle().fill(colors.cautionSurface))
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Couldn't create your report")
+                        Text("Couldn’t create your report")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(colors.textPrimary)
                         Text("Try again from Export.")

@@ -385,7 +385,7 @@ struct SettingsView: View {
         } header: {
             BPSectionHeader(title: "Records")
         } footer: {
-            Text("Photos attached to records stay on this iPhone. They aren't included in iCloud sync.")
+            Text("Photos attached to records stay on this iPhone. They aren’t included in iCloud sync.")
                 .font(.footnote)
                 .foregroundStyle(colors.textSecondary)
                 .accessibilityIdentifier("settings.photoStorageDisclosure")
@@ -472,7 +472,7 @@ struct SettingsView: View {
     private var syncSubtitle: String? {
         if viewModel.syncService.isSyncing || viewModel.syncService.isRunningInitialSync { return "Syncing…" }
         if !viewModel.syncService.accountAvailable { return "iCloud sync is off. Your records are safe on this iPhone." }
-        if viewModel.syncService.syncError != nil { return "Couldn't sync just now. Your records are safe on this iPhone." }
+        if viewModel.syncService.syncError != nil { return "Couldn’t sync just now. Your records are safe on this iPhone." }
         if let date = viewModel.syncService.lastSyncDate {
             let formatter = RelativeDateTimeFormatter()
             formatter.unitsStyle = .short
@@ -883,7 +883,7 @@ private struct SavedLabelStyle: LabelStyle {
 
 /// Plain disclaimer at the foot of Settings. The PDF export carries its own version.
 struct NotTaxAdviceNote: View {
-    static let text = "LandlordHours keeps your records. It doesn't give tax advice. Check your qualification with a tax professional."
+    static let text = "LandlordHours keeps your records. It doesn’t give tax advice. Ask a tax professional what your hours mean for you."
 
     @Environment(\.colorScheme) private var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
@@ -960,7 +960,7 @@ struct TaxProfileView: View {
                 SettingToggleRow(
                     symbol: "person.2",
                     title: "Spouse hours",
-                    subtitle: "Track your spouse's hours too. They count together for material participation, never for your 750.",
+                    subtitle: "Track your spouse’s hours too. They count together for material participation, never for your 750.",
                     isOn: $taxProfile.spouseTracking
                 )
                 .accessibilityIdentifier("taxProfile.spouseTracking")

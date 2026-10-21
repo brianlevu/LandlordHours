@@ -293,7 +293,7 @@ final class PaywallCaptureUITests: XCTestCase {
                     scrollTo("paywall.restoreNone")
                     Thread.sleep(forTimeInterval: 0.8)
                     XCTAssertTrue(restore.isEnabled, "\(suffix): Restore can be tried again")
-                    XCTAssertTrue(message.label.hasPrefix(outcome == "timeout" ? "The App Store didn't answer" : "Couldn't reach the App Store"),
+                    XCTAssertTrue(message.label.hasPrefix(outcome == "timeout" ? "The App Store didn’t answer" : "Couldn’t reach the App Store"),
                                   "\(suffix): wrong message '\(message.label)'")
                     save("paywall-restore-\(suffix)")
                     // Scrolled: body text passes the close button's row; nothing may sit under it.
@@ -319,7 +319,7 @@ final class PaywallCaptureUITests: XCTestCase {
                     }
                     row.tap()
                     // The result shows inline under the row; the row stays tappable to retry.
-                    let expected = outcome == "timeout" ? "The App Store didn't answer" : "Couldn't reach the App Store"
+                    let expected = outcome == "timeout" ? "The App Store didn’t answer" : "Couldn’t reach the App Store"
                     let shown = NSPredicate(format: "label CONTAINS %@", expected)
                     XCTAssertTrue(app.descendants(matching: .any).matching(shown).firstMatch.waitForExistence(timeout: 10),
                                   "\(suffix): no inline restore message")

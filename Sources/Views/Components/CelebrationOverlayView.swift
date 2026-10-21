@@ -22,18 +22,18 @@ enum CelebrationType: Identifiable, Equatable {
 
     var title: String {
         switch self {
-        case .propertyAdded: return "Property Added!"
-        case .goalMet: return "Goal Met!"
-        case .greatWork: return "Great Work!"
-        case .weeklyStreak: return "On Fire!"
-        case .hoursLogged(let m): return "\(m) Hours!"
+        case .propertyAdded: return "Property added!"
+        case .goalMet: return "Goal met!"
+        case .greatWork: return "Great work!"
+        case .weeklyStreak: return "On fire!"
+        case .hoursLogged(let m): return "\(m) hours!"
         }
     }
 
     var subtitle: String {
         switch self {
         case .propertyAdded: return "Your journey begins"
-        case .goalMet: return "You\u{2019}ve qualified \u{2014} amazing work"
+        case .goalMet: return "You’ve reached your goal hours"
         case .greatWork: return "Keep up the momentum"
         case .weeklyStreak: return "3 weeks in a row"
         case .hoursLogged: return "Every hour counts"

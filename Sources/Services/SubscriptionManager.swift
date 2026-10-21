@@ -190,7 +190,7 @@ class SubscriptionManager: ObservableObject {
 
             // Find the pro product
             guard let product = products.first(where: { $0.id == proProductID }) else {
-                purchaseError = "We couldn't reach the App Store to load Pro. Check your connection and try again."
+                purchaseError = "We couldn’t reach the App Store to load Pro. Check your connection and try again."
                 isLoading = false
                 return .failed
             }
@@ -217,11 +217,11 @@ class SubscriptionManager: ObservableObject {
                             await transaction.finish()
                             return (.purchased, nil)
                         }
-                        return (.failed, "The App Store couldn't confirm this purchase. Please try again.")
+                        return (.failed, "The App Store couldn’t confirm this purchase. Please try again.")
                     case .userCancelled:
                         return (.cancelled, nil) // User cancelled, no error
                     case .pending:
-                        return (.pending, "Purchase is pending approval. We'll unlock Pro after it is approved.")
+                        return (.pending, "Purchase is pending approval. We’ll unlock Pro after it is approved.")
                     @unknown default:
                         return (.failed, "Purchase could not be completed. Please try again.")
                     }
@@ -288,12 +288,12 @@ class SubscriptionManager: ObservableObject {
             Analytics.purchaseRestored()
             return true
         }
-        purchaseError = "We didn't find an earlier Pro purchase for this Apple Account."
+        purchaseError = "We didn’t find an earlier Pro purchase for this Apple Account."
         return false
     }
 
-    static let restoreTimedOutMessage = String(localized: "The App Store didn't answer. Try again in a moment.")
-    static let restoreFailedMessage = String(localized: "Couldn't reach the App Store. Check your connection and try again.")
+    static let restoreTimedOutMessage = String(localized: "The App Store didn’t answer. Try again in a moment.")
+    static let restoreFailedMessage = String(localized: "Couldn’t reach the App Store. Check your connection and try again.")
     static let restoreCancelledMessage = String(localized: "Restore was cancelled.")
 
     @MainActor

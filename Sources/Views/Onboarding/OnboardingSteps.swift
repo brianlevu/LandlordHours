@@ -605,7 +605,7 @@ struct OnbPropertyStep: View {
             .disabled(flow.trimmedName.isEmpty)
             .allowsHitTesting(!flow.stakeDropped)
             .accessibilityIdentifier("onb-primary")
-            Button("I'll add it later") {
+            Button("I’ll add it later") {
                 focused = false
                 flow.skipProperty(OnbMotion.morph(reduce))
             }

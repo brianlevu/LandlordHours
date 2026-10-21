@@ -285,7 +285,7 @@ struct ExportPDFView: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("export.generatePDF")
 
-                    Text("You can close this. We'll let you know when it's ready.")
+                    Text("You can close this. We’ll let you know when it’s ready.")
                         .font(.footnote)
                         .foregroundStyle(colors.textSecondary)
                         .multilineTextAlignment(.center)
@@ -314,7 +314,7 @@ struct ExportPDFView: View {
             }
 
             if viewModel.initialPullFailed && gate.allowsCreate {
-                Label("Couldn't reach iCloud. This report may be missing hours from your other devices.",
+                Label("Couldn’t reach iCloud. This report may be missing hours from your other devices.",
                       systemImage: "icloud.slash")
                     .font(.footnote)
                     .foregroundStyle(colors.textSecondary)
@@ -335,7 +335,7 @@ struct ExportPDFView: View {
     /// The pull is slow, not failed: the report may miss hours from other devices. The user
     /// chooses to go ahead anyway (the only way to create while syncing).
     private var createWithLocalButton: some View {
-        Button("Create with what's on this device") { generateExports(force: true) }
+        Button("Create with what’s on this device") { generateExports(force: true) }
             .font(AppTypography.button)
             .foregroundStyle(colors.action)
             .frame(maxWidth: .infinity, minHeight: 44)

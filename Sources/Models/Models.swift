@@ -12,8 +12,8 @@ enum PropertyType: String, Codable, CaseIterable {
     
     var fullName: String {
         switch self {
-        case .ltr: return "Long-Term Rental"
-        case .str: return "Short-Term Rental"
+        case .ltr: return "Long-term rental"
+        case .str: return "Short-term rental"
         }
     }
     
@@ -121,14 +121,14 @@ enum ActivityCategory: String, Codable, CaseIterable {
         case .repairs: return "Fixing leaks, HVAC, plumbing, electrical"
         case .management: return "Collecting rent, communications, scheduling"
         case .leasing: return "Showing units, screening tenants, signing leases"
-        case .bookkeeping: return "Accounting, tax prep, financial records"
+        case .bookkeeping: return "Bookkeeping, tax prep, financial records"
         case .legal: return "Evictions, compliance, permits"
         case .insurance: return "Claims, policy reviews"
         case .travel: return "Driving to property for activities"
         case .renovations: return "Major improvements, remodeling"
-        case .investing: return "NOT countable - Investment decisions"
-        case .financing: return "NOT countable - Loan decisions"
-        case .contractNegotiation: return "NOT countable - Purchase/sale negotiations"
+        case .investing: return "Investor work, not counted: investment decisions"
+        case .financing: return "Investor work, not counted: loan decisions"
+        case .contractNegotiation: return "Investor work, not counted: buying and selling talks"
         }
     }
     

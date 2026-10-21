@@ -15,7 +15,7 @@ enum AppleSignInFlow {
         case failed
     }
 
-    static let failureMessage = "Sign in with Apple isn't available right now. You can start without an account, or check that you're signed in to your Apple Account in Settings."
+    static let failureMessage = "Sign in with Apple isn’t available right now. You can start without an account, or check that you’re signed in to your Apple Account in Settings."
 
     static func configure(_ request: ASAuthorizationAppleIDRequest) {
         request.requestedScopes = [.fullName, .email]
