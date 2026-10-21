@@ -342,11 +342,19 @@ final class FreeUserPaywallUITests: XCTestCase {
 
     private func scrollTo(_ element: XCUIElement, maxSwipes: Int = 8) {
         var swipes = 0
-        while (!element.exists || !element.isHittable) && swipes < maxSwipes {
+        while (!element.exists || !element.isHittable || isUnderTabBar(element)) && swipes < maxSwipes {
             app.swipeUp()
             swipes += 1
         }
         XCTAssertTrue(element.waitForExistence(timeout: 3), "Could not reach \(element)")
+    }
+
+    /// The floating tab bar is an overlay the accessibility tree still calls hittable through, so a tap
+    /// on a lock sitting under it lands on a tab (Today's "Your record" sits last, right above it).
+    private func isUnderTabBar(_ element: XCUIElement) -> Bool {
+        let tabBar = app.buttons["tab.today"]
+        guard element.exists, tabBar.exists, tabBar.isHittable else { return false }
+        return element.frame.maxY > tabBar.frame.minY - 8
     }
 
     /// 2.0 onboarding, the quickest way through: no calendar, no property (six taps to Today).
