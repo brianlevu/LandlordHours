@@ -25,3 +25,14 @@ Base: `origin/release/2.0` at f80538a. Merge order: wp-paywall (2821ed4), wp-log
 
 ## Open items for the final merge
 - Today shows "Your record" whenever there are entries. Paywall's old `shouldShowProNudge` also required at least one property. I kept Today's rule. Today owns the layout, and ProGate's lock rule is unchanged.
+
+## Later folds and fixes (same night)
+
+- **wp-today bd91a63 and 54e3d23:** clean merges. They bring the QA scripts from release/2.0 and wrap suggestion titles at AX sizes.
+- **wp-paywall b0e4f44:** clean merge. It brings one shared StoreKit test session for the unit tests.
+- **Rental-work rename:** the strings the verifier listed were already "rental work" after the merges. I renamed what was left: the Engagement Lab debug string and comments.
+- **Onboarding and sign-in tests:** their launch and tap waits went from 10–12s to 20s, after the Today verifier diagnosed a timing flake under load.
+- **Log picker lock test:** scoped to the picker. With ProGate merged, Today's "Your record" lock under the sheet has its own Unlock Pro.
+- **Free-journey tests:** lock taps now stay clear of the floating tab bar. On iPhone, Today's "Your record" lock sits last, so a tap on it landed on the Records tab.
+- **Log verifier must-fix:** the tab-2 route now uses `LogSheetRoute.forPlusRoute`. It covers the Review timer notification and widget, and intents. A running timer opens `.timer` and a waiting stopped draft opens `.timerReview`. Otherwise it opens `.log`. Both the live route and the cold-launch route use it. Unit tests are in `LogPlusRouteTests`.
+  - No UI test: the stopped-draft debug seed runs after the cold-launch route has already been picked.
