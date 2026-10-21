@@ -1988,6 +1988,65 @@
    "landlord": true,
    "category": "investing",
    "split": "deals"
+  },
+  {
+   "title": "Negotiation call with the seller's agent",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "List the Pine Street house for sale with the broker",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "split": "deals"
+  },
+  {
+   "title": "Sign listing agreement for Cedar Flats",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "property": "cedar",
+   "split": "deals"
+  },
+  {
+   "title": "Negotiate price with the buyer's agent - Maple Cottage",
+   "landlord": true,
+   "category": "contractNegotiation",
+   "property": "maple",
+   "split": "deals"
+  },
+  {
+   "title": "Closing at the title company at 9am",
+   "landlord": true,
+   "category": "financing",
+   "split": "deals"
+  },
+  {
+   "title": "Escrow closing call for the Pine St duplex",
+   "landlord": true,
+   "category": "financing",
+   "split": "deals"
+  },
+  {
+   "title": "Pay the mortgage payment for Oak Street Duplex",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": "oak",
+   "split": "deals"
+  },
+  {
+   "title": "Record the mortgage payment - Lakeview",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": "lakeview",
+   "split": "deals"
+  },
+  {
+   "title": "Set up autopay for the loan payment on Maple Cottage",
+   "landlord": true,
+   "category": "bookkeeping",
+   "property": "maple",
+   "split": "deals"
   }
  ]
 }

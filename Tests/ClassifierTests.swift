@@ -227,6 +227,12 @@ final class ClassifierTests: XCTestCase {
             ("1031 exchange - identify replacement property", .investing),
             ("Tour potential rental on Walnut Ave", .investing),
             ("Look at duplex listing in Eastside", .investing),
+            ("Negotiation call with the seller's agent", .contractNegotiation),
+            ("Negotiate price with the buyer's agent", .contractNegotiation),
+            ("List the Pine Street house for sale with the broker", .contractNegotiation),
+            ("Sign listing agreement for Cedar Flats", .contractNegotiation),
+            ("Closing at the title company at 9am", .financing),
+            ("Escrow closing call for the Pine St duplex", .financing),
         ]
         let backend = FakeOnDeviceBackend(answer: answer(true, 0.9, category: .management, ref: "P1"))
         let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
@@ -241,8 +247,27 @@ final class ClassifierTests: XCTestCase {
 
     func testCountableTitlesWithDealLikeWordsKeepTheirCategory() {
         for title in ["Post listing on Zillow", "Vacancy - update rental listing photos", "Mortgage payment for Oak Street Duplex",
-                      "Loan payment autopay - Maple", "Virtual tour video for listing", "Fix sink at Oak"] {
+                      "Loan payment autopay - Maple", "Virtual tour video for listing", "Fix sink at Oak",
+                      "Negotiate lease renewal with tenant", "Negotiation with tenant over late rent", "Closing the gate at Maple",
+                      "Closing up the pool for winter"] {
             XCTAssertNil(DealSignal.category(forTitle: title), title)
+        }
+    }
+
+    /// Paying an existing loan is bookkeeping, which counts; it must never come out as Financing
+    /// (non-countable) from the keyword table or the model, on any source.
+    func testLoanAndMortgagePaymentsStayCountable() async {
+        let backend = FakeOnDeviceBackend(answer: answer(true, 0.9, category: .financing))
+        let chain = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
+        for title in ["Pay the mortgage payment", "Record the mortgage payment", "Set up autopay for the loan payment",
+                      "Pay HELOC installment - Maple"] {
+            for kind in [Suggestion.Kind.calendar, .location, .gmail] {
+                let c = await chain.classify(candidate(title, kind: kind), properties: properties)
+                XCTAssertNotEqual(c.category, .financing, "\(kind): \(title)")
+                if let category = c.category { XCTAssertTrue(category.countsForREPS, "\(kind): \(title)") }
+            }
+            let rules = await RulesClassifier().classify(candidate(title, kind: .gmail), properties: properties)
+            XCTAssertNotEqual(rules.category, .financing, "rules email: \(title)")
         }
     }
 

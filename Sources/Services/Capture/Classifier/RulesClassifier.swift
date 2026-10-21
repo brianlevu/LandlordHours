@@ -99,25 +99,52 @@ enum DealSignal {
         "potential rental", "potential property", "replacement property", "property to buy",
     ]
 
+    /// Words that put a bare "closing" in a purchase or sale ("Closing at the title company"),
+    /// not "Closing the gate".
+    static let closingContext = [
+        "title company", "escrow", "sale", "purchase", "buyer", "buyers", "seller", "sellers", "attorney",
+        "lender", "docs", "documents", "disclosure", "costs", "date", "table", "settlement",
+    ]
+    /// Who a purchase or sale negotiation is with. A tenant or lease negotiation stays Leasing.
+    static let negotiationContext = [
+        "seller", "sellers", "buyer", "buyers", "agent", "broker", "realtor", "purchase", "sale", "price", "offer",
+    ]
+    static let tenantContext = ["tenant", "tenants", "lease", "renewal", "rent", "guest", "applicant"]
+
     /// The non-countable category a title's deal signal forces, or nil.
     static func category(forTitle title: String) -> ActivityCategory? {
-        let text = RulesEngine.normalize(title)
-        let padded = " \(text) "
+        let padded = " \(RulesEngine.normalize(title)) "
         func has(_ phrase: String) -> Bool { padded.contains(" \(phrase) ") }
-        // Paying a loan or mortgage is bookkeeping, not a financing decision.
-        let isPayment = has("payment") || has("pay") || has("autopay")
+        let isPayment = isLoanPayment(padded)
+        let isTenantMatter = tenantContext.contains(where: has)
         if contractNegotiation.contains(where: has) { return .contractNegotiation }
+        let negotiates = ["negotiate", "negotiation", "negotiations", "negotiating"].contains(where: has)
+        if negotiates, !isTenantMatter, negotiationContext.contains(where: has) { return .contractNegotiation }
+        let lists = has("list") || has("listing") || has("listings")
+        let looks = has("look at") || has("tour") || has("view")
+        // Listing the user's own property for sale is selling; looking at a listing is buying.
+        if has("listing agreement") || (lists && has("for sale") && !looks) { return .contractNegotiation }
         if !isPayment, financing.contains(where: has) { return .financing }
+        if has("closing"), closingContext.contains(where: has) { return .financing }
         if investing.contains(where: has) { return .investing }
-        // Looking at a listing (not posting or refreshing one) is weighing a purchase.
-        if has("listing") || has("listings"), has("look at") || has("for sale") {
-            return .investing
-        }
+        if lists, has("look at") || has("for sale") { return .investing }
         return nil
     }
 
-    /// The category to propose: a deal signal's non-countable category, else `category`.
+    /// "Pay the mortgage", "Record the loan payment", "autopay for the loan": paying an existing
+    /// loan is bookkeeping, which counts, not a financing decision.
+    static func isLoanPayment(_ padded: String) -> Bool {
+        func has(_ phrase: String) -> Bool { padded.contains(" \(phrase) ") }
+        let pays = ["pay", "pays", "paid", "paying", "payment", "payments", "autopay", "installment"].contains(where: has)
+        let debt = ["mortgage", "mortgages", "loan", "loans", "heloc", "note"].contains(where: has)
+        return pays && debt
+    }
+
+    /// The category to propose: a deal signal's non-countable category, else `category`. A loan
+    /// or mortgage payment that came out as Financing (keyword table or model) is Bookkeeping.
     static func apply(_ category: ActivityCategory?, title: String) -> ActivityCategory? {
-        Self.category(forTitle: title) ?? category
+        if let deal = Self.category(forTitle: title) { return deal }
+        if category == .financing, isLoanPayment(" \(RulesEngine.normalize(title)) ") { return .bookkeeping }
+        return category
     }
 }
