@@ -14,6 +14,9 @@ struct ExportPDFView: View {
     @State private var sharing: ShareRequest?
     /// WP-L: the report is made in the background; this sheet can close while it runs.
     @ObservedObject private var job = ExportJob.shared
+    /// WP-P: a free user sees this page as a `.page` locked preview.
+    @ObservedObject private var subscriptionManager = SubscriptionManager.shared
+    @State private var paywall: ProPaywallRequest?
 
     /// The records this sheet would export now; a ready report made from other records is stale.
     private var fingerprint: String { ExportFingerprint.current(app: viewModel, year: year) }
@@ -47,25 +50,42 @@ struct ExportPDFView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Export report")
-                            .lhDisplayFont(.largeTitle)
-                            .foregroundStyle(colors.textPrimary)
-                            .accessibilityAddTraits(.isHeader)
-                        Text("A PDF for your accountant and a CSV spreadsheet of every entry.")
-                            .font(.subheadline)
-                            .foregroundStyle(colors.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                LockedPreview(
+                    size: .page,
+                    entry: .exportPage,
+                    line: ProGate.lockLine(.exportPage),
+                    keeps: ProGate.keepsLine(.exportPage),
+                    unlocked: !ProGate.isExportLocked(isPro: subscriptionManager.isPro),
+                    stamp: "PREVIEW",
+                    onUnlock: openPaywall
+                ) {
+                    VStack(alignment: .leading, spacing: 24) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Export report")
+                                .lhDisplayFont(.largeTitle)
+                                .foregroundStyle(colors.textPrimary)
+                                .accessibilityAddTraits(.isHeader)
+                            Text("A PDF for your accountant and a CSV spreadsheet of every entry.")
+                                .font(.subheadline)
+                                .foregroundStyle(colors.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        yearChips
+
+                        // Free: the summary stays sharp; the page itself is what Pro unlocks,
+                        // so it sits under the lock (sandbox lock-export).
+                        if ProGate.isExportLocked(isPro: subscriptionManager.isPro) { summary }
                     }
+                    .padding(.bottom, 24)
+                } locked: {
+                    VStack(alignment: .leading, spacing: 24) {
+                        pagePreview
 
-                    yearChips
+                        if !ProGate.isExportLocked(isPro: subscriptionManager.isPro) { summary }
 
-                    pagePreview
-
-                    summary
-
-                    actions
+                        actions
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
@@ -87,6 +107,7 @@ struct ExportPDFView: View {
             }
         }
         .hidesAppTabBar()
+        .proPaywall($paywall)
         .task(id: year) { await renderPreview() }
         .onAppear { job.isSheetVisible = true }
         .onDisappear { job.isSheetVisible = false }
@@ -321,6 +342,15 @@ struct ExportPDFView: View {
             .accessibilityIdentifier("export.createLocal")
     }
 
+    // MARK: Pro
+
+    /// Opens the export paywall; after a purchase the blur lifts and the report starts.
+    private func openPaywall() {
+        paywall = ProPaywallRequest(context: .export, entry: .exportPage, year: year, onUnlocked: {
+            if gate.allowsCreate && shareItem == nil { generateExports() }
+        })
+    }
+
     // MARK: Data
 
     var yearEntries: [TimeEntry] {
@@ -378,6 +408,7 @@ struct ExportPDFView: View {
 
     /// `force`: the user chose to export what's on this device while the pull is still running.
     private func generateExports(force: Bool = false) {
+        guard !ProGate.isExportLocked(isPro: subscriptionManager.isPro) else { return openPaywall() }
         guard gate.allowsCreate || (force && gate == .stillSyncing && canExport) else { return }
         job.start(report: makeReport(), year: year, fingerprint: fingerprint)
     }

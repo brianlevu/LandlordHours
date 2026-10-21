@@ -107,7 +107,7 @@ final class TodayHouseUITests: XCTestCase {
             launch(hours: "212", extra: ["-LHColorScheme", scheme])
             XCTAssertTrue(hero.waitForExistence(timeout: 20))
             for _ in 0..<6 { app.swipeUp() }
-            let lastCard = app.buttons["dashboard.unlockPro"]
+            let lastCard = app.descendants(matching: .any)["today.yourRecord"].firstMatch
             XCTAssertTrue(lastCard.waitForExistence(timeout: 5))
             let bar = app.buttons["tab.logTime"]
             XCTAssertTrue(bar.exists)

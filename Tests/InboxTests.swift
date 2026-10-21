@@ -212,14 +212,19 @@ final class InboxViewModelTests: CaptureTestCase {
         XCTAssertEqual(model.badgeCount, 1)
         XCTAssertEqual(model.toast?.kind, .problem)
         XCTAssertNil(model.toast?.undo)
-        XCTAssertEqual(model.toast?.message, "Not saved. Your plan has reached its limit.")
+        XCTAssertEqual(model.toast?.message, "Not saved. This one needs Pro.")
+        // WP-P: the plan's limit routes to the paywall about adding a rental, not a dead end.
+        XCTAssertEqual(model.paywallRequest?.context, .secondProperty)
+        XCTAssertEqual(model.paywallRequest?.entry, .inboxLimit)
+        XCTAssertNil(model.sheetSuggestion)
     }
 
     func testNoStoreNeverClaimsLogged() {
         let a = item("A")
         let model = model(store: .some(nil))
         XCTAssertEqual(model.swipeLog(a), .failed, "No profile: nothing saved, and it says so")
-        XCTAssertNil(model.log(a, edits: SuggestionEdits()))
+        // WP-P fix: a failed save is reported, never nil (the sheet used to close as if logged).
+        XCTAssertEqual(model.log(a, edits: SuggestionEdits()), .needsInput(missing: [.profile]))
         XCTAssertEqual(model.toast?.kind, .problem)
         XCTAssertEqual(model.toast?.message, InboxViewModel.noProfileMessage)
         XCTAssertTrue(app.timeEntries.filter { $0.sourceKey != nil }.isEmpty)
@@ -271,7 +276,7 @@ final class InboxViewModelTests: CaptureTestCase {
         let model = model()
         XCTAssertEqual(model.log(receiptLike, edits: SuggestionEdits()), .needsInput(missing: [.hours]))
         XCTAssertNil(model.toast)
-        XCTAssertNil(model.log(receiptLike, edits: SuggestionEdits(hours: 1.25, participant: .spouse)))
+        XCTAssertNotNil(model.log(receiptLike, edits: SuggestionEdits(hours: 1.25, participant: .spouse)).entryId, "Saved")
         let entry = app.timeEntries.first { $0.sourceKey == receiptLike.sourceKey }
         XCTAssertEqual(entry?.hours, 1.25)
         XCTAssertEqual(entry?.participant, .spouse)

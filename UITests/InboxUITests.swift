@@ -180,7 +180,7 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(scrollTo(turnover))
         swipeDismiss(turnover)
         XCTAssertTrue(undo.waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["Marked not landlord work"].exists)
+        XCTAssertTrue(app.staticTexts["Marked not rental work"].exists)
         XCTAssertFalse(row("turnover").exists)
     }
 
@@ -221,7 +221,7 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(scrollTo(sam))
         sam.tap()
         XCTAssertTrue(app.descendants(matching: .any)["confirm.notSure"].waitForExistence(timeout: 5))
-        // The mute link scrolls under the pinned Log / Not landlord work bar: bring it clear first.
+        // The mute link scrolls under the pinned Log / Not rental work bar: bring it clear first.
         let mute = app.buttons["confirm.mute"]
         let pinnedTop = app.buttons["confirm.log"].frame.minY
         var swipes = 0
