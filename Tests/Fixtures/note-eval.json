@@ -1,7 +1,7 @@
 {
  "now": "2026-10-20T15:00:00-07:00",
  "timeZone": "America/Los_Angeles",
- "note": "Hand-labelled landlord notes for the Log time note reader. null = the field must stay empty (the honest answer). categoryAnyOf lists every defensible category. nonCountable = every allowed answer is a non-countable category (hard rule).",
+ "note": "Hand-labelled landlord notes for the Log time note reader. null = the field must stay empty (the honest answer). categoryAnyOf lists every defensible category. nonCountable = every allowed answer is a non-countable category (hard rule). n67-n69 (2026-10-21): notes naming two rentals; the honest property is empty.",
  "properties": [
   {
    "ref": "pine",
@@ -918,6 +918,48 @@
     "repairs"
    ],
    "hours": 2.5,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "n67",
+   "note": "Painted the Oak condo and also mowed at Maple",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": [
+    "repairs",
+    "management",
+    "renovations"
+   ],
+   "hours": null,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "n68",
+   "note": "Maple + Oak: collected rent, 20 min each",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": [
+    "management",
+    "bookkeeping"
+   ],
+   "hours": null,
+   "date": null,
+   "participant": null,
+   "nonCountable": false
+  },
+  {
+   "id": "n69",
+   "note": "showed the lofts and then the beach condo, 3 hours total",
+   "spouseTracking": false,
+   "property": null,
+   "categoryAnyOf": [
+    "leasing"
+   ],
+   "hours": 3,
    "date": null,
    "participant": null,
    "nonCountable": false

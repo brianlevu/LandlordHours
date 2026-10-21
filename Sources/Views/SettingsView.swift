@@ -547,10 +547,18 @@ private struct AutoCaptureSettingsSection: View {
     /// (ClassifierChain); a Log time note goes to the on-device model first and to Private
     /// Cloud Compute only when the phone's model can't answer and the toggle below is on
     /// (NoteReaderChain + PCCGate). Nothing is saved until the user taps Log.
-    static var aiDisclosure: String {
-        if #available(iOS 27.0, *) { return aiDisclosureWithPCC }
-        return aiDisclosureOnDevice
+    /// PCC is offered (toggle + disclosure) only on iOS 27 in a build that carries the PCC
+    /// entitlement (PCCEntitlement). Otherwise notes never leave the phone, and the copy says so.
+    static var offersPCC: Bool {
+        guard #available(iOS 27.0, *) else { return false }
+        #if DEBUG
+        // Captures of the entitled variant only; the gate itself never reads this.
+        if ProcessInfo.processInfo.arguments.contains("-LHShowPCCSetting") { return true }
+        #endif
+        return PCCEntitlement.isConfigured
     }
+
+    static var aiDisclosure: String { offersPCC ? aiDisclosureWithPCC : aiDisclosureOnDevice }
 
     static let aiDisclosureWithPCC = "Calendar suggestions use Apple\u{2019}s on-device model. When you type or say a note in Log time, that model reads it to fill in the form. If it can\u{2019}t, Apple\u{2019}s Private Cloud Compute may read it instead (turn that off above). Private Cloud Compute doesn\u{2019}t keep your note. Nothing goes to us or anyone else, and nothing is saved until you tap Log."
 
@@ -578,7 +586,7 @@ private struct AutoCaptureSettingsSection: View {
             .disabled(!calendarOn || isAsking || UserScope.userId == nil)
             .accessibilityIdentifier("settings.capture.prompts")
 
-            if #available(iOS 27.0, *) {
+            if Self.offersPCC {
                 SettingToggleRow(
                     symbol: "lock.icloud",
                     title: "Private Cloud Compute",

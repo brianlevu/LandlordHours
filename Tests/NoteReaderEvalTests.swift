@@ -102,13 +102,30 @@ final class NoteReaderEvalTests: XCTestCase {
         var rawViolations: [String] = []
         var failures = 0
         var latencies: [Double] = []
-        for c in set.fixture.cases {
+        // NOTE_EVAL_LIMIT=<n> runs the first n notes (short real-device runs); calls are paced
+        // and a rate limit backs off (15 s, doubling) instead of hammering the model.
+        let limit = Int(ProcessInfo.processInfo.environment["NOTE_EVAL_LIMIT"] ?? "") ?? Int.max
+        var backoff: UInt64 = 15
+        for c in set.fixture.cases.prefix(limit) {
             let request = set.request(c)
             let prompt = NoteModelPrompt(request)
             let rules = NoteRules.read(request)
-            let started = Date()
+            var started = Date()
             do {
-                let draft = try await backend.draft(prompt)
+                var draft: NoteModelDraft?
+                for attempt in 0..<3 {
+                    do {
+                        started = Date()
+                        draft = try await backend.draft(prompt)
+                        backoff = 15
+                        break
+                    } catch where NoteReaderChain.generationFailure(error) == .rateLimited && attempt < 2 {
+                        rawViolations.append("\(c.id): rate limited, waiting \(backoff)s")
+                        try await Task.sleep(nanoseconds: backoff * 1_000_000_000)
+                        backoff = min(backoff * 2, 120)
+                    }
+                }
+                guard let draft else { throw NoteModelScriptedError.rateLimited }
                 latencies.append(Date().timeIntervalSince(started))
                 // What the model said before the guards (for the report).
                 if draft.hours != nil && c.hours == nil { rawViolations.append("\(c.id): model hours \(draft.hours!)") }
@@ -124,7 +141,7 @@ final class NoteReaderEvalTests: XCTestCase {
                 rawViolations.append("\(c.id): call failed \(error)")
             }
         }
-        if failures == set.fixture.cases.count {
+        if failures == min(limit, set.fixture.cases.count) {
             // The model says it's available but every call failed (a slimmed simulator answers
             // ModelManagerError 1008): that's "unavailable here", not a score.
             print("NOTE-EVAL \(name): every call failed (\(rawViolations.first ?? "")); the chain fell back to rules on each")
@@ -132,8 +149,9 @@ final class NoteReaderEvalTests: XCTestCase {
         }
         latencies.sort()
         let median = latencies.isEmpty ? 0 : latencies[latencies.count / 2]
+        let p90 = latencies.isEmpty ? 0 : latencies[min(latencies.count - 1, Int(Double(latencies.count) * 0.9))]
         print(report.line)
-        print(String(format: "NOTE-EVAL %@ median latency %.2fs · failures %d", name, median, failures))
+        print(String(format: "NOTE-EVAL %@ latency n=%d median %.2fs p90 %.2fs max %.2fs · failures %d", name, latencies.count, median, p90, latencies.last ?? 0, failures))
         print("NOTE-EVAL \(name) misses: \(report.misses.joined(separator: " "))")
         for line in rawViolations { print("NOTE-EVAL \(name) raw: \(line)") }
         for line in report.samples { print("NOTE-EVAL \(name) description: \(line)") }

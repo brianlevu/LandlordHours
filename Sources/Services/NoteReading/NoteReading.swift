@@ -44,6 +44,9 @@ struct NoteReading: Equatable {
     var participant: Participant?
     var description: String?
     var tier: Suggestion.Tier = .rules
+    /// How many of the user's properties the note names. Two or more: the property stays
+    /// empty (log each one), never a guess at one of them.
+    var mentionedPropertyCount = 0
 
     var isEmpty: Bool {
         propertyId == nil && category == nil && hours == nil && date == nil && participant == nil && description == nil
@@ -69,9 +72,13 @@ enum NoteRules {
         let text = request.text
         let normalized = RulesEngine.normalize(text)
         var reading = NoteReading()
-        reading.propertyId = property(normalized: normalized, properties: request.properties)?.id
+        let mentioned = mentionedProperties(normalized: normalized, properties: request.properties)
+        reading.mentionedPropertyCount = mentioned.count
+        reading.propertyId = mentioned.count >= 2 ? nil : property(normalized: normalized, properties: request.properties)?.id
         reading.category = category(normalized: normalized)
         reading.hours = NoteDuration.hours(in: text)
+        // "20 min each" across two rentals is not 20 min for one of them.
+        if mentioned.count >= 2, RulesEngine.words(normalized).contains("each") { reading.hours = nil }
         reading.date = NoteDateResolver.resolve(text, now: request.now, calendar: request.calendar)
         reading.participant = participant(normalized: normalized, spouseTracking: request.spouseTracking)
         reading.tier = .rules
@@ -84,6 +91,34 @@ enum NoteRules {
     static func property(normalized: String, properties: [RentalProperty]) -> RentalProperty? {
         guard let match = RulesEngine.matchProperty(normalized: normalized, properties: properties), !match.isWeak else { return nil }
         return match.property
+    }
+
+    /// Every property the note names, strongest first. After a property is found its words are
+    /// taken out, so "Oak St Duplex" doesn't also count "Oak St Triplex" through "Oak St".
+    static func mentionedProperties(normalized: String, properties: [RentalProperty]) -> [RentalProperty] {
+        var remaining = normalized
+        var found: [RentalProperty] = []
+        for _ in properties.indices {
+            let others = properties.filter { p in !found.contains { $0.id == p.id } }
+            let hits = others.filter { p in
+                RulesEngine.matchProperty(normalized: remaining, properties: [p]).map { !$0.isWeak } ?? false
+            }
+            guard !hits.isEmpty else { break }
+            let chosen = RulesEngine.matchProperty(normalized: remaining, properties: hits).map { [$0.property] } ?? hits
+            found += chosen
+            for p in chosen { remaining = removingWords(of: p, from: remaining) }
+        }
+        return found
+    }
+
+    private static func removingWords(of property: RentalProperty, from normalized: String) -> String {
+        var drop = Set<String>()
+        for phrase in [property.name, property.shortAddress] + property.aliases {
+            for word in RulesEngine.words(RulesEngine.normalize(phrase)) where !ClassifierKeywords.propertyStopWords.contains(word) {
+                drop.insert(word)
+            }
+        }
+        return RulesEngine.words(normalized).filter { !drop.contains($0) }.joined(separator: " ")
     }
 
     /// Ordered: the first category with a hit wins. Non-countable work comes first so
@@ -354,7 +389,7 @@ enum NoteFactGuard {
         "a", "an", "the", "at", "on", "in", "for", "with", "of", "to", "from", "and", "or", "about",
         "regarding", "re", "by", "via", "per", "after", "before", "during", "into", "over", "this",
         "that", "its", "their", "his", "her", "them", "it", "was", "were", "is", "be", "been",
-        "work", "worked", "task", "tasks", "activity", "activities", "property", "properties",
+        "work", "task", "tasks", "activity", "activities", "property", "properties",
         "rental", "rentals", "owner", "landlord", "performed", "handled", "conducted",
         "attended", "met", "meeting", "meet", "call", "called", "phone", "discussed", "discussion",
         "reviewed", "review", "coordinated", "coordinate", "visited", "visit", "spoke", "related",
@@ -394,6 +429,9 @@ enum NoteFactGuard {
         guard var text = description?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
         text = text.replacingOccurrences(of: "\n", with: " ")
         guard text.count <= maxLength else { return nil }
+        // An instruction smuggled into the note never becomes the record's description.
+        let lowered = text.lowercased()
+        if ["ignore", "instruction", "prompt", "disregard"].contains(where: lowered.contains) { return nil }
         let allowed = sourceWords(request: request, propertyId: propertyId, category: category)
         let said = Set(words(request.text))
         let kind = category.flatMap { categoryWords[$0] } ?? []
@@ -563,11 +601,15 @@ enum NoteReadMerge {
         let normalized = RulesEngine.normalize(request.text)
         var out = NoteReading(tier: tier)
 
+        out.mentionedPropertyCount = rules.mentionedPropertyCount
         // Property: a rules match on a name, alias or address is exact; otherwise the model's
-        // pick, which can only be one of the user's properties.
+        // pick, which can only be one of the user's properties. Never when the note names two
+        // or more: the user logs each one.
         // The model's pick must also be named in the note somehow (a name, alias or street
         // word, allowing a typo): a model left alone picks a property for "all the rentals".
-        if let id = rules.propertyId {
+        if rules.mentionedPropertyCount >= 2 {
+            out.propertyId = nil
+        } else if let id = rules.propertyId {
             out.propertyId = id
         } else if let picked = prompt.property(for: draft.propertyOption), isGrounded(picked, in: request.text) {
             out.propertyId = picked.id
@@ -584,6 +626,8 @@ enum NoteReadMerge {
         // duration at all.
         if let hours = rules.hours {
             out.hours = hours
+        } else if rules.mentionedPropertyCount >= 2 {
+            out.hours = nil   // split across rentals: the user says how long each took
         } else if let hours = draft.hours, hours > 0, hours <= 24, NoteDuration.hasEvidence(request.text) {
             out.hours = hours
         }

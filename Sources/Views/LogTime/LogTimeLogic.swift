@@ -70,6 +70,9 @@ struct LogForm: Equatable {
     /// "Description for your record": the model's sentence (fact-checked), editable. Nil hides
     /// the row. The note stays the user's own words.
     private(set) var recordDescription: String?
+    /// "Your note mentions 2 rentals. Log each one separately." Shown under Property while the
+    /// property is empty because the note named several.
+    private(set) var propertyHint: String?
     /// Fields the user touched. A fill skips them.
     private(set) var userSet: Set<LogField> = []
     /// Fields the last fill wrote (they flash once, and Undo puts them back).
@@ -100,6 +103,7 @@ struct LogForm: Equatable {
 
     mutating func setProperty(_ id: UUID?) {
         propertyId = id
+        propertyHint = nil
         userSet.insert(.property)
         filled.remove(.property)
     }
@@ -202,6 +206,9 @@ struct LogForm: Equatable {
         if let text = reading.description, !userSet.contains(.description) {
             next.recordDescription = text
         }
+        if !userSet.contains(.property) {
+            next.propertyHint = Self.propertyHint(count: reading.mentionedPropertyCount)
+        }
 
         let after = next.snapshot
         let differs = Self.differing(before, after, calendar: calendar).subtracting(userSet)
@@ -229,6 +236,10 @@ struct LogForm: Equatable {
         return out
     }
 
+    static func propertyHint(count: Int) -> String? {
+        count >= 2 ? "Your note mentions \(count) rentals. Log each one separately." : nil
+    }
+
     var canUndoFill: Bool { beforeFill != nil && fillSource != nil }
 
     /// "Filled from your note · Undo": puts back exactly what was there before the fill.
@@ -243,6 +254,7 @@ struct LogForm: Equatable {
         if filled.contains(.participant) { participant = before.participant }
         if filled.contains(.date) { date = before.date }
         if filled.contains(.description) { recordDescription = before.recordDescription }
+        propertyHint = nil
         filled = []
         fillSource = nil
         beforeFill = nil

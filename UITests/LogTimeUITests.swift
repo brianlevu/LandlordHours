@@ -103,6 +103,18 @@ final class LogTimeUITests: XCTestCase {
         XCTAssertEqual(app.buttons["log.save"].label, "Log 1h")
     }
 
+    func testTwoRentalsLeaveThePropertyForTheUser() {
+        launch(seed: "four", extra: ["-LHNoteModel", "fake"])
+        app.buttons["tab.logTime"].tap()
+        let note = element("log.note")
+        XCTAssertTrue(note.waitForExistence(timeout: 8))
+        note.tap()
+        note.typeText("Fixed the sink at Pine Cabin and mowed at Maple Court, 2 hours")
+        XCTAssertTrue(element("log.propertyHint").waitForExistence(timeout: 8))
+        XCTAssertTrue(shows("mentions 2 rentals"))
+        XCTAssertTrue(app.buttons["log.property"].label.contains("Choose"), app.buttons["log.property"].label)
+    }
+
     func testWithoutAModelTheRulesStillFill() {
         launch(seed: "four", extra: ["-LHNoteModel", "unavailable"])
         app.buttons["tab.logTime"].tap()
@@ -319,6 +331,7 @@ final class LogTimeUITests: XCTestCase {
         Shot(name: "ai-undone", seed: "four", extra: ["-LHOpenLog", "aiNote", "-LHNoteModel", "fake"], waitFor: "log.description", settle: 1.0,
              tap: "log.fill.undo", then: "log.property"),
         Shot(name: "ai-partial", seed: "four", extra: ["-LHOpenLog", "aiPartial", "-LHNoteModel", "fake"], waitFor: "log.fill.caption", settle: 1.5),
+        Shot(name: "ai-two-rentals", seed: "four", extra: ["-LHOpenLog", "aiTwoRentals", "-LHNoteModel", "fake"], waitFor: "log.propertyHint", settle: 1.5),
         Shot(name: "ai-rules-only", seed: "four", extra: ["-LHOpenLog", "aiNote", "-LHNoteModel", "unavailable"], waitFor: "log.fill.caption", settle: 1.5),
         Shot(name: "today-timer-running", seed: "four", extra: ["-LHTodayTimer", "running"], waitFor: "today.timer.stop", settle: 2),
         Shot(name: "today-timer-draft", seed: "four", extra: ["-LHTodayTimer", "draft"], waitFor: "today.timerDraft", settle: 2),
@@ -351,7 +364,7 @@ final class LogTimeUITests: XCTestCase {
     /// Apple's model filling the note: thinking, filled, Undo, partial, no model → rules.
     /// Frames changed by the 44pt Undo target and the Date-row scroll (round 2).
     func testCaptureAIFillFixups() {
-        let names: Set<String> = ["ai-filled", "ai-partial", "ai-rules-only"]
+        let names: Set<String> = ["ai-filled", "ai-partial", "ai-rules-only", "ai-two-rentals"]
         for scheme in ["light", "dark"] {
             for size in [nil, "xxl", "ax3"] as [String?] { captureAll(scheme: scheme, size: size, prefix: "ai-", names: names) }
         }

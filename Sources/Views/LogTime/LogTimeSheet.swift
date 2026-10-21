@@ -182,7 +182,7 @@ struct LogTimeSheet: View {
         #if DEBUG
         LogSheetDebug.apply(to: &form, mode: &mode, picker: &picker, voiceIntro: &showVoiceIntro,
                             saveError: &saveError, properties: properties, viewModel: viewModel, focus: { noteFocused = true })
-        if LogSheetDebug.state == "aiNote" || LogSheetDebug.state == "aiPartial" {
+        if ["aiNote", "aiPartial", "aiTwoRentals"].contains(LogSheetDebug.state ?? "") {
             readNote(delay: 0.6, source: .note)
         }
         if LogSheetDebug.state == "listening" {
@@ -489,6 +489,19 @@ struct LogTimeSheet: View {
                 } else {
                     Text("Choose").foregroundStyle(saveError != nil || showsMissing ? colors.caution : colors.action)
                 }
+            }
+            if let hint = form.propertyHint, form.propertyId == nil {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "info.circle").accessibilityHidden(true)
+                    Text(hint).fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.footnote)
+                .foregroundStyle(colors.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("log.propertyHint")
             }
             if LogParticipantRule.showsPicker(spouseTracking: spouseTracking), !isRecovery {
                 divider

@@ -65,12 +65,12 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         let calendarSwitch = element("settings.capture.calendar")
         XCTAssertTrue(scrollTo(calendarSwitch), "Auto-capture section is in Settings")
         XCTAssertTrue(element("settings.capture.prompts").exists)
-        // iOS 27: the note may go to Private Cloud Compute, so the disclosure says so and the
-        // toggle sits in the section (NoteReaderChain + PCCGate).
-        let disclosure = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Private Cloud Compute doesn\u{2019}t keep your note")).firstMatch
+        // This build has no PCC entitlement (LH_PCC_ENTITLED = NO): notes stay on the phone, the
+        // disclosure says so, and no PCC toggle is offered.
+        let disclosure = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "on your iPhone, to fill in the form")).firstMatch
         XCTAssertTrue(scrollTo(disclosure), "Apple AI disclosure is shown")
         XCTAssertTrue(disclosure.label.contains("nothing is saved until you tap Log"), disclosure.label)
-        XCTAssertTrue(element("settings.capture.pcc").exists, "the Private Cloud Compute toggle")
+        XCTAssertFalse(element("settings.capture.pcc").exists, "no PCC toggle without the entitlement")
         element("settings.capture.muted").tap()
         XCTAssertTrue(element("settings.muted.screen").waitForExistence(timeout: 5))
     }
@@ -79,13 +79,14 @@ final class RecordsReportsSettingsUITests: XCTestCase {
     /// and AX3 (frames to LH_CAPTURE_DIR).
     func testCaptureSettingsAIDisclosure() {
         continueAfterFailure = true
+        for (variant, extraArgs) in [("pcc", ["-LHShowPCCSetting"]), ("ondevice", [String]())] {
         for scheme in ["light", "dark"] {
             for ax3 in [false, true] {
-                launch(tab: 4, scheme: scheme, extra: ax3 ? ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL"] : [])
-                let toggle = element("settings.capture.pcc")
+                launch(tab: 4, scheme: scheme, extra: extraArgs + (ax3 ? ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL"] : []))
+                let toggle = element(variant == "pcc" ? "settings.capture.pcc" : "settings.capture.muted")
                 XCTAssertTrue(toggle.waitForExistence(timeout: 20) || scrollTo(toggle, maxSwipes: 14))
                 XCTAssertTrue(scrollTo(toggle, maxSwipes: 14), "PCC toggle")
-                let suffix = "\(scheme)\(ax3 ? "-ax3" : "")"
+                let suffix = "\(variant)-\(scheme)\(ax3 ? "-ax3" : "")"
                 // Frame 1: the toggle near the top of the screen.
                 var tries = 0
                 while toggle.frame.minY > 260 && tries < 8 {
@@ -94,7 +95,7 @@ final class RecordsReportsSettingsUITests: XCTestCase {
                     tries += 1
                 }
                 // At the default size the toggle and the disclosure share one screen: one frame.
-                if ax3 { settleAndCapture("settings-pcc-toggle-\(suffix)", wait: 1.5) }
+                if ax3 && variant == "pcc" { settleAndCapture("settings-pcc-toggle-\(suffix)", wait: 1.5) }
                 // Frame 2: the whole disclosure above the tab bar.
                 let disclosure = element("settings.capture.aiDisclosure")
                 let tabBar = app.buttons["tab.today"]
@@ -118,6 +119,7 @@ final class RecordsReportsSettingsUITests: XCTestCase {
                     settleAndCapture("settings-ai-disclosure-\(suffix)-2", wait: 1.5)
                 }
             }
+        }
         }
     }
 

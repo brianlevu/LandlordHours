@@ -68,6 +68,10 @@ targets:
         # UIBackgroundModes fetch/processing are declared (WP4); only .capture.refresh is registered
         # (CaptureNotificationRefresher), .capture.backfill is registered by the backfill work.
         INFOPLIST_FILE: Sources/App/Info.plist
+        # Private Cloud Compute needs the com.apple.developer.private-cloud-compute entitlement;
+        # without it FoundationModels traps ("Missing entitlement"). Set YES only together with
+        # that key in LandlordHours.entitlements (a unit test keeps them in step).
+        LH_PCC_ENTITLED: "NO"
         SWIFT_EMIT_LOC_STRINGS: YES
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "Apple Development"

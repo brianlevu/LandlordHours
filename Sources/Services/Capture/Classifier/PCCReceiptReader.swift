@@ -46,6 +46,24 @@ struct PCCSettings {
     }
 }
 
+/// Whether this build is signed with the PCC entitlement. FoundationModels traps (a crash, not
+/// an error) when an app without `com.apple.developer.private-cloud-compute` calls PCC, and
+/// `PrivateCloudComputeLanguageModel.availability` still says `.available`. So availability
+/// alone never opens PCC: the build must also say it carries the entitlement
+/// (Info.plist `LHPrivateCloudComputeEntitled` = `$(LH_PCC_ENTITLED)`, NO by default).
+enum PCCEntitlement {
+    static let infoKey = "LHPrivateCloudComputeEntitled"
+
+    static var isConfigured: Bool { isConfigured(in: .main) }
+
+    static func isConfigured(in bundle: Bundle) -> Bool {
+        let raw = bundle.object(forInfoDictionaryKey: infoKey)
+        if let flag = raw as? Bool { return flag }
+        if let text = raw as? String { return ["yes", "true", "1"].contains(text.lowercased()) }
+        return false
+    }
+}
+
 /// System PCC state, behind a protocol so tests inject every state.
 protocol PCCSystemStatusProviding {
     func status() -> ModelAvailability
@@ -53,6 +71,7 @@ protocol PCCSystemStatusProviding {
 
 struct SystemPCCStatus: PCCSystemStatusProviding {
     func status() -> ModelAvailability {
+        guard PCCEntitlement.isConfigured else { return .unavailable(.notEntitled) }
         #if canImport(FoundationModels)
         if #available(iOS 27.0, *) {
             let model = PrivateCloudComputeLanguageModel()

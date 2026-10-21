@@ -42,6 +42,8 @@ enum NoteModelBackends {
     /// Private Cloud Compute on iOS 27+. Availability here is the system's only; the user
     /// setting and the remote flag are checked by `PCCGate` in the chain.
     static func privateCloudCompute() -> NoteModelBackend {
+        // Without the entitlement a PCC call traps the app: never build the real backend.
+        guard PCCEntitlement.isConfigured else { return UnavailableNoteBackend(tier: .pcc, reason: .notEntitled) }
         #if canImport(FoundationModels)
         if #available(iOS 27.0, *) { return PCCNoteBackend() }
         #endif
@@ -143,6 +145,7 @@ struct PCCNoteBackend: NoteModelBackend {
     var availability: ModelAvailability { SystemPCCStatus().status() }
 
     func draft(_ prompt: NoteModelPrompt) async throws -> NoteModelDraft {
+        guard PCCEntitlement.isConfigured else { throw NoteModelError.unavailable(.notEntitled) }
         let model = PrivateCloudComputeLanguageModel()
         let session = LanguageModelSession(model: model, dynamicInstructions: Instructions(NoteModelPrompt.instructions))
         let response = try await session.respond(to: prompt.prompt, schema: try NoteFillSchema.make(for: prompt),
