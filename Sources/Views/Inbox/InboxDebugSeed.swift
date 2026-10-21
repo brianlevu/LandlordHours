@@ -43,8 +43,14 @@ enum InboxDebugSeed {
 
         // `limit` / `limit-waiting` (WP-P): a free user at the one-rental limit.
         let atLimit = scenario.hasPrefix("limit")
+        // Screenshot hook: `-LHTodayStrName "<name>"` names the seeded short-term rental (default Pine Cabin).
+        let strName: String = {
+            let a = ProcessInfo.processInfo.arguments
+            if let i = a.firstIndex(of: "-LHTodayStrName"), a.indices.contains(i + 1) { return a[i + 1] }
+            return "Pine Cabin"
+        }()
         if app.properties.isEmpty {
-            app.addProperty(name: "Pine Cabin", address: "14 Pine Ridge Rd", type: .str)
+            app.addProperty(name: strName, address: "14 Pine Ridge Rd", type: .str)
             if !atLimit { app.addProperty(name: "Oak Street Duplex", address: "220 Oak St", type: .ltr) }
         }
         TaxProfileManager.shared.spouseTracking = true
@@ -116,7 +122,7 @@ enum InboxDebugSeed {
     }
 
     static func inboxItems(app: AppViewModel, now: Date) -> [Suggestion] {
-        let pine = app.properties.first { $0.name == "Pine Cabin" }?.id ?? app.properties.first?.id
+        let pine = app.properties.first { $0.propertyType == .str }?.id ?? app.properties.first?.id
         let oak = app.properties.first { $0.name == "Oak Street Duplex" }?.id ?? app.properties.last?.id
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: now)
