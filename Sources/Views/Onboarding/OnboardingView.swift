@@ -31,16 +31,9 @@ struct OnboardingView: View {
             var services = OnbServices.live(app: viewModel, environment: .current) { completion in
                 finish(completion)
             }
-            // ContentView shows this view while `!isSignedIn || showOnboarding`. Making the
-            // profile flips isSignedIn first, so without this the shell mounts for a frame,
-            // this view is torn down and its flow restarts on Welcome: the first "Start
-            // building" tap looks ignored. Hold the flow on screen before the profile exists.
+            // Hold the flow on screen before any new profile exists (see `holdingOnboarding`).
             let keepShown = $showOnboarding
-            let makeProfile = services.ensureProfile
-            services.ensureProfile = {
-                keepShown.wrappedValue = true
-                makeProfile()
-            }
+            services = services.holdingOnboarding { keepShown.wrappedValue = true }
             let made = OnbFlow(cohort: .new, services: services, startAt: start)
             OnbDebugLaunch.apply(to: made)
             OnbBackfill.flowStarted()
@@ -113,6 +106,7 @@ extension OnbServices {
     static func live(app: AppViewModel, environment: CaptureSetupEnvironment, complete: @escaping (OnbCompletion) -> Void) -> OnbServices {
         var s = OnbServices()
         s.ensureProfile = { if !app.isSignedIn { app.continueWithoutAccount() } }
+        s.signUpWithApple = { app.signUp() }
         s.saveGoal = { goal in GoalManager.shared.setGoalChoice(goal.goalChoice) }
         s.saveWho = { who in TaxProfileManager.shared.spouseTracking = (who == .both) }
         s.addProperty = { name, address in
@@ -501,8 +495,7 @@ struct OnbWelcomeContent: View {
             switch AppleSignInFlow.complete(result) {
             case .signedIn(let isNewUser):
                 if isNewUser {
-                    viewModel.signUp()
-                    flow.next(OnbMotion.morph(reduce))
+                    flow.signUpWithApple(OnbMotion.morph(reduce))
                 } else {
                     // Returning: their profile already finished setup, so the app opens on Today.
                     viewModel.signIn()
