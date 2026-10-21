@@ -279,6 +279,15 @@ struct HouseHeroCard: View {
             .foregroundStyle(HouseTokens.drafting)
     }
 
+    /// The line under the stage name. A record has no target, so none. A 100-hour target shows only
+    /// "Foundation at 100h" until it is reached (never "Roof at 500h" for someone aiming at 100).
+    private var showsNextMilestone: Bool {
+        guard progress.nextStep != nil else { return false }
+        guard let copy = heroCopy else { return true }
+        guard let target = copy.targetHours else { return false }
+        return target > 100 || progress.hours < 100
+    }
+
     private var footerIsNil: Bool { if case .none = footer { return true }; return false }
 
     /// The caption and the pace are two lines: "of 500 hours", then "On pace for Dec 31" across the card's width.
@@ -467,7 +476,7 @@ struct HouseHeroCard: View {
                                     .foregroundStyle(HouseTokens.onHeroPrimary)
                                     .lineLimit(2)
                                 // A record has no target, so no "Roof at 500h" line: the stage name alone.
-                                if progress.nextStep != nil, heroCopy?.targetHours != nil || heroCopy == nil {
+                                if showsNextMilestone {
                                     Text(progress.nextMilestoneLabel)
                                         .font(.footnote)
                                         .foregroundStyle(HouseTokens.onHeroSecondary)
