@@ -137,3 +137,17 @@ Three slim iPhone 17 Pro sims on iOS 27.0, with store, pim and iCloud kept on (s
   - TodayHouse: 6/6. TodayLoading: 3/3.
   - Records/Reports/Settings: 6/6.
   - Properties: 4/4. Property alias: 4/4.
+
+## Round 3 (targeted): wp-learn e82050e
+
+The merge's only conflict was project.pbxproj, regenerated with xcodegen. The grep found no markers, and the simulator build passed.
+
+Three slim sims, with store, pim and iCloud kept on:
+- **Unit:** 910 run, 3 skipped, 0 failed. This excludes `ProPurchaseStoreKitTests`, which ran alone and passed 4/4.
+  - In the full run it hung again at `testRestoreFindsAnEarlierPurchase`. That's 3 of 4 full runs; fix/storekit-tests is pending.
+- **UI, 25 tests, 0 failures:**
+  - LearnDeleteRestore: 3/3.
+  - Records/Reports/Settings: 6/6.
+  - Settings and appearance in LandlordHoursUITests: 2/2.
+  - SignInReplacement (restore): 3/3.
+  - Onboarding: 11/11.
