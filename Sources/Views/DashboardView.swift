@@ -106,11 +106,13 @@ struct DashboardView: View {
     }
 
     /// The rental the 100 or 500 hour count belongs to; nil when it covers every rental.
-    private var heroPropertyName: String? {
-        guard houseGoal != .reps750, goalManager.goalChoice != .record, !TaxProfileManager.shared.groupingElection,
-              !viewModel.properties.isEmpty else { return nil }
-        let overview = viewModel.materialParticipationOverview(year: currentYear, includeSpouse: viewModel.tracksSpouseJointly)
-        return viewModel.properties.first { $0.id == overview.propertyId }?.name
+    private var heroPropertyName: String? { viewModel.todayFocusProperty(year: currentYear)?.name }
+
+    /// The rental Today names in the eyebrow, the house flag and the subtitle: always the same
+    /// one. When the count covers every rental there is no focus; the first rental stands in
+    /// for the flag and subtitle only.
+    private var todayFocusName: String? {
+        viewModel.todayFocusProperty(year: currentYear)?.name ?? viewModel.properties.first?.name
     }
     @State private var showParticipationSheet = false
 
@@ -234,7 +236,7 @@ struct DashboardView: View {
 
     private var heroStakeName: String? {
         guard isNewOwner else { return nil }
-        return viewModel.properties.first?.name
+        return todayFocusName
     }
 
     private func refreshNewOwnerState() {
@@ -707,7 +709,7 @@ struct DashboardView: View {
             return "Every hour you log starts with a place."
         }
         if viewModel.timeEntries.isEmpty {
-            let name = viewModel.properties.first?.name ?? "Your rental"
+            let name = todayFocusName ?? "Your rental"
             return foundInInbox.count > 0
                 ? "\(name) is staked. Confirm what we found, or log something new."
                 : String(localized: "\(name) is staked. Log your first hour while it’s fresh.")

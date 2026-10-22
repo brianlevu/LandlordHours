@@ -8,6 +8,7 @@ import Foundation
 //        (Pine Cabin 212h, Oak Street Duplex 520h, the long-named lofts 128h, Maple Court 0h; or
 //        twelve rentals; or Pine Cabin alone as a FREE user at the limit; or none).
 //        four/twelve are Pro; limit/empty are free. Goal REPS, spouse hours off.
+//        brian: Delaney Ct (long), Santa Ray Ave (short), Yeandle Ave (long), 0h, Pro.
 //   -LHPropertiesGoal mp100    the material participation goal, no grouping election
 //                              (rows read "80h of 100h" / "212h · past 100h")
 extension AppViewModel {
@@ -42,6 +43,11 @@ extension AppViewModel {
                      Seed(name: "Sunset Bungalow", address: "19 Sunset Pl", type: .ltr, hours: 503),
                      Seed(name: "Granite Flats", address: "2 Quarry Rd", type: .ltr, hours: 12),
                      Seed(name: "Willow Cottage", address: "61 Willow Way", type: .str, hours: 240)]
+        case "brian":
+            // 2.0.1 home-screen captures: three rentals, no hours yet, added in this order.
+            seeds = [Seed(name: "Delaney Ct", address: "1 Delaney Ct", type: .ltr, hours: 0),
+                     Seed(name: "Santa Ray Ave", address: "2 Santa Ray Ave", type: .str, hours: 0),
+                     Seed(name: "Yeandle Ave", address: "3 Yeandle Ave", type: .ltr, hours: 0)]
         case "limit": seeds = [pine]
         case "empty": seeds = []
         default: seeds = [pine, oak, lofts, maple]
@@ -49,7 +55,7 @@ extension AppViewModel {
 
         // Captures show the screen itself, not the first-run guided overlay.
         GuidedOnboardingStore.skip()
-        let pro = set == "four" || set == "twelve"
+        let pro = set == "four" || set == "twelve" || set == "brian"
         UserDefaults.standard.set(pro, forKey: UserScope.key("isProUser"))
         UserDefaults.standard.set(pro, forKey: UserScope.key("hasPurchasedPro"))
         SubscriptionManager.shared.reload()

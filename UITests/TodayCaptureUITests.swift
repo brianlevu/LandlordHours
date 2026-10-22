@@ -153,6 +153,30 @@ final class TodayCaptureUITests: XCTestCase {
         }
     }
 
+    /// 2.0.1: Brian's setup (goal 100; Delaney Ct and Yeandle Ave long stays, Santa Ray Ave short
+    /// stays, no hours). Today names Santa Ray Ave in the eyebrow, flag and subtitle; the rows
+    /// read "0h of 100h" only for Santa Ray Ave.
+    func testCaptureBriansSetup() {
+        let args = ["-LHMockScenario", "emptyMainTabs", "-LHSeedSuggestions", "empty", "-LHPropertiesSeed", "brian",
+                    "-LHPropertiesGoal", "mp100", "-LHGoalChoice", "mp100"] + Self.tuesday
+        for scheme in ["light", "dark"] {
+            for size in [Size.standard, Size.ax3] {
+                app.terminate()
+                var arguments = [UITestIsolation.resetProfilesArgument, "-LHNoSwipePeek", "-LHInitialTab", "0",
+                                 "-LHColorScheme", scheme, "-AppleLanguages", "(en)", "-AppleLocale", "en_US"] + args
+                if let category = size.category { arguments += ["-UIPreferredContentSizeCategoryName", category] }
+                app.launchArguments = arguments
+                app.launch()
+                XCTAssertTrue(app.descendants(matching: .any)["today.hero"].waitForExistence(timeout: 25))
+                Thread.sleep(forTimeInterval: 2.2)
+                write("today-brian-\(scheme)\(size.rawValue)")
+                app.buttons["tab.properties"].tap()
+                Thread.sleep(forTimeInterval: 2.0)
+                write("properties-brian-\(scheme)\(size.rawValue)")
+            }
+        }
+    }
+
     func testCaptureHero100() {
         for state in ["hero-100-confirm", "hero-100-str", "hero-100-str-long"] { capture(state) }
     }

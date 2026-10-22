@@ -94,6 +94,22 @@ extension AppViewModel {
     var propertyGoalIsPerProperty: Bool {
         PropertyMeta.isPerPropertyTest(goal: houseGoal, groupingElection: TaxProfileManager.shared.groupingElection)
     }
+
+    /// Whether the hero counts this rental toward the goal (same rule as Today's eyebrow).
+    func heroCounts(_ property: RentalProperty) -> Bool {
+        TaxQualificationEngine.countedProperties(properties).contains { $0.id == property.id }
+    }
+
+    /// The one rental Today names; nil when the count covers every rental.
+    func todayFocusProperty(year: Int = Calendar.current.component(.year, from: Date())) -> RentalProperty? {
+        TaxQualificationEngine.todayFocusProperty(
+            entries: tracksSpouseJointly ? timeEntries : timeEntries.filter { $0.participant == .selfParticipant },
+            properties: properties,
+            year: year,
+            groupingElection: TaxProfileManager.shared.groupingElection,
+            countsPerRental: houseGoal != .reps750 && GoalManager.shared.goalChoice != .record
+        )
+    }
 }
 
 struct PropertyFigures {
@@ -133,17 +149,20 @@ enum PropertyHouseStage {
 }
 
 enum PropertyMeta {
-    /// "212h this year". Only for a material participation goal WITHOUT a grouping election (the
-    /// 500h test then runs per rental): "212h of 500h", past the line "520h this year" (the stage lives on the house art, never in the hours line).
-    /// Whole hours, rounded down so a row never runs ahead of the records.
-    static func hoursLine(_ hours: Double, goal: HouseGoal, groupingElection: Bool) -> String {
+    /// "212h this year". A rental with its own target reads "12h of 100h" (the goal's own number:
+    /// 100, 500) until it passes the line, then "120h this year" (the stage lives on the house
+    /// art, never in the hours line). Only a rental the hero counts has a target, and only for a
+    /// material participation goal WITHOUT a grouping election; under 750 the total lives on
+    /// Today and a row shows hours only. Whole hours, rounded down so a row never runs ahead of
+    /// the records.
+    static func hoursLine(_ hours: Double, goal: HouseGoal, groupingElection: Bool, counted: Bool = true) -> String {
         let whole = Int(max(0, hours.isFinite ? hours : 0).rounded(.down))
-        guard isPerPropertyTest(goal: goal, groupingElection: groupingElection) else { return "\(whole)h this year" }
-        let target = Int(PropertyHouseStage.completeHours)
-        return hours < PropertyHouseStage.completeHours ? "\(whole)h of \(target)h" : String(localized: "\(whole)h this year")
+        guard counted, isPerPropertyTest(goal: goal, groupingElection: groupingElection) else { return "\(whole)h this year" }
+        let target = Int(goal.targetHours)
+        return whole < target ? "\(whole)h of \(target)h" : String(localized: "\(whole)h this year")
     }
 
-    /// The per-rental 500h wording applies only to material participation without grouping.
+    /// A per-rental target applies only to material participation without grouping.
     static func isPerPropertyTest(goal: HouseGoal, groupingElection: Bool) -> Bool {
         goal != .reps750 && !groupingElection
     }

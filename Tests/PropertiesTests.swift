@@ -183,10 +183,11 @@ final class PropertyHouseStageTests: XCTestCase {
 
     func testWordingPerGoalAndGrouping() {
         // Material participation, no grouping election: the 500h test runs per rental.
+        // The target is the goal's own number (100 or 500).
         for goal in [HouseGoal.mp500, .mp100] {
-            XCTAssertEqual(PropertyMeta.hoursLine(212, goal: goal, groupingElection: false), "212h of 500h")
-            XCTAssertEqual(PropertyMeta.hoursLine(499.9, goal: goal, groupingElection: false), "499h of 500h")
-            XCTAssertEqual(PropertyMeta.hoursLine(520, goal: goal, groupingElection: false), "520h this year")
+            let target = Int(goal.targetHours)
+            XCTAssertEqual(PropertyMeta.hoursLine(Double(target) - 0.1, goal: goal, groupingElection: false), "\(target - 1)h of \(target)h")
+            XCTAssertEqual(PropertyMeta.hoursLine(Double(target) + 20, goal: goal, groupingElection: false), "\(target + 20)h this year")
             // With a grouping election there is no per-rental test.
             XCTAssertEqual(PropertyMeta.hoursLine(212, goal: goal, groupingElection: true), "212h this year")
         }

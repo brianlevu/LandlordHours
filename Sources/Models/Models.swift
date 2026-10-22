@@ -615,12 +615,34 @@ struct TaxQualificationEngine {
             )
         }
         if groupingElection { return status(nil) }
-        let shortStays = properties.filter { $0.propertyType == .str }
-        let candidates = (!shortStays.isEmpty && shortStays.count < properties.count) ? shortStays : properties
-        return candidates
+        return countedProperties(properties)
             .map { status($0.id) }
             .max { $0.ownerAndSpouseHours < $1.ownerAndSpouseHours }
             ?? status(nil)
+    }
+
+    /// The rentals the 100 or 500 hour count looks at: the short-stay rentals when stays are
+    /// mixed (a long-term rental's hours never stand in for one), otherwise every rental.
+    /// Today's hero and the Properties rows both read this, so they never disagree.
+    static func countedProperties(_ properties: [RentalProperty]) -> [RentalProperty] {
+        let shortStays = properties.filter { $0.propertyType == .str }
+        return (!shortStays.isEmpty && shortStays.count < properties.count) ? shortStays : properties
+    }
+
+    /// The one rental Today names (eyebrow, house flag, subtitle): the counted rental with the
+    /// most hours. nil when the count covers every rental (grouping election, 750 goal, record).
+    static func todayFocusProperty(
+        entries: [TimeEntry],
+        properties: [RentalProperty],
+        year: Int,
+        groupingElection: Bool,
+        countsPerRental: Bool
+    ) -> RentalProperty? {
+        guard countsPerRental, !groupingElection, !properties.isEmpty else { return nil }
+        let overview = materialParticipationOverview(
+            entries: entries, properties: properties, year: year, groupingElection: false
+        )
+        return properties.first { $0.id == overview.propertyId }
     }
 
     private static func entriesForYear(_ entries: [TimeEntry], year: Int) -> [TimeEntry] {

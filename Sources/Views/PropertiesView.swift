@@ -223,7 +223,8 @@ struct PropertiesView: View {
                         allProperties: viewModel.properties,
                         hours: viewModel.propertyCountableHours(property.id),
                         goal: goal,
-                        perPropertyGoal: perPropertyGoal
+                        perPropertyGoal: perPropertyGoal,
+                        heroCounts: viewModel.heroCounts(property)
                     )
                 }
                 .buttonStyle(.lhPressable)
@@ -410,6 +411,7 @@ struct PropertyRow: View {
     let hours: Double
     let goal: HouseGoal
     var perPropertyGoal = false
+    var heroCounts = true
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -418,7 +420,7 @@ struct PropertyRow: View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
         let ax = dynamicTypeSize.isAccessibilitySize
         let kind = PropertyMeta.kindLabel(property.propertyType)
-        let line = PropertyMeta.hoursLine(hours, goal: goal, groupingElection: !perPropertyGoal)
+        let line = PropertyMeta.hoursLine(hours, goal: goal, groupingElection: !perPropertyGoal, counted: heroCounts)
         (ax ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))) {
             PropertySeal(property, in: allProperties, size: 40)
             VStack(alignment: .leading, spacing: 3) {
