@@ -643,7 +643,13 @@ final class ProPurchaseStoreKitTests: XCTestCase {
 
     func testRestoreFindsAPurchaseOnThisDeviceWithoutAskingTheAppStore() async throws {
         let manager = SubscriptionManager.shared
+        await manager.loadProducts()
         _ = try await session.buyProduct(identifier: "com.openclaw.landlordhours.pro")
+        // buyProduct returns before the purchase reaches currentEntitlements (under load it was
+        // still empty in 32 of 150 runs, so restore saw nothing and fell back to AppStore.sync()).
+        // Wait for it to land, as testRestoreFindsAnEarlierPurchase does, before "signing out".
+        await waitForPro(manager)
+        XCTAssertTrue(manager.isPro, "the purchase landed in the test session's entitlements")
         resetScoped()
         var synced = false
         manager.syncWithAppStore = { synced = true }
