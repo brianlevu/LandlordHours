@@ -2,6 +2,17 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "%@ + %@ + %lld more": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ + %@ + %lld more"
+          }
+        }
+      }
+    },
     "%@ · %@": {
       "extractionState": "manual",
       "localizations": {
@@ -68,6 +79,17 @@
         }
       }
     },
+    "%lld hours combined, %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld hours combined, %@"
+          }
+        }
+      }
+    },
     "%lld of %lld": {
       "extractionState": "manual",
       "localizations": {
@@ -90,24 +112,13 @@
         }
       }
     },
-    "%lld rentals count toward this · %lldh logged this year": {
+    "%lld rentals": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld rentals count toward this · %lldh logged this year"
-          }
-        }
-      }
-    },
-    "%lld rentals · %lldh logged this year": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld rentals · %lldh logged this year"
+            "value": "%lld rentals"
           }
         }
       }
@@ -163,17 +174,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "2 to review in your Inbox"
-          }
-        }
-      }
-    },
-    "2026 · %lld rentals · %lldh logged": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "2026 · %lld rentals · %lldh logged"
           }
         }
       }
@@ -244,6 +244,39 @@
         }
       }
     },
+    "Add up rentals": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add up rentals"
+          }
+        }
+      }
+    },
+    "Added up": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added up"
+          }
+        }
+      }
+    },
+    "Added up, no target": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added up, no target"
+          }
+        }
+      }
+    },
     "All rentals": {
       "extractionState": "manual",
       "localizations": {
@@ -299,6 +332,17 @@
         }
       }
     },
+    "Done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        }
+      }
+    },
     "From %@ to %@": {
       "extractionState": "manual",
       "localizations": {
@@ -317,6 +361,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "From your calendar"
+          }
+        }
+      }
+    },
+    "Hours kept, no target": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hours kept, no target"
+          }
+        }
+      }
+    },
+    "I do more": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I do more"
           }
         }
       }
@@ -376,17 +442,6 @@
         }
       }
     },
-    "No, I do more": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No, I do more"
-          }
-        }
-      }
-    },
     "Not sure": {
       "extractionState": "manual",
       "localizations": {
@@ -420,6 +475,17 @@
         }
       }
     },
+    "Part of your %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Part of your %lld"
+          }
+        }
+      }
+    },
     "Reaching a number is based on your records; your CPA decides what it means.": {
       "extractionState": "manual",
       "localizations": {
@@ -442,17 +508,6 @@
         }
       }
     },
-    "Record only: ": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Record only: "
-          }
-        }
-      }
-    },
     "Say who does most of the hands-on work at each rental. The app shows what it would track, and you choose.": {
       "extractionState": "manual",
       "localizations": {
@@ -460,6 +515,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Say who does most of the hands-on work at each rental. The app shows what it would track, and you choose."
+          }
+        }
+      }
+    },
+    "See all": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See all"
           }
         }
       }
@@ -497,13 +563,13 @@
         }
       }
     },
-    "Someone else does more hours here, so 100 can’t be reached. 500 doesn’t compare you with anyone": {
+    "Someone else does more hours here, so the app can’t track 100 here. 500 doesn’t compare you with anyone": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Someone else does more hours here, so 100 can’t be reached. 500 doesn’t compare you with anyone"
+            "value": "Someone else does more hours here, so the app can’t track 100 here. 500 doesn’t compare you with anyone"
           }
         }
       }
@@ -519,24 +585,24 @@
         }
       }
     },
-    "That’s not a cleaner": {
+    "Tap rentals to add them up": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "That’s not a cleaner"
+            "value": "Tap rentals to add them up"
           }
         }
       }
     },
-    "This is a still, put together from the shipped house art. It is only for a gut check.": {
+    "They do more": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This is a still, put together from the shipped house art. It is only for a gut check."
+            "value": "They do more"
           }
         }
       }
@@ -574,17 +640,6 @@
         }
       }
     },
-    "Yes, they do more": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yes, they do more"
-          }
-        }
-      }
-    },
     "You do most of the work, so 100 hours and more than anyone else still fits": {
       "extractionState": "manual",
       "localizations": {
@@ -614,6 +669,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "hours at this rental"
+          }
+        }
+      }
+    },
+    "hours combined": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hours combined"
           }
         }
       }

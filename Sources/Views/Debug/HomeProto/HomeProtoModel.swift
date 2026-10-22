@@ -3,22 +3,27 @@ import SwiftUI
 #if DEBUG
 // MARK: - Home-screen prototypes (throwaway, DEBUG only)
 //
-//   -LHHomeProto E|A|B|goalcheck      which screen
+//   -LHHomeProto E|goalcheck          which screen
 //   -LHHomeSeed brian|reps750|eight   which sample owner
-//   -LHHomeFocus <n>                  start with item n focused (E/A/B)
+//   -LHHomeFocus <n>                  start with item n focused (E)
+//   -LHHomeSum a,b                    E: start in "Add up" mode with these rental ids
+//   -LHHomeSheet grid                 E: open the "See all" grid at launch
+//   -LHHomeAutoplay                   E: scripted tour (for the video)
 //   -LHHomeStep inbox|check|diff      goalcheck: the Inbox card, the questions, or scrolled to the diff
 //
 // Spec: AgentScratch/landlordhours/2026-10-23/home-options/options.md. Nothing here ships:
 // the real HouseHeroCard, PropertyHouseTile and tokens are reused, never redrawn.
 
 struct HomeProtoLaunch {
-    enum Screen: String { case e = "E", a = "A", b = "B", goalcheck }
+    enum Screen: String { case e = "E", goalcheck }
     enum Step: String { case inbox, check, diff }
 
     let screen: Screen
     let seed: HomeProtoSeed
     let focusIndex: Int
     let step: Step
+    let sum: [String]
+    let grid: Bool
 
     static let current: HomeProtoLaunch? = {
         let args = ProcessInfo.processInfo.arguments
@@ -32,7 +37,9 @@ struct HomeProtoLaunch {
             screen: screen,
             seed: HomeProtoSeed.make(value("-LHHomeSeed") ?? "brian"),
             focusIndex: Int(value("-LHHomeFocus") ?? "") ?? 0,
-            step: Step(rawValue: value("-LHHomeStep") ?? "") ?? .check)
+            step: Step(rawValue: value("-LHHomeStep") ?? "") ?? .check,
+            sum: (value("-LHHomeSum") ?? "").split(separator: ",").map(String.init),
+            grid: value("-LHHomeSheet") == "grid")
     }()
 }
 
@@ -54,11 +61,7 @@ struct HomeProtoRental: Identifiable, Equatable {
 
     var isRecord: Bool { if case .record = target { return true }; return false }
 
-    /// The mini-house stage hours: the rental's house completes at its own target, pinned at 500.
-    var houseHours: Double {
-        if case .own(100) = target { return min(hours * 5, 500) }
-        return hours
-    }
+    var hasOwnTarget: Bool { if case .own = target { return true }; return false }
 }
 
 enum HomeProtoFocus: Hashable {
@@ -119,50 +122,96 @@ struct HomeProtoSeed {
 
     // MARK: Hero model
 
-    struct Hero {
-        let progress: HouseProgress
-        let copy: TodayHeroCopy
-        let flag: String
-    }
-
     static let now: Date = Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 23, hour: 12)) ?? Date()
 
-    func hero(_ focus: HomeProtoFocus) -> Hero {
-        let year = 2026
-        let yearText = String(year)
+    /// Everything the hero card draws. The house stage comes from `HomeProtoStage`, the same
+    /// function the tiles use, so a rental's hero and its tile always show the same house.
+    struct HeroVM {
+        let key: String
+        let year: String
+        let name: String?
+        let tag: String
+        let qualifier: String?
+        let number: Int
+        let caption: String
+        let status: String?
+        let tone: HouseStatusTone
+        let goal: HouseGoal
+        let stageHours: Double
+        let stageTitle: String
+        let stageSub: String?
+        let flag: String
+        let spoken: String
+    }
+
+    private func stageWords(_ goal: HouseGoal, hours stageHours: Double, target: Int?) -> (String, String?) {
+        let progress = HouseProgress(hours: stageHours, goal: goal)
+        let showsNext = progress.nextStep != nil && (target.map { $0 > 100 || stageHours < 100 } ?? false)
+        return (progress.stage.spokenName, showsNext ? progress.nextMilestoneLabel : nil)
+    }
+
+    func hero(_ focus: HomeProtoFocus) -> HeroVM {
+        let yearText = "2026"
         switch focus {
         case .all:
             let goal: HouseGoal = .reps750
-            let copy = TodayHeroCopy.make(.init(goal: goal, hours: totalHours, year: year, now: Self.now, daysOfData: 200))
-            return Hero(progress: HouseProgress(hours: totalHours, goal: goal), copy: copy, flag: name(.all))
+            let copy = TodayHeroCopy.make(.init(goal: goal, hours: totalHours, year: 2026, now: Self.now, daysOfData: 200))
+            let words = stageWords(goal, hours: totalHours, target: 750)
+            return HeroVM(key: "all", year: yearText, name: nil, tag: copy.eyebrowTarget, qualifier: copy.qualifier,
+                          number: Int(totalHours.rounded(.down)), caption: copy.caption, status: copy.status, tone: copy.tone,
+                          goal: goal, stageHours: totalHours, stageTitle: words.0, stageSub: words.1, flag: name(.all),
+                          spoken: copy.spoken)
         case .rental(let id):
             guard let r = rental(id) else { return hero(.all) }
+            let whole = Int(r.hours.rounded(.down))
             switch r.target {
             case .own(let target):
                 let goal: HouseGoal = target == 100 ? .mp100 : .mp500
-                let copy = TodayHeroCopy.make(.init(goal: goal, hours: r.hours, year: year, now: Self.now,
-                                                    propertyName: r.name, daysOfData: 200))
-                return Hero(progress: HouseProgress(hours: r.hours, goal: goal), copy: copy, flag: r.name)
+                let copy = TodayHeroCopy.make(.init(goal: goal, hours: r.hours, year: 2026, now: Self.now, propertyName: r.name, daysOfData: 200))
+                let stageHours = HomeProtoStage.hours(for: r)
+                let words = stageWords(goal, hours: stageHours, target: target)
+                return HeroVM(key: id, year: yearText, name: r.name, tag: copy.eyebrowTarget, qualifier: copy.qualifier,
+                              number: whole, caption: copy.caption, status: copy.status, tone: copy.tone, goal: goal,
+                              stageHours: stageHours, stageTitle: words.0, stageSub: words.1, flag: r.name, spoken: copy.spoken)
             case .record(let reason):
-                let tag = String(localized: "Record only", table: "HomeProto")
-                let copy = TodayHeroCopy(
-                    eyebrow: String(localized: "\(yearText) · \(r.name) · \(tag)", table: "HomeProto"), eyebrowYear: yearText, eyebrowTarget: tag,
-                    propertyName: r.name, targetHours: nil, qualifier: reason,
-                    caption: String(localized: "hours logged in \(yearText)", table: "HomeProto"),
-                    phrase: nil, tone: .neutral, needsConfirmation: false, claimsReached: false)
-                return Hero(progress: HouseProgress(hours: r.hours, goal: .mp500), copy: copy, flag: r.name)
+                // No target, so no building stage: a plain lot.
+                return HeroVM(key: id, year: yearText, name: r.name, tag: String(localized: "Record only", table: "HomeProto"),
+                              qualifier: reason, number: whole,
+                              caption: String(localized: "hours logged in \(yearText)", table: "HomeProto"),
+                              status: nil, tone: .neutral, goal: .mp500, stageHours: 0,
+                              stageTitle: String(localized: "Hours kept, no target", table: "HomeProto"), stageSub: nil,
+                              flag: r.name, spoken: spoken(r))
             case .counts:
                 let shared = sharedTarget ?? 750
-                let tag = String(localized: "Counts toward \(shared)", table: "HomeProto")
-                let copy = TodayHeroCopy(
-                    eyebrow: String(localized: "\(yearText) · \(r.name) · \(tag)", table: "HomeProto"), eyebrowYear: yearText, eyebrowTarget: tag,
-                    propertyName: r.name, targetHours: nil, qualifier: nil,
-                    caption: String(localized: "hours at this rental", table: "HomeProto"),
-                    phrase: String(localized: "\(Int(totalHours)) of \(shared) in all", table: "HomeProto"),
-                    tone: .neutral, needsConfirmation: false, claimsReached: false)
-                return Hero(progress: HouseProgress(hours: r.hours, goal: .mp500), copy: copy, flag: r.name)
+                return HeroVM(key: id, year: yearText, name: r.name, tag: String(localized: "Counts toward \(shared)", table: "HomeProto"),
+                              qualifier: nil, number: whole,
+                              caption: String(localized: "hours at this rental", table: "HomeProto"),
+                              status: String(localized: "\(Int(totalHours)) of \(shared) in all", table: "HomeProto"), tone: .neutral,
+                              goal: .mp500, stageHours: 0,
+                              stageTitle: String(localized: "Part of your \(shared)", table: "HomeProto"), stageSub: nil,
+                              flag: r.name, spoken: spoken(r))
             }
         }
+    }
+
+    /// Two or more rentals added up: just the sum and the names, no target and no stage.
+    func combined(_ ids: [String]) -> HeroVM {
+        let picked = ids.compactMap { rental($0) }
+        let total = picked.reduce(0) { $0 + $1.hours }
+        let names: String
+        switch picked.count {
+        case 0, 1: names = picked.first?.name ?? ""
+        case 2: names = "\(picked[0].name) + \(picked[1].name)"
+        default: names = String(localized: "\(picked[0].name) + \(picked[1].name) + \(picked.count - 2) more", table: "HomeProto")
+        }
+        let tag = String(localized: "Added up", table: "HomeProto")
+        let whole = Int(total.rounded(.down))
+        return HeroVM(key: "sum-" + ids.joined(separator: "-"), year: "2026", name: nil, tag: tag, qualifier: nil, number: whole,
+                      caption: String(localized: "hours combined", table: "HomeProto"), status: names, tone: .neutral,
+                      goal: .mp500, stageHours: 0,
+                      stageTitle: String(localized: "Added up, no target", table: "HomeProto"), stageSub: nil,
+                      flag: String(localized: "\(picked.count) rentals", table: "HomeProto"),
+                      spoken: String(localized: "\(whole) hours combined, \(names)", table: "HomeProto"))
     }
 
     // MARK: Words for tiles and rows
@@ -190,5 +239,14 @@ struct HomeProtoSeed {
         case .counts: return String(localized: "\(r.name), \(whole) hours, counts toward the shared total", table: "HomeProto")
         }
     }
+}
+
+/// The ONE stage function. The hero and every tile ask it, so a rental never shows one house
+/// in the hero and another in its tile. A rental with its own target builds (pinned at the 500
+/// line, like the Properties mini-house); a record-only rental is a plain lot.
+enum HomeProtoStage {
+    static func hours(for r: HomeProtoRental) -> Double { r.hasOwnTarget ? min(r.hours, 500) : 0 }
+    static func keyframe(hours: Double) -> HouseKeyframe { HouseProgress.keyframe(for: hours) }
+    static func keyframe(for r: HomeProtoRental) -> HouseKeyframe { keyframe(hours: hours(for: r)) }
 }
 #endif

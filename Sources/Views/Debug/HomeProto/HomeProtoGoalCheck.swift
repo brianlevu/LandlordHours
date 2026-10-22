@@ -68,26 +68,30 @@ struct HomeProtoInboxPage: View {
                 .font(.subheadline).foregroundStyle(colors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 8) {
-                choice(String(localized: "Yes, they do more", table: "HomeProto"), primary: true)
-                choice(String(localized: "No, I do more", table: "HomeProto"), primary: false)
-                choice(String(localized: "That’s not a cleaner", table: "HomeProto"), primary: false)
+                choice(String(localized: "They do more", table: "HomeProto"))
+                choice(String(localized: "I do more", table: "HomeProto"))
+                choice(String(localized: "Not sure", table: "HomeProto"))
             }
             .padding(.top, 4)
             Text("Nothing changes until you tap.", tableName: "HomeProto")
                 .font(.footnote).foregroundStyle(colors.textSecondary)
+            Text("Reaching a number is based on your records; your CPA decides what it means.", tableName: "HomeProto")
+                .font(.footnote).foregroundStyle(colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(18)
         .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
-    private func choice(_ title: String, primary: Bool) -> some View {
+    /// Equal weight: none is filled, so nothing leans toward an answer.
+    private func choice(_ title: String) -> some View {
         Button {} label: {
             Text(title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(primary ? colors.onAction : colors.action)
+                .foregroundStyle(colors.action)
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .padding(.horizontal, 12)
-                .background(Capsule().fill(primary ? colors.action : colors.actionSurface))
+                .background(Capsule().fill(colors.actionSurface))
         }
         .buttonStyle(.lhPressable)
     }
@@ -203,7 +207,7 @@ struct HomeProtoCheckPage: View {
                     to: santaTarget == 100 ? nil : String(localized: "500 hours", table: "HomeProto"),
                     why: santaTarget == 100
                         ? String(localized: "You do most of the work, so 100 hours and more than anyone else still fits", table: "HomeProto")
-                        : String(localized: "Someone else does more hours here, so 100 can’t be reached. 500 doesn’t compare you with anyone", table: "HomeProto"))
+                        : String(localized: "Someone else does more hours here, so the app can’t track 100 here. 500 doesn’t compare you with anyone", table: "HomeProto"))
             Divider().overlay(colors.border)
             diffRow(name: "Delaney Ct", from: String(localized: "Record only", table: "HomeProto"), to: nil,
                     why: String(localized: "A manager does most of the work here", table: "HomeProto"))
