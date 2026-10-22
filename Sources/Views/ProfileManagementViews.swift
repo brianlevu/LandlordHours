@@ -54,9 +54,9 @@ struct ProfileRestoreSheet: View {
 
                 Group {
                     if context == .welcome {
-                        Text("Records from an earlier sign-in, on this iPhone or in iCloud. Pick one to open it. Nothing is merged or deleted.")
+                        Text("Records from before, on this iPhone or in iCloud. Pick one to open it. Nothing is merged or deleted.")
                     } else {
-                        Text("Records from another sign-in, on this iPhone or in iCloud. Yours stay put, and you can switch back any time.")
+                        Text("Other records on this iPhone or in iCloud. Yours stay put, and you can switch back any time.")
                     }
                 }
                 .font(.body)
@@ -117,7 +117,7 @@ struct ProfileRestoreSheet: View {
                 }
 
                 if profiles.contains(where: \.isICloudOnly) {
-                    Text("Photos weren’t saved to iCloud, so profiles restored from iCloud come back without them. Hours, properties and settings come back in full.")
+                    Text("Photos weren’t saved to iCloud, so records restored from iCloud come back without them. Hours, properties and settings come back in full.")
                         .font(.footnote)
                         .foregroundStyle(colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -166,14 +166,12 @@ private struct ProfileCandidateRow: View {
             PropertySeal(monogram: initial, palette: palette, size: 40)
 
             VStack(alignment: .leading, spacing: 2) {
-                // Zero-width break opportunities between characters: a long address breaks
-                // anywhere without the hyphen SwiftUI adds inside a word ("exam-ple.com").
-                Text(verbatim: Self.breakAnywhere(profile.displayLabel))
-                    .accessibilityLabel(Text(verbatim: profile.displayLabel))
+                // An email sits on its own line and loses its middle if it is too long; words
+                // wrap at word boundaries. Nothing breaks mid-word.
+                Text(verbatim: profile.displayLabel)
                     .font(.body.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
-                    // Long relay addresses wrap to a second line instead of losing their middle.
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 2)
+                    .lineLimit(profile.displayLabel.contains("@") ? 1 : 3)
                     .truncationMode(.middle)
                     .fixedSize(horizontal: false, vertical: true)
                 countsLine
@@ -200,10 +198,6 @@ private struct ProfileCandidateRow: View {
         .frame(minHeight: 72)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-    }
-
-    static func breakAnywhere(_ text: String) -> String {
-        text.map(String.init).joined(separator: "\u{200B}")
     }
 
     private var initial: String {
@@ -274,7 +268,7 @@ struct SettingsAccountSection: View {
                 .sheet(isPresented: $showSwitchConfirm) {
                     ProfileSwitchConfirmSheet(
                         title: "Switch profile?",
-                        message: "Your data stays on this iPhone. Open it again anytime with Restore earlier data.",
+                        message: "Your records stay on this iPhone. Open them again anytime with Restore earlier records.",
                         onConfirm: {
                             showSwitchConfirm = false
                             viewModel.signOut()

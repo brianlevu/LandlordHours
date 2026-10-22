@@ -472,9 +472,13 @@ struct OnbWelcomeContent: View {
                     }
                     .padding(.top, 4)
                     if !restorable.isEmpty || cloudProblem {
-                        Button(restorable.count <= 1 ? String(localized: "Restore earlier data") : String(localized: "Restore earlier data (\(restorable.count))")) { showRestore = true }
+                        Button { showRestore = true } label: {
+                            if restorable.count <= 1 { Text("Restore earlier records") } else { Text("Restore earlier records (\(restorable.count))") }
+                        }
                             .buttonStyle(OnbLink(color: HouseTokens.onHeroPrimary))
                             .font(.footnote.weight(.semibold))
+                            // Wraps to a second line at large sizes; never truncates, never overlaps.
+                            .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("welcome.restoreEarlierData")
                     }
                 }
@@ -540,7 +544,7 @@ struct OnbWelcomeContent: View {
     }
 
     private var accountLead: some View {
-        Text("Have an account?")
+        Text("Been here before?")
             .font(.footnote)
             .foregroundStyle(HouseTokens.onHeroSecondary)
     }
@@ -555,7 +559,7 @@ struct OnbWelcomeContent: View {
                     flow.signUpWithApple(OnbMotion.morph(reduce))
                 } else {
                     // Returning: their profile already finished setup, so the app opens on Today.
-                    viewModel.signIn()
+                    viewModel.adoptReturningAppleSignIn()
                     leaveWelcome()
                 }
             case .cancelled: break

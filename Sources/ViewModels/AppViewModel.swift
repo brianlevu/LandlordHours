@@ -364,6 +364,34 @@ class AppViewModel: ObservableObject {
         return RestoreDiscovery(profiles: ProfileDiscovery.merge(device: device, cloud: cloud), cloudProblem: cloudProblem)
     }
 
+    /// A returning Apple user signed in on Welcome while a profile made by "Get started" was
+    /// active. `AppleSignInFlow.complete` has already written the Apple keys. Runs the same
+    /// teardown as `switchToProfile` for the outgoing profile (sync stopped, timer saved), then
+    /// signs in as the Apple user. An outgoing profile with no entries and no properties is
+    /// removed so it never clutters Restore; one with data stays restorable.
+    func adoptReturningAppleSignIn() {
+        let defaults = UserDefaults.standard
+        let appleKeys = [ProfileKeys.appleUserId, ProfileKeys.appleUserName, ProfileKeys.appleUserEmail]
+        let saved = appleKeys.compactMap { key in defaults.string(forKey: key).map { (key, $0) } }
+        guard saved.contains(where: { $0.0 == ProfileKeys.appleUserId }) else { signIn(); return }
+        // Hide the Apple id so signOut tears down the profile that is actually active.
+        for key in appleKeys { defaults.removeObject(forKey: key) }
+        let outgoing = UserScope.userId
+        if isSignedIn || outgoing != nil { signOut() }
+        for (key, value) in saved { defaults.set(value, forKey: key) }
+        defaults.set(LoginType.apple.rawValue, forKey: ProfileKeys.loginType)
+        signIn()
+        if let outgoing, outgoing != UserScope.userId, ProfileDiscovery.isEmptyProfile(outgoing, defaults: defaults) {
+            Self.clearScopedAccountData(for: outgoing)
+            for key in ["LandlordHours.properties", "LandlordHours.entries", "hasCompletedOnboarding", ProfileRestore.profileNameKey] {
+                defaults.removeObject(forKey: UserScope.key(key, userId: outgoing))
+            }
+            if defaults.string(forKey: ProfileKeys.previousProfileId) == outgoing {
+                defaults.removeObject(forKey: ProfileKeys.previousProfileId)
+            }
+        }
+    }
+
     /// Whether the active profile has finished onboarding. False with no profile.
     var activeProfileCompletedOnboarding: Bool {
         guard isSignedIn, UserScope.userId != nil else { return false }

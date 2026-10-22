@@ -265,7 +265,7 @@ final class ProfileDiscoveryTests: XCTestCase {
         XCTAssertEqual(found[1].lastEntryDate, Date(timeIntervalSince1970: 1_790_000_000))
         XCTAssertEqual(found[1].sources, [.device])
         XCTAssertEqual(found[1].displayLabel, "a•••@example.com")
-        XCTAssertEqual(found[0].displayLabel, "Signed in with Apple")
+        XCTAssertEqual(found[0].displayLabel, "Records signed in with Apple")
     }
 
     func testDeviceDiscoveryOffersCorruptProfileRatherThanHidingIt() {
@@ -757,7 +757,7 @@ final class RestorableProfileIdTests: XCTestCase {
     func testAppleProfileLabelsAndAnalyticsKindsCarryNoId() {
         let apple = DiscoveredProfile(id: "001234.abc.1234", entryCount: 1, propertyCount: 0, lastEntryDate: nil, sources: [.iCloud], name: nil)
         XCTAssertTrue(apple.isAppleProfile)
-        XCTAssertEqual(apple.displayLabel, "Signed in with Apple")
+        XCTAssertEqual(apple.displayLabel, "Records signed in with Apple")
         XCTAssertEqual(apple.analyticsKind, "apple")
         XCTAssertEqual(apple.analyticsSource, "icloud")
         let email = DiscoveredProfile(id: "email-a@b.com", entryCount: 1, propertyCount: 0, lastEntryDate: nil, sources: [.device, .iCloud], name: nil)
@@ -862,7 +862,7 @@ final class SignInSafetyTests: XCTestCase {
         let found = await viewModel.discoverRestorable(cloudSource: FakeCloudSource(records: []))
         let profile = found.profiles.first { $0.id == apple }
         XCTAssertNotNil(profile, "Apple-id profiles are offered")
-        XCTAssertEqual(profile?.displayLabel, "Signed in with Apple")
+        XCTAssertEqual(profile?.displayLabel, "Records signed in with Apple")
 
         viewModel.switchToProfile(profile!)
         XCTAssertEqual(UserScope.userId, apple)
@@ -928,5 +928,60 @@ final class SignInSafetyTests: XCTestCase {
         XCTAssertEqual(completed.count, 1)
         XCTAssertEqual(completed.first?.1["kind"] as? String, "email")
         XCTAssertEqual(completed.first?.1["source"] as? String, "icloud")
+    }
+
+    // MARK: Returning Apple sign-in over a half-made profile
+
+    private func appleKeysAsAfterSignIn(_ apple: String) {
+        UserDefaults.standard.set(apple, forKey: ProfileKeys.appleUserId)
+        UserDefaults.standard.set("Pat Lee", forKey: ProfileKeys.appleUserName)
+    }
+
+    func testReturningAppleSignInRemovesTheEmptyHalfMadeProfile() {
+        let old = makeId("local-")
+        UserDefaults.standard.set(old, forKey: ProfileKeys.localProfileId)
+        UserDefaults.standard.set(LoginType.local.rawValue, forKey: ProfileKeys.loginType)
+        let apple = "001234.\(UUID().uuidString.prefix(12)).4321"
+        created.append(apple)
+        seedProfileData(.standard, id: apple, entries: 2, properties: 1)
+        let viewModel = AppViewModel()
+        XCTAssertEqual(UserScope.userId, old)
+
+        appleKeysAsAfterSignIn(apple)
+        viewModel.adoptReturningAppleSignIn()
+
+        XCTAssertEqual(UserScope.userId, apple)
+        XCTAssertEqual(viewModel.timeEntries.count, 2)
+        XCTAssertNil(UserDefaults.standard.string(forKey: ProfileKeys.localProfileId), "the old pointer is cleared")
+        XCTAssertEqual(UserDefaults.standard.string(forKey: ProfileKeys.appleUserName), "Pat Lee")
+        XCTAssertFalse(UserDefaults.standard.dictionaryRepresentation().keys.contains { $0.hasPrefix("u.\(old).") },
+                       "an empty half-made profile leaves nothing behind")
+        XCTAssertNil(UserDefaults.standard.string(forKey: ProfileKeys.previousProfileId))
+    }
+
+    func testReturningAppleSignInKeepsAHalfMadeProfileThatHasData() async {
+        let old = makeId("local-")
+        UserDefaults.standard.set(old, forKey: ProfileKeys.localProfileId)
+        UserDefaults.standard.set(LoginType.local.rawValue, forKey: ProfileKeys.loginType)
+        seedProfileData(.standard, id: old, entries: 3, properties: 1)
+        UserDefaults.standard.removeObject(forKey: UserScope.key("hasCompletedOnboarding", userId: old))
+        let apple = "001234.\(UUID().uuidString.prefix(12)).8765"
+        created.append(apple)
+        seedProfileData(.standard, id: apple, entries: 1, properties: 1)
+        let viewModel = AppViewModel()
+
+        appleKeysAsAfterSignIn(apple)
+        viewModel.adoptReturningAppleSignIn()
+
+        XCTAssertEqual(UserScope.userId, apple)
+        let found = await viewModel.discoverRestorable(cloudSource: FakeCloudSource(records: []))
+        XCTAssertEqual(found.profiles.first { $0.id == old }?.entryCount, 3, "the profile with data stays restorable")
+    }
+
+    func testEmptyProfileCheck() {
+        let id = makeId("local-")
+        XCTAssertTrue(ProfileDiscovery.isEmptyProfile(id))
+        seedProfileData(.standard, id: id, entries: 1, properties: 0)
+        XCTAssertFalse(ProfileDiscovery.isEmptyProfile(id))
     }
 }

@@ -181,8 +181,8 @@ struct DiscoveredProfile: Identifiable, Equatable {
             return ProfileDiscovery.maskedEmail(String(id.dropFirst(ProfileKeys.emailProfilePrefix.count)))
         }
         if let name, !name.isEmpty { return name }
-        if isAppleProfile { return String(localized: "Signed in with Apple") }
-        return "Profile without an account"
+        if isAppleProfile { return String(localized: "Records signed in with Apple") }
+        return String(localized: "Records on this iPhone")
     }
 
     /// Apple ids are opaque; anything that is not an email or local profile is one.
@@ -278,6 +278,19 @@ enum ProfileDiscovery {
             ))
         }
         return sorted(results)
+    }
+
+    /// True when the profile holds no entries and no properties (and nothing undecodable).
+    static func isEmptyProfile(_ id: String, defaults: UserDefaults = .standard) -> Bool {
+        for key in ["LandlordHours.entries", "LandlordHours.properties"] {
+            guard let data = defaults.data(forKey: UserScope.key(key, userId: id)) else { continue }
+            if key.hasSuffix("entries") {
+                guard let items = try? JSONDecoder().decode([TimeEntry].self, from: data), items.isEmpty else { return false }
+            } else {
+                guard let items = try? JSONDecoder().decode([RentalProperty].self, from: data), items.isEmpty else { return false }
+            }
+        }
+        return true
     }
 
     /// Groups discovery-only CloudKit records by `appUserId`.
