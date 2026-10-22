@@ -109,6 +109,7 @@
 		7E0B82EEBC8E67989BB1C257 /* TimerDraftUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27D9AE994D0696BCE6E017B9 /* TimerDraftUITests.swift */; };
 		8032DDB8A814D5CA5A69FCD2 /* NotificationCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75598601544E6898E955D9D4 /* NotificationCopy.swift */; };
 		80CEA4EE10BA0654A9DC6216 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2866F8C3251DDD2D9593392E /* AppGroup.swift */; };
+		81632334A03D4B8A475F6A68 /* LogTimeProtoModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21AEC2C21B376331AB4BA3C9 /* LogTimeProtoModel.swift */; };
 		826B4790C35C2F223F1B5C19 /* HouseRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F6C712F36C0B59A33BB4D48 /* HouseRenderingTests.swift */; };
 		86277D1C3EF4C21CAB223CB5 /* ProMoments.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF39EBE443D66C2EA654096 /* ProMoments.swift */; };
 		874E4639B3AFACC6422540B5 /* LearnArticles.json in Resources */ = {isa = PBXBuildFile; fileRef = 86103C34CCCA866F131145AD /* LearnArticles.json */; };
@@ -184,6 +185,7 @@
 		CB01259AC7A91CF603A4AFA8 /* TodayLoadingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 895DED5292E6EFA986E744B1 /* TodayLoadingUITests.swift */; };
 		CB4A4FF6CB46CB23A628AA19 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD25AA91ABB5FB4C307E491 /* DashboardView.swift */; };
 		CC3AD4AEC85263A4DB7CC2EE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7987DD5DAFB64A0DD0B89D /* SettingsView.swift */; };
+		CF3288BE92BCD2A0090FF9E5 /* LogTimeProtoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FCA9277BFD726925EEB5EF7 /* LogTimeProtoView.swift */; };
 		CFF4E951C86ED09D23364162 /* HouseHeroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64B545F329C15FB9C02AE25C /* HouseHeroView.swift */; };
 		D007EBD21D3BF0C7744F91FC /* ClassifierV2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A098406B491E959C7B4D8B8 /* ClassifierV2Tests.swift */; };
 		D0A3207E4B100126D6F04154 /* InboxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C1266007D5A65E91EE7405 /* InboxViewModel.swift */; };
@@ -194,6 +196,7 @@
 		D6F01A1BCC4C63937DFC7BB8 /* CalendarDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEA07735A91C141EB38666AE /* CalendarDetector.swift */; };
 		D944AA90DB2DCE59079C61F9 /* AuditReportPDFRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46C2C28508D1F64A007B6BF9 /* AuditReportPDFRenderer.swift */; };
 		DABEFE3725F860151429E838 /* HouseTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45315D80200D5FEE893898D7 /* HouseTokens.swift */; };
+		DD73D284C5B2126B480846D3 /* LogTimeProto.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 9B7067D1B52029FBE4060639 /* LogTimeProto.xcstrings */; };
 		E02EF041E5591D2D38927D89 /* SuggestionConfirmSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39B0EF9F3EAF62E2B3ADF0FE /* SuggestionConfirmSheet.swift */; };
 		E14CA2D492CCD3E880FD658F /* AppToastCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69107CB3FEDA99A0E363D796 /* AppToastCenter.swift */; };
 		E57066D892140F0329FFD63C /* CalendarDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4B3AC0F459D7FC09BE5961 /* CalendarDetectorTests.swift */; };
@@ -291,6 +294,7 @@
 		1D59E5BD8B45AF17ABFDFFAD /* BrandTypographyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandTypographyTests.swift; sourceTree = "<group>"; };
 		1E4FDA46A18FD2D2EB716A39 /* LHIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHIcons.swift; sourceTree = "<group>"; };
 		2084B656B116C58A4F214944 /* LogTimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogTimeTests.swift; sourceTree = "<group>"; };
+		21AEC2C21B376331AB4BA3C9 /* LogTimeProtoModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogTimeProtoModel.swift; sourceTree = "<group>"; };
 		22F2A5256E57CEBACC7BDAAC /* StoreKitLocalIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitLocalIntegrationTests.swift; sourceTree = "<group>"; };
 		2487D044B1E2C51F52E4363B /* LockedPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockedPreview.swift; sourceTree = "<group>"; };
 		27D9AE994D0696BCE6E017B9 /* TimerDraftUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerDraftUITests.swift; sourceTree = "<group>"; };
@@ -381,6 +385,7 @@
 		895DED5292E6EFA986E744B1 /* TodayLoadingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayLoadingUITests.swift; sourceTree = "<group>"; };
 		8ABD160E56491F781779A536 /* SignInReplacementUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInReplacementUITests.swift; sourceTree = "<group>"; };
 		8F16B919639EBDE7C821FEC2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		8FCA9277BFD726925EEB5EF7 /* LogTimeProtoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogTimeProtoView.swift; sourceTree = "<group>"; };
 		941819645199CADCCE670A56 /* SyncChangeTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncChangeTracker.swift; sourceTree = "<group>"; };
 		9450F642556AC44158906810 /* SurfaceCaptureBoard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfaceCaptureBoard.swift; sourceTree = "<group>"; };
 		95834A15C18661C7066155C1 /* LandlordHoursTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LandlordHoursTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -390,6 +395,7 @@
 		992994028B8E0F68D1C27592 /* InboxDebugSeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxDebugSeed.swift; sourceTree = "<group>"; };
 		99CFE43DF9B09D92BC335C35 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		9AD25AA91ABB5FB4C307E491 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		9B7067D1B52029FBE4060639 /* LogTimeProto.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = LogTimeProto.xcstrings; sourceTree = "<group>"; };
 		9BD0C14501D62C45A5DC61D6 /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
 		9C7095428AF6E20B6D84218E /* LogTimeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogTimeSheet.swift; sourceTree = "<group>"; };
 		9D257BE0EA8064F9A7B1A5FD /* LearnLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnLibrary.swift; sourceTree = "<group>"; };
@@ -521,6 +527,7 @@
 		2A213114BF4DC83320D1EDE0 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				9B7067D1B52029FBE4060639 /* LogTimeProto.xcstrings */,
 				F6D3D033303840291C77E351 /* Fonts */,
 				6D9969762CC4C6DAF9E6376E /* Learn */,
 			);
@@ -730,6 +737,15 @@
 				A84A6850D05E888F5A54AED1 /* Fixtures */,
 			);
 			path = Tests;
+			sourceTree = "<group>";
+		};
+		AAC67743BFF080FBC25FF67C /* Proto */ = {
+			isa = PBXGroup;
+			children = (
+				21AEC2C21B376331AB4BA3C9 /* LogTimeProtoModel.swift */,
+				8FCA9277BFD726925EEB5EF7 /* LogTimeProtoView.swift */,
+			);
+			path = Proto;
 			sourceTree = "<group>";
 		};
 		BAC3D7197D15E275C7A072F9 /* Capture */ = {
@@ -943,6 +959,7 @@
 				1C3403D84E20A7CB20F711A0 /* LogTimeLogic.swift */,
 				9C7095428AF6E20B6D84218E /* LogTimeSheet.swift */,
 				C8286A8110E3A8CAD0693108 /* TodayTimerSection.swift */,
+				AAC67743BFF080FBC25FF67C /* Proto */,
 			);
 			path = LogTime;
 			sourceTree = "<group>";
@@ -1114,6 +1131,7 @@
 				38B5E98FF26323E43143DBF3 /* LaunchScreen.storyboard in Resources */,
 				3C9A055713D8A40AAFFB526A /* Learn.xcstrings in Resources */,
 				874E4639B3AFACC6422540B5 /* LearnArticles.json in Resources */,
+				DD73D284C5B2126B480846D3 /* LogTimeProto.xcstrings in Resources */,
 				A6D2501F6D2AE42B9C7BA27E /* PrivacyInfo.xcprivacy in Resources */,
 				2CF2678CBE8415E9B3A17DAA /* WidgetAssets.xcassets in Resources */,
 			);
@@ -1234,6 +1252,8 @@
 				3A0726992B3571FD26AFF6EE /* LogPickers.swift in Sources */,
 				C5622A011D1DC145A3B3227C /* LogSheetDebug.swift in Sources */,
 				7A5C510D68D0C7652FC67178 /* LogTimeLogic.swift in Sources */,
+				81632334A03D4B8A475F6A68 /* LogTimeProtoModel.swift in Sources */,
+				CF3288BE92BCD2A0090FF9E5 /* LogTimeProtoView.swift in Sources */,
 				170DCB2FCEE6FFB6A5EEB29E /* LogTimeSheet.swift in Sources */,
 				F7592DE1A4DA7F5A9B32BA03 /* MilestoneCelebrationView.swift in Sources */,
 				58BD4A141A6B09D86C26766B /* ModelAvailability.swift in Sources */,
