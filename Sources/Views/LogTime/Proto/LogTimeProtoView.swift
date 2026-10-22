@@ -8,7 +8,6 @@ import LucideIcons
 struct LogTimeProtoRoot: View {
     @StateObject private var model: ProtoModel
     @Environment(\.colorScheme) private var scheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
 
     init() {
         let hold = LogTimeProtoLaunch.value("-LHProtoState") != nil
@@ -21,7 +20,6 @@ struct LogTimeProtoRoot: View {
     var body: some View {
         LogTimeProtoSheet(model: model)
             .preferredColorScheme(AppearanceManager.forcedColorSchemeFromLaunchArguments ?? .dark)
-            .background(colors.background.ignoresSafeArea())
             .onAppear {
                 if let state = LogTimeProtoLaunch.value("-LHProtoState") { model.preset(state) }
                 if LogTimeProtoLaunch.value("-LHProtoScript") != nil { model.runScript() }
@@ -30,7 +28,21 @@ struct LogTimeProtoRoot: View {
     }
 }
 
-// MARK: - The sheet
+// MARK: - Prototype-only tokens
+
+extension AdaptiveColors {
+    /// Dark cards lifted off the canvas (was 1.25:1): #1A2350 plus a 1px white 8% stroke. Light cards keep the brand white.
+    var sheetCard: Color { colorScheme == .dark ? Color(hex: "1A2350") : backgroundSecondary }
+    var sheetStroke: Color { colorScheme == .dark ? Color.white.opacity(0.08) : border }
+}
+
+/// Blur + fade in place; the outgoing view leaves at once so two lines never overlap.
+private struct BlurFade: ViewModifier {
+    var on: Bool
+    func body(content: Content) -> some View { content.blur(radius: on ? 4 : 0).opacity(on ? 0 : 1) }
+}
+
+// MARK: - The docked sheet
 
 struct LogTimeProtoSheet: View {
     @ObservedObject var model: ProtoModel
@@ -38,62 +50,84 @@ struct LogTimeProtoSheet: View {
     @Environment(\.dynamicTypeSize) private var type
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var noteFocused: Bool
-    @ScaledMetric(relativeTo: .body) private var chevronSize: CGFloat = 16
     @FocusState private var nameFocused: Bool
+    @ScaledMetric(relativeTo: .body) private var chevronSize: CGFloat = 16
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
 
-    private var unfoldTransition: AnyTransition {
-        reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98, anchor: .top))
-    }
+    private var isLarge: Bool { model.f.unfolded || model.zeroMode || model.listening || model.micIntro || type.isAccessibilitySize }
+    private var unfoldTransition: AnyTransition { reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98, anchor: .top)) }
+    private var sheetAnim: Animation { reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.3, dampingFraction: 1.0) }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            colors.background.ignoresSafeArea()
-            ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    header
-                    if model.zeroMode { rentalNameField }
-                    noteCard
-                    if let caption = model.caption { captionLine(caption).transition(.opacity) }
-                    if model.f.unfolded {
-                        rows.id("rows").transition(unfoldTransition)
-                        if model.f.manual { autoFillOff.transition(.opacity) }
-                    } else {
-                        recents.transition(.opacity)
-                        detailsEntry.transition(.opacity)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 14)
-                .padding(.bottom, 24)
+        GeometryReader { geo in
+            ZStack(alignment: .bottom) {
+                colors.background.ignoresSafeArea()
+                Color.black.opacity(scheme == .dark ? 0.5 : 0.28).ignoresSafeArea()
+                panel
+                    .frame(height: isLarge ? geo.size.height - 6 : min(geo.size.height, UIScreen.main.bounds.height * 0.56))
+                    .animation(sheetAnim, value: isLarge)
+                if let toast = model.toast { toastView(toast.text).padding(.bottom, type.isAccessibilitySize ? 190 : 96).transition(.move(edge: .bottom).combined(with: .opacity)) }
             }
-            .scrollDismissesKeyboard(.interactively)
-            .onAppear {
-                if LogTimeProtoLaunch.value("-LHProtoScroll") == "1" {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { proxy.scrollTo("rows", anchor: .top) }
-                }
-            }
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) { logBar }
-            if let toast = model.toast { toastView(toast.text).padding(.bottom, 96).transition(.move(edge: .bottom).combined(with: .opacity)) }
         }
         .onChange(of: model.wantsFocus) { _, want in if model.zeroMode && want { nameFocused = true } else { noteFocused = want } }
         .onChange(of: model.zeroMode) { _, z in if z && !model.hold { nameFocused = true } }
     }
 
+    private var panel: some View {
+        VStack(spacing: 0) {
+            Capsule().fill(colors.textTertiary.opacity(0.6)).frame(width: 36, height: 5).padding(.top, 8).padding(.bottom, 6)
+                .accessibilityHidden(true)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    content
+                        .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 20)
+                }
+                .scrollDismissesKeyboard(.interactively)
+                .onAppear {
+                    if LogTimeProtoLaunch.value("-LHProtoScroll") == "1" {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { proxy.scrollTo("rows", anchor: .top) }
+                    }
+                }
+            }
+            logBar
+        }
+        .background(
+            UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous)
+                .fill(colors.background)
+                .overlay(UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous).strokeBorder(colors.sheetStroke, lineWidth: 1))
+                .ignoresSafeArea(edges: .bottom)
+        )
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            header
+            if model.zeroMode { rentalNameField }
+            noteField
+            toolsRow
+            if model.micIntro { micIntroCard.transition(.opacity) }
+            if model.f.unfolded {
+                rows.id("rows").transition(unfoldTransition)
+                if model.hoursQuestionable { hoursFootnote.transition(.opacity) }
+                if model.f.manual { autoFillOff.transition(.opacity) }
+            } else if !model.micIntro {
+                detailsLine.transition(.opacity)
+                enterDetails.transition(.opacity)
+            }
+        }
+    }
+
     // MARK: header
+
+    private var title: String { model.zeroMode ? pl("Log your first hour") : (model.timerRan != nil ? pl("Log the timer") : pl("Log time")) }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(model.eyebrow)
-                .font(.system(.caption2, design: .monospaced).weight(.medium))
-                .tracking(1.3)
+                .font(.system(.caption2, design: .monospaced).weight(.medium)).tracking(1.3)
                 .foregroundStyle(colors.draftingInk)
             HStack(alignment: .center) {
-                (model.zeroMode ? PT("Log your first hour") : PT("Log time"))
-                    .font(.system(.title, design: .default).weight(.bold))
-                    .foregroundStyle(colors.textPrimary)
+                Text(title).font(.system(.title).weight(.bold)).foregroundStyle(colors.textPrimary)
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 8)
                 if !model.f.unfolded && !model.zeroMode { timerPill }
@@ -108,166 +142,154 @@ struct LogTimeProtoSheet: View {
                 LucideIcon(image: Lucide.timer, size: 16)
                 if !type.isAccessibilitySize { PT("Timer").font(.system(.subheadline).weight(.semibold)) }
             }
-            .foregroundStyle(colors.textPrimary)
-            .padding(.horizontal, 14)
-            .frame(minHeight: 44)
-            .background(Capsule().fill(colors.backgroundSecondary))
-            .overlay(Capsule().strokeBorder(colors.border, lineWidth: 0.5))
+            .foregroundStyle(colors.textPrimary).padding(.horizontal, 14).frame(minHeight: 44)
+            .background(Capsule().fill(colors.sheetCard)).overlay(Capsule().strokeBorder(colors.sheetStroke, lineWidth: 1))
         }
-        .buttonStyle(.lhPressable)
-        .accessibilityLabel(pl("Timer"))
+        .buttonStyle(.lhPressable).accessibilityLabel(pl("Timer"))
     }
 
     private var closeButton: some View {
         Button {} label: {
-            LucideIcon(image: Lucide.x, size: 18)
-                .foregroundStyle(colors.textPrimary)
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(colors.backgroundSecondary))
-                .overlay(Circle().strokeBorder(colors.border, lineWidth: 0.5))
+            LucideIcon(image: Lucide.x, size: 18).foregroundStyle(colors.textPrimary).frame(width: 44, height: 44)
+                .background(Circle().fill(colors.sheetCard)).overlay(Circle().strokeBorder(colors.sheetStroke, lineWidth: 1))
         }
-        .buttonStyle(.lhPressable)
-        .accessibilityLabel(pl("Close"))
+        .buttonStyle(.lhPressable).accessibilityLabel(pl("Close"))
     }
 
     // MARK: first-run rental field
 
     private var rentalNameField: some View {
         VStack(alignment: .leading, spacing: 8) {
-            PT("Which rental is this for?")
-                .font(.system(.headline))
-                .foregroundStyle(colors.textPrimary)
+            PT("Which rental is this for?").font(.system(.headline)).foregroundStyle(colors.textPrimary)
             ZStack(alignment: .leading) {
                 if model.rentalName.isEmpty {
-                    PT("Name or address, like “Pine Cabin”")
-                        .font(.system(.body)).foregroundStyle(colors.textSecondary).allowsHitTesting(false)
+                    PT("Name or address, like “Pine Cabin”").font(.system(.body)).foregroundStyle(colors.textSecondary).allowsHitTesting(false)
                 }
-                TextField("", text: $model.rentalName)
-                    .font(.system(.body))
-                    .foregroundStyle(colors.textPrimary)
-                    .focused($nameFocused)
-                    .accessibilityLabel(pl("Rental name"))
+                TextField("", text: $model.rentalName).font(.system(.body)).foregroundStyle(colors.textPrimary)
+                    .focused($nameFocused).accessibilityLabel(pl("Rental name"))
             }
-            .padding(.horizontal, 16)
-            .frame(minHeight: 52)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(nameFocused ? colors.action : colors.border, lineWidth: nameFocused ? 1.5 : 0.5))
-            PT("You can add the address and type later.")
-                .font(.system(.footnote)).foregroundStyle(colors.textSecondary)
+            .padding(.horizontal, 16).frame(minHeight: 52)
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.sheetCard))
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(nameFocused ? colors.action : colors.sheetStroke, lineWidth: nameFocused ? 1.5 : 1))
+            PT("You can add the address and type later.").font(.system(.footnote)).foregroundStyle(colors.textSecondary)
         }
     }
 
-    // MARK: note
+    // MARK: note (bare text on the sheet, Todoist Quick Add style)
 
-    private var notePlaceholder: String { model.zeroMode ? pl("What did you do? Try “fixed the sink, 1 hour”") : (model.f.manual ? pl("What did you do? (optional)") : pl("What did you do? Try “fixed the sink at Pine Cabin, 1 hour”")) }
+    private var notePlaceholder: String {
+        if model.timerRan != nil { return pl("What did you work on?") }
+        if model.zeroMode { return pl("What did you do? Try “fixed the sink, 1 hour”") }
+        return model.f.manual ? pl("What did you do? (optional)") : pl("What did you do? Try “fixed the sink at Pine Cabin, 1 hour”")
+    }
 
-    private var noteCard: some View {
-        // Double bezel: a card shell, a tertiary core, concentric radii.
+    private var noteField: some View {
         ZStack(alignment: .topLeading) {
             if model.f.note.isEmpty {
-                Text(notePlaceholder)
-                    .font(.system(.title3))
-                    .foregroundStyle(colors.textSecondary)
-                    .padding(.top, 1)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
+                Text(notePlaceholder).font(.system(.title3)).foregroundStyle(colors.textSecondary).allowsHitTesting(false).accessibilityHidden(true)
             }
             TextField("", text: Binding(get: { model.f.note }, set: { model.setNote($0) }), axis: .vertical)
-                .font(.system(.title3))
-                .foregroundStyle(colors.textPrimary)
-                .lineLimit(3...6)
-                .focused($noteFocused)
-                .submitLabel(.done)
+                .font(.system(.title3)).foregroundStyle(colors.textPrimary).tint(colors.action)
+                .lineLimit(2...6).focused($noteFocused).submitLabel(.done)
                 .accessibilityLabel(pl("What did you do?"))
-                .padding(.bottom, 44)
         }
-        .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 4)
-        .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 19, style: .continuous).fill(colors.backgroundTertiary))
-        .overlay(alignment: .bottomTrailing) { micButton.padding(8) }
-        .padding(3)
-        .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(colors.backgroundSecondary))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(noteFocused ? colors.action : colors.border, lineWidth: noteFocused ? 1.5 : 0.5))
+        .frame(maxWidth: .infinity, minHeight: 56, alignment: .topLeading)
+    }
+
+    // MARK: tools row: recents or caption on the left, mic on the right
+
+    private var toolsRow: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Group {
+                if model.f.unfolded || model.listening { captionBlock } else { recents }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            micButton
+        }
     }
 
     private var micButton: some View {
-        Button {} label: {
-            LucideIcon(image: Lucide.mic, size: 20)
-                .foregroundStyle(colors.actionText)
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(colors.actionSurface))
+        Button { model.micTapped() } label: {
+            ZStack {
+                if model.listening { Circle().strokeBorder(colors.action.opacity(0.5), lineWidth: 3).frame(width: 52, height: 52) }
+                LucideIcon(image: model.listening ? Lucide.square : Lucide.mic, size: 20)
+                    .foregroundStyle(model.listening ? colors.onAction : colors.actionText)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(model.listening ? colors.action : colors.actionSurface))
+            }.frame(width: 52, height: 52)
         }
         .buttonStyle(.lhPressable)
-        .accessibilityLabel(pl("Talk instead of type"))
+        .accessibilityLabel(model.listening ? pl("Stop listening") : pl("Talk instead of type"))
     }
 
-    // MARK: caption
-
-    private func captionLine(_ text: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            if model.readingModel { ReadingLine().alignmentGuide(.firstTextBaseline) { $0[.bottom] - 4 } }
-            else if !model.noneFound { Sparkle() }
-            Text(text)
-                .font(.system(.footnote).weight(.medium))
-                .foregroundStyle(model.noneFound ? colors.caution : colors.textSecondary)
-                .id(text)
-                .transition(.opacity)
-            Spacer(minLength: 4)
-            if model.fillSource != nil && !model.readingModel {
-                Button { model.undoFill() } label: {
-                    PT("Undo").font(.system(.footnote).weight(.semibold)).foregroundStyle(colors.actionText)
-                        .padding(.horizontal, 10).frame(minHeight: 44)
+    @ViewBuilder private var captionBlock: some View {
+        if let text = model.caption {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                if model.readingModel { ReadingLine().alignmentGuide(.firstTextBaseline) { $0[.bottom] - 4 } }
+                else if model.fillSource != nil && !model.noneFound && !model.listening { Sparkle() }
+                Text(text)
+                    .font(.system(.footnote).weight(.medium))
+                    .foregroundStyle(model.noneFound ? colors.cautionText : colors.textSecondary)
+                    .id(text)
+                    .transition(reduceMotion ? .opacity : .asymmetric(insertion: .modifier(active: BlurFade(on: true), identity: BlurFade(on: false)), removal: .identity))
+                if model.fillSource != nil && !model.readingModel && !model.listening {
+                    Button { model.undoFill() } label: {
+                        PT("Undo").font(.system(.footnote).weight(.semibold)).foregroundStyle(colors.actionText)
+                            .padding(.horizontal, 8).frame(minHeight: 44)
+                    }
+                    .buttonStyle(.lhPressable).accessibilityLabel(pl("Undo the fill"))
                 }
-                .buttonStyle(.lhPressable)
-                .accessibilityLabel(pl("Undo the fill"))
             }
-        }
-        .padding(.horizontal, 4)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: text)
+            .frame(minHeight: 44, alignment: .leading)
+            .animation(reduceMotion ? .easeOut(duration: 0.15) : .easeOut(duration: 0.2), value: text)
+        } else { Color.clear.frame(height: 44) }
     }
-
-    // MARK: initial: recents + the labelled manual door
 
     private var recents: some View {
         VStack(alignment: .leading, spacing: 8) {
-            PT("RECENT")
-                .font(.system(.caption2, design: .monospaced).weight(.medium)).tracking(1.3)
-                .foregroundStyle(colors.draftingInk)
+            PT("RECENT").font(.system(.caption2, design: .monospaced).weight(.medium)).tracking(1.3).foregroundStyle(colors.draftingInk)
             FlowLayout(spacing: 8) {
                 recentChip(.repairs, ProtoData.pine, 1)
                 recentChip(.leasing, ProtoData.oak, 0.5)
             }
         }
-        .padding(.horizontal, 4)
     }
 
     private func recentChip(_ c: ActivityCategory, _ p: RentalProperty, _ h: Double) -> some View {
-        Button { model.applyRecent(c, p, h) } label: {
-            Text(verbatim: "\(ProtoData.short(c)) · \(p.name) · \(hoursText(h))")
-                .font(.system(.subheadline).weight(.medium)).fixedSize(horizontal: false, vertical: true)
-                .foregroundStyle(colors.textPrimary)
+        let text = type.isAccessibilitySize ? "\(ProtoData.short(c)) · \(p.name)" : "\(ProtoData.short(c)) · \(p.name) · \(hoursText(h))"
+        return Button { model.applyRecent(c, p, h) } label: {
+            Text(verbatim: text).font(.system(.subheadline).weight(.medium)).foregroundStyle(colors.textPrimary).fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 14).frame(minHeight: 44)
-                .background(Capsule().fill(colors.backgroundSecondary))
-                .overlay(Capsule().strokeBorder(colors.border, lineWidth: 0.5))
+                .background(Capsule().fill(colors.sheetCard)).overlay(Capsule().strokeBorder(colors.sheetStroke, lineWidth: 1))
         }
         .buttonStyle(.lhPressable)
     }
 
-    private var detailsEntry: some View {
+    private var micIntroCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            PT("Talk like you'd tell a friend. We'll fill the rest.").font(.system(.title3).weight(.semibold)).foregroundStyle(colors.textPrimary)
+            Button { model.startTalking() } label: {
+                PT("Start talking").font(.system(.headline)).foregroundStyle(colors.onAction).frame(maxWidth: .infinity, minHeight: 52).background(Capsule().fill(colors.action))
+            }.buttonStyle(.lhPressable)
+        }
+        .padding(18).frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(colors.sheetCard))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(colors.sheetStroke, lineWidth: 1))
+    }
+
+    // MARK: initial: one quiet details line + a quiet text button
+
+    private var detailsLine: some View {
+        Text(model.initialLine).font(.system(.footnote)).foregroundStyle(colors.textSecondary).fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var enterDetails: some View {
         Button { model.enterManual() } label: {
-            HStack(spacing: 12) {
-                LucideIcon(image: Lucide.slidersHorizontal, size: 18).foregroundStyle(colors.actionText)
-                VStack(alignment: .leading, spacing: 2) {
-                    PT("Enter details yourself").font(.system(.body).weight(.semibold)).foregroundStyle(colors.textPrimary)
-                    Text(model.initialLine).font(.system(.footnote)).fixedSize(horizontal: false, vertical: true).foregroundStyle(colors.textSecondary).multilineTextAlignment(.leading)
-                }
-                Spacer(minLength: 4)
-                LucideIcon(image: Lucide.chevronRight, size: 16).foregroundStyle(colors.textSecondary)
+            HStack(spacing: 8) {
+                LucideIcon(image: Lucide.slidersHorizontal, size: 16)
+                PT("Enter details yourself").font(.system(.body).weight(.medium))
             }
-            .padding(.horizontal, 16).padding(.vertical, 12)
-            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(colors.border, lineWidth: 0.5))
+            .foregroundStyle(colors.actionText).frame(minHeight: 44, alignment: .leading)
         }
         .buttonStyle(.lhPressable)
         .accessibilityHint(pl("Shows every field and turns off auto-fill for this entry."))
@@ -280,6 +302,13 @@ struct LogTimeProtoSheet: View {
                 PT("Turn on").font(.system(.footnote).weight(.semibold)).foregroundStyle(colors.actionText).frame(minHeight: 44)
             }.buttonStyle(.lhPressable)
             Spacer()
+        }
+    }
+
+    private var hoursFootnote: some View {
+        HStack(spacing: 8) {
+            Circle().fill(colors.cautionText).frame(width: 6, height: 6)
+            PT("You didn't say how long").font(.system(.footnote).weight(.medium)).foregroundStyle(colors.cautionText)
         }.padding(.horizontal, 4)
     }
 
@@ -291,32 +320,30 @@ struct LogTimeProtoSheet: View {
             row(.category); divider
             row(.hours); divider
             row(.date)
-            if model.f.record != nil { divider; recordRow }
+            if model.f.record != nil { divider; recordRow.transition(.opacity) }
         }
-        .background(RoundedRectangle(cornerRadius: 19, style: .continuous).fill(colors.backgroundTertiary))
-        .clipShape(RoundedRectangle(cornerRadius: 19, style: .continuous))
-        .padding(3)
-        .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(colors.backgroundSecondary))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(colors.border, lineWidth: 0.5))
+        .padding(4)
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(colors.sheetCard))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(colors.sheetStroke, lineWidth: 1))
     }
 
-    private var divider: some View { Rectangle().fill(colors.border.opacity(0.6)).frame(height: 0.5).padding(.leading, 16) }
+    private var divider: some View { Rectangle().fill(colors.sheetStroke).frame(height: 1).padding(.horizontal, 12) }
 
     private func label(_ f: PField) -> String {
         switch f { case .property: return pl("Rental"); case .category: return pl("Kind of work"); case .hours: return pl("How long")
         case .date: return pl("Date"); case .record: return pl("On the record") }
     }
 
-    private enum Look { case filled(PSource?), empty, loud(String), updated }
+    private enum Look { case filled(Bool), empty, caution, updated }
 
     private func look(_ f: PField) -> Look {
         if model.updated[f] != nil { return .updated }
         switch f {
-        case .property: return model.f.propertyId == nil ? .empty : .filled(model.f.marks[.property])
-        case .category: return model.f.category == nil ? .empty : .filled(model.f.marks[.category])
-        case .hours: return model.f.hoursIsDefault ? .loud(pl("\(hoursText(model.f.hours))? You didn't say how long")) : .filled(model.f.marks[.hours])
-        case .date: return .filled(model.f.marks[.date])
-        case .record: return .filled(model.f.marks[.record])
+        case .property: return model.f.propertyId == nil ? .empty : .filled(model.f.marks[.property] != nil)
+        case .category: return model.f.category == nil ? .empty : .filled(model.f.marks[.category] != nil)
+        case .hours: return model.hoursQuestionable ? .caution : .filled(model.f.marks[.hours] != nil)
+        case .date: return .filled(model.f.marks[.date] != nil)
+        case .record: return .filled(model.f.marks[.record] != nil)
         }
     }
 
@@ -334,106 +361,92 @@ struct LogTimeProtoSheet: View {
         let l = look(f)
         let open = model.expanded == f
         return VStack(spacing: 0) {
-            Button { model.toggle(f) } label: {
-                rowLabel(f, l, open: open)
-            }
-            .buttonStyle(.lhPressable)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(rowA11y(f, l))
-            .accessibilityHint(pl("Double-tap to change."))
+            Button { model.toggle(f) } label: { rowLabel(f, l, open: open) }
+                .buttonStyle(.lhPressable)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(rowA11y(f, l))
+                .accessibilityHint(pl("Double-tap to change."))
             if f == .property, model.f.propertyId == nil, model.mentioned.count >= 2 { twoRentalHint }
             if case .updated = l { updatedLine(f) }
             if open { editor(f).transition(.opacity) }
         }
-        .background(rowWash(f, l))
-    }
-
-    @ViewBuilder private func rowWash(_ f: PField, _ l: Look) -> some View {
-        switch l {
-        case .loud, .updated: colors.cautionSurface
-        default: colors.timber.opacity(model.flash.contains(f) ? 0.16 : 0)
-        }
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(colors.timber.opacity(model.flash.contains(f) ? 0.16 : 0)))
     }
 
     private func rowLabel(_ f: PField, _ l: Look, open: Bool) -> some View {
         let stacked = type.isAccessibilitySize
-        return Group {
+        return HStack(alignment: .center, spacing: 10) {
+            accentBar(l)
             if stacked {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(label(f)).font(.system(.subheadline)).foregroundStyle(colors.textSecondary)
-                    HStack { valueView(f, l); Spacer(minLength: 4); chevron(open) }
+                    valueView(f, l, trailing: false).frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else {
-                HStack(alignment: .center, spacing: 12) {
-                    Text(label(f)).font(.system(.subheadline)).foregroundStyle(colors.textSecondary)
-                        .frame(minWidth: 96, alignment: .leading)
-                    Spacer(minLength: 4)
-                    valueView(f, l)
-                    chevron(open)
-                }
+                Text(label(f)).font(.system(.subheadline)).foregroundStyle(colors.textSecondary).frame(minWidth: 96, alignment: .leading)
+                Spacer(minLength: 4)
+                valueView(f, l, trailing: true)
             }
+            LucideIcon(image: Lucide.chevronRight, size: chevronSize).foregroundStyle(colors.textSecondary).rotationEffect(.degrees(open ? 90 : 0))
         }
-        .padding(.horizontal, 16).padding(.vertical, 10)
+        .padding(.horizontal, 12).padding(.vertical, 10)
         .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
         .contentShape(Rectangle())
     }
 
-    private func chevron(_ open: Bool) -> some View {
-        LucideIcon(image: Lucide.chevronRight, size: chevronSize).foregroundStyle(colors.textSecondary)
-            .rotationEffect(.degrees(open ? 90 : 0))
+    /// The one timber accent: a 3pt bar on rows whose value came from the note.
+    @ViewBuilder private func accentBar(_ l: Look) -> some View {
+        if case .filled(true) = l { Capsule().fill(colors.timber).frame(width: 3, height: 26).accessibilityHidden(true) }
+        else { Color.clear.frame(width: 3, height: 26) }
     }
 
-    @ViewBuilder private func valueView(_ f: PField, _ l: Look) -> some View {
+    @ViewBuilder private func valueView(_ f: PField, _ l: Look, trailing: Bool) -> some View {
+        let align: TextAlignment = trailing ? .trailing : .leading
         switch l {
         case .empty:
             PT("Choose").font(.system(.body).weight(.semibold)).foregroundStyle(colors.actionText)
                 .padding(.horizontal, 14).frame(minHeight: 36)
                 .overlay(Capsule().strokeBorder(colors.action, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))
-        case .loud(let text):
-            Text(text).font(.system(.body).weight(.semibold)).foregroundStyle(colors.cautionText).multilineTextAlignment(.trailing)
-        case .updated:
-            HStack(spacing: 6) { Text(valueText(f)).font(.system(.body).weight(.semibold)).foregroundStyle(colors.cautionText) }
-        case .filled(let src):
-            HStack(spacing: 6) {
-                Text(valueText(f)).font(.system(.body).weight(.semibold)).foregroundStyle(colors.textPrimary).multilineTextAlignment(.trailing)
-                if src != nil { Sparkle() }
+        case .caution, .updated:
+            HStack(spacing: 8) {
+                Circle().fill(colors.cautionText).frame(width: 6, height: 6)
+                Text(valueText(f)).font(.system(.body).weight(.semibold)).foregroundStyle(colors.cautionText).multilineTextAlignment(align)
             }
+        case .filled:
+            Text(valueText(f)).font(.system(.body).weight(.semibold)).foregroundStyle(colors.textPrimary).multilineTextAlignment(align)
         }
     }
 
     private func rowA11y(_ f: PField, _ l: Look) -> String {
         switch l {
         case .empty: return pl("\(label(f)), not chosen. Button.")
-        case .loud: return pl("\(label(f)), \(valueText(f)), you didn't say how long. Button.")
+        case .caution: return pl("\(label(f)), \(valueText(f)), you didn't say how long. Button.")
         case .updated: return pl("\(label(f)), \(valueText(f)), updated from your note. Button.")
-        case .filled(let s): return s == nil ? pl("\(label(f)), \(valueText(f)). Button.") : pl("\(label(f)), \(valueText(f)), filled from your note. Button.")
+        case .filled(let note): return note ? pl("\(label(f)), \(valueText(f)), filled from your note. Button.") : pl("\(label(f)), \(valueText(f)). Button.")
         }
     }
 
     private var recordRow: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
+        HStack(alignment: .top, spacing: 10) {
+            accentBar(.filled(true)).padding(.top, 2)
+            VStack(alignment: .leading, spacing: 4) {
                 Text(label(.record)).font(.system(.subheadline)).foregroundStyle(colors.textSecondary)
-                Sparkle()
+                Text(model.f.record ?? "").font(.system(.body)).foregroundStyle(colors.textPrimary).fixedSize(horizontal: false, vertical: true)
             }
-            Text(model.f.record ?? "").font(.system(.body)).foregroundStyle(colors.textPrimary)
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16).padding(.vertical, 12)
+        .padding(.horizontal, 12).padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(colors.timber.opacity(model.flash.contains(.record) ? 0.16 : 0))
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(colors.timber.opacity(model.flash.contains(.record) ? 0.16 : 0)))
         .accessibilityElement(children: .combine)
     }
 
     private var twoRentalHint: some View {
         VStack(alignment: .leading, spacing: 10) {
-            PT("Your note mentions 2 rentals. Log each one on its own.")
-                .font(.system(.footnote)).foregroundStyle(colors.textSecondary)
-            FlowLayout(spacing: 8) {
-                ForEach(model.mentioned) { p in chip(p.name, selected: false) { model.pick(property: p.id) } }
-            }
+            PT("Your note mentions 2 rentals. Log each one on its own.").font(.system(.footnote)).foregroundStyle(colors.textSecondary)
+            FlowLayout(spacing: 8) { ForEach(model.mentioned) { p in chip(p.name, selected: false) { model.pick(property: p.id) } } }
         }
-        .padding(.horizontal, 16).padding(.bottom, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16).padding(.bottom, 12).frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func updatedLine(_ f: PField) -> some View {
@@ -444,7 +457,7 @@ struct LogTimeProtoSheet: View {
             }.buttonStyle(.lhPressable)
             Spacer()
         }
-        .padding(.horizontal, 16).padding(.bottom, 2)
+        .padding(.horizontal, 25).padding(.bottom, 2)
     }
 
     // MARK: inline editors
@@ -453,13 +466,9 @@ struct LogTimeProtoSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             switch f {
             case .property:
-                FlowLayout(spacing: 8) {
-                    ForEach(model.properties) { p in chip(p.name, selected: model.f.propertyId == p.id) { model.pick(property: p.id) } }
-                }
+                FlowLayout(spacing: 8) { ForEach(model.properties) { p in chip(p.name, selected: model.f.propertyId == p.id) { model.pick(property: p.id) } } }
             case .category:
-                FlowLayout(spacing: 8) {
-                    ForEach(ProtoData.counted, id: \.self) { c in chip(ProtoData.short(c), selected: model.f.category == c) { model.pick(category: c) } }
-                }
+                FlowLayout(spacing: 8) { ForEach(ProtoData.counted, id: \.self) { c in chip(ProtoData.short(c), selected: model.f.category == c) { model.pick(category: c) } } }
             case .hours:
                 FlowLayout(spacing: 8) {
                     ForEach([0.5, 1, 1.5, 2, 4], id: \.self) { h in chip(hoursText(h), selected: !model.f.hoursIsDefault && model.f.hours == h) { model.set(hours: h, collapse: true) } }
@@ -479,34 +488,24 @@ struct LogTimeProtoSheet: View {
                 PT("This kind of work doesn't count toward your hours.").font(.system(.footnote)).foregroundStyle(colors.textSecondary)
             }
         }
-        .padding(.horizontal, 16).padding(.bottom, 14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16).padding(.bottom, 14).frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var stepper: some View {
         let layout = type.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 10)) : AnyLayout(HStackLayout(spacing: 16))
         return layout {
             stepButton(Lucide.minus, label: pl("Less")) { model.set(hours: model.f.hours - 0.25, collapse: false) }
-            Text(hoursText(model.f.hours))
-                .font(.system(.largeTitle, design: .rounded).weight(.semibold))
-                .monospacedDigit()
-                .foregroundStyle(colors.textPrimary)
-                .contentTransition(.numericText())
-                .frame(minWidth: 110)
+            Text(hoursText(model.f.hours)).font(.system(.largeTitle, design: .rounded).weight(.semibold)).monospacedDigit()
+                .foregroundStyle(colors.textPrimary).contentTransition(.numericText()).frame(minWidth: 110)
             stepButton(Lucide.plus, label: pl("More")) { model.set(hours: model.f.hours + 0.25, collapse: false) }
-        }
-        .frame(maxWidth: .infinity)
+        }.frame(maxWidth: .infinity)
     }
 
     private func stepButton(_ image: UIImage, label: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            LucideIcon(image: image, size: 20).foregroundStyle(colors.textPrimary)
-                .frame(width: 48, height: 48)
-                .background(Circle().fill(colors.backgroundSecondary))
-                .overlay(Circle().strokeBorder(colors.border, lineWidth: 0.5))
-        }
-        .buttonStyle(.lhPressable)
-        .accessibilityLabel(label)
+            LucideIcon(image: image, size: 20).foregroundStyle(colors.textPrimary).frame(width: 48, height: 48)
+                .background(Circle().fill(colors.sheetCard)).overlay(Circle().strokeBorder(colors.sheetStroke, lineWidth: 1))
+        }.buttonStyle(.lhPressable).accessibilityLabel(label)
     }
 
     private func chip(_ text: String, selected: Bool, _ action: @escaping () -> Void) -> some View {
@@ -514,68 +513,44 @@ struct LogTimeProtoSheet: View {
             Text(verbatim: text).font(.system(.subheadline).weight(.medium)).fixedSize(horizontal: false, vertical: true)
                 .foregroundStyle(selected ? colors.actionText : colors.textPrimary)
                 .padding(.horizontal, 14).frame(minHeight: 44)
-                .background(Capsule().fill(selected ? colors.actionSurface : colors.backgroundSecondary))
-                .overlay(Capsule().strokeBorder(selected ? colors.action : colors.border, lineWidth: selected ? 1.5 : 0.5))
+                .background(Capsule().fill(selected ? colors.actionSurface : colors.background))
+                .overlay(Capsule().strokeBorder(selected ? colors.action : colors.sheetStroke, lineWidth: selected ? 1.5 : 1))
         }
-        .buttonStyle(.lhPressable)
-        .accessibilityAddTraits(selected ? .isSelected : [])
+        .buttonStyle(.lhPressable).accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    // MARK: the Log bar
+    // MARK: the Log bar: one filled button that names what it will do
 
     private var logBar: some View {
-        VStack(spacing: 8) {
-            if let gap = model.gap {
-                Button { model.primary() } label: {
-                    barLabel(gapText(gap)).foregroundStyle(colors.actionText)
-                        .background(Capsule().fill(colors.actionSurface))
-                        .overlay(Capsule().strokeBorder(colors.action.opacity(0.6), lineWidth: 1))
-                }.buttonStyle(.lhPressable)
-            } else if let summary = model.summary {
-                let short = pl("Log \(model.hoursLabel)")
-                let full = model.zeroMode ? pl("Add \(model.propertyName ?? "") and log \(summary)") : pl("Log \(summary)")
-                ViewThatFits(in: .horizontal) {
-                    Button { model.primary() } label: { barLabel(full, oneLine: true).foregroundStyle(colors.onAction).background(Capsule().fill(colors.action)) }
-                        .buttonStyle(.lhPressable)
-                    VStack(spacing: 8) {
-                        Text(summary).font(.system(.footnote)).lineLimit(3).foregroundStyle(colors.textPrimary).multilineTextAlignment(.center).frame(maxWidth: .infinity)
-                        Button { model.primary() } label: { barLabel(short).foregroundStyle(colors.onAction).background(Capsule().fill(colors.action)) }
-                            .buttonStyle(.lhPressable)
-                    }
-                }
-            }
+        Button { model.primary() } label: {
+            Text(verbatim: model.barText)
+                .font(.system(.headline)).foregroundStyle(colors.onAction)
+                .lineLimit(3).fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.center)
+                .padding(.horizontal, 20).padding(.vertical, 8)
+                .frame(maxWidth: .infinity, minHeight: 56)
+                .background(Capsule().fill(colors.action))
+                .contentShape(Capsule())
+                .id(model.barText)
+                .transition(reduceMotion ? .opacity : .asymmetric(insertion: .modifier(active: BlurFade(on: true), identity: BlurFade(on: false)), removal: .identity))
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: model.summary)
+        .buttonStyle(.lhPressable)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: model.barText)
         .padding(.horizontal, 20).padding(.top, 10).padding(.bottom, 10)
-        .background(colors.background.overlay(alignment: .top) { Rectangle().fill(colors.border.opacity(0.5)).frame(height: 0.5) })
-    }
-
-    private func gapText(_ g: ProtoModel.Gap) -> String {
-        switch g { case .name: return pl("Name your rental"); case .rental: return pl("Pick a rental"); case .kind: return pl("Pick the kind of work") }
-    }
-
-    private func barLabel(_ text: String, oneLine: Bool = false) -> some View {
-        Text(verbatim: text)
-            .font(.system(.headline))
-            .lineLimit(oneLine ? 1 : 3)
-            .fixedSize(horizontal: oneLine, vertical: true)
-            .multilineTextAlignment(.center)
-            .padding(.horizontal, 20)
-            .frame(maxWidth: .infinity, minHeight: 56)
-            .contentShape(Capsule())
+        .background(colors.background.overlay(alignment: .top) { Rectangle().fill(colors.sheetStroke).frame(height: 1) })
     }
 
     // MARK: toast
 
     private func toastView(_ text: String) -> some View {
-        HStack(spacing: 14) {
-            Text(verbatim: text).font(.system(.subheadline).weight(.medium)).foregroundStyle(colors.background).fixedSize(horizontal: false, vertical: true)
+        let layout = type.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(spacing: 14))
+        return layout {
+            Text(verbatim: text).font(.system(.subheadline).weight(.medium)).foregroundStyle(colors.background).lineLimit(2).fixedSize(horizontal: false, vertical: true)
             Button { model.undoLog() } label: {
                 PT("Undo").font(.system(.subheadline).weight(.semibold)).foregroundStyle(colors.background).underline().frame(minHeight: 44)
             }.buttonStyle(.lhPressable)
         }
         .padding(.horizontal, 20).padding(.vertical, 6)
-        .background(Capsule().fill(colors.textPrimary))
+        .background(RoundedRectangle(cornerRadius: type.isAccessibilitySize ? 24 : 30, style: .continuous).fill(colors.textPrimary))
         .padding(.horizontal, 20)
         .accessibilityElement(children: .combine)
     }
@@ -587,9 +562,7 @@ private struct Sparkle: View {
     @Environment(\.colorScheme) private var scheme
     @ScaledMetric(relativeTo: .footnote) private var size: CGFloat = 14
     var body: some View {
-        LucideIcon(image: Lucide.sparkles, size: size)
-            .foregroundStyle(AdaptiveColors(colorScheme: scheme).timberInk)
-            .accessibilityHidden(true)
+        LucideIcon(image: Lucide.sparkles, size: size).foregroundStyle(AdaptiveColors(colorScheme: scheme).timberInk).accessibilityHidden(true)
     }
 }
 
@@ -634,7 +607,7 @@ struct FlowLayout: Layout {
 }
 
 extension ProtoModel {
-    /// The initial summary of what Log would record: defaults in words.
+    /// The initial summary of what Log would record: defaults in words, one quiet line.
     var initialLine: String {
         let kind = f.category.map { ProtoData.short($0) + (f.categoryRemembered ? " " + pl("(last used)") : "") } ?? pl("Choose kind of work")
         let who = propertyName ?? (zeroMode ? pl("Name your rental") : pl("Choose rental"))

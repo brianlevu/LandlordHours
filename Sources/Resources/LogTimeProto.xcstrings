@@ -78,17 +78,6 @@
         }
       }
     },
-    "%@? You didn't say how long": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@? You didn't say how long"
-          }
-        }
-      }
-    },
     "(last used)": {
       "extractionState": "manual",
       "localizations": {
@@ -309,13 +298,35 @@
         }
       }
     },
-    "Log %@": {
+    "Listening… tap to stop": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Log %@"
+            "value": "Listening… tap to stop"
+          }
+        }
+      }
+    },
+    "Log %@ at %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log %@ at %@"
+          }
+        }
+      }
+    },
+    "Log the timer": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log the timer"
           }
         }
       }
@@ -540,6 +551,28 @@
         }
       }
     },
+    "Start talking": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start talking"
+          }
+        }
+      }
+    },
+    "Stop listening": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop listening"
+          }
+        }
+      }
+    },
     "TODAY · %@": {
       "extractionState": "manual",
       "localizations": {
@@ -562,6 +595,17 @@
         }
       }
     },
+    "Talk like you'd tell a friend. We'll fill the rest.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk like you'd tell a friend. We'll fill the rest."
+          }
+        }
+      }
+    },
     "This kind of work doesn't count toward your hours.": {
       "extractionState": "manual",
       "localizations": {
@@ -580,6 +624,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Timer"
+          }
+        }
+      }
+    },
+    "Timer ran %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Timer ran %@"
           }
         }
       }
@@ -694,6 +749,17 @@
         }
       }
     },
+    "What did you work on?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What did you work on?"
+          }
+        }
+      }
+    },
     "Which rental is this for?": {
       "extractionState": "manual",
       "localizations": {
@@ -723,6 +789,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "You can add the address and type later."
+          }
+        }
+      }
+    },
+    "You didn't say how long": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You didn't say how long"
           }
         }
       }

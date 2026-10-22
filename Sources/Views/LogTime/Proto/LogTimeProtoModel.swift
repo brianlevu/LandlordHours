@@ -28,13 +28,14 @@ func pl(_ key: String.LocalizationValue) -> String { String(localized: key, tabl
 func PT(_ key: LocalizedStringKey) -> Text { Text(key, tableName: "LogTimeProto") }
 
 enum ProtoScenario: String {
-    case full, partial, two, swap
+    case full, partial, two, swap, noKind
     var note: String {
         switch self {
         case .full: return "fixed the sink at Pine Cabin, about 2 hours yesterday"
         case .partial: return "met the plumber at Oak Street"
         case .two: return "turnover clean at Pine Cabin and Oak Street"
         case .swap: return "replaced the water heater at Oak Street, 3 hours"
+        case .noKind: return "walked Oak Street with Mike"
         }
     }
 }
@@ -111,6 +112,11 @@ final class ProtoModel: ObservableObject {
     @Published var toast: (text: String, id: Int)?
     @Published var wantsFocus = false
     @Published var pendingTotal = ProtoData.hoursSoFar
+    @Published var listening = false
+    @Published var micIntro = false
+    /// Timer review: the run that filled the hours.
+    @Published var timerRan: String?
+    static let transcript = "Fixed the sink at Pine Cabin, took about an hour"
 
     private var before: ProtoForm?
     private var readTask: Task<Void, Never>?
@@ -136,7 +142,9 @@ final class ProtoModel: ObservableObject {
         if f.category == nil { return .kind }
         return nil
     }
-    var hoursLabel: String { hoursText(f.hours) + (f.hoursIsDefault ? "?" : "") }
+    var hoursLabel: String { hoursText(f.hours) }
+    /// A note was read and it never said how long: the 1h is a default, not a fact.
+    var hoursQuestionable: Bool { f.hoursIsDefault && !f.note.isEmpty && !f.manual }
     var isToday: Bool { Calendar.current.isDateInToday(f.date) }
     var dateWord: String {
         if Calendar.current.isDateInToday(f.date) { return pl("Today") }
@@ -147,18 +155,26 @@ final class ProtoModel: ObservableObject {
         let md = f.date.formatted(.dateTime.month(.abbreviated).day())
         return pl("\(dateWord), \(md)")
     }
-    /// Every value that affects the record, in the order the owner reads it.
-    var summary: String? {
-        guard gap == nil, let cat = f.category, let name = propertyName else { return nil }
-        var parts = [hoursLabel, ProtoData.short(cat), name]
-        if !isToday { parts.append(dateWord) }
-        return parts.joined(separator: "\u{00A0}· ")
+    /// What the button says it will do: hours and rental, plus the day when it isn't today.
+    var barText: String {
+        switch gap {
+        case .name?: return pl("Name your rental")
+        case .rental?: return pl("Pick a rental")
+        case .kind?: return pl("Pick the kind of work")
+        case nil:
+            let name = propertyName ?? ""
+            var t = zeroMode ? pl("Add \(name) and log \(hoursLabel)") : pl("Log \(hoursLabel) at \(name)")
+            if !isToday { t += "\u{00A0}· " + dateWord }
+            return t
+        }
     }
     var eyebrow: String {
         let d = f.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()).uppercased()
         return isToday ? pl("TODAY · \(d)") : pl("\(dateWord.uppercased()) · \(d)")
     }
     var caption: String? {
+        if listening { return pl("Listening… tap to stop") }
+        if let ran = timerRan { return pl("Timer ran \(ran)") }
         if readingModel { return fillSource == .rules ? pl("Matched from your words. Reading your note.") : pl("Reading your note") }
         if noneFound { return pl("Couldn't tell which rental. Pick it below.") }
         switch fillSource {
@@ -302,6 +318,16 @@ final class ProtoModel: ObservableObject {
         }
     }
 
+    func micTapped() {
+        anim {
+            if listening { listening = false }
+            else if !micSeen { micIntro = true }
+            else { listening = true }
+        }
+    }
+    func startTalking() { anim { micSeen = true; micIntro = false; listening = true } }
+    @Published var micSeen = false
+
     func enterManual() {
         readTask?.cancel(); modelTask?.cancel()
         anim { f.manual = true; f.unfolded = true; fillSource = nil; readingModel = false; noneFound = false }
@@ -393,6 +419,12 @@ final class ProtoModel: ObservableObject {
         case "edit": f.note = scenario.note; readRules(); applyModel(late: false); expanded = .hours
         case "undone": f.note = scenario.note; readRules(); applyModel(late: false); undoFill()
         case "manual": enterManual()
+        case "listening":
+            f.note = Self.transcript; readRules(); readingModel = false; listening = true
+        case "micIntro": micIntro = true
+        case "timerReview":
+            f.propertyId = ProtoData.pine.id; f.category = .repairs; f.categoryRemembered = false
+            f.hours = 4440.0 / 3600.0; f.hoursIsDefault = false; f.unfolded = true; timerRan = hoursText(4440.0 / 3600.0)
         case "zero": zeroMode = true; f.category = .repairs
         case "zeroNamed": zeroMode = true; rentalName = "Pine Cabin"; f.note = "fixed the sink, 1 hour"; readRules()
         case "toast": showToast(pl("Logged \(hoursText(2)) · \(Int(ProtoData.hoursSoFar + 2)) of \(ProtoData.goal) hours"))
