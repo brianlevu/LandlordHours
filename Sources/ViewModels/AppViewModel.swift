@@ -249,6 +249,7 @@ class AppViewModel: ObservableObject {
     
     func checkSignInState() {
         let defaults = UserDefaults.standard
+        ProfileIdentity.hydrateActive(defaults)
         if defaults.string(forKey: ProfileKeys.appleUserId) != nil {
             isSignedIn = true
             userName = defaults.string(forKey: ProfileKeys.appleUserName) ?? "User"
@@ -277,6 +278,7 @@ class AppViewModel: ObservableObject {
 
     func signIn() {
         isSignedIn = true
+        ProfileIdentity.hydrateActive(.standard)
         // Clear in-memory state from any previous user before loading new user's data.
         // This prevents stale data from leaking if a CloudKit sync fires during the transition.
         properties = []
@@ -455,6 +457,8 @@ class AppViewModel: ObservableObject {
         }
         endTimerLiveActivity(propertyId: timerPropertyId, category: timerCategory, startDate: timerStartTime, needsReview: false)
 
+        // The live name/email keys are about to go; keep the profile's own copy first.
+        ProfileIdentity.stashActive(defaults)
         // Clear auth keys (unscoped — shared on device)
         for key in ProfileKeys.signOutKeys {
             defaults.removeObject(forKey: key)
@@ -634,6 +638,9 @@ class AppViewModel: ObservableObject {
         "propertyGoals",
         "iCloudBackupEnabled",
         "profileImageData",
+        ProfileIdentity.nameKey,
+        ProfileIdentity.emailKey,
+        ProfileIdentity.editedKey,
         GuidedOnboardingStore.completedKey,
         GuidedOnboardingStore.skippedKey,
         "LandlordHours.taxProfile.filingStatus",

@@ -21,40 +21,47 @@ enum AppleSignInFlow {
         request.requestedScopes = [.fullName, .email]
     }
 
+    /// Applies one Apple authorization. Apple sends the name and email only the first time, so a
+    /// later sign-in arrives with nil for both: that must never erase what is stored. A value the
+    /// user edited in Profile is never replaced by Apple's; otherwise Apple's fills it in.
+    static func record(userId: String, givenName: String?, familyName: String?, email: String?,
+                       defaults: UserDefaults = .standard) -> Outcome {
+        // "New" means this Apple ID has never finished setup on this device — not merely
+        // "not the currently stored ID" (a returning user who switched profiles must not be
+        // sent through onboarding again).
+        let isNewUser = !defaults.bool(forKey: UserScope.key("hasCompletedOnboarding", userId: userId))
+        let liveId = defaults.string(forKey: ProfileKeys.appleUserId)
+        defaults.set(userId, forKey: ProfileKeys.appleUserId)
+
+        var stored = ProfileIdentity.saved(userId: userId, defaults: defaults)
+        // Live keys of this same Apple ID (signed in before this build stashed a copy).
+        if liveId == userId {
+            stored.name = stored.name ?? ProfileIdentity.clean(defaults.string(forKey: ProfileKeys.appleUserName))
+            stored.email = stored.email ?? ProfileIdentity.clean(defaults.string(forKey: ProfileKeys.appleUserEmail))
+        }
+        let appleName = ProfileIdentity.clean([givenName, familyName].compactMap { $0 }.joined(separator: " "))
+        let appleEmail = ProfileIdentity.clean(email)
+        let name = stored.edited ? (stored.name ?? appleName) : (appleName ?? stored.name)
+        let mail = stored.edited ? (stored.email ?? appleEmail) : (appleEmail ?? stored.email)
+        if let name { defaults.set(name, forKey: ProfileKeys.appleUserName) }
+        if let mail { defaults.set(mail, forKey: ProfileKeys.appleUserEmail) }
+        ProfileIdentity.remember(userId: userId, name: name, email: mail, edited: false, defaults: defaults)
+
+        let manager = AppleSignInManager.shared
+        manager.userId = userId
+        manager.isSignedIn = true
+        manager.loginType = .apple
+        manager.fullName = name
+        manager.email = mail
+        return .signedIn(isNewUser: isNewUser)
+    }
+
     static func complete(_ result: Result<ASAuthorization, Error>) -> Outcome {
         switch result {
         case .success(let authorization):
             guard let appleIdCredential = authorization.credential as? ASAuthorizationAppleIDCredential else { return .failed }
-            let userId = appleIdCredential.user
-            // "New" means this Apple ID has never finished setup on this device — not merely
-            // "not the currently stored ID" (a returning user who switched profiles must not be
-            // sent through onboarding again).
-            let isNewUser = !UserDefaults.standard.bool(
-                forKey: UserScope.key("hasCompletedOnboarding", userId: userId)
-            )
-            UserDefaults.standard.set(userId, forKey: "appleUserId")
-
-            AppleSignInManager.shared.userId = userId
-            AppleSignInManager.shared.isSignedIn = true
-            AppleSignInManager.shared.loginType = .apple
-
-            if let fullName = appleIdCredential.fullName {
-                let name = [fullName.givenName, fullName.familyName]
-                    .compactMap { $0 }
-                    .joined(separator: " ")
-                if !name.isEmpty {
-                    AppleSignInManager.shared.fullName = name
-                    UserDefaults.standard.set(name, forKey: "appleUserName")
-                }
-            }
-
-            if let email = appleIdCredential.email {
-                AppleSignInManager.shared.email = email
-                UserDefaults.standard.set(email, forKey: "appleUserEmail")
-            } else if let existingEmail = UserDefaults.standard.string(forKey: "appleUserEmail") {
-                AppleSignInManager.shared.email = existingEmail
-            }
-            return .signedIn(isNewUser: isNewUser)
+            let name = appleIdCredential.fullName.map { [$0.givenName, $0.familyName].compactMap { $0 }.joined(separator: " ") }
+            return record(userId: appleIdCredential.user, givenName: name, familyName: nil, email: appleIdCredential.email)
         case .failure(let error):
             logger.error("Apple Sign-In failed: \(error.localizedDescription)")
             // Code 1001 = user cancelled — don't show an error.
@@ -105,6 +112,7 @@ class AppleSignInManager: ObservableObject {
     
     func checkExistingSignIn() {
         let defaults = UserDefaults.standard
+        ProfileIdentity.hydrateActive(defaults)
         if let userId = defaults.string(forKey: ProfileKeys.appleUserId) {
             self.userId = userId
             self.isSignedIn = true
@@ -151,14 +159,20 @@ class AppleSignInManager: ObservableObject {
             emailKey = ProfileKeys.emailUserEmail
         }
 
-        if let name = name {
+        var edited = false
+        if let name = ProfileIdentity.clean(name) {
+            edited = edited || name != ProfileIdentity.clean(fullName)
             fullName = name
             defaults.set(name, forKey: nameKey)
         }
 
-        if let email = email {
+        if let email = ProfileIdentity.clean(email) {
+            edited = edited || email != ProfileIdentity.clean(self.email)
             self.email = email
             defaults.set(email, forKey: emailKey)
+        }
+        if let id = userId {
+            ProfileIdentity.remember(userId: id, name: fullName, email: self.email, edited: edited, defaults: defaults)
         }
 
         if let imageData = imageData {

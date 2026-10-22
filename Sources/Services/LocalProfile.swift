@@ -60,6 +60,70 @@ enum ProfileKeys {
     }
 }
 
+// MARK: - Profile identity (name, email)
+
+/// A profile's name and email, kept per profile (`u.<id>.profile.*`) so they outlive sign-out.
+///
+/// The live keys (`appleUserName`, `localProfileName`, ...) are device-wide and cleared on
+/// sign-out. Apple sends the name and email only on the first authorization, so for an Apple
+/// profile the live copy was the only copy and a sign-out followed by a sign-in lost both
+/// (2.0.1). Rules: never store nil, empty or the "User" fallback; a user's edit beats any Apple
+/// value; Apple fills only what the user hasn't edited.
+enum ProfileIdentity {
+    static let nameKey = "profile.name"
+    static let emailKey = "profile.email"
+    static let editedKey = "profile.userEdited"
+    /// The display fallback; never a stored value.
+    static let fallbackName = "User"
+
+    static func clean(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty, trimmed != fallbackName else { return nil }
+        return trimmed
+    }
+
+    static func saved(userId: String, defaults: UserDefaults = .standard) -> (name: String?, email: String?, edited: Bool) {
+        (clean(defaults.string(forKey: UserScope.key(nameKey, userId: userId))),
+         clean(defaults.string(forKey: UserScope.key(emailKey, userId: userId))),
+         defaults.bool(forKey: UserScope.key(editedKey, userId: userId)))
+    }
+
+    /// Writes the per-profile copy. Missing, empty or "User" values leave what is stored alone.
+    static func remember(userId: String, name: String?, email: String?, edited: Bool, defaults: UserDefaults = .standard) {
+        if let name = clean(name) { defaults.set(name, forKey: UserScope.key(nameKey, userId: userId)) }
+        if let email = clean(email) { defaults.set(email, forKey: UserScope.key(emailKey, userId: userId)) }
+        if edited { defaults.set(true, forKey: UserScope.key(editedKey, userId: userId)) }
+    }
+
+    /// The device-wide name and email keys for the active profile, or nil with no profile.
+    static func liveKeys(_ defaults: UserDefaults = .standard) -> (id: String, name: String, email: String)? {
+        if let id = defaults.string(forKey: ProfileKeys.appleUserId), !id.isEmpty {
+            return (id, ProfileKeys.appleUserName, ProfileKeys.appleUserEmail)
+        }
+        if let id = defaults.string(forKey: ProfileKeys.localProfileId), !id.isEmpty {
+            return (id, ProfileKeys.localProfileName, ProfileKeys.localProfileEmail)
+        }
+        if let id = defaults.string(forKey: ProfileKeys.emailUserId), !id.isEmpty {
+            return (id, ProfileKeys.emailUserName, ProfileKeys.emailUserEmail)
+        }
+        return nil
+    }
+
+    /// Before sign-out clears the live keys: keep the active profile's name and email.
+    static func stashActive(_ defaults: UserDefaults = .standard) {
+        guard let live = liveKeys(defaults) else { return }
+        remember(userId: live.id, name: defaults.string(forKey: live.name), email: defaults.string(forKey: live.email), edited: false, defaults: defaults)
+    }
+
+    /// After sign-in: fill empty live keys from the per-profile copy.
+    static func hydrateActive(_ defaults: UserDefaults = .standard) {
+        guard let live = liveKeys(defaults) else { return }
+        let stored = saved(userId: live.id, defaults: defaults)
+        if clean(defaults.string(forKey: live.name)) == nil, let name = stored.name { defaults.set(name, forKey: live.name) }
+        if clean(defaults.string(forKey: live.email)) == nil, let email = stored.email { defaults.set(email, forKey: live.email) }
+    }
+}
+
 // MARK: - Email → local profile migration
 
 enum ProfileMigration {
@@ -383,11 +447,15 @@ enum ProfileRestore {
         defaults.set(id, forKey: ProfileKeys.localProfileId)
         if let name = profile.name ?? defaults.string(forKey: UserScope.key(profileNameKey, userId: id)), !name.isEmpty {
             defaults.set(name, forKey: ProfileKeys.localProfileName)
+        } else if let name = ProfileIdentity.saved(userId: id, defaults: defaults).name {
+            defaults.set(name, forKey: ProfileKeys.localProfileName)
         } else {
             defaults.removeObject(forKey: ProfileKeys.localProfileName)
         }
         if id.hasPrefix(ProfileKeys.emailProfilePrefix) {
             defaults.set(String(id.dropFirst(ProfileKeys.emailProfilePrefix.count)), forKey: ProfileKeys.localProfileEmail)
+        } else if let email = ProfileIdentity.saved(userId: id, defaults: defaults).email {
+            defaults.set(email, forKey: ProfileKeys.localProfileEmail)
         } else {
             defaults.removeObject(forKey: ProfileKeys.localProfileEmail)
         }
