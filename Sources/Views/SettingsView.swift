@@ -30,6 +30,8 @@ struct SettingsView: View {
     @State private var profileImage: Data?
     @State private var restoreStatusMessage: String?
     @State private var restorableProfiles: [DiscoveredProfile] = []
+    @State private var restoreCloudProblem = false
+    @State private var restoreRetrying = false
     @State private var showRestoreSheet = false
     @State private var route: SettingsRoute?
     /// Backs the "Share anonymous usage data" toggle. Stores whether the user opted OUT (default
@@ -122,7 +124,19 @@ struct SettingsView: View {
                 ExportPDFView(year: Calendar.current.component(.year, from: Date()))
             }
             .sheet(isPresented: $showRestoreSheet) {
-                ProfileRestoreSheet(profiles: restorableProfiles, context: .settings) { profile in
+                ProfileRestoreSheet(
+                    profiles: restorableProfiles, context: .settings,
+                    cloudProblem: restoreCloudProblem, isRetrying: restoreRetrying,
+                    onRetry: {
+                        Task {
+                            restoreRetrying = true
+                            let found = await viewModel.discoverRestorable()
+                            restorableProfiles = found.profiles
+                            restoreCloudProblem = found.cloudProblem
+                            restoreRetrying = false
+                        }
+                    }
+                ) { profile in
                     showRestoreSheet = false
                     viewModel.switchToProfile(profile)
                     Task { restorableProfiles = await viewModel.discoverRestorableProfiles() }
@@ -143,7 +157,9 @@ struct SettingsView: View {
                     }
                 }
                 #endif
-                restorableProfiles = await viewModel.discoverRestorableProfiles()
+                let found = await viewModel.discoverRestorable()
+                restorableProfiles = found.profiles
+                restoreCloudProblem = found.cloudProblem
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("-LHOpenRestoreSheet"), !restorableProfiles.isEmpty {
                     showRestoreSheet = true

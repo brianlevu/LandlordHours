@@ -858,7 +858,8 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     func fetchProfileRecordSummaries() async throws -> [CloudRecordSummary] {
         guard container != nil, let database else { return [] }
         await checkAccountStatus()
-        guard accountAvailable else { return [] }
+        // Not "nothing found": the Restore sheet must say it could not look.
+        guard accountAvailable else { throw ProfileDiscoveryError.iCloudUnavailable }
 
         var summaries: [CloudRecordSummary] = []
         let config = CKFetchRecordZoneChangesOperation.ZoneConfiguration()

@@ -6,7 +6,7 @@ import AuthenticationServices
 //
 // New users: `OnboardingView` replaces the 1.x sign-in wall and onboarding. Welcome leads with
 // "Start building" (a profile on this iPhone); Sign in with Apple and "Restore earlier data" sit
-// small under it for returning people. Upgraders: `OnbWhatsNewSheet` over Today.
+// small under it for returning people, until the active profile has finished onboarding. Upgraders: `OnbWhatsNewSheet` over Today.
 
 struct OnboardingView: View {
     @Binding var showOnboarding: Bool
@@ -18,7 +18,8 @@ struct OnboardingView: View {
         Group {
             if let flow {
                 OnbRoot(flow: flow)
-                    .environment(\.onbWelcomeAccount, viewModel.isSignedIn ? .hidden : .shown)
+                    .environment(\.onbWelcomeAccount, OnbWelcomeAccount.resolve(hasCompletedOnboarding: viewModel.activeProfileCompletedOnboarding))
+                    .environment(\.onbLeaveWelcome, { showOnboarding = false })
             } else {
                 Color.clear
             }
@@ -216,7 +217,17 @@ enum OnbBackfill {
 // MARK: - Root
 
 private struct BottomInsetKey: EnvironmentKey { static let defaultValue: CGFloat = 34 }
-enum OnbWelcomeAccount { case shown, hidden }
+enum OnbWelcomeAccount {
+    case shown, hidden
+
+    /// Sign in and Restore stay on Welcome until the active profile has finished onboarding. A
+    /// profile made by "Get started" that was never finished has nothing to protect, so hiding
+    /// them for it left a returning person with no way back to their records.
+    static func resolve(hasCompletedOnboarding: Bool) -> OnbWelcomeAccount {
+        hasCompletedOnboarding ? .hidden : .shown
+    }
+}
+private struct LeaveWelcomeKey: EnvironmentKey { static let defaultValue: () -> Void = {} }
 private struct WelcomeAccountKey: EnvironmentKey { static let defaultValue: OnbWelcomeAccount = .shown }
 private struct DisplayTitlesKey: EnvironmentKey { static let defaultValue = false }
 extension EnvironmentValues {
@@ -228,6 +239,12 @@ extension EnvironmentValues {
     var onbWelcomeAccount: OnbWelcomeAccount {
         get { self[WelcomeAccountKey.self] }
         set { self[WelcomeAccountKey.self] = newValue }
+    }
+    /// Closes onboarding when a returning person signs in from Welcome while a half-made profile
+    /// was already active (the shell is then not re-entered by a sign-in change).
+    var onbLeaveWelcome: () -> Void {
+        get { self[LeaveWelcomeKey.self] }
+        set { self[LeaveWelcomeKey.self] = newValue }
     }
     /// Step titles in Fraunces display (What's new).
     var onbDisplayTitles: Bool {
@@ -400,7 +417,10 @@ struct OnbWelcomeContent: View {
     @Environment(\.onbBottomInset) private var bottomInset
     @Environment(\.onbWelcomeAccount) private var account
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.onbLeaveWelcome) private var leaveWelcome
     @State private var restorable: [DiscoveredProfile] = []
+    @State private var cloudProblem = false
+    @State private var isRetrying = false
     @State private var showRestore = false
     @State private var signInError = false
 
@@ -451,8 +471,8 @@ struct OnbWelcomeContent: View {
                         VStack(spacing: 8) { accountLead; appleButton }
                     }
                     .padding(.top, 4)
-                    if !restorable.isEmpty {
-                        Button(restorable.count == 1 ? String(localized: "Restore earlier data") : String(localized: "Restore earlier data (\(restorable.count))")) { showRestore = true }
+                    if !restorable.isEmpty || cloudProblem {
+                        Button(restorable.count <= 1 ? String(localized: "Restore earlier data") : String(localized: "Restore earlier data (\(restorable.count))")) { showRestore = true }
                             .buttonStyle(OnbLink(color: HouseTokens.onHeroPrimary))
                             .font(.footnote.weight(.semibold))
                             .accessibilityIdentifier("welcome.restoreEarlierData")
@@ -476,12 +496,25 @@ struct OnbWelcomeContent: View {
         }
         .task {
             guard account == .shown else { return }
-            restorable = await viewModel.discoverRestorableProfiles()
+            await search(announce: true)
         }
         .sheet(isPresented: $showRestore) {
-            ProfileRestoreSheet(profiles: restorable, context: .welcome) { profile in
+            ProfileRestoreSheet(
+                profiles: restorable, context: .welcome,
+                cloudProblem: cloudProblem, isRetrying: isRetrying,
+                onRetry: {
+                    Task {
+                        isRetrying = true
+                        await search(announce: false)
+                        isRetrying = false
+                    }
+                }
+            ) { profile in
                 showRestore = false
                 viewModel.switchToProfile(profile)
+                // Sign-out and sign-in land in one pass, so the shell never sees the change. When
+                // Welcome was held open by an unfinished profile, close it ourselves.
+                if viewModel.activeProfileCompletedOnboarding { leaveWelcome() }
             }
             .environmentObject(viewModel)
         }
@@ -490,6 +523,20 @@ struct OnbWelcomeContent: View {
         } message: {
             Text(AppleSignInFlow.failureMessage)
         }
+    }
+
+    private func search(announce: Bool) async {
+        let found = await viewModel.discoverRestorable()
+        restorable = found.profiles
+        cloudProblem = found.cloudProblem
+        guard announce, !found.profiles.isEmpty || found.cloudProblem else { return }
+        let kinds = found.profiles.map(\.analyticsKind)
+        Analytics.restoreOffered(
+            emailCount: kinds.filter { $0 == "email" }.count,
+            localCount: kinds.filter { $0 == "local" }.count,
+            appleCount: kinds.filter { $0 == "apple" }.count,
+            cloudProblem: found.cloudProblem
+        )
     }
 
     private var accountLead: some View {
@@ -509,6 +556,7 @@ struct OnbWelcomeContent: View {
                 } else {
                     // Returning: their profile already finished setup, so the app opens on Today.
                     viewModel.signIn()
+                    leaveWelcome()
                 }
             case .cancelled: break
             case .failed: signInError = true

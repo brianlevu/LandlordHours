@@ -330,23 +330,44 @@ class AppViewModel: ObservableObject {
         }
         ProfileRestore.activate(profile, defaults: .standard)
         signIn()
+        Analytics.restoreCompleted(kind: profile.analyticsKind, source: profile.analyticsSource)
     }
 
     /// Inactive earlier profiles found on this device and (when reachable) in iCloud.
     func discoverRestorableProfiles(cloudSource: CloudProfileRecordSource? = nil) async -> [DiscoveredProfile] {
+        await discoverRestorable(cloudSource: cloudSource).profiles
+    }
+
+    private static let restoreLogger = Logger(subsystem: "com.openclaw.landlordhours", category: "Restore")
+
+    /// Same search, but says when iCloud could not be searched instead of quietly returning
+    /// only what is on this iPhone.
+    func discoverRestorable(cloudSource: CloudProfileRecordSource? = nil) async -> RestoreDiscovery {
         let activeId = UserScope.userId
         let device = ProfileDiscovery.deviceProfiles(defaults: .standard, excluding: activeId)
-        let source: CloudProfileRecordSource = cloudSource ?? syncService
+        var source: CloudProfileRecordSource = cloudSource ?? syncService
+        #if DEBUG
+        if cloudSource == nil, let fake = DebugCloudProfiles.sourceIfRequested() { source = fake }
+        #endif
         let cloud: [DiscoveredProfile]
+        var cloudProblem = false
         do {
             cloud = ProfileDiscovery.cloudProfiles(
                 from: try await source.fetchProfileRecordSummaries(),
                 excluding: activeId
             )
         } catch {
+            Self.restoreLogger.error("Restore search could not reach iCloud: \(String(describing: error), privacy: .public)")
             cloud = []
+            cloudProblem = true
         }
-        return ProfileDiscovery.merge(device: device, cloud: cloud)
+        return RestoreDiscovery(profiles: ProfileDiscovery.merge(device: device, cloud: cloud), cloudProblem: cloudProblem)
+    }
+
+    /// Whether the active profile has finished onboarding. False with no profile.
+    var activeProfileCompletedOnboarding: Bool {
+        guard isSignedIn, UserScope.userId != nil else { return false }
+        return UserDefaults.standard.bool(forKey: UserScope.key("hasCompletedOnboarding"))
     }
 
     /// Call when a new account is created (not for returning sign-in).

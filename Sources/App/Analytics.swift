@@ -270,6 +270,22 @@ enum Analytics {
         capture("profile_created", properties: ["kind": kind.rawValue])
     }
 
+    /// Welcome or the Restore sheet showed earlier records the person can open. Counts and fixed
+    /// kinds only: never an id, an email or a name. `cloudProblem` = iCloud could not be searched.
+    static func restoreOffered(emailCount: Int, localCount: Int, appleCount: Int, cloudProblem: Bool) {
+        capture("restore_offered", properties: [
+            "email_profiles": emailCount,
+            "local_profiles": localCount,
+            "apple_profiles": appleCount,
+            "icloud_problem": cloudProblem
+        ])
+    }
+
+    /// An earlier profile was opened. `kind`: email, local or apple. `source`: device, icloud or both.
+    static func restoreCompleted(kind: String, source: String) {
+        capture("restore_completed", properties: ["kind": kind, "source": source])
+    }
+
     /// We asked iOS to show its rating prompt. iOS decides whether it actually appears.
     static func ratingPromptRequested(trigger: RatingPromptTrigger) {
         capture("rating_prompt_requested", properties: ["trigger": trigger.rawValue])

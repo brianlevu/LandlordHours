@@ -43,7 +43,11 @@ struct ContentView: View {
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @StateObject private var goalManager = GoalManager.shared
     @State private var selectedTab = Self.initialTabFromLaunchArguments()
+    #if DEBUG
+    @State private var showOnboarding = WelcomeStateFixture.forceWelcome
+    #else
     @State private var showOnboarding = false
+    #endif
     @State private var isCustomTabBarHidden = false
     /// WP-L: background work the shell surfaces (look-back reveal, export ready banner).
     @ObservedObject private var houseEvents = TodayHouseEvents.shared

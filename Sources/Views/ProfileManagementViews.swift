@@ -15,6 +15,10 @@ struct ProfileRestoreSheet: View {
 
     let profiles: [DiscoveredProfile]
     let context: Context
+    /// iCloud could not be searched: say so, with a way to try again.
+    var cloudProblem = false
+    var isRetrying = false
+    var onRetry: (() -> Void)?
     let onRestore: (DiscoveredProfile) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -50,15 +54,49 @@ struct ProfileRestoreSheet: View {
 
                 Group {
                     if context == .welcome {
-                        Text("Records from an earlier sign-in on this iPhone. Pick one to open it. Nothing is merged or deleted.")
+                        Text("Records from an earlier sign-in, on this iPhone or in iCloud. Pick one to open it. Nothing is merged or deleted.")
                     } else {
-                        Text("Records from another sign-in on this iPhone. Yours stay put, and you can switch back any time.")
+                        Text("Records from another sign-in, on this iPhone or in iCloud. Yours stay put, and you can switch back any time.")
                     }
                 }
                 .font(.body)
                 .foregroundStyle(colors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
+                if cloudProblem {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Couldn’t reach iCloud. Check you’re signed in to iCloud and try again.")
+                            .font(.body)
+                            .foregroundStyle(colors.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("restore.cloudError")
+                        if let onRetry {
+                            Button(action: onRetry) {
+                                Text(isRetrying ? "Trying again…" : "Try again")
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(AppColors.onAction)
+                                    .padding(.horizontal, 20)
+                                    .frame(minHeight: 44)
+                                    .background(Capsule().fill(colors.action))
+                            }
+                            .buttonStyle(.lhPressable)
+                            .disabled(isRetrying)
+                            .accessibilityIdentifier("restore.tryAgain")
+                        }
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: AppCornerRadius.medium).fill(colors.cautionSurface))
+                }
+
+                if profiles.isEmpty && !cloudProblem {
+                    Text("We didn’t find any earlier records.")
+                        .font(.body)
+                        .foregroundStyle(colors.textSecondary)
+                        .accessibilityIdentifier("restore.empty")
+                }
+
+                if !profiles.isEmpty {
                 VStack(spacing: 0) {
                     ForEach(Array(profiles.enumerated()), id: \.element.id) { index, profile in
                         Button {
@@ -76,6 +114,7 @@ struct ProfileRestoreSheet: View {
                     }
                 }
                 .propertyCard()
+                }
 
                 if profiles.contains(where: \.isICloudOnly) {
                     Text("Photos weren’t saved to iCloud, so profiles restored from iCloud come back without them. Hours, properties and settings come back in full.")

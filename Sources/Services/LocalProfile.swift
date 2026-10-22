@@ -181,8 +181,39 @@ struct DiscoveredProfile: Identifiable, Equatable {
             return ProfileDiscovery.maskedEmail(String(id.dropFirst(ProfileKeys.emailProfilePrefix.count)))
         }
         if let name, !name.isEmpty { return name }
+        if isAppleProfile { return String(localized: "Signed in with Apple") }
         return "Profile without an account"
     }
+
+    /// Apple ids are opaque; anything that is not an email or local profile is one.
+    var isAppleProfile: Bool {
+        !id.hasPrefix(ProfileKeys.emailProfilePrefix) && !id.hasPrefix(ProfileKeys.localProfilePrefix)
+    }
+
+    /// Fixed analytics values, never the id itself.
+    var analyticsKind: String {
+        if id.hasPrefix(ProfileKeys.emailProfilePrefix) { return "email" }
+        if id.hasPrefix(ProfileKeys.localProfilePrefix) { return "local" }
+        return "apple"
+    }
+
+    var analyticsSource: String {
+        if sources.contains(.device) && sources.contains(.iCloud) { return "both" }
+        return sources.contains(.iCloud) ? "icloud" : "device"
+    }
+}
+
+/// What a restore search found, and whether iCloud could be searched at all.
+struct RestoreDiscovery: Equatable {
+    var profiles: [DiscoveredProfile]
+    /// iCloud could not be searched (no account, or the request failed). Device profiles are
+    /// still listed; the sheet says so instead of looking empty.
+    var cloudProblem: Bool
+}
+
+enum ProfileDiscoveryError: Error {
+    /// CloudKit exists but the iPhone has no usable iCloud account right now.
+    case iCloudUnavailable
 }
 
 /// A single CloudKit record reduced to what discovery needs.
@@ -202,11 +233,10 @@ enum ProfileDiscovery {
     static let entriesSuffix = ".LandlordHours.entries"
     static let propertiesSuffix = ".LandlordHours.properties"
 
-    /// Profiles that can be restored: legacy `email-*` profiles plus `local-*`
-    /// profiles left on the device by "Switch profile". Apple IDs come back via
-    /// Sign in with Apple and DEBUG `debug-*` scenarios are never offered.
+    /// Profiles that can be restored: email, local and Apple-id profiles. Only DEBUG
+    /// `debug-*` scenario profiles (and an empty id) are never offered.
     static func isRestorableProfileId(_ id: String) -> Bool {
-        id.hasPrefix(ProfileKeys.emailProfilePrefix) || id.hasPrefix(ProfileKeys.localProfilePrefix)
+        !id.isEmpty && !id.hasPrefix("debug-")
     }
 
     /// Scans `u.<id>.LandlordHours.entries|properties` keys for inactive restorable profiles.

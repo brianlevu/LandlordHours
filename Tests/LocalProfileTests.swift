@@ -258,12 +258,14 @@ final class ProfileDiscoveryTests: XCTestCase {
 
         let found = ProfileDiscovery.deviceProfiles(defaults: defaults, excluding: "email-active@example.com")
 
-        XCTAssertEqual(found.map(\.id), ["email-a@example.com", "email-a@example.com.au"])
-        XCTAssertEqual(found[0].entryCount, 5)
-        XCTAssertEqual(found[0].propertyCount, 2)
-        XCTAssertEqual(found[0].lastEntryDate, Date(timeIntervalSince1970: 1_790_000_000))
-        XCTAssertEqual(found[0].sources, [.device])
-        XCTAssertEqual(found[0].displayLabel, "a•••@example.com")
+        // 2.0.1: Apple-id profiles are offered too; only debug- scenarios, empty and active ones are not.
+        XCTAssertEqual(found.map(\.id), ["apple-001", "email-a@example.com", "email-a@example.com.au"])
+        XCTAssertEqual(found[1].entryCount, 5)
+        XCTAssertEqual(found[1].propertyCount, 2)
+        XCTAssertEqual(found[1].lastEntryDate, Date(timeIntervalSince1970: 1_790_000_000))
+        XCTAssertEqual(found[1].sources, [.device])
+        XCTAssertEqual(found[1].displayLabel, "a•••@example.com")
+        XCTAssertEqual(found[0].displayLabel, "Signed in with Apple")
     }
 
     func testDeviceDiscoveryOffersCorruptProfileRatherThanHidingIt() {
@@ -301,7 +303,7 @@ final class ProfileDiscoveryTests: XCTestCase {
             from: try await source.fetchProfileRecordSummaries(),
             excluding: "local-active"
         )
-        XCTAssertEqual(Set(cloud.map(\.id)), ["email-a@example.com", "email-b@example.com"])
+        XCTAssertEqual(Set(cloud.map(\.id)), ["apple-001", "email-a@example.com", "email-b@example.com"])
         let a = try XCTUnwrap(cloud.first { $0.id == "email-a@example.com" })
         XCTAssertEqual(a.entryCount, 2)
         XCTAssertEqual(a.propertyCount, 1)
@@ -311,7 +313,7 @@ final class ProfileDiscoveryTests: XCTestCase {
         let device = [DiscoveredProfile(id: "email-a@example.com", entryCount: 3, propertyCount: 1,
                                         lastEntryDate: date, sources: [.device], name: nil)]
         let merged = ProfileDiscovery.merge(device: device, cloud: cloud)
-        XCTAssertEqual(merged.count, 2, "Same profile on device and in iCloud appears once")
+        XCTAssertEqual(merged.count, 3, "Same profile on device and in iCloud appears once")
         let mergedA = try XCTUnwrap(merged.first { $0.id == "email-a@example.com" })
         XCTAssertEqual(mergedA.sources, [.device, .iCloud])
         XCTAssertEqual(mergedA.entryCount, 3, "Device counts win")
@@ -735,5 +737,196 @@ final class LocalProfileFlowTests: XCTestCase {
         XCTAssertEqual(viewModel.timeEntries.count, 4)
         XCTAssertTrue(UserDefaults.standard.bool(forKey: "u.\(email).isProUser"), "Pro carried to the restored profile")
         XCTAssertTrue(UserDefaults.standard.bool(forKey: "u.\(apple).isProUser"), "Apple profile keeps Pro")
+    }
+}
+
+// MARK: - 2.0.1 sign-in safety
+
+final class RestorableProfileIdTests: XCTestCase {
+    func testEmailLocalAndAppleIdsAreRestorable() {
+        XCTAssertTrue(ProfileDiscovery.isRestorableProfileId("email-brianlevu@gmail.com"))
+        XCTAssertTrue(ProfileDiscovery.isRestorableProfileId("local-6F1E2D3C-0000-4000-8000-00000000A001"))
+        XCTAssertTrue(ProfileDiscovery.isRestorableProfileId("001234.5f6e7d8c9b0a4c3d8e2f1a0b9c8d7e6f.1234"))
+    }
+
+    func testDebugScenarioAndEmptyIdsAreNeverOffered() {
+        XCTAssertFalse(ProfileDiscovery.isRestorableProfileId("debug-richData"))
+        XCTAssertFalse(ProfileDiscovery.isRestorableProfileId(""))
+    }
+
+    func testAppleProfileLabelsAndAnalyticsKindsCarryNoId() {
+        let apple = DiscoveredProfile(id: "001234.abc.1234", entryCount: 1, propertyCount: 0, lastEntryDate: nil, sources: [.iCloud], name: nil)
+        XCTAssertTrue(apple.isAppleProfile)
+        XCTAssertEqual(apple.displayLabel, "Signed in with Apple")
+        XCTAssertEqual(apple.analyticsKind, "apple")
+        XCTAssertEqual(apple.analyticsSource, "icloud")
+        let email = DiscoveredProfile(id: "email-a@b.com", entryCount: 1, propertyCount: 0, lastEntryDate: nil, sources: [.device, .iCloud], name: nil)
+        XCTAssertEqual(email.analyticsKind, "email")
+        XCTAssertEqual(email.analyticsSource, "both")
+    }
+}
+
+final class WelcomeAccountVisibilityTests: XCTestCase {
+    func testNoProfileOrUnfinishedProfileShowsSignInAndRestore() {
+        XCTAssertEqual(OnbWelcomeAccount.resolve(hasCompletedOnboarding: false), .shown)
+    }
+
+    func testFinishedProfileHidesThem() {
+        XCTAssertEqual(OnbWelcomeAccount.resolve(hasCompletedOnboarding: true), .hidden)
+    }
+}
+
+@MainActor
+final class SignInSafetyTests: XCTestCase {
+    private var authSnapshot: AuthStateSnapshot!
+    private var created: [String] = []
+    private var events: [(String, [String: Any])] = []
+
+    override func setUp() {
+        super.setUp()
+        authSnapshot = AuthStateSnapshot.capture()
+        AuthStateSnapshot.clearAll()
+        created = []
+        events = []
+        Analytics.testSpy = { [weak self] name, props in self?.events.append((name, props)) }
+    }
+
+    override func tearDown() {
+        Analytics.testSpy = nil
+        for id in created {
+            AppViewModel.clearScopedAccountData(for: id)
+            for key in ["LandlordHours.properties", "LandlordHours.entries", "hasCompletedOnboarding"] {
+                UserDefaults.standard.removeObject(forKey: UserScope.key(key, userId: id))
+            }
+        }
+        authSnapshot.restore()
+        super.tearDown()
+    }
+
+    private func makeId(_ prefix: String) -> String {
+        let id = "\(prefix)\(UUID().uuidString.prefix(8))"
+        created.append(id)
+        return id
+    }
+
+    /// Brian's state after 2.0: "Get started" made a local profile that never finished
+    /// onboarding, and his records sit in iCloud under an email profile.
+    private func brianState() -> (viewModel: AppViewModel, active: String, email: String, cloud: FakeCloudSource) {
+        let active = makeId("local-")
+        UserDefaults.standard.set(active, forKey: ProfileKeys.localProfileId)
+        UserDefaults.standard.set(LoginType.local.rawValue, forKey: ProfileKeys.loginType)
+        UserDefaults.standard.removeObject(forKey: UserScope.key("hasCompletedOnboarding", userId: active))
+        let email = "email-brian-\(UUID().uuidString.prefix(6))@example.com"
+        created.append(email)
+        let date = Date(timeIntervalSince1970: 1_790_000_000)
+        let cloud = FakeCloudSource(records: [
+            CloudRecordSummary(appUserId: email, recordType: "TimeEntry", date: date),
+            CloudRecordSummary(appUserId: email, recordType: "Property", date: nil)
+        ])
+        return (AppViewModel(), active, email, cloud)
+    }
+
+    func testBrianStateShowsBothOptionsAndListsTheCloudOnlyEmailProfile() async {
+        let state = brianState()
+        XCTAssertTrue(state.viewModel.isSignedIn, "the half-made local profile counts as signed in")
+        XCTAssertFalse(state.viewModel.activeProfileCompletedOnboarding)
+        XCTAssertEqual(OnbWelcomeAccount.resolve(hasCompletedOnboarding: state.viewModel.activeProfileCompletedOnboarding), .shown)
+
+        let found = await state.viewModel.discoverRestorable(cloudSource: state.cloud)
+        XCTAssertFalse(found.cloudProblem)
+        let email = found.profiles.first { $0.id == state.email }
+        XCTAssertNotNil(email, "the email profile is listed")
+        XCTAssertTrue(email?.isICloudOnly == true)
+        XCTAssertFalse(found.profiles.contains { $0.id == state.active }, "the active profile is not offered")
+    }
+
+    func testFinishedUserDoesNotGetTheButtons() {
+        let state = brianState()
+        UserDefaults.standard.set(true, forKey: UserScope.key("hasCompletedOnboarding", userId: state.active))
+        XCTAssertTrue(state.viewModel.activeProfileCompletedOnboarding)
+        XCTAssertEqual(OnbWelcomeAccount.resolve(hasCompletedOnboarding: state.viewModel.activeProfileCompletedOnboarding), .hidden)
+    }
+
+    func testNoProfileMeansNotCompleted() {
+        XCTAssertFalse(AppViewModel().activeProfileCompletedOnboarding)
+    }
+
+    func testAppleIdProfileOnDeviceIsListedAndRestoresThroughSwitchToProfile() async {
+        let active = makeId("local-")
+        UserDefaults.standard.set(active, forKey: ProfileKeys.localProfileId)
+        let apple = "001234.\(UUID().uuidString.prefix(12)).1234"
+        created.append(apple)
+        seedProfileData(.standard, id: apple, entries: 3, properties: 1)
+        let viewModel = AppViewModel()
+
+        let found = await viewModel.discoverRestorable(cloudSource: FakeCloudSource(records: []))
+        let profile = found.profiles.first { $0.id == apple }
+        XCTAssertNotNil(profile, "Apple-id profiles are offered")
+        XCTAssertEqual(profile?.displayLabel, "Signed in with Apple")
+
+        viewModel.switchToProfile(profile!)
+        XCTAssertEqual(UserScope.userId, apple)
+        XCTAssertEqual(viewModel.timeEntries.count, 3)
+        XCTAssertTrue(viewModel.activeProfileCompletedOnboarding)
+        XCTAssertEqual(events.last?.0, "restore_completed")
+        XCTAssertEqual(events.last?.1["kind"] as? String, "apple")
+        XCTAssertEqual(events.last?.1["source"] as? String, "device")
+    }
+
+    func testICloudOnlyAppleProfileRestoresAsCompletedAndPullsFirst() async {
+        let apple = "001234.\(UUID().uuidString.prefix(12)).5678"
+        created.append(apple)
+        let cloud = FakeCloudSource(records: [CloudRecordSummary(appUserId: apple, recordType: "TimeEntry", date: Date())])
+        let viewModel = AppViewModel()
+        let found = await viewModel.discoverRestorable(cloudSource: cloud)
+        let profile = try! XCTUnwrap(found.profiles.first { $0.id == apple })
+        viewModel.switchToProfile(profile)
+        XCTAssertEqual(UserScope.userId, apple)
+        XCTAssertTrue(UserDefaults.standard.bool(forKey: UserScope.key("cloudkit.migrationDone", userId: apple)))
+        XCTAssertTrue(viewModel.activeProfileCompletedOnboarding)
+    }
+
+    func testDiscoveryErrorIsReportedAndDeviceProfilesStillListed() async {
+        let device = makeId("local-")
+        seedProfileData(.standard, id: device, entries: 1, properties: 1)
+        let viewModel = AppViewModel()
+        struct Offline: Error {}
+        let found = await viewModel.discoverRestorable(cloudSource: FakeCloudSource(records: [], error: Offline()))
+        XCTAssertTrue(found.cloudProblem)
+        XCTAssertTrue(found.profiles.contains { $0.id == device })
+
+        let noAccount = await viewModel.discoverRestorable(cloudSource: FakeCloudSource(records: [], error: ProfileDiscoveryError.iCloudUnavailable))
+        XCTAssertTrue(noAccount.cloudProblem, "no iCloud account is a problem too, not 'nothing found'")
+
+        let ok = await viewModel.discoverRestorable(cloudSource: FakeCloudSource(records: []))
+        XCTAssertFalse(ok.cloudProblem)
+    }
+
+    func testRestoreEventsCarryOnlyCountsAndFixedValues() {
+        Analytics.restoreOffered(emailCount: 1, localCount: 0, appleCount: 1, cloudProblem: false)
+        Analytics.restoreCompleted(kind: "email", source: "icloud")
+        XCTAssertEqual(events.map(\.0), ["restore_offered", "restore_completed"])
+        let offered = events[0].1
+        XCTAssertEqual(offered["email_profiles"] as? Int, 1)
+        XCTAssertEqual(offered["apple_profiles"] as? Int, 1)
+        XCTAssertEqual(offered["icloud_problem"] as? Bool, false)
+        for (_, props) in events {
+            for value in props.values {
+                if let text = value as? String {
+                    XCTAssertFalse(text.contains("@"), "no email in analytics")
+                    XCTAssertTrue(["email", "local", "apple", "device", "icloud", "both"].contains(text))
+                }
+            }
+        }
+    }
+
+    func testRestoreCompletedFiresOnceForAnEmailProfileFromICloud() async {
+        let state = brianState()
+        let found = await state.viewModel.discoverRestorable(cloudSource: state.cloud)
+        state.viewModel.switchToProfile(found.profiles.first { $0.id == state.email }!)
+        let completed = events.filter { $0.0 == "restore_completed" }
+        XCTAssertEqual(completed.count, 1)
+        XCTAssertEqual(completed.first?.1["kind"] as? String, "email")
+        XCTAssertEqual(completed.first?.1["source"] as? String, "icloud")
     }
 }

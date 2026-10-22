@@ -87,6 +87,7 @@ extension AppViewModel {
             LegacyProfileFixture.resetAllRestorableProfiles()
         }
         TimerDraftFixture.seedIfRequested()
+        WelcomeStateFixture.seedIfRequested()
         guard let mode = LegacyProfileFixture.requestedMode else { return }
         LegacyProfileFixture.seed(mode)
     }
@@ -149,6 +150,80 @@ enum TimerDraftFixture {
         defaults.set(try? JSONEncoder().encode(properties), forKey: UserScope.key("LandlordHours.properties", userId: profileId))
         defaults.set(try? JSONEncoder().encode([TimeEntry]()), forKey: UserScope.key("LandlordHours.entries", userId: profileId))
         defaults.set(try? JSONEncoder().encode(drafts), forKey: UserScope.key("LandlordHours.staleTimerRecoveries", userId: profileId))
+    }
+}
+
+/// DEBUG-only: `-LHSeedWelcomeState deadEnd|completed` seeds an active local profile.
+/// - deadEnd: Brian's state after 2.0: "Get started" made a profile, onboarding never finished.
+/// - completed: a profile that finished onboarding (pair with `-LHForceWelcome` to see Welcome).
+enum WelcomeStateFixture {
+    static let profileId = "local-welcome-fixture"
+
+    @MainActor
+    static func seedIfRequested(defaults: UserDefaults = .standard) {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "-LHSeedWelcomeState"), args.indices.contains(index + 1) else { return }
+        let state = args[index + 1]
+        for key in ProfileKeys.signOutKeys + [ProfileKeys.previousProfileId] {
+            defaults.removeObject(forKey: key)
+        }
+        AppViewModel.clearScopedAccountData(for: profileId)
+        defaults.set(profileId, forKey: ProfileKeys.localProfileId)
+        defaults.set(LoginType.local.rawValue, forKey: ProfileKeys.loginType)
+        let onboardingKey = UserScope.key("hasCompletedOnboarding", userId: profileId)
+        if state == "completed" {
+            defaults.set(true, forKey: onboardingKey)
+            defaults.set(true, forKey: UserScope.key("legacyDataMigrated", userId: profileId))
+            defaults.set(true, forKey: UserScope.key(GuidedOnboardingStore.completedKey, userId: profileId))
+        } else {
+            defaults.removeObject(forKey: onboardingKey)
+        }
+    }
+
+    static var forceWelcome: Bool { ProcessInfo.processInfo.arguments.contains("-LHForceWelcome") }
+}
+
+/// DEBUG-only: `-LHFakeCloudProfiles brian|error|errorOnce|empty` replaces the iCloud search.
+/// brian = an email profile and an Apple profile that exist only in iCloud; error = iCloud can't be
+/// reached; errorOnce = the first search fails, the retry finds them.
+@MainActor
+enum DebugCloudProfiles {
+    private static var searches = 0
+
+    static func sourceIfRequested() -> CloudProfileRecordSource? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "-LHFakeCloudProfiles"), args.indices.contains(index + 1) else { return nil }
+        searches += 1
+        switch args[index + 1] {
+        case "error": return Fake(fail: true, records: [])
+        case "errorOnce": return Fake(fail: searches == 1, records: brian)
+        case "empty": return Fake(fail: false, records: [])
+        default: return Fake(fail: false, records: brian)
+        }
+    }
+
+    private static var brian: [CloudRecordSummary] {
+        let now = Date()
+        func entries(_ owner: String, _ count: Int) -> [CloudRecordSummary] {
+            (0..<count).map { CloudRecordSummary(appUserId: owner, recordType: "TimeEntry", date: now.addingTimeInterval(-86_400 * Double($0 + 2))) }
+        }
+        let email = "email-brianlevu@gmail.com"
+        let apple = "001234.5f6e7d8c9b0a4c3d8e2f1a0b9c8d7e6f.1234"
+        return entries(email, 14) + entries(apple, 3)
+            + [CloudRecordSummary(appUserId: email, recordType: "Property", date: nil),
+               CloudRecordSummary(appUserId: email, recordType: "Property", date: nil),
+               CloudRecordSummary(appUserId: apple, recordType: "Property", date: nil)]
+    }
+
+    @MainActor private final class Fake: CloudProfileRecordSource {
+        struct Unreachable: Error {}
+        let fail: Bool
+        let records: [CloudRecordSummary]
+        init(fail: Bool, records: [CloudRecordSummary]) { self.fail = fail; self.records = records }
+        func fetchProfileRecordSummaries() async throws -> [CloudRecordSummary] {
+            if fail { throw Unreachable() }
+            return records
+        }
     }
 }
 

@@ -43,6 +43,56 @@ final class OnboardingUITests: XCTestCase {
         return (element.value as? String) == value
     }
 
+    // MARK: Sign in and Restore on Welcome (2.0.1)
+
+    /// Brian's state: "Get started" made a profile, onboarding never finished, his records are
+    /// in iCloud under an email profile. Welcome must still offer both ways back.
+    func testUnfinishedProfileStillSeesSignInAndRestore() {
+        launchFresh(["-LHSeedWelcomeState", "deadEnd", "-LHFakeCloudProfiles", "brian"])
+        XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 20), "Welcome")
+        XCTAssertTrue(app.buttons["welcome.signInWithApple"].waitForExistence(timeout: 10), "Sign in with Apple")
+        let restore = app.buttons["welcome.restoreEarlierData"]
+        XCTAssertTrue(restore.waitForExistence(timeout: 10), "Restore earlier data")
+        restore.tap()
+        XCTAssertTrue(app.buttons["restore.profile.email-brianlevu@gmail.com"].waitForExistence(timeout: 10), "email profile listed")
+        let apple = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "restore.profile.001234.")).firstMatch
+        XCTAssertTrue(apple.exists, "Apple profile listed")
+        app.buttons["restore.profile.email-brianlevu@gmail.com"].tap()
+        // Restoring opens the app on Today, not back on Welcome.
+        XCTAssertTrue(app.descendants(matching: .any)["today.header.title"].firstMatch.waitForExistence(timeout: 20), "Restore opens Today")
+        XCTAssertFalse(app.buttons["onb-start"].exists, "Restore leaves Welcome")
+    }
+
+    func testFinishedProfileDoesNotSeeSignInOrRestore() {
+        launchFresh(["-LHSeedWelcomeState", "completed", "-LHForceWelcome", "-LHFakeCloudProfiles", "brian"])
+        XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 20), "Welcome")
+        Thread.sleep(forTimeInterval: 2)
+        XCTAssertFalse(app.buttons["welcome.signInWithApple"].exists)
+        XCTAssertFalse(app.buttons["welcome.restoreEarlierData"].exists)
+    }
+
+    func testFreshInstallSeesSignInAndRestoreOnlyWhenThereIsSomethingToRestore() {
+        launchFresh(["-LHFakeCloudProfiles", "empty"])
+        XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["welcome.signInWithApple"].waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 2)
+        XCTAssertFalse(app.buttons["welcome.restoreEarlierData"].exists)
+    }
+
+    /// iCloud can't be searched: Restore stays visible, says so plainly, and Try again works.
+    func testRestoreShowsPlainErrorAndTryAgainFindsTheRecords() {
+        launchFresh(["-LHSeedWelcomeState", "deadEnd", "-LHFakeCloudProfiles", "errorOnce"])
+        let restore = app.buttons["welcome.restoreEarlierData"]
+        XCTAssertTrue(restore.waitForExistence(timeout: 20), "Restore stays visible when iCloud can't be searched")
+        restore.tap()
+        let message = app.staticTexts["restore.cloudError"]
+        XCTAssertTrue(message.waitForExistence(timeout: 10))
+        XCTAssertTrue(message.label.contains("Couldn’t reach iCloud"), message.label)
+        tap(app.buttons["restore.tryAgain"])
+        XCTAssertTrue(app.buttons["restore.profile.email-brianlevu@gmail.com"].waitForExistence(timeout: 10), "retry lists the records")
+        XCTAssertFalse(app.staticTexts["restore.cloudError"].exists)
+    }
+
     // MARK: One tap on Welcome
 
     /// Regression (fix/onb-start): making the profile flipped isSignedIn before showOnboarding,
@@ -314,5 +364,78 @@ final class OnboardingUITests: XCTestCase {
         tap(app.buttons["tab.today"])
         XCTAssertFalse(app.staticTexts["today.hero.found"].waitForExistence(timeout: 3), "Today shows no found hours either")
         XCTAssertFalse(app.buttons["backfill-review"].exists, "No reveal for work that never counts")
+    }
+}
+
+/// 2.0.1 sign-in safety frames for the visual gate (`TEST_RUNNER_LH_CAPTURE_DIR=<dir>`): Welcome in
+/// three states and the Restore sheet with records and with the iCloud error, light and dark, at
+/// the default size and AX3.
+final class SignInSafetyCaptureUITests: XCTestCase {
+    private var app: XCUIApplication!
+
+    override func setUp() {
+        super.setUp()
+        UITestIsolation.resetStoreKit()
+        continueAfterFailure = false
+        app = XCUIApplication()
+    }
+
+    func testCaptureLightDefault() { captureAll(scheme: "light", size: nil) }
+    func testCaptureDarkDefault() { captureAll(scheme: "dark", size: nil) }
+    func testCaptureLightAX3() { captureAll(scheme: "light", size: "ax3") }
+    func testCaptureDarkAX3() { captureAll(scheme: "dark", size: "ax3") }
+
+    private func launch(_ extra: [String], scheme: String, size: String?) {
+        app.terminate()
+        var args = [UITestIsolation.resetProfilesArgument, "-LHColorScheme", scheme,
+                    "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        if size == "ax3" { args += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL"] }
+        app.launchArguments = args + extra
+        app.launch()
+    }
+
+    private func captureAll(scheme: String, size: String?) {
+        let suffix = scheme + (size.map { "-\($0)" } ?? "")
+
+        launch(["-LHFakeCloudProfiles", "empty"], scheme: scheme, size: size)
+        XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["welcome.signInWithApple"].waitForExistence(timeout: 10))
+        shoot("welcome-fresh-\(suffix)")
+
+        launch(["-LHSeedWelcomeState", "deadEnd", "-LHFakeCloudProfiles", "brian"], scheme: scheme, size: size)
+        XCTAssertTrue(app.buttons["welcome.restoreEarlierData"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["welcome.signInWithApple"].exists)
+        shoot("welcome-deadend-fixed-\(suffix)")
+        app.buttons["welcome.restoreEarlierData"].tap()
+        XCTAssertTrue(app.buttons["restore.profile.email-brianlevu@gmail.com"].waitForExistence(timeout: 10))
+        shoot("restore-email-and-apple-\(suffix)")
+        if size == "ax3" {
+            app.swipeUp()
+            shoot("restore-email-and-apple-scrolled-\(suffix)")
+        }
+
+        launch(["-LHSeedWelcomeState", "deadEnd", "-LHFakeCloudProfiles", "error"], scheme: scheme, size: size)
+        XCTAssertTrue(app.buttons["welcome.restoreEarlierData"].waitForExistence(timeout: 20))
+        app.buttons["welcome.restoreEarlierData"].tap()
+        XCTAssertTrue(app.staticTexts["restore.cloudError"].waitForExistence(timeout: 10))
+        shoot("restore-icloud-error-\(suffix)")
+
+        launch(["-LHSeedWelcomeState", "completed", "-LHForceWelcome", "-LHFakeCloudProfiles", "brian"], scheme: scheme, size: size)
+        XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 20))
+        Thread.sleep(forTimeInterval: 2)
+        XCTAssertFalse(app.buttons["welcome.signInWithApple"].exists)
+        shoot("welcome-completed-\(suffix)")
+    }
+
+    private func shoot(_ name: String) {
+        Thread.sleep(forTimeInterval: 1.2)
+        let screenshot = XCUIScreen.main.screenshot()
+        let shot = XCTAttachment(screenshot: screenshot)
+        shot.name = name
+        shot.lifetime = .keepAlways
+        add(shot)
+        if let dir = ProcessInfo.processInfo.environment["LH_CAPTURE_DIR"], !dir.isEmpty {
+            try? screenshot.pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).png"))
+        }
     }
 }
