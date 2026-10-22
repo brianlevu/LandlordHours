@@ -60,7 +60,7 @@ struct LogTimeProtoSheet: View {
     @ScaledMetric(relativeTo: .body) private var chevronSize: CGFloat = 16
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
 
-    private var isLarge: Bool { model.f.unfolded || model.zeroMode || model.listening || model.micIntro || type.isAccessibilitySize }
+    private var isLarge: Bool { model.zeroMode || type.isAccessibilitySize }
     /// New content slides in out of the line above it; old content leaves at once, so two layouts never overlap.
     private var enter: AnyTransition { .asymmetric(insertion: reduceMotion ? .opacity : .opacity.combined(with: .offset(y: -14)), removal: .identity) }
     private var unfoldTransition: AnyTransition { enter }
@@ -73,9 +73,9 @@ struct LogTimeProtoSheet: View {
             ZStack(alignment: .bottom) {
                 Color.black.opacity(model.presented ? (scheme == .dark ? 0.5 : 0.28) : 0).ignoresSafeArea()
                 panel
-                    .frame(height: isLarge ? geo.size.height - 6 : min(geo.size.height, UIScreen.main.bounds.height * 0.56))
+                    .frame(height: isLarge ? geo.size.height - 6 : min(geo.size.height, UIScreen.main.bounds.height * 0.70))
                     .offset(y: model.presented ? 0 : geo.size.height + 80)
-                if !model.presented {
+                if !model.presented && model.landed {
                     VStack(spacing: 12) {
                         if let toast = model.toast { toastView(type.isAccessibilitySize ? toast.short : toast.text).transition(.asymmetric(insertion: reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 16)), removal: .opacity)) }
                         HStack { Spacer(); fab }.padding(.horizontal, 20)
@@ -583,18 +583,24 @@ struct LogTimeProtoSheet: View {
     // MARK: the Log bar: one filled button that names what it will do
 
     private var logBar: some View {
-        Button { model.primary() } label: {
-            Text(verbatim: model.barText)
-                .contentTransition(reduceMotion ? .identity : .numericText())
-                .font(.system(.headline)).foregroundStyle(colors.onAction)
-                .lineLimit(3).fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.center)
-                .padding(.horizontal, 20).padding(.vertical, 8)
-                .frame(maxWidth: .infinity, minHeight: 56)
-                .background(Capsule().fill(colors.action))
-                .contentShape(Capsule())
+        let label = model.barText(ax: type.isAccessibilitySize)
+        return Button { model.primary() } label: {
+            ZStack {
+                // Only the words change: old label leaves up, new one arrives from below, a quick crossfade (no glyph morph).
+                Text(verbatim: label)
+                    .id(label)
+                    .transition(reduceMotion ? .opacity : .asymmetric(insertion: .opacity.combined(with: .offset(y: 8)), removal: .opacity.combined(with: .offset(y: -8))))
+            }
+            .font(.system(.headline)).foregroundStyle(colors.onAction)
+            .lineLimit(3).fixedSize(horizontal: false, vertical: true).multilineTextAlignment(.center)
+            .padding(.horizontal, 20).padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .background(Capsule().fill(colors.action))
+            .clipShape(Capsule())
+            .contentShape(Capsule())
         }
         .buttonStyle(.lhPressable)
-        .animation(.easeOut(duration: 0.12), value: model.barText)
+        .animation(.easeOut(duration: 0.14), value: label)
         .padding(.horizontal, 20).padding(.top, 10).padding(.bottom, 10)
         .background(colors.background.overlay(alignment: .top) { Rectangle().fill(colors.sheetStroke).frame(height: 1) })
     }

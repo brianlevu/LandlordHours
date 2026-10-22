@@ -115,6 +115,8 @@ final class ProtoModel: ObservableObject {
     @Published var listening = false
     @Published var exiting = false
     @Published var presented = true
+    /// The sheet has left: the toast and the Log time button may arrive.
+    @Published var landed = false
     var instant = false
     @Published var micIntro = false
     /// Timer review: the run that filled the hours.
@@ -159,7 +161,7 @@ final class ProtoModel: ObservableObject {
         return pl("\(dateWord), \(md)")
     }
     /// What the button says it will do: hours and rental, plus the day when it isn't today.
-    var barText: String {
+    func barText(ax: Bool = false) -> String {
         switch gap {
         case .name?: return pl("Name your rental")
         case .rental?: return pl("Pick a rental")
@@ -169,7 +171,7 @@ final class ProtoModel: ObservableObject {
             // Non-breaking inside each phrase: a wrapped label breaks before "at", never inside "Pine Cabin".
             func nb(_ s: String) -> String { s.replacingOccurrences(of: " ", with: "\u{00A0}") }
             var t = zeroMode ? pl("Add \(name) and log \(hoursLabel)") : nb(pl("Log \(hoursLabel)")) + " " + nb(pl("at \(name)"))
-            if !isToday { t += "\u{00A0}· " + dateWord }
+            if !isToday { t += ax ? " " + dateWord : "\u{00A0}· " + dateWord }   // AX: no separator to strand at a line end
             return t
         }
     }
@@ -402,13 +404,14 @@ final class ProtoModel: ObservableObject {
         readTask?.cancel(); modelTask?.cancel()
         Task { [weak self] in
             guard let self else { return }
-            // 1. what is on the sheet fades out; 2. the sheet leaves while the toast arrives on the screen below; 3. reset off screen.
+            // The row fade and the sheet's drop start together (ease-in, so the rows are gone before the sheet moves far):
+            // no empty beat. The toast arrives only after the sheet and scrim have cleared.
             withAnimation(.easeIn(duration: 0.13)) { self.exiting = true }
-            try? await Task.sleep(nanoseconds: 140_000_000)
-            withAnimation(self.reduceMotionNow ? .easeOut(duration: 0.2) : .easeIn(duration: 0.25)) { self.presented = false }
-            try? await Task.sleep(nanoseconds: 150_000_000)   // the toast arrives once the sheet has mostly left
+            withAnimation(self.reduceMotionNow ? .easeOut(duration: 0.2) : .easeIn(duration: 0.26)) { self.presented = false }
+            try? await Task.sleep(nanoseconds: 280_000_000)
+            withAnimation(.easeOut(duration: 0.2)) { self.landed = true }
             self.showToast(text, short)
-            try? await Task.sleep(nanoseconds: 160_000_000)
+            try? await Task.sleep(nanoseconds: 30_000_000)
             var t = Transaction(); t.disablesAnimations = true
             withTransaction(t) {
                 self.f = ProtoForm(); self.fillSource = nil; self.readingModel = false; self.noneFound = false
@@ -421,7 +424,7 @@ final class ProtoModel: ObservableObject {
 
     func reopen() {
         withAnimation(.easeOut(duration: 0.13)) { toast = nil }
-        withAnimation(.easeOut(duration: 0.28)) { presented = true }
+        withAnimation(.easeOut(duration: 0.28)) { presented = true; landed = false }
     }
 
     func showToast(_ text: String, _ short: String) {
@@ -439,7 +442,7 @@ final class ProtoModel: ObservableObject {
     func undoLog() {
         withAnimation(.easeIn(duration: 0.13)) { toast = nil }
         if let l = lastLogged { f = l }
-        withAnimation(.easeOut(duration: 0.28)) { presented = true }
+        withAnimation(.easeOut(duration: 0.28)) { presented = true; landed = false }
     }
 
     // MARK: presets (captures) and the script (video)
@@ -466,7 +469,7 @@ final class ProtoModel: ObservableObject {
             f.hours = 4440.0 / 3600.0; f.hoursIsDefault = false; f.unfolded = true; timerRan = hoursText(4440.0 / 3600.0)
         case "zero": zeroMode = true; f.category = .repairs
         case "zeroNamed": zeroMode = true; rentalName = "Pine Cabin"; f.note = "fixed the sink, 1 hour"; readRules()
-        case "toast": presented = false; showToast(pl("Logged \(hoursText(2)) · \(Int(ProtoData.hoursSoFar + 2)) of \(ProtoData.goal) hours"), pl("Logged \(hoursText(2)) · \(Int(ProtoData.hoursSoFar + 2)) of \(ProtoData.goal)"))
+        case "toast": presented = false; landed = true; showToast(pl("Logged \(hoursText(2)) · \(Int(ProtoData.hoursSoFar + 2)) of \(ProtoData.goal) hours"), pl("Logged \(hoursText(2)) · \(Int(ProtoData.hoursSoFar + 2)) of \(ProtoData.goal)"))
         default: break
         }
     }
