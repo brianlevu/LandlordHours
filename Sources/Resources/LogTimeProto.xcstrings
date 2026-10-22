@@ -309,13 +309,13 @@
         }
       }
     },
-    "Log %@ at %@": {
+    "Log %@": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Log %@ at %@"
+            "value": "Log %@"
           }
         }
       }
@@ -349,6 +349,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Log your first hour"
+          }
+        }
+      }
+    },
+    "Logged %@ · %@ of %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logged %@ · %@ of %@"
           }
         }
       }
@@ -811,6 +822,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Your note mentions 2 rentals. Log each one on its own."
+          }
+        }
+      }
+    },
+    "at %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "at %@"
           }
         }
       }

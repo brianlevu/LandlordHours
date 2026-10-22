@@ -109,7 +109,7 @@ final class ProtoModel: ObservableObject {
     @Published var mentioned: [RentalProperty] = []
     /// Rows the model changed after the user had seen them: field → value before.
     @Published var updated: [PField: ProtoForm] = [:]
-    @Published var toast: (text: String, id: Int)?
+    @Published var toast: (text: String, short: String, id: Int)?
     @Published var wantsFocus = false
     @Published var pendingTotal = ProtoData.hoursSoFar
     @Published var listening = false
@@ -163,8 +163,10 @@ final class ProtoModel: ObservableObject {
         case .kind?: return pl("Pick the kind of work")
         case nil:
             let name = propertyName ?? ""
-            var t = zeroMode ? pl("Add \(name) and log \(hoursLabel)") : pl("Log \(hoursLabel) at \(name)")
-            if !isToday { t += "\u{00A0}· " + dateWord }
+            // Non-breaking inside each phrase: a wrapped label breaks before "at", never inside "Pine Cabin".
+            func nb(_ s: String) -> String { s.replacingOccurrences(of: " ", with: "\u{00A0}") }
+            var t = zeroMode ? pl("Add \(name) and log \(hoursLabel)") : nb(pl("Log \(hoursLabel)")) + " " + nb(pl("at \(name)"))
+            if !isToday { t += " ·\u{00A0}" + dateWord }
             return t
         }
     }
@@ -185,6 +187,8 @@ final class ProtoModel: ObservableObject {
     }
 
     // MARK: animation helper
+
+    var reduceMotionNow: Bool { UIAccessibility.isReduceMotionEnabled }
 
     func anim(_ body: () -> Void) {
         if UIAccessibility.isReduceMotionEnabled { withAnimation(.easeOut(duration: 0.2), body) }
@@ -373,6 +377,7 @@ final class ProtoModel: ObservableObject {
 
     func log() {
         let text = pl("Logged \(hoursText(f.hours)) · \(Int(ProtoData.hoursSoFar + f.hours)) of \(ProtoData.goal) hours")
+        let short = pl("Logged \(hoursText(f.hours)) · \(Int(ProtoData.hoursSoFar + f.hours)) of \(ProtoData.goal)")
         lastLogged = f
         if !UIAccessibility.isReduceMotionEnabled { UINotificationFeedbackGenerator().notificationOccurred(.success) }
         readTask?.cancel(); modelTask?.cancel()
@@ -383,13 +388,13 @@ final class ProtoModel: ObservableObject {
             _ = keepZero
         }
         before = nil
-        showToast(text)
+        showToast(text, short)
     }
 
-    func showToast(_ text: String) {
+    func showToast(_ text: String, _ short: String) {
         toastCounter += 1
         let id = toastCounter
-        withAnimation(.easeOut(duration: 0.22)) { toast = (text, id) }
+        withAnimation(reduceMotionNow ? .easeOut(duration: 0.2) : .spring(response: 0.3, dampingFraction: 1.0)) { toast = (text, short, id) }
         guard !hold else { return }
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 4_000_000_000)
@@ -427,7 +432,7 @@ final class ProtoModel: ObservableObject {
             f.hours = 4440.0 / 3600.0; f.hoursIsDefault = false; f.unfolded = true; timerRan = hoursText(4440.0 / 3600.0)
         case "zero": zeroMode = true; f.category = .repairs
         case "zeroNamed": zeroMode = true; rentalName = "Pine Cabin"; f.note = "fixed the sink, 1 hour"; readRules()
-        case "toast": showToast(pl("Logged \(hoursText(2)) · \(Int(ProtoData.hoursSoFar + 2)) of \(ProtoData.goal) hours"))
+        case "toast": showToast(pl("Logged \(hoursText(2)) · \(Int(ProtoData.hoursSoFar + 2)) of \(ProtoData.goal) hours"), pl("Logged \(hoursText(2)) · \(Int(ProtoData.hoursSoFar + 2)) of \(ProtoData.goal)"))
         default: break
         }
     }
@@ -436,7 +441,7 @@ final class ProtoModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             try? await Task.sleep(nanoseconds: 1_200_000_000)
-            self.wantsFocus = true
+            if LogTimeProtoLaunch.value("-LHProtoFocus") == "1" { self.wantsFocus = true }
             try? await Task.sleep(nanoseconds: 700_000_000)
             for ch in self.scenario.note {
                 self.setNote(self.f.note + String(ch))

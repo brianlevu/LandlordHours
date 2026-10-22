@@ -21,6 +21,12 @@ struct LogTimeProtoRoot: View {
         LogTimeProtoSheet(model: model)
             .preferredColorScheme(AppearanceManager.forcedColorSchemeFromLaunchArguments ?? .dark)
             .onAppear {
+                // -LHProtoSlow 0.15: run every animation at 15% speed so a screen recording can be read frame by frame.
+                if let s = LogTimeProtoLaunch.value("-LHProtoSlow").flatMap(Float.init) {
+                    DispatchQueue.main.async {
+                        for scene in UIApplication.shared.connectedScenes { (scene as? UIWindowScene)?.windows.forEach { $0.layer.speed = s } }
+                    }
+                }
                 if let state = LogTimeProtoLaunch.value("-LHProtoState") { model.preset(state) }
                 if LogTimeProtoLaunch.value("-LHProtoScript") != nil { model.runScript() }
                 if LogTimeProtoLaunch.value("-LHProtoFocus") == "1" { model.wantsFocus = true }
@@ -32,8 +38,8 @@ struct LogTimeProtoRoot: View {
 
 extension AdaptiveColors {
     /// Dark cards lifted off the canvas (was 1.25:1): #1A2350 plus a 1px white 8% stroke. Light cards keep the brand white.
-    var sheetCard: Color { colorScheme == .dark ? Color(hex: "1A2350") : backgroundSecondary }
-    var sheetStroke: Color { colorScheme == .dark ? Color.white.opacity(0.08) : border }
+    var sheetCard: Color { colorScheme == .dark ? Color(hex: "283360") : backgroundSecondary }
+    var sheetStroke: Color { colorScheme == .dark ? Color.white.opacity(0.10) : border }
 }
 
 /// Blur + fade in place; the outgoing view leaves at once so two lines never overlap.
@@ -54,8 +60,12 @@ struct LogTimeProtoSheet: View {
     @ScaledMetric(relativeTo: .body) private var chevronSize: CGFloat = 16
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
 
-    private var isLarge: Bool { model.f.unfolded || model.zeroMode || model.listening || model.micIntro || type.isAccessibilitySize }
-    private var unfoldTransition: AnyTransition { reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98, anchor: .top)) }
+    private var isLarge: Bool { model.f.unfolded || model.zeroMode || model.listening || model.micIntro || model.toast != nil || type.isAccessibilitySize }
+    /// New content slides in out of the line above it; old content leaves at once, so two layouts never overlap.
+    private var enter: AnyTransition { .asymmetric(insertion: reduceMotion ? .opacity : .opacity.combined(with: .offset(y: -14)), removal: .identity) }
+    private var unfoldTransition: AnyTransition { enter }
+    /// Changed text: the new words blur in, the old words leave at once, so two strings are never on screen together.
+    private var textSwap: AnyTransition { reduceMotion ? .asymmetric(insertion: .opacity, removal: .identity) : .asymmetric(insertion: .modifier(active: BlurFade(on: true), identity: BlurFade(on: false)), removal: .identity) }
     private var sheetAnim: Animation { reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.3, dampingFraction: 1.0) }
 
     var body: some View {
@@ -65,8 +75,6 @@ struct LogTimeProtoSheet: View {
                 Color.black.opacity(scheme == .dark ? 0.5 : 0.28).ignoresSafeArea()
                 panel
                     .frame(height: isLarge ? geo.size.height - 6 : min(geo.size.height, UIScreen.main.bounds.height * 0.56))
-                    .animation(sheetAnim, value: isLarge)
-                if let toast = model.toast { toastView(toast.text).padding(.bottom, type.isAccessibilitySize ? 190 : 96).transition(.move(edge: .bottom).combined(with: .opacity)) }
             }
         }
         .onChange(of: model.wantsFocus) { _, want in if model.zeroMode && want { nameFocused = true } else { noteFocused = want } }
@@ -83,12 +91,19 @@ struct LogTimeProtoSheet: View {
                         .padding(.horizontal, 20).padding(.top, 6).padding(.bottom, 20)
                 }
                 .scrollDismissesKeyboard(.interactively)
+                .mask(alignment: .top) {
+                    VStack(spacing: 0) {
+                        Color.black
+                        LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 24)
+                    }
+                }
                 .onAppear {
                     if LogTimeProtoLaunch.value("-LHProtoScroll") == "1" {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { proxy.scrollTo("rows", anchor: .top) }
                     }
                 }
             }
+            if let toast = model.toast { toastView(type.isAccessibilitySize ? toast.short : toast.text).transition(.asymmetric(insertion: reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 12)), removal: .opacity)) }
             logBar
         }
         .background(
@@ -105,14 +120,14 @@ struct LogTimeProtoSheet: View {
             if model.zeroMode { rentalNameField }
             noteField
             toolsRow
-            if model.micIntro { micIntroCard.transition(.opacity) }
+            if model.micIntro { micIntroCard.transition(enter) }
             if model.f.unfolded {
-                rows.id("rows").transition(unfoldTransition)
-                if model.hoursQuestionable { hoursFootnote.transition(.opacity) }
-                if model.f.manual { autoFillOff.transition(.opacity) }
+                rows.id("rows").transition(enter)
+                if model.hoursQuestionable { hoursFootnote.transition(enter) }
+                if model.f.manual { autoFillOff.transition(enter) }
             } else if !model.micIntro {
-                detailsLine.transition(.opacity)
-                enterDetails.transition(.opacity)
+                detailsLine.transition(.identity)
+                enterDetails.transition(.identity)
             }
         }
     }
@@ -126,11 +141,14 @@ struct LogTimeProtoSheet: View {
             Text(model.eyebrow)
                 .font(.system(.caption2, design: .monospaced).weight(.medium)).tracking(1.3)
                 .foregroundStyle(colors.draftingInk)
+                .id(model.eyebrow)
+                .transition(textSwap)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: model.eyebrow)
             HStack(alignment: .center) {
                 Text(title).font(.system(.title).weight(.bold)).foregroundStyle(colors.textPrimary)
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 8)
-                if !model.f.unfolded && !model.zeroMode { timerPill }
+                if !model.f.unfolded && !model.zeroMode { timerPill.transition(.asymmetric(insertion: .opacity, removal: .identity)) }
                 closeButton
             }
         }
@@ -201,7 +219,7 @@ struct LogTimeProtoSheet: View {
     private var toolsRow: some View {
         HStack(alignment: .top, spacing: 12) {
             Group {
-                if model.f.unfolded || model.listening { captionBlock } else { recents }
+                if model.f.unfolded || model.listening { captionBlock.transition(enter) } else { recents.transition(.identity) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             micButton
@@ -224,18 +242,22 @@ struct LogTimeProtoSheet: View {
 
     @ViewBuilder private var captionBlock: some View {
         if let text = model.caption {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                if model.readingModel { ReadingLine().alignmentGuide(.firstTextBaseline) { $0[.bottom] - 4 } }
-                else if model.fillSource != nil && !model.noneFound && !model.listening { Sparkle() }
-                Text(text)
-                    .font(.system(.footnote).weight(.medium))
-                    .foregroundStyle(model.noneFound ? colors.cautionText : colors.textSecondary)
-                    .id(text)
-                    .transition(reduceMotion ? .opacity : .asymmetric(insertion: .modifier(active: BlurFade(on: true), identity: BlurFade(on: false)), removal: .identity))
+            let ax = type.isAccessibilitySize
+            let stack = ax ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
+            stack {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    if model.readingModel { ReadingLine().alignmentGuide(.firstTextBaseline) { $0[.bottom] - 4 } }
+                    else if model.fillSource != nil && !model.noneFound && !model.listening { Sparkle() }
+                    Text(text)
+                        .font(.system(.footnote).weight(.medium))
+                        .foregroundStyle(model.noneFound ? colors.cautionText : colors.textSecondary)
+                        .id(text)
+                        .transition(reduceMotion ? .opacity : .asymmetric(insertion: .modifier(active: BlurFade(on: true), identity: BlurFade(on: false)), removal: .identity))
+                }
                 if model.fillSource != nil && !model.readingModel && !model.listening {
                     Button { model.undoFill() } label: {
                         PT("Undo").font(.system(.footnote).weight(.semibold)).foregroundStyle(colors.actionText)
-                            .padding(.horizontal, 8).frame(minHeight: 44)
+                            .padding(.horizontal, ax ? 0 : 8).frame(minHeight: 44)
                     }
                     .buttonStyle(.lhPressable).accessibilityLabel(pl("Undo the fill"))
                 }
@@ -279,8 +301,17 @@ struct LogTimeProtoSheet: View {
 
     // MARK: initial: one quiet details line + a quiet text button
 
+    /// The quiet details line; the rows slide out of it. (matchedGeometryEffect on the values was tried and dropped: it keeps both layouts on screen during the move.)
     private var detailsLine: some View {
-        Text(model.initialLine).font(.system(.footnote)).foregroundStyle(colors.textSecondary).fixedSize(horizontal: false, vertical: true)
+        let pieces = model.initialPieces
+        return FlowLayout(spacing: 4) {
+            ForEach(Array(pieces.enumerated()), id: \.offset) { i, piece in
+                HStack(spacing: 4) {
+                    Text(piece.1).font(.system(.footnote)).foregroundStyle(colors.textSecondary)
+                    if i < pieces.count - 1 { Text(verbatim: "·").font(.system(.footnote)).foregroundStyle(colors.textSecondary) }
+                }
+            }
+        }
     }
 
     private var enterDetails: some View {
@@ -320,7 +351,7 @@ struct LogTimeProtoSheet: View {
             row(.category); divider
             row(.hours); divider
             row(.date)
-            if model.f.record != nil { divider; recordRow.transition(.opacity) }
+            if model.f.record != nil { divider; recordRow.transition(.asymmetric(insertion: .opacity.animation(.easeOut(duration: 0.18).delay(0.12)), removal: .identity)) }
         }
         .padding(4)
         .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(colors.sheetCard))
@@ -396,7 +427,7 @@ struct LogTimeProtoSheet: View {
 
     /// The one timber accent: a 3pt bar on rows whose value came from the note.
     @ViewBuilder private func accentBar(_ l: Look) -> some View {
-        if case .filled(true) = l { Capsule().fill(colors.timber).frame(width: 3, height: 26).accessibilityHidden(true) }
+        if case .filled(true) = l { Capsule().fill(scheme == .dark ? colors.timber : colors.timberInk).frame(width: 3, height: 26).accessibilityHidden(true) }
         else { Color.clear.frame(width: 3, height: 26) }
     }
 
@@ -531,27 +562,28 @@ struct LogTimeProtoSheet: View {
                 .background(Capsule().fill(colors.action))
                 .contentShape(Capsule())
                 .id(model.barText)
-                .transition(reduceMotion ? .opacity : .asymmetric(insertion: .modifier(active: BlurFade(on: true), identity: BlurFade(on: false)), removal: .identity))
+                .transition(textSwap)
         }
         .buttonStyle(.lhPressable)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: model.barText)
+        .animation(reduceMotion ? .easeOut(duration: 0.15) : .easeOut(duration: 0.18), value: model.barText)
         .padding(.horizontal, 20).padding(.top, 10).padding(.bottom, 10)
         .background(colors.background.overlay(alignment: .top) { Rectangle().fill(colors.sheetStroke).frame(height: 1) })
     }
 
     // MARK: toast
 
+    /// Sits in the panel, above the Log bar: content makes room for it and is never covered.
     private func toastView(_ text: String) -> some View {
-        let layout = type.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(spacing: 14))
-        return layout {
-            Text(verbatim: text).font(.system(.subheadline).weight(.medium)).foregroundStyle(colors.background).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+        HStack(spacing: 12) {
+            Text(verbatim: text).font(.system(.subheadline).weight(.medium)).foregroundStyle(colors.background)
+                .lineLimit(2).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
             Button { model.undoLog() } label: {
                 PT("Undo").font(.system(.subheadline).weight(.semibold)).foregroundStyle(colors.background).underline().frame(minHeight: 44)
             }.buttonStyle(.lhPressable)
         }
-        .padding(.horizontal, 20).padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: type.isAccessibilitySize ? 24 : 30, style: .continuous).fill(colors.textPrimary))
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 20).padding(.vertical, 4)
+        .background(RoundedRectangle(cornerRadius: type.isAccessibilitySize ? 24 : 28, style: .continuous).fill(colors.textPrimary))
+        .padding(.horizontal, 20).padding(.top, 6)
         .accessibilityElement(children: .combine)
     }
 }
@@ -607,6 +639,12 @@ struct FlowLayout: Layout {
 }
 
 extension ProtoModel {
+    /// The details line as separate values, one per row.
+    var initialPieces: [(PField, String)] {
+        let kind = f.category.map { ProtoData.short($0) + (f.categoryRemembered ? " " + pl("(last used)") : "") } ?? pl("Choose kind of work")
+        return [(.property, propertyName ?? (zeroMode ? pl("Name your rental") : pl("Choose rental"))), (.category, kind), (.hours, hoursLabel), (.date, dateWord)]
+    }
+
     /// The initial summary of what Log would record: defaults in words, one quiet line.
     var initialLine: String {
         let kind = f.category.map { ProtoData.short($0) + (f.categoryRemembered ? " " + pl("(last used)") : "") } ?? pl("Choose kind of work")
