@@ -121,7 +121,7 @@ final class CalendarDetector: CaptureDetector {
                 start: event.start,
                 end: event.end,
                 // Same fallback title 1.x used, so notes match on a 1.1 device.
-                title: event.title ?? "Calendar Event",
+                title: event.title ?? "Calendar event",
                 externalId: event.externalId,
                 legacyEventIdentifier: event.eventIdentifier,
                 containerId: event.calendarId,

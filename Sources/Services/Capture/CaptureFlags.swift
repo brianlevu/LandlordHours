@@ -21,11 +21,14 @@ enum CaptureFlag: String, CaseIterable {
     case locationBeta = "capture-location-beta"
     /// On-device Gmail reader.
     case gmailReader = "capture-gmail"
+    /// Apple's on-device model reading Log time notes (rules still fill when off).
+    case noteModel = "capture-note-model"
 
     /// Value when nothing remote has ever been seen and the build passes the minimum gate.
     var defaultValue: Bool {
         switch self {
-        case .autoCapture, .privateCloudCompute: return true
+        case .autoCapture, .noteModel, .privateCloudCompute: return true
+        // PCC is on by default (device-tested 2026-10-21). The remote flag stays the kill switch; the entitlement and the user's toggle still gate it.
         case .locationBeta, .gmailReader: return false
         }
     }

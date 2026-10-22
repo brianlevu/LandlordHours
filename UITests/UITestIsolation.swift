@@ -47,3 +47,18 @@ enum UITestIsolation {
         #endif
     }
 }
+
+extension UITestIsolation {
+    /// The 2.0 goal step: two plain answers (what you rent out, who does real estate as a main
+    /// job); the suggested target is then already selected. Ids: rental-short|long|both and
+    /// pro-me|spouse|none. Ends on the target cards.
+    static func answerGoalQuestions(_ app: XCUIApplication, rental: String = "rental-short", pro: String = "pro-me", timeout: TimeInterval = 15) {
+        for id in [rental, pro] {
+            let card = app.buttons[id]
+            XCTAssertTrue(card.waitForExistence(timeout: timeout), "missing \(id)")
+            let deadline = Date().addingTimeInterval(timeout)
+            while !card.isHittable && Date() < deadline { Thread.sleep(forTimeInterval: 0.2) }
+            card.tap()
+        }
+    }
+}

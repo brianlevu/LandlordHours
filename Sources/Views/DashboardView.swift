@@ -1,5 +1,4 @@
 import SwiftUI
-import LucideIcons
 
 /// WP-L: what Today says while things are still arriving. Loading (the first iCloud pull) never
 /// reads as a brand-new user, and a running 90-day look-back gets its own state instead of
@@ -63,10 +62,14 @@ struct DashboardView: View {
     /// The Inbox's model (shell-owned): Today's To confirm reads and writes the same list, so the
     /// count here, the Inbox and its tab badge are one number.
     @ObservedObject var inbox: InboxViewModel
+    /// The "did anyone else do more?" answer lives here; the hero's words follow it.
+    @ObservedObject private var taxProfile = TaxProfileManager.shared
 
     private var currentYear: Int { Calendar.current.component(.year, from: Date()) }
+    /// The real estate professional's own count: yours, or your spouse's when they answered that
+    /// their spouse is the pro.
     private var repsStatus: TaxQualificationEngine.REPSResult {
-        viewModel.repsStatus(participant: .selfParticipant, year: currentYear)
+        viewModel.repsStatus(participant: goalManager.repsParticipant, year: currentYear)
     }
 
     // MARK: House inputs
@@ -77,6 +80,39 @@ struct DashboardView: View {
     private var targetHours: Double { houseGoal.targetHours }
     private var isGoalMet: Bool { HouseProgress(hours: totalHours, goal: houseGoal).isGoalMet }
     private var pace: TodayPace { TodayPace.resolve(hours: totalHours, goal: houseGoal) }
+
+    /// The hero's words: target, whose count, and where you stand against Dec 31.
+    private var heroCopy: TodayHeroCopy {
+        TodayHeroCopy.make(.init(
+            goal: houseGoal,
+            isRecord: goalManager.goalChoice == .record,
+            hours: totalHours,
+            year: currentYear,
+            now: InboxClock.now(),
+            repsParticipant: goalManager.repsParticipant,
+            halfTest: repsStatus.moreThanHalfStatus,
+            noOneParticipatedMore: taxProfile.noOneParticipatedMore(forYear: currentYear),
+            propertyName: heroPropertyName,
+            daysOfData: daysOfData,
+            hasPendingToConfirm: inbox.badgeCount > 0 || foundInInbox.count > 0))
+    }
+
+    /// Days since the first hour logged this year (the pace waits for two weeks or ten hours).
+    private var daysOfData: Int {
+        let calendar = Calendar.current
+        let year = currentYear
+        guard let first = viewModel.timeEntries.filter({ calendar.component(.year, from: $0.date) == year }).map(\.date).min() else { return 0 }
+        return max(0, calendar.dateComponents([.day], from: calendar.startOfDay(for: first), to: calendar.startOfDay(for: InboxClock.now())).day ?? 0)
+    }
+
+    /// The rental the 100 or 500 hour count belongs to; nil when it covers every rental.
+    private var heroPropertyName: String? {
+        guard houseGoal != .reps750, goalManager.goalChoice != .record, !TaxProfileManager.shared.groupingElection,
+              !viewModel.properties.isEmpty else { return nil }
+        let overview = viewModel.materialParticipationOverview(year: currentYear, includeSpouse: viewModel.tracksSpouseJointly)
+        return viewModel.properties.first { $0.id == overview.propertyId }?.name
+    }
+    @State private var showParticipationSheet = false
 
     /// What the hero draws: the live hours, or the pre-save hours while a confirm build waits to play.
     private var heroProgress: HouseProgress {
@@ -160,7 +196,8 @@ struct DashboardView: View {
     /// This week's countable hours, Monday first, with the house's spouse rule.
     private var weekDays: [TodayWeekDay] {
         TodayWeek.days(entries: viewModel.timeEntries, goal: houseGoal,
-                       includeSpouse: viewModel.tracksSpouseJointly, now: InboxClock.now())
+                       includeSpouse: viewModel.tracksSpouseJointly,
+                       repsParticipant: goalManager.repsParticipant, now: InboxClock.now())
     }
 
     private var showsRecordSlot: Bool {
@@ -305,6 +342,7 @@ struct DashboardView: View {
                             .id("today.section.confirm")
                             if shouldShowActivationCard {
                                 homeActivationCard
+                                    .id("today.section.setup")
                             }
                             if !viewModel.properties.isEmpty {
                                 VStack(alignment: .leading, spacing: 12) {
@@ -573,10 +611,11 @@ struct DashboardView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text(dashboardSubtitle)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
                     .foregroundStyle(colors.textSecondary)
                     .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("today.header.subtitle")
             }
 
             // 2.0: the action chips are gone (redesign-specs §2); "+" in the tab bar logs time.
@@ -671,15 +710,15 @@ struct DashboardView: View {
             let name = viewModel.properties.first?.name ?? "Your rental"
             return foundInInbox.count > 0
                 ? "\(name) is staked. Confirm what we found, or log something new."
-                : "\(name) is staked. Log your first hour while it's fresh."
+                : String(localized: "\(name) is staked. Log your first hour while it’s fresh.")
         }
-        return "\(AppFormat.hours(headerHours)) counted toward \(Int(targetHours)) hours this year."
+        return TodayHeroCopy.headerLine(hours: headerHours, target: Int(targetHours), isRecord: goalManager.goalChoice == .record, year: currentYear)
     }
 
     private var compactHeaderTitle: String {
         if let title = mode.compactTitle { return title }
         if shouldShowActivationCard { return "Finish setup" }
-        return "\(AppFormat.hours(headerHours)) logged"
+        return String(localized: "\(OnbFormat.hours(headerHours)) logged")
     }
 
     private var compactHeaderSubtitle: String {
@@ -687,7 +726,7 @@ struct DashboardView: View {
         if shouldShowActivationCard {
             return "\(completedActivationSteps)/2 essentials complete"
         }
-        return pace.text
+        return heroCopy.status ?? pace.text
     }
 
     private var userInitials: String {
@@ -705,8 +744,9 @@ struct DashboardView: View {
             HouseHeroCard(
                 progress: heroProgress,
                 year: currentYear,
-                status: pace.text,
-                statusTone: heroStatusTone,
+                status: heroCopy.status,
+                statusTone: heroCopy.tone,
+                heroCopy: heroCopy,
                 onCelebration: { _ in presentNextCelebration() },
                 footer: heroFooter,
                 stakeName: heroStakeName,
@@ -721,6 +761,18 @@ struct DashboardView: View {
             .accessibilityElement(children: viewModel.properties.isEmpty && isNewOwner ? .contain : .ignore)
             .accessibilityLabel(heroAccessibilityLabel)
             .accessibilityIdentifier("today.hero")
+            // Over 100 hours with "did anyone do more?" unanswered: the hero opens that question.
+            .onTapGesture { if heroCopy.needsConfirmation && !hoursPending { showParticipationSheet = true } }
+            .accessibilityAddTraits(heroCopy.needsConfirmation ? .isButton : [])
+            .accessibilityHint(heroCopy.needsConfirmation ? "Opens the question about anyone else’s hours" : "")
+            .sheet(isPresented: $showParticipationSheet) {
+                ParticipationConfirmationSheet(
+                    year: currentYear,
+                    currentAnswer: taxProfile.noOneParticipatedMore(forYear: currentYear)
+                ) { answer in
+                    taxProfile.setNoOneParticipatedMore(answer, forYear: currentYear)
+                }
+            }
 
         }
     }
@@ -738,7 +790,8 @@ struct DashboardView: View {
             layout {
                 TodayPaceCard(model: ruleCard, isPending: hoursPending)
                     .accessibilityIdentifier(isREPS ? "dashboard.fiftyPercent" : "dashboard.daysLeft")
-                TodayPaceCard(model: TodayPaceCards.finish(hours: totalHours, goal: houseGoal, pace: pace, now: Date()),
+                TodayPaceCard(model: TodayPaceCards.finish(hours: totalHours, goal: houseGoal, pace: pace, now: Date(),
+                                                      paceReady: TodayHeroCopy.paceIsReady(hours: totalHours, daysOfData: daysOfData)),
                               isPending: hoursPending)
                     .accessibilityIdentifier("dashboard.finishPace")
             }
@@ -777,96 +830,63 @@ struct DashboardView: View {
         let live = HouseProgress(hours: totalHours, goal: houseGoal)
         switch heroFooter {
         case .emptyLot:
-            return "\(currentYear). An empty lot. Add a property. Every hour you confirm builds on it."
+            return "\(currentYear). An empty lot. \(TodayHeroCopy.emptyLotLine(target: heroCopy.targetHours))"
         case .found(let hours):
             return "\(currentYear). \(live.accessibilityLabel) \(hours) found in your calendar, not counted until you confirm."
         case nil:
-            return "\(currentYear). \(live.accessibilityLabel) \(pace.text)."
+            return "\(heroCopy.propertyName == nil ? String(currentYear) : heroCopy.eyebrow). \(live.accessibilityLabel(claimsGoalReached: heroCopy.claimsReached)) \(heroCopy.qualifier.map { "\($0). " } ?? "")\(heroCopy.spoken)."
         }
     }
 
     // MARK: - Activation
     private var homeActivationCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 12) {
-                LHIconTile(
-                    icon: Lucide.listChecks,
-                    color: colors.action,
-                    wash: colors.actionSurface,
-                    size: 42,
-                    isActive: true
-                )
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Finish your tax-ready setup")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                    Text("A few quick steps make every hour easier to review later.")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                        .lineSpacing(2)
-                }
-
-                Spacer(minLength: 8)
-
-                Text("\(completedActivationSteps)/2")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+            let isLarge = dynamicTypeSize.isAccessibilitySize
+            let badge = Text("\(completedActivationSteps)/2")
+                .font(.system(.caption, design: .rounded, weight: .black))
+                .foregroundStyle(colors.textSecondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(colors.backgroundTertiary)
+                .clipShape(Capsule())
+            let words = VStack(alignment: .leading, spacing: 4) {
+                Text("Finish setting up")
+                    .font(.system(.headline, design: .rounded, weight: .black))
+                    .foregroundStyle(colors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("A few quick steps make every hour easier to review later.")
+                    .font(.system(.footnote, design: .rounded, weight: .medium))
                     .foregroundStyle(colors.textSecondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(colors.backgroundTertiary)
-                    .clipShape(Capsule())
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if isLarge {
+                // Past the accessibility sizes the words take the full width; tile and count share a row above.
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack { SetupHeaderTile(symbol: "checklist"); Spacer(minLength: 8); badge }
+                    words
+                }
+            } else {
+                HStack(alignment: .top, spacing: 12) {
+                    SetupHeaderTile(symbol: "checklist")
+                    words
+                    Spacer(minLength: 8)
+                    badge
+                }
             }
 
             // A plain Grid, not LazyVGrid: four tiles need no laziness, and since WP-L removed the
             // launch splash the lazy grid left its first row out of the accessibility tree.
-            Grid(horizontalSpacing: 10, verticalSpacing: 10) {
-                GridRow {
-                activationActionTile(
-                    title: "Property",
-                    subtitle: viewModel.properties.isEmpty ? "Add first" : "\(viewModel.properties.count) ready",
-                    icon: Lucide.building2,
-                    isComplete: !viewModel.properties.isEmpty,
-                    accessibilityIdentifier: "home.activation.property",
-                    action: {
-                        openAddPropertyFromHome()
-                    }
-                )
-
-                activationActionTile(
-                    title: "First hour",
-                    subtitle: viewModel.timeEntries.isEmpty ? "Log now" : AppFormat.hours(totalHours),
-                    icon: Lucide.clock,
-                    isComplete: !viewModel.timeEntries.isEmpty,
-                    accessibilityIdentifier: "home.activation.firstHour",
-                    action: {
-                        NotificationCenter.default.post(name: .switchToTab, object: 2)
-                    }
-                )
-
+            // At accessibility sizes the 2x2 grid becomes one column, so the scaled words fit.
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: 10) {
+                    ForEach(activationTiles, id: \.identifier) { activationActionTile($0) }
                 }
-                GridRow {
-                activationActionTile(
-                    title: "Learn",
-                    subtitle: "What counts",
-                    icon: Lucide.bookOpenText,
-                    isComplete: false,
-                    accessibilityIdentifier: "home.activation.learn",
-                    action: {
-                        showLearningCenter = true
-                    }
-                )
-
-                activationActionTile(
-                    title: "Report",
-                    subtitle: "Check pace",
-                    icon: Lucide.chartColumnIncreasing,
-                    isComplete: false,
-                    accessibilityIdentifier: "home.activation.report",
-                    action: {
-                        NotificationCenter.default.post(name: .switchToTab, object: 3)
-                    }
-                )
+            } else {
+                let tiles = activationTiles
+                Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                    GridRow { activationActionTile(tiles[0]); activationActionTile(tiles[1]) }
+                    GridRow { activationActionTile(tiles[2]); activationActionTile(tiles[3]) }
                 }
             }
         }
@@ -892,52 +912,43 @@ struct DashboardView: View {
         }
     }
 
-    private func activationActionTile(
-        title: String,
-        subtitle: String,
-        icon: UIImage,
-        isComplete: Bool,
-        accessibilityIdentifier: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(isComplete ? colors.positiveSurface : colors.backgroundTertiary)
-                        .frame(width: 40, height: 40)
+    private struct ActivationTile {
+        let title: String
+        let subtitle: String
+        let symbol: String
+        let isComplete: Bool
+        let identifier: String
+        let action: () -> Void
+    }
 
-                    LucideIcon(image: isComplete ? Lucide.circleCheck : icon, size: 19)
-                        .foregroundStyle(isComplete ? colors.positive : colors.textPrimary)
-                }
+    private var activationTiles: [ActivationTile] {
+        [
+            ActivationTile(
+                title: String(localized: "Property"),
+                subtitle: viewModel.properties.isEmpty ? String(localized: "Add first") : String(localized: "\(viewModel.properties.count) ready"),
+                symbol: "building.2", isComplete: !viewModel.properties.isEmpty,
+                identifier: "home.activation.property", action: { openAddPropertyFromHome() }),
+            ActivationTile(
+                title: String(localized: "First hour"),
+                subtitle: viewModel.timeEntries.isEmpty ? String(localized: "Log now") : AppFormat.hours(totalHours),
+                symbol: "clock", isComplete: !viewModel.timeEntries.isEmpty,
+                identifier: "home.activation.firstHour",
+                action: { NotificationCenter.default.post(name: .switchToTab, object: 2) }),
+            ActivationTile(
+                title: String(localized: "Learn"), subtitle: String(localized: "What counts"),
+                symbol: "book", isComplete: false,
+                identifier: "home.activation.learn", action: { showLearningCenter = true }),
+            ActivationTile(
+                title: String(localized: "Report"), subtitle: String(localized: "Check pace"),
+                symbol: "chart.bar", isComplete: false,
+                identifier: "home.activation.report",
+                action: { NotificationCenter.default.post(name: .switchToTab, object: 3) }),
+        ]
+    }
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-
-                    Text(subtitle)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(colors.textSecondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.82)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: 92)
-            .padding(12)
-            .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.72 : 0.9))
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(colors.border.opacity(0.22), lineWidth: 1)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(title). \(subtitle)")
-        .accessibilityIdentifier(accessibilityIdentifier)
+    private func activationActionTile(_ tile: ActivationTile) -> some View {
+        ActivationTileView(tile: tile.title, subtitle: tile.subtitle, symbol: tile.symbol,
+                           isComplete: tile.isComplete, identifier: tile.identifier, action: tile.action)
     }
 
 }
@@ -991,7 +1002,9 @@ struct EntryListRow: View {
                 HStack(spacing: 4) {
                     if entry.isCalendarImport {
                         HStack(spacing: 2) {
-                            LucideIcon(image: Lucide.calendar, size: 9)
+                            Image(systemName: "calendar")
+                                .font(.system(size: 9, weight: .medium))
+                                .accessibilityHidden(true)
                             Text("Cal")
                                 .font(.system(size: 9, weight: .medium, design: .rounded))
                         }
@@ -1002,7 +1015,7 @@ struct EntryListRow: View {
                         .clipShape(Capsule())
                     }
                     if !entry.countsForREPS {
-                        Text("Non-REPS")
+                        Text("Not counted")
                             .font(.system(size: 10, weight: .medium, design: .rounded))
                             .foregroundStyle(AppColors.coral)
                             .padding(.horizontal, 6)
@@ -1124,5 +1137,84 @@ struct TodayRecordLockCard: View {
         guard page == nil else { return }
         page = await RecordPageModel.load(entries: viewModel.timeEntries, properties: viewModel.properties,
                                           owner: viewModel.userName, year: year)
+    }
+}
+
+
+/// The setup card's header tile: a blueprint action tile with an SF Symbol (brand system §4:
+/// function icons are symbols; the 3D tool renders are for categories).
+private struct SetupHeaderTile: View {
+    let symbol: String
+    @Environment(\.colorScheme) private var colorScheme
+    @ScaledMetric(relativeTo: .headline) private var side: CGFloat = 42
+
+    var body: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        Image(systemName: symbol)
+            .font(.system(size: side * 0.45, weight: .regular))
+            .foregroundStyle(colors.action)
+            .frame(width: side, height: side)
+            .background(colors.actionSurface, in: RoundedRectangle(cornerRadius: side * 0.28, style: .continuous))
+            .accessibilityHidden(true)
+    }
+}
+
+
+/// One setup tile. Fonts are text styles and the glyph box is a scaled metric, so the tile grows
+/// with Dynamic Type; at accessibility sizes the icon sits beside the words instead of above.
+private struct ActivationTileView: View {
+    let tile: String
+    let subtitle: String
+    let symbol: String
+    let isComplete: Bool
+    let identifier: String
+    let action: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .body) private var box: CGFloat = 40
+    @ScaledMetric(relativeTo: .body) private var minHeight: CGFloat = 92
+
+    var body: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(HStackLayout(alignment: .center, spacing: 14))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
+        Button(action: action) {
+            layout {
+                ZStack {
+                    RoundedRectangle(cornerRadius: box * 0.35, style: .continuous)
+                        .fill(isComplete ? colors.positiveSurface : colors.backgroundTertiary)
+                    Image(systemName: isComplete ? "checkmark.circle" : symbol)
+                        .font(.system(size: box * 0.47, weight: .regular))
+                        .foregroundStyle(isComplete ? colors.positive : colors.textPrimary)
+                        .accessibilityHidden(true)
+                }
+                .frame(width: box, height: box)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(tile)
+                        .font(.system(.subheadline, design: .rounded, weight: .bold))
+                        .foregroundStyle(colors.textPrimary)
+                    Text(subtitle)
+                        .font(.system(.footnote, design: .rounded, weight: .medium))
+                        .foregroundStyle(colors.textSecondary)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                if dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 0 : minHeight, alignment: .topLeading)
+            .padding(12)
+            .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.72 : 0.9))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(colors.border.opacity(0.22), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(tile). \(subtitle)")
+        .accessibilityIdentifier(identifier)
     }
 }

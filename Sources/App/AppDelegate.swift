@@ -105,7 +105,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             UNNotificationCategory(
                 identifier: "LANDLORDHOURS_TRACK",
                 actions: [
-                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_TRACK", title: "Log Time", options: foreground)
+                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_TRACK", title: "Log time", options: foreground)
                 ],
                 intentIdentifiers: [],
                 options: []
@@ -113,7 +113,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             UNNotificationCategory(
                 identifier: "LANDLORDHOURS_REVIEW_CALENDAR",
                 actions: [
-                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_REVIEW_CALENDAR", title: "Review Drafts", options: foreground)
+                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_REVIEW_CALENDAR", title: "See what’s waiting", options: foreground)
                 ],
                 intentIdentifiers: [],
                 options: []
@@ -121,7 +121,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             UNNotificationCategory(
                 identifier: "LANDLORDHOURS_EXPORT",
                 actions: [
-                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_EXPORT", title: "Prepare Export", options: foreground)
+                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_EXPORT", title: "Make the PDF", options: foreground)
                 ],
                 intentIdentifiers: [],
                 options: []
@@ -129,7 +129,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             UNNotificationCategory(
                 identifier: "LANDLORDHOURS_REPORTS",
                 actions: [
-                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_REPORTS", title: "Open Reports", options: foreground)
+                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_REPORTS", title: "Open reports", options: foreground)
                 ],
                 intentIdentifiers: [],
                 options: []
@@ -137,7 +137,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             UNNotificationCategory(
                 identifier: "LANDLORDHOURS_ADD_PROPERTY",
                 actions: [
-                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_ADD_PROPERTY", title: "Add Property", options: foreground)
+                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_ADD_PROPERTY", title: "Add property", options: foreground)
                 ],
                 intentIdentifiers: [],
                 options: []
@@ -145,7 +145,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             UNNotificationCategory(
                 identifier: "LANDLORDHOURS_TIMER",
                 actions: [
-                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_TIMER", title: "Review Timer", options: foreground)
+                    UNNotificationAction(identifier: "LANDLORDHOURS_ACTION_TIMER", title: "Check the timer", options: foreground)
                 ],
                 intentIdentifiers: [],
                 options: []

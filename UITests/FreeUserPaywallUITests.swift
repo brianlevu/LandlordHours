@@ -360,8 +360,8 @@ final class FreeUserPaywallUITests: XCTestCase {
     /// 2.0 onboarding, the quickest way through: no calendar, no property (six taps to Today).
     private func walkOnboarding(captureScheme scheme: String) {
         tap(app.buttons["onb-start"])
-        tap(app.buttons["goal-750"])
-        tap(app.buttons["onb-primary"])                        // Build toward 750h
+        UITestIsolation.answerGoalQuestions(app)
+        tap(app.buttons["onb-primary"])                        // Aim for 750 hours
         tap(app.buttons["onb-link"])                           // Calendar: Not now
         tap(app.buttons["onb-primary"])                        // Who: Continue
         // No paywall step anywhere in onboarding.
@@ -369,7 +369,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "lifetime")).firstMatch.exists)
         XCTAssertTrue(app.buttons["onb-link"].waitForExistence(timeout: 6))
         settleAndCapture("onboarding-last-step", scheme: scheme, waitFor: app.buttons["onb-link"])
-        tap(app.buttons["onb-link"])                           // I'll add it later
+        tap(app.buttons["onb-link"])                           // I’ll add it later
         XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 10), "Onboarding lands on the app, not a paywall")
         XCTAssertFalse(app.descendants(matching: .any)["paywall.title"].exists)
         settleAndCapture("onboarding-finished-home", scheme: scheme, waitFor: app.buttons["tab.today"])

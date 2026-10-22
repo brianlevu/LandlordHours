@@ -12,8 +12,8 @@ enum PropertyType: String, Codable, CaseIterable {
     
     var fullName: String {
         switch self {
-        case .ltr: return "Long-Term Rental"
-        case .str: return "Short-Term Rental"
+        case .ltr: return "Long-term rental"
+        case .str: return "Short-term rental"
         }
     }
     
@@ -121,14 +121,14 @@ enum ActivityCategory: String, Codable, CaseIterable {
         case .repairs: return "Fixing leaks, HVAC, plumbing, electrical"
         case .management: return "Collecting rent, communications, scheduling"
         case .leasing: return "Showing units, screening tenants, signing leases"
-        case .bookkeeping: return "Accounting, tax prep, financial records"
+        case .bookkeeping: return "Bookkeeping, tax prep, financial records"
         case .legal: return "Evictions, compliance, permits"
         case .insurance: return "Claims, policy reviews"
         case .travel: return "Driving to property for activities"
         case .renovations: return "Major improvements, remodeling"
-        case .investing: return "NOT countable - Investment decisions"
-        case .financing: return "NOT countable - Loan decisions"
-        case .contractNegotiation: return "NOT countable - Purchase/sale negotiations"
+        case .investing: return "Investor work, not counted: investment decisions"
+        case .financing: return "Investor work, not counted: loan decisions"
+        case .contractNegotiation: return "Investor work, not counted: buying and selling talks"
         }
     }
     
@@ -358,6 +358,9 @@ struct TimeEntry: Identifiable, Codable {
     var sourceDetail: String?
     /// The suggestion's dedupe key. The entry's `id` is derived from it (see `CaptureIdentity`).
     var sourceKey: String?
+    /// 2.0 Log time: the short, fact-checked description for the record (from Apple's model,
+    /// edited or confirmed by the user). `notes` stays the user's own words. Additive/optional.
+    var recordDescription: String?
 
     init(
         id: UUID = UUID(),
@@ -374,7 +377,8 @@ struct TimeEntry: Identifiable, Codable {
         detectedAt: Date? = nil,
         confirmedAt: Date? = nil,
         sourceDetail: String? = nil,
-        sourceKey: String? = nil
+        sourceKey: String? = nil,
+        recordDescription: String? = nil
     ) {
         self.id = id
         self.propertyId = propertyId
@@ -391,6 +395,7 @@ struct TimeEntry: Identifiable, Codable {
         self.confirmedAt = confirmedAt
         self.sourceDetail = sourceDetail
         self.sourceKey = sourceKey
+        self.recordDescription = recordDescription
         self.createdAt = Date()
         self.modifiedAt = Date()
     }
@@ -414,6 +419,7 @@ struct TimeEntry: Identifiable, Codable {
         confirmedAt = try c.decodeIfPresent(Date.self, forKey: .confirmedAt)
         sourceDetail = try c.decodeIfPresent(String.self, forKey: .sourceDetail)
         sourceKey = try c.decodeIfPresent(String.self, forKey: .sourceKey)
+        recordDescription = try c.decodeIfPresent(String.self, forKey: .recordDescription)
     }
     
     // Helper to get property name - call this when needed
@@ -589,7 +595,9 @@ struct TaxQualificationEngine {
 
     /// Single source of truth for the material participation figure shown on
     /// Dashboard, Reports, widget and Siri. With a grouping election all properties
-    /// count as one activity; without it, the best single property counts.
+    /// count as one activity; without it, the best single property counts. Owners with BOTH
+    /// kinds of rental get their short-term rental's own count: the 100 and 500 hour tests
+    /// are counted per rental, and a long-term rental's hours never stand in for it.
     static func materialParticipationOverview(
         entries: [TimeEntry],
         properties: [RentalProperty],
@@ -607,7 +615,9 @@ struct TaxQualificationEngine {
             )
         }
         if groupingElection { return status(nil) }
-        return properties
+        let shortStays = properties.filter { $0.propertyType == .str }
+        let candidates = (!shortStays.isEmpty && shortStays.count < properties.count) ? shortStays : properties
+        return candidates
             .map { status($0.id) }
             .max { $0.ownerAndSpouseHours < $1.ownerAndSpouseHours }
             ?? status(nil)

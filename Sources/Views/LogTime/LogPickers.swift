@@ -63,7 +63,7 @@ struct LogCategoryPicker: View {
                         }
                     }
                     .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    Text("Investor work. Log it for your records; it never counts toward the 750 or 500-hour tests or the house.")
+                    Text("Investor work. Log it for your records; it never counts toward your hours.")
                         .font(.footnote)
                         .foregroundStyle(colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)

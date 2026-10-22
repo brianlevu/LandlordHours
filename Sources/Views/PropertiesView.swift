@@ -269,7 +269,7 @@ struct PropertiesView: View {
                 .foregroundStyle(colors.textPrimary)
                 .multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
-            Text("Once we know where your rentals are, every hour you confirm goes up on the house.")
+            Text("Once we know where your rentals are, every hour you confirm counts toward your goal.")
                 .font(.subheadline)
                 .foregroundStyle(colors.textSecondary)
                 .multilineTextAlignment(.center)
@@ -721,7 +721,7 @@ struct PropertyDetailView: View {
     }
 
     private func nothingYet(_ property: RentalProperty) -> some View {
-        Text("Nothing logged at \(property.name) yet. Hours you confirm here go up on its house.")
+        Text("Nothing logged at \(property.name) yet. Hours you confirm here count toward your goal.")
             .font(.subheadline)
             .foregroundStyle(colors.textSecondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -926,8 +926,9 @@ struct PropertyEditSheet: View {
                 }
             }
             .padding(20)
-            // Clear the pinned footer (its 16pt fade + the 52pt button + 8pt), plus 12pt of air.
-            .padding(.bottom, 44)
+            // Clear the pinned footer (its 32pt scrim + the 52pt button + 8pt), plus 12pt of air,
+            // so "Delete property" at the end of the scroll sits clear of the fade.
+            .padding(.bottom, 76)
             Color.clear.frame(height: 1).id("propertySheet.bottom")
         }
 #if DEBUG

@@ -260,6 +260,82 @@ final class PaywallCaptureUITests: XCTestCase {
         return button.exists ? button : app.descendants(matching: .any)[id].firstMatch
     }
 
+    // MARK: Restore that fails (DEBUG -LHRestoreOutcome)
+
+    private var restoreOutDir: URL {
+        let home = ProcessInfo.processInfo.environment["SIMULATOR_HOST_HOME"] ?? NSHomeDirectory()
+        let date = ProcessInfo.processInfo.environment["LH_CAPTURE_DATE"] ?? "2026-10-22"
+        let url = URL(fileURLWithPath: home)
+            .appendingPathComponent("AgentScratch/landlordhours/\(date)/storekit-frames-r2", isDirectory: true)
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    /// The paywall and Settings after a restore that timed out or failed, light and dark, at the
+    /// default size and AX3. Restore is tapped for real; only the App Store call is forced to fail.
+    /// Each frame also proves the retry: the Restore control is enabled again afterwards.
+    func testCaptureRestoreFailureStates() {
+        let restoreSizes = Self.sizes.filter { $0.0 != "xxl" }
+        for outcome in ["timeout", "failure"] {
+            for (sizeName, size) in restoreSizes {
+                for scheme in Self.schemes {
+                    let suffix = "\(outcome)-\(scheme)-\(sizeName)"
+
+                    // Paywall (Settings entry).
+                    launch(scenario: "occasional", scheme: scheme, size: size,
+                           extra: ["-LHPaywallPreview", "settings", "-LHRestoreOutcome", outcome])
+                    XCTAssertTrue(app.staticTexts["paywall.title"].waitForExistence(timeout: 12), "\(suffix): paywall missing")
+                    scrollTo("paywall.restore")
+                    let restore = app.buttons["paywall.restore"].firstMatch
+                    restore.tap()
+                    let message = app.descendants(matching: .any)["paywall.restoreNone"].firstMatch
+                    XCTAssertTrue(message.waitForExistence(timeout: 10), "\(suffix): no restore message")
+                    scrollTo("paywall.restoreNone")
+                    Thread.sleep(forTimeInterval: 0.8)
+                    XCTAssertTrue(restore.isEnabled, "\(suffix): Restore can be tried again")
+                    XCTAssertTrue(message.label.hasPrefix(outcome == "timeout" ? "The App Store didn’t answer" : "Couldn’t reach the App Store"),
+                                  "\(suffix): wrong message '\(message.label)'")
+                    save("paywall-restore-\(suffix)")
+                    // Scrolled: body text passes the close button's row; nothing may sit under it.
+                    app.swipeUp(velocity: .slow); app.swipeUp(velocity: .slow)
+                    Thread.sleep(forTimeInterval: 0.6)
+                    save("paywall-restore-\(suffix)-scrolled")
+
+                    // Settings.
+                    launch(scenario: "occasional", scheme: scheme, size: size, extra: ["-LHRestoreOutcome", outcome])
+                    // Two controls carry this label (the AX header has its own); tap the visible one.
+                    let openSettings = app.buttons.matching(NSPredicate(format: "label == %@", "Open profile and settings"))
+                    XCTAssertTrue(openSettings.firstMatch.waitForExistence(timeout: 8), "\(suffix): no Settings entry")
+                    let visible = openSettings.allElementsBoundByIndex.first { $0.isHittable } ?? openSettings.firstMatch
+                    visible.tap()
+                    XCTAssertTrue(app.descendants(matching: .any)["settings.profile"].waitForExistence(timeout: 10), "\(suffix): Settings did not open")
+                    scrollTo("settings.restorePurchase")
+                    let row = app.buttons["settings.restorePurchase"].firstMatch
+                    // At AX3 the row can sit under the floating tab bar; lift it clear before tapping.
+                    let tabBar = app.buttons["tab.today"]
+                    var lifts = 0
+                    while tabBar.exists && row.frame.maxY > tabBar.frame.minY - 12 && lifts < 6 {
+                        app.swipeUp(velocity: .slow); lifts += 1
+                    }
+                    row.tap()
+                    // The result shows inline under the row; the row stays tappable to retry.
+                    let expected = outcome == "timeout" ? "The App Store didn’t answer" : "Couldn’t reach the App Store"
+                    let shown = NSPredicate(format: "label CONTAINS %@", expected)
+                    XCTAssertTrue(app.descendants(matching: .any).matching(shown).firstMatch.waitForExistence(timeout: 10),
+                                  "\(suffix): no inline restore message")
+                    XCTAssertFalse(app.alerts.firstMatch.exists, "\(suffix): no system alert")
+                    var settle = 0
+                    while tabBar.exists && row.frame.maxY > tabBar.frame.minY - 12 && settle < 4 {
+                        app.swipeUp(velocity: .slow); settle += 1
+                    }
+                    Thread.sleep(forTimeInterval: 0.8)
+                    XCTAssertTrue(row.isEnabled, "\(suffix): Restore can be tried again")
+                    save("settings-restore-\(suffix)")
+                }
+            }
+        }
+    }
+
     private func tapButton(_ id: String) {
         let target = app.buttons[id].firstMatch
         XCTAssertTrue(target.waitForExistence(timeout: 8), "Missing \(id)")
@@ -285,7 +361,8 @@ final class PaywallCaptureUITests: XCTestCase {
 
     private func save(_ name: String) {
         let shot = XCUIScreen.main.screenshot()
-        try? shot.pngRepresentation.write(to: outDir.appendingPathComponent("\(name).png"))
+        let dir = name.contains("-restore-") ? restoreOutDir : outDir
+        try? shot.pngRepresentation.write(to: dir.appendingPathComponent("\(name).png"))
         let attachment = XCTAttachment(screenshot: shot)
         attachment.name = name
         attachment.lifetime = .keepAlways

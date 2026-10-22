@@ -10,8 +10,13 @@ struct LandlordHoursApp: App {
     private var viewModel: AppViewModel { AppModelHost.shared.viewModel }
     @StateObject private var categoryManager = CategoryManager.shared
     @StateObject private var appearanceManager = AppearanceManager.shared
+    /// 2.0: the first frame repeats the launch screen, then hands off (LaunchHandoffView.swift).
+    @State private var launchHandoffFinished = false
 
     init() {
+        #if DEBUG
+        RestoreFailureLaunch.prepare()   // -LHRestoreOutcome timeout|failure (captures only)
+        #endif
         // Tab bar: soft but legible. Keep content from visually bleeding through the controls.
         let tabBar = UITabBarAppearance()
         tabBar.configureWithOpaqueBackground()
@@ -49,13 +54,24 @@ struct LandlordHoursApp: App {
             .environmentObject(categoryManager)
             .environmentObject(appearanceManager)
             .preferredColorScheme(AppearanceManager.forcedColorSchemeFromLaunchArguments ?? appearanceManager.preferredColorScheme)
+            .overlay {
+                if !launchHandoffFinished {
+                    LaunchHandoffOverlay(
+                        destination: viewModel.isSignedIn ? .today : .welcome,
+                        isFinished: $launchHandoffFinished
+                    )
+                }
+            }
     }
 
     var body: some Scene {
         WindowGroup {
             #if DEBUG
             // House capture hook (-LHHousePreview <hours> <goal> <scheme>); see HousePreviewLaunchHook.swift.
-            if let housePreview = HousePreviewLaunch.current {
+            if let board = SurfaceBoardLaunch.current {
+                // Surfaces capture boards (-LHSurfaceBoard <name>); see SurfaceCaptureBoard.swift.
+                SurfaceCaptureRoot(launch: board)
+            } else if let housePreview = HousePreviewLaunch.current {
                 HousePreviewRoot(config: housePreview)
             } else {
                 appRoot

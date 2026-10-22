@@ -178,7 +178,8 @@ final class EndOfEventSchedulerTests: XCTestCase {
 
         let request = try XCTUnwrap(center.captureRequests.first)
         XCTAssertEqual(request.identifier, "capture.end.\(s.sourceKey)")
-        XCTAssertEqual(request.content.body, "Plumber visit just ended. Log 2h at Pine Cabin?")
+        XCTAssertEqual(request.content.title, "Plumber visit just ended")
+        XCTAssertEqual(request.content.body, "Log 2h at Pine Cabin?")
         XCTAssertEqual(request.content.categoryIdentifier, CaptureNotificationAction.categoryIdentifier)
         XCTAssertEqual(request.content.userInfo[NotificationPayload.profileIdKey] as? String, "p1")
         XCTAssertEqual(request.content.userInfo[NotificationPayload.sourceKeyKey] as? String, s.sourceKey)
@@ -187,6 +188,7 @@ final class EndOfEventSchedulerTests: XCTestCase {
         XCTAssertEqual(fireDate(request), date(2026, 3, 2, 12, 5))
         for word in ["tax", "deduct", "IRS", "qualif"] {
             XCTAssertFalse(request.content.body.localizedCaseInsensitiveContains(word), "No tax claims in copy")
+            XCTAssertFalse(request.content.title.localizedCaseInsensitiveContains(word), "No tax claims in copy")
         }
     }
 
@@ -272,10 +274,12 @@ final class EndOfEventSchedulerTests: XCTestCase {
         })
         let lateRequest = try XCTUnwrap(byKey[late.sourceKey])
         XCTAssertEqual(fireDate(lateRequest), date(2026, 3, 3, 8))
-        XCTAssertEqual(lateRequest.content.body, "Plumber visit ended yesterday. Log 2h at Pine Cabin?")
+        XCTAssertEqual(lateRequest.content.title, "Plumber visit ended yesterday")
+        XCTAssertEqual(lateRequest.content.body, "Log 2h at Pine Cabin?")
         let earlyRequest = try XCTUnwrap(byKey[early.sourceKey])
         XCTAssertEqual(fireDate(earlyRequest), date(2026, 3, 4, 8))
-        XCTAssertEqual(earlyRequest.content.body, "Plumber visit ended earlier today. Log 2h at Pine Cabin?")
+        XCTAssertEqual(earlyRequest.content.title, "Plumber visit ended earlier today")
+        XCTAssertEqual(earlyRequest.content.body, "Log 2h at Pine Cabin?")
         XCTAssertEqual(fireDate(try XCTUnwrap(byKey[edge.sourceKey])), date(2026, 3, 5, 20, 55))
     }
 
@@ -392,15 +396,13 @@ final class EndOfEventSchedulerTests: XCTestCase {
     func testCopyVariants() {
         let scheduler = makeScheduler()
         var s = suggestion("A", end: date(2026, 3, 2, 12), hours: 1.5)
-        XCTAssertEqual(scheduler.body(for: s, fireDate: date(2026, 3, 2, 12, 5), deferred: false),
-                       "Plumber visit just ended. Log 1.5h at Pine Cabin?")
+        XCTAssertEqual(scheduler.content(for: s, fireDate: date(2026, 3, 2, 12, 5), deferred: false),
+                       NotificationText(title: "Plumber visit just ended", body: "Log 1.5h at Pine Cabin?"))
         s.proposedPropertyId = nil
         s.proposedHours = 0.75
-        XCTAssertEqual(scheduler.body(for: s, fireDate: date(2026, 3, 2, 12, 5), deferred: false),
-                       "Plumber visit just ended. Log 45 min?")
+        XCTAssertEqual(scheduler.content(for: s, fireDate: date(2026, 3, 2, 12, 5), deferred: false).body, "Log 45 min?")
         s.proposedHours = nil
-        XCTAssertEqual(scheduler.body(for: s, fireDate: date(2026, 3, 2, 12, 5), deferred: false),
-                       "Plumber visit just ended. Log it?")
+        XCTAssertEqual(scheduler.content(for: s, fireDate: date(2026, 3, 2, 12, 5), deferred: false).body, "Log it?")
         XCTAssertEqual(EndOfEventScheduler.hoursText(2), "2h")
         XCTAssertEqual(EndOfEventScheduler.hoursText(1.25), "1.25h")
         XCTAssertEqual(EndOfEventScheduler.shortTitle(String(repeating: "x", count: 80)).count, 60)
@@ -1030,8 +1032,9 @@ final class SyncPushChangedOnlyTests: CaptureTestCase {
 
     func testFailedAccountDeleteUnblocksPushing() async {
         let (viewModel, service, _) = makeModel()
+        // iCloud can't be reached (the same on a simulator and on a signed-in device).
+        service.accountDeleteOverride = .init(accountAvailable: { false }, fetchRecordIDs: { _ in [] }, deleteBatch: { _ in })
         do {
-            // No CloudKit container on the simulator: the delete throws after quiescing.
             try await service.deleteCurrentUserRecords(properties: viewModel.properties, entries: viewModel.timeEntries,
                                                        categories: [], userId: profileId)
             XCTFail("Expected iCloud to be unavailable in tests")

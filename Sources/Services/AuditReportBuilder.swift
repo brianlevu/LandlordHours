@@ -63,29 +63,29 @@ struct AuditReport {
         var moreThanHalfText: String {
             if let met = meetsMoreThanHalfTest { return met ? "Met" : "Not met" }
             return participant == .spouse
-                ? "Not evaluated — spouse work hours aren't tracked in the app yet"
-                : "Not evaluated — add your other work hours"
+                ? "Not checked. Spouse work hours aren’t tracked in the app yet"
+                : "Not checked. Add your other work hours"
         }
 
         /// One calm, factual line for the cover page.
         var coverLine: String {
             let hours = AuditReportFormat.hours(realEstateHours)
             guard meets750HourTest else {
-                return "\(displayName): \(hours) hours. The 750-hour test needs more than 750 hours."
+                return "\(displayName): \(hours) hours. That is not yet over 750."
             }
             switch meetsMoreThanHalfTest {
-            case .some(true): return "\(displayName): \(hours) hours. Meets the 750-hour and more-than-half tests."
-            case .some(false): return "\(displayName): \(hours) hours. Meets the 750-hour test; does not meet the more-than-half test."
-            case .none: return "\(displayName): \(hours) hours. Meets the 750-hour test; more-than-half test not evaluated."
+            case .some(true): return "\(displayName): \(hours) hours. Over 750, and over half of work hours."
+            case .some(false): return "\(displayName): \(hours) hours. Over 750, but not over half of work hours."
+            case .none: return "\(displayName): \(hours) hours. Over 750. Half of work hours not checked."
             }
         }
 
         var statusText: String {
             switch isQualified {
-            case .some(true): return "Meets both REPS hour tests"
+            case .some(true): return "Over 750 hours and over half of work hours"
             case .some(false):
-                return meets750HourTest ? "Does not meet the more-than-half test" : "Does not meet the 750-hour test"
-            case .none: return "750-hour test met; more-than-half test not evaluated"
+                return meets750HourTest ? "Not over half of work hours" : "Not over 750 hours"
+            case .none: return "Over 750 hours. Half of work hours not checked"
             }
         }
     }
@@ -98,10 +98,10 @@ struct AuditReport {
         let pendingConfirmation: Bool
 
         var statusText: String {
-            if meets500HourTest { return "Meets 500-hour test" }
-            if meets100HourTest { return "Meets 100-hour test" }
-            if pendingConfirmation { return "Over 100 hours; confirm no one participated more" }
-            return "Below material participation thresholds"
+            if meets500HourTest { return "Over 500 hours" }
+            if meets100HourTest { return "Over 100 hours, and no one else did more" }
+            if pendingConfirmation { return "Over 100 hours. Confirm no one else did more" }
+            return "Under 100 hours"
         }
     }
 
@@ -264,7 +264,7 @@ enum AuditReportBuilder {
                 category: entry.category,
                 participant: entry.participant,
                 hours: entry.hours,
-                description: entry.notes,
+                description: entry.recordDescription ?? entry.notes,
                 loggedAt: entry.createdAt,
                 lastEditedAt: edited ? entry.modifiedAt : nil,
                 source: entry.source,
@@ -425,7 +425,7 @@ enum AuditReportBuilder {
 // MARK: - Shared formatting
 
 enum AuditReportFormat {
-    static let disclaimer = "LandlordHours is a record-keeping tool, not tax advice. Review your qualification with a tax professional."
+    static let disclaimer = "LandlordHours is a record-keeping tool, not tax advice. Ask a tax professional what your hours mean for you."
 
     static let suggestionExplanation = "Suggested entries were proposed by the app (for example, from your calendar or a receipt) and added to your record only when you confirmed them."
 

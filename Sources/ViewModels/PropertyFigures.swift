@@ -134,13 +134,13 @@ enum PropertyHouseStage {
 
 enum PropertyMeta {
     /// "212h this year". Only for a material participation goal WITHOUT a grouping election (the
-    /// 500h test then runs per rental): "212h of 500h", past the line "520h · roof’s on".
+    /// 500h test then runs per rental): "212h of 500h", past the line "520h this year" (the stage lives on the house art, never in the hours line).
     /// Whole hours, rounded down so a row never runs ahead of the records.
     static func hoursLine(_ hours: Double, goal: HouseGoal, groupingElection: Bool) -> String {
         let whole = Int(max(0, hours.isFinite ? hours : 0).rounded(.down))
         guard isPerPropertyTest(goal: goal, groupingElection: groupingElection) else { return "\(whole)h this year" }
         let target = Int(PropertyHouseStage.completeHours)
-        return hours < PropertyHouseStage.completeHours ? "\(whole)h of \(target)h" : "\(whole)h · roof’s on"
+        return hours < PropertyHouseStage.completeHours ? "\(whole)h of \(target)h" : String(localized: "\(whole)h this year")
     }
 
     /// The per-rental 500h wording applies only to material participation without grouping.

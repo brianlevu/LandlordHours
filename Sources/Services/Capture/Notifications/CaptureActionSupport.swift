@@ -145,18 +145,8 @@ enum CaptureFollowUp: Equatable {
     /// A queued "Log it" waited over a week (iCloud never finished): back in the inbox.
     case queuedTooLong
 
-    func body(title: String) -> String {
-        let name = EndOfEventScheduler.shortTitle(title)
-        switch self {
-        case .mightAlreadyBeLogged: return "You may have logged \(name) already. Tap to check before saving."
-        case .eventMoved: return "\(name) moved on your calendar. Tap to check the time before saving."
-        case .eventGone: return "\(name) is no longer on your calendar, so nothing was logged."
-        case .cannotVerify: return "Couldn't check \(name) on your calendar. Tap to log it yourself."
-        case .needsInput: return "\(name) needs a property or hours. Tap to finish logging it."
-        case .offerMute: return "Got it. Stop suggesting events like \(name)?"
-        case .queuedTooLong: return "\(name) wasn't logged yet because iCloud didn't finish syncing. Tap to review it."
-        }
-    }
+    /// Title = the event; body = one plain sentence (NotificationCopy).
+    func content(title: String) -> NotificationText { NotificationCopy.followUp(self, eventTitle: title) }
 
     var categoryIdentifier: String {
         self == .offerMute ? CaptureNotificationAction.muteOfferCategoryIdentifier : CaptureNotificationAction.reviewCategoryIdentifier
@@ -172,7 +162,9 @@ struct SystemCaptureFollowUpPoster: CaptureFollowUpPosting {
 
     @MainActor func post(_ followUp: CaptureFollowUp, for suggestion: Suggestion, profileId: String) async {
         let content = UNMutableNotificationContent()
-        content.body = followUp.body(title: suggestion.title)
+        let text = followUp.content(title: suggestion.title)
+        content.title = text.title
+        content.body = text.body
         content.categoryIdentifier = followUp.categoryIdentifier
         content.threadIdentifier = EndOfEventScheduler.threadIdentifier
         content.userInfo = CaptureNotificationAction.userInfo(profileId: profileId, sourceKey: suggestion.sourceKey)

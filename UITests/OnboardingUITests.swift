@@ -54,8 +54,8 @@ final class OnboardingUITests: XCTestCase {
             let start = app.buttons["onb-start"]
             XCTAssertTrue(start.waitForExistence(timeout: 20), "launch \(attempt): Welcome")
             start.tap()                                            // exactly one tap
-            XCTAssertTrue(app.buttons["goal-750"].waitForExistence(timeout: 8),
-                          "launch \(attempt): one Start building tap reaches the goal step")
+            XCTAssertTrue(app.buttons["rental-short"].waitForExistence(timeout: 8),
+                          "launch \(attempt): one Get started tap reaches the goal step")
             XCTAssertFalse(start.exists, "launch \(attempt): Welcome never comes back")
         }
     }
@@ -67,9 +67,9 @@ final class OnboardingUITests: XCTestCase {
         let start = app.buttons["onb-start"]
         XCTAssertTrue(start.waitForExistence(timeout: 20))
         start.tap()                                                // exactly one tap
-        XCTAssertTrue(app.buttons["goal-750"].waitForExistence(timeout: 8), "Start never waits on iCloud")
-        tap(app.buttons["goal-750"])
-        tap(app.buttons["onb-primary"])                            // Build toward 750h
+        XCTAssertTrue(app.buttons["rental-short"].waitForExistence(timeout: 8), "Start never waits on iCloud")
+        UITestIsolation.answerGoalQuestions(app)                   // short stays, real estate is my main job
+        tap(app.buttons["onb-primary"])                            // Aim for 750 hours
         tap(app.buttons["onb-primary"])                            // Look at my calendar (fake deny)
         XCTAssertTrue(app.buttons["who-me"].waitForExistence(timeout: 8))
         tap(app.buttons["onb-primary"])                            // Who: Continue
@@ -77,7 +77,9 @@ final class OnboardingUITests: XCTestCase {
         tap(field)
         field.typeText("Elm")
         tap(app.buttons["onb-primary"])                            // Save it
-        XCTAssertTrue(app.staticTexts["Your house is staked."].waitForExistence(timeout: 10))
+        let setUp = app.staticTexts["staked-setup"]
+        XCTAssertTrue(setUp.waitForExistence(timeout: 10))
+        XCTAssertEqual(setUp.label, "You’re set up for 750 hours.")
     }
 
     // MARK: Happy path
@@ -85,8 +87,12 @@ final class OnboardingUITests: XCTestCase {
     func testHappyPathFindsHoursAndReviewOpensTheInbox() {
         launchFresh(["-LHFakeCalendar", "granted", "-LHFakeNotifications", "granted"])
         tap(app.buttons["onb-start"], timeout: 20)                 // Welcome → a profile on this iPhone
-        tap(app.buttons["goal-750"])
-        tap(app.buttons["onb-primary"])                            // Build toward 750h
+        UITestIsolation.answerGoalQuestions(app, rental: "rental-short", pro: "pro-none")
+        XCTAssertTrue(app.staticTexts["Based on your answers, start here"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["onb-primary"].label, "Aim for 100 hours", "Short stays and no real estate pro: 100 hours, already selected")
+        XCTAssertTrue(app.buttons["goal-100"].isSelected)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Most common")).firstMatch.exists)
+        tap(app.buttons["onb-primary"])
         let look = app.buttons["onb-primary"]
         XCTAssertTrue(look.waitForExistence(timeout: 5))
         XCTAssertEqual(look.label, "Look at my calendar")
@@ -101,11 +107,11 @@ final class OnboardingUITests: XCTestCase {
         field.typeText("Oak Street duplex")
         tap(app.buttons["onb-primary"])                            // Save it: one tap, moves on by itself
         let yes = app.buttons["onb-primary"]
-        XCTAssertTrue(app.staticTexts["Want a note when a visit ends?"].waitForExistence(timeout: 6))
+        XCTAssertTrue(app.staticTexts["Want a nudge to log it while it’s fresh?"].waitForExistence(timeout: 6))
         tap(yes)                                                   // fake notifications "Allow"
         let found = app.staticTexts["staked-found"]
         XCTAssertTrue(found.waitForExistence(timeout: 10))
-        XCTAssertEqual(found.label, "35h found", "The fixture look-back: 22 items, 35h")
+        XCTAssertEqual(found.label, "35 hours found. 0 counted.", "The fixture look-back: 22 items, 35h")
         let review = app.buttons["onb-today"]
         XCTAssertEqual(review.label, "Review 22 suggestions")
         tap(review)
@@ -129,16 +135,16 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(waitForValue(app.buttons["tab.inbox"], "21 to confirm"), "Confirm logged the row")
     }
 
-    // MARK: Skip path: six taps to Today
+    // MARK: Skip path: seven taps to Today
 
-    func testSkipPathIsSixTapsToTheEmptyLot() {
+    func testSkipPathIsSevenTapsToTheEmptyLot() {
         launchFresh()
         tap(app.buttons["onb-start"], timeout: 20)                 // 1
-        tap(app.buttons["goal-750"])                               // 2
-        tap(app.buttons["onb-primary"])                            // 3 Build toward 750h
-        tap(app.buttons["onb-link"])                               // 4 Not now
-        tap(app.buttons["onb-primary"])                            // 5 Continue
-        tap(app.buttons["onb-link"])                               // 6 I'll add it later
+        UITestIsolation.answerGoalQuestions(app)                   // 2, 3 (750 is suggested)
+        tap(app.buttons["onb-primary"])                            // 4 Aim for 750 hours
+        tap(app.buttons["onb-link"])                               // 5 Not now
+        tap(app.buttons["onb-primary"])                            // 6 Continue
+        tap(app.buttons["onb-link"])                               // 7 I'll add it later
         XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["today.hero.addProperty"].waitForExistence(timeout: 5), "The empty lot carries Add property")
         XCTAssertTrue(app.buttons["today-find-hours"].exists, "Look at my calendar waits on Today")
@@ -155,6 +161,8 @@ final class OnboardingUITests: XCTestCase {
     func testCalendarDeniedSkipsTheNoteAndStakesQuietly() {
         launchFresh(["-LHFakeCalendar", "denied"])
         tap(app.buttons["onb-start"], timeout: 20)
+        UITestIsolation.answerGoalQuestions(app, rental: "rental-long", pro: "pro-none")
+        XCTAssertEqual(app.buttons["onb-primary"].label, "Aim for 500 hours", "Long-term and no real estate pro: 500 hours")
         tap(app.buttons["goal-record"])
         XCTAssertEqual(app.buttons["onb-primary"].label, "Keep a record")
         tap(app.buttons["onb-primary"])
@@ -165,7 +173,8 @@ final class OnboardingUITests: XCTestCase {
         field.typeText("Pine")
         XCTAssertFalse(app.descendants(matching: .any)["property-hint"].exists, "No count without the calendar")
         tap(app.buttons["onb-primary"])                            // Save it
-        XCTAssertTrue(app.staticTexts["Your house is staked."].waitForExistence(timeout: 8), "No visit-end note without the calendar")
+        XCTAssertTrue(app.staticTexts["staked-setup"].waitForExistence(timeout: 8), "No visit-end note without the calendar")
+        XCTAssertEqual(app.staticTexts["staked-setup"].label, "You’re set up to keep a record.")
         XCTAssertEqual(app.buttons["onb-today"].label, "Go to Today")
         tap(app.buttons["onb-today"])
         XCTAssertTrue(app.buttons["today-find-hours"].waitForExistence(timeout: 8))
@@ -174,10 +183,10 @@ final class OnboardingUITests: XCTestCase {
     func testNotificationsDeclinedInAppNeverPrompts() {
         launchFresh(["-LHFakeCalendar", "granted", "-LHFakeNotifications", "granted"])
         tap(app.buttons["onb-start"], timeout: 20)
-        tap(app.buttons["goal-750"])
-        tap(app.buttons["onb-primary"])
-        tap(app.buttons["onb-primary"])
-        tap(app.buttons["onb-primary"])
+        UITestIsolation.answerGoalQuestions(app)
+        tap(app.buttons["onb-primary"])                            // Aim for 750 hours
+        tap(app.buttons["onb-primary"])                            // Look at my calendar
+        tap(app.buttons["onb-primary"])                            // Who: Continue
         let field = app.textFields["property-name"]
         tap(field)
         field.typeText("Oak")
@@ -189,11 +198,15 @@ final class OnboardingUITests: XCTestCase {
     func testBackGoesToThePreviousStep() {
         launchFresh()
         tap(app.buttons["onb-start"], timeout: 20)
-        tap(app.buttons["goal-750"])
+        UITestIsolation.answerGoalQuestions(app)
         tap(app.buttons["onb-primary"])
         XCTAssertTrue(app.buttons["onb-link"].waitForExistence(timeout: 5))
         tap(app.buttons["onb-back"])
-        XCTAssertTrue(app.staticTexts["What are you building toward?"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Based on your answers, start here"].waitForExistence(timeout: 5))
+        tap(app.buttons["onb-back"])                               // back through the questions
+        XCTAssertTrue(app.staticTexts["Do you or your spouse do real estate as a main job?"].waitForExistence(timeout: 5))
+        tap(app.buttons["onb-back"])
+        XCTAssertTrue(app.staticTexts["What do you rent out?"].waitForExistence(timeout: 5))
     }
 
     // MARK: Upgraders
@@ -220,7 +233,7 @@ final class OnboardingUITests: XCTestCase {
         app.resetAuthorizationStatus(for: .calendar)                // iOS will ask again
         launchFresh()
         tap(app.buttons["onb-start"], timeout: 20)
-        tap(app.buttons["goal-750"])
+        UITestIsolation.answerGoalQuestions(app)
         tap(app.buttons["onb-primary"])
         let look = app.buttons["onb-primary"]
         XCTAssertTrue(look.waitForExistence(timeout: 5))
@@ -259,7 +272,7 @@ final class OnboardingUITests: XCTestCase {
         tapAlertButton(alert, ["Allow Full Access", "Allow"])
         XCTAssertTrue(app.buttons["who-me"].waitForExistence(timeout: 8), "Allowed: on to Who does the work")
         nameRental("Oak")
-        XCTAssertTrue(app.staticTexts["Want a note when a visit ends?"].waitForExistence(timeout: 8),
+        XCTAssertTrue(app.staticTexts["Want a nudge to log it while it’s fresh?"].waitForExistence(timeout: 8),
                       "The visit-end note is asked only after a real calendar grant")
         tap(app.buttons["onb-secondary"])                          // Not now
         XCTAssertTrue(app.buttons["onb-today"].waitForExistence(timeout: 10))
@@ -271,7 +284,7 @@ final class OnboardingUITests: XCTestCase {
         tapAlertButton(alert, ["Don’t Allow", "Don't Allow"])
         XCTAssertTrue(app.buttons["who-me"].waitForExistence(timeout: 8), "Denied: on to Who does the work, no scolding")
         nameRental("Pine")
-        XCTAssertTrue(app.staticTexts["Your house is staked."].waitForExistence(timeout: 8), "No visit-end note without the calendar")
+        XCTAssertTrue(app.staticTexts["staked-setup"].waitForExistence(timeout: 8), "No visit-end note without the calendar")
         XCTAssertEqual(app.buttons["onb-today"].label, "Go to Today")
         tap(app.buttons["onb-today"])
         XCTAssertTrue(app.buttons["today-find-hours"].waitForExistence(timeout: 8), "Today keeps a way back to the calendar")
@@ -282,8 +295,8 @@ final class OnboardingUITests: XCTestCase {
     func testOnlyNonCountableWorkFoundSaysSoInsteadOfHours() {
         launchFresh(["-LHFakeCalendar", "granted", "-LHFakeNotifications", "granted", "-LHBackfillNonCountable"])
         tap(app.buttons["onb-start"], timeout: 20)
-        tap(app.buttons["goal-750"])
-        tap(app.buttons["onb-primary"])                            // Build toward 750h
+        UITestIsolation.answerGoalQuestions(app)
+        tap(app.buttons["onb-primary"])                            // Aim for 750 hours
         tap(app.buttons["onb-primary"])                            // Look at my calendar (fake allow)
         tap(app.buttons["onb-primary"])                            // Who: Continue
         let field = app.textFields["property-name"]
@@ -294,7 +307,7 @@ final class OnboardingUITests: XCTestCase {
         let line = app.staticTexts["staked-nothing-countable"]
         XCTAssertTrue(line.waitForExistence(timeout: 10))
         XCTAssertEqual(line.label.lowercased(), "we found 22 things, but none count toward your hours yet.")
-        XCTAssertTrue(app.staticTexts["Your house is staked."].exists)
+        XCTAssertTrue(app.staticTexts["staked-setup"].exists)
         XCTAssertFalse(app.staticTexts["staked-found"].exists, "Never a found-hours headline")
         XCTAssertEqual(app.buttons["onb-today"].label, "Review 22 suggestions", "They still wait in the Inbox")
         tap(app.buttons["onb-today"])

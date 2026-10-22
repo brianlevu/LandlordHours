@@ -9,6 +9,9 @@ import PhotosUI
 // docs/design/2.0-hifi-reference-spec.md §j.
 
 struct SettingsView: View {
+    #if DEBUG
+    @MainActor private static var didApplyDebugRoute = false
+    #endif
     @EnvironmentObject var viewModel: AppViewModel
     @EnvironmentObject var categoryManager: CategoryManager
     @StateObject private var subscriptionManager = SubscriptionManager.shared
@@ -75,7 +78,7 @@ struct SettingsView: View {
                 appSection
                 privacySection
                 supportSection
-                SettingsAccountSection()
+                SettingsAccountSection(onDeleteData: { route = .deleteData })
 
                 Section {
                     VStack(alignment: .leading, spacing: 12) {
@@ -108,15 +111,8 @@ struct SettingsView: View {
                 case .learningCenter: LearningCenterView()
                 case .contactSupport: ContactSupportView()
                 case .muted: MutedSuggestionsView()
+                case .deleteData: DeleteAllDataView()
                 }
-            }
-            .alert("Restore purchase", isPresented: Binding(
-                get: { restoreStatusMessage != nil },
-                set: { if !$0 { restoreStatusMessage = nil } }
-            )) {
-                Button("OK", role: .cancel) { restoreStatusMessage = nil }
-            } message: {
-                Text(restoreStatusMessage ?? "")
             }
             .sheet(isPresented: $showingProfileEdit) {
                 ProfileEditView(userName: $userName, userEmail: $userEmail, profileImage: $profileImage)
@@ -133,6 +129,20 @@ struct SettingsView: View {
                 }
             }
             .task(id: viewModel.isSignedIn) {
+                #if DEBUG
+                // Before the profile discovery below, which can wait on iCloud for a long time on
+                // a signed-in device. `.task` re-runs when Settings reappears after a pop, so the
+                // page opens once per launch.
+                if !Self.didApplyDebugRoute {
+                    if ProcessInfo.processInfo.arguments.contains("-LHOpenDeleteData") {
+                        Self.didApplyDebugRoute = true
+                        route = .deleteData
+                    } else if ProcessInfo.processInfo.arguments.contains("-LHOpenLearningCenterFromSettings") {
+                        Self.didApplyDebugRoute = true
+                        route = .learningCenter
+                    }
+                }
+                #endif
                 restorableProfiles = await viewModel.discoverRestorableProfiles()
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("-LHOpenRestoreSheet"), !restorableProfiles.isEmpty {
@@ -236,15 +246,19 @@ struct SettingsView: View {
 
             Button {
                 Task {
+                    restoreStatusMessage = nil
                     await subscriptionManager.restorePurchases()
                     restoreStatusMessage = subscriptionManager.hasPurchased
-                        ? "Your Pro purchase has been restored."
-                        : (subscriptionManager.purchaseError ?? "No previous purchase was found.")
+                        ? String(localized: "Your Pro purchase has been restored.")
+                        : (subscriptionManager.restoreFailureMessage ?? subscriptionManager.purchaseError ?? String(localized: "No previous purchase was found."))
                 }
             } label: {
+                // The result shows inline under the row (not a system alert, whose message text
+                // iOS draws below AA); the row stays tappable to try again.
                 SettingRow(
                     symbol: "arrow.clockwise",
-                    title: subscriptionManager.isLoading ? "Restoring purchase…" : "Restore purchase"
+                    title: subscriptionManager.isLoading ? "Restoring purchase…" : "Restore purchase",
+                    subtitle: subscriptionManager.isLoading ? nil : restoreStatusMessage
                 )
             }
             .buttonStyle(.plain)
@@ -371,7 +385,7 @@ struct SettingsView: View {
         } header: {
             BPSectionHeader(title: "Records")
         } footer: {
-            Text("Photos attached to records stay on this iPhone. They aren't included in iCloud sync.")
+            Text("Photos attached to records stay on this iPhone. They aren’t included in iCloud sync.")
                 .font(.footnote)
                 .foregroundStyle(colors.textSecondary)
                 .accessibilityIdentifier("settings.photoStorageDisclosure")
@@ -458,7 +472,7 @@ struct SettingsView: View {
     private var syncSubtitle: String? {
         if viewModel.syncService.isSyncing || viewModel.syncService.isRunningInitialSync { return "Syncing…" }
         if !viewModel.syncService.accountAvailable { return "iCloud sync is off. Your records are safe on this iPhone." }
-        if viewModel.syncService.syncError != nil { return "Couldn't sync just now. Your records are safe on this iPhone." }
+        if viewModel.syncService.syncError != nil { return "Couldn’t sync just now. Your records are safe on this iPhone." }
         if let date = viewModel.syncService.lastSyncDate {
             let formatter = RelativeDateTimeFormatter()
             formatter.unitsStyle = .short
@@ -556,7 +570,7 @@ struct ProfileAvatar: View {
 /// Settings' pushed screens. Buttons + one destination (not NavigationLinks in the List), so
 /// each row is a plain button for VoiceOver and UI tests, with its own chevron.
 enum SettingsRoute: Hashable {
-    case taxProfile, learningCenter, contactSupport, muted
+    case taxProfile, learningCenter, contactSupport, muted, deleteData
 }
 
 private struct AutoCaptureSettingsSection: View {
@@ -572,7 +586,30 @@ private struct AutoCaptureSettingsSection: View {
     @State private var blockedMessage: String?
     @State private var isAsking = false
 
-    static let aiDisclosure = "Suggestions use Apple's on-device model. Nothing is sent to us or any third party."
+    @State private var pccOn = PCCSettings().isEnabled
+
+    /// Must stay true to the code: calendar titles only ever reach the on-device model
+    /// (ClassifierChain); a Log time note goes to the on-device model first and to Private
+    /// Cloud Compute only when the phone's model can't answer and the toggle below is on
+    /// (NoteReaderChain + PCCGate). Nothing is saved until the user taps Log.
+    /// PCC is offered (toggle + disclosure) only on iOS 27 in a build that carries the PCC
+    /// entitlement (PCCEntitlement). Otherwise notes never leave the phone, and the copy says so.
+    static var offersPCC: Bool {
+        guard #available(iOS 27.0, *) else { return false }
+        #if DEBUG
+        // Captures of the entitled variant only; the gate itself never reads this.
+        if ProcessInfo.processInfo.arguments.contains("-LHShowPCCSetting") { return true }
+        #endif
+        return PCCEntitlement.isConfigured
+    }
+
+    static var aiDisclosure: String { offersPCC ? aiDisclosureWithPCC : aiDisclosureOnDevice }
+
+    static let aiDisclosureWithPCC = "Calendar suggestions use Apple\u{2019}s on-device model. When you type or say a note in Log time, that model reads it to fill in the form. If it can\u{2019}t, Apple\u{2019}s Private Cloud Compute may read it instead (turn that off above). Apple runs Private Cloud Compute, and it doesn\u{2019}t keep your note. Nothing goes to us or anyone else, and nothing is saved until you tap Log."
+
+    static let aiDisclosureOnDevice = "Calendar suggestions and the notes you type or say in Log time are read by Apple\u{2019}s on-device model, on your iPhone, to fill in the form. Nothing goes to us or anyone else, and nothing is saved until you tap Log."
+
+    static let pccSubtitle = "Lets Apple\u{2019}s Private Cloud Compute read a Log time note when your iPhone\u{2019}s model can\u{2019}t. Apple runs it and keeps nothing. Off keeps every note on your iPhone."
 
     var body: some View {
         Section {
@@ -593,6 +630,19 @@ private struct AutoCaptureSettingsSection: View {
             )
             .disabled(!calendarOn || isAsking || UserScope.userId == nil)
             .accessibilityIdentifier("settings.capture.prompts")
+
+            if Self.offersPCC {
+                SettingToggleRow(
+                    symbol: "lock.icloud",
+                    title: "Private Cloud Compute",
+                    subtitle: Self.pccSubtitle,
+                    isOn: Binding(get: { pccOn }, set: { on in
+                        pccOn = on
+                        PCCSettings().isEnabled = on
+                    })
+                )
+                .accessibilityIdentifier("settings.capture.pcc")
+            }
 
             Button(action: onOpenMuted) {
                 SettingRow(
@@ -649,6 +699,7 @@ private struct AutoCaptureSettingsSection: View {
     private func reload() {
         calendarOn = CaptureOptIn.calendarSuggestionsEnabled()
         promptsOn = EventPromptsConsent.isEnabled()
+        pccOn = PCCSettings().isEnabled
         muteCount = AppModelHost.shared.suggestionStore?.muteRules.count ?? 0
     }
 
@@ -832,7 +883,7 @@ private struct SavedLabelStyle: LabelStyle {
 
 /// Plain disclaimer at the foot of Settings. The PDF export carries its own version.
 struct NotTaxAdviceNote: View {
-    static let text = "LandlordHours keeps your records. It doesn't give tax advice. Check your qualification with a tax professional."
+    static let text = "LandlordHours keeps your records. It doesn’t give tax advice. Ask a tax professional what your hours mean for you."
 
     @Environment(\.colorScheme) private var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
@@ -909,7 +960,7 @@ struct TaxProfileView: View {
                 SettingToggleRow(
                     symbol: "person.2",
                     title: "Spouse hours",
-                    subtitle: "Track your spouse's hours too. They count together for material participation, never for your 750.",
+                    subtitle: "Track your spouse’s hours too. They count together for material participation, never for your 750.",
                     isOn: $taxProfile.spouseTracking
                 )
                 .accessibilityIdentifier("taxProfile.spouseTracking")

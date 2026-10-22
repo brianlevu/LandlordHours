@@ -1218,10 +1218,21 @@ final class EngagementIntelligenceServiceTests: XCTestCase {
         context.goalType = .str
         context.targetHours = 100
 
+        // Both kinds of rental (Oak is long-term, Elm is short-term): the 100 and 500 hour tests are
+        // counted per rental, so ungrouped owners get the short-term rental's own count (Elm's
+        // 100), never the long-term rental's 525 standing in for it.
         context.groupingElection = false
-        XCTAssertEqual(service.snapshot(for: context, calendar: calendar).yearHours, 525, accuracy: 0.001)
+        XCTAssertEqual(service.snapshot(for: context, calendar: calendar).yearHours, 100, accuracy: 0.001)
         context.groupingElection = true
         XCTAssertEqual(service.snapshot(for: context, calendar: calendar).yearHours, 625, accuracy: 0.001)
+        // Two long-term rentals: the best single property, as before.
+        let c = RentalProperty(name: "Birch", address: "3 Birch", propertyType: .ltr)
+        var ltrOnly = makeContext(now: date(year: 2026, month: 10, day: 1), properties: [a, c],
+                                  entries: [e(a, .selfParticipant, 300), e(a, .spouse, 225), e(c, .selfParticipant, 100)])
+        ltrOnly.goalType = .str
+        ltrOnly.targetHours = 100
+        ltrOnly.groupingElection = false
+        XCTAssertEqual(service.snapshot(for: ltrOnly, calendar: calendar).yearHours, 525, accuracy: 0.001)
     }
 
     func testIntentSummaryShowsSelfHoursTowardRepsTarget() {
@@ -1234,7 +1245,7 @@ final class EngagementIntelligenceServiceTests: XCTestCase {
             recommendation: service.recommendation(for: context)
         )
 
-        XCTAssertTrue(text.contains("You have 300.0 hours toward 750 this year"), text)
+        XCTAssertTrue(text.contains("You have 300 of your 750 hours for 2026"), text)
         XCTAssertFalse(text.contains("900"), text)
     }
 
@@ -1248,7 +1259,7 @@ final class EngagementIntelligenceServiceTests: XCTestCase {
             recommendation: service.recommendation(for: context)
         )
 
-        XCTAssertTrue(text.contains("You have 900.0 hours toward 100 this year"), text)
+        XCTAssertTrue(text.contains("You have 900 hours for 2026, past your 100-hour goal"), text)
     }
 
     func testWidgetSnapshotProgressUsesSelfHoursForReps() {

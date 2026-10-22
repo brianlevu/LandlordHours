@@ -67,9 +67,10 @@ final class PropertyCountableHoursTests: CaptureTestCase {
         TaxProfileManager.shared.spouseTracking = true
         XCTAssertEqual(vm.propertyCountableHours(oak, goal: .mp500), 110, accuracy: 0.001)
         XCTAssertEqual(vm.propertyCountableHours(pine, goal: .mp100), 10, accuracy: 0.001)
-        // Without a grouping election the best property is Today's number.
+        // Without a grouping election Today shows one rental's own count: with both kinds of
+        // rental (Oak is long-term, Pine Cabin is short-term) that is the short-term rental's.
         TaxProfileManager.shared.groupingElection = false
-        XCTAssertEqual(vm.propertyCountableHours(oak, goal: .mp500), vm.houseCountableHours(goal: .mp500), accuracy: 0.001)
+        XCTAssertEqual(vm.propertyCountableHours(pine, goal: .mp500), vm.houseCountableHours(goal: .mp500), accuracy: 0.001)
 
         TaxProfileManager.shared.spouseTracking = false
         XCTAssertEqual(vm.propertyCountableHours(oak, goal: .mp500), 70, accuracy: 0.001)
@@ -185,7 +186,7 @@ final class PropertyHouseStageTests: XCTestCase {
         for goal in [HouseGoal.mp500, .mp100] {
             XCTAssertEqual(PropertyMeta.hoursLine(212, goal: goal, groupingElection: false), "212h of 500h")
             XCTAssertEqual(PropertyMeta.hoursLine(499.9, goal: goal, groupingElection: false), "499h of 500h")
-            XCTAssertEqual(PropertyMeta.hoursLine(520, goal: goal, groupingElection: false), "520h · roof’s on")
+            XCTAssertEqual(PropertyMeta.hoursLine(520, goal: goal, groupingElection: false), "520h this year")
             // With a grouping election there is no per-rental test.
             XCTAssertEqual(PropertyMeta.hoursLine(212, goal: goal, groupingElection: true), "212h this year")
         }

@@ -59,7 +59,7 @@ final class EngagementSpouseSettingTests: XCTestCase {
             snapshot: service.snapshot(for: ctx, calendar: calendar),
             recommendation: service.recommendation(for: ctx, calendar: calendar)
         )
-        XCTAssertTrue(text.contains("You have 300.0 hours toward 100 this year"), text)
+        XCTAssertTrue(text.contains("You have 300 hours for 2026, past your 100-hour goal"), text)
     }
 
     func testDefaultContextKeepsTheJointTotal() {
@@ -300,7 +300,7 @@ final class ReportsLogicTests: XCTestCase {
 
     func testBothTestsMetIsPositive() {
         let standing = ReportsLogic.repsStanding(person: .you, rep: rep(hours: 800, other: 400), year: 2026, now: midOctober, calendar: calendar)
-        XCTAssertEqual(standing.status, "Both tests met")
+        XCTAssertEqual(standing.status, "Past both marks")
         XCTAssertEqual(standing.tone, .positive)
     }
 

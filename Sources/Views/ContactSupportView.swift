@@ -25,7 +25,7 @@ struct ContactSupportView: View {
                         .lhDisplayFont(.largeTitle)
                         .foregroundStyle(colors.textPrimary)
                         .accessibilityAddTraits(.isHeader)
-                    Text("Questions about tracking, exports or setup? Write to Brian, who builds LandlordHours. You'll hear back by email.")
+                    Text("Questions about tracking, exports or setup? Write to Brian, who builds LandlordHours. You’ll hear back by email.")
                         .font(.subheadline)
                         .foregroundStyle(colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)

@@ -79,6 +79,72 @@ final class LogTimeUITests: XCTestCase {
         XCTAssertTrue(element("log.missing").exists)
     }
 
+    // MARK: Apple's model fills the note (NoteReaderChain; -LHNoteModel scripts the model tier)
+
+    func testModelFillsEveryFieldAndUndoPutsThemBack() {
+        launch(seed: "four", extra: ["-LHNoteModel", "fake"])
+        app.buttons["tab.logTime"].tap()
+        let note = element("log.note")
+        XCTAssertTrue(note.waitForExistence(timeout: 8))
+        note.tap()
+        note.typeText("fixed the sink at Oak St with Mike, about 2 hours yesterday")
+        let description = element("log.description")
+        XCTAssertTrue(description.waitForExistence(timeout: 8), "the model's description for the record")
+        XCTAssertTrue(app.buttons["log.property"].label.contains("Oak Street Duplex"), app.buttons["log.property"].label)
+        XCTAssertTrue(app.buttons["log.category"].label.contains("Repairs"), app.buttons["log.category"].label)
+        XCTAssertTrue(app.buttons["log.date"].label.contains("Yesterday"), app.buttons["log.date"].label)
+        XCTAssertEqual(app.buttons["log.save"].label, "Log 2h")
+        XCTAssertTrue(element("log.fill.caption").waitForExistence(timeout: 4))
+        app.buttons["log.done"].tap()
+        app.buttons["log.fill.undo"].tap()
+        XCTAssertTrue(description.waitForNonExistence(timeout: 4), "Undo clears the description")
+        XCTAssertTrue(app.buttons["log.property"].label.contains("Choose"), app.buttons["log.property"].label)
+        XCTAssertTrue(app.buttons["log.date"].label.contains("Today"), app.buttons["log.date"].label)
+        XCTAssertEqual(app.buttons["log.save"].label, "Log 1h")
+    }
+
+    func testTwoRentalsLeaveThePropertyForTheUser() {
+        launch(seed: "four", extra: ["-LHNoteModel", "fake"])
+        app.buttons["tab.logTime"].tap()
+        let note = element("log.note")
+        XCTAssertTrue(note.waitForExistence(timeout: 8))
+        note.tap()
+        note.typeText("Fixed the sink at Pine Cabin and mowed at Maple Court, 2 hours")
+        XCTAssertTrue(element("log.propertyHint").waitForExistence(timeout: 8))
+        XCTAssertTrue(shows("mentions 2 rentals"))
+        XCTAssertTrue(app.buttons["log.property"].label.contains("Choose"), app.buttons["log.property"].label)
+    }
+
+    func testWithoutAModelTheRulesStillFill() {
+        launch(seed: "four", extra: ["-LHNoteModel", "unavailable"])
+        app.buttons["tab.logTime"].tap()
+        let note = element("log.note")
+        XCTAssertTrue(note.waitForExistence(timeout: 8))
+        note.tap()
+        note.typeText("fixed the sink at Oak St with Mike, about 2 hours yesterday")
+        XCTAssertTrue(element("log.fill.caption").waitForExistence(timeout: 6))
+        XCTAssertTrue(app.buttons["log.property"].label.contains("Oak Street Duplex"))
+        XCTAssertEqual(app.buttons["log.save"].label, "Log 2h")
+        XCTAssertFalse(element("log.reading").exists, "no drafting line without a model")
+        XCTAssertFalse(element("log.description").exists, "rules never write a description")
+    }
+
+    func testWhileTheModelThinksTheRulesHaveFilledAndLogStillWorks() {
+        launch(seed: "four", extra: ["-LHNoteModel", "thinking"])
+        app.buttons["tab.logTime"].tap()
+        let note = element("log.note")
+        XCTAssertTrue(note.waitForExistence(timeout: 8))
+        note.tap()
+        note.typeText("fixed the sink at Oak St, 2 hours")
+        XCTAssertTrue(element("log.reading").waitForExistence(timeout: 6), "the drafting line while Apple's model reads")
+        XCTAssertTrue(app.buttons["log.property"].label.contains("Oak Street Duplex"), "the rules filled first")
+        let save = app.buttons["log.save"]
+        XCTAssertEqual(save.label, "Log 2h")
+        XCTAssertTrue(save.isEnabled, "the UI never blocks on the model")
+        save.tap()
+        XCTAssertTrue(element("shell.toast").waitForExistence(timeout: 5))
+    }
+
     func testVoiceDeniedOffersSettingsAndDimsTheMic() {
         launch(seed: "four", extra: ["-LHVoiceDenied"])
         app.buttons["tab.logTime"].tap()
@@ -162,7 +228,7 @@ final class LogTimeUITests: XCTestCase {
         save.tap()
         let error = element("log.saveError")
         XCTAssertTrue(error.waitForExistence(timeout: 4))
-        XCTAssertTrue(shows("Couldn't save this"), error.label)
+        XCTAssertTrue(shows("Couldn’t save this"), error.label)
         XCTAssertTrue(save.exists, "the sheet stays open with the note")
         XCTAssertFalse(element("shell.toast").exists)
         save.tap()   // the next try works
@@ -173,7 +239,7 @@ final class LogTimeUITests: XCTestCase {
         launch(seed: "four", extra: ["-LHOpenLog", "notCounted"])
         let line = element("log.notCounted")
         XCTAssertTrue(line.waitForExistence(timeout: 10))
-        XCTAssertTrue(shows("Financing doesn\u{2019}t count toward your hours or the house."), line.label)
+        XCTAssertTrue(shows("Financing doesn\u{2019}t count toward your hours."), line.label)
         XCTAssertTrue(app.buttons["log.save"].isEnabled)
     }
 
@@ -232,6 +298,11 @@ final class LogTimeUITests: XCTestCase {
         var extra: [String] = []
         let waitFor: String
         var settle: Double = 1.2
+        /// Tapped after `waitFor` appears (e.g. Undo), then `then` is awaited.
+        var tap: String? = nil
+        var then: String? = nil
+        /// Scrolled fully into view instead of `waitFor` (e.g. the Date row below the description).
+        var scrollTo: String? = nil
     }
 
     private let shots: [Shot] = [
@@ -254,6 +325,15 @@ final class LogTimeUITests: XCTestCase {
         Shot(name: "timer-idle", seed: "four", extra: ["-LHOpenLog", "timerIdle"], waitFor: "timer.start"),
         Shot(name: "timer-running", seed: "four", extra: ["-LHOpenLog", "timerRunning"], waitFor: "timer.card"),
         Shot(name: "timer-review", seed: "four", extra: ["-LHOpenLog", "timerReview"], waitFor: "log.timer.ran"),
+        // Apple's model filling the note (scripted model tier, the real reader and form).
+        Shot(name: "ai-thinking", seed: "four", extra: ["-LHOpenLog", "aiNote", "-LHNoteModel", "thinking"], waitFor: "log.reading", settle: 1.5),
+        Shot(name: "ai-filled", seed: "four", extra: ["-LHOpenLog", "aiNote", "-LHNoteModel", "fake"], waitFor: "log.description", settle: 1.5,
+             scrollTo: "log.date"),
+        Shot(name: "ai-undone", seed: "four", extra: ["-LHOpenLog", "aiNote", "-LHNoteModel", "fake"], waitFor: "log.description", settle: 1.0,
+             tap: "log.fill.undo", then: "log.property"),
+        Shot(name: "ai-partial", seed: "four", extra: ["-LHOpenLog", "aiPartial", "-LHNoteModel", "fake"], waitFor: "log.fill.caption", settle: 1.5),
+        Shot(name: "ai-two-rentals", seed: "four", extra: ["-LHOpenLog", "aiTwoRentals", "-LHNoteModel", "fake"], waitFor: "log.propertyHint", settle: 1.5),
+        Shot(name: "ai-rules-only", seed: "four", extra: ["-LHOpenLog", "aiNote", "-LHNoteModel", "unavailable"], waitFor: "log.fill.caption", settle: 1.5),
         Shot(name: "today-timer-running", seed: "four", extra: ["-LHTodayTimer", "running"], waitFor: "today.timer.stop", settle: 2),
         Shot(name: "today-timer-draft", seed: "four", extra: ["-LHTodayTimer", "draft"], waitFor: "today.timerDraft", settle: 2),
         Shot(name: "today-timer-discarded", seed: "four", extra: ["-LHTodayTimer", "discarded"], waitFor: "shell.toast", settle: 1),
@@ -282,6 +362,21 @@ final class LogTimeUITests: XCTestCase {
         }
     }
 
+    /// Apple's model filling the note: thinking, filled, Undo, partial, no model → rules.
+    /// Frames changed by the 44pt Undo target and the Date-row scroll (round 2).
+    func testCaptureAIFillFixups() {
+        let names: Set<String> = ["ai-filled", "ai-partial", "ai-rules-only", "ai-two-rentals"]
+        for scheme in ["light", "dark"] {
+            for size in [nil, "xxl", "ax3"] as [String?] { captureAll(scheme: scheme, size: size, prefix: "ai-", names: names) }
+        }
+    }
+
+    func testCaptureAIFillStates() {
+        for scheme in ["light", "dark"] {
+            for size in [nil, "xxl", "ax3"] as [String?] { captureAll(scheme: scheme, size: size, prefix: "ai-") }
+        }
+    }
+
     /// Today's timer card in every scheme and size (re-run after a Today-only fix).
     func testCaptureTodayTimerCards() {
         for scheme in ["light", "dark"] {
@@ -295,13 +390,31 @@ final class LogTimeUITests: XCTestCase {
         for shot in shots where shot.name.hasPrefix(prefix) && (names?.contains(shot.name) ?? true) {
             app.terminate()
             launch(seed: shot.seed, scheme: scheme, extra: shot.extra + sizeArgs(size))
-            let target = element(shot.waitFor)
+            var target = element(shot.waitFor)
             XCTAssertTrue(target.waitForExistence(timeout: 15), "\(shot.name): \(shot.waitFor)")
+            if let tap = shot.tap {
+                // Let the fill settle, then tap (Undo) and wait for the result.
+                Thread.sleep(forTimeInterval: 1.2)
+                let button = element(tap)
+                if button.waitForExistence(timeout: 6) { button.tap() }
+                if let then = shot.then { XCTAssertTrue(element(then).waitForExistence(timeout: 6), "\(shot.name): \(then)") }
+                XCTAssertFalse(element("log.description").exists, "\(shot.name): Undo cleared the description")
+                // The waited-for element may be gone after the tap: scroll to the result instead.
+                target = element(shot.then ?? "log.property")
+            }
+            if let scrollTo = shot.scrollTo {
+                // The fill lands after ~1 s; scroll once the row is final.
+                Thread.sleep(forTimeInterval: 1.2)
+                target = element(scrollTo)
+            }
             if shot.waitFor != "shell.toast" && shot.waitFor != "log.done" {
                 // Today's card sits under the hero, and at AX sizes a sheet's state (the Who row,
                 // the save error) can sit below the fold: scroll it fully into view.
                 let today = app.buttons["tab.today"]
-                let bottom = shot.name.hasPrefix("today-") ? today.frame.minY : app.windows.firstMatch.frame.maxY - 24
+                var bottom = shot.name.hasPrefix("today-") ? today.frame.minY : app.windows.firstMatch.frame.maxY - 24
+                // A row the pinned Log button would fade over must clear the button.
+                let save = app.buttons["log.save"]
+                if shot.scrollTo != nil, save.exists { bottom = min(bottom, save.frame.minY - 48) }
                 let bar = (bottom: bottom, minY: bottom)
                 // Short drags from mid-screen (never from an edge, which would leave the app)
                 // until the card sits fully above the tab bar.

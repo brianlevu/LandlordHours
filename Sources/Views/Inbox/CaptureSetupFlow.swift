@@ -229,7 +229,7 @@ struct CaptureSetupFlow: View {
     /// One suggestion row and one notification, so people see what they are agreeing to.
     private var preview: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("What you'll see")
+            Text("What you’ll see")
                 .font(.footnote.weight(.semibold))
                 .textCase(.uppercase)
                 .tracking(0.3)

@@ -57,7 +57,10 @@ struct ContentView: View {
     /// 2.0: "+" opens Log time / the timer as a sheet (it covers the tab bar). Tab index 2 is
     /// kept as a route: anything that selects it opens this sheet instead.
     @State private var logRoute: LogSheetRoute?
-    @ObservedObject private var shellToasts = AppToastCenter.shared
+    /// 2.0 surfaces: the one toast queue (Log time and the timer post to it through
+    /// `AppToastCenter`), and Get help opened from the load-error toast.
+    @ObservedObject private var toastCenter = LHToastCenter.shared
+    @State private var showGetHelp = false
 
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
@@ -94,18 +97,23 @@ struct ContentView: View {
                 .zIndex(999)
             }
         }
-        .overlay(alignment: .top) {
-            if let message = viewModel.persistenceError {
-                LHErrorBanner(message: message) {
-                    animate(AppAnimation.reveal) { viewModel.persistenceError = nil }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .zIndex(1000)
+        // 2.0: the one toast (LHToast) replaces the save-error banner and the property-added
+        // confetti. In the tab shell the Inbox's own toast takes the slot first; the queue waits.
+        .overlay(alignment: .bottom) {
+            if !(isShowingMainContent && inboxModel.toast != nil) {
+                LHToastHost(center: toastCenter)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, isShowingMainContent && !isCustomTabBarHidden ? Self.tabBarHeight + 8 + 12 : 12)
+                    .zIndex(1000)
             }
         }
-        .lhMotion(AppAnimation.reveal, value: viewModel.persistenceError)
+        .onChange(of: viewModel.persistenceError, initial: true) { _, message in
+            guard let message else { return }
+            showPersistenceToast(message)
+        }
+        .sheet(isPresented: $showGetHelp) {
+            NavigationStack { ContactSupportView() }
+        }
         // WP-P: the one paywall, opened by any screen through ProPaywallPresenter.shared.
         .proPaywallHost()
         #if DEBUG
@@ -171,6 +179,19 @@ struct ContentView: View {
         guard CaptureOptIn.shouldShowWhatsNew(hasCompletedOnboarding: completed) else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
             showCaptureWhatsNew = true
+        }
+    }
+
+    private var isShowingMainContent: Bool { viewModel.isSignedIn && !showOnboarding }
+
+    /// Save failed → "Retry"; load failed → "Help" (the records are still on this iPhone).
+    private func showPersistenceToast(_ message: String) {
+        if message == AppViewModel.loadFailureMessage {
+            toastCenter.show(.problem, message, actionTitle: "Help") { showGetHelp = true }
+        } else {
+            toastCenter.show(.problem, message, actionTitle: "Retry") { [weak viewModel] in
+                viewModel?.retrySave()
+            }
         }
     }
 
@@ -263,20 +284,12 @@ struct ContentView: View {
                     .zIndex(5)
             }
 
-            // Log time and timer toasts ("Logged 1h 30m at Pine Cabin · Undo"): the Inbox toast,
-            // full width, just above the tab bar.
-            if let toast = shellToasts.inboxToast, inboxModel.toast == nil, !isCustomTabBarHidden {
-                InboxUndoToast(toast: toast, onUndo: { shellToasts.undo() },
-                               showsUndo: shellToasts.toast?.hasUndo ?? false, identifier: "shell.toast")
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, Self.tabBarHeight + 8 + 12)
-                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-                    .zIndex(5)
-            }
+            // Log time and timer toasts go through LHToastCenter (the shell's LHToastHost).
         }
         .onAppear {
             #if DEBUG
             InboxDebugSeed.applyIfNeeded(app: viewModel)
+            SurfaceDebugHooks.apply(toasts: toastCenter, app: viewModel)
             #endif
             inboxModel.reload()
             presentCaptureWhatsNewIfNeeded()
@@ -311,12 +324,13 @@ struct ContentView: View {
                 .presentationDragIndicator(.hidden)
                 .presentationBackground(colors.background)
         }
-        .lhMotion(AppAnimation.reveal, value: shellToasts.toast)
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { inboxModel.reload() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .captureSuggestionsDidChange)) { _ in
             inboxModel.reload(animated: true)
+            // The widget's to-confirm count is the Inbox badge's count.
+            viewModel.refreshWidgetSurface()
         }
         .lhMotion(AppAnimation.reveal, value: exportBanner)
         // WP-L: the look-back finished in the background. Today plays the house reveal itself;
@@ -437,7 +451,7 @@ struct ContentView: View {
     }
 
     private func openLog(_ route: LogSheetRoute) {
-        shellToasts.dismiss()
+        AppToastCenter.shared.dismiss()
         guard logRoute == nil else { return }
         logRoute = route
     }

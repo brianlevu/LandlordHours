@@ -19,12 +19,14 @@ final class LandlordHoursUITests: XCTestCase {
     func testFirstRunPropertyNeedsOnlyAName() {
         launch(scenario: "firstTime", tab: 0)
         waitAndTap(app.buttons["onb-start"])
-        XCTAssertTrue(app.staticTexts["What are you building toward?"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["What do you rent out?"].waitForExistence(timeout: 8))
+        waitAndTap(app.buttons["rental-both"])
+        waitAndTap(app.buttons["pro-none"])
         let goalCTA = app.buttons["onb-primary"]
-        XCTAssertFalse(goalCTA.isEnabled, "The goal button waits for a choice")
-        waitAndTap(app.buttons["goal-mp"])
-        XCTAssertTrue(app.buttons["goal-mp100"].waitForExistence(timeout: 3), "500 or 100 reveals its two chips")
-        XCTAssertEqual(goalCTA.label, "Build toward 500h")
+        XCTAssertTrue(goalCTA.waitForExistence(timeout: 5))
+        XCTAssertEqual(goalCTA.label, "Aim for 100 hours", "Both kinds, no real estate pro: 100 hours is suggested and selected")
+        waitAndTap(app.buttons["goal-500"])
+        XCTAssertEqual(goalCTA.label, "Aim for 500 hours")
         waitAndTap(goalCTA)
         waitAndTap(app.buttons["onb-link"])                    // Calendar: Not now
         waitAndTap(app.buttons["who-both"])
@@ -32,7 +34,7 @@ final class LandlordHoursUITests: XCTestCase {
         waitAndTap(app.buttons["onb-primary"])
 
         let save = app.buttons["onb-primary"]
-        XCTAssertTrue(app.staticTexts["Name your first rental."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Which rental first?"].waitForExistence(timeout: 5))
         XCTAssertFalse(save.isEnabled, "Save waits for a name")
         XCTAssertFalse(app.textFields["property-address"].exists, "Address folded away")
         let nameField = app.textFields["property-name"]
@@ -180,7 +182,7 @@ final class LandlordHoursUITests: XCTestCase {
             ("occasional", 2, "Log time", "occasional-track"),
             ("occasional", 3, "Reports", "occasional-reports"),
             ("occasional", 4, "Settings", "occasional-settings"),
-            ("frequent", 0, "counted toward 750 hours", "frequent-home"),
+            ("frequent", 0, "toward 750 this year", "frequent-home"),
             ("frequent", 1, "3 rentals ·", "frequent-properties"),
             ("frequent", 2, "Log time", "frequent-track"),
             ("frequent", 3, "Reports", "frequent-reports"),
@@ -192,6 +194,11 @@ final class LandlordHoursUITests: XCTestCase {
                 app.terminate()
                 launch(scenario: item.scenario, tab: item.tab)
                 assertVisibleText(item.expectedText, timeout: 8)
+                if item.attachment == "frequent-home" {
+                    let subtitle = app.descendants(matching: .any)["today.header.subtitle"].firstMatch
+                    XCTAssertTrue(subtitle.waitForExistence(timeout: 5), "Today header line")
+                    XCTAssertTrue(subtitle.label.hasSuffix("toward 750 this year."), subtitle.label)
+                }
                 attachScreenshot(named: item.attachment)
                 XCTAssertFalse(app.staticTexts["Welcome to LandlordHours"].exists)
             }
@@ -255,7 +262,7 @@ final class LandlordHoursUITests: XCTestCase {
         // 2.0: an owner with no property sees the empty lot; its "Add property" is the one action.
         let addProperty = app.buttons["today.hero.addProperty"].firstMatch
         XCTAssertTrue(addProperty.waitForExistence(timeout: 8))
-        XCTAssertFalse(app.staticTexts["Finish your tax-ready setup"].exists, "Setup card follows the first property")
+        XCTAssertFalse(app.staticTexts["Finish setting up"].exists, "Setup card follows the first property")
         let propertyName = app.textFields["property.name"]
         // The launch splash fades over ~1s and can swallow the first tap.
         for _ in 0..<3 where !propertyName.exists {
@@ -301,7 +308,7 @@ final class LandlordHoursUITests: XCTestCase {
 
         XCTAssertTrue(app.descendants(matching: .any)["shell.toast"].waitForExistence(timeout: 5))
 
-        XCTAssertFalse(app.staticTexts["Finish your tax-ready setup"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["Finish setting up"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["home.activation.firstHour"].exists)
     }
 

@@ -142,7 +142,7 @@ final class WPLCaptureUITests: XCTestCase {
     }
 
     // (d) The export sheet's sync gate: waiting for hours, still syncing (with the explicit
-    // "Create with what's on this device"), and the failed-pull note. Forced via a DEBUG hook.
+    // "Create with what’s on this device"), and the failed-pull note. Forced via a DEBUG hook.
     func testCaptureD_ExportSyncStates() {
         for state in ["waiting", "syncing", "failed"] {
             app.terminate()

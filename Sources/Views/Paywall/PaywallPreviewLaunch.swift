@@ -37,6 +37,35 @@ struct PaywallPreviewLaunch: Equatable {
     }
 }
 
+/// DEBUG-only launch hook for captures of a restore that fails.
+///
+/// `-LHRestoreOutcome timeout` makes the App Store sync hang, so the restore deadline (cut to
+/// 1 s) ends it; `-LHRestoreOutcome failure` makes the sync fail as if offline. Installed at
+/// launch (LandlordHoursApp.init). Only the App Store call is replaced; the restore path, the
+/// paywall and Settings run as shipped, and Restore is tapped for real (PaywallCaptureUITests).
+enum RestoreFailureLaunch {
+    enum Outcome: String { case timeout, failure }
+
+    static var outcome: Outcome? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-LHRestoreOutcome"), i + 1 < args.count else { return nil }
+        return Outcome(rawValue: args[i + 1])
+    }
+
+    @MainActor
+    static func prepare(_ manager: SubscriptionManager = .shared) {
+        switch outcome {
+        case .timeout?:
+            SubscriptionManager.restoreSyncTimeout = 1
+            manager.syncWithAppStore = { try await Task.sleep(nanoseconds: 3_600_000_000_000) }
+        case .failure?:
+            manager.syncWithAppStore = { throw URLError(.notConnectedToInternet) }
+        case nil:
+            break
+        }
+    }
+}
+
 struct PaywallPreviewRoot: View {
     let launch: PaywallPreviewLaunch
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared

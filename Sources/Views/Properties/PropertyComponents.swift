@@ -213,16 +213,20 @@ struct PropertyStaySegment: View {
 
     var body: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
-        let layout = dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(spacing: 2))
+        let stacked = dynamicTypeSize.isAccessibilitySize
+        let layout = stacked
+            ? AnyLayout(VStackLayout(spacing: 4))
             : AnyLayout(HStackLayout(spacing: 2))
+        // Stacked (AX sizes), the pills are rounded rectangles with an equal 4pt gap on every
+        // side of the container, so the selected one is centred in its track.
+        let radius: CGFloat = stacked ? 24 : 26
         layout {
             segment("Months or longer", type: .ltr, colors: colors)
             segment("A few nights at a time", type: .str, colors: colors)
         }
-        .padding(3)
-        .background(RoundedRectangle(cornerRadius: 26, style: .continuous).fill(colors.backgroundSecondary))
-        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(colors.border, lineWidth: 0.5))
+        .padding(stacked ? 4 : 3)
+        .background(RoundedRectangle(cornerRadius: radius + 4, style: .continuous).fill(colors.backgroundSecondary))
+        .overlay(RoundedRectangle(cornerRadius: radius + 4, style: .continuous).strokeBorder(colors.border, lineWidth: 0.5))
         .sensoryFeedback(.selection, trigger: propertyType)
     }
 
@@ -238,8 +242,8 @@ struct PropertyStaySegment: View {
                 .foregroundStyle(on ? colors.onAction : colors.textPrimary)
                 .padding(.horizontal, 8)
                 .frame(maxWidth: .infinity, minHeight: 44)
-                .background(Capsule().fill(on ? colors.action : Color.clear))
-                .contentShape(Capsule())
+                .background(RoundedRectangle(cornerRadius: dynamicTypeSize.isAccessibilitySize ? 24 : 26, style: .continuous).fill(on ? colors.action : Color.clear))
+                .contentShape(Rectangle())
         }
         .buttonStyle(.lhPressable)
         .accessibilityAddTraits(on ? .isSelected : [])

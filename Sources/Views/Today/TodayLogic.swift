@@ -78,11 +78,14 @@ enum TodayWeek {
     /// rule: REPS counts your own hours only (the IRS tests each spouse alone; spouse hours never
     /// combine). Material participation adds spouse hours only when the household tracks them
     /// jointly. Investor-only tasks (investing, financing, negotiation) never count.
-    static func counts(_ entry: TimeEntry, goal: HouseGoal, includeSpouse: Bool) -> Bool {
+    /// `repsParticipant` is whose own count the 750 follows (the spouse's when the spouse is the
+    /// real estate professional); every other goal counts the owner, plus the spouse when joint.
+    static func counts(_ entry: TimeEntry, goal: HouseGoal, includeSpouse: Bool, repsParticipant: Participant = .selfParticipant) -> Bool {
         guard entry.countsForREPS else { return false }
+        if goal == .reps750 { return entry.participant == repsParticipant }
         switch entry.participant {
         case .selfParticipant: return true
-        case .spouse: return goal != .reps750 && includeSpouse
+        case .spouse: return includeSpouse
         }
     }
 
@@ -92,13 +95,14 @@ enum TodayWeek {
         entries: [TimeEntry],
         goal: HouseGoal,
         includeSpouse: Bool,
+        repsParticipant: Participant = .selfParticipant,
         now: Date,
         calendar base: Calendar = .current
     ) -> [TodayWeekDay] {
         let calendar = mondayCalendar(base)
         let start = startOfWeek(containing: now, calendar: calendar)
         let today = calendar.startOfDay(for: now)
-        let counted = entries.filter { counts($0, goal: goal, includeSpouse: includeSpouse) }
+        let counted = entries.filter { counts($0, goal: goal, includeSpouse: includeSpouse, repsParticipant: repsParticipant) }
         let formatter = DateFormatter()
         formatter.calendar = calendar
         formatter.timeZone = calendar.timeZone
@@ -164,9 +168,14 @@ enum TodayPaceCards {
         return max(Double(max(days, 1)) / 7, 1)
     }
 
-    static func finish(hours: Double, goal: HouseGoal, pace: TodayPace, now: Date, calendar: Calendar = .current) -> TodayPaceCardModel {
+    static func finish(hours: Double, goal: HouseGoal, pace: TodayPace, now: Date, calendar: Calendar = .current, paceReady: Bool = true) -> TodayPaceCardModel {
         if HouseProgress(hours: hours, goal: goal).isGoalMet {
             return TodayPaceCardModel(label: "Goal hours", value: "Reached", status: "Keep logging for your record", tone: .positive)
+        }
+        if !paceReady {
+            // After one hour, "74h a week" is noise: the number waits for enough hours.
+            return TodayPaceCardModel(label: String(localized: "To finish by Dec 31"), value: String(localized: "Not yet"),
+                                      status: String(localized: "Needs a few weeks of hours"), tone: .neutral)
         }
         let remaining = max(goal.targetHours - hours, 0.01)
         let perWeek = Int((remaining / weeksLeft(now: now, calendar: calendar)).rounded(.up))
@@ -177,5 +186,156 @@ enum TodayPaceCards {
             status: behind ? "Behind pace" : (pace.tone == .positive ? "On pace" : nil),
             tone: behind ? .caution : .neutral
         )
+    }
+}
+
+
+// MARK: - The hero's words: the target, whose count it is, and where you stand
+
+/// What the Today hero says (goal-first messaging, 2.0). One pure type so every state is tested:
+/// the eyebrow names the target, the caption says how far along you are against Dec 31, and the
+/// 750 and 100-hour tests add what makes them different (whose count, and "more than anyone
+/// else"). The 100-hour test is never shown as reached until the owner confirms no one did more.
+struct TodayHeroCopy: Equatable {
+    /// "2026 · 500-hour target", or "2026 · Tahoe cabin · 100-hour target" when the count is one rental's
+    /// (the view sets it in mono capitals).
+    let eyebrow: String
+    /// The pieces of the eyebrow, so a long rental name can shorten with an ellipsis and the rest never wraps.
+    let eyebrowYear: String
+    let eyebrowTarget: String
+    let propertyName: String?
+    /// The target in hours; nil for "just keep a record".
+    let targetHours: Int?
+    /// "your own count", "spouse’s own count" or "more than anyone else"; nil for 500 hours.
+    let qualifier: String?
+    /// "of 500 hours".
+    let caption: String
+    /// What follows the caption, lower case: "on pace for Dec 31", "9h a week to finish by Dec 31".
+    let phrase: String?
+    let tone: HouseStatusTone
+    /// The 100-hour test is over 100 hours and waiting on "did anyone do more?": the hero opens that question.
+    let needsConfirmation: Bool
+    /// The hours target is reached AND nothing about it is still open (the half test, the 100-hour question).
+    let claimsReached: Bool
+
+    /// The status line as a sentence: "On pace for Dec 31".
+    var status: String? { phrase.map(Self.sentenceCased) }
+
+    /// One line for VoiceOver and tests: "of 500 hours · on pace for Dec 31".
+    var spoken: String {
+        guard let phrase else { return caption }
+        return String(localized: "\(caption) · \(phrase)")
+    }
+
+    /// The empty lot's line, with the person's own target when one is set.
+    static func emptyLotLine(target: Int?) -> String {
+        target.map { String(localized: "Add a rental. Hours you confirm count toward your \($0).") }
+            ?? String(localized: "Add a rental. Hours you confirm count toward your goal.")
+    }
+
+    static func sentenceCased(_ s: String) -> String {
+        guard let first = s.first else { return s }
+        return first.uppercased() + s.dropFirst()
+    }
+
+    struct Input {
+        var goal: HouseGoal
+        /// "Just keep a record": no target, no pace.
+        var isRecord = false
+        var hours: Double
+        var year: Int
+        var now: Date
+        var calendar: Calendar = .current
+        /// Whose own count the 750 follows.
+        var repsParticipant: Participant = .selfParticipant
+        /// The half test for that person: only meaningful for the 750.
+        var halfTest: TaxQualificationEngine.MoreThanHalfStatus = .notEntered
+        /// This year's "did anyone else do more?" answer (nil = unanswered).
+        var noOneParticipatedMore: Bool?
+        /// The rental the count belongs to (100 and 500 hour tests are counted per rental); nil when
+        /// the count covers every rental (a grouping election, the 750, a record).
+        var propertyName: String?
+        /// Days since the first hour this year was logged; the pace waits for enough of them.
+        var daysOfData: Int = .max
+        /// Something is waiting in the Inbox to confirm.
+        var hasPendingToConfirm = false
+    }
+
+    /// Pace needs two weeks of hours or ten confirmed hours, whichever comes first.
+    static let paceMinDays = 14
+    static let paceMinHours = 10.0
+
+    static func paceIsReady(hours: Double, daysOfData: Int) -> Bool {
+        hours >= paceMinHours || daysOfData >= paceMinDays
+    }
+
+    /// The line under the Today title: "212h toward 750 this year." (no ".0"), or for a record "212 hours logged this year."
+    static func headerLine(hours: Double, target: Int, isRecord: Bool, year: Int) -> String {
+        isRecord
+            ? String(localized: "\(OnbFormat.hoursInWords(hours)) logged in \(String(year)).")
+            : String(localized: "\(OnbFormat.hours(hours)) toward \(target) this year.")
+    }
+
+    static func make(_ i: Input) -> TodayHeroCopy {
+        let target = Int(i.goal.targetHours)
+        let yearText = String(i.year)
+        if i.isRecord {
+            return TodayHeroCopy(
+                eyebrow: String(localized: "\(yearText) · Your record"),
+                eyebrowYear: yearText, eyebrowTarget: String(localized: "Your record"), propertyName: nil, targetHours: nil,
+                qualifier: nil,
+                caption: String(localized: "hours logged in \(yearText)"),
+                phrase: nil, tone: .neutral, needsConfirmation: false, claimsReached: false)
+        }
+        let targetText = String(localized: "\(target)-hour target")
+        let name = i.propertyName.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+        let eyebrow = name.map { String(localized: "\(yearText) · \($0) · \(targetText)") } ?? String(localized: "\(yearText) · \(targetText)")
+        let caption = String(localized: "of \(target) hours")
+        let qualifier: String?
+        switch i.goal {
+        case .reps750:
+            qualifier = i.repsParticipant == .spouse ? String(localized: "spouse’s own count") : String(localized: "your own count")
+        case .mp100: qualifier = String(localized: "more than anyone else")
+        case .mp500: qualifier = nil
+        }
+        func result(_ phrase: String?, _ tone: HouseStatusTone, confirm: Bool = false, reached: Bool = false) -> TodayHeroCopy {
+            TodayHeroCopy(eyebrow: eyebrow, eyebrowYear: yearText, eyebrowTarget: targetText, propertyName: name, targetHours: target,
+                          qualifier: qualifier, caption: caption, phrase: phrase, tone: tone,
+                          needsConfirmation: confirm, claimsReached: reached)
+        }
+
+        if HouseProgress(hours: i.hours, goal: i.goal).isGoalMet {
+            switch i.goal {
+            case .reps750:
+                switch i.halfTest {
+                case .met: return result(String(localized: "reached, based on your records"), .positive, reached: true)
+                case .notEntered: return result(String(localized: "750 reached. Add your other work hours to check the half rule."), .caution)
+                case .notMet: return result(String(localized: "750 reached. The half rule isn’t met yet."), .caution)
+                }
+            case .mp500:
+                return result(String(localized: "reached, based on your records"), .positive, reached: true)
+            case .mp100:
+                switch i.noOneParticipatedMore {
+                case true?: return result(String(localized: "reached · no one did more, based on your records"), .positive, reached: true)
+                case false?: return result(String(localized: "someone else did more"), .caution)
+                case nil: return result(String(localized: "confirm no one did more"), .caution, confirm: true)
+                }
+            }
+        }
+
+        // Pace waits for two weeks of hours or ten confirmed hours: after one hour "74h a week" is noise.
+        if !paceIsReady(hours: i.hours, daysOfData: i.daysOfData) {
+            return result(i.hasPendingToConfirm ? String(localized: "Confirm your found hours to see your pace.")
+                                                : String(localized: "Log a few weeks to see your pace."), .neutral)
+        }
+        let weeks = TodayPaceCards.weeksLeft(now: i.now, calendar: i.calendar)
+        let perWeek = Int((max(i.goal.targetHours - i.hours, 0.01) / weeks).rounded(.up))
+        let finishLine = String(localized: "\(perWeek)h a week to finish by Dec 31")
+        let day = Double(i.calendar.ordinality(of: .day, in: .year, for: i.now) ?? 1)
+        let daysInYear = Double(i.calendar.range(of: .day, in: .year, for: i.now)?.count ?? 365)
+        let expected = i.goal.targetHours * day / daysInYear
+        return i.hours >= expected
+            ? result(String(localized: "on pace for Dec 31"), .positive)
+            : result(finishLine, .caution)
     }
 }

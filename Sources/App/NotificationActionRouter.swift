@@ -375,7 +375,9 @@ final class NotificationActionRouter {
             return .properties
         case .track, .timerReview:
             return .track
-        case .reports, .calendarReview, .export:
+        case .calendarReview:
+            return .inbox
+        case .reports, .export:
             return .reports
         case .none:
             return .home

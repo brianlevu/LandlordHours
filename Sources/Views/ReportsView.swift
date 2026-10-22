@@ -101,7 +101,7 @@ struct ReportsView: View {
         let now = Date()
         let currentYear = calendar.component(.year, from: now)
         if selectedYear < currentYear { return "The \(String(selectedYear)) tax year is closed." }
-        if selectedYear > currentYear { return "\(String(selectedYear)) hasn't started yet." }
+        if selectedYear > currentYear { return "\(String(selectedYear)) hasn’t started yet." }
         let end = calendar.date(from: DateComponents(year: currentYear, month: 12, day: 31)) ?? now
         let days = max(calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: end).day ?? 0, 0)
         return "Through \(now.formatted(.dateTime.month(.abbreviated).day())) · \(days) days left in the year"
@@ -597,7 +597,7 @@ struct ParticipationConfirmationSheet: View {
                             .tracking(1.3)
                             .foregroundStyle(colors.draftingInk)
 
-                        Text("Did anyone else, like a property manager or contractor, spend more time on this property than you and your spouse this year?")
+                        Text("Did anyone else, like a property manager or contractor, spend more time on any of your rentals than you and your spouse this year?")
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(colors.textPrimary)
                             .fixedSize(horizontal: false, vertical: true)

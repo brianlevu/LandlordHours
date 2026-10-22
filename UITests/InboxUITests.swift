@@ -234,7 +234,7 @@ final class InboxUITests: XCTestCase {
         let option = app.buttons["Events named \u{201C}Call with Sam\u{201D}"]
         XCTAssertTrue(option.waitForExistence(timeout: 3))
         option.tap()
-        XCTAssertTrue(app.staticTexts["We won't suggest events like this"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["We won’t suggest events like this"].waitForExistence(timeout: 3))
         XCTAssertFalse(row("call-sam").exists)
     }
 
