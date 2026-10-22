@@ -113,6 +113,9 @@ final class ProtoModel: ObservableObject {
     @Published var wantsFocus = false
     @Published var pendingTotal = ProtoData.hoursSoFar
     @Published var listening = false
+    @Published var exiting = false
+    @Published var presented = true
+    var instant = false
     @Published var micIntro = false
     /// Timer review: the run that filled the hours.
     @Published var timerRan: String?
@@ -166,7 +169,7 @@ final class ProtoModel: ObservableObject {
             // Non-breaking inside each phrase: a wrapped label breaks before "at", never inside "Pine Cabin".
             func nb(_ s: String) -> String { s.replacingOccurrences(of: " ", with: "\u{00A0}") }
             var t = zeroMode ? pl("Add \(name) and log \(hoursLabel)") : nb(pl("Log \(hoursLabel)")) + " " + nb(pl("at \(name)"))
-            if !isToday { t += " ·\u{00A0}" + dateWord }
+            if !isToday { t += "\u{00A0}· " + dateWord }
             return t
         }
     }
@@ -192,7 +195,20 @@ final class ProtoModel: ObservableObject {
 
     func anim(_ body: () -> Void) {
         if UIAccessibility.isReduceMotionEnabled { withAnimation(.easeOut(duration: 0.2), body) }
-        else { withAnimation(.spring(response: 0.3, dampingFraction: 1.0), body) }
+        else { withAnimation(.easeOut(duration: 0.28), body) }
+    }
+
+    /// Leave, then arrive: what is on screen fades out (130ms ease-in), then the new state comes in (ease-out, one transaction).
+    /// Old and new content are never on screen together. Static presets skip the wait.
+    func swap(_ body: @escaping () -> Void, then: (() -> Void)? = nil) {
+        if hold || instant { anim(body); then?(); return }
+        Task { [weak self] in
+            guard let self else { return }
+            withAnimation(.easeIn(duration: 0.13)) { self.exiting = true }
+            try? await Task.sleep(nanoseconds: 140_000_000)
+            self.anim { self.exiting = false; body() }
+            then?()
+        }
     }
 
     // MARK: note + rules
@@ -221,7 +237,7 @@ final class ProtoModel: ObservableObject {
         let r = NoteRules.read(request())
         if before == nil { before = f }
         var changed: Set<PField> = []
-        anim {
+        let body = { [self] in
             mentioned = r.mentionedPropertyCount >= 2 && !zeroMode
                 ? NoteRules.mentionedProperties(normalized: RulesEngine.normalize(f.note), properties: properties) : []
             if !f.touched.contains(.property), let id = r.propertyId { f.propertyId = id; f.marks[.property] = .rules; changed.insert(.property) }
@@ -237,16 +253,19 @@ final class ProtoModel: ObservableObject {
             noneFound = changed.isEmpty || (f.propertyId == nil && f.category == nil && mentioned.isEmpty)
             readingModel = hasModel
         }
-        rulesAt = Date()
-        pulse(changed)
-        UIAccessibility.post(notification: .announcement, argument: pl("Filled from your words."))
-        guard hasModel, !hold else { return }
-        modelTask = Task { [weak self] in
-            guard let self else { return }
-            try? await Task.sleep(nanoseconds: UInt64(self.modelDelay * 1_000_000_000))
-            guard !Task.isCancelled else { return }
-            self.applyModel(late: Date().timeIntervalSince(self.rulesAt) > 1.5)
+        let finish = { [self] in
+            rulesAt = Date()
+            pulse(changed)
+            UIAccessibility.post(notification: .announcement, argument: pl("Filled from your words."))
+            guard hasModel, !hold, !instant else { return }
+            modelTask = Task { [weak self] in
+                guard let self else { return }
+                try? await Task.sleep(nanoseconds: UInt64(self.modelDelay * 1_000_000_000))
+                guard !Task.isCancelled else { return }
+                self.applyModel(late: Date().timeIntervalSince(self.rulesAt) > 1.5)
+            }
         }
+        if f.unfolded { anim(body); finish() } else { swap(body, then: finish) }
     }
 
     /// The scripted model pass: confirms what the rules found, fills the kind of work from intent,
@@ -334,7 +353,7 @@ final class ProtoModel: ObservableObject {
 
     func enterManual() {
         readTask?.cancel(); modelTask?.cancel()
-        anim { f.manual = true; f.unfolded = true; fillSource = nil; readingModel = false; noneFound = false }
+        swap { [self] in f.manual = true; f.unfolded = true; fillSource = nil; readingModel = false; noneFound = false }
     }
 
     func turnAutoFillOn() {
@@ -358,7 +377,7 @@ final class ProtoModel: ObservableObject {
     func set(date d: Date) { anim { f.date = Calendar.current.startOfDay(for: d); touch(.date); expanded = nil } }
 
     func applyRecent(_ c: ActivityCategory, _ p: RentalProperty, _ h: Double) {
-        anim {
+        swap { [self] in
             f.category = c; f.categoryRemembered = false; f.propertyId = p.id; f.hours = h; f.hoursIsDefault = false
             f.touched = [.property, .category, .hours]; f.marks = [:]; f.unfolded = true
         }
@@ -381,38 +400,53 @@ final class ProtoModel: ObservableObject {
         lastLogged = f
         if !UIAccessibility.isReduceMotionEnabled { UINotificationFeedbackGenerator().notificationOccurred(.success) }
         readTask?.cancel(); modelTask?.cancel()
-        let keepZero = zeroMode
-        anim {
-            f = ProtoForm(); fillSource = nil; readingModel = false; noneFound = false; updated = [:]; mentioned = []; expanded = nil
-            zeroMode = false
-            _ = keepZero
+        Task { [weak self] in
+            guard let self else { return }
+            // 1. what is on the sheet fades out; 2. the sheet leaves while the toast arrives on the screen below; 3. reset off screen.
+            withAnimation(.easeIn(duration: 0.13)) { self.exiting = true }
+            try? await Task.sleep(nanoseconds: 140_000_000)
+            withAnimation(self.reduceMotionNow ? .easeOut(duration: 0.2) : .easeIn(duration: 0.25)) { self.presented = false }
+            try? await Task.sleep(nanoseconds: 150_000_000)   // the toast arrives once the sheet has mostly left
+            self.showToast(text, short)
+            try? await Task.sleep(nanoseconds: 160_000_000)
+            var t = Transaction(); t.disablesAnimations = true
+            withTransaction(t) {
+                self.f = ProtoForm(); self.fillSource = nil; self.readingModel = false; self.noneFound = false
+                self.updated = [:]; self.mentioned = []; self.expanded = nil; self.zeroMode = false; self.exiting = false
+                self.listening = false; self.timerRan = nil
+            }
+            self.before = nil
         }
-        before = nil
-        showToast(text, short)
+    }
+
+    func reopen() {
+        withAnimation(.easeOut(duration: 0.13)) { toast = nil }
+        withAnimation(.easeOut(duration: 0.28)) { presented = true }
     }
 
     func showToast(_ text: String, _ short: String) {
         toastCounter += 1
         let id = toastCounter
-        withAnimation(reduceMotionNow ? .easeOut(duration: 0.2) : .spring(response: 0.3, dampingFraction: 1.0)) { toast = (text, short, id) }
+        withAnimation(.easeOut(duration: 0.28)) { toast = (text, short, id) }
         guard !hold else { return }
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 4_000_000_000)
             guard let self, self.toast?.id == id else { return }
-            withAnimation(.easeIn(duration: 0.18)) { self.toast = nil }
+            withAnimation(.easeIn(duration: 0.13)) { self.toast = nil }
         }
     }
 
     func undoLog() {
-        withAnimation(.easeIn(duration: 0.18)) { toast = nil }
-        if let l = lastLogged { anim { f = l } }
+        withAnimation(.easeIn(duration: 0.13)) { toast = nil }
+        if let l = lastLogged { f = l }
+        withAnimation(.easeOut(duration: 0.28)) { presented = true }
     }
 
     // MARK: presets (captures) and the script (video)
 
     func preset(_ name: String) {
-        suppress = true
-        defer { suppress = false }
+        suppress = true; instant = true
+        defer { suppress = false; instant = false }
         switch name {
         case "initial": break
         case "typing": f.note = scenario.note
@@ -432,14 +466,15 @@ final class ProtoModel: ObservableObject {
             f.hours = 4440.0 / 3600.0; f.hoursIsDefault = false; f.unfolded = true; timerRan = hoursText(4440.0 / 3600.0)
         case "zero": zeroMode = true; f.category = .repairs
         case "zeroNamed": zeroMode = true; rentalName = "Pine Cabin"; f.note = "fixed the sink, 1 hour"; readRules()
-        case "toast": showToast(pl("Logged \(hoursText(2)) · \(Int(ProtoData.hoursSoFar + 2)) of \(ProtoData.goal) hours"), pl("Logged \(hoursText(2)) · \(Int(ProtoData.hoursSoFar + 2)) of \(ProtoData.goal)"))
+        case "toast": presented = false; showToast(pl("Logged \(hoursText(2)) · \(Int(ProtoData.hoursSoFar + 2)) of \(ProtoData.goal) hours"), pl("Logged \(hoursText(2)) · \(Int(ProtoData.hoursSoFar + 2)) of \(ProtoData.goal)"))
         default: break
         }
     }
 
-    func runScript() {
+    func runScript(logOnly: Bool = false) {
         Task { [weak self] in
             guard let self else { return }
+            if logOnly { try? await Task.sleep(nanoseconds: 1_800_000_000); self.primary(); return }
             try? await Task.sleep(nanoseconds: 1_200_000_000)
             if LogTimeProtoLaunch.value("-LHProtoFocus") == "1" { self.wantsFocus = true }
             try? await Task.sleep(nanoseconds: 700_000_000)
@@ -450,7 +485,7 @@ final class ProtoModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 700_000_000)   // the pause: rules fill, rows unfold
             self.wantsFocus = false
             try? await Task.sleep(nanoseconds: 3_800_000_000) // model lands
-            self.primary()
+            if LogTimeProtoLaunch.value("-LHProtoNoLog") != "1" { self.primary() }
         }
     }
 }
