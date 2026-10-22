@@ -367,10 +367,23 @@ struct HouseHeroCard: View {
                             if let copy = heroCopy, let name = copy.propertyName {
                                 // One rental's count: its name sits in the eyebrow and shortens with an
                                 // ellipsis (never wraps mid-word); the year and the target stay whole.
-                                HStack(spacing: 0) {
-                                    eyebrowText("\(copy.eyebrowYear) · ").fixedSize()
-                                    eyebrowText(name).lineLimit(1).truncationMode(.tail).layoutPriority(-1)
-                                    eyebrowText(" · \(copy.eyebrowTarget)").fixedSize()
+                                Group {
+                                    if typeSize.isAccessibilitySize {
+                                        // AX sizes: the name never shortens. It gets its own line(s),
+                                        // wrapped at word breaks; the year and target share the line above.
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            eyebrowText("\(copy.eyebrowYear) · \(copy.eyebrowTarget)")
+                                                .fixedSize(horizontal: false, vertical: true)
+                                            eyebrowText(name)
+                                                .fixedSize(horizontal: false, vertical: true)
+                                        }
+                                    } else {
+                                        HStack(spacing: 0) {
+                                            eyebrowText("\(copy.eyebrowYear) · ").fixedSize()
+                                            eyebrowText(name).lineLimit(1).truncationMode(.tail).layoutPriority(-1)
+                                            eyebrowText(" · \(copy.eyebrowTarget)").fixedSize()
+                                        }
+                                    }
                                 }
                                 .accessibilityElement(children: .ignore)
                                 .accessibilityLabel(copy.eyebrow)
