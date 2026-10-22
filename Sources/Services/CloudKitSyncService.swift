@@ -195,8 +195,12 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
             || !(viewModel?.timeEntries.isEmpty ?? true)
             || !CategoryManager.shared.customCategories.isEmpty
         var pullSucceeded = false
+        // An Apple profile this device has never onboarded may be a returning Apple ID whose
+        // iCloud data hasn't arrived yet: never push first, or defaults overwrite the cloud.
+        let pullFirstOnly = Self.mustPullBeforePush(defaults: .standard, userId: startingFor)
         await Self.runInitialSync(
             defaults: .standard,
+            pullFirst: pullFirstOnly,
             migrationDoneKey: migrationDoneKey,
             hasLocalData: hasLocalData,
             push: { await ops.push() },
@@ -211,6 +215,11 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
             return
         }
         initialSyncCompletedFor = startingFor
+        if pullFirstOnly {
+            // Cloud values are now local, so this pushes the merged state, not defaults.
+            UserDefaults.standard.set(true, forKey: migrationDoneKey)
+            if hasLocalData { await ops.push() }
+        }
         if hasHeldPush {
             hasHeldPush = false
             flushedHeldPushCount += 1
@@ -268,13 +277,25 @@ final class CloudKitSyncService: ObservableObject, CloudProfileRecordSource {
     ///   already set (see `ProfileRestore.activate`), so they always pull first.
     /// - When the push is skipped for empty state, the initial push is marked done
     ///   after the pull; later edits push through `schedulePush()` as usual.
+    /// True for an Apple profile with no local `hasCompletedOnboarding` for that id.
+    static func mustPullBeforePush(defaults: UserDefaults, userId: String?) -> Bool {
+        guard let userId, defaults.string(forKey: ProfileKeys.appleUserId) == userId else { return false }
+        return !defaults.bool(forKey: UserScope.key("hasCompletedOnboarding", userId: userId))
+    }
+
     static func runInitialSync(
         defaults: UserDefaults,
+        pullFirst: Bool = false,
         migrationDoneKey: String,
         hasLocalData: Bool,
         push: () async -> Void,
         pull: () async -> Void
     ) async {
+        if pullFirst {
+            // The caller pushes local changes after a successful pull and then marks migration done.
+            await pull()
+            return
+        }
         let migrationDone = defaults.bool(forKey: migrationDoneKey)
         if !migrationDone && hasLocalData {
             await push()

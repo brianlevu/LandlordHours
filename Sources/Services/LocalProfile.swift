@@ -112,7 +112,8 @@ enum ProfileIdentity {
     /// Before sign-out clears the live keys: keep the active profile's name and email.
     static func stashActive(_ defaults: UserDefaults = .standard) {
         guard let live = liveKeys(defaults) else { return }
-        remember(userId: live.id, name: defaults.string(forKey: live.name), email: defaults.string(forKey: live.email), edited: false, defaults: defaults)
+        remember(userId: live.id, name: defaults.string(forKey: live.name), email: defaults.string(forKey: live.email),
+                 edited: clean(defaults.string(forKey: live.name)) != nil, defaults: defaults)
     }
 
     /// After sign-in: fill empty live keys from the per-profile copy.

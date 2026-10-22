@@ -381,6 +381,37 @@ final class ProfileDiscoveryTests: XCTestCase {
         XCTAssertEqual(ProfileKeys.resolveUserId(defaults), id)
     }
 
+    func testReturningAppleIdOnNewDeviceNeverPushesFirst() async {
+        let (defaults, suite) = makeSuite()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let id = "apple-returning"
+        defaults.set(id, forKey: ProfileKeys.appleUserId)
+        XCTAssertTrue(CloudKitSyncService.mustPullBeforePush(defaults: defaults, userId: id))
+        var calls: [String] = []
+        await CloudKitSyncService.runInitialSync(defaults: defaults, pullFirst: true, migrationDoneKey: "kp", hasLocalData: true,
+                                                 push: { calls.append("push") }, pull: { calls.append("pull") })
+        XCTAssertEqual(calls, ["pull"], "No push before the pull")
+        XCTAssertFalse(defaults.bool(forKey: "kp"), "Migration is marked only after a successful pull")
+        // Onboarded here, or not an Apple profile: the old rules apply.
+        defaults.set(true, forKey: UserScope.key("hasCompletedOnboarding", userId: id))
+        XCTAssertFalse(CloudKitSyncService.mustPullBeforePush(defaults: defaults, userId: id))
+        XCTAssertFalse(CloudKitSyncService.mustPullBeforePush(defaults: defaults, userId: "local-x"))
+    }
+
+    func testStashTreatsEditedNameAsEdited() {
+        let (defaults, suite) = makeSuite()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("apple-n", forKey: ProfileKeys.appleUserId)
+        defaults.set("Sam Landlord", forKey: ProfileKeys.appleUserName)
+        ProfileIdentity.stashActive(defaults)
+        XCTAssertTrue(ProfileIdentity.saved(userId: "apple-n", defaults: defaults).edited)
+        // "User" and empty are not edits.
+        defaults.set("apple-m", forKey: ProfileKeys.appleUserId)
+        defaults.set("User", forKey: ProfileKeys.appleUserName)
+        ProfileIdentity.stashActive(defaults)
+        XCTAssertFalse(ProfileIdentity.saved(userId: "apple-m", defaults: defaults).edited)
+    }
+
     func testEmptyStatePushGuard() async {
         let (defaults, suite) = makeSuite()
         defer { defaults.removePersistentDomain(forName: suite) }
