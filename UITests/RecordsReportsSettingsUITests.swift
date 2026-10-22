@@ -65,12 +65,23 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         let calendarSwitch = element("settings.capture.calendar")
         XCTAssertTrue(scrollTo(calendarSwitch), "Auto-capture section is in Settings")
         XCTAssertTrue(element("settings.capture.prompts").exists)
-        // This build has no PCC entitlement (LH_PCC_ENTITLED = NO): notes stay on the phone, the
-        // disclosure says so, and no PCC toggle is offered.
-        let disclosure = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "on your iPhone, to fill in the form")).firstMatch
-        XCTAssertTrue(scrollTo(disclosure), "Apple AI disclosure is shown")
-        XCTAssertTrue(disclosure.label.contains("nothing is saved until you tap Log"), disclosure.label)
-        XCTAssertFalse(element("settings.capture.pcc").exists, "no PCC toggle without the entitlement")
+        // The disclosure follows the build's entitlement. This build sets LH_PCC_ENTITLED = YES
+        // (project.yml), and the PCC toggle needs iOS 27, so on iOS 27+ Settings offers PCC and
+        // says notes may go to Apple's Private Cloud Compute (which Apple runs and doesn't keep).
+        // Below iOS 27 notes stay on the phone and the on-device text shows.
+        let expectsPCC = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27
+        if expectsPCC {
+            let disclosure = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Private Cloud Compute may read it instead")).firstMatch
+            XCTAssertTrue(scrollTo(disclosure), "Private Cloud Compute disclosure is shown")
+            XCTAssertTrue(disclosure.label.contains("Apple runs Private Cloud Compute, and it doesn\u{2019}t keep your note"), disclosure.label)
+            XCTAssertTrue(disclosure.label.contains("nothing is saved until you tap Log"), disclosure.label)
+            XCTAssertTrue(element("settings.capture.pcc").exists, "PCC toggle is offered with the entitlement")
+        } else {
+            let disclosure = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "on your iPhone, to fill in the form")).firstMatch
+            XCTAssertTrue(scrollTo(disclosure), "Apple AI disclosure is shown")
+            XCTAssertTrue(disclosure.label.contains("nothing is saved until you tap Log"), disclosure.label)
+            XCTAssertFalse(element("settings.capture.pcc").exists, "no PCC toggle below iOS 27")
+        }
         element("settings.capture.muted").tap()
         XCTAssertTrue(element("settings.muted.screen").waitForExistence(timeout: 5))
     }

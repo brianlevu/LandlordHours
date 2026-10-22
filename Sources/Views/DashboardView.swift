@@ -615,6 +615,7 @@ struct DashboardView: View {
                     .foregroundStyle(colors.textSecondary)
                     .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("today.header.subtitle")
             }
 
             // 2.0: the action chips are gone (redesign-specs §2); "+" in the tab bar logs time.

@@ -182,7 +182,7 @@ final class LandlordHoursUITests: XCTestCase {
             ("occasional", 2, "Log time", "occasional-track"),
             ("occasional", 3, "Reports", "occasional-reports"),
             ("occasional", 4, "Settings", "occasional-settings"),
-            ("frequent", 0, "counted toward 750 hours", "frequent-home"),
+            ("frequent", 0, "toward 750 this year", "frequent-home"),
             ("frequent", 1, "3 rentals ·", "frequent-properties"),
             ("frequent", 2, "Log time", "frequent-track"),
             ("frequent", 3, "Reports", "frequent-reports"),
@@ -194,6 +194,11 @@ final class LandlordHoursUITests: XCTestCase {
                 app.terminate()
                 launch(scenario: item.scenario, tab: item.tab)
                 assertVisibleText(item.expectedText, timeout: 8)
+                if item.attachment == "frequent-home" {
+                    let subtitle = app.descendants(matching: .any)["today.header.subtitle"].firstMatch
+                    XCTAssertTrue(subtitle.waitForExistence(timeout: 5), "Today header line")
+                    XCTAssertTrue(subtitle.label.hasSuffix("toward 750 this year."), subtitle.label)
+                }
                 attachScreenshot(named: item.attachment)
                 XCTAssertFalse(app.staticTexts["Welcome to LandlordHours"].exists)
             }
