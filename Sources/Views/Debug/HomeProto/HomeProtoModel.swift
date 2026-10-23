@@ -3,20 +3,39 @@ import SwiftUI
 #if DEBUG
 // MARK: - Home-screen prototypes (throwaway, DEBUG only)
 //
-//   -LHHomeProto E|goalcheck          which screen
+//   -LHHomeProto E|seeall|goalcheck|stages   which screen
 //   -LHHomeSeed brian|reps750|eight   which sample owner
 //   -LHHomeFocus <n>                  start with item n focused (E)
 //   -LHHomeSum a,b                    E: start in "Add up" mode with these rental ids
 //   -LHHomeSheet grid                 E: open the "See all" grid at launch
 //   -LHHomeAutoplay                   E: scripted tour (for the video)
-//   -LHHomeStep inbox|check|diff      goalcheck: the Inbox card, the questions, or scrolled to the diff
+//   -LHHomeStep inbox|q1..qN|r1..rN|summary   goalcheck: the Inbox card, rental n's question or result, the summary
+//   -LHHomeAnswers other,me,...       goalcheck: preset answers (me|spouse|other|notsure) per rental
+//   -LHHomeSlow 4                     goalcheck: quarter-speed choreography
 //
 // Spec: AgentScratch/landlordhours/2026-10-23/home-options/options.md. Nothing here ships:
 // the real HouseHeroCard, PropertyHouseTile and tokens are reused, never redrawn.
 
 struct HomeProtoLaunch {
-    enum Screen: String { case e = "E", goalcheck }
-    enum Step: String { case inbox, check, diff }
+    enum Screen: String { case e = "E", seeall, goalcheck, stages }
+
+    /// Where the Check my goal flow starts: the Inbox card, rental n's question (q), its result (r), or the summary.
+    enum Step: Equatable {
+        case inbox
+        case question(Int)
+        case result(Int)
+        case summary
+
+        init(_ raw: String) {
+            let n = Int(raw.dropFirst()) ?? 1
+            switch raw.first {
+            case "q": self = .question(max(1, n) - 1)
+            case "r": self = .result(max(1, n) - 1)
+            case "s": self = .summary
+            default: self = raw == "inbox" ? .inbox : .question(0)
+            }
+        }
+    }
 
     let screen: Screen
     let seed: HomeProtoSeed
@@ -24,6 +43,13 @@ struct HomeProtoLaunch {
     let step: Step
     let sum: [String]
     let grid: Bool
+    /// -LHHomeAnswers other,me,...  one answer per rental, in order (me|spouse|other|notsure).
+    let answers: [String]
+    /// -LHHomeSlow 4  multiplies every duration in the Check my goal choreography (4 = quarter speed).
+    let slow: Double
+    let autoplay: Bool
+    /// -LHHomeScroll rentals|end: scroll to the row of rentals (Today) or the bottom of the card (Check my goal).
+    let scroll: String?
 
     static let current: HomeProtoLaunch? = {
         let args = ProcessInfo.processInfo.arguments
@@ -37,9 +63,13 @@ struct HomeProtoLaunch {
             screen: screen,
             seed: HomeProtoSeed.make(value("-LHHomeSeed") ?? "brian"),
             focusIndex: Int(value("-LHHomeFocus") ?? "") ?? 0,
-            step: Step(rawValue: value("-LHHomeStep") ?? "") ?? .check,
+            step: Step(value("-LHHomeStep") ?? "q1"),
             sum: (value("-LHHomeSum") ?? "").split(separator: ",").map(String.init),
-            grid: value("-LHHomeSheet") == "grid")
+            grid: value("-LHHomeSheet") == "grid" || screen == .seeall,
+            answers: (value("-LHHomeAnswers") ?? "").split(separator: ",").map(String.init),
+            slow: Double(value("-LHHomeSlow") ?? "") ?? 1,
+            autoplay: args.contains("-LHHomeAutoplay"),
+            scroll: value("-LHHomeScroll"))
     }()
 }
 
@@ -58,11 +88,19 @@ struct HomeProtoRental: Identifiable, Equatable {
     let shortStay: Bool
     let hours: Double
     let target: HomeProtoTarget
+    /// Pace against its own target. Nil for record-only and shared-total rentals.
+    var pace: HomeProtoPace? = nil
+    /// Whole hours a week still needed (behind rentals only).
+    var weeklyNeed: Int? = nil
+    /// "July": the month the target was reached.
+    var reached: String? = nil
 
     var isRecord: Bool { if case .record = target { return true }; return false }
 
     var hasOwnTarget: Bool { if case .own = target { return true }; return false }
 }
+
+enum HomeProtoPace { case behind, onPace, done }
 
 enum HomeProtoFocus: Hashable {
     case all
@@ -100,18 +138,18 @@ struct HomeProtoSeed {
             let manager = String(localized: "A manager does most of the work here", table: "HomeProto")
             let longStay = String(localized: "Long stays have no target under your goal", table: "HomeProto")
             return HomeProtoSeed(id: id, rentals: [
-                HomeProtoRental(id: "tahoe", name: "Tahoe Cabin", shortStay: true, hours: 64, target: .own(100)),
-                HomeProtoRental(id: "lake", name: "Lake House", shortStay: true, hours: 112, target: .own(100)),
-                HomeProtoRental(id: "palm", name: "Palm Studio", shortStay: true, hours: 230, target: .own(500)),
-                HomeProtoRental(id: "birch", name: "Birch Flat", shortStay: true, hours: 310, target: .own(500)),
-                HomeProtoRental(id: "maple", name: "Maple Duplex", shortStay: false, hours: 140, target: .own(500)),
+                HomeProtoRental(id: "tahoe", name: "Tahoe Cabin", shortStay: true, hours: 64, target: .own(100), pace: .behind, weeklyNeed: 4),
+                HomeProtoRental(id: "lake", name: "Lake House", shortStay: true, hours: 112, target: .own(100), pace: .done, reached: "July"),
+                HomeProtoRental(id: "palm", name: "Palm Studio", shortStay: true, hours: 230, target: .own(500), pace: .onPace),
+                HomeProtoRental(id: "birch", name: "Birch Flat", shortStay: true, hours: 310, target: .own(500), pace: .onPace),
+                HomeProtoRental(id: "maple", name: "Maple Duplex", shortStay: false, hours: 140, target: .own(500), pace: .behind, weeklyNeed: 36),
                 HomeProtoRental(id: "oak", name: "Oak Street", shortStay: false, hours: 40, target: .record(reason: manager)),
                 HomeProtoRental(id: "cedar", name: "Cedar Row", shortStay: false, hours: 22, target: .record(reason: longStay)),
                 HomeProtoRental(id: "pine", name: "Pine Court", shortStay: false, hours: 0, target: .record(reason: manager)),
             ], sharedTarget: nil)
         default:
             return HomeProtoSeed(id: "brian", rentals: [
-                HomeProtoRental(id: "santa", name: "Santa Ray Ave", shortStay: true, hours: 12, target: .own(100)),
+                HomeProtoRental(id: "santa", name: "Santa Ray Ave", shortStay: true, hours: 12, target: .own(100), pace: .behind, weeklyNeed: 9),
                 HomeProtoRental(id: "delaney", name: "Delaney Ct", shortStay: false, hours: 84,
                                 target: .record(reason: String(localized: "A manager does most of the work here", table: "HomeProto"))),
                 HomeProtoRental(id: "yeandle", name: "Yeandle Ave", shortStay: false, hours: 0,
@@ -242,11 +280,92 @@ struct HomeProtoSeed {
 }
 
 /// The ONE stage function. The hero and every tile ask it, so a rental never shows one house
-/// in the hero and another in its tile. A rental with its own target builds (pinned at the 500
-/// line, like the Properties mini-house); a record-only rental is a plain lot.
+/// in the hero and another in its tile. A rental with its own target builds on ITS OWN scale
+/// (100 of 100 hours is the roof, like 500 of 500); a record-only or shared rental is a plain lot.
 enum HomeProtoStage {
-    static func hours(for r: HomeProtoRental) -> Double { r.hasOwnTarget ? min(r.hours, 500) : 0 }
+    static func hours(for r: HomeProtoRental) -> Double {
+        guard case .own(let t) = r.target, t > 0 else { return 0 }
+        return min(r.hours / Double(t) * 500, 500)
+    }
+    /// The same house after a target change: the rental's hours on the new target's scale.
+    static func hours(for r: HomeProtoRental, target t: Int) -> Double {
+        guard t > 0, r.hasOwnTarget || t > 0 else { return 0 }
+        return min(r.hours / Double(t) * 500, 500)
+    }
     static func keyframe(hours: Double) -> HouseKeyframe { HouseProgress.keyframe(for: hours) }
     static func keyframe(for r: HomeProtoRental) -> HouseKeyframe { keyframe(hours: hours(for: r)) }
+}
+#endif
+
+#if DEBUG
+// MARK: - Words for the See-all list and the tiles
+
+extension HomeProtoSeed {
+    func tileHours(_ r: HomeProtoRental) -> String {
+        let whole = Int(r.hours.rounded(.down))
+        if case .own(let t) = r.target {
+            return r.hours >= Double(t) ? String(localized: "\(whole)h ✓", table: "HomeProto")
+                                        : String(localized: "\(whole) of \(t)", table: "HomeProto")
+        }
+        return String(localized: "\(whole)h", table: "HomeProto")
+    }
+
+    func tilePlan(_ r: HomeProtoRental) -> String {
+        switch r.target {
+        case .own(let t): return String(localized: "\(t)-hour target", table: "HomeProto")
+        case .record: return String(localized: "Record", table: "HomeProto")
+        case .counts: return String(localized: "Counts toward \(sharedTarget ?? 750)", table: "HomeProto")
+        }
+    }
+
+    /// The second line of a See-all row.
+    func planLine(_ r: HomeProtoRental) -> String {
+        switch r.target {
+        case .own(let t):
+            let base = String(localized: "\(t)-hour target", table: "HomeProto")
+            if r.pace == .done, let month = r.reached { return String(localized: "\(base) · reached in \(month)", table: "HomeProto") }
+            if r.pace == .behind, let n = r.weeklyNeed { return String(localized: "\(base) · \(n)h a week to finish", table: "HomeProto") }
+            return base
+        case .record(let reason):
+            return reason.hasPrefix("Long") ? String(localized: "Long stays · no target", table: "HomeProto")
+                                            : String(localized: "Record only", table: "HomeProto")
+        case .counts:
+            return String(localized: "Counts toward \(sharedTarget ?? 750)", table: "HomeProto")
+        }
+    }
+
+    enum Section: CaseIterable { case needsAttention, onPace, done, recordOnly, counts }
+
+    func section(_ r: HomeProtoRental) -> Section {
+        switch r.target {
+        case .counts: return .counts
+        case .record: return .recordOnly
+        case .own: return r.pace == .behind ? .needsAttention : (r.pace == .done ? .done : .onPace)
+        }
+    }
+
+    func rentals(in s: Section) -> [HomeProtoRental] {
+        let list = rentals.filter { section($0) == s }
+        func pct(_ r: HomeProtoRental) -> Double { if case .own(let t) = r.target { return r.hours / Double(t) }; return 0 }
+        switch s {
+        case .needsAttention: return list.sorted { ($0.weeklyNeed ?? 0) > ($1.weeklyNeed ?? 0) }
+        case .onPace: return list.sorted { pct($0) > pct($1) }
+        case .done, .recordOnly, .counts: return list.sorted { $0.hours > $1.hours }
+        }
+    }
+
+    var behindCount: Int { rentals.filter { section($0) == .needsAttention }.count }
+    var onPaceCount: Int { rentals.filter { [.onPace, .done].contains(section($0)) }.count }
+}
+
+enum HomeProtoPaceStyle {
+    /// caution when behind, positive when on pace or done, action when pace is not known.
+    static func color(_ r: HomeProtoRental, _ colors: AdaptiveColors) -> Color {
+        switch r.pace {
+        case .behind: return colors.caution
+        case .onPace, .done: return colors.positive
+        case nil: return colors.action
+        }
+    }
 }
 #endif

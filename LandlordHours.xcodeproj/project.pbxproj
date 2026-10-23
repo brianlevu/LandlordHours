@@ -197,6 +197,7 @@
 		D944AA90DB2DCE59079C61F9 /* AuditReportPDFRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46C2C28508D1F64A007B6BF9 /* AuditReportPDFRenderer.swift */; };
 		DABEFE3725F860151429E838 /* HouseTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45315D80200D5FEE893898D7 /* HouseTokens.swift */; };
 		DD0AF6924D7F09EEE888B905 /* HomeProtoGoalCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21DE0D1F7A98A17C80BC055B /* HomeProtoGoalCheck.swift */; };
+		DD0AF6924D7F09EEE888B906 /* HomeProtoSeeAll.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21DE0D1F7A98A17C80BC055C /* HomeProtoSeeAll.swift */; };
 		E02EF041E5591D2D38927D89 /* SuggestionConfirmSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39B0EF9F3EAF62E2B3ADF0FE /* SuggestionConfirmSheet.swift */; };
 		E14CA2D492CCD3E880FD658F /* AppToastCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69107CB3FEDA99A0E363D796 /* AppToastCenter.swift */; };
 		E303130FEAEAED98F0C73328 /* HomeProto.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 211F3D055A88E3761BAD4030 /* HomeProto.xcstrings */; };
@@ -297,6 +298,7 @@
 		2084B656B116C58A4F214944 /* LogTimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogTimeTests.swift; sourceTree = "<group>"; };
 		211F3D055A88E3761BAD4030 /* HomeProto.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = HomeProto.xcstrings; sourceTree = "<group>"; };
 		21DE0D1F7A98A17C80BC055B /* HomeProtoGoalCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeProtoGoalCheck.swift; sourceTree = "<group>"; };
+		21DE0D1F7A98A17C80BC055C /* HomeProtoSeeAll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeProtoSeeAll.swift; sourceTree = "<group>"; };
 		22F2A5256E57CEBACC7BDAAC /* StoreKitLocalIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitLocalIntegrationTests.swift; sourceTree = "<group>"; };
 		2487D044B1E2C51F52E4363B /* LockedPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockedPreview.swift; sourceTree = "<group>"; };
 		27D9AE994D0696BCE6E017B9 /* TimerDraftUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerDraftUITests.swift; sourceTree = "<group>"; };
@@ -540,6 +542,7 @@
 			isa = PBXGroup;
 			children = (
 				21DE0D1F7A98A17C80BC055B /* HomeProtoGoalCheck.swift */,
+				21DE0D1F7A98A17C80BC055C /* HomeProtoSeeAll.swift */,
 				7E1118E5D970E5A0CACA5DE5 /* HomeProtoModel.swift */,
 				4C3693F281CD0A1482B59D44 /* HomeProtoViews.swift */,
 			);
@@ -1227,6 +1230,7 @@
 				12BA2B1FF6DA34B9708EABF4 /* ExportPDFView.swift in Sources */,
 				A47503D607E3D15AB9B78D16 /* HistoryView.swift in Sources */,
 				DD0AF6924D7F09EEE888B905 /* HomeProtoGoalCheck.swift in Sources */,
+				DD0AF6924D7F09EEE888B906 /* HomeProtoSeeAll.swift in Sources */,
 				4B83F456BE7CB75E2B4EB482 /* HomeProtoModel.swift in Sources */,
 				B865919D28E13FB618CE1ACB /* HomeProtoViews.swift in Sources */,
 				3736EF25A1251F900A2E6B8B /* HouseArtView.swift in Sources */,

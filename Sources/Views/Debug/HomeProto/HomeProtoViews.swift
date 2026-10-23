@@ -13,20 +13,49 @@ struct HomeProtoRoot: View {
         ZStack {
             colors.background.ignoresSafeArea()
             switch config.screen {
-            case .e: HomeProtoToday { HomeProtoOptionE(config: config) }
-            case .goalcheck: HomeProtoGoalCheckRoot(step: config.step)
+            case .e, .seeall:
+                HomeProtoTabShell {
+                    NavigationStack {
+                        HomeProtoToday { HomeProtoOptionE(config: config) }
+                            .navigationTitle(Text("Today", tableName: "HomeProto"))
+                            .toolbar(.hidden, for: .navigationBar)
+                    }
+                }
+            case .goalcheck: HomeProtoGoalCheckRoot(config: config)
+            case .stages: HomeProtoStageSheet()
             }
         }
     }
 }
 
-/// A stand-in for the Today tab: the title, the option under test, and the Inbox row under it.
-struct HomeProtoToday<Content: View>: View {
+/// The real five-tab bar (the shipped custom tab icons), so a screen is judged with its chrome.
+struct HomeProtoTabShell<Content: View>: View {
     @ViewBuilder var content: Content
     @Environment(\.colorScheme) private var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
+        TabView {
+            content.background(colors.background.ignoresSafeArea()).tabItem { Label { Text("Today", tableName: "HomeProto") } icon: { LHIcon.home.tabItemImage } }
+            Color.clear.tabItem { Label { Text("Properties", tableName: "HomeProto") } icon: { LHIcon.properties.tabItemImage } }
+            Color.clear.tabItem { Label { Text("Track", tableName: "HomeProto") } icon: { LHIcon.track.tabItemImage } }
+            Color.clear.tabItem { Label { Text("Reports", tableName: "HomeProto") } icon: { LHIcon.reports.tabItemImage } }
+            Color.clear.tabItem { Label { Text("Settings", tableName: "HomeProto") } icon: { LHIcon.settings.tabItemImage } }
+        }
+        .tint(colors.action)
+    }
+}
+
+/// A stand-in for the Today tab: the title, the option under test, and the Inbox row under it.
+struct HomeProtoToday<Content: View>: View {
+    var scrollTarget: String? = ProcessInfo.processInfo.arguments.firstIndex(of: "-LHHomeScroll")
+        .flatMap { ProcessInfo.processInfo.arguments.indices.contains($0 + 1) ? ProcessInfo.processInfo.arguments[$0 + 1] : nil }
+    @ViewBuilder var content: Content
+    @Environment(\.colorScheme) private var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        ScrollViewReader { proxy in
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Today", tableName: "HomeProto")
@@ -47,6 +76,12 @@ struct HomeProtoToday<Content: View>: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 40)
+        }
+        .background(colors.background.ignoresSafeArea())
+        .onAppear {
+            guard scrollTarget == "rentals" else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { proxy.scrollTo("rentals", anchor: .top) }
+        }
         }
     }
 }
@@ -167,95 +202,32 @@ struct HomeProtoHeroCard: View {
     }
 }
 
-// MARK: - Tile art
-
-/// A flat house, one colour. The quiet stand-in for a rental that isn't focused.
-struct HomeProtoSilhouette: Shape {
-    func path(in r: CGRect) -> Path {
-        var p = Path()
-        func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y) }
-        p.move(to: pt(0.5, 0.06)); p.addLine(to: pt(0.96, 0.46)); p.addLine(to: pt(0.04, 0.46)); p.closeSubpath()
-        p.addRect(CGRect(x: r.minX + r.width * 0.16, y: r.minY + r.height * 0.44, width: r.width * 0.68, height: r.height * 0.5))
-        p.addRect(CGRect(x: r.minX + r.width * 0.43, y: r.minY + r.height * 0.66, width: r.width * 0.14, height: r.height * 0.28))
-        return p
-    }
-}
-
-struct HomeProtoTileArt: View {
-    let size: CGFloat
-    let full: Bool
-    let keyframe: HouseKeyframe
-    /// Progress to the rental's own target; nil when it has none (no bar is drawn).
-    let fraction: Double?
-    var checked = false
-    @Environment(\.colorScheme) private var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        ZStack {
-            if full {
-                InboxBlueprintPaper(cornerRadius: size * 0.28)
-                Image(decorative: keyframe.builtImageName)
-                    .resizable().interpolation(.high).scaledToFit()
-                    .scaleEffect(1.18).offset(y: -size * 0.02)
-            } else {
-                RoundedRectangle(cornerRadius: size * 0.28, style: .continuous).fill(colors.backgroundTertiary)
-                HomeProtoSilhouette()
-                    .fill(colors.draftingInk, style: FillStyle(eoFill: true))
-                    .frame(width: size * 0.5, height: size * 0.5)
-                    .offset(y: -size * 0.08)
-            }
-        }
-        .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
-        .overlay(alignment: .bottom) {
-            if let fraction, !full {
-                GeometryReader { g in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(colors.border)
-                        Capsule().fill(colors.action).frame(width: max(3, g.size.width * min(1, fraction)))
-                    }
-                }
-                .frame(height: 3)
-                .padding(.horizontal, size * 0.18).padding(.bottom, size * 0.1)
-            }
-        }
-        .overlay(alignment: .topTrailing) {
-            if checked {
-                ZStack {
-                    Circle().fill(colors.action)
-                    LucideIcon(image: Lucide.check, size: 12).foregroundStyle(colors.onAction)
-                }
-                .frame(width: 22, height: 22).offset(x: 6, y: -6)
-            }
-        }
-        .accessibilityHidden(true)
-    }
-}
-
 // MARK: - Option E: hero + one swipeable row of houses
 
 struct HomeProtoOptionE: View {
     let seed: HomeProtoSeed
+    private let autoplayOn: Bool
     @State private var focus: HomeProtoFocus
     @State private var summing: Bool
     @State private var summed: [String]
-    @State private var showGrid: Bool
+    @State private var showSeeAll: Bool
     @State private var scrollTo: String?
     @Namespace private var ring
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-    private let tileWidth: CGFloat = 108
+    private let tileWidth: CGFloat = 120
+    private let tileHeight: CGFloat = 176
 
     init(config: HomeProtoLaunch) {
         seed = config.seed
+        autoplayOn = config.autoplay
         let order = config.seed.focusOrder
         _focus = State(initialValue: order.indices.contains(config.focusIndex) ? order[config.focusIndex] : order[0])
         _summing = State(initialValue: !config.sum.isEmpty)
         _summed = State(initialValue: config.sum)
-        _showGrid = State(initialValue: config.grid)
+        _showSeeAll = State(initialValue: config.grid)
     }
 
     private var tap: Animation { reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.3, dampingFraction: 1.0) }
@@ -312,10 +284,11 @@ struct HomeProtoOptionE: View {
                 header
                 if typeSize.isAccessibilitySize { list } else { tiles }
             }
+            .id("rentals")
             .accessibilityElement(children: .contain)
         }
-        .sheet(isPresented: $showGrid) {
-            HomeProtoGridSheet(seed: seed, focus: focus) { f in showGrid = false; select(f) }
+        .navigationDestination(isPresented: $showSeeAll) {
+            HomeProtoSeeAll(seed: seed) { f in showSeeAll = false; select(f) }
         }
         .task { await autoplay() }
     }
@@ -358,9 +331,9 @@ struct HomeProtoOptionE: View {
         .accessibilityIdentifier("e.addup")
     }
 
-    // MARK: Row
+    // MARK: Row of tiles
 
-    private func isFull(_ f: HomeProtoFocus) -> Bool { !summing && focus == f }
+    private func isFocused(_ f: HomeProtoFocus) -> Bool { !summing && focus == f }
     private func isSelected(_ f: HomeProtoFocus) -> Bool {
         if summing, case .rental(let id) = f { return summed.contains(id) }
         return !summing && focus == f
@@ -369,14 +342,16 @@ struct HomeProtoOptionE: View {
     private var tiles: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     if seed.sharedTarget != nil { allTile }
                     ForEach(seed.rentals) { r in rentalTile(r) }
                     if seed.rentals.count >= 6 { seeAllTile }
                     addTile
                 }
+                .scrollTargetLayout()
                 .padding(.vertical, 4).padding(.horizontal, 2)
             }
+            .scrollTargetBehavior(.viewAligned)
             .scrollClipDisabled()
             .onAppear { proxy.scrollTo(focus, anchor: .center) }
             .onChange(of: focus) { _, f in withAnimation(tap) { proxy.scrollTo(f, anchor: .center) } }
@@ -387,26 +362,52 @@ struct HomeProtoOptionE: View {
         }
     }
 
-    private func tileFrame<Art: View>(_ f: HomeProtoFocus, label: String, name: String, line1: String, line2: String,
+    /// 120 x 176: art box, optional 3pt bar, name, hours, plan. A tile never changes size when focused.
+    private func tileFrame<Art: View>(_ f: HomeProtoFocus, label: String, name: String, hours: String, plan: String,
+                                      bar: (fraction: Double, color: Color)?, reached: Bool,
                                       @ViewBuilder art: () -> Art) -> some View {
         let selected = isSelected(f)
         return Button { select(f) } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                art()
-                Text(name).font(.footnote.weight(.semibold)).foregroundStyle(colors.textPrimary).lineLimit(1).minimumScaleFactor(0.8)
-                Text(line1).font(.caption.weight(.medium)).monospacedDigit().foregroundStyle(colors.textPrimary).lineLimit(1)
-                Text(line2).font(.caption2).foregroundStyle(colors.textSecondary).lineLimit(1).minimumScaleFactor(0.8)
+            VStack(alignment: .leading, spacing: 0) {
+                art().frame(maxWidth: .infinity)
+                Group {
+                    if let bar {
+                        GeometryReader { g in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(colors.border)
+                                Capsule().fill(bar.color).frame(width: max(3, g.size.width * min(1, bar.fraction)))
+                            }
+                        }
+                    } else { Color.clear }
+                }
+                .frame(height: 3).padding(.horizontal, 4).padding(.top, 8)
+                Text(name).font(.system(size: 13, weight: .semibold)).foregroundStyle(colors.textPrimary)
+                    .lineLimit(1).minimumScaleFactor(0.85).padding(.top, 8)
+                Text(hours).font(.system(size: 13, weight: .medium, design: .rounded)).monospacedDigit()
+                    .foregroundStyle(colors.textPrimary).lineLimit(1).padding(.top, 2)
+                Text(plan).font(.system(size: 11)).foregroundStyle(colors.textSecondary)
+                    .lineLimit(1).minimumScaleFactor(0.85).padding(.top, 2)
+                Spacer(minLength: 0)
             }
-            .frame(width: tileWidth - 20, alignment: .leading)
-            .padding(10)
-            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(.horizontal, 12).padding(.top, 12).padding(.bottom, 10)
+            .frame(width: tileWidth, height: tileHeight, alignment: .topLeading)
+            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(alignment: .topTrailing) {
+                if reached {
+                    ZStack {
+                        Circle().fill(colors.action)
+                        LucideIcon(image: Lucide.check, size: 12).foregroundStyle(colors.onAction)
+                    }
+                    .frame(width: 22, height: 22).offset(x: -4, y: 4)
+                }
+            }
             .overlay {
                 if selected {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(colors.action, lineWidth: 2)
+                    RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(colors.action, lineWidth: 2)
                         .matchedGeometryEffect(id: summing ? "sum-\(name)" : "ring", in: ring)
                 }
             }
-            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
         .buttonStyle(.lhPressable)
         .id(f)
@@ -417,9 +418,17 @@ struct HomeProtoOptionE: View {
 
     private func rentalTile(_ r: HomeProtoRental) -> some View {
         let f = HomeProtoFocus.rental(r.id)
-        return tileFrame(f, label: seed.spoken(r), name: r.name, line1: seed.hoursLine(r), line2: seed.targetLine(r)) {
-            HomeProtoTileArt(size: tileWidth - 20, full: isFull(f), keyframe: HomeProtoStage.keyframe(for: r),
-                             fraction: ownFraction(r), checked: summing && summed.contains(r.id))
+        let under: Bool = { if case .own(let t) = r.target { return r.hours < Double(t) }; return false }()
+        let bar: (Double, Color)? = under ? (ownFraction(r) ?? 0, HomeProtoPaceStyle.color(r, colors)) : nil
+        return tileFrame(f, label: seed.spoken(r), name: r.name, hours: seed.tileHours(r), plan: seed.tilePlan(r),
+                         bar: bar, reached: r.pace == .done) {
+            HomeProtoArt(size: 88, keyframe: HomeProtoStage.keyframe(for: r), style: isFocused(f) ? .plain : .quiet)
+                .overlay(alignment: .topTrailing) {
+                    if summing && summed.contains(r.id) {
+                        ZStack { Circle().fill(colors.action); LucideIcon(image: Lucide.check, size: 12).foregroundStyle(colors.onAction) }
+                            .frame(width: 22, height: 22).offset(x: 6, y: -6)
+                    }
+                }
         }
     }
 
@@ -431,21 +440,31 @@ struct HomeProtoOptionE: View {
     private var allTile: some View {
         let total = seed.totalHours, target = Double(seed.sharedTarget ?? 750)
         return tileFrame(.all, label: String(localized: "All rentals, \(Int(total)) of \(Int(target)) hours", table: "HomeProto"),
-                         name: seed.name(.all), line1: String(localized: "\(Int(total)) of \(Int(target))", table: "HomeProto"),
-                         line2: String(localized: "One shared total", table: "HomeProto")) {
-            HomeProtoTileArt(size: tileWidth - 20, full: isFull(.all), keyframe: HomeProtoStage.keyframe(hours: total), fraction: total / target)
+                         name: seed.name(.all), hours: String(localized: "\(Int(total)) of \(Int(target))", table: "HomeProto"),
+                         plan: String(localized: "One shared total", table: "HomeProto"),
+                         bar: (total / target, colors.action), reached: false) {
+            HomeProtoArt(size: 88, keyframe: HomeProtoStage.keyframe(hours: total), style: .plain)
         }
     }
 
     private var seeAllTile: some View {
-        Button { showGrid = true } label: {
-            VStack(spacing: 8) {
-                LucideIcon(image: Lucide.layoutGrid, size: 24).foregroundStyle(colors.action)
-                Text("See all", tableName: "HomeProto").font(.footnote.weight(.semibold)).foregroundStyle(colors.action)
-                Text("\(seed.rentals.count) rentals", tableName: "HomeProto").font(.caption2).foregroundStyle(colors.textSecondary)
+        Button { showSeeAll = true } label: {
+            VStack(spacing: 14) {
+                ZStack {
+                    ForEach(0..<3, id: \.self) { i in
+                        HomeProtoArt(size: 40, keyframe: .k00_lot, style: .plain)
+                            .offset(x: CGFloat(i - 1) * 6, y: CGFloat(i - 1) * 6)
+                            .zIndex(Double(i))
+                    }
+                }
+                .frame(width: 56, height: 56)
+                VStack(spacing: 2) {
+                    Text("See all", tableName: "HomeProto").font(.system(size: 13, weight: .semibold)).foregroundStyle(colors.action)
+                    Text("\(seed.rentals.count) rentals", tableName: "HomeProto").font(.system(size: 13, weight: .semibold)).foregroundStyle(colors.action)
+                }
             }
-            .frame(width: 84, height: tileWidth + 36)
-            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .frame(width: tileWidth, height: tileHeight)
+            .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
         .buttonStyle(.lhPressable)
         .id("seeall")
@@ -455,25 +474,31 @@ struct HomeProtoOptionE: View {
     private var addTile: some View {
         Button {} label: {
             VStack(spacing: 8) {
-                LucideIcon(image: Lucide.circlePlus, size: 24).foregroundStyle(colors.action)
-                Text("Add", tableName: "HomeProto").font(.footnote.weight(.semibold)).foregroundStyle(colors.action)
+                LucideIcon(image: Lucide.plus, size: 22).foregroundStyle(colors.action)
+                Text("Add", tableName: "HomeProto").font(.system(size: 13, weight: .semibold)).foregroundStyle(colors.action)
             }
-            .frame(width: 64, height: tileWidth + 36)
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(colors.border, style: StrokeStyle(lineWidth: 1, dash: [4, 4])))
+            .frame(width: 80, height: tileHeight)
+            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(colors.border, style: StrokeStyle(lineWidth: 1.5, dash: [5, 5])))
         }
         .buttonStyle(.lhPressable)
         .id("add")
     }
 
-    // MARK: Large text: a list instead of a row
+    // MARK: Large text: the See-all row grammar, three shown
 
     private var list: some View {
         let order = seed.focusOrder
-        return VStack(spacing: 8) {
-            ForEach(Array(order.prefix(3)), id: \.self) { f in listRow(f) }
+        return VStack(spacing: 10) {
+            VStack(spacing: 0) {
+                ForEach(Array(order.prefix(3).enumerated()), id: \.element) { i, f in
+                    if i > 0 { Rectangle().fill(colors.border).frame(height: 0.5).padding(.leading, 84) }
+                    listRow(f)
+                }
+            }
+            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             if order.count > 3 {
-                Button { showGrid = true } label: {
+                Button { showSeeAll = true } label: {
                     Text("See all \(order.count) rentals", tableName: "HomeProto")
                         .font(.subheadline.weight(.semibold)).foregroundStyle(colors.action)
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -483,26 +508,21 @@ struct HomeProtoOptionE: View {
         }
     }
 
-    private func listRow(_ f: HomeProtoFocus) -> some View {
-        let r: HomeProtoRental? = { if case .rental(let id) = f { return seed.rental(id) } else { return nil } }()
+    @ViewBuilder private func listRow(_ f: HomeProtoFocus) -> some View {
         let selected = isSelected(f)
-        let total = seed.totalHours, target = Double(seed.sharedTarget ?? 750)
-        return Button { select(f) } label: {
-            HStack(spacing: 12) {
-                HomeProtoTileArt(size: 56, full: isFull(f),
-                                 keyframe: r.map { HomeProtoStage.keyframe(for: $0) } ?? HomeProtoStage.keyframe(hours: total),
-                                 fraction: r.map { ownFraction($0) } ?? total / target,
-                                 checked: summing && (r.map { summed.contains($0.id) } ?? false))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(r?.name ?? seed.name(.all)).font(.headline).foregroundStyle(colors.textPrimary)
-                    Text(r.map { String(localized: "\(seed.hoursLine($0)) · \(seed.targetLine($0))", table: "HomeProto") }
-                         ?? String(localized: "\(Int(total)) of \(Int(target))", table: "HomeProto"))
-                        .font(.subheadline).foregroundStyle(colors.textSecondary)
+        Button { select(f) } label: {
+            Group {
+                switch f {
+                case .rental(let id):
+                    if let r = seed.rental(id) { HomeProtoRentalRow(seed: seed, r: r) }
+                case .all:
+                    let total = seed.totalHours, target = seed.sharedTarget ?? 750
+                    HomeProtoListRow(keyframe: HomeProtoStage.keyframe(hours: total), name: seed.name(.all),
+                                     plan: String(localized: "One shared total", table: "HomeProto")) {
+                        HomeProtoNumber(main: "\(Int(total))", rest: String(localized: "of \(target)", table: "HomeProto"))
+                    } tag: { EmptyView() }
                 }
-                Spacer(minLength: 0)
             }
-            .padding(12)
-            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay { if selected { RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(colors.action, lineWidth: 2) } }
         }
         .buttonStyle(.lhPressable)
@@ -512,70 +532,18 @@ struct HomeProtoOptionE: View {
     // MARK: Scripted tour for the video (-LHHomeAutoplay)
 
     private func autoplay() async {
-        guard ProcessInfo.processInfo.arguments.contains("-LHHomeAutoplay") else { return }
+        guard autoplayOn else { return }
         let order = seed.focusOrder
         func pause(_ s: Double) async { try? await Task.sleep(nanoseconds: UInt64(s * 1_000_000_000)) }
         await pause(1.5)
-        for i in [1, 2] where order.indices.contains(i) { select(order[i]); await pause(1.4) }
+        for i in [1, 2, 3] where order.indices.contains(i) { select(order[i]); await pause(1.4) }
         select(order[0]); await pause(1.2)
         toggleSum(); await pause(1.2)
         for i in [1, 2] where order.indices.contains(i) { select(order[i]); await pause(1.3) }
         await pause(0.8)
         toggleSum(); await pause(1.3)
         scrollTo = "seeall"; await pause(1.4)
-        if seed.rentals.count >= 6 { showGrid = true; await pause(2.8); showGrid = false; await pause(1.0) }
-    }
-}
-
-// MARK: - See all: a grid of every house
-
-struct HomeProtoGridSheet: View {
-    let seed: HomeProtoSeed
-    let focus: HomeProtoFocus
-    let onPick: (HomeProtoFocus) -> Void
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dynamicTypeSize) private var typeSize
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    var body: some View {
-        ZStack {
-            colors.background.ignoresSafeArea()
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        Text("All rentals", tableName: "HomeProto").font(.title2.weight(.semibold)).foregroundStyle(colors.textPrimary)
-                            .accessibilityAddTraits(.isHeader)
-                        Spacer()
-                        Text("\(Int(seed.totalHours.rounded(.down)))h logged this year", tableName: "HomeProto")
-                            .font(.footnote.weight(.medium)).foregroundStyle(colors.textSecondary)
-                    }
-                    .padding(.top, 24)
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: typeSize.isAccessibilitySize ? 260 : 140), spacing: 12)], spacing: 12) {
-                        ForEach(seed.rentals) { r in cell(r) }
-                    }
-                }
-                .padding(.horizontal, 20).padding(.bottom, 24)
-            }
-        }
-        .presentationDetents([.large])
-    }
-
-    private func cell(_ r: HomeProtoRental) -> some View {
-        let f = HomeProtoFocus.rental(r.id)
-        return Button { onPick(f) } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                HomeProtoTileArt(size: 88, full: true, keyframe: HomeProtoStage.keyframe(for: r), fraction: nil)
-                Text(r.name).font(.subheadline.weight(.semibold)).foregroundStyle(colors.textPrimary)
-                Text(seed.hoursLine(r)).font(.footnote.weight(.medium)).monospacedDigit().foregroundStyle(colors.textPrimary)
-                Text(seed.targetLine(r)).font(.caption).foregroundStyle(colors.textSecondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay { if focus == f { RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(colors.action, lineWidth: 2) } }
-        }
-        .buttonStyle(.lhPressable)
-        .accessibilityLabel(seed.spoken(r))
+        if seed.rentals.count >= 6 { showSeeAll = true; await pause(3.2); showSeeAll = false; await pause(1.0) }
     }
 }
 #endif
