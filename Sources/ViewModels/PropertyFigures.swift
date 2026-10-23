@@ -100,15 +100,12 @@ extension AppViewModel {
         TaxQualificationEngine.countedProperties(properties).contains { $0.id == property.id }
     }
 
-    /// The one rental Today names; nil when the count covers every rental.
+    /// The one rental Today names (eyebrow, house flag, subtitle, widget): the rental the owner
+    /// focused on Today, or the default one. nil when Today is on "All rentals". The source of
+    /// truth for every surface that names a rental; see `resolvedTodayFocus`.
     func todayFocusProperty(year: Int = Calendar.current.component(.year, from: Date())) -> RentalProperty? {
-        TaxQualificationEngine.todayFocusProperty(
-            entries: tracksSpouseJointly ? timeEntries : timeEntries.filter { $0.participant == .selfParticipant },
-            properties: properties,
-            year: year,
-            groupingElection: TaxProfileManager.shared.groupingElection,
-            countsPerRental: houseGoal != .reps750 && GoalManager.shared.goalChoice != .record
-        )
+        if case .rental(let id) = resolvedTodayFocus(year: year) { return properties.first { $0.id == id } }
+        return nil
     }
 }
 
