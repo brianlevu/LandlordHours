@@ -383,7 +383,6 @@ Rules, all **[grep]** unless marked:
 | `count` | `.easeOut(0.60)` — hero digits only | new |
 | `ringProgress` | `.spring(duration: 0.60, bounce: 0)` — hero mask, ring | `spring(0.7, 0.82)` |
 | `stage` | `.spring(duration: 0.45, bounce: 0)` — milestone only | `logoEntrance` |
-| `sweep` | `.easeOut(0.45)` — the drafting pass line only | new |
 
 ### B.3 Named motions
 
@@ -397,7 +396,7 @@ Rules, all **[grep]** unless marked:
 | `tileFocus` | picker tile selected | ring stroke `border` → `action` crossfade (0.15); no scale | `quick` | `.selection` | same |
 | `countChange` | count capsule, row hours, stat values | `contentTransition(.numericText())` | `standard` | none | crossfade |
 | `heroCountUp` | hours value changes while Today is visible, never on appear | digits count from the previous value (0.60); house mask rises (0.60) | `count`, `ringProgress` | none | digits jump; mask crossfades 0.2 |
-| `draftingPass` | an hour is confirmed or logged while Today is visible (signature; the brand's own move) | as the house mask rises (`ringProgress`, 0.60), one 1pt drafting-cyan (`#8FD3FF`, `drafting` token) horizontal line sweeps once left → right across the newly built band of the house (0.45, opacity 0.9 → 0), as if a pen drew the line the mask then fills; then stillness. Bound to the same hours `value:` as `heroCountUp`; never on appear; one-shot (no `repeatForever`). Total ≤ 0.60. When hours cross a milestone, `houseStageAdvance` plays instead, never both. | `ringProgress` + `sweep` | the row's `.success`, fired on the same state change; the pass adds no second haptic (one haptic per event) | the new band crossfades from linework to solid (0.30), no line, no mask motion; haptic kept |
+| `buildStep` | an hour is confirmed or logged while Today is visible (signature; the brand's own move) | the newly earned band of the house **builds in the existing timber/framing style**: the same stage assets and build animation the house already uses (`ConfirmBuildAnimation`, `HouseArtView` stage layers), scoped to the band the new hours earned, as the mask rises (`ringProgress`, 0.60); the framing goes up, the band fills, then stillness. No new art, no overlay line. Bound to the same hours `value:` as `heroCountUp`; never on appear; one-shot (no `repeatForever`). Total ≤ 0.60. When hours cross a milestone, `houseStageAdvance` plays instead, never both. | `ringProgress` + `stage` | the row's `.success`, fired on the same state change; the step adds no second haptic (one haptic per event) | the new band crossfades from linework to built (0.30), no framing motion, no mask motion; haptic kept |
 | `houseStageAdvance` | hours cross 100 / 500 / 750 (signature) | linework → solid crossfade (0.22) while the new part scales 0.96 → 1 (0.45); brass sign fades in at 0.30; one confetti burst ≤ 0.60; total ≤ 0.60 | `reveal`, `stage` | `.success` once at the sign | solid part fades in 0.3; no scale, no confetti |
 | `toastIn` / `toastOut` | toast shown / dismissed | in: y +24 → 0 with opacity (0.22); out: opacity → 0, y 0 → +12 (0.15); swipe-down follows the finger then `settle` | `reveal` / `quick` | `.success` saves, `.error` failures, none info | opacity only |
 | `sheetUnfold` | section expands inside a sheet | height with content fade (0.30); ≤ 4 rows stagger at 30ms | `flow`, `reveal` | none | fade 0.2, no stagger |
@@ -414,7 +413,7 @@ Brian's pick (2026-10-23): "your work shows up" scenes on the hero. Four scenes:
 
 | Rule | Spec | Kind |
 |---|---|---|
-| When | A scene plays only after a matching entry for the shown rental is confirmed or logged **while Today is visible**, after `draftingPass` has finished. Once per entry, keyed by the entry id (`TodayScenePlayed` set); never on appear, never on a timer, never on a loop. A batch confirm plays at most one scene (the newest matching entry). | grep (trigger bound to the entry id; no `repeatForever`, no `TimelineView(.animation)` in `House/`) |
+| When | A scene plays only after a matching entry for the shown rental is confirmed or logged **while Today is visible**, after `buildStep` has finished. Once per entry, keyed by the entry id (`TodayScenePlayed` set); never on appear, never on a timer, never on a loop. A batch confirm plays at most one scene (the newest matching entry). | grep (trigger bound to the entry id; no `repeatForever`, no `TimelineView(.animation)` in `House/`) |
 | Duration | Enter ≤ 0.60 (`stage`), hold ≤ 2.4s static, exit ≤ 0.60 (`reveal` reversed). Total ≤ 3.6s. After the exit the prop may remain as a still detail (the van stays parked) until Today disappears; no motion after the exit. | measured in code |
 | Where | The scene band is the lower-right of the hero: below the number's baseline band and right of 45% of the card width; it never overlaps the number, the eyebrow, the pace line, the stage label or the switcher row **[measured: bbox intersection = 0]**. The sky sits behind the number only as a flat tint; white on the darkest sky tint stays ≥ 7:1 (today 9.06 on blueprint) **[measured contrast]**. | measured |
 | Over the number | Never. If a scene would need to cross the number's band, it is not a scene we ship. | measured |
