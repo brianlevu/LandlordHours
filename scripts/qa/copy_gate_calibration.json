@@ -1,0 +1,1473 @@
+{
+ "labeler": "Claude (Opus 5.5), hand-labelled; the Claude reference, not a legal opinion",
+ "note": "plain=true means a regular person would say it aloud to a friend. tax_claim=true means it claims/implies a tax status or gives tax advice. Written rows are known-bad examples plus 8 plain controls.",
+ "rows": [
+  {
+   "text": "Go to Today",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Permanently remove this profile's records",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Someone participated more",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Keep up the momentum",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Your calendar had this from {} to {}. Change it if the work ran long or short.",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Voice entry stopped. Try again or type the note.",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "You may have logged {} already. Tap to check before saving.",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Usually applies going forward",
+   "source": "app",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Qualification by participant (REPS)",
+   "source": "app",
+   "plain": false,
+   "tax_claim": true,
+   "tone": "jargon"
+  },
+  {
+   "text": "Back up your records to iCloud",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Add a short description for your records.",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Your hours only. Turn on spouse hours in Tax profile to count both.",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Appendix: where entries came from",
+   "source": "app",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Grouping election",
+   "source": "app",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Add a property. Every hour you confirm builds on it.",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Couldn't reach iCloud. This report may be missing hours from your other devices.",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "PDF and CSV of every {} entry, with where it came from.",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Marked not landlord work. Undo is available.",
+   "source": "app",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "500-hour test",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "We'll put work here when your calendar looks like rental work. Nothing counts until you say so.",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Suggestions use Apple's on-device model. Nothing is sent to us or any third party.",
+   "source": "app",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "{} is staked. Log your first hour while it's fresh.",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Calendar access is off for LandlordHours. Turn it on in iOS Settings.",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Paid once. Exports and every rental are unlocked.",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Might already be logged",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Change the hours or confirm them first.",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Counts for REPS",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Does not meet the 750-hour test",
+   "source": "app",
+   "plain": false,
+   "tax_claim": true,
+   "tone": "jargon"
+  },
+  {
+   "text": "{}: {} hours. Meets the 750-hour and more-than-half tests.",
+   "source": "app",
+   "plain": false,
+   "tax_claim": true,
+   "tone": "jargon"
+  },
+  {
+   "text": "Meets both REPS hour tests",
+   "source": "app",
+   "plain": false,
+   "tax_claim": true,
+   "tone": "jargon"
+  },
+  {
+   "text": "LandlordHours is a record-keeping tool, not tax advice. Review your qualification with a tax professional.",
+   "source": "app",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Create your first evidence file",
+   "source": "app",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Add your first property to start tracking evidence.",
+   "source": "app",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "{}h are ready for tax-year review.",
+   "source": "app",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Goal hours reached, based on your records.",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Turn the hours you logged into a PDF or CSV you can hand to your tax professional.",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Pro adds a PDF and CSV of your hours for tax time, and room for every rental you own. You pay once.",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Prepare tax-year records",
+   "source": "app",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Finished after 750h",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Rental Activity Time Log: Tax Year {}",
+   "source": "app",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Couldn't open your saved records. They're still on your device — reopen the app, and contact support if this keeps happening.",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Hours in REPS-countable activities",
+   "source": "app",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Tap to open timer",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Switch profile?",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Behind REPS pace",
+   "source": "app",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "You qualify as a real estate professional.",
+   "source": "written",
+   "plain": true,
+   "tax_claim": true,
+   "tone": "plain"
+  },
+  {
+   "text": "Your hours make you REPS-qualified for 2026.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": true,
+   "tone": "jargon"
+  },
+  {
+   "text": "Stay audit-ready all year.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": true,
+   "tone": "salesy"
+  },
+  {
+   "text": "Defensible records the IRS will accept.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": true,
+   "tone": "salesy"
+  },
+  {
+   "text": "Save thousands in taxes with your rental losses.",
+   "source": "written",
+   "plain": true,
+   "tax_claim": true,
+   "tone": "salesy"
+  },
+  {
+   "text": "File your return with confidence. Deduct every loss.",
+   "source": "written",
+   "plain": true,
+   "tax_claim": true,
+   "tone": "salesy"
+  },
+  {
+   "text": "You should claim the passive loss deduction this year.",
+   "source": "written",
+   "plain": true,
+   "tax_claim": true,
+   "tone": "plain"
+  },
+  {
+   "text": "Tax-ready reports in one tap.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "salesy"
+  },
+  {
+   "text": "Guaranteed to hold up in an audit.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": true,
+   "tone": "salesy"
+  },
+  {
+   "text": "Congratulations, you meet the IRS requirements for real estate professional status.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": true,
+   "tone": "jargon"
+  },
+  {
+   "text": "Based on your hours, you will not owe passive activity tax.",
+   "source": "written",
+   "plain": true,
+   "tax_claim": true,
+   "tone": "plain"
+  },
+  {
+   "text": "Our AI makes sure you pass the 750 hour test.",
+   "source": "written",
+   "plain": true,
+   "tax_claim": true,
+   "tone": "salesy"
+  },
+  {
+   "text": "This entry qualifies toward your material participation.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": true,
+   "tone": "jargon"
+  },
+  {
+   "text": "You're on track to qualify as a real estate professional.",
+   "source": "written",
+   "plain": true,
+   "tax_claim": true,
+   "tone": "plain"
+  },
+  {
+   "text": "Substantiate your contemporaneous activity documentation.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Evidentiary-grade logs for regulatory compliance.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Utilize this module to facilitate the aggregation of disparate time artifacts.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Per the aforementioned terms, the user hereby consents to data processing.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Material participation heuristics are evaluated against grouping elections.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Leverage synergies across your property portfolio.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Your entries have been persisted to the local datastore.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Authentication token expired. Re-authenticate to continue.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "An error occurred while processing your request (code 0x3F).",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Contemporaneous log entries mitigate adverse examination risk.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": true,
+   "tone": "jargon"
+  },
+  {
+   "text": "The #1 app every smart landlord needs. Unlock your full potential today!",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "salesy"
+  },
+  {
+   "text": "Supercharge your rental business with powerful, game-changing tools.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "salesy"
+  },
+  {
+   "text": "Don't miss out. Limited time offer, upgrade now and save big!",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "salesy"
+  },
+  {
+   "text": "Experience the ultimate, best-in-class time tracking revolution.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "salesy"
+  },
+  {
+   "text": "Join thousands of happy landlords crushing their goals!",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "salesy"
+  },
+  {
+   "text": "Please be advised that your subscription will auto-renew unless cancelled 24 hours prior.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Time entries are subject to validation pursuant to your selected tax profile.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Seamlessly unlock unparalleled insights into your rental performance.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "salesy"
+  },
+  {
+   "text": "Your attestation is required prior to export.",
+   "source": "written",
+   "plain": false,
+   "tax_claim": false,
+   "tone": "jargon"
+  },
+  {
+   "text": "Take the guesswork out of taxes and let us handle everything.",
+   "source": "written",
+   "plain": true,
+   "tax_claim": true,
+   "tone": "salesy"
+  },
+  {
+   "text": "Never worry about the IRS again.",
+   "source": "written",
+   "plain": true,
+   "tax_claim": true,
+   "tone": "salesy"
+  },
+  {
+   "text": "You must log 750 hours or you will lose your deduction.",
+   "source": "written",
+   "plain": true,
+   "tax_claim": true,
+   "tone": "plain"
+  },
+  {
+   "text": "Log your hours in a few taps.",
+   "source": "written",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "This app doesn't give tax advice.",
+   "source": "written",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Share a PDF with your accountant.",
+   "source": "written",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Track your hours toward 750.",
+   "source": "written",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Ask your tax professional what counts.",
+   "source": "written",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Delete this entry?",
+   "source": "written",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Nice work. That's 3 hours this week.",
+   "source": "written",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  },
+  {
+   "text": "Something went wrong. Try again.",
+   "source": "written",
+   "plain": true,
+   "tax_claim": false,
+   "tone": "plain"
+  }
+ ],
+ "config": {
+  "plain_speech": {
+   "threshold": 0.65,
+   "agreement": 0.865,
+   "agreement_at_0.5": 0.764,
+   "holdout_agreement": 0.865,
+   "tp": 39,
+   "tn": 38,
+   "fp": 9,
+   "fn": 3,
+   "n": 89,
+   "advisory": false
+  },
+  "tax_claim": {
+   "threshold": 0.3,
+   "agreement": 0.978,
+   "agreement_at_0.5": 0.966,
+   "holdout_agreement": 0.966,
+   "tp": 20,
+   "tn": 67,
+   "fp": 1,
+   "fn": 1,
+   "n": 89,
+   "advisory": false
+  },
+  "tone": {
+   "threshold": 0.65,
+   "agreement": 0.854,
+   "agreement_at_0.5": 0.809,
+   "holdout_agreement": 0.797,
+   "tp": 36,
+   "tn": 40,
+   "fp": 3,
+   "fn": 10,
+   "n": 89,
+   "advisory": false,
+   "three_way_accuracy": 0.798
+  }
+ },
+ "model": "jev-latest",
+ "calibrated_on": "2026-10-20",
+ "jev": {
+  "Go to Today": {
+   "plain_speech": 0.81,
+   "tax_claim": 0.03,
+   "tone": {
+    "plain": 1.0,
+    "jargon": 0.0,
+    "salesy": 0.0
+   }
+  },
+  "Permanently remove this profile's records": {
+   "plain_speech": 0.26,
+   "tax_claim": 0.02,
+   "tone": {
+    "plain": 0.72,
+    "jargon": 0.28,
+    "salesy": 0.0
+   }
+  },
+  "Someone participated more": {
+   "plain_speech": 0.6,
+   "tax_claim": 0.05,
+   "tone": {
+    "plain": 0.98,
+    "jargon": 0.02,
+    "salesy": 0.0
+   }
+  },
+  "Keep up the momentum": {
+   "plain_speech": 0.65,
+   "tax_claim": 0.03,
+   "tone": {
+    "plain": 0.65,
+    "jargon": 0.0,
+    "salesy": 0.35
+   }
+  },
+  "Your calendar had this from {} to {}. Change it if the work ran long or short.": {
+   "plain_speech": 0.66,
+   "tax_claim": 0.03,
+   "tone": {
+    "plain": 1.0,
+    "jargon": 0.0,
+    "salesy": 0.0
+   }
+  },
+  "Voice entry stopped. Try again or type the note.": {
+   "plain_speech": 0.64,
+   "tax_claim": 0.02,
+   "tone": {
+    "plain": 1.0,
+    "jargon": 0.0,
+    "salesy": 0.0
+   }
+  },
+  "You may have logged {} already. Tap to check before saving.": {
+   "plain_speech": 0.63,
+   "tax_claim": 0.03,
+   "tone": {
+    "plain": 1.0,
+    "jargon": 0.0,
+    "salesy": 0.0
+   }
+  },
+  "Usually applies going forward": {
+   "plain_speech": 0.28,
+   "tax_claim": 0.09,
+   "tone": {
+    "plain": 0.77,
+    "jargon": 0.23,
+    "salesy": 0.0
+   }
+  },
+  "Qualification by participant (REPS)": {
+   "plain_speech": 0.12,
+   "tax_claim": 0.46,
+   "tone": {
+    "plain": 0.07,
+    "jargon": 0.93,
+    "salesy": 0.0
+   }
+  },
+  "Back up your records to iCloud": {
+   "plain_speech": 0.76,
+   "tax_claim": 0.03,
+   "tone": {
+    "plain": 0.99,
+    "jargon": 0.01,
+    "salesy": 0.0
+   }
+  },
+  "Add a short description for your records.": {
+   "plain_speech": 0.59,
+   "tax_claim": 0.04,
+   "tone": {
+    "plain": 0.98,
+    "jargon": 0.02,
+    "salesy": 0.0
+   }
+  },
+  "Your hours only. Turn on spouse hours in Tax profile to count both.": {
+   "plain_speech": 0.37,
+   "tax_claim": 0.25,
+   "tone": {
+    "plain": 0.68,
+    "jargon": 0.32,
+    "salesy": 0.0
+   }
+  },
+  "Appendix: where entries came from": {
+   "plain_speech": 0.32,
+   "tax_claim": 0.08,
+   "tone": {
+    "plain": 0.97,
+    "jargon": 0.03,
+    "salesy": 0.0
+   }
+  },
+  "Grouping election": {
+   "plain_speech": 0.3,
+   "tax_claim": 0.15,
+   "tone": {
+    "plain": 0.63,
+    "jargon": 0.37,
+    "salesy": 0.0
+   }
+  },
+  "Add a property. Every hour you confirm builds on it.": {
+   "plain_speech": 0.41,
+   "tax_claim": 0.31,
+   "tone": {
+    "plain": 0.84,
+    "jargon": 0.01,
+    "salesy": 0.15
+   }
+  },
+  "Couldn't reach iCloud. This report may be missing hours from your other devices.": {
+   "plain_speech": 0.63,
+   "tax_claim": 0.02,
+   "tone": {
+    "plain": 0.94,
+    "jargon": 0.06,
+    "salesy": 0.0
+   }
+  },
+  "PDF and CSV of every {} entry, with where it came from.": {
+   "plain_speech": 0.45,
+   "tax_claim": 0.04,
+   "tone": {
+    "plain": 0.89,
+    "jargon": 0.11,
+    "salesy": 0.0
+   }
+  },
+  "Marked not landlord work. Undo is available.": {
+   "plain_speech": 0.5,
+   "tax_claim": 0.04,
+   "tone": {
+    "plain": 0.97,
+    "jargon": 0.03,
+    "salesy": 0.0
+   }
+  },
+  "500-hour test": {
+   "plain_speech": 0.38,
+   "tax_claim": 0.28,
+   "tone": {
+    "plain": 0.29,
+    "jargon": 0.71,
+    "salesy": 0.0
+   }
+  },
+  "We'll put work here when your calendar looks like rental work. Nothing counts until you say so.": {
+   "plain_speech": 0.59,
+   "tax_claim": 0.13,
+   "tone": {
+    "plain": 0.99,
+    "jargon": 0.01,
+    "salesy": 0.0
+   }
+  },
+  "Suggestions use Apple's on-device model. Nothing is sent to us or any third party.": {
+   "plain_speech": 0.32,
+   "tax_claim": 0.03,
+   "tone": {
+    "plain": 0.97,
+    "jargon": 0.03,
+    "salesy": 0.0
+   }
+  },
+  "{} is staked. Log your first hour while it's fresh.": {
+   "plain_speech": 0.39,
+   "tax_claim": 0.21,
+   "tone": {
+    "plain": 0.63,
+    "jargon": 0.28,
+    "salesy": 0.09
+   }
+  },
+  "Calendar access is off for LandlordHours. Turn it on in iOS Settings.": {
+   "plain_speech": 0.65,
+   "tax_claim": 0.02,
+   "tone": {
+    "plain": 0.99,
+    "jargon": 0.01,
+    "salesy": 0.0
+   }
+  },
+  "Paid once. Exports and every rental are unlocked.": {
+   "plain_speech": 0.48,
+   "tax_claim": 0.03,
+   "tone": {
+    "plain": 0.4,
+    "jargon": 0.0,
+    "salesy": 0.6
+   }
+  },
+  "Might already be logged": {
+   "plain_speech": 0.79,
+   "tax_claim": 0.03,
+   "tone": {
+    "plain": 1.0,
+    "jargon": 0.0,
+    "salesy": 0.0
+   }
+  },
+  "Change the hours or confirm them first.": {
+   "plain_speech": 0.72,
+   "tax_claim": 0.05,
+   "tone": {
+    "plain": 1.0,
+    "jargon": 0.0,
+    "salesy": 0.0
+   }
+  },
+  "Counts for REPS": {
+   "plain_speech": 0.56,
+   "tax_claim": 0.13,
+   "tone": {
+    "plain": 0.8200000000000001,
+    "jargon": 0.18,
+    "salesy": 0.0
+   }
+  },
+  "Does not meet the 750-hour test": {
+   "plain_speech": 0.26,
+   "tax_claim": 0.28,
+   "tone": {
+    "plain": 0.12,
+    "jargon": 0.88,
+    "salesy": 0.0
+   }
+  },
+  "{}: {} hours. Meets the 750-hour and more-than-half tests.": {
+   "plain_speech": 0.15,
+   "tax_claim": 0.84,
+   "tone": {
+    "plain": 0.27,
+    "jargon": 0.73,
+    "salesy": 0.0
+   }
+  },
+  "Meets both REPS hour tests": {
+   "plain_speech": 0.21,
+   "tax_claim": 0.76,
+   "tone": {
+    "plain": 0.09,
+    "jargon": 0.91,
+    "salesy": 0.0
+   }
+  },
+  "LandlordHours is a record-keeping tool, not tax advice. Review your qualification with a tax professional.": {
+   "plain_speech": 0.12,
+   "tax_claim": 0.04,
+   "tone": {
+    "plain": 0.61,
+    "jargon": 0.39,
+    "salesy": 0.0
+   }
+  },
+  "Create your first evidence file": {
+   "plain_speech": 0.34,
+   "tax_claim": 0.06,
+   "tone": {
+    "plain": 0.85,
+    "jargon": 0.15,
+    "salesy": 0.0
+   }
+  },
+  "Add your first property to start tracking evidence.": {
+   "plain_speech": 0.49,
+   "tax_claim": 0.03,
+   "tone": {
+    "plain": 0.98,
+    "jargon": 0.02,
+    "salesy": 0.0
+   }
+  },
+  "{}h are ready for tax-year review.": {
+   "plain_speech": 0.33,
+   "tax_claim": 0.15,
+   "tone": {
+    "plain": 0.57,
+    "jargon": 0.43,
+    "salesy": 0.0
+   }
+  },
+  "Goal hours reached, based on your records.": {
+   "plain_speech": 0.36,
+   "tax_claim": 0.11,
+   "tone": {
+    "plain": 0.87,
+    "jargon": 0.13,
+    "salesy": 0.0
+   }
+  },
+  "Turn the hours you logged into a PDF or CSV you can hand to your tax professional.": {
+   "plain_speech": 0.6,
+   "tax_claim": 0.06,
+   "tone": {
+    "plain": 0.98,
+    "jargon": 0.01,
+    "salesy": 0.01
+   }
+  },
+  "Pro adds a PDF and CSV of your hours for tax time, and room for every rental you own. You pay once.": {
+   "plain_speech": 0.37,
+   "tax_claim": 0.07,
+   "tone": {
+    "plain": 0.41,
+    "jargon": 0.0,
+    "salesy": 0.59
+   }
+  },
+  "Prepare tax-year records": {
+   "plain_speech": 0.42,
+   "tax_claim": 0.08,
+   "tone": {
+    "plain": 0.8,
+    "jargon": 0.2,
+    "salesy": 0.0
+   }
+  },
+  "Finished after 750h": {
+   "plain_speech": 0.52,
+   "tax_claim": 0.07,
+   "tone": {
+    "plain": 0.98,
+    "jargon": 0.02,
+    "salesy": 0.0
+   }
+  },
+  "Rental Activity Time Log: Tax Year {}": {
+   "plain_speech": 0.26,
+   "tax_claim": 0.04,
+   "tone": {
+    "plain": 0.23,
+    "jargon": 0.77,
+    "salesy": 0.0
+   }
+  },
+  "Couldn't open your saved records. They're still on your device — reopen the app, and contact support if this keeps happening.": {
+   "plain_speech": 0.6,
+   "tax_claim": 0.02,
+   "tone": {
+    "plain": 1.0,
+    "jargon": 0.0,
+    "salesy": 0.0
+   }
+  },
+  "Hours in REPS-countable activities": {
+   "plain_speech": 0.18,
+   "tax_claim": 0.09,
+   "tone": {
+    "plain": 0.03,
+    "jargon": 0.97,
+    "salesy": 0.0
+   }
+  },
+  "Tap to open timer": {
+   "plain_speech": 0.76,
+   "tax_claim": 0.02,
+   "tone": {
+    "plain": 1.0,
+    "jargon": 0.0,
+    "salesy": 0.0
+   }
+  },
+  "Switch profile?": {
+   "plain_speech": 0.75,
+   "tax_claim": 0.05,
+   "tone": {
+    "plain": 0.99,
+    "jargon": 0.01,
+    "salesy": 0.0
+   }
+  },
+  "Behind REPS pace": {
+   "plain_speech": 0.39,
+   "tax_claim": 0.09,
+   "tone": {
+    "plain": 0.45,
+    "jargon": 0.54,
+    "salesy": 0.01
+   }
+  },
+  "You qualify as a real estate professional.": {
+   "plain_speech": 0.29,
+   "tax_claim": 0.93,
+   "tone": {
+    "plain": 0.39,
+    "jargon": 0.6,
+    "salesy": 0.01
+   }
+  },
+  "Your hours make you REPS-qualified for 2026.": {
+   "plain_speech": 0.21,
+   "tax_claim": 0.94,
+   "tone": {
+    "plain": 0.06,
+    "jargon": 0.52,
+    "salesy": 0.42
+   }
+  },
+  "Stay audit-ready all year.": {
+   "plain_speech": 0.3,
+   "tax_claim": 0.6,
+   "tone": {
+    "plain": 0.52,
+    "jargon": 0.19,
+    "salesy": 0.29
+   }
+  },
+  "Defensible records the IRS will accept.": {
+   "plain_speech": 0.14,
+   "tax_claim": 0.84,
+   "tone": {
+    "plain": 0.05,
+    "jargon": 0.89,
+    "salesy": 0.06
+   }
+  },
+  "Save thousands in taxes with your rental losses.": {
+   "plain_speech": 0.23,
+   "tax_claim": 0.96,
+   "tone": {
+    "plain": 0.0,
+    "jargon": 0.0,
+    "salesy": 1.0
+   }
+  },
+  "File your return with confidence. Deduct every loss.": {
+   "plain_speech": 0.15,
+   "tax_claim": 0.95,
+   "tone": {
+    "plain": 0.02,
+    "jargon": 0.04,
+    "salesy": 0.94
+   }
+  },
+  "You should claim the passive loss deduction this year.": {
+   "plain_speech": 0.15,
+   "tax_claim": 0.97,
+   "tone": {
+    "plain": 0.01,
+    "jargon": 0.98,
+    "salesy": 0.01
+   }
+  },
+  "Tax-ready reports in one tap.": {
+   "plain_speech": 0.33,
+   "tax_claim": 0.11,
+   "tone": {
+    "plain": 0.16,
+    "jargon": 0.0,
+    "salesy": 0.84
+   }
+  },
+  "Guaranteed to hold up in an audit.": {
+   "plain_speech": 0.26,
+   "tax_claim": 0.89,
+   "tone": {
+    "plain": 0.02,
+    "jargon": 0.05,
+    "salesy": 0.93
+   }
+  },
+  "Congratulations, you meet the IRS requirements for real estate professional status.": {
+   "plain_speech": 0.16,
+   "tax_claim": 0.96,
+   "tone": {
+    "plain": 0.04,
+    "jargon": 0.85,
+    "salesy": 0.11
+   }
+  },
+  "Based on your hours, you will not owe passive activity tax.": {
+   "plain_speech": 0.19,
+   "tax_claim": 0.94,
+   "tone": {
+    "plain": 0.05,
+    "jargon": 0.95,
+    "salesy": 0.0
+   }
+  },
+  "Our AI makes sure you pass the 750 hour test.": {
+   "plain_speech": 0.21,
+   "tax_claim": 0.91,
+   "tone": {
+    "plain": 0.0,
+    "jargon": 0.0,
+    "salesy": 1.0
+   }
+  },
+  "This entry qualifies toward your material participation.": {
+   "plain_speech": 0.11,
+   "tax_claim": 0.9,
+   "tone": {
+    "plain": 0.01,
+    "jargon": 0.99,
+    "salesy": 0.0
+   }
+  },
+  "You're on track to qualify as a real estate professional.": {
+   "plain_speech": 0.38,
+   "tax_claim": 0.91,
+   "tone": {
+    "plain": 0.66,
+    "jargon": 0.22,
+    "salesy": 0.12
+   }
+  },
+  "Substantiate your contemporaneous activity documentation.": {
+   "plain_speech": 0.06,
+   "tax_claim": 0.29,
+   "tone": {
+    "plain": 0.0,
+    "jargon": 1.0,
+    "salesy": 0.0
+   }
+  },
+  "Evidentiary-grade logs for regulatory compliance.": {
+   "plain_speech": 0.06,
+   "tax_claim": 0.17,
+   "tone": {
+    "plain": 0.0,
+    "jargon": 1.0,
+    "salesy": 0.0
+   }
+  },
+  "Utilize this module to facilitate the aggregation of disparate time artifacts.": {
+   "plain_speech": 0.03,
+   "tax_claim": 0.05,
+   "tone": {
+    "plain": 0.0,
+    "jargon": 1.0,
+    "salesy": 0.0
+   }
+  },
+  "Per the aforementioned terms, the user hereby consents to data processing.": {
+   "plain_speech": 0.02,
+   "tax_claim": 0.02,
+   "tone": {
+    "plain": 0.0,
+    "jargon": 1.0,
+    "salesy": 0.0
+   }
+  },
+  "Material participation heuristics are evaluated against grouping elections.": {
+   "plain_speech": 0.04,
+   "tax_claim": 0.2,
+   "tone": {
+    "plain": 0.0,
+    "jargon": 1.0,
+    "salesy": 0.0
+   }
+  },
+  "Leverage synergies across your property portfolio.": {
+   "plain_speech": 0.05,
+   "tax_claim": 0.09,
+   "tone": {
+    "plain": 0.0,
+    "jargon": 0.82,
+    "salesy": 0.18
+   }
+  },
+  "Your entries have been persisted to the local datastore.": {
+   "plain_speech": 0.08,
+   "tax_claim": 0.02,
+   "tone": {
+    "plain": 0.07,
+    "jargon": 0.93,
+    "salesy": 0.0
+   }
+  },
+  "Authentication token expired. Re-authenticate to continue.": {
+   "plain_speech": 0.26,
+   "tax_claim": 0.02,
+   "tone": {
+    "plain": 0.3,
+    "jargon": 0.7,
+    "salesy": 0.0
+   }
+  },
+  "An error occurred while processing your request (code 0x3F).": {
+   "plain_speech": 0.13,
+   "tax_claim": 0.02,
+   "tone": {
+    "plain": 0.16,
+    "jargon": 0.84,
+    "salesy": 0.0
+   }
+  },
+  "Contemporaneous log entries mitigate adverse examination risk.": {
+   "plain_speech": 0.04,
+   "tax_claim": 0.74,
+   "tone": {
+    "plain": 0.0,
+    "jargon": 1.0,
+    "salesy": 0.0
+   }
+  },
+  "The #1 app every smart landlord needs. Unlock your full potential today!": {
+   "plain_speech": 0.07,
+   "tax_claim": 0.06,
+   "tone": {
+    "plain": 0.0,
+    "jargon": 0.0,
+    "salesy": 1.0
+   }
+  },
+  "Supercharge your rental business with powerful, game-changing tools.": {
+   "plain_speech": 0.05,
+   "tax_claim": 0.04,
+   "tone": {
+    "plain": 0.0,
+    "jargon": 0.0,
+    "salesy": 1.0
+   }
+  },
+  "Don't miss out. Limited time offer, upgrade now and save big!": {
+   "plain_speech": 0.06,
+   "tax_claim": 0.04,
+   "tone": {
+    "plain": 0.0,
+    "jargon": 0.0,
+    "salesy": 1.0
+   }
+  },
+  "Experience the ultimate, best-in-class time tracking revolution.": {
+   "plain_speech": 0.04,
+   "tax_claim": 0.03,
+   "tone": {
+    "plain": 0.0,
+    "jargon": 0.0,
+    "salesy": 1.0
+   }
+  },
+  "Join thousands of happy landlords crushing their goals!": {
+   "plain_speech": 0.08,
+   "tax_claim": 0.05,
+   "tone": {
+    "plain": 0.0,
+    "jargon": 0.0,
+    "salesy": 1.0
+   }
+  },
+  "Please be advised that your subscription will auto-renew unless cancelled 24 hours prior.": {
+   "plain_speech": 0.07,
+   "tax_claim": 0.02,
+   "tone": {
+    "plain": 0.1,
+    "jargon": 0.9,
+    "salesy": 0.0
+   }
+  },
+  "Time entries are subject to validation pursuant to your selected tax profile.": {
+   "plain_speech": 0.04,
+   "tax_claim": 0.13,
+   "tone": {
+    "plain": 0.0,
+    "jargon": 1.0,
+    "salesy": 0.0
+   }
+  },
+  "Seamlessly unlock unparalleled insights into your rental performance.": {
+   "plain_speech": 0.05,
+   "tax_claim": 0.05,
+   "tone": {
+    "plain": 0.0,
+    "jargon": 0.0,
+    "salesy": 1.0
+   }
+  },
+  "Your attestation is required prior to export.": {
+   "plain_speech": 0.06,
+   "tax_claim": 0.08,
+   "tone": {
+    "plain": 0.01,
+    "jargon": 0.99,
+    "salesy": 0.0
+   }
+  },
+  "Take the guesswork out of taxes and let us handle everything.": {
+   "plain_speech": 0.13,
+   "tax_claim": 0.31,
+   "tone": {
+    "plain": 0.03,
+    "jargon": 0.0,
+    "salesy": 0.97
+   }
+  },
+  "Never worry about the IRS again.": {
+   "plain_speech": 0.33,
+   "tax_claim": 0.74,
+   "tone": {
+    "plain": 0.02,
+    "jargon": 0.0,
+    "salesy": 0.98
+   }
+  },
+  "You must log 750 hours or you will lose your deduction.": {
+   "plain_speech": 0.36,
+   "tax_claim": 0.81,
+   "tone": {
+    "plain": 0.54,
+    "jargon": 0.43,
+    "salesy": 0.03
+   }
+  },
+  "Log your hours in a few taps.": {
+   "plain_speech": 0.72,
+   "tax_claim": 0.03,
+   "tone": {
+    "plain": 0.73,
+    "jargon": 0.0,
+    "salesy": 0.27
+   }
+  },
+  "This app doesn't give tax advice.": {
+   "plain_speech": 0.44,
+   "tax_claim": 0.05,
+   "tone": {
+    "plain": 0.91,
+    "jargon": 0.09,
+    "salesy": 0.0
+   }
+  },
+  "Share a PDF with your accountant.": {
+   "plain_speech": 0.75,
+   "tax_claim": 0.07,
+   "tone": {
+    "plain": 0.98,
+    "jargon": 0.02,
+    "salesy": 0.0
+   }
+  },
+  "Track your hours toward 750.": {
+   "plain_speech": 0.63,
+   "tax_claim": 0.1,
+   "tone": {
+    "plain": 0.98,
+    "jargon": 0.02,
+    "salesy": 0.0
+   }
+  },
+  "Ask your tax professional what counts.": {
+   "plain_speech": 0.74,
+   "tax_claim": 0.24,
+   "tone": {
+    "plain": 0.98,
+    "jargon": 0.02,
+    "salesy": 0.0
+   }
+  },
+  "Delete this entry?": {
+   "plain_speech": 0.84,
+   "tax_claim": 0.03,
+   "tone": {
+    "plain": 1.0,
+    "jargon": 0.0,
+    "salesy": 0.0
+   }
+  },
+  "Nice work. That's 3 hours this week.": {
+   "plain_speech": 0.81,
+   "tax_claim": 0.04,
+   "tone": {
+    "plain": 0.98,
+    "jargon": 0.0,
+    "salesy": 0.02
+   }
+  },
+  "Something went wrong. Try again.": {
+   "plain_speech": 0.81,
+   "tax_claim": 0.02,
+   "tone": {
+    "plain": 1.0,
+    "jargon": 0.0,
+    "salesy": 0.0
+   }
+  }
+ }
+}

@@ -1,0 +1,613 @@
+#!/usr/bin/env python3
+"""Deterministic pre-checks for a directory of iOS captures (3x PNGs). No AI.
+
+  frame_check.py FRAME_DIR [--out DIR] [--recursive] [--crops] [--min-ratio 4.5]
+
+Per frame:
+  duplicates   byte-identical files under different names (sha256)
+  violet       share of pixels with hue 252-300, s>0.35, v>0.45 (retired brand hue)
+  status bar   ink-vs-background contrast of the top 54pt (time and icon halves, each on its own)
+  tokens       canvas / card / action colours sampled at fixed points, nearest brand token + deltaE76
+  text         glyph clusters (edge-density line boxes): glyph colour vs local background contrast;
+               flags < 4.5:1, or < 3:1 for big text (box height >= 22pt)
+Writes frame_check.json (everything) and frame_check.md (ONLY flagged frames and regions).
+Suppression (defaults in DEFAULTS, override with --config JSON, disable with --no-suppress):
+  skip frames   names matching `*midfade*` (mid-animation) get no checks and are listed under Skipped
+  iOS-drawn     lock-screen / wallpaper frames: only the duplicate check runs
+  theme-fixed   Welcome frames: dark/light byte-identical pairs are expected; Welcome and paywall-* frames may have blueprint blue as canvas
+  bands         text is ignored inside the status bar, home indicator, tab bar and the scroll fade above it
+  allowed       per-region token allow-list (blueprint #1E3FA6, hero gradient #1D3EA4>#19358E)
+  glyph size    clusters smaller than --min-cluster-pt, or small square-ish blobs (card corners), are not text
+Exit 0 clean, 1 flagged. Python 3 stdlib + Pillow. Heuristics: confirm every flag by eye.
+Tokens come from docs/design/2.0-brand-system.md.
+
+Mode `density` (the [measured] rules of docs/design/DESIGN-STANDARD.md section 2; needs numpy):
+  frame_check.py density FRAME.png [FRAME2.png ...] [--json out.json] [--dt auto|default|xxl|ax]
+                         [--scale 3] [--fold 0.88] [--items-present N]
+  Per frame: list row heights, largest card share of the viewport, complete rows above the fold,
+  empty-band share inside cards. Verdicts: D1 row 56-88pt (default Dynamic Type), D2 item <= 12%
+  (<= 30% AX), D3 >= 5 items above fold (with --items-present), D4 empty bands <= 35%, D6 card <= 20%
+  / hero <= 40% (grouped list containers are judged per row). Exit 1 on any FAIL.
+"""
+from __future__ import annotations
+import argparse, colorsys, fnmatch, hashlib, json, math, sys
+from collections import deque
+from pathlib import Path
+import os, re
+from PIL import Image, ImageChops, ImageFilter
+try:
+    import numpy as np
+except ImportError:  # density mode only
+    np = None
+
+SCALE = 3.0  # 3x captures
+STATUS_PT = 54
+TOKENS = {  # docs/design/2.0-brand-system.md
+    "canvas": {"light": "#EEF2FA", "dark": "#0B1230"},
+    "card": {"light": "#FFFFFF", "dark": "#141C3F"},
+    "cardTertiary": {"light": "#F6F8FD", "dark": "#1B2550"},
+    "action": {"light": "#1E3FA6", "dark": "#8FD3FF"},
+    "actionSurface": {"light": "#E3E9FA", "dark": "#182A5C"},
+    "brand": {"light": "#1E3FA6", "dark": "#1E3FA6"},  # theme-fixed blueprint hero
+}
+# Everything a gate has repeatedly rejected as a false positive lives here. Override with --config FILE.json.
+DEFAULTS = {
+    "bands_pt": {"status_bar": 54, "home_indicator": 34, "tab_bar": 112, "scroll_fade": 28},  # heights; tab_bar includes the home indicator
+    "skip_frame_globs": ["*midfade*"],
+    "ios_drawn_globs": ["*lockscreen*", "*lock-screen*", "*lock_screen*", "*wallpaper*"],
+    "theme_fixed_globs": ["*welcome*"],  # dark/light byte-identical pairs are expected (not paywalls: identical AX3 states are a real defect)
+    "blueprint_canvas_globs": ["*welcome*", "*paywall-*"],  # full-bleed blueprint screens: blueprint blue is the canvas
+    "min_cluster_pt": [16, 8],       # (width, height) of a glyph cluster, in points
+    "corner_blob_max_pt": [24, 1.6],  # clusters narrower than this AND with width/height below the ratio are card corners
+    "allowed_tokens": {  # region -> [{"color": "#hex" | "#a>#b" gradient, "tol": dE, "frames": optional glob}]
+        "card": [{"color": "#1E3FA6", "tol": 8}, {"color": "#1D3EA4>#19358E", "tol": 10}],
+        "action": [{"color": "#1E3FA6", "tol": 8}, {"color": "#1D3EA4>#19358E", "tol": 10}],
+        "canvas": [{"color": "#1E3FA6", "tol": 10, "frames": "@blueprint_canvas"},
+                   {"color": "#1D3EA4>#19358E", "tol": 12, "frames": "@blueprint_canvas"}],
+    },
+}
+CFG = DEFAULTS
+
+
+def seg_dist(c, a, b):
+    """Smallest dE from colour c to the RGB segment a-b (sampled; gradients are linear in RGB)."""
+    return min(dE(c, tuple(a[i] + (b[i] - a[i]) * t / 20 for i in range(3))) for t in range(21))
+
+
+def allowed(region, rgb, fname):
+    for e in CFG["allowed_tokens"].get(region, []):
+        fr = e.get("frames")
+        if fr and not (matches(fname, CFG["blueprint_canvas_globs"]) if fr == "@blueprint_canvas" else fnmatch.fnmatch(fname, fr)): continue
+        a, _, b = e["color"].partition(">")
+        d = seg_dist(rgb, hex2rgb(a), hex2rgb(b)) if b else dE(rgb, hex2rgb(a))
+        if d <= e.get("tol", 8): return e["color"]
+    return None
+
+
+def matches(name, globs): return any(fnmatch.fnmatch(name, g) for g in globs)
+
+
+DELTA_E_FLAG = {"canvas": 8.0, "card": 8.0, "action": 16.0}
+
+
+def hex2rgb(h): return tuple(int(h[i:i + 2], 16) for i in (1, 3, 5))
+def rgb2hex(c): return "#%02X%02X%02X" % tuple(int(round(x)) for x in c)
+
+
+def lin(v):
+    v /= 255.0
+    return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+
+
+def lum(c): return 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2])
+
+
+def ratio(a, b):
+    la, lb = lum(a), lum(b)
+    if la < lb: la, lb = lb, la
+    return (la + 0.05) / (lb + 0.05)
+
+
+def lab(c):
+    r, g, b = (lin(x) for x in c)
+    x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047
+    y = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883
+    f = lambda t: t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+    fx, fy, fz = f(x), f(y), f(z)
+    return 116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)
+
+
+def dE(a, b): return math.dist(lab(a), lab(b))
+
+
+def median_color(px):
+    n = len(px)
+    return tuple(sorted(p[i] for p in px)[n // 2] for i in range(3))
+
+
+def mode_color(px, q=4):
+    from collections import Counter
+    c = Counter((p[0] // q, p[1] // q, p[2] // q) for p in px)
+    (r, g, b), _ = c.most_common(1)[0]
+    return (r * q + q // 2, g * q + q // 2, b * q + q // 2)
+
+
+def region_pixels(im, box):
+    return list(im.crop(box).getdata())
+
+
+# ---------------------------------------------------------------- checks
+
+def violet_pct(im):
+    small = im.resize((im.width // 2, im.height // 2))
+    h, s, v = small.convert("HSV").split()
+    m = ImageChops.multiply(ImageChops.multiply(h.point(lambda x: 255 if 178.5 <= x <= 212.5 else 0),
+                                                s.point(lambda x: 255 if x > 0.35 * 255 else 0)),
+                            v.point(lambda x: 255 if x > 0.45 * 255 else 0))
+    hist = m.histogram()
+    return 100.0 * hist[255] / (small.width * small.height)
+
+
+def ink_vs_bg(px):
+    """Split a region into background (median) and ink (farthest pixels). Returns (ink, bg, ratio) or None."""
+    bg = median_color(px)
+    dist = sorted(px, key=lambda p: -sum(abs(p[i] - bg[i]) for i in range(3)))
+    far = dist[:max(8, len(px) // 40)]
+    if sum(abs(far[0][i] - bg[i]) for i in range(3)) < 90:
+        return None  # no glyphs here
+    core = dist[:max(6, len(far) // 3)]
+    ink = median_color(core)
+    return ink, bg, ratio(ink, bg)
+
+
+def status_bar(im):
+    h = int(STATUS_PT * SCALE)
+    out = []
+    for name, (x0, x1) in (("time", (0.08, 0.40)), ("icons", (0.62, 0.95))):
+        px = region_pixels(im, (int(im.width * x0), int(12 * SCALE), int(im.width * x1), h))
+        r = ink_vs_bg(px)
+        if r:
+            out.append({"part": name, "ink": rgb2hex(r[0]), "bg": rgb2hex(r[1]), "ratio": round(r[2], 2)})
+    return out
+
+
+def sample_tokens(im, fname="", suppress=True):
+    W, H = im.size
+    res = {}
+    # canvas: gutter strip x = 3..9pt, four heights
+    px = []
+    for fy in (0.25, 0.4, 0.6, 0.8):
+        y = int(H * fy)
+        px += region_pixels(im, (int(3 * SCALE), y, int(9 * SCALE), y + 6))
+    c = median_color(px)
+    res["canvas"] = c
+    # card: modal colour in the column x = 26..32pt that is not canvas
+    col = [p for p in region_pixels(im, (int(26 * SCALE), int(H * 0.15), int(32 * SCALE), int(H * 0.85)))
+           if dE(p, c) > 3]
+    if len(col) > 200:
+        res["card"] = mode_color(col, 2)
+    # action: modal saturated blue/cyan pixel
+    small = im.resize((W // 3, H // 3))
+    blue = []
+    for p in small.getdata():
+        hh, ss, vv = colorsys.rgb_to_hsv(p[0] / 255, p[1] / 255, p[2] / 255)
+        if 0.52 <= hh <= 0.68 and ss > 0.5 and 0.35 < vv < 0.95:
+            blue.append(p)
+    if len(blue) > 0.002 * small.width * small.height:
+        res["action"] = mode_color(blue, 4)
+    out = {}
+    for name, rgb in res.items():
+        names = {"canvas": ["canvas"], "card": ["card", "cardTertiary", "actionSurface", "brand"],
+                 "action": ["action", "brand", "actionSurface", "card", "canvas"]}[name]
+        best = None
+        for tn in names:
+            for theme, hx in TOKENS[tn].items():
+                d = dE(rgb, hex2rgb(hx))
+                if best is None or d < best[0]: best = (d, tn, theme, hx)
+        flag = best[0] > DELTA_E_FLAG[name]
+        ok = allowed(name, rgb, fname) if (flag and suppress) else None
+        out[name] = {"sampled": rgb2hex(rgb), "nearest": f"{best[1]}/{best[2]} {best[3]}", "deltaE": round(best[0], 1),
+                     "flag": flag and not ok}
+        if ok: out[name]["allowed_by"] = ok
+    return out
+
+
+def text_regions(im, min_ratio, suppress=True, stats=None):
+    """Find line boxes by edge density, measure glyph-vs-background contrast in each."""
+    W, H = im.size
+    g = im.convert("L").resize((W // 3, H // 3), Image.LANCZOS)
+    e = g.filter(ImageFilter.FIND_EDGES).point(lambda v: 255 if v > 28 else 0)
+    e = e.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.MaxFilter(3))
+    w, h = e.size
+    data = e.load()
+    seen = bytearray(w * h)
+    boxes = []
+    b = CFG["bands_pt"]
+    top = STATUS_PT if not suppress else b["status_bar"]  # status bar handled separately
+    ph = H / SCALE
+    bottom_cut = ph - b["tab_bar"] - b["scroll_fade"]  # tab bar, home indicator and the fade above it
+    stats = stats if stats is not None else {}
+    def bump(k): stats[k] = stats.get(k, 0) + 1
+    for y0 in range(top, h):
+        for x0 in range(w):
+            if data[x0, y0] and not seen[y0 * w + x0]:
+                q = deque([(x0, y0)]); seen[y0 * w + x0] = 1
+                x1 = x2 = x0; y1 = y2 = y0; n = 0
+                while q:
+                    x, y = q.popleft(); n += 1
+                    x1 = min(x1, x); x2 = max(x2, x); y1 = min(y1, y); y2 = max(y2, y)
+                    for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                        if 0 <= nx < w and top <= ny < h and data[nx, ny] and not seen[ny * w + nx]:
+                            seen[ny * w + nx] = 1; q.append((nx, ny))
+                bw, bh = x2 - x1 + 1, y2 - y1 + 1
+                if 6 <= bh <= 40 and bw >= 12 and n > 20:
+                    boxes.append((x1, y1, x2, y2))
+    out = []
+    for x1, y1, x2, y2 in boxes:
+        # shrink the dilation (3 passes of 3x3 = ~3px) back to the glyph extent
+        box = (max(0, (x1 + 3) * 3), max(0, (y1 + 3) * 3), min(W, (x2 - 2) * 3), min(H, (y2 - 2) * 3))
+        if box[2] - box[0] < 24 or box[3] - box[1] < 15: continue
+        px = region_pixels(im, box)
+        r = ink_vs_bg(px)
+        if not r: continue
+        ink, bg, cr = r
+        height_pt = (box[3] - box[1]) / SCALE
+        width_pt = (box[2] - box[0]) / SCALE
+        if suppress:
+            if (box[1] / SCALE + height_pt / 2) >= bottom_cut: bump("band: tab bar / home indicator / scroll fade"); continue
+            mw, mh = CFG["min_cluster_pt"]
+            if width_pt < mw or height_pt < mh: bump("glyph cluster too small"); continue
+            cw, cr_ = CFG["corner_blob_max_pt"]
+            if width_pt < cw and width_pt / max(height_pt, 1) < cr_: bump("corner-like blob"); continue
+        big = height_pt >= 22
+        need = 3.0 if big else min_ratio
+        out.append({"box_pt": [round(box[0] / SCALE), round(box[1] / SCALE), round(box[2] / SCALE), round(box[3] / SCALE)],
+                    "ink": rgb2hex(ink), "bg": rgb2hex(bg), "ratio": round(cr, 2), "need": need, "flag": cr < need,
+                    "big": big, "_box": box})
+    return out
+
+
+# ----------------------------------------------------------------- main
+
+def legacy_main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("dir"); ap.add_argument("--out", default=".")
+    ap.add_argument("--recursive", action="store_true")
+    ap.add_argument("--crops", action="store_true", help="save a crop of every flagged text region")
+    ap.add_argument("--min-ratio", type=float, default=4.5)
+    ap.add_argument("--violet-max", type=float, default=0.05, help="flag when violet pixels exceed this percent")
+    ap.add_argument("--config", help="JSON file overriding DEFAULTS (bands_pt, skip_frame_globs, allowed_tokens, ...)")
+    ap.add_argument("--skip-glob", action="append", default=[], help="extra frame-name glob to skip (repeatable)")
+    ap.add_argument("--exclude-top", type=float, help="status bar band height in pt (text ignored above it)")
+    ap.add_argument("--exclude-bottom", type=float, help="tab bar band height in pt, home indicator included")
+    ap.add_argument("--min-cluster-pt", help="WxH minimum glyph cluster in pt, e.g. 16x8")
+    ap.add_argument("--no-suppress", action="store_true", help="old behaviour: every raw flag, no suppression rules")
+    a = ap.parse_args()
+    global CFG
+    CFG = json.loads(json.dumps(DEFAULTS))
+    if a.config:
+        for k, v in json.loads(Path(a.config).read_text()).items():
+            CFG[k].update(v) if isinstance(CFG.get(k), dict) else CFG.__setitem__(k, v)
+    CFG["skip_frame_globs"] += a.skip_glob
+    if a.exclude_top is not None: CFG["bands_pt"]["status_bar"] = a.exclude_top
+    if a.exclude_bottom is not None: CFG["bands_pt"]["tab_bar"] = a.exclude_bottom
+    if a.min_cluster_pt: CFG["min_cluster_pt"] = [float(x) for x in a.min_cluster_pt.lower().split("x")]
+    sup = not a.no_suppress
+    suppressed = {}
+    root = Path(a.dir)
+    files = sorted(root.rglob("*.png") if a.recursive else root.glob("*.png"))
+    out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
+    frames, skipped, hashes = [], [], {}
+    for f in files:
+        hashes.setdefault(hashlib.sha256(f.read_bytes()).hexdigest(), []).append(f.name)
+    def dup_exempt(n): return sup and (matches(n, CFG["skip_frame_globs"]) or matches(n, CFG["theme_fixed_globs"]))
+    dups = []
+    for v in hashes.values():
+        v = [n for n in v if not (sup and matches(n, CFG["skip_frame_globs"]))]
+        if len(v) > 1 and not (all(dup_exempt(n) for n in v)):
+            dups.append(v)
+        elif len(v) > 1: suppressed["theme-fixed identical pair"] = suppressed.get("theme-fixed identical pair", 0) + 1
+    for f in files:
+        if sup and matches(f.name, CFG["skip_frame_globs"]):
+            skipped.append((f.name, "mid-animation frame (skip glob)")); continue
+        try:
+            im = Image.open(f).convert("RGB")
+        except Exception as e:
+            skipped.append((f.name, f"unreadable: {e}")); continue
+        if im.width < 1000 or not (0.40 <= im.width / im.height <= 0.80):
+            skipped.append((f.name, f"not a 3x phone/tablet frame ({im.width}x{im.height})")); continue
+        rec = {"file": f.name, "size": [im.width, im.height], "flags": []}
+        ios = sup and matches(f.name, CFG["ios_drawn_globs"])
+        if ios:
+            skipped.append((f.name, "iOS-drawn frame: only the duplicate check applies")); frames.append(rec); continue
+        v = violet_pct(im); rec["violet_pct"] = round(v, 3)
+        if v > a.violet_max: rec["flags"].append(f"violet {v:.2f}% of pixels")
+        rec["status_bar"] = status_bar(im)
+        for s in rec["status_bar"]:
+            need = 4.5
+            if s["ratio"] < need: rec["flags"].append(f"status bar {s['part']} {s['ratio']}:1 ({s['ink']} on {s['bg']})")
+        rec["tokens"] = sample_tokens(im, f.name, sup)
+        for k, t in rec["tokens"].items():
+            if t["flag"]: rec["flags"].append(f"token {k} {t['sampled']} is dE {t['deltaE']} from {t['nearest']}")
+        tr = text_regions(im, a.min_ratio, sup, suppressed)
+        rec["text_regions"] = [{k: v for k, v in t.items() if k != "_box"} for t in tr]
+        for i, t in enumerate(tr):
+            if t["flag"]:
+                rec["flags"].append(f"text {t['box_pt']} {t['ratio']}:1 < {t['need']} ({t['ink']} on {t['bg']})")
+                if a.crops:
+                    cd = out / "flagged"; cd.mkdir(exist_ok=True)
+                    b = t["_box"]; pad = 12
+                    im.crop((max(0, b[0] - pad), max(0, b[1] - pad), min(im.width, b[2] + pad), min(im.height, b[3] + pad))
+                            ).save(cd / f"{f.stem}__{i}.png")
+        frames.append(rec)
+    dup_names = {n for g in dups for n in g}
+    for r in frames:
+        if r["file"] in dup_names:
+            grp = next(g for g in dups if r["file"] in g)
+            r["flags"].insert(0, "byte-identical to " + ", ".join(n for n in grp if n != r["file"]))
+    rep = {"dir": str(root), "frames": len(frames), "duplicates": dups, "skipped": skipped, "suppressed": suppressed, "results": frames}
+    (out / "frame_check.json").write_text(json.dumps(rep, indent=1))
+    L = [f"# frame_check: {root}", "",
+         f"{len(frames)} frames, {sum(1 for r in frames if r['flags'])} flagged, {len(dups)} duplicate group(s), "
+         f"{len(skipped)} skipped. Heuristics: confirm each flag by eye. Only flagged items are listed.", ""]
+    if suppressed:
+        L += ["Suppressed (not flagged): " + "; ".join(f"{k} x{v}" for k, v in sorted(suppressed.items())), ""]
+    if dups:
+        L += ["## Byte-identical files", ""] + ["- " + ", ".join(g) for g in dups] + [""]
+    flagged = [r for r in frames if r["flags"]]
+    if flagged:
+        L += ["## Flagged frames", ""]
+        for r in flagged:
+            L.append(f"### {r['file']}")
+            L += [f"- {x}" for x in r["flags"][:40]]
+            if len(r["flags"]) > 40: L.append(f"- ... {len(r['flags']) - 40} more in the JSON")
+            L.append("")
+    if skipped:
+        L += ["## Skipped", ""] + [f"- {n}: {why}" for n, why in skipped[:20]]
+    (out / "frame_check.md").write_text("\n".join(L) + "\n")
+    print(f"{len(frames)} frames, {len(flagged)} flagged, {len(dups)} duplicate groups -> {out}/frame_check.md")
+    return 1 if flagged else 0
+
+
+# ---- density mode (design standard section 2) ----
+D1_MIN, D1_MAX = 56.0, 88.0
+D2_DEFAULT, D2_AX = 0.12, 0.30
+D4_MAX = 0.35
+D6_CARD, D6_HERO = 0.20, 0.40
+FOLD_FRAC = 0.88
+
+
+def rgb_to_lab(a: np.ndarray) -> np.ndarray:
+    c = a.astype(np.float64) / 255.0
+    c = np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+    m = np.array([[0.4124564, 0.3575761, 0.1804375],
+                  [0.2126729, 0.7151522, 0.0721750],
+                  [0.0193339, 0.1191920, 0.9503041]])
+    xyz = c @ m.T / np.array([0.95047, 1.0, 1.08883])
+    f = np.where(xyz > 0.008856, np.cbrt(xyz), 7.787 * xyz + 16 / 116)
+    return np.stack([116 * f[..., 1] - 16, 500 * (f[..., 0] - f[..., 1]),
+                     200 * (f[..., 1] - f[..., 2])], axis=-1)
+
+
+def runs(mask: np.ndarray, min_len: int = 1, close_gap: int = 0):
+    idx = np.flatnonzero(mask)
+    if idx.size == 0:
+        return []
+    out, start, prev = [], idx[0], idx[0]
+    for i in idx[1:]:
+        if i - prev - 1 > close_gap:
+            out.append((start, prev + 1))
+            start = i
+        prev = i
+    out.append((start, prev + 1))
+    return [(a, b) for a, b in out if b - a >= min_len]
+
+
+def detect_dt(name: str) -> str:
+    n = name.lower()
+    if re.search(r"ax\d?(?![a-z])", n):
+        return "ax"
+    if "xxl" in n:
+        return "xxl"
+    return "default"
+
+
+def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: int | None):
+    img = Image.open(path).convert("RGB")
+    W, H = img.size
+    a = np.asarray(img)
+    lab = rgb_to_lab(a)
+    vp_pt = H / scale
+    fold = int(H * fold_frac)
+    canvas = lab[:, 4, :]  # per-row canvas colour
+    probes = [int(40 * scale), W - int(40 * scale)]
+    diff = np.zeros(H, dtype=bool)
+    both = np.ones(H, dtype=bool)
+    for px in probes:
+        band = lab[:, px - 3:px + 3, :]
+        d = np.linalg.norm(band - canvas[:, None, :], axis=2)
+        both &= (d > 2.5).mean(axis=1) > 0.8
+    top_skip = int(62 * scale)  # status bar / dynamic island
+    both[:top_skip] = False
+    both[fold:] = False  # the floating tab bar owns everything below the fold
+    card_rows = runs(both, min_len=int(40 * scale), close_gap=3)
+    cards = []
+    for (y0, y1) in card_rows:
+        # horizontal extent: sample at mid-height of the card
+        ym = (y0 + y1) // 2
+        row_d = np.linalg.norm(lab[ym] - canvas[ym], axis=1) > 2.5
+        xs = np.flatnonzero(row_d)
+        # edges: outermost columns that are contiguous with probe columns
+        x0 = probes[0]
+        while x0 > 0 and np.linalg.norm(lab[ym, x0 - 1] - canvas[ym]) > 4.5:
+            x0 -= 1
+        x1 = probes[1]
+        while x1 < W - 1 and np.linalg.norm(lab[ym, x1 + 1] - canvas[ym]) > 4.5:
+            x1 += 1
+        x1 += 1
+        # refine top/bottom with columns just past the corner radius (exact edges)
+        cols = [x0 + int(22 * scale), x1 - int(22 * scale)]
+        def inside(y):
+            return all(np.linalg.norm(lab[y, cx] - canvas[y]) > 2.5 for cx in cols)
+        while y0 > top_skip and inside(y0 - 1):
+            y0 -= 1
+        while y1 < fold and inside(y1):
+            y1 += 1
+        # card fill: modal colour of the interior
+        inner = a[y0:y1, x0 + 6:x1 - 6].reshape(-1, 3)
+        vals, counts = np.unique((inner // 4), axis=0, return_counts=True)
+        fill_rgb = (vals[counts.argmax()] * 4 + 2).astype(np.uint8)
+        fill_lab = rgb_to_lab(fill_rgb[None, :])[0]
+        r, g, b = [int(v) for v in fill_rgb]
+        hero = (b >= 120 and b - r >= 80 and (b - r) / max(b, 1) > 0.6)
+        cards.append(dict(y0=int(y0), y1=int(y1), x0=int(x0), x1=int(x1), fill=fill_lab,
+                          hero=bool(hero)))
+
+    res_cards, all_rows, flags = [], [], []
+    for c in cards:
+        y0, y1, x0, x1 = c["y0"], min(c["y1"], H), c["x0"], c["x1"]
+        cut = c["y1"] >= fold - 2
+        vis_y1 = min(y1, fold) if cut else y1
+        band = lab[y0:vis_y1, x0 + 3:x1 - 3, :]
+        div_rows = []
+        n = band.shape[0]
+        off = 4
+        if not c["hero"] and n > 2 * off + 2:
+            # divider candidate at y: differs from both y-off and y+off across >= 50% of the width
+            cand = np.zeros(n, dtype=bool)
+            ys = np.arange(off, n - off)
+            d_up = np.linalg.norm(band[ys] - band[ys - off], axis=2) > 2.5
+            d_dn = np.linalg.norm(band[ys] - band[ys + off], axis=2) > 2.5
+            # hairline dividers run to the card's trailing edge; progress tracks and
+            # text do not, so require the last 24px of the row to differ too
+            tail = (d_up[:, -24:].mean(axis=1) >= 0.9) & (d_dn[:, -24:].mean(axis=1) >= 0.9)
+            cand[ys] = (d_up.mean(axis=1) >= 0.5) & (d_dn.mean(axis=1) >= 0.5) & tail
+            for (a0, a1) in runs(cand, close_gap=1):
+                if a1 - a0 <= 4 and a0 > 8 and n - a1 > 8:
+                    div_rows.append(y0 + (a0 + a1) // 2)
+        bounds = [y0] + div_rows + [y1]
+        rows = []
+        for i in range(len(bounds) - 1):
+            top, bot = bounds[i], bounds[i + 1]
+            complete = bot <= fold and not (i == len(bounds) - 2 and cut)
+            rows.append(dict(y0=top, y1=bot, h_pt=round((bot - top) / scale, 1), complete=bool(complete)))
+        is_list = len(div_rows) >= 1
+        # empty bands: rows inside card (x inset 16pt) all card fill or canvas
+        ix0, ix1 = x0 + int(16 * scale), x1 - int(16 * scale)
+        empty_share = None
+        if not c["hero"] and ix1 > ix0:
+            iy0, iy1 = y0 + int(16 * scale), vis_y1 - (0 if cut else int(16 * scale))
+            if iy1 > iy0:
+                reg = lab[iy0:iy1, ix0:ix1, :]
+                near_fill = np.linalg.norm(reg - c["fill"], axis=2) <= 3
+                near_canvas = np.linalg.norm(reg - canvas[iy0:iy1, None, :], axis=2) <= 3
+                empty_row = (near_fill | near_canvas).all(axis=1)
+                empty_share = round(float(empty_row.sum() / (vis_y1 - y0)), 3)
+            else:
+                empty_share = 0.0
+        h_pt = (y1 - y0) / scale
+        vis_pt = (vis_y1 - y0) / scale
+        res_cards.append(dict(
+            bbox_px=[c["x0"], y0, c["x1"], y1], hero=c["hero"], list_container=is_list,
+            height_pt=round(h_pt, 1), visible_height_pt=round(vis_pt, 1),
+            viewport_share=round(vis_pt / vp_pt, 3), cut_by_fold=bool(cut),
+            empty_band_share=empty_share, rows=rows if is_list else [],
+            gutter_pt=round(c["x0"] / scale, 1)))
+        if is_list:
+            all_rows += rows
+
+    checks = []
+
+    def chk(rule, ok, detail):
+        checks.append(dict(rule=rule, pass_=bool(ok), detail=detail))
+
+    done = [r for r in all_rows if r["complete"]]
+    if dt == "default" and done:
+        bad = [r["h_pt"] for r in done if not (D1_MIN <= r["h_pt"] <= D1_MAX)]
+        chk("D1 row height 56-88pt", not bad,
+            f"rows {[float(r['h_pt']) for r in done]}" + (f"; out of range {[float(b) for b in bad]}" if bad else ""))
+    lim = D2_AX if dt == "ax" else D2_DEFAULT
+    if done:
+        worst = max(r["h_pt"] for r in done) / vp_pt
+        chk(f"D2 item share <= {int(lim * 100)}%", worst <= lim, f"largest row {worst:.1%}")
+    non_hero_items = [c for c in res_cards if not c["hero"] and not c["list_container"]]
+    for c in non_hero_items:
+        chk("D6 card share <= 20%", c["viewport_share"] <= D6_CARD,
+            f"card at y={c['bbox_px'][1]} is {c['viewport_share']:.1%} ({c['visible_height_pt']}pt)")
+    for c in res_cards:
+        if c["hero"]:
+            chk("D6 hero share <= 40%", c["viewport_share"] <= D6_HERO,
+                f"hero {c['viewport_share']:.1%}")
+        if c["empty_band_share"] is not None:
+            chk("D4 empty bands <= 35%", c["empty_band_share"] <= D4_MAX,
+                f"card at y={c['bbox_px'][1]} empty {c['empty_band_share']:.1%}")
+    n_items = len(done)
+    if items_present is not None and items_present >= 5:
+        need = 4 if dt in ("xxl", "ax") else 5
+        chk(f"D3 items above fold >= {need}", n_items >= need, f"{n_items} complete rows above fold")
+
+    verdict = "PASS" if all(c["pass_"] for c in checks) and checks else ("FAIL" if checks else "NO_DATA")
+    return dict(
+        frame=path, size_px=[W, H], viewport_pt=[round(W / scale, 1), round(vp_pt, 1)], dynamic_type=dt,
+        fold_px=fold, cards=res_cards,
+        summary=dict(
+            row_heights_pt=[r["h_pt"] for r in all_rows if r["complete"]],
+            largest_card_share=max([c["viewport_share"] for c in res_cards], default=0.0),
+            largest_non_list_card_share=max([c["viewport_share"] for c in res_cards if not c["list_container"] and not c["hero"]], default=0.0),
+            items_above_fold=n_items,
+            max_empty_band_share=max([c["empty_band_share"] or 0 for c in res_cards], default=0.0),
+            gutter_pt_info=(res_cards[0]["gutter_pt"] if res_cards else None)),
+        checks=checks, verdict=verdict)
+
+
+def _j(o):
+    if isinstance(o, np.integer):
+        return int(o)
+    if isinstance(o, np.floating):
+        return float(o)
+    raise TypeError(type(o))
+
+
+def cmd_density(args) -> int:
+    results = []
+    for f in args.frames:
+        dt = args.dt if args.dt != "auto" else detect_dt(os.path.basename(f))
+        results.append(analyse(f, dt, args.scale, args.fold, args.items_present))
+    if args.json:
+        with open(args.json, "w") as fh:
+            json.dump(results, fh, indent=2, default=_j)
+    else:
+        print(json.dumps(results, indent=2, default=_j))
+    for r in results:
+        s = r["summary"]
+        fails = [c["rule"] for c in r["checks"] if not c["pass_"]]
+        print(f"{r['verdict']:7} {os.path.basename(r['frame'])} rows={[float(x) for x in s['row_heights_pt']]} "
+              f"maxcard={s['largest_card_share']:.0%} items={s['items_above_fold']} "
+              f"empty={s['max_empty_band_share']:.0%}" + (f" fails={fails}" if fails else ""),
+              file=sys.stderr if not args.json else sys.stdout)
+    n_fail = sum(r["verdict"] == "FAIL" for r in results)
+    line = f"density: {len(results) - n_fail}/{len(results)} frames pass, {n_fail} fail"
+    print(line, file=sys.stderr if not args.json else sys.stdout)
+    return 1 if n_fail else 0
+
+
+def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "density":
+        if np is None:
+            sys.exit("density mode needs numpy")
+        p = argparse.ArgumentParser(prog="frame_check.py density", description="measured density rules (standard section 2)")
+        p.add_argument("mode")
+        p.add_argument("frames", nargs="+")
+        p.add_argument("--json", help="write JSON here (default: stdout)")
+        p.add_argument("--dt", choices=["auto", "default", "xxl", "ax"], default="auto",
+                       help="Dynamic Type of the frame; auto reads _ax3 / xxl from the file name")
+        p.add_argument("--scale", type=float, default=SCALE, help="px per pt (default 3)")
+        p.add_argument("--fold", type=float, default=FOLD_FRAC, help="fold as a fraction of frame height (tab bar top)")
+        p.add_argument("--items-present", type=int, help="items that exist in the screen's data; enables D3")
+        return cmd_density(p.parse_args())
+    return legacy_main()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
