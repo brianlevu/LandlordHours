@@ -48,7 +48,27 @@ try:
 except ImportError:  # density mode only
     np = None
 
-SCALE = 3.0  # 3x captures
+SCALE = 3.0  # px per pt of the frame being checked; set per frame by use_scale()
+# Known device capture sizes (portrait and landscape): px per pt and device class.
+KNOWN_SIZES = {
+    (1206, 2622): (3.0, "iphone"), (1320, 2868): (3.0, "iphone"), (1179, 2556): (3.0, "iphone"),
+    (2064, 2752): (2.0, "ipad"), (2752, 2064): (2.0, "ipad"),      # iPad Pro 13" at 2x
+    (1398, 2034): (3.0, "duo"), (2034, 1398): (3.0, "duo"),        # Duo closed
+    (2007, 2853): (3.0, "duo"), (2853, 2007): (3.0, "duo"),        # Duo open
+}
+
+
+def infer_scale(w, h):
+    """(px per pt, device class) from the capture size; unknown phone-like sizes are 3x."""
+    if (w, h) in KNOWN_SIZES:
+        return KNOWN_SIZES[(w, h)]
+    return 3.0, "unknown"
+
+
+def use_scale(scale):
+    global SCALE
+    SCALE = float(scale)
+
 STATUS_PT = 54
 TOKENS = {  # docs/design/2.0-brand-system.md
     "canvas": {"light": "#EEF2FA", "dark": "#0B1230"},
@@ -196,7 +216,7 @@ def sample_tokens(im, fname="", suppress=True):
     if len(col) > 200:
         res["card"] = mode_color(col, 2)
     # action: modal saturated blue/cyan pixel
-    small = im.resize((W // 3, H // 3))
+    small = im.resize((max(1, W // 3), max(1, H // 3)))
     blue = []
     for p in small.getdata():
         hh, ss, vv = colorsys.rgb_to_hsv(p[0] / 255, p[1] / 255, p[2] / 255)
@@ -224,7 +244,8 @@ def sample_tokens(im, fname="", suppress=True):
 def text_regions(im, min_ratio, suppress=True, stats=None):
     """Find line boxes by edge density, measure glyph-vs-background contrast in each."""
     W, H = im.size
-    g = im.convert("L").resize((W // 3, H // 3), Image.LANCZOS)
+    D = max(1, int(round(SCALE)))  # downsample so one pixel is one point
+    g = im.convert("L").resize((W // D, H // D), Image.LANCZOS)
     e = g.filter(ImageFilter.FIND_EDGES).point(lambda v: 255 if v > 28 else 0)
     e = e.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.MaxFilter(3))
     w, h = e.size
@@ -254,8 +275,8 @@ def text_regions(im, min_ratio, suppress=True, stats=None):
     out = []
     for x1, y1, x2, y2 in boxes:
         # shrink the dilation (3 passes of 3x3 = ~3px) back to the glyph extent
-        box = (max(0, (x1 + 3) * 3), max(0, (y1 + 3) * 3), min(W, (x2 - 2) * 3), min(H, (y2 - 2) * 3))
-        if box[2] - box[0] < 24 or box[3] - box[1] < 15: continue
+        box = (max(0, (x1 + 3) * D), max(0, (y1 + 3) * D), min(W, (x2 - 2) * D), min(H, (y2 - 2) * D))
+        if box[2] - box[0] < 8 * SCALE or box[3] - box[1] < 5 * SCALE: continue
         px = region_pixels(im, box)
         r = ink_vs_bg(px)
         if not r: continue
@@ -286,6 +307,7 @@ def legacy_main():
     ap.add_argument("--min-ratio", type=float, default=4.5)
     ap.add_argument("--violet-max", type=float, default=0.05, help="flag when violet pixels exceed this percent")
     ap.add_argument("--config", help="JSON file overriding DEFAULTS (bands_pt, skip_frame_globs, allowed_tokens, ...)")
+    ap.add_argument("--scale", type=float, help="px per pt; default is inferred from the capture size (iPhone 3x, iPad Pro 13in 2x, Duo 3x)")
     ap.add_argument("--skip-glob", action="append", default=[], help="extra frame-name glob to skip (repeatable)")
     ap.add_argument("--exclude-top", type=float, help="status bar band height in pt (text ignored above it)")
     ap.add_argument("--exclude-bottom", type=float, help="tab bar band height in pt, home indicator included")
@@ -300,6 +322,9 @@ def legacy_main():
     CFG["skip_frame_globs"] += a.skip_glob
     if a.exclude_top is not None: CFG["bands_pt"]["status_bar"] = a.exclude_top
     if a.exclude_bottom is not None: CFG["bands_pt"]["tab_bar"] = a.exclude_bottom
+    BANDS_DEFAULT = dict(CFG["bands_pt"])
+    # iPad / Duo: 24pt status bar, no bottom tab bar (the sidebar or top tab bar is content), home indicator only
+    BANDS_TABLET = dict(status_bar=24, home_indicator=20, tab_bar=20, scroll_fade=0)
     if a.min_cluster_pt: CFG["min_cluster_pt"] = [float(x) for x in a.min_cluster_pt.lower().split("x")]
     sup = not a.no_suppress
     suppressed = {}
@@ -323,8 +348,14 @@ def legacy_main():
             im = Image.open(f).convert("RGB")
         except Exception as e:
             skipped.append((f.name, f"unreadable: {e}")); continue
-        if im.width < 1000 or not (0.40 <= im.width / im.height <= 0.80):
-            skipped.append((f.name, f"not a 3x phone/tablet frame ({im.width}x{im.height})")); continue
+        if a.scale:
+            sc, dev = a.scale, "custom"
+        else:
+            sc, dev = infer_scale(im.width, im.height)
+        if dev == "unknown" and (im.width < 1000 or not (0.40 <= im.width / im.height <= 0.80)):
+            skipped.append((f.name, f"unknown capture size ({im.width}x{im.height}); pass --scale N to check it")); continue
+        use_scale(sc)
+        CFG["bands_pt"] = dict(BANDS_DEFAULT if dev in ("iphone", "unknown", "custom") else BANDS_TABLET)
         rec = {"file": f.name, "size": [im.width, im.height], "flags": []}
         ios = sup and matches(f.name, CFG["ios_drawn_globs"])
         if ios:
@@ -421,8 +452,11 @@ def detect_dt(name: str) -> str:
     return "default"
 
 
-def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: int | None):
+def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: int | None, device: str = "iphone",
+            crop_pt=None):
     img = Image.open(path).convert("RGB")
+    if crop_pt:  # analyse one pane of a multi-column iPad/Duo layout: x0:x1 in points
+        img = img.crop((int(crop_pt[0] * scale), 0, int(crop_pt[1] * scale), img.height))
     W, H = img.size
     a = np.asarray(img)
     lab = rgb_to_lab(a)
@@ -447,9 +481,17 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
             break
     if bar:
         fold = min(fold, bar[0])
-    canvas0 = lab[:, 4, :]  # per-row canvas colour
-    probes = [int(40 * scale), W - int(40 * scale)]
-    top_skip = int(62 * scale)  # status bar / dynamic island
+    # iPad/Duo with a sidebar: the content column starts at the sidebar's long vertical edge
+    cx = 0
+    if device not in ("iphone", "unknown", "custom") and W > H * 0.9:
+        lo_, hi_ = int(180 * scale), int(460 * scale)
+        rows_ = slice(int(80 * scale), H - int(80 * scale), 4)
+        prof = [np.linalg.norm(lab[rows_, x] - lab[rows_, x - 3], axis=1).mean() for x in range(lo_, min(hi_, W - 10))]
+        if prof and max(prof) > 1.5:
+            cx = lo_ + int(np.argmax(prof))
+    canvas0 = lab[:, cx + 6, :]  # per-row canvas colour
+    probes = [cx + int(40 * scale), W - int(40 * scale)]
+    top_skip = int((62 if device in ("iphone", "unknown", "custom") else 30) * scale)  # status bar / dynamic island
 
     def detect(canvas, ylo, yhi):
         """Card boxes between ylo and yhi against a per-row canvas colour."""
@@ -468,7 +510,7 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
             # its height (its top corners are rounded), a card never gets closer than its gutter
             for yy in sorted({ym, *range(y0 + 10, y1 - 10, 30)}):
                 xx = probes[0]
-                while xx > 0 and np.linalg.norm(lab[yy, xx - 1] - canvas[yy]) > 4.5:
+                while xx > cx and np.linalg.norm(lab[yy, xx - 1] - canvas[yy]) > 4.5:
                     xx -= 1
                 x0 = min(x0, xx)
             x1 = probes[1]
@@ -493,7 +535,7 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
         return out
 
     # 1. cards against the page canvas; wide runs touching the screen edge are sheets / header bands
-    sheet_x = int(12 * scale)
+    sheet_x = cx + int(12 * scale)
     cards, sheets, controls = [], [], []
     for c in detect(canvas0, top_skip, fold):
         if c["x0"] < sheet_x:
@@ -549,9 +591,16 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
             d_up = np.linalg.norm(band[ys] - band[ys - off], axis=2) > 2.5
             d_dn = np.linalg.norm(band[ys] - band[ys + off], axis=2) > 2.5
             # hairline dividers run to the card's trailing edge; progress tracks and
-            # text do not, so require the last 24px of the row to differ too
-            tail = (d_up[:, -24:].mean(axis=1) >= 0.9) & (d_dn[:, -24:].mean(axis=1) >= 0.9)
-            cand[ys] = (d_up.mean(axis=1) >= 0.5) & (d_dn.mean(axis=1) >= 0.5) & tail
+            # text do not, so require the strip near the trailing edge to differ too
+            # (window 8-15pt from the edge: iPhone dividers run to the edge, iPad ones stop ~7pt short)
+            # iPad inset-grouped dividers stop 15pt short of the card edge (the content inset)
+            tab = device not in ("iphone", "unknown", "custom")
+            t0, t1 = (int(24 * scale), int(16 * scale)) if tab else (int(15 * scale), int(8 * scale))
+            tail = (d_up[:, -t0:-t1].mean(axis=1) >= 0.9) & (d_dn[:, -t0:-t1].mean(axis=1) >= 0.9)
+            # a progress bar (coloured fill + grey track) is not a divider: hairlines are neutral
+            chroma = np.hypot(band[ys][:, :, 1], band[ys][:, :, 2])
+            neutral = (chroma > 38).mean(axis=1) < 0.03  # dark-theme hairlines are navy (chroma ~29)
+            cand[ys] = (d_up.mean(axis=1) >= 0.5) & (d_dn.mean(axis=1) >= 0.5) & tail & neutral
             for (a0, a1) in runs(cand, close_gap=1):
                 if a1 - a0 <= 4 and a0 > 8 and n - a1 > 8:
                     div_rows.append(y0 + (a0 + a1) // 2)
@@ -746,7 +795,16 @@ def cmd_density(args) -> int:
     results = []
     for f in args.frames:
         dt = args.dt if args.dt != "auto" else detect_dt(os.path.basename(f))
-        results.append(analyse(f, dt, args.scale, args.fold, args.items_present))
+        with Image.open(f) as im0:
+            sc, dev = infer_scale(*im0.size)
+        if args.scale:
+            sc, dev = args.scale, ("custom" if dev == "unknown" else dev)
+        fold = args.fold if args.fold else (0.88 if dev in ("iphone", "unknown", "custom") else 0.97)
+        use_scale(sc)
+        crop = [float(v) for v in args.crop.split(":")] if args.crop else None
+        r = analyse(f, dt, sc, fold, args.items_present, dev, crop)
+        r["scale"], r["device"] = sc, dev
+        results.append(r)
     if args.json:
         with open(args.json, "w") as fh:
             json.dump(results, fh, indent=2, default=_j)
@@ -777,8 +835,9 @@ def main():
         p.add_argument("--json", help="write JSON here (default: stdout)")
         p.add_argument("--dt", choices=["auto", "default", "xxl", "ax"], default="auto",
                        help="Dynamic Type of the frame; auto reads _ax3 / xxl from the file name")
-        p.add_argument("--scale", type=float, default=SCALE, help="px per pt (default 3)")
-        p.add_argument("--fold", type=float, default=FOLD_FRAC, help="fold as a fraction of frame height (tab bar top)")
+        p.add_argument("--scale", type=float, help="px per pt; default inferred from the capture size (iPhone 3x, iPad Pro 13in 2x, Duo 3x)")
+        p.add_argument("--fold", type=float, help="fold as a fraction of frame height (default 0.88 phone with tab bar, 0.97 iPad/Duo)")
+        p.add_argument("--crop", help="x0:x1 in pt: analyse one pane of a multi-column layout (list pane, detail pane)")
         p.add_argument("--items-present", type=int, help="items that exist in the screen's data; enables D3")
         return cmd_density(p.parse_args())
     return legacy_main()
