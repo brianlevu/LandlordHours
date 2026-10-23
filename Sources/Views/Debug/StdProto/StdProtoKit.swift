@@ -1,0 +1,670 @@
+import SwiftUI
+
+#if DEBUG
+// MARK: - Design-standard mockups (DEBUG only, throwaway)
+//
+//   -LHStdProto today|inbox|logtime|seeall|goalcheck   which screen
+//   -LHHomeSeed brian|reps750|eight                    which owner
+//   -LHStdState <state>                                logtime: empty|filled|gap · goalcheck: question|result|summary
+//   -LHStdScroll bottom                                Today: start scrolled to the end
+//   -LHStdDemo confirm|tiles|logtime|goalcheck         scripted run for the videos
+//
+// Law: docs/design/DESIGN-STANDARD.md (components §1, density §2, motion §B, voice §C).
+// Every visible string goes through `L(...)` into StdProto.xcstrings.
+
+/// Every string on these screens: the StdProto string catalog.
+func L(_ key: String.LocalizationValue) -> String { String(localized: key, table: "StdProto") }
+
+/// Canonical lines (standard §C.5): one key per idea, never a variant.
+enum StdCanon {
+    static var nothingCounts: String { String(localized: "common.nothingCountsUntilConfirm", defaultValue: "Nothing counts until you confirm it.", table: "StdProto") }
+    static var cpa: String { String(localized: "common.cpaFootnote", defaultValue: "Your CPA decides what the numbers mean.", table: "StdProto") }
+    static var confirm: String { String(localized: "row.action.confirm", defaultValue: "Confirm", table: "StdProto") }
+    static var notRentalWork: String { String(localized: "row.action.notRentalWork", defaultValue: "Not rental work", table: "StdProto") }
+    static func confirmLikely(_ n: Int) -> String { String(localized: "row.batch.confirmLikely", defaultValue: "Confirm \(n) likely", table: "StdProto") }
+}
+
+struct StdProtoLaunch {
+    enum Screen: String { case today, inbox, logtime, seeall, goalcheck }
+
+    let screen: Screen
+    let seedID: String
+    let state: String
+    let scroll: String?
+    let demo: String?
+
+    static let current: StdProtoLaunch? = {
+        let args = ProcessInfo.processInfo.arguments
+        func value(_ flag: String) -> String? {
+            guard let j = args.firstIndex(of: flag), args.indices.contains(j + 1) else { return nil }
+            return args[j + 1]
+        }
+        guard let raw = value("-LHStdProto"), let screen = Screen(rawValue: raw) else { return nil }
+        return StdProtoLaunch(screen: screen, seedID: value("-LHHomeSeed") ?? "brian",
+                              state: value("-LHStdState") ?? "", scroll: value("-LHStdScroll"), demo: value("-LHStdDemo"))
+    }()
+}
+
+// MARK: - Motion tokens (§B.2) and the hours format (§1.2)
+
+enum StdMotion {
+    static let feedback = Animation.easeOut(duration: 0.12)
+    static let quick = Animation.easeInOut(duration: 0.15)
+    static let reveal = Animation.easeOut(duration: 0.22)
+    static let standard = Animation.easeInOut(duration: 0.24)
+    static let flow = Animation.spring(duration: 0.30, bounce: 0)
+    static let collapse = Animation.spring(duration: 0.25, bounce: 0)
+    static let segment = Animation.spring(duration: 0.25, bounce: 0)
+    static let pop = Animation.spring(duration: 0.26, bounce: 0.30)
+    static let count = Animation.easeOut(duration: 0.60)
+    static let ringProgress = Animation.spring(duration: 0.60, bounce: 0)
+}
+
+enum StdFormat {
+    /// "2h", "30m", "1h 30m", "—" for unknown.
+    static func hours(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        let minutes = Int((value * 60).rounded())
+        let h = minutes / 60, m = minutes % 60
+        if h == 0 { return L("\(m)m") }
+        if m == 0 { return L("\(h)h") }
+        return L("\(h)h \(m)m")
+    }
+}
+
+/// Short category names, from the catalog.
+extension ActivityCategory {
+    var stdLabel: String {
+        switch self {
+        case .repairs: return L("Repairs")
+        case .management: return L("Management")
+        case .leasing: return L("Leasing")
+        case .bookkeeping: return L("Bookkeeping")
+        case .legal: return L("Legal")
+        case .insurance: return L("Insurance")
+        case .travel: return L("Travel")
+        case .renovations: return L("Renovation")
+        case .investing: return L("Investing")
+        case .financing: return L("Financing")
+        case .contractNegotiation: return L("Negotiation")
+        }
+    }
+}
+
+/// Reads the scheme once per view.
+struct StdColors: DynamicProperty {
+    @Environment(\.colorScheme) private var scheme
+    var c: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
+}
+
+// MARK: - Type helpers
+
+enum StdFont {
+    /// Drafting label: SF Mono 11 medium (caption2), caps, +12% tracking.
+    static let drafting = Font.system(.caption2, design: .monospaced, weight: .medium)
+    static let draftingTracking: CGFloat = 1.32
+}
+
+// MARK: - LHScreenTitle (§1.14)
+
+struct StdScreenTitle: View {
+    let title: String
+    var subtitle: String? = nil
+    @Environment(\.colorScheme) private var scheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(LHFont.fraunces(.largeTitle))
+                .foregroundStyle(colors.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+            if let subtitle {
+                Text(subtitle).font(.subheadline).foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Sheet title (§1.14 sheet style): drafting eyebrow + SF title2 semibold, close .icon on the right.
+struct StdSheetHeader: View {
+    var eyebrow: String? = nil
+    let title: String
+    var leading: (() -> Void)? = nil
+    var onClose: () -> Void = {}
+    @Environment(\.colorScheme) private var scheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            if let leading {
+                Button(action: leading) { Image(systemName: "chevron.left") }
+                    .buttonStyle(StdButtonStyle(.icon))
+                    .accessibilityLabel(L("Back"))
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                if let eyebrow {
+                    Text(eyebrow).font(StdFont.drafting).textCase(.uppercase).tracking(StdFont.draftingTracking)
+                        .foregroundStyle(colors.draftingInk)
+                }
+                Text(title).font(.title2.weight(.semibold)).foregroundStyle(colors.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
+            }
+            Spacer(minLength: 8)
+            Button(action: onClose) { Image(systemName: "xmark") }
+                .buttonStyle(StdButtonStyle(.icon))
+                .accessibilityLabel(L("Close"))
+        }
+        .frame(minHeight: 56)
+    }
+}
+
+// MARK: - LHSectionHeader (§1.15)
+
+struct StdSectionHeader: View {
+    let title: String
+    var count: Int? = nil
+    var ink: Color? = nil
+    var trailing: String? = nil
+    var onTrailing: () -> Void = {}
+    @Environment(\.colorScheme) private var scheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    private var label: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Text(title).font(StdFont.drafting).textCase(.uppercase).tracking(StdFont.draftingTracking)
+                .foregroundStyle(ink ?? colors.draftingInk)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            if let count {
+                Text(verbatim: "\(count)")
+                    .font(.caption2.weight(.semibold)).monospacedDigit()
+                    .foregroundStyle(colors.action)
+                    .padding(.horizontal, 7)
+                    .frame(minWidth: 20, minHeight: 20)
+                    .background(Capsule().fill(colors.actionSurface))
+                    .contentTransition(.numericText(value: Double(count)))
+                    .animation(StdMotion.standard, value: count)
+                    .fixedSize()
+            }
+        }
+    }
+
+    var body: some View {
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 4) {
+                    label
+                    if let trailing { Button(trailing, action: onTrailing).buttonStyle(StdButtonStyle(.tertiary)) }
+                }
+            } else {
+                HStack(alignment: .center, spacing: 8) {
+                    label
+                    Spacer(minLength: 8)
+                    if let trailing { Button(trailing, action: onTrailing).buttonStyle(StdButtonStyle(.tertiary)) }
+                }
+            }
+        }
+        .textCase(nil)
+        .frame(minHeight: 28)
+    }
+}
+
+// MARK: - LHTag (§1.16)
+
+struct StdTag: View {
+    let text: String
+    let ink: Color
+    var wash: Color? = nil
+
+    var body: some View {
+        Text(text)
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(ink)
+            .lineLimit(1)
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .frame(minHeight: 20)
+            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(wash ?? ink.opacity(0.12)))
+    }
+}
+
+// MARK: - LHChip (§1.16)
+
+struct StdChip: View {
+    let text: String
+    var selected = false
+    var action: () -> Void = {}
+    @Environment(\.colorScheme) private var scheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
+
+    var body: some View {
+        Button(action: action) {
+            Text(text)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(selected ? colors.onAction : colors.textPrimary)
+                .lineLimit(1)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 34)
+                .background(Capsule().fill(selected ? colors.action : colors.backgroundTertiary))
+                .overlay(Capsule().strokeBorder(colors.border, lineWidth: selected ? 0 : 0.5))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(StdPressStyle())
+    }
+}
+
+// MARK: - LHButton (§1.13) and press (§B.3)
+
+struct StdPressStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+            .opacity(configuration.isPressed && reduceMotion ? 0.8 : 1)
+            .animation(configuration.isPressed ? StdMotion.feedback : StdMotion.quick, value: configuration.isPressed)
+    }
+}
+
+struct StdButtonStyle: ButtonStyle {
+    enum Kind { case primary, secondary, tertiary, icon, iconOnBlueprint }
+    let kind: Kind
+    var destructive = false
+    init(_ kind: Kind, destructive: Bool = false) { self.kind = kind; self.destructive = destructive }
+
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.isEnabled) private var enabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
+
+    func makeBody(configuration: Configuration) -> some View {
+        styled(configuration.label)
+            .opacity(enabled ? 1 : 0.4)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+            .opacity(configuration.isPressed && reduceMotion ? 0.8 : 1)
+            .animation(configuration.isPressed ? StdMotion.feedback : StdMotion.quick, value: configuration.isPressed)
+    }
+
+    @ViewBuilder private func styled(_ label: Configuration.Label) -> some View {
+        switch kind {
+        case .primary:
+            label.font(.body.weight(.semibold))
+                .foregroundStyle(colors.onAction)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20).padding(.vertical, 12)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(Capsule().fill(colors.action))
+                .contentShape(Capsule())
+        case .secondary:
+            label.font(.subheadline.weight(.semibold))
+                .foregroundStyle(colors.action)
+                .padding(.horizontal, 18)
+                .frame(minHeight: 44)
+                .background(Capsule().fill(colors.actionSurface))
+                .contentShape(Capsule())
+        case .tertiary:
+            label.font(.subheadline.weight(.semibold))
+                .foregroundStyle(destructive ? colors.destructive : colors.action)
+                .padding(.horizontal, 4)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        case .icon:
+            label.font(.body.weight(.semibold))
+                .foregroundStyle(colors.textSecondary)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(colors.backgroundTertiary))
+                .contentShape(Circle())
+        case .iconOnBlueprint:
+            label.font(.body.weight(.semibold))
+                .foregroundStyle(Color.white)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(Color.white.opacity(0.14)))
+                .contentShape(Circle())
+        }
+    }
+}
+
+// MARK: - LHRow.Action (§1.3): the confirm item
+
+struct StdSuggestion: Identifiable, Equatable {
+    enum Source { case calendar, reminder }
+    enum Status { case none, notSure, needsHours, mightBeLogged }
+    let id: String
+    let title: String
+    let source: Source
+    let when: String
+    let category: ActivityCategory?
+    let status: Status
+    let hours: Double?
+    /// The rental it counts toward, when the item names one (moves the hero on confirm).
+    var rental: String? = nil
+    var canQuickLog: Bool { hours != nil && status != .needsHours }
+    var isLikely: Bool { canQuickLog && status == .none }
+}
+
+struct StdActionRow: View {
+    let item: StdSuggestion
+    let confirmed: Bool
+    let onConfirm: () -> Void
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
+
+    private var tag: (String, Color, Color?)? {
+        switch item.status {
+        case .notSure: return (L("Not sure"), colors.caution, colors.cautionSurface)
+        case .needsHours: return (L("Needs hours"), colors.caution, colors.cautionSurface)
+        case .mightBeLogged: return (L("Might be logged"), colors.informational, colors.informationalSurface)
+        case .none:
+            guard let c = item.category else { return nil }
+            return (c.stdLabel, colors.categoryInk(c), colors.categoryWash(c))
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            control
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 4) {
+                    title
+                    metaText(word: false).font(.subheadline).foregroundStyle(colors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .center, spacing: 8) {
+                        hours
+                        if let tag { StdTag(text: tag.0, ink: tag.1, wash: tag.2) }
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    title
+                    meta
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                hours.padding(.top, 2)
+            }
+        }
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAction(named: Text(StdCanon.notRentalWork)) {}
+    }
+
+    private var control: some View {
+        Button(action: onConfirm) {
+            ZStack {
+                Circle().strokeBorder(confirmed ? colors.positive : colors.textTertiary, lineWidth: 1.5)
+                Circle().fill(colors.positive).opacity(confirmed ? 1 : 0)
+                Image(systemName: "checkmark").font(.caption.weight(.bold)).foregroundStyle(Color.white)
+                    .opacity(confirmed ? 1 : 0)
+            }
+            .frame(width: 22, height: 22)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+        .padding(.leading, -11).padding(.vertical, -11)
+        .accessibilityLabel(item.canQuickLog ? L("Confirm \(StdFormat.hours(item.hours))") : L("Review and confirm"))
+        .accessibilityIdentifier("row.confirm.\(item.id)")
+    }
+
+    private var title: some View {
+        Text(item.title)
+            .font(.body.weight(.semibold))
+            .foregroundStyle(colors.textPrimary)
+            .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var sourceIcon: String { item.source == .calendar ? "calendar" : "checklist" }
+    private var sourceWord: String { item.source == .calendar ? L("Calendar") : L("Reminder") }
+
+    private func metaText(word: Bool) -> Text {
+        let glyph = Text(Image(systemName: sourceIcon))
+        return word ? glyph + Text(verbatim: " ") + Text(L("\(sourceWord) · \(item.when)"))
+                    : glyph + Text(verbatim: " ") + Text(item.when)
+    }
+
+    @ViewBuilder private var meta: some View {
+        if typeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 4) {
+                metaText(word: true).fixedSize(horizontal: false, vertical: true)
+                if let tag { StdTag(text: tag.0, ink: tag.1, wash: tag.2) }
+            }
+            .font(.subheadline).foregroundStyle(colors.textSecondary)
+        } else {
+            ViewThatFits(in: .horizontal) {
+                metaLine(word: true).fixedSize()
+                metaLine(word: false).fixedSize()
+                metaLine(word: false)
+            }
+            .font(.subheadline).foregroundStyle(colors.textSecondary)
+        }
+    }
+
+    private func metaLine(word: Bool) -> some View {
+        HStack(spacing: 6) {
+            metaText(word: word).lineLimit(1)
+            if let tag { StdTag(text: tag.0, ink: tag.1, wash: tag.2).fixedSize() }
+        }
+    }
+
+    private var hours: some View {
+        Text(StdFormat.hours(item.hours))
+            .font(.subheadline.weight(.semibold)).fontDesign(.rounded).monospacedDigit()
+            .foregroundStyle(item.hours == nil ? colors.textTertiary : colors.textPrimary)
+            .lineLimit(1)
+            .fixedSize()
+    }
+}
+
+struct StdMetaLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 4) { configuration.icon; configuration.title }
+    }
+}
+
+// MARK: - LHRow.Browse (§1.4)
+
+struct StdBrowseRow<Leading: View>: View {
+    let title: String
+    let meta: String
+    var value: String? = nil
+    var valueInk: Color? = nil
+    var chevron = true
+    @ViewBuilder var leading: Leading
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
+
+    var body: some View {
+        HStack(alignment: typeSize.isAccessibilitySize ? .top : .center, spacing: 12) {
+            leading.frame(width: 36, height: 36)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.body.weight(.semibold)).foregroundStyle(colors.textPrimary)
+                    .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
+                    .fixedSize(horizontal: false, vertical: typeSize.isAccessibilitySize)
+                Text(meta).font(.subheadline).foregroundStyle(colors.textSecondary)
+                    .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
+                    .fixedSize(horizontal: false, vertical: typeSize.isAccessibilitySize)
+                if typeSize.isAccessibilitySize, let value { valueText(value) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if !typeSize.isAccessibilitySize, let value { valueText(value) }
+            if chevron {
+                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(colors.textTertiary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+
+    private func valueText(_ v: String) -> some View {
+        Text(v).font(.subheadline.weight(.semibold)).fontDesign(.rounded).monospacedDigit()
+            .foregroundStyle(valueInk ?? colors.textPrimary).lineLimit(1).fixedSize()
+    }
+}
+
+// MARK: - LHTile.Stat (§1.11)
+
+struct StdStatTile: View {
+    let value: String
+    let label: String
+    var ink: Color? = nil
+    var glyph: String? = nil
+    @Environment(\.colorScheme) private var scheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                if let glyph {
+                    Image(systemName: glyph).font(.headline).foregroundStyle(ink ?? colors.textPrimary)
+                        .accessibilityHidden(true)
+                }
+                Text(value).font(.title2.weight(.bold)).fontDesign(.rounded).monospacedDigit()
+                    .foregroundStyle(colors.textPrimary)
+                    .contentTransition(.numericText())
+            }
+            Text(label).font(.caption).foregroundStyle(colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 84, alignment: .topLeading)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - LHFootnote.cpa (§1.22)
+
+struct StdCPAFootnote: View {
+    @Environment(\.colorScheme) private var scheme
+    var body: some View {
+        Text(StdCanon.cpa)
+            .font(.footnote)
+            .foregroundStyle(AdaptiveColors(colorScheme: scheme).textSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+// MARK: - LHSegmented (§1.8)
+
+struct StdSegmented: View {
+    let options: [String]
+    @Binding var selection: Int
+    @Namespace private var thumb
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(options.indices, id: \.self) { i in
+                Button {
+                    withAnimation(reduceMotion ? StdMotion.quick : StdMotion.segment) { selection = i }
+                } label: {
+                    Text(options[i])
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(i == selection ? colors.textPrimary : colors.textSecondary)
+                        .frame(maxWidth: .infinity, minHeight: 32)
+                        .frame(minWidth: 64)
+                        .background {
+                            if i == selection {
+                                Capsule().fill(colors.backgroundSecondary)
+                                    .overlay(Capsule().strokeBorder(colors.border, lineWidth: 0.5))
+                                    .matchedGeometryEffect(id: "thumb", in: thumb)
+                            }
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(i == selection ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .frame(minHeight: 36)
+        .background(Capsule().fill(colors.backgroundTertiary))
+        .sensoryFeedback(.selection, trigger: selection)
+    }
+}
+
+// MARK: - LHStepper (§1.9)
+
+struct StdStepper: View {
+    @Binding var hours: Double
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
+
+    var body: some View {
+        let layout = typeSize >= .accessibility3 ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))
+        layout {
+            Button { hours = max(0, hours - 0.25) } label: { Image(systemName: "minus") }
+                .buttonStyle(StdButtonStyle(.icon)).accessibilityLabel(L("Less"))
+            Text(StdFormat.hours(hours))
+                .font(.title2.weight(.semibold)).fontDesign(.rounded).monospacedDigit()
+                .foregroundStyle(colors.textPrimary)
+                .contentTransition(.numericText(value: hours))
+                .animation(StdMotion.standard, value: hours)
+                .frame(minWidth: 100)
+            Button { hours = min(24, hours + 0.25) } label: { Image(systemName: "plus") }
+                .buttonStyle(StdButtonStyle(.icon)).accessibilityLabel(L("More"))
+        }
+        .sensoryFeedback(.selection, trigger: hours)
+    }
+}
+
+// MARK: - Counting number for heroCountUp
+
+/// Digits count from the previous value to the new one; the animation is whatever the caller's
+/// transaction carries (`StdMotion.count` = easeOut 0.60).
+struct StdCountingText: View, Animatable {
+    var value: Double
+    var animatableData: Double {
+        get { value }
+        set { value = newValue }
+    }
+    var body: some View { Text(verbatim: "\(Int(value.rounded()))") }
+}
+
+/// Motion log for the hand-off: prints each named motion with its start time when -LHStdMotionLog is set.
+enum StdMotionLog {
+    static let on = ProcessInfo.processInfo.arguments.contains("-LHStdMotionLog")
+    static func mark(_ name: String) {
+        guard on else { return }
+        FileHandle.standardError.write("STDMOTION \(name) \(CACurrentMediaTime())\n".data(using: .utf8) ?? Data())
+    }
+}
+#endif
+
+#if DEBUG
+// MARK: - Geometry log for the density hand-off (-LHStdGeom): "STDGEOM name minY height minX width" in points.
+
+enum StdGeom {
+    static let on = ProcessInfo.processInfo.arguments.contains("-LHStdGeom")
+    static func log(_ line: String) {
+        guard on else { return }
+        FileHandle.standardError.write((line + "\n").data(using: .utf8) ?? Data())
+    }
+}
+
+extension View {
+    @ViewBuilder func stdMeasure(_ name: String) -> some View {
+        if StdGeom.on {
+            onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { r in
+                StdGeom.log(String(format: "STDGEOM %@ %.1f %.1f %.1f %.1f", name, r.minY, r.height, r.minX, r.width))
+            }
+        } else {
+            self
+        }
+    }
+}
+#endif
