@@ -36,4 +36,21 @@ final class StdProtoDemoUITests: XCTestCase {
         app.buttons["Log time"].firstMatch.tap()
         Thread.sleep(forTimeInterval: 2.0)
     }
+
+    /// Scrolls down so the tab bar minimizes, then writes a screenshot to STD_SHOT (host path).
+    /// Launch arguments come from STD_ARGS (space separated).
+    func testMinimizedBarShot() throws {
+        let env = ProcessInfo.processInfo.environment
+        let app = XCUIApplication()
+        app.launchArguments = (env["STD_ARGS"] ?? "-LHStdProto today").split(separator: " ").map(String.init)
+        app.launch()
+        Thread.sleep(forTimeInterval: 3.0)
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+            .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)),
+                   withVelocity: 500, thenHoldForDuration: 0.3)
+        Thread.sleep(forTimeInterval: 2.0)
+        if let path = env["STD_SHOT"] {
+            try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: path))
+        }
+    }
 }
