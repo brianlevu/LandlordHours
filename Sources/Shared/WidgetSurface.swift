@@ -38,6 +38,10 @@ struct WidgetSurfaceSnapshot: Codable, Equatable {
     var stageTitle: String
     /// "Roof at 500h", or "House finished" when every step is done.
     var nextStepLabel: String
+    /// 2.1: the rental Today is focused on, when the owner has several and the focus has its own
+    /// target (the hours, goal and house above are that rental's). nil: the goal's total.
+    /// Optional, so a snapshot written by 2.0.x still decodes.
+    var focusName: String? = nil
 
     static let empty = WidgetSurfaceSnapshot(
         updatedAt: Date(timeIntervalSince1970: 0),
@@ -151,16 +155,19 @@ struct WidgetSurfaceDisplay: Equatable {
         switch state {
         case .timer: return "Timer"
         case .noProperty: return "Start here"
-        default: return "Your hours"
+        default: return focusName ?? "Your hours"
         }
     }
+
+    /// The focused rental's name, when the widget shows one rental of several.
+    var focusName: String? { snapshot.focusName?.isEmpty == false ? snapshot.focusName : nil }
 
     var mediumLabel: String {
         switch state {
         case .timer: return "Timer · today"
         case .noProperty: return "LandlordHours"
         default:
-            let who = snapshot.goal == .reps750 ? "Your REPS hours" : "Your hours"
+            let who = focusName ?? (snapshot.goal == .reps750 ? "Your REPS hours" : "Your hours")
             return "\(who) · \(String(snapshot.taxYear))"
         }
     }
@@ -282,7 +289,7 @@ struct WidgetSurfaceDisplay: Equatable {
         case .noProperty: return "LandlordHours. Add a rental to start counting."
         case .timer: return "Timer running at \(timerPropertyName)."
         default:
-            var parts = ["\(number) of your \(goalNumber) hours."]
+            var parts = [focusName.map { "\($0), \(number) of \(goalNumber) hours." } ?? "\(number) of your \(goalNumber) hours."]
             if let s = status { parts.append(s.text + ".") }
             if pendingCount > 0 { parts.append("\(pendingCount) to confirm.") }
             return parts.joined(separator: " ")
