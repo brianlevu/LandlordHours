@@ -584,7 +584,9 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
             for bi in range(len(bands) - 1):
                 b = bands[bi]
                 lo, hi = extent(b)
-                if (lo <= int(24 * scale) and hi <= 0.62 * cw and (b[1] - b[0]) <= 30 * scale
+                # the band under a header starts with a ring control; the header itself does not, and
+                # may carry a trailing action label ("Review all"), so no limit on its right extent
+                if (lo <= int(24 * scale) and (b[1] - b[0]) <= 30 * scale and not starts_with_ring(b)
                         and starts_with_ring(bands[bi + 1], partial=bool(cut and bi + 1 == len(bands) - 1))):
                     headers.append(dict(ink_top=y0 + b[0], ink_bot=y0 + b[1],
                                         prev_bot=(y0 + bands[bi - 1][1]) if bi > 0 else None,
@@ -605,7 +607,9 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
                 if sg[0] <= h["ink_top"] < sg[1]:
                     i = segs.index(sg)
                     parts = []
-                    if h["prev_bot"] is not None:
+                    # a divider may sit between the previous day's last row and this header
+                    # (r8): then the segment starts after prev_bot and has no row above the header
+                    if h["prev_bot"] is not None and h["prev_bot"] + pad > sg[0] + 2 * pad:
                         parts.append([sg[0], h["prev_bot"] + pad])
                     if h["next_top"] is not None:
                         parts.append([h["next_top"] - pad, sg[1]])
