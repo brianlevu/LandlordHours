@@ -231,7 +231,7 @@ struct StdTodayScreen: View {
     private func topHeader(day: String?) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
-                StdScreenTitle(title: L("Today"))
+                StdScreenTitle(title: L("Today"), subtitle: typeSize.isAccessibilitySize ? nil : L("Fri, Oct 23"))
                 // iOS 26+: Log time is the tab bar's trailing glass button; earlier versions keep it here.
                 if #unavailable(iOS 26.0) {
                     Button { showLog = true } label: { Image(systemName: "plus") }
@@ -481,7 +481,7 @@ struct StdHeroCard: View {
             .accessibilityLabel(L("\(hero.flag), \(Int(hero.number)) \(hero.label). \(statusWords)"))
             .accessibilityAdjustableAction { dir in step(dir == .increment ? 1 : -1) }
             .accessibilityIdentifier("std.hero")
-            if typeSize < .xxLarge && !single {
+            if !typeSize.isAccessibilitySize && !single {
                 Rectangle().fill(HouseTokens.drafting.opacity(0.25)).frame(height: 0.5)
                 rentalRow
             }
@@ -577,7 +577,7 @@ struct StdHeroCard: View {
     }
 
     private func fullTop(_ night: Bool) -> some View {
-        let houseSize: CGFloat = single ? (typeSize >= .xxLarge ? 112 : 148) : 150
+        let houseSize: CGFloat = single ? (typeSize >= .xxLarge ? 112 : 132) : 150
         return VStack(alignment: .leading, spacing: 0) {
             if single {
                 Text(L("2026 · \(hero.flag)")).font(StdFont.drafting).textCase(.uppercase).tracking(StdFont.draftingTracking)
@@ -601,8 +601,7 @@ struct StdHeroCard: View {
             if single { status.padding(.top, 2) }
         }
         .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 12)
-        // XXL: the rental switcher folds into a 44pt control in the corner (the row returns below XXL).
-        .overlay(alignment: .topTrailing) { if typeSize >= .xxLarge && !single { rentalMenu.padding(8) } }
+
         // The ambient sky: a fixed box in the top-right corner, behind the house, clear of the number.
         .background(alignment: .topTrailing) {
             StdHeroAmbient().frame(width: 190, height: 64)
