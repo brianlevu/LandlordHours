@@ -684,7 +684,7 @@ struct LogTimeSheet: View {
         readTask?.cancel()
         let text = form.trimmedNote
         guard text.count >= 6, mode == .log, !manual, !LogSheetDebug.holdsReading else {
-            isReading = false
+            if !LogSheetDebug.holdsReading { isReading = false }
             noteDirty = false
             return
         }

@@ -117,11 +117,13 @@ extension LogTimeSheet {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 if reading { LogReadingLine().alignmentGuide(.firstTextBaseline) { $0[.bottom] - 4 } }
                 else if sparkle { LogSparkle() }
+                // A new line fades in; the old one is gone at once, so two captions never overlap.
                 Text(verbatim: text)
+                    .id(text)
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(caution ? colors.cautionText : colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .contentTransition(.opacity)
+                    .transition(.asymmetric(insertion: .opacity, removal: .identity))
             }
             .padding(.vertical, 4)
             .accessibilityElement(children: .combine)

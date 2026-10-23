@@ -57,7 +57,7 @@ struct LogChip: View {
 
     var body: some View {
         let colors = AdaptiveColors(colorScheme: scheme)
-        Button(action: action) {
+        let button = Button(action: action) {
             Text(verbatim: title)
                 .font(.subheadline.weight(.medium))
                 .fixedSize(horizontal: false, vertical: true)
@@ -72,7 +72,7 @@ struct LogChip: View {
         }
         .buttonStyle(.lhPressable)
         .accessibilityAddTraits(selected ? .isSelected : [])
-        .accessibilityIdentifier(identifier ?? "")
+        if let identifier { button.accessibilityIdentifier(identifier) } else { button }
     }
 }
 

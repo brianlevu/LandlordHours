@@ -31,6 +31,7 @@ extension LogTimeSheet {
         .padding(4)
         .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(colors.sheetCard))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(colors.sheetStroke, lineWidth: 1))
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("log.rows")
     }
 
@@ -110,7 +111,6 @@ extension LogTimeSheet {
         return VStack(spacing: 0) {
             Button { toggle(field) } label: { rowLabel(field, look, open: open) }
                 .buttonStyle(.lhPressable)
-                .accessibilityElement(children: .ignore)
                 .accessibilityLabel(a11y(field, look))
                 .accessibilityHint("Double-tap to change.")
                 .accessibilityAddTraits(open ? .isSelected : [])
