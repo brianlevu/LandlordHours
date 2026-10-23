@@ -11,6 +11,8 @@ struct StdLogTimeSheet: View {
     let onClose: () -> Void
     /// The post-log beat: the sheet hands the hours back and Today does the rest.
     var onLog: (Double) -> Void = { _ in }
+    /// A dropped receipt (adaptive §3.3): one line under the rows. nil on the phone.
+    var attachment: String? = nil
 
     @State private var phase: Phase
     @State private var note: String
@@ -32,7 +34,8 @@ struct StdLogTimeSheet: View {
     private static var filledNote: String { L("Fixed the leaking tap at Santa Ray Ave, took about an hour and a half") }
     private static var gapNote: String { L("Showed the place to two families this morning") }
 
-    init(seed: StdSeed, launch: StdProtoLaunch, onClose: @escaping () -> Void, onLog: @escaping (Double) -> Void = { _ in }) {
+    init(seed: StdSeed, launch: StdProtoLaunch, onClose: @escaping () -> Void, onLog: @escaping (Double) -> Void = { _ in }, attachment: String? = nil) {
+        self.attachment = attachment
         self.seed = seed
         self.launch = launch
         self.onClose = onClose
@@ -61,6 +64,9 @@ struct StdLogTimeSheet: View {
                     } else {
                         fillCaption
                         rows
+                        if let attachment {
+                            Label(attachment, systemImage: "paperclip").font(.subheadline).foregroundStyle(colors.textSecondary)
+                        }
                     }
                 }
                 .padding(.horizontal, 20)

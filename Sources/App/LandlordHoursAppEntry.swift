@@ -71,6 +71,9 @@ struct LandlordHoursApp: App {
             if let board = SurfaceBoardLaunch.current {
                 // Surfaces capture boards (-LHSurfaceBoard <name>); see SurfaceCaptureBoard.swift.
                 SurfaceCaptureRoot(launch: board)
+            } else if let adaptive = AdaptiveLaunch.current {
+                // Adaptive layout mockups (-LHAdaptive <screen>); see Views/Debug/StdProto/AdaptiveProto.swift.
+                AdaptiveProtoEntry(launch: adaptive)
             } else if let stdProto = StdProtoLaunch.current {
                 // Design-standard mockups (-LHStdProto <screen>); see Views/Debug/StdProto.
                 StdProtoRoot(launch: stdProto)
