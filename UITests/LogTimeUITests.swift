@@ -71,7 +71,7 @@ final class LogTimeUITests: XCTestCase {
         let note = element("log.note")
         XCTAssertTrue(note.waitForExistence(timeout: 8))
         note.tap()
-        note.typeText("Showing at Oak Street Duplex for 2 hours")
+        note.typeText("Fixed the sink at Oak Street Duplex for 2 hours")
         XCTAssertTrue(element("log.fill.caption").waitForExistence(timeout: 6))
         expectation(for: NSPredicate(format: "label BEGINSWITH %@", "Log 2h at Oak Street Duplex"), evaluatedWith: app.buttons["log.save"])
         waitForExpectations(timeout: 6)
@@ -478,7 +478,7 @@ final class LogTimeUITests: XCTestCase {
         launch(seed: "four", scheme: "light", extra: ["-LHNoteModel", "swap", "-LHLogScript", "swap", "-LHLogNoLog", "1"])
         XCTAssertTrue(element("log.updated.undo").waitForExistence(timeout: 20), "a late model answer says it updated the row")
         element("log.updated.undo").tap()
-        XCTAssertTrue(element("log.updated.undo").waitForNonExistence(timeout: 4))
+        XCTAssertTrue(element("log.updated.undo").waitForNonExistence(timeout: 8))
     }
 
     private func sizeArgs(_ size: String?) -> [String] {

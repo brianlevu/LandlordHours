@@ -287,6 +287,8 @@ struct LogTimeSheet: View {
 
     var header: some View {
         VStack(alignment: .leading, spacing: 6) {
+            // At accessibility sizes the buttons get their own line, so the date and the title keep the full width.
+            if isAX { HStack(spacing: 8) { Spacer(minLength: 0); headerButtons } }
             eyebrowView
             HStack(alignment: .center, spacing: 8) {
                 Text(title)
@@ -296,11 +298,15 @@ struct LogTimeSheet: View {
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("log.title")
                 Spacer(minLength: 8)
-                if isAX && mode == .log && !showVoiceIntro { micButton }
-                if showsTimerButton { timerButton }
-                LogSheetCloseButton { onClose() }
+                if !isAX { headerButtons }
             }
         }
+    }
+
+    @ViewBuilder var headerButtons: some View {
+        if isAX && mode == .log && !showVoiceIntro { micButton }
+        if showsTimerButton { timerButton }
+        LogSheetCloseButton { onClose() }
     }
 
     /// The day the entry is for. A new string fades in over a beat; the old one is gone at once,

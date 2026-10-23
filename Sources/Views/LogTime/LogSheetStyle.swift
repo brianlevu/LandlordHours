@@ -100,7 +100,8 @@ struct LogReadingLine: View {
             .frame(width: 26, height: 1.5)
             .scaleEffect(x: reduceMotion || drawn ? 1 : 0.1, anchor: .leading)
             .onAppear {
-                guard !reduceMotion else { return }
+                // Settled capture frames hold still (a looping animation keeps the UI-test runner from idling).
+                guard !reduceMotion, !LogSheetDebug.instantUnfold else { return }
                 withAnimation(.easeOut(duration: 0.9).repeatForever(autoreverses: false)) { drawn = true }
             }
             .accessibilityHidden(true)
