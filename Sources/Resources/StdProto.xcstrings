@@ -34,6 +34,17 @@
         }
       }
     },
+    "%@ · %@ · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · %@ · %@"
+          }
+        }
+      }
+    },
     "%@ · %@ · Today": {
       "extractionState": "manual",
       "localizations": {
@@ -41,6 +52,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ · %@ · Today"
+          }
+        }
+      }
+    },
+    "%@ · Me": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · Me"
+          }
+        }
+      }
+    },
+    "%@ · Spouse": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · Spouse"
           }
         }
       }
@@ -298,6 +331,28 @@
         }
       }
     },
+    "Add a receipt or photo": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a receipt or photo"
+          }
+        }
+      }
+    },
+    "Add a rental": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a rental"
+          }
+        }
+      }
+    },
     "All rentals": {
       "extractionState": "manual",
       "localizations": {
@@ -375,6 +430,17 @@
         }
       }
     },
+    "Choose": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose"
+          }
+        }
+      }
+    },
     "Cleaner": {
       "extractionState": "manual",
       "localizations": {
@@ -408,6 +474,17 @@
         }
       }
     },
+    "Couldn’t tell which rental. Pick it below.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t tell which rental. Pick it below."
+          }
+        }
+      }
+    },
     "Counts toward %lld": {
       "extractionState": "manual",
       "localizations": {
@@ -430,6 +507,17 @@
         }
       }
     },
+    "Date and who: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date and who: %@"
+          }
+        }
+      }
+    },
     "Details": {
       "extractionState": "manual",
       "localizations": {
@@ -441,6 +529,17 @@
         }
       }
     },
+    "Didn’t say": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Didn’t say"
+          }
+        }
+      }
+    },
     "Done": {
       "extractionState": "manual",
       "localizations": {
@@ -448,6 +547,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Done"
+          }
+        }
+      }
+    },
+    "Filled from your note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filled from your note"
           }
         }
       }
@@ -591,6 +701,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hours"
+          }
+        }
+      }
+    },
+    "How long": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How long"
           }
         }
       }
@@ -958,6 +1079,17 @@
         }
       }
     },
+    "Not chosen yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not chosen yet"
+          }
+        }
+      }
+    },
     "Not picked": {
       "extractionState": "manual",
       "localizations": {
@@ -1178,6 +1310,17 @@
         }
       }
     },
+    "Pick the kind of work": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick the kind of work"
+          }
+        }
+      }
+    },
     "Plumber at Maple Duplex": {
       "extractionState": "manual",
       "localizations": {
@@ -1229,6 +1372,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Reached %lld in %@"
+          }
+        }
+      }
+    },
+    "Reading your note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading your note"
           }
         }
       }
@@ -1409,6 +1563,17 @@
         }
       }
     },
+    "Showed Santa Ray Ave and Delaney Ct, 2 hours each": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Showed Santa Ray Ave and Delaney Ct, 2 hours each"
+          }
+        }
+      }
+    },
     "Showed the place to two families this morning": {
       "extractionState": "manual",
       "localizations": {
@@ -1442,6 +1607,17 @@
         }
       }
     },
+    "Shows the date and who did the work": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows the date and who did the work"
+          }
+        }
+      }
+    },
     "Smoke alarm batteries": {
       "extractionState": "manual",
       "localizations": {
@@ -1453,6 +1629,17 @@
         }
       }
     },
+    "Sorted the paperwork for this month": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sorted the paperwork for this month"
+          }
+        }
+      }
+    },
     "Spouse": {
       "extractionState": "manual",
       "localizations": {
@@ -1460,6 +1647,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Spouse"
+          }
+        }
+      }
+    },
+    "Start a timer": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a timer"
           }
         }
       }
@@ -1493,6 +1691,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Talk instead"
+          }
+        }
+      }
+    },
+    "Talk instead of type": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk instead of type"
           }
         }
       }
@@ -1596,6 +1805,17 @@
         }
       }
     },
+    "Today, Oct 23": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today, Oct 23"
+          }
+        }
+      }
+    },
     "Travel": {
       "extractionState": "manual",
       "localizations": {
@@ -1662,6 +1882,17 @@
         }
       }
     },
+    "Updated": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Updated"
+          }
+        }
+      }
+    },
     "Wed": {
       "extractionState": "manual",
       "localizations": {
@@ -1680,6 +1911,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "What did you do?"
+          }
+        }
+      }
+    },
+    "What did you do? (optional)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What did you do? (optional)"
           }
         }
       }
@@ -1794,6 +2036,17 @@
         }
       }
     },
+    "Your note names %lld rentals. Log each on its own.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your note names %lld rentals. Log each on its own."
+          }
+        }
+      }
+    },
     "Your spouse": {
       "extractionState": "manual",
       "localizations": {
@@ -1834,6 +2087,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nothing counts until you confirm it."
+          }
+        }
+      }
+    },
+    "from your note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "from your note"
           }
         }
       }
@@ -1911,6 +2175,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "this week"
+          }
+        }
+      }
+    },
+    "· last used": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· last used"
+          }
+        }
+      }
+    },
+    "· only rental": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· only rental"
           }
         }
       }
