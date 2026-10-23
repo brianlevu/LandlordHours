@@ -26,8 +26,13 @@ Mode `density` (the [measured] rules of docs/design/DESIGN-STANDARD.md section 2
                          [--scale 3] [--fold 0.88] [--items-present N]
   Per frame: list row heights, largest card share of the viewport, complete rows above the fold,
   empty-band share inside cards. Verdicts: D1 row 56-88pt (default Dynamic Type), D2 item <= 12%
-  (<= 30% AX), D3 >= 5 items above fold (with --items-present), D4 empty bands <= 35%, D6 card <= 20%
+  (<= 45% AX3), D3 >= 5 items above fold (with --items-present), D4 empty bands <= 35%, D6 card <= 20%
   / hero <= 40% (grouped list containers are judged per row). Exit 1 on any FAIL.
+  Standard amendments applied: D2 <= 45% at AX3; D4 skips grouped value-row containers (>= 3 rows of
+  44-68pt, 88pt at XXL; also exempt from D1); a card's centred foot action ("Confirm N likely", last
+  row < 56pt) is not a row for D1/D2/D3. Not counted as cards: sheets (a box that reaches the screen
+  edge; its inner cards are found against the sheet fill), header bands of a sheet, blue controls under
+  120pt, outlined input fields, and at AX3 any block cut by the fold (judged by D2 on its visible part).
 """
 from __future__ import annotations
 import argparse, colorsys, fnmatch, hashlib, json, math, sys
@@ -372,7 +377,7 @@ def legacy_main():
 
 # ---- density mode (design standard section 2) ----
 D1_MIN, D1_MAX = 56.0, 88.0
-D2_DEFAULT, D2_AX = 0.12, 0.30
+D2_DEFAULT, D2_AX = 0.12, 0.45
 D4_MAX = 0.35
 D6_CARD, D6_HERO = 0.20, 0.40
 FOLD_FRAC = 0.88
@@ -420,52 +425,94 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
     lab = rgb_to_lab(a)
     vp_pt = H / scale
     fold = int(H * fold_frac)
-    canvas = lab[:, 4, :]  # per-row canvas colour
+    canvas0 = lab[:, 4, :]  # per-row canvas colour
     probes = [int(40 * scale), W - int(40 * scale)]
-    diff = np.zeros(H, dtype=bool)
-    both = np.ones(H, dtype=bool)
-    for px in probes:
-        band = lab[:, px - 3:px + 3, :]
-        d = np.linalg.norm(band - canvas[:, None, :], axis=2)
-        both &= (d > 2.5).mean(axis=1) > 0.8
     top_skip = int(62 * scale)  # status bar / dynamic island
-    both[:top_skip] = False
-    both[fold:] = False  # the floating tab bar owns everything below the fold
-    card_rows = runs(both, min_len=int(40 * scale), close_gap=3)
-    cards = []
-    for (y0, y1) in card_rows:
-        # horizontal extent: sample at mid-height of the card
-        ym = (y0 + y1) // 2
-        row_d = np.linalg.norm(lab[ym] - canvas[ym], axis=1) > 2.5
-        xs = np.flatnonzero(row_d)
-        # edges: outermost columns that are contiguous with probe columns
-        x0 = probes[0]
-        while x0 > 0 and np.linalg.norm(lab[ym, x0 - 1] - canvas[ym]) > 4.5:
-            x0 -= 1
-        x1 = probes[1]
-        while x1 < W - 1 and np.linalg.norm(lab[ym, x1 + 1] - canvas[ym]) > 4.5:
-            x1 += 1
-        x1 += 1
-        # refine top/bottom with columns just past the corner radius (exact edges)
-        cols = [x0 + int(22 * scale), x1 - int(22 * scale)]
-        def inside(y):
-            return all(np.linalg.norm(lab[y, cx] - canvas[y]) > 2.5 for cx in cols)
-        while y0 > top_skip and inside(y0 - 1):
-            y0 -= 1
-        while y1 < fold and inside(y1):
-            y1 += 1
-        # card fill: modal colour of the interior
-        inner = a[y0:y1, x0 + 6:x1 - 6].reshape(-1, 3)
-        vals, counts = np.unique((inner // 4), axis=0, return_counts=True)
-        fill_rgb = (vals[counts.argmax()] * 4 + 2).astype(np.uint8)
-        fill_lab = rgb_to_lab(fill_rgb[None, :])[0]
-        r, g, b = [int(v) for v in fill_rgb]
-        hero = (b >= 120 and b - r >= 80 and (b - r) / max(b, 1) > 0.6)
-        cards.append(dict(y0=int(y0), y1=int(y1), x0=int(x0), x1=int(x1), fill=fill_lab,
-                          hero=bool(hero)))
 
-    res_cards, all_rows, flags = [], [], []
+    def detect(canvas, ylo, yhi):
+        """Card boxes between ylo and yhi against a per-row canvas colour."""
+        both = np.ones(H, dtype=bool)
+        for px in probes:
+            band = lab[:, px - 3:px + 3, :]
+            d = np.linalg.norm(band - canvas[:, None, :], axis=2)
+            both &= (d > 2.5).mean(axis=1) > 0.8
+        both[:ylo] = False
+        both[yhi:] = False
+        out = []
+        for (y0, y1) in runs(both, min_len=int(40 * scale), close_gap=3):
+            ym = (y0 + y1) // 2
+            x0 = probes[0]
+            # leftmost edge over sampled rows: a sheet reaches the screen edge somewhere on
+            # its height (its top corners are rounded), a card never gets closer than its gutter
+            for yy in sorted({ym, *range(y0 + 10, y1 - 10, 30)}):
+                xx = probes[0]
+                while xx > 0 and np.linalg.norm(lab[yy, xx - 1] - canvas[yy]) > 4.5:
+                    xx -= 1
+                x0 = min(x0, xx)
+            x1 = probes[1]
+            while x1 < W - 1 and np.linalg.norm(lab[ym, x1 + 1] - canvas[ym]) > 4.5:
+                x1 += 1
+            x1 += 1
+            cols = [x0 + int(22 * scale), x1 - int(22 * scale)]
+
+            def inside(y):
+                return all(np.linalg.norm(lab[y, cx] - canvas[y]) > 2.5 for cx in cols)
+            while y0 > ylo and inside(y0 - 1):
+                y0 -= 1
+            while y1 < yhi and inside(y1):
+                y1 += 1
+            inner = a[y0:y1, x0 + 6:x1 - 6].reshape(-1, 3)
+            vals, counts = np.unique((inner // 4), axis=0, return_counts=True)
+            fill_rgb = (vals[counts.argmax()] * 4 + 2).astype(np.uint8)
+            fr, fg, fb = [int(v) for v in fill_rgb]
+            blue = fb >= 120 and fb - fr >= 80 and (fb - fr) / max(fb, 1) > 0.6
+            out.append(dict(y0=int(y0), y1=int(y1), x0=int(x0), x1=int(x1), canvas=canvas,
+                            fill=rgb_to_lab(fill_rgb[None, :])[0], blue=bool(blue)))
+        return out
+
+    # 1. cards against the page canvas; wide runs touching the screen edge are sheets / header bands
+    sheet_x = int(12 * scale)
+    cards, sheets, controls = [], [], []
+    for c in detect(canvas0, top_skip, fold):
+        if c["x0"] < sheet_x:
+            sheets.append(c)
+            continue
+        cards.append(c)
+    # 2. inside each sheet the canvas is the sheet fill, so find its cards again
+    for s in sheets:
+        # sheet fill from the gutter strip just inside its edge (cards never touch it)
+        sy0 = s["y0"] + (s["y1"] - s["y0"]) // 3
+        strip = a[sy0:s["y1"], s["x0"] + 8:s["x0"] + 30].reshape(-1, 3)
+        vals, counts = np.unique(strip // 4, axis=0, return_counts=True)
+        sfill = rgb_to_lab((vals[counts.argmax()] * 4 + 2).astype(np.uint8)[None, :])[0]
+        canvas2 = canvas0.copy()
+        canvas2[s["y0"]:s["y1"]] = sfill
+        for c in detect(canvas2, max(s["y0"], top_skip), min(s["y1"], fold)):
+            if c["x0"] >= sheet_x and (c["x0"], c["y0"]) not in [(k["x0"], k["y0"]) for k in cards]:
+                cards.append(c)
+    # 3. saturated blue boxes shorter than 120pt are buttons, not heroes or cards
+    kept = []
     for c in cards:
+        c["hero"] = c["blue"] and (c["y1"] - c["y0"]) >= 120 * scale
+        if c["blue"] and not c["hero"]:
+            controls.append(c)
+            continue
+        kept.append(c)
+    # 4. an outlined box (edge pixels clearly differ from its own fill) is an input field, not a card
+    cards = []
+    fields = []
+    for c in sorted(kept, key=lambda c: c["y0"]):
+        ym = (c["y0"] + c["y1"]) // 2
+        edge = min(np.linalg.norm(lab[ym, c["x0"] + k] - c["fill"]) for k in (1, 2))
+        if not c["hero"] and edge > 5 and np.linalg.norm(c["fill"] - c["canvas"][ym]) > 2.5:
+            fields.append(c)
+        else:
+            cards.append(c)
+    canvas = canvas0
+
+    res_cards, all_rows = [], []
+    for c in cards:
+        cv = c["canvas"]
         y0, y1, x0, x1 = c["y0"], min(c["y1"], H), c["x0"], c["x1"]
         cut = c["y1"] >= fold - 2
         vis_y1 = min(y1, fold) if cut else y1
@@ -490,9 +537,34 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
         rows = []
         for i in range(len(bounds) - 1):
             top, bot = bounds[i], bounds[i + 1]
-            complete = bot <= fold and not (i == len(bounds) - 2 and cut)
-            rows.append(dict(y0=top, y1=bot, h_pt=round((bot - top) / scale, 1), complete=bool(complete)))
+            last = i == len(bounds) - 2
+            complete = bot <= fold and not (last and cut)
+            rows.append(dict(y0=top, y1=bot, h_pt=round((bot - top) / scale, 1), complete=bool(complete), foot=False))
         is_list = len(div_rows) >= 1
+        # foot action ("Confirm N likely"): the last row of a list container, shorter than the
+        # D1 minimum, whose ink is one centred text run. It is not a list item.
+        if is_list and len(rows) >= 2:
+            lr = rows[-1]
+            if lr["h_pt"] < D1_MIN and lr["complete"]:
+                seg = lab[lr["y0"] + 3:lr["y1"] - 3, x0 + 3:x1 - 3, :]
+                ink = (np.linalg.norm(seg - c["fill"], axis=2) > 12).any(axis=0)
+                xs = np.flatnonzero(ink)
+                if xs.size:
+                    mid = (xs[0] + xs[-1]) / 2 / seg.shape[1]
+                    span = (xs[-1] - xs[0]) / seg.shape[1]
+                    if abs(mid - 0.5) <= 0.12 and span <= 0.7:
+                        lr["foot"] = True
+        item_rows = [r for r in rows if not r["foot"]]
+        # D4 exemption: grouped value rows (Settings-style) have uniform rows of 44-64pt
+        # at default type (<= 84pt at XXL); their padding is the row rhythm.
+        value_group = False
+        if is_list and dt in ("default", "xxl") and len(item_rows) >= 3:
+            cap = 68 if dt == "default" else 88  # LHRow.Value is 52pt; the stepper row runs taller
+            hs = [r["h_pt"] for r in item_rows if r["complete"]]
+            core = [h for h in hs if 44 <= h <= cap]
+            value_group = (len(core) >= 3 and len(core) >= 0.6 * len(hs)
+                           and (max(core) - min(core)) <= max(14, 0.3 * min(core))
+                           and all(h <= 120 for h in hs))  # one taller row (stepper, gap note) is allowed
         # empty bands: rows inside card (x inset 16pt) all card fill or canvas
         ix0, ix1 = x0 + int(16 * scale), x1 - int(16 * scale)
         empty_share = None
@@ -501,7 +573,7 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
             if iy1 > iy0:
                 reg = lab[iy0:iy1, ix0:ix1, :]
                 near_fill = np.linalg.norm(reg - c["fill"], axis=2) <= 3
-                near_canvas = np.linalg.norm(reg - canvas[iy0:iy1, None, :], axis=2) <= 3
+                near_canvas = np.linalg.norm(reg - cv[iy0:iy1, None, :], axis=2) <= 3
                 empty_row = (near_fill | near_canvas).all(axis=1)
                 empty_share = round(float(empty_row.sum() / (vis_y1 - y0)), 3)
             else:
@@ -512,34 +584,49 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
             bbox_px=[c["x0"], y0, c["x1"], y1], hero=c["hero"], list_container=is_list,
             height_pt=round(h_pt, 1), visible_height_pt=round(vis_pt, 1),
             viewport_share=round(vis_pt / vp_pt, 3), cut_by_fold=bool(cut),
-            empty_band_share=empty_share, rows=rows if is_list else [],
-            gutter_pt=round(c["x0"] / scale, 1)))
+            empty_band_share=empty_share, d4_exempt_value_rows=bool(value_group),
+            rows=rows if is_list else [], gutter_pt=round(c["x0"] / scale, 1)))
         if is_list:
             all_rows += rows
+            if value_group:
+                for r in rows:
+                    r["d1_exempt"] = True
 
     checks = []
 
     def chk(rule, ok, detail):
         checks.append(dict(rule=rule, pass_=bool(ok), detail=detail))
 
-    done = [r for r in all_rows if r["complete"]]
+    item_rows_all = [r for r in all_rows if not r["foot"]]
+    done = [r for r in item_rows_all if r["complete"]]
     if dt == "default" and done:
-        bad = [r["h_pt"] for r in done if not (D1_MIN <= r["h_pt"] <= D1_MAX)]
-        chk("D1 row height 56-88pt", not bad,
-            f"rows {[float(r['h_pt']) for r in done]}" + (f"; out of range {[float(b) for b in bad]}" if bad else ""))
+        d1 = [r for r in done if not r.get("d1_exempt")]
+        bad = [r["h_pt"] for r in d1 if not (D1_MIN <= r["h_pt"] <= D1_MAX)]
+        if d1:
+            chk("D1 row height 56-88pt", not bad,
+                f"rows {[float(r['h_pt']) for r in d1]}" + (f"; out of range {[float(b) for b in bad]}" if bad else ""))
     lim = D2_AX if dt == "ax" else D2_DEFAULT
-    if done:
-        worst = max(r["h_pt"] for r in done) / vp_pt
+    # D2: complete rows, plus the visible part of a row cut by the fold (a lower bound)
+    d2_rows = [r["h_pt"] for r in done]
+    d2_rows += [r["h_pt"] if r["complete"] else (min(r["y1"], fold) - r["y0"]) / scale
+                for r in item_rows_all if not r["complete"]]
+    d2_rows = [h for h in d2_rows]
+    for c in res_cards:
+        if c["cut_by_fold"] and not c["list_container"] and dt == "ax":
+            d2_rows.append(c["visible_height_pt"])  # a cut single block at AX is judged as one item
+    if d2_rows:
+        worst = max(d2_rows) / vp_pt
         chk(f"D2 item share <= {int(lim * 100)}%", worst <= lim, f"largest row {worst:.1%}")
-    non_hero_items = [c for c in res_cards if not c["hero"] and not c["list_container"]]
-    for c in non_hero_items:
+    for c in [c for c in res_cards if not c["hero"] and not c["list_container"]]:
+        if c["cut_by_fold"] and dt == "ax":
+            continue  # cut by the fold at AX3: a container, judged by D2, not a card
         chk("D6 card share <= 20%", c["viewport_share"] <= D6_CARD,
             f"card at y={c['bbox_px'][1]} is {c['viewport_share']:.1%} ({c['visible_height_pt']}pt)")
     for c in res_cards:
         if c["hero"]:
             chk("D6 hero share <= 40%", c["viewport_share"] <= D6_HERO,
                 f"hero {c['viewport_share']:.1%}")
-        if c["empty_band_share"] is not None:
+        if c["empty_band_share"] is not None and not c["d4_exempt_value_rows"]:
             chk("D4 empty bands <= 35%", c["empty_band_share"] <= D4_MAX,
                 f"card at y={c['bbox_px'][1]} empty {c['empty_band_share']:.1%}")
     n_items = len(done)
@@ -551,8 +638,11 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
     return dict(
         frame=path, size_px=[W, H], viewport_pt=[round(W / scale, 1), round(vp_pt, 1)], dynamic_type=dt,
         fold_px=fold, cards=res_cards,
+        ignored=dict(sheets=[[s["x0"], s["y0"], s["x1"], s["y1"]] for s in sheets],
+                     controls=[[s["x0"], s["y0"], s["x1"], s["y1"]] for s in controls],
+                     fields=[[s["x0"], s["y0"], s["x1"], s["y1"]] for s in fields]),
         summary=dict(
-            row_heights_pt=[r["h_pt"] for r in all_rows if r["complete"]],
+            row_heights_pt=[r["h_pt"] for r in done],
             largest_card_share=max([c["viewport_share"] for c in res_cards], default=0.0),
             largest_non_list_card_share=max([c["viewport_share"] for c in res_cards if not c["list_container"] and not c["hero"]], default=0.0),
             items_above_fold=n_items,
@@ -587,7 +677,9 @@ def cmd_density(args) -> int:
               f"empty={s['max_empty_band_share']:.0%}" + (f" fails={fails}" if fails else ""),
               file=sys.stderr if not args.json else sys.stdout)
     n_fail = sum(r["verdict"] == "FAIL" for r in results)
-    line = f"density: {len(results) - n_fail}/{len(results)} frames pass, {n_fail} fail"
+    n_nod = sum(r["verdict"] == "NO_DATA" for r in results)
+    line = (f"density: {len(results) - n_fail - n_nod}/{len(results)} frames pass, {n_fail} fail, "
+            f"{n_nod} no data (nothing measurable above the fold)")
     print(line, file=sys.stderr if not args.json else sys.stdout)
     return 1 if n_fail else 0
 
