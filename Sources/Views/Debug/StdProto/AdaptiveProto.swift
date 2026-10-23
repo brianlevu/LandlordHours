@@ -246,10 +246,10 @@ struct AdaptiveShell: View {
                 .badge(seed.suggestions.count)
             Tab(value: AdaptiveTab.records) { root(L("Records")) { AdaptiveRecords(selectFirst: launch.select) } } label: { tabLabel(L("Records"), "list.bullet.rectangle") }
             // Tab name per the standard's word list (C.4): "Properties" (the phone's tab); "rentals" in sentences.
-            Tab(value: AdaptiveTab.rentals) { root(L("Properties")) { placeholder(L("All rentals")) } } label: { tabLabel(L("Properties"), "house") }
+            Tab(value: AdaptiveTab.rentals) { root(L("Properties")) { placeholder(L("All rentals")) } } label: { houseLabel(L("Properties"), Self.smallHouse(hours: seed.hero(.all).stageHours)) }
             TabSection(L("Your rentals")) {
                 ForEach(seed.rentals.rentals) { r in
-                    Tab(value: AdaptiveTab.rental(r.id)) { root(r.name) { placeholder(r.name) } } label: { tabLabel(r.name, "house") }
+                    Tab(value: AdaptiveTab.rental(r.id)) { root(r.name) { placeholder(r.name) } } label: { houseLabel(r.name, Self.smallHouse(hours: HomeProtoStage.hours(for: r))) }
                 }
             }
             // Spec r2 used .defaultVisibility(.hidden, for: .tabBar): on iPadOS 27 the section still
@@ -279,6 +279,23 @@ struct AdaptiveShell: View {
     /// Sidebar/bar label: one line, tail ellipsis, so AX sizes never break a word mid-way.
     private func tabLabel(_ title: String, _ symbol: String) -> some View {
         Label { Text(title).lineLimit(1).truncationMode(.tail) } icon: { Image(systemName: symbol) }
+    }
+
+    /// The small house family (small-house/icons, 28pt) at a stage, instead of a generic SF house.
+    static func smallHouse(hours: Double) -> String {
+        let stage: String
+        switch HouseProgress.keyframe(for: hours) {
+        case .k00_lot: stage = "lot"
+        case .k01_slab: stage = "foundation"
+        case .k12_roof, .k13_siding020, .k14_siding040, .k15_siding060, .k16_siding080, .k17_siding100: stage = "roof"
+        case .k18_finished: stage = "finished"
+        default: stage = "frame"
+        }
+        return "HouseSmall_\(stage)_28"
+    }
+
+    private func houseLabel(_ title: String, _ asset: String) -> some View {
+        Label { Text(title).lineLimit(1).truncationMode(.tail) } icon: { Image(asset).renderingMode(.original) }
     }
 
     static let selectionTint = Color.lhDynamic(light: "1E3FA6", dark: "4774C6")
@@ -320,40 +337,21 @@ struct AdaptiveShell: View {
     }
 }
 
-/// tabViewSidebarHeader: the compact hero (house 120pt, "206 of 750", one pace line); tap opens Today.
+/// tabViewSidebarHeader: the app's mark and name only. The hero lives on Today; repeating it in the
+/// sidebar beside the same hero read as a duplicate (r6).
 struct AdaptiveSidebarHero: View {
     let seed: StdSeed
     let onTap: () -> Void
     @Environment(\.colorScheme) private var scheme
-    @Environment(\.dynamicTypeSize) private var typeSize
     var body: some View {
-        let hero = seed.hero(.all)
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 2) {
-                // AX sizes: the number alone (the sidebar is 280pt; art and pace line would fill it).
-                if !typeSize.isAccessibilitySize {
-                ZStack {
-                    let k = HouseProgress.keyframe(for: hero.stageHours)
-                    Image(decorative: k.builtImageName).resizable().interpolation(.high).scaledToFit()
-                    HouseLineworkImage(name: k.linesImageName).foregroundStyle(HouseTokens.drafting)
-                }
-                .frame(width: 120, height: 120)
-                .frame(maxWidth: .infinity)
-                }
-                Text(L("\(Int(hero.number)) of 750")).font(.title2.weight(.bold)).fontDesign(.rounded).monospacedDigit()
-                    .foregroundStyle(HouseTokens.onHeroPrimary)
-                if let s = hero.status, !typeSize.isAccessibilitySize {
-                    Text(s).font(.subheadline.weight(.semibold)).foregroundStyle(HouseTokens.cautionOnHero)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(StdHeroSky(phase: .day))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        HStack(spacing: 10) {
+            LHCompactLogo(size: 28)
+            LHWordmark(fontSize: 20)
         }
-        .buttonStyle(StdPressStyle())
-        .accessibilityLabel(L("Today, \(Int(hero.number)) of 750 hours"))
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(verbatim: "LandlordHours"))
     }
 }
 
@@ -538,11 +536,13 @@ struct AdaptiveToday: View {
                                 StdStatTile(value: t.0, label: t.1, glyph: t.2).stdMeasure("stat.\(i)")
                             }
                         }
-                        StdCPAFootnote().padding(.top, 16)
                     }
                     .textCase(nil)
                     .stdHeaderInsets()
                 }
+                // r6: This week sits under Pace so both columns end near the same height.
+                weekSection
+                Section {} header: { StdCPAFootnote().textCase(nil).stdHeaderInsets() }
             }
             .modifier(AdaptiveListStyle())
             .frame(width: col)
@@ -551,7 +551,6 @@ struct AdaptiveToday: View {
             // Right: the work. To confirm (own List, swipes) then This week.
             List {
                 confirmSection
-                weekSection
             }
             .modifier(AdaptiveListStyle())
             .frame(width: col)
