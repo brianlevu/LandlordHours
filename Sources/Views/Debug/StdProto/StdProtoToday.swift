@@ -28,6 +28,11 @@ struct StdProtoRoot: View {
 
     private var records: some View { colors.background.ignoresSafeArea() }
 
+    private func onLog() {
+        tab = 0
+        logRequest += 1
+    }
+
     var body: some View {
         Group {
             if #available(iOS 26.0, *) { nativeTabs } else { legacyTabs }
@@ -35,25 +40,21 @@ struct StdProtoRoot: View {
         .tint(colors.action)
     }
 
-    /// iOS 26+: the system Liquid Glass tab bar. Log time is the detached trailing glass button
-    /// (the `.search`-role slot, the place Music and Photos give their one special action): a tap
-    /// opens the Log time sheet over Today. The bar shrinks while scrolling down.
+    /// iOS 26+: the system Liquid Glass tab bar with four tabs; Log time is a separate interactive
+    /// glass circle (`.glassEffect(.regular.interactive())`) floating at the trailing edge just above
+    /// the bar, like a compose action. On iOS 27 a `.search`-role tab sits inline in the bar at rest
+    /// (measured), and `tabViewBottomAccessory` is a full-width capsule, so neither stays detached.
+    /// ⌘N opens it on iPad. The bar shrinks while scrolling down; the button stays put.
     @available(iOS 26.0, *)
     private var nativeTabs: some View {
         TabView(selection: $tab) {
-            Tab(L("Today"), systemImage: "sun.max", value: 0) { today }
-            Tab(L("Inbox"), systemImage: "tray", value: 1) { StdInboxScreen(seed: seed, launch: launch) }
+            Tab(L("Today"), systemImage: "sun.max", value: 0) { today.stdComposeButton(onLog) }
+            Tab(L("Inbox"), systemImage: "tray", value: 1) { StdInboxScreen(seed: seed, launch: launch).stdComposeButton(onLog) }
                 .badge(seed.suggestions.count)
-            Tab(L("Records"), systemImage: "list.bullet.rectangle", value: 2) { records }
-            Tab(L("Properties"), systemImage: "house", value: 3) { records }
-            Tab(value: 4, role: .search) { Color.clear } label: { Label(L("Log time"), systemImage: "plus") }
+            Tab(L("Records"), systemImage: "list.bullet.rectangle", value: 2) { records.stdComposeButton(onLog) }
+            Tab(L("Properties"), systemImage: "house", value: 3) { records.stdComposeButton(onLog) }
         }
         .tabBarMinimizeBehavior(.onScrollDown)
-        .onChange(of: tab) { _, new in
-            guard new == 4 else { return }
-            tab = 0
-            logRequest += 1
-        }
     }
 
     /// iOS 17–25 fallback: the classic tab bar; Log time stays in Today's title row.
@@ -142,6 +143,7 @@ struct StdTodayScreen: View {
                 paceSection
             }
             .listStyle(.insetGrouped)
+            .modifier(StdTopEdge())
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY - $0.safeAreaInsets.bottom } action: { y in
                 StdGeom.log(String(format: "STDGEOM fold %.1f 0 0 0", y))
             }
@@ -309,7 +311,7 @@ struct StdTodayScreen: View {
     @ViewBuilder private var toastView: some View {
         if let toast {
             LHToast(spec: toast)
-                .padding(.horizontal, 16)
+                .padding(.leading, 16).padding(.trailing, 16 + StdCompose.reserve)
                 .padding(.bottom, 12)
                 .id(toast.id)
                 .transition(.asymmetric(insertion: .offset(y: reduceMotion ? 0 : 24).combined(with: .opacity),
@@ -751,3 +753,52 @@ struct StdHeroCard: View {
 #endif
 
 
+
+#if DEBUG
+/// Space the floating Log time button takes at the trailing edge (pinned bars and toasts leave it).
+enum StdCompose {
+    static let size: CGFloat = 56
+    static var reserve: CGFloat { if #available(iOS 26.0, *) { return size + 12 } else { return 0 } }
+}
+
+extension View {
+    /// The detached Log time glass button, bottom-trailing above the tab bar (iOS 26+).
+    @ViewBuilder func stdComposeButton(_ action: @escaping () -> Void) -> some View {
+        if #available(iOS 26.0, *) {
+            overlay(alignment: .bottomTrailing) {
+                Button(action: action) {
+                    Image(systemName: "plus")
+                        .font(.title2.weight(.semibold))
+                        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                        .frame(width: StdCompose.size, height: StdCompose.size)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: .circle)
+                .keyboardShortcut("n", modifiers: .command)
+                .accessibilityLabel(L("Log time"))
+                .accessibilityIdentifier("compose.logTime")
+                .padding(.trailing, 20)
+                .padding(.bottom, 12)
+            }
+        } else {
+            self
+        }
+    }
+}
+#endif
+
+#if DEBUG
+/// Content under the status bar fades behind the system scroll edge effect, so the clock never sits
+/// on the blue hero (iOS 26+; earlier: a canvas-tinted band).
+struct StdTopEdge: ViewModifier {
+    @Environment(\.colorScheme) private var scheme
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.scrollEdgeEffectStyle(.hard, for: .top)
+        } else {
+            content
+        }
+    }
+}
+#endif

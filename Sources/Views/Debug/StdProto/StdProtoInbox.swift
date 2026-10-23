@@ -112,7 +112,8 @@ struct StdInboxScreen: View {
                         .contentShape(Capsule())
                 }
                 .buttonStyle(StdPressStyle())
-                .padding(.horizontal, 20)
+                .padding(.leading, 20)
+                .padding(.trailing, 20 + StdCompose.reserve)
                 .padding(.bottom, 12)
                 .transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 12)))
                     .accessibilityIdentifier("inbox.confirmLikely.pinned")
@@ -121,7 +122,7 @@ struct StdInboxScreen: View {
         .animation(StdMotion.reveal, value: pinned)
         .overlay(alignment: .bottom) {
             if let toast {
-                LHToast(spec: toast).padding(.horizontal, 16).padding(.bottom, 12).id(toast.id)
+                LHToast(spec: toast).padding(.leading, 16).padding(.trailing, 16 + StdCompose.reserve).padding(.bottom, 12).id(toast.id)
                     .transition(.asymmetric(insertion: .offset(y: reduceMotion ? 0 : 24).combined(with: .opacity),
                                             removal: .offset(y: reduceMotion ? 0 : 12).combined(with: .opacity)))
             }

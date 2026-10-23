@@ -502,11 +502,13 @@ struct StdWhyTargetSheet: View {
         let cleaner = why == .t500
         let pro = why == .t750
         return [
-            Row(target: 100, meaning: L("100 hours, and more than anyone else here"),
+            Row(target: 100, meaning: typeSize.isAccessibilitySize ? L("100 hours, more than anyone here")
+                                                                  : L("100 hours, and more than anyone else here"),
                 fits: !cleaner, reason: cleaner ? L("A cleaner does more hours here") : L("You do most of the work here")),
             Row(target: 500, meaning: L("500 hours, no comparison"),
                 fits: true, reason: L("Doesn't depend on who else works here")),
-            Row(target: 750, meaning: L("750 hours, and more than half your working time, as a real estate pro"),
+            Row(target: 750, meaning: typeSize.isAccessibilitySize ? L("750 hours, and more than half your working time")
+                                                                  : L("750 hours, and more than half your working time, as a real estate pro"),
                 fits: pro, reason: pro ? L("You said real estate is your main job") : L("Needs real estate as your main job")),
         ]
     }
@@ -544,7 +546,8 @@ struct StdWhyTargetSheet: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)
-            .padding(.bottom, 24)
+            // Clear of the sheet's bottom corner curve when scrolled to the end.
+            .padding(.bottom, 44)
         }
         .scrollBounceBehavior(.basedOnSize)
         .background(colors.background.ignoresSafeArea())
@@ -563,25 +566,27 @@ struct StdWhyTargetSheet: View {
         let isPick = r.target == recommended
         let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
         return layout {
-            Text(verbatim: "\(r.target)")
-                .font(.title3.weight(.bold)).fontDesign(.rounded).monospacedDigit()
-                .foregroundStyle(isPick ? colors.action : colors.textPrimary)
-                .frame(minWidth: typeSize.isAccessibilitySize ? nil : 48, alignment: .leading)
+            // Large text: the meaning line already starts with the number, so the big numeral goes.
+            if !typeSize.isAccessibilitySize {
+                Text(verbatim: "\(r.target)")
+                    .font(.title3.weight(.bold)).fontDesign(.rounded).monospacedDigit()
+                    .foregroundStyle(isPick ? colors.action : colors.textPrimary)
+                    .frame(minWidth: 48, alignment: .leading)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(r.meaning).font(.subheadline.weight(.semibold)).foregroundStyle(colors.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
-                Label {
-                    Text(r.reason).fixedSize(horizontal: false, vertical: true)
-                } icon: {
-                    Image(systemName: r.fits ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundStyle(r.fits ? colors.positive : colors.textSecondary)
-                }
-                .font(.subheadline).foregroundStyle(colors.textSecondary)
-                .accessibilityLabel(r.fits ? L("Fits: \(r.reason)") : L("Doesn't fit: \(r.reason)"))
+                // The mark sits inline so the reason wraps at full width (large text stays compact).
+                (Text(Image(systemName: r.fits ? "checkmark.circle.fill" : "xmark.circle.fill"))
+                    .foregroundColor(r.fits ? colors.positive : colors.textSecondary)
+                 + Text(verbatim: " ") + Text(r.reason))
+                    .font(.subheadline).foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel(r.fits ? L("Fits: \(r.reason)") : L("Doesn't fit: \(r.reason)"))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 16).padding(.vertical, 6)
+        .padding(.horizontal, 16).padding(.vertical, typeSize.isAccessibilitySize ? 4 : 6)
         .background {
             RoundedRectangle(cornerRadius: 20, style: .continuous).fill(colors.actionSurface)
                 .opacity(isPick && emphasis ? 1 : 0)

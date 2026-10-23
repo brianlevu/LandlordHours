@@ -243,6 +243,17 @@
         }
       }
     },
+    "100 hours, more than anyone here": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "100 hours, more than anyone here"
+          }
+        }
+      }
+    },
     "2026 · %@": {
       "extractionState": "manual",
       "localizations": {
@@ -272,6 +283,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "500 hours, no comparison"
+          }
+        }
+      }
+    },
+    "750 hours, and more than half your working time": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "750 hours, and more than half your working time"
           }
         }
       }
