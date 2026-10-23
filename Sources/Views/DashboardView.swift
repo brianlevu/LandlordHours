@@ -836,6 +836,8 @@ struct DashboardView: View {
             .simultaneousGesture(heroSwipe, including: showsRentalRow ? .all : .subviews)
             .accessibilityElement(children: viewModel.properties.isEmpty && isNewOwner ? .contain : .ignore)
             .accessibilityLabel(heroAccessibilityLabel)
+            // With several rentals the value is the rental on the flag (the focus).
+            .accessibilityValue(showsRentalRow ? (heroStakeName ?? "") : "")
             .accessibilityIdentifier("today.hero")
             // Over 100 hours with "did anyone do more?" unanswered: the hero opens that question.
             .onTapGesture { if heroCopy.needsConfirmation && !hoursPending { showParticipationSheet = true } }
@@ -845,8 +847,8 @@ struct DashboardView: View {
                 let propertyId = heroState.participationPropertyId
                 ParticipationConfirmationSheet(
                     year: currentYear,
-                    propertyName: propertyId.flatMap { id in viewModel.properties.first { $0.id == id }?.name },
-                    currentAnswer: taxProfile.noOneParticipatedMore(forYear: currentYear, propertyId: propertyId)
+                    currentAnswer: taxProfile.noOneParticipatedMore(forYear: currentYear, propertyId: propertyId),
+                    propertyName: propertyId.flatMap { id in viewModel.properties.first { $0.id == id }?.name }
                 ) { answer in
                     taxProfile.setNoOneParticipatedMore(answer, forYear: currentYear, propertyId: propertyId)
                 }
