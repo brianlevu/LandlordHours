@@ -265,6 +265,17 @@
         }
       }
     },
+    "Back to Today": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back to Today"
+          }
+        }
+      }
+    },
     "Bookkeeping": {
       "extractionState": "manual",
       "localizations": {

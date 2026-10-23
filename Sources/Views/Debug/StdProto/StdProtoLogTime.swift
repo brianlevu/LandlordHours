@@ -47,6 +47,7 @@ struct StdLogTimeSheet: View {
             StdSheetHeader(eyebrow: L("Today · Fri, Oct 23"), title: L("Log time"), onClose: onClose)
                 .padding(.horizontal, 20).padding(.top, 12)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerH = $0 }
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     noteField
@@ -62,8 +63,14 @@ struct StdLogTimeSheet: View {
                 .padding(.top, 8)
                 .padding(.bottom, 16)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentH = $0 }
+                Color.clear.frame(height: 1).id("end")
             }
             .scrollBounceBehavior(.basedOnSize)
+            .onAppear {
+                guard launch.scroll == "bottom" else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { proxy.scrollTo("end", anchor: .bottom) }
+            }
+            }
         }
         .background(colors.background.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
@@ -159,7 +166,7 @@ struct StdLogTimeSheet: View {
                 Image(systemName: "chevron.down").font(.footnote.weight(.semibold)).foregroundStyle(colors.textTertiary)
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 56)
+            .frame(minHeight: 58)
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(colors.backgroundSecondary))
             .contentShape(Rectangle())
         }
@@ -195,12 +202,22 @@ struct StdLogTimeSheet: View {
             divider(3)
             valueRow(3, L("Date"), L("Today"), fromNote: false)
             divider(4)
-            HStack {
-                Text(L("Who")).font(.body).foregroundStyle(colors.textPrimary)
-                Spacer(minLength: 12)
-                StdSegmented(options: [L("Me"), L("Spouse")], selection: $who).frame(maxWidth: 200)
+            Group {
+                if typeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(L("Who")).font(.body).foregroundStyle(colors.textPrimary)
+                        StdSegmented(options: [L("Me"), L("Spouse")], selection: $who)
+                    }
+                    .padding(.vertical, 10)
+                } else {
+                    HStack {
+                        Text(L("Who")).font(.body).foregroundStyle(colors.textPrimary)
+                        Spacer(minLength: 12)
+                        StdSegmented(options: [L("Me"), L("Spouse")], selection: $who).frame(maxWidth: 200)
+                    }
+                }
             }
-            .padding(.horizontal, 16).frame(minHeight: 56)
+            .padding(.horizontal, 16).frame(minHeight: 58)
             .stdUnfold(index: 4, shown: rowsShown)
         }
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(colors.backgroundSecondary))
@@ -223,7 +240,7 @@ struct StdLogTimeSheet: View {
             Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(colors.textTertiary)
         }
         .padding(.horizontal, 16)
-        .frame(minHeight: 56)
+        .frame(minHeight: 58)
         .stdUnfold(index: index, shown: rowsShown)
     }
 
@@ -241,7 +258,7 @@ struct StdLogTimeSheet: View {
             StdStepper(hours: $hours)
         }
         .padding(.horizontal, 16).padding(.vertical, 6)
-        .frame(minHeight: 56)
+        .frame(minHeight: 58)
     }
 
     private func unfold() {

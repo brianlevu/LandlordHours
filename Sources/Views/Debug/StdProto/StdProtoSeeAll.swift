@@ -36,7 +36,7 @@ struct StdSeeAllScreen: View {
                 if !list.isEmpty {
                     Section {
                         ForEach(list) { rental in
-                            StdBrowseRow(title: rental.name, meta: meta(rental), value: value(rental), chevron: false, metaLines: 2) {
+                            StdBrowseRow(title: rental.name, meta: meta(rental), value: value(rental), chevron: false, metaLines: 3) {
                                 HomeProtoArt(size: 36, keyframe: HomeProtoStage.keyframe(for: rental))
                             }
                             .stdMeasure("row.\(rental.id)")
@@ -48,6 +48,11 @@ struct StdSeeAllScreen: View {
                     } header: {
                         VStack(alignment: .leading, spacing: 0) {
                             if s == firstSection {
+                                // Flat back control, the same style as every close button (no glass hairline).
+                                Button {} label: { Image(systemName: "chevron.left") }
+                                    .buttonStyle(StdButtonStyle(.icon))
+                                    .accessibilityLabel(L("Back to Today"))
+                                    .padding(.bottom, 8)
                                 StdScreenTitle(title: L("All rentals"), subtitle: subtitle)
                                     .stdMeasure("title")
                                     .padding(.bottom, 24)
@@ -69,13 +74,7 @@ struct StdSeeAllScreen: View {
         .scrollContentBackground(.hidden)
         .background(colors.background.ignoresSafeArea())
         .environment(\.defaultMinListRowHeight, 44)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {} label: { Label(L("Today"), systemImage: "chevron.left").labelStyle(.titleAndIcon) }
-                    .tint(colors.action)
-            }
-        }
+        .toolbar(.hidden, for: .navigationBar)
     }
 
     /// The summary the stat tiles used to carry, as one line (D3: rows lead).

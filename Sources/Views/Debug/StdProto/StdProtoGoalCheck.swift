@@ -47,19 +47,31 @@ struct StdGoalCheckSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             topBar
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    switch step {
-                    case .question, .result: rentalStep
-                    case .summary: summary
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        switch step {
+                        case .question, .result: rentalStep
+                        case .summary: summary
+                        }
+                        Color.clear.frame(height: 1).id("end")
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 24)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                // The CTA is pinned under the content; the content scrolls above it (AX3).
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    footer.background(colors.background)
+                }
+                .onAppear {
+                    guard let target = StdProtoLaunch.current?.scroll else { return }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                        if target == "chart" { proxy.scrollTo("chart", anchor: .top) } else { proxy.scrollTo("end", anchor: .bottom) }
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 24)
             }
-            .scrollBounceBehavior(.basedOnSize)
-            footer
         }
         .background(colors.background.ignoresSafeArea())
         .sensoryFeedback(.selection, trigger: answer)
@@ -99,6 +111,8 @@ struct StdGoalCheckSheet: View {
 
     // MARK: One rental: question, then the picture
 
+    @ScaledMetric(relativeTo: .body) private var iconBox: CGFloat = 36
+
     private var rentalStep: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(typeSize.isAccessibilitySize ? L("Rental 1 of \(count)") : L("Rental 1 of \(count) · \(target)-hour target"))
@@ -112,13 +126,16 @@ struct StdGoalCheckSheet: View {
                         .foregroundStyle(colors.textSecondary)
                 }
             }
-            Text(L("Who does most of the hands-on work here?"))
-                .font(.headline).foregroundStyle(colors.textPrimary)
-                .fixedSize(horizontal: false, vertical: true)
+            // Large text: once answered, the question gives its room to the answer and the picture.
+            if step == .question || !typeSize.isAccessibilitySize {
+                Text(L("Who does most of the hands-on work here?"))
+                    .font(.headline).foregroundStyle(colors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             peopleRows
             if step == .result {
                 VStack(alignment: .leading, spacing: 8) {
-                    comparison
+                    comparison.id("chart")
                     Text(resultLine)
                         .font(.subheadline).foregroundStyle(colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -147,13 +164,17 @@ struct StdGoalCheckSheet: View {
                 let w = words(a)
                 let selected = answer == a
                 Button { pick(a) } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: w.1).font(.body).foregroundStyle(a == .spouse ? colors.rose : colors.action)
-                            .frame(width: 36, height: 36)
+                    HStack(alignment: .top, spacing: 12) {
+                        // A fixed scaled box: the glyph sits inside it, the label wraps after it.
+                        Image(systemName: w.1).resizable().scaledToFit()
+                            .frame(width: iconBox * 0.55, height: iconBox * 0.55)
+                            .foregroundStyle(a == .spouse ? colors.rose : colors.action)
+                            .frame(width: iconBox, height: iconBox)
                             .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
                                 .fill(a == .spouse ? colors.roseWash : colors.actionSurface))
+                            .padding(.top, 10)
                         Text(w.0).font(.body).foregroundStyle(colors.textPrimary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity, minHeight: iconBox + 20, alignment: .leading)
                             .fixedSize(horizontal: false, vertical: true)
                         Image(systemName: "checkmark").font(.body.weight(.semibold)).foregroundStyle(colors.action)
                             .frame(width: 44, height: 44)
@@ -208,12 +229,12 @@ struct StdGoalCheckSheet: View {
     private var comparison: some View {
         VStack(alignment: .leading, spacing: 10) {
             ruler
-            HStack(spacing: 16) {
+            (typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6)) : AnyLayout(HStackLayout(spacing: 16))) {
                 hoursChip(L("You"), StdFormat.hours(rental.hours), ink: colors.positive)
                 if answer == .cleaner || answer == .spouse {
                     hoursChip(otherLabel, L("No record"), ink: nil)
                 }
-                Spacer(minLength: 0)
+                if !typeSize.isAccessibilitySize { Spacer(minLength: 0) }
             }
         }
         .padding(16)
@@ -224,15 +245,17 @@ struct StdGoalCheckSheet: View {
 
     /// Your hours come from records; anyone else's are "No record", never a guess.
     private func hoursChip(_ who: String, _ value: String, ink: Color?) -> some View {
-        HStack(spacing: 6) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
             Circle().fill(ink ?? Color.clear)
                 .overlay(Circle().strokeBorder(ink == nil ? colors.textTertiary : Color.clear, lineWidth: 1.5))
                 .frame(width: 10, height: 10)
-            Text(who).font(.subheadline.weight(.semibold)).foregroundStyle(colors.textPrimary)
-            Text(value).font(.subheadline).fontDesign(ink == nil ? .default : .rounded).monospacedDigit()
-                .foregroundStyle(ink == nil ? colors.textSecondary : colors.textPrimary)
+            // One Text so it wraps between words, never inside one.
+            (Text(who).fontWeight(.semibold).foregroundColor(colors.textPrimary)
+             + Text(verbatim: " ")
+             + Text(value).foregroundColor(ink == nil ? colors.textSecondary : colors.textPrimary))
+                .font(.subheadline).monospacedDigit()
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var resultLine: String {
@@ -246,10 +269,10 @@ struct StdGoalCheckSheet: View {
     /// 0 … 750 with ticks at 100 / 500 / 750; your hours fill from 0; the target marker rides 100 → 500.
     private var ruler: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
+            (typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2)) : AnyLayout(HStackLayout())) {
                 Text(L("Target")).font(StdFont.drafting).textCase(.uppercase).tracking(StdFont.draftingTracking)
                     .foregroundStyle(colors.draftingInk)
-                Spacer()
+                if !typeSize.isAccessibilitySize { Spacer() }
                 Text(L("\(Int(marker.rounded())) hours")).font(.subheadline.weight(.semibold)).fontDesign(.rounded).monospacedDigit()
                     .foregroundStyle(colors.action)
                     .contentTransition(.numericText(value: marker))
@@ -263,15 +286,17 @@ struct StdGoalCheckSheet: View {
                     Rectangle().fill(colors.positive).frame(width: max(3, x(rental.hours) - 8), height: 4).offset(x: 8, y: 8)
                     ForEach([100.0, 500, 750], id: \.self) { t in
                         Rectangle().fill(colors.textTertiary).frame(width: 1, height: 6).offset(x: x(t), y: 11)
-                        Text(verbatim: "\(Int(t))").font(StdFont.drafting).foregroundStyle(colors.textSecondary)
-                            .fixedSize()
-                            .frame(width: 40).offset(x: x(t) - 20, y: 18)
+                        if !typeSize.isAccessibilitySize {
+                            Text(verbatim: "\(Int(t))").font(StdFont.drafting).foregroundStyle(colors.textSecondary)
+                                .fixedSize()
+                                .frame(width: 40).offset(x: x(t) - 20, y: 18)
+                        }
                     }
                     StdPointer().fill(colors.action).frame(width: 12, height: 8).offset(x: x(marker) - 6, y: -1)
                     Rectangle().fill(colors.action).frame(width: 2, height: 12).offset(x: x(marker) - 1, y: 5)
                 }
             }
-            .frame(height: 32)
+            .frame(height: typeSize.isAccessibilitySize ? 20 : 32)
             .accessibilityHidden(true)
         }
     }
@@ -287,7 +312,7 @@ struct StdGoalCheckSheet: View {
                     if i > 0 { Rectangle().fill(colors.border).frame(height: 0.5).padding(.leading, 64) }
                     let row = summaryWords(r)
                     StdBrowseRow(title: r.name, meta: row.meta, value: row.value, valueInk: row.changed ? colors.action : colors.textSecondary,
-                                 chevron: false, metaLines: 2) {
+                                 chevron: false, metaLines: 3) {
                         HomeProtoArt(size: 36, keyframe: HomeProtoStage.keyframe(for: r))
                     }
                     .padding(.horizontal, 16).padding(.vertical, 8)

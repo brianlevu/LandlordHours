@@ -354,6 +354,8 @@ struct StdActionRow: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     /// One title line at the current text size, so the circle sits on the first line.
     @ScaledMetric(relativeTo: .body) private var titleLine: CGFloat = 22
+    /// The circle grows with the text (22pt at default) so it never looks undersized at AX sizes.
+    @ScaledMetric(relativeTo: .body) private var circle: CGFloat = 22
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
 
     private var isStatus: Bool { item.status != .none }
@@ -416,12 +418,12 @@ struct StdActionRow: View {
             ZStack {
                 Circle().strokeBorder(confirmed ? colors.positive : colors.textTertiary, lineWidth: 1.5)
                 Circle().fill(colors.positive).opacity(confirmed ? 1 : 0)
-                Image(systemName: "checkmark").resizable().scaledToFit().frame(width: 10, height: 10)
+                Image(systemName: "checkmark").resizable().scaledToFit().frame(width: circle * 0.45, height: circle * 0.45)
                     .foregroundStyle(Color.white)
                     .opacity(confirmed ? 1 : 0)
             }
-            .frame(width: 22, height: 22)
-            .frame(width: 22, height: max(22, titleLine))
+            .frame(width: circle, height: circle)
+            .frame(width: circle, height: max(circle, titleLine))
             .padding(11)
             .contentShape(Rectangle())
             .padding(-11)
@@ -602,6 +604,8 @@ struct StdSegmented: View {
                 } label: {
                     Text(options[i])
                         .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .foregroundStyle(i == selection ? colors.textPrimary : colors.textSecondary)
                         .frame(maxWidth: .infinity, minHeight: 32)
                         .frame(minWidth: 64)
@@ -712,10 +716,11 @@ struct StdCollapse: ViewModifier {
     }
 }
 
-/// The rowConfirm timeline shared by Today and Inbox: fill (feedback 0.12) → fade (0.08, starts at
-/// 0.12) → collapse (spring 0.25, starts at 0.14) → removal without animation. Total ≈ 0.39s.
+/// rowConfirm, Reminders-style: the circle fills and ticks (feedback 0.12), the row is held 0.5s so
+/// the tick reads, then the removal runs inside withAnimation(.collapse) and the List closes the gap.
 @MainActor
 enum StdRowConfirm {
+    static let hold: UInt64 = 500_000_000
     static func run(id: String, reduceMotion: Bool,
                     fill: @escaping () -> Void,
                     fade: @escaping () -> Void,
@@ -723,19 +728,9 @@ enum StdRowConfirm {
                     remove: @escaping () -> Void) {
         withAnimation(reduceMotion ? StdMotion.quick : StdMotion.feedback) { fill() }
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 120_000_000)
-            withAnimation(.easeOut(duration: reduceMotion ? 0.15 : 0.08)) { fade() }
-            if reduceMotion {
-                try? await Task.sleep(nanoseconds: 150_000_000)
-                var t = Transaction(); t.disablesAnimations = true
-                withTransaction(t) { remove() }
-                return
-            }
-            try? await Task.sleep(nanoseconds: 20_000_000)
-            withAnimation(StdMotion.collapse) { collapse() }
-            try? await Task.sleep(nanoseconds: 250_000_000)
-            var t = Transaction(); t.disablesAnimations = true
-            withTransaction(t) { remove() }
+            try? await Task.sleep(nanoseconds: 120_000_000 + hold)
+            StdMotionLog.mark("rowConfirm.collapse")
+            withAnimation(reduceMotion ? .easeOut(duration: 0.15) : StdMotion.collapse) { remove() }
         }
     }
 }
