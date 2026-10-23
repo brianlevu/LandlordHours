@@ -18,4 +18,22 @@ final class StdProtoDemoUITests: XCTestCase {
         start.press(forDuration: 0.05, thenDragTo: end, withVelocity: 900, thenHoldForDuration: 0.05)
         Thread.sleep(forTimeInterval: 4.0)
     }
+
+    func testTodayScrollMinimizesTabBar() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-LHStdProto", "today", "-LHHomeSeed", "brian", "-LHSkyTime", "day",
+                               "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
+        app.launch()
+        Thread.sleep(forTimeInterval: 2.5)
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+        start.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)),
+                    withVelocity: 600, thenHoldForDuration: 0.1)
+        Thread.sleep(forTimeInterval: 2.0)
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
+            .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8)),
+                   withVelocity: 600, thenHoldForDuration: 0.1)
+        Thread.sleep(forTimeInterval: 2.0)
+        app.buttons["Log time"].firstMatch.tap()
+        Thread.sleep(forTimeInterval: 2.0)
+    }
 }

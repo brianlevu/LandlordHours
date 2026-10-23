@@ -14,26 +14,58 @@ struct StdProtoRoot: View {
         _tab = State(initialValue: [.inbox, .goalcheck].contains(launch.screen) ? 1 : 0)
     }
 
+    @State private var logRequest = 0
+
+    private var seed: StdSeed { StdSeed.make(launch.seedID) }
+
+    @ViewBuilder private var today: some View {
+        if launch.screen == .seeall {
+            NavigationStack { StdSeeAllScreen(seed: seed) }
+        } else {
+            StdTodayScreen(seed: seed, launch: launch, openInbox: { tab = 1 }, logRequest: logRequest)
+        }
+    }
+
+    private var records: some View { colors.background.ignoresSafeArea() }
+
     var body: some View {
-        let seed = StdSeed.make(launch.seedID)
+        Group {
+            if #available(iOS 26.0, *) { nativeTabs } else { legacyTabs }
+        }
+        .tint(colors.action)
+    }
+
+    /// iOS 26+: the system Liquid Glass tab bar. Log time is the detached trailing glass button
+    /// (the `.search`-role slot, the place Music and Photos give their one special action): a tap
+    /// opens the Log time sheet over Today. The bar shrinks while scrolling down.
+    @available(iOS 26.0, *)
+    private var nativeTabs: some View {
         TabView(selection: $tab) {
-            Group {
-                if launch.screen == .seeall {
-                    NavigationStack { StdSeeAllScreen(seed: seed) }
-                } else {
-                    StdTodayScreen(seed: seed, launch: launch, openInbox: { tab = 1 })
-                }
-            }
-            .tabItem { Label(L("Today"), systemImage: "sun.max") }.tag(0)
+            Tab(L("Today"), systemImage: "sun.max", value: 0) { today }
+            Tab(L("Inbox"), systemImage: "tray", value: 1) { StdInboxScreen(seed: seed, launch: launch) }
+                .badge(seed.suggestions.count)
+            Tab(L("Records"), systemImage: "list.bullet.rectangle", value: 2) { records }
+            Tab(L("Properties"), systemImage: "house", value: 3) { records }
+            Tab(value: 4, role: .search) { Color.clear } label: { Label(L("Log time"), systemImage: "plus") }
+        }
+        .tabBarMinimizeBehavior(.onScrollDown)
+        .onChange(of: tab) { _, new in
+            guard new == 4 else { return }
+            tab = 0
+            logRequest += 1
+        }
+    }
+
+    /// iOS 17–25 fallback: the classic tab bar; Log time stays in Today's title row.
+    private var legacyTabs: some View {
+        TabView(selection: $tab) {
+            today.tabItem { Label(L("Today"), systemImage: "sun.max") }.tag(0)
             StdInboxScreen(seed: seed, launch: launch)
                 .tabItem { Label(L("Inbox"), systemImage: "tray") }.tag(1)
                 .badge(seed.suggestions.count)
-            colors.background.ignoresSafeArea()
-                .tabItem { Label(L("Records"), systemImage: "list.bullet.rectangle") }.tag(2)
-            colors.background.ignoresSafeArea()
-                .tabItem { Label(L("Properties"), systemImage: "house") }.tag(3)
+            records.tabItem { Label(L("Records"), systemImage: "list.bullet.rectangle") }.tag(2)
+            records.tabItem { Label(L("Properties"), systemImage: "house") }.tag(3)
         }
-        .tint(colors.action)
     }
 }
 
@@ -43,6 +75,8 @@ struct StdTodayScreen: View {
     let seed: StdSeed
     let launch: StdProtoLaunch
     var openInbox: () -> Void = {}
+    /// Increments when the tab bar's Log time button is tapped.
+    var logRequest = 0
     @State private var focus: HomeProtoFocus
     @State private var items: [StdSuggestion]
     @State private var confirmed: Set<String> = []
@@ -59,10 +93,11 @@ struct StdTodayScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
 
-    init(seed: StdSeed, launch: StdProtoLaunch, openInbox: @escaping () -> Void = {}) {
+    init(seed: StdSeed, launch: StdProtoLaunch, openInbox: @escaping () -> Void = {}, logRequest: Int = 0) {
         self.seed = seed
         self.launch = launch
         self.openInbox = openInbox
+        self.logRequest = logRequest
         _focus = State(initialValue: seed.rentals.focusOrder.first ?? .all)
         let byDay = seed.suggestions.enumerated().sorted { ($0.element.groupRank, $0.offset) < ($1.element.groupRank, $1.offset) }.map(\.element)
         _items = State(initialValue: Array(byDay.prefix(3)))
@@ -130,6 +165,7 @@ struct StdTodayScreen: View {
                 .presentationDragIndicator(.visible)
         }
         .task { await demo() }
+        .onChange(of: logRequest) { _, _ in showLog = true }
     }
 
     // MARK: To confirm
@@ -193,9 +229,12 @@ struct StdTodayScreen: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
                 StdScreenTitle(title: L("Today"), subtitle: typeSize.isAccessibilitySize ? nil : L("Fri, Oct 23"))
-                Button { showLog = true } label: { Image(systemName: "plus") }
-                    .buttonStyle(StdButtonStyle(.icon))
-                    .accessibilityLabel(L("Log time"))
+                // iOS 26+: Log time is the tab bar's trailing glass button; earlier versions keep it here.
+                if #unavailable(iOS 26.0) {
+                    Button { showLog = true } label: { Image(systemName: "plus") }
+                        .buttonStyle(StdButtonStyle(.icon))
+                        .accessibilityLabel(L("Log time"))
+                }
             }
             .padding(.bottom, 8)
             StdHeroCard(seed: live, focus: $focus).stdMeasure("hero").padding(.top, 16)
