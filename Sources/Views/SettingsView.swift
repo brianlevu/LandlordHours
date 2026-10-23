@@ -114,6 +114,7 @@ struct SettingsView: View {
                 case .contactSupport: ContactSupportView()
                 case .muted: MutedSuggestionsView()
                 case .deleteData: DeleteAllDataView()
+                case .goalCheck: GoalCheckView()
                 }
             }
             .sheet(isPresented: $showingProfileEdit) {
@@ -151,6 +152,9 @@ struct SettingsView: View {
                     if ProcessInfo.processInfo.arguments.contains("-LHOpenDeleteData") {
                         Self.didApplyDebugRoute = true
                         route = .deleteData
+                    } else if ProcessInfo.processInfo.arguments.contains("-LHOpenGoalCheck") {
+                        Self.didApplyDebugRoute = true
+                        route = .goalCheck
                     } else if ProcessInfo.processInfo.arguments.contains("-LHOpenLearningCenterFromSettings") {
                         Self.didApplyDebugRoute = true
                         route = .learningCenter
@@ -586,7 +590,7 @@ struct ProfileAvatar: View {
 /// Settings' pushed screens. Buttons + one destination (not NavigationLinks in the List), so
 /// each row is a plain button for VoiceOver and UI tests, with its own chevron.
 enum SettingsRoute: Hashable {
-    case taxProfile, learningCenter, contactSupport, muted, deleteData
+    case taxProfile, learningCenter, contactSupport, muted, deleteData, goalCheck
 }
 
 private struct AutoCaptureSettingsSection: View {
@@ -938,6 +942,7 @@ struct TaxProfileView: View {
     @State private var newPropertyName = ""
     @State private var newPropertyAddress = ""
     @State private var newPropertyType: PropertyType = .ltr
+    @State private var showGoalCheck = false
 
     private var participationAnswerLabel: String {
         switch taxProfile.noOneParticipatedMore(forYear: taxProfile.taxYear) {
@@ -989,7 +994,11 @@ struct TaxProfileView: View {
                 // The same four goals as onboarding (2.0 adds material participation at 500h).
                 Picker(selection: Binding(
                     get: { goalManager.goalChoice },
-                    set: { goalManager.setGoalChoice($0) }
+                    set: {
+                        goalManager.setGoalChoice($0)
+                        // 2.1: say which rentals moved (context taken after the change).
+                        RentalPlanAnnouncer.announce(viewModel.rentalPlanContext)
+                    }
                 )) {
                     ForEach(GoalChoice.allCases) { choice in
                         Text(choice.title).tag(choice)
@@ -1012,10 +1021,31 @@ struct TaxProfileView: View {
                     symbol: "square.stack.3d.up",
                     title: "Grouping election",
                     subtitle: "Treat all your rentals as one activity for material participation.",
-                    isOn: $taxProfile.groupingElection
+                    isOn: Binding(
+                        get: { taxProfile.groupingElection },
+                        set: {
+                            taxProfile.groupingElection = $0
+                            RentalPlanAnnouncer.announce(viewModel.rentalPlanContext)
+                        }
+                    )
                 )
+
+                Button {
+                    showGoalCheck = true
+                } label: {
+                    SettingRow(symbol: "checklist", title: String(localized: "Check my goal", table: "Home"),
+                               subtitle: String(localized: "Who does the work at each rental, and what the app tracks", table: "Home"),
+                               showsChevron: true)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("taxProfile.checkMyGoal")
             } header: {
                 BPSectionHeader(title: "Goal")
+            } footer: {
+                Text(RentalPlanWords.cpaLine)
+                    .font(.footnote)
+                    .foregroundStyle(colors.textSecondary)
+                    .accessibilityIdentifier("taxProfile.cpaLine")
             }
             .listRowBackground(colors.backgroundSecondary)
 
@@ -1122,6 +1152,7 @@ struct TaxProfileView: View {
                 taxProfile.setNoOneParticipatedMore(answer, forYear: taxProfile.taxYear)
             }
         }
+        .navigationDestination(isPresented: $showGoalCheck) { GoalCheckView() }
         .accessibilityIdentifier("taxProfile.screen")
     }
 

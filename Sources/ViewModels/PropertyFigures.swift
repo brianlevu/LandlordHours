@@ -159,6 +159,81 @@ enum PropertyMeta {
         return whole < target ? "\(whole)h of \(target)h" : String(localized: "\(whole)h this year")
     }
 
+    /// 2.1: the hours part of a row, read from the rental's OWN plan (never the global goal):
+    /// own target "12h of 100h" (its own 100 or 500, also once past it: "120h of 100h"); record
+    /// only and shared "84h this year". Whole hours, rounded down.
+    static func hoursLine(_ hours: Double, track: RentalTrack) -> String {
+        let whole = wholeHours(hours)
+        if case .ownTarget(let target) = track {
+            return String(localized: "\(whole)h of \(target)h", table: "Home")
+        }
+        return String(localized: "\(whole)h this year", table: "Home")
+    }
+
+    /// 2.1: the row's whole second line, from the rental's plan:
+    ///   own target  "12h of 100h · A few nights"
+    ///   record only "84h this year · Long stays: hours kept, no target" (the reason in plain words)
+    ///   shared      "12h this year · Long stays"
+    /// Under "just keep a record" every rental is record only, so the row says only the kind.
+    static func rowLine(hours: Double, track: RentalTrack, type: PropertyType) -> String {
+        let hoursPart = hoursLine(hours, track: track)
+        let kind = kindLabel(type)
+        let second: String
+        switch track {
+        case .recordOnly(let reason) where reason != .goalIsRecord:
+            second = RentalPlanWords.rowRoleLine(track, kindLabel: kind)
+        default:
+            second = kind
+        }
+        return String(localized: "\(hoursPart) · \(second)", table: "Home")
+    }
+
+    /// 2.1: the list header. One shared total reads "3 rentals · 212h toward 750"; otherwise
+    /// "3 rentals · 96h this year".
+    static func headerLine(count: Int, totalHours: Double, mode: RentalPlanMode) -> String {
+        let whole = wholeHours(totalHours)
+        if case .shared(let target) = mode {
+            return count == 1
+                ? String(localized: "1 rental · \(whole)h toward \(target)", table: "Home")
+                : String(localized: "\(count) rentals · \(whole)h toward \(target)", table: "Home")
+        }
+        return count == 1
+            ? String(localized: "1 rental · \(whole)h this year", table: "Home")
+            : String(localized: "\(count) rentals · \(whole)h this year", table: "Home")
+    }
+
+    /// One group of rows on the list.
+    struct Section: Equatable {
+        enum Kind: Equatable { case all, tracking, recordOnly }
+        let kind: Kind
+        let properties: [RentalProperty]
+
+        var title: String? {
+            switch kind {
+            case .all: return nil
+            case .tracking: return String(localized: "Tracking a target", table: "Home")
+            case .recordOnly: return String(localized: "Record only", table: "Home")
+            }
+        }
+
+        static func == (a: Section, b: Section) -> Bool { a.kind == b.kind && a.properties.map(\.id) == b.properties.map(\.id) }
+    }
+
+    /// The list groups rentals under "Tracking a target" / "Record only" only when both exist;
+    /// otherwise one untitled group. List order is kept inside each group.
+    static func sections(_ properties: [RentalProperty], plans: [UUID: RentalPlan]) -> [Section] {
+        let tracking = properties.filter { plans[$0.id]?.track.hasOwnTarget == true }
+        let record = properties.filter { plans[$0.id]?.track.isRecordOnly == true }
+        guard !tracking.isEmpty, !record.isEmpty, tracking.count + record.count == properties.count else {
+            return properties.isEmpty ? [] : [Section(kind: .all, properties: properties)]
+        }
+        return [Section(kind: .tracking, properties: tracking), Section(kind: .recordOnly, properties: record)]
+    }
+
+    private static func wholeHours(_ hours: Double) -> Int {
+        Int(max(0, hours.isFinite ? hours : 0).rounded(.down))
+    }
+
     /// A per-rental target applies only to material participation without grouping.
     static func isPerPropertyTest(goal: HouseGoal, groupingElection: Bool) -> Bool {
         goal != .reps750 && !groupingElection

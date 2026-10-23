@@ -30,6 +30,8 @@ struct PropertiesView: View {
     @ObservedObject private var subscription = SubscriptionManager.shared
     @ObservedObject private var taxProfile = TaxProfileManager.shared
     @ObservedObject private var goalManager = GoalManager.shared
+    /// 2.1: overrides and answers move rows between "Tracking a target" and "Record only".
+    @ObservedObject private var planStore = RentalPlanStore.shared
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -55,7 +57,6 @@ struct PropertiesView: View {
         return viewModel.isAwaitingInitialPull && viewModel.properties.isEmpty
     }
 
-    private var goal: HouseGoal { viewModel.houseGoal }
     private var perPropertyGoal: Bool { viewModel.propertyGoalIsPerProperty }
     private var atLimit: Bool { viewModel.propertiesAtFreeLimit }
 
@@ -155,9 +156,11 @@ struct PropertiesView: View {
                 PlaceholderBar(width: 170, height: 14)
                     .padding(.top, 8)
             } else if !viewModel.properties.isEmpty {
-                let total = viewModel.properties.reduce(0) { $0 + viewModel.propertyCountableHours($1.id) }
+                // 2.1: the sum of the rows (each counted the way its own plan counts it); one shared
+                // total reads "212h toward 750".
+                let total = viewModel.properties.reduce(0) { $0 + viewModel.rentalHours($1) }
                 HStack(spacing: 6) {
-                    Text("\(viewModel.properties.count) \(viewModel.properties.count == 1 ? "rental" : "rentals") · \(Int(total.rounded(.down)))h this year")
+                    Text(PropertyMeta.headerLine(count: viewModel.properties.count, totalHours: total, mode: viewModel.rentalPlanMode))
                         .font(.subheadline)
                         .monospacedDigit()
                         .foregroundStyle(colors.textSecondary)
@@ -213,48 +216,71 @@ struct PropertiesView: View {
 
     // MARK: List
 
+    /// 2.1: rows grouped under "Tracking a target" / "Record only" only when both exist.
     private var listCard: some View {
         let shown = shownProperties
-        return VStack(spacing: 0) {
-            ForEach(Array(shown.enumerated()), id: \.element.id) { index, property in
-                NavigationLink(value: PropertyRoute.detail(property.id)) {
-                    PropertyRow(
-                        property: property,
-                        allProperties: viewModel.properties,
-                        hours: viewModel.propertyCountableHours(property.id),
-                        goal: goal,
-                        perPropertyGoal: perPropertyGoal,
-                        heroCounts: viewModel.heroCounts(property)
-                    )
-                }
-                .buttonStyle(.lhPressable)
-                .contextMenu {
-                    Button("Edit", systemImage: "pencil") { editor = .edit(property) }
-                    Button("Delete", systemImage: "trash", role: .destructive) {
-                        deletion = PropertyDeletion.make(for: property, in: viewModel)
+        let plans = RentalPlanning.plans(viewModel.rentalPlanContext)
+        let sections = PropertyMeta.sections(shown, plans: plans)
+        let indexOf = Dictionary(uniqueKeysWithValues: shown.enumerated().map { ($0.element.id, $0.offset) })
+        return VStack(alignment: .leading, spacing: 20) {
+            ForEach(Array(sections.enumerated()), id: \.offset) { sectionIndex, section in
+                let isLast = sectionIndex == sections.count - 1
+                VStack(alignment: .leading, spacing: 10) {
+                    if let title = section.title {
+                        PropertySectionHeader(title)
+                            .accessibilityIdentifier(section.kind == .tracking ? "properties.section.tracking" : "properties.section.record")
                     }
-                }
-                .accessibilityAction(named: "Edit") { editor = .edit(property) }
-                .accessibilityAction(named: "Delete") { deletion = PropertyDeletion.make(for: property, in: viewModel) }
-                .accessibilityIdentifier("properties.row.\(index)")
-                if index < shown.count - 1 || atLimit {
-                    PropertyInsetDivider(leading: dynamicTypeSize.isAccessibilitySize ? 16 : 16 + 40 + 12)
+                    VStack(spacing: 0) {
+                        ForEach(Array(section.properties.enumerated()), id: \.element.id) { index, property in
+                            row(property, plan: plans[property.id], index: indexOf[property.id] ?? index)
+                            if index < section.properties.count - 1 || (isLast && atLimit) {
+                                PropertyInsetDivider(leading: dynamicTypeSize.isAccessibilitySize ? 16 : 16 + 40 + 12)
+                            }
+                        }
+                        if isLast && atLimit {
+                            PropertiesAtLimitRow(
+                                firstPropertyName: viewModel.properties.first?.name,
+                                onUnlock: { openPaywall() }
+                            )
+                        }
+                    }
+                    .propertyCard()
                 }
             }
             if shown.isEmpty {
-                Text("No rentals match “\(query)”.")
-                    .font(.subheadline)
-                    .foregroundStyle(colors.textSecondary)
-                    .frame(maxWidth: .infinity, minHeight: 76)
-            }
-            if atLimit {
-                PropertiesAtLimitRow(
-                    firstPropertyName: viewModel.properties.first?.name,
-                    onUnlock: { openPaywall() }
-                )
+                VStack(spacing: 0) {
+                    Text("No rentals match “\(query)”.")
+                        .font(.subheadline)
+                        .foregroundStyle(colors.textSecondary)
+                        .frame(maxWidth: .infinity, minHeight: 76)
+                    if atLimit {
+                        PropertiesAtLimitRow(firstPropertyName: viewModel.properties.first?.name, onUnlock: { openPaywall() })
+                    }
+                }
+                .propertyCard()
             }
         }
-        .propertyCard()
+    }
+
+    private func row(_ property: RentalProperty, plan: RentalPlan?, index: Int) -> some View {
+        NavigationLink(value: PropertyRoute.detail(property.id)) {
+            PropertyRow(
+                property: property,
+                allProperties: viewModel.properties,
+                hours: viewModel.rentalHours(property),
+                track: plan?.track ?? viewModel.rentalPlan(for: property).track
+            )
+        }
+        .buttonStyle(.lhPressable)
+        .contextMenu {
+            Button("Edit", systemImage: "pencil") { editor = .edit(property) }
+            Button("Delete", systemImage: "trash", role: .destructive) {
+                deletion = PropertyDeletion.make(for: property, in: viewModel)
+            }
+        }
+        .accessibilityAction(named: "Edit") { editor = .edit(property) }
+        .accessibilityAction(named: "Delete") { deletion = PropertyDeletion.make(for: property, in: viewModel) }
+        .accessibilityIdentifier("properties.row.\(index)")
     }
 
     private var emptyCard: some View {
@@ -333,7 +359,7 @@ struct PropertiesView: View {
 #if DEBUG
     /// -LHOpenAddProperty · -LHOpenFirstPropertyDetail · -LHOpenFirstPropertyDetailLower ·
     /// -LHOpenFirstPropertyEdit · -LHOpenFirstPropertyDelete · -LHOpenSecondPropertyDetail ·
-    /// -LHPropertiesInfo · -LHPropertiesScrollBottom
+    /// -LHPropertiesInfo · -LHPropertiesScrollBottom · -LHOpenPropertyNamed <name>
     private func handleDebugLaunchSurfaceIfNeeded(proxy: ScrollViewProxy) {
         guard !didHandleDebugLaunchSurface else { return }
         didHandleDebugLaunchSurface = true
@@ -347,6 +373,9 @@ struct PropertiesView: View {
             }
             if args.contains("-LHOpenAddProperty") {
                 openAddProperty()
+            } else if let i = args.firstIndex(of: "-LHOpenPropertyNamed"), args.indices.contains(i + 1),
+                      let named = viewModel.properties.first(where: { $0.name == args[i + 1] }) {
+                path.append(PropertyRoute.detail(named.id))
             } else if let first = viewModel.properties.first {
                 if args.contains("-LHOpenFirstPropertyDetail") || args.contains("-LHOpenFirstPropertyDetailLower") {
                     path.append(PropertyRoute.detail(first.id))
@@ -408,10 +437,10 @@ struct PropertiesAtLimitRow: View {
 struct PropertyRow: View {
     let property: RentalProperty
     let allProperties: [RentalProperty]
+    /// This rental's hours, counted the way its own plan counts them.
     let hours: Double
-    let goal: HouseGoal
-    var perPropertyGoal = false
-    var heroCounts = true
+    /// 2.1: how this rental is tracked; the line and the mini-house read it, never the global goal.
+    let track: RentalTrack
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -419,8 +448,9 @@ struct PropertyRow: View {
     var body: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
         let ax = dynamicTypeSize.isAccessibilitySize
-        let kind = PropertyMeta.kindLabel(property.propertyType)
-        let line = PropertyMeta.hoursLine(hours, goal: goal, groupingElection: !perPropertyGoal, counted: heroCounts)
+        let line = PropertyMeta.rowLine(hours: hours, track: track, type: property.propertyType)
+        let stageHours = RentalStage.hours(track: track, hours: hours)
+        let stageName = track.isRecordOnly ? RentalPlanWords.tileLine(track) : PropertyHouseStage.stage(for: stageHours).spokenName
         (ax ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))) {
             PropertySeal(property, in: allProperties, size: 40)
             VStack(alignment: .leading, spacing: 3) {
@@ -430,15 +460,16 @@ struct PropertyRow: View {
                     .lineLimit(ax ? 5 : (dynamicTypeSize >= .xxLarge ? 4 : 2))
                     .allowsTightening(true)
                     .multilineTextAlignment(.leading)
-                // Non-breaking spaces keep "A few nights" on one line.
-                Text("\(line) · \(kind.replacingOccurrences(of: " ", with: "\u{00A0}"))")
+                // Non-breaking spaces keep "A few nights" together.
+                Text(line.replacingOccurrences(of: "A few nights", with: "A\u{00A0}few\u{00A0}nights"))
                     .font(.subheadline)
                     .monospacedDigit()
                     .foregroundStyle(colors.textSecondary)
                     .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if !ax { Spacer(minLength: 8) }
-            if dynamicTypeSize < .xxLarge { PropertyHouseTile(hours: hours, size: 48) }
+            if dynamicTypeSize < .xxLarge { PropertyHouseTile(hours: stageHours, size: 48) }
             if !ax {
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
@@ -452,7 +483,7 @@ struct PropertyRow: View {
         .frame(minHeight: 76)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(property.name), \(line), \(kind). \(PropertyHouseStage.stage(for: hours).spokenName).")
+        .accessibilityLabel("\(property.name), \(line). \(stageName).")
         .accessibilityAddTraits(.isButton)
     }
 }
@@ -465,6 +496,7 @@ struct PropertyDetailView: View {
 
     @EnvironmentObject var viewModel: AppViewModel
     @ObservedObject private var taxProfile = TaxProfileManager.shared
+    @ObservedObject private var planStore = RentalPlanStore.shared
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.dismiss) private var dismiss
@@ -507,6 +539,7 @@ struct PropertyDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 32) {
                     hero(property, figures: figures)
+                    RentalPlanCardView(property: property)
                     if figures.kinds.isEmpty && figures.recent.isEmpty {
                         nothingYet(property)
                     } else {
@@ -537,7 +570,10 @@ struct PropertyDetailView: View {
         let ax = dynamicTypeSize.isAccessibilitySize
         // From XXL the text lines wrap into the house's corner, so the house moves below them.
         let stacked = dynamicTypeSize >= .xxLarge
-        let stage = PropertyHouseStage.stage(for: figures.hours)
+        // 2.1: the same house as the row: own target pinned at 500, record only a plain lot.
+        let track = viewModel.rentalPlan(for: property).track
+        let stageHours = RentalStage.hours(track: track, hours: figures.hours)
+        let stageName = track.isRecordOnly ? RentalPlanWords.tileLine(track) : PropertyHouseStage.stage(for: stageHours).spokenName
         let whole = Int(figures.hours.rounded(.down))
         let street = property.address.split(separator: ",").first.map(String.init) ?? ""
         let eyebrow = [PropertyMeta.kindLabel(property.propertyType), street].filter { !$0.isEmpty }.joined(separator: " · ")
@@ -573,11 +609,11 @@ struct PropertyDetailView: View {
             Text(entriesLine)
                 .font(.subheadline)
                 .foregroundStyle(HouseTokens.onHeroSecondary)
-            Text(stage.spokenName)
+            Text(stageName)
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(figures.hours >= 500 ? HouseTokens.positiveOnHero : HouseTokens.onHeroPrimary)
+                .foregroundStyle(stageHours >= 500 ? HouseTokens.positiveOnHero : HouseTokens.onHeroPrimary)
         }
-        let house = HouseHeroArt(keyframe: PropertyHouseStage.keyframe(for: figures.hours))
+        let house = HouseHeroArt(keyframe: PropertyHouseStage.keyframe(for: stageHours))
 
         return Group {
             if stacked {
@@ -602,7 +638,7 @@ struct PropertyDetailView: View {
         .background(InboxBlueprintPaper(cornerRadius: 24))
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(property.name). \(whole) hours this year, \(entriesLine). \(stage.spokenName).")
+        .accessibilityLabel("\(property.name). \(whole) hours this year, \(entriesLine). \(stageName).")
         .accessibilityIdentifier("property.hero")
     }
 
@@ -1239,6 +1275,8 @@ struct PropertyEditSheet: View {
                 viewModel.updateProperty(added)
             }
         }
+        // 2.1: a new rental or a new kind can move other rentals' plans; say what moved.
+        RentalPlanAnnouncer.announce(viewModel.rentalPlanContext)
         dismiss()
     }
 
