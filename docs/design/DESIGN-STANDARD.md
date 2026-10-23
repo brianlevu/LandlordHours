@@ -91,7 +91,7 @@ Records, Properties, Learn, picker lists. Same grid as 1.3: leading **36pt** til
 
 ### 1.5 Value row `LHRow.Value` (pickers)
 
-Inside sheets and forms, in an inner surface (radius 12, `backgroundTertiary`): height 52, label `.body` left, value `.body` `textSecondary` right + `chevron.right` (or `chevron.up.chevron.down` for a menu). Tap opens a sheet (≥ 6 options) or a `Menu` (≤ 5). Replaces the hand-built value rows in `LogTimeSheet:593` and `SuggestionConfirmSheet`. **[measured]** 52pt.
+Inside sheets and forms, in an inner surface (radius 12, `backgroundTertiary`): `minHeight` **56** (D1's floor; r2's 52 contradicted it), label `.body` left, value `.body` `textSecondary` right + `chevron.right` (or `chevron.up.chevron.down` for a menu). Tap opens a sheet (≥ 6 options) or a `Menu` (≤ 5). Replaces the hand-built value rows in `LogTimeSheet:593` and `SuggestionConfirmSheet`. **[measured]** 56–88pt, like every row.
 
 ### 1.6 Toggle row `LHRow.Toggle`
 
@@ -180,6 +180,8 @@ Current component (radius 22, min 52): one glyph + ≤ 2 lines + one `.tertiary`
 
 System `.sheet`, detents `[.medium, .large]` when content allows, drag indicator visible. Header 56: title (§1.14 sheet style) left, `.icon` close right. Gutter 20. `.primary` pinned via `safeAreaInset`, 16 inset; ≤ 1 `.tertiary` above it. No hero art in task sheets.
 
+**Focused-entry sheets (Log time, the confirm sheet), decided by Brian 2026-10-23:** an **opaque** `.large` sheet on `backgroundSecondary`, with the system's push-back and dim of the screen behind it, so the task has the whole screen and nothing shows through. Liquid Glass appears only on the Log (`.primary`) button and on the system keyboard; the sheet surface itself is never glass or translucent material. **[grep]** no `.presentationBackground(.thinMaterial/.ultraThinMaterial/.glass…)` on `LogTimeSheet` or `SuggestionConfirmSheet`; `.presentationDetents([.large])` on both; the primary button carries the glass style only inside the `#available(iOS 26, *)` branch.
+
 ### 1.21 Alerts and dialogs
 
 System `.alert` only for irreversible destructive acts (delete all data, remove a rental): title ≤ 6 words, message ≤ 2 sentences, buttons are verbs ("Delete", "Keep"), destructive role set; never "OK"/"Yes". ≥ 3 choices → `.confirmationDialog`. Everything reversible gets a toast with Undo, never an alert **[grep: `.alert(` sites listed in the hand-off]**.
@@ -190,7 +192,7 @@ System `.alert` only for irreversible destructive acts (delete all data, remove 
 
 ### 1.23 Paywall scaffold
 
-Blueprint band ≤ 40% of viewport with the record preview (the preview's title string is the same key as the real PDF title, §C.5) → plan card radius 20: name + `LHTag` "PAY ONCE" → price `.largeTitle.rounded.bold` + "once, yours to keep" `.subheadline` → one body line → `.primary` "Unlock for $29.99" → `.tertiary` "Restore purchase" → status line → benefits as 52pt `LHRow.Browse` with SF glyphs → legal `.footnote` links in 44 frames. Close is `.icon` on blueprint. No countdowns, no fake scarcity, no `dynamicTypeSize` clamp.
+Blueprint band ≤ 40% of viewport with the record preview (the preview's title string is the same key as the real PDF title, §C.5) → plan card radius 20: name + `LHTag` "PAY ONCE" → price `.largeTitle.rounded.bold` + "once, yours to keep" `.subheadline` → one body line → `.primary` "Unlock for $29.99" → `.tertiary` "Restore purchase" → status line → benefits as 56pt `LHRow.Browse` with SF glyphs → legal `.footnote` links in 44 frames. Close is `.icon` on blueprint. No countdowns, no fake scarcity, no `dynamicTypeSize` clamp.
 
 ### 1.24 Onboarding scaffold
 
@@ -259,7 +261,7 @@ Default Dynamic Type, 402×874pt, light and dark, unless stated. The builder rep
 | D1 | Actionable row height, divider to divider | 56–88; target 64 | measured |
 | D2 | One list item's share of viewport | ≤ 12% default; ≤ 45% at AX3 (a two-line row at AX3 cannot meet 30%; mockup review 2026-10-23) | measured |
 | D3 | List tab (Inbox, Records, Properties) with ≥ 5 items present: complete rows visible under the title, above the tab bar | ≥ 5 at default, ≥ 4 at XXL | measured |
-| D3b | Today above the fold at default and XXL | title + hero + section header + ≥ 2 rows + next header | measured |
+| D3b | Today above the fold **at default size only** | title + hero + section header + ≥ 2 rows + the "This week" header. At XXL and above, "This week" may sit below the fold provided Today scrolls to it and nothing is removed: **features are never dropped to fit; the hero shrinks first** (compact variant, D3c), then row text wraps. | measured |
 | D3c | Today at AX1–AX3 | hero switches to its compact variant (number + label, art hidden, ≤ 160pt); title + compact hero + header + ≥ 1 row visible | measured |
 | D4 | Empty bands inside a card: pixel rows within the card inset 16 that are all card background (ΔE ≤ 3), as share of card height | ≤ 35%. Applies to `LHCard.*` and the hero. Grouped value-row containers (Settings-style `LHRow.Value`/`LHRow.Toggle` groups, as in Settings, Log time and the confirm sheet) are exempt: their padding is the row rhythm, and Settings itself would fail | measured |
 | D5 | Primary actions per card; actions in a row | 1 per card; rows: one leading control, no pills | grep |
