@@ -29,7 +29,7 @@ Mode `density` (the [measured] rules of docs/design/DESIGN-STANDARD.md section 2
   (<= 45% AX3), D3 >= 5 items above fold (with --items-present), D4 empty bands <= 35%, D6 card <= 20%
   / hero <= 40% (grouped list containers are judged per row). Exit 1 on any FAIL.
   Standard amendments applied: D2 <= 45% at AX3; D4 skips grouped value-row containers (>= 3 rows of
-  44-68pt, 88pt at XXL; also exempt from D1); a card's centred foot action ("Confirm N likely", last
+  44-68pt, 88pt at XXL; D4 only, D1 and D2 still apply); a card's centred foot action ("Confirm N likely", last
   row < 56pt) is not a row for D1/D2/D3. Not counted as cards: sheets (a box that reaches the screen
   edge; its inner cards are found against the sheet fill), header bands of a sheet, blue controls under
   120pt, outlined input fields, and at AX3 any block cut by the fold (judged by D2 on its visible part).
@@ -588,9 +588,6 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
             rows=rows if is_list else [], gutter_pt=round(c["x0"] / scale, 1)))
         if is_list:
             all_rows += rows
-            if value_group:
-                for r in rows:
-                    r["d1_exempt"] = True
 
     checks = []
 
@@ -599,12 +596,12 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
 
     item_rows_all = [r for r in all_rows if not r["foot"]]
     done = [r for r in item_rows_all if r["complete"]]
-    if dt == "default" and done:
-        d1 = [r for r in done if not r.get("d1_exempt")]
-        bad = [r["h_pt"] for r in d1 if not (D1_MIN <= r["h_pt"] <= D1_MAX)]
-        if d1:
-            chk("D1 row height 56-88pt", not bad,
-                f"rows {[float(r['h_pt']) for r in d1]}" + (f"; out of range {[float(b) for b in bad]}" if bad else ""))
+    if dt in ("default", "xxl") and done:
+        # rows only grow with Dynamic Type, so the 56pt floor holds at XXL; the 88pt ceiling is default only
+        hi = D1_MAX if dt == "default" else 1e9
+        bad = [r["h_pt"] for r in done if not (D1_MIN <= r["h_pt"] <= hi)]
+        chk("D1 row height 56-88pt" if dt == "default" else "D1 row height >= 56pt (XXL)", not bad,
+            f"rows {[float(r['h_pt']) for r in done]}" + (f"; out of range {[float(b) for b in bad]}" if bad else ""))
     lim = D2_AX if dt == "ax" else D2_DEFAULT
     # D2: complete rows, plus the visible part of a row cut by the fold (a lower bound)
     d2_rows = [r["h_pt"] for r in done]
