@@ -194,7 +194,24 @@ Blueprint band ≤ 40% of viewport with the record preview (the preview's title 
 
 Uses the app's components and tokens; `OnbColor` and the `Onb*` styles are deleted **[grep]**. Progress: 3pt track `border`, fill `action`. Back `.icon`, Skip `.tertiary`. Step title SF `.title1.semibold` (Fraunces only on Welcome). Option cards are `LHRow.Browse` rows in one grouped container; selection is shown the Apple Settings way, with a **trailing `checkmark` in `action`** (`.body.semibold`, 44 frame) on the selected row and the row's hairline stroke turning `action`; the leading slot holds the option's SF glyph. The 22pt leading circle is reserved for confirm in §1.3 and never appears in onboarding or pickers **[grep]**. One `.primary` pinned. No Dynamic Type clamps; frames at AX3 required.
 
-### 1.25 Widgets and Live Activity
+### 1.25 Navigation and Liquid Glass (iOS 26+)
+
+Brian's question, 2026-10-23: does the navigation use the latest Liquid Glass design? Today it does not: `ContentView.swift` draws a custom floating tab bar with its own material, a detached "+" circle and hand-set sizes. Decision: **the native `TabView` only**, so the system draws the Liquid Glass bar and keeps it current with every iOS release.
+
+| Rule | Spec | Kind |
+|---|---|---|
+| Tab bar | SwiftUI `TabView` with `Tab` items (Today, Inbox, Records, Properties), SF Symbols, `.tint(colors.action)`. No custom tab bar, no `ZStack` overlay bar, no `UITabBar` appearance hacks. | **[grep]** `TabView(` present at the root; zero views named `*TabBar*` outside previews; zero `.toolbar(.hidden, for: .tabBar)` at the root. |
+| Minimize behaviour | `.tabBarMinimizeBehavior(.onScrollDown)`: the bar shrinks to the active tab as the user scrolls down and returns on scroll up. Nothing else may react to the bar's size; use the system safe-area insets. | [grep] modifier present once, at the root |
+| Create action | "Log time" (`plus`) is **not a tab**. It is the detached trailing glass action beside the bar: `.tabViewBottomAccessory` is not used (it is for persistent content, not a button); the "+" is a `Button` in a bottom-trailing `.safeAreaInset` styled with `.buttonStyle(.glass)` (`.glassProminent` when the active tab has nothing logged today), 56pt, SF `plus` `.title2.semibold`, label "Log time". It stays visible while the bar is minimized. One create action for the whole app; screens never add a second "+" in their title row (Properties' "Add property" moves to the list's empty state and the screen's `.toolbar` trailing item). | [grep] exactly one `plus` glass action; no `plus` in `LHScreenTitle` trailing slots |
+| Badges | System `.badge(_:)` on the Inbox tab only, with the To confirm count (likely + not sure; muted excluded). Hidden at 0. No badge on Today, Records or Properties. Red system badge is accepted (it is the system's semantic, not our `destructive`). | [grep] one `.badge(` call, on the Inbox `Tab` |
+| Content under the bar | Scroll views and lists run edge to edge under the bar and the glass action; **no reserved bottom heights** (`padding(.bottom, 100)`, `Spacer(minLength: 80)`, fixed `tabBarHeight` constants are deleted). Bottom-anchored controls (`LHButton.primary` in sheets, the pinned batch bar §1.3b, `LHToast`) use `safeAreaInset(edge: .bottom)` so they follow the bar as it minimizes. The system scroll-edge effect replaces our `TodayTopEdgeFade`. | [grep] no bottom padding ≥ 60 at a tab root; `TodayTopEdgeFade` deleted |
+| System materials | Bars, sheets, popovers, menus and the glass action use the system: `TabView`, `NavigationStack` toolbars, `.sheet`, `Menu`, `.buttonStyle(.glass)`, `.glassEffect()` on the few floating controls we own (the glass action, the pinned batch bar, the toast). No hand-made glass: no `.ultraThinMaterial` + hairline + shadow stacks imitating a bar, no blurred `Rectangle`s, no `backdrop`-style layers. Light and dark follow the system; we never force a material's tint. | [grep] `.glassEffect(` / `.glass` only in `LHButton.icon` glass variant, `LHToast`, the batch bar; zero `.ultraThinMaterial`/`.thinMaterial` on bar-shaped views |
+| Text over glass | Text on a glass surface uses `textPrimary`/`textSecondary` with the system's vibrancy (`.foregroundStyle(.primary/.secondary)` inside the glass container), never a fixed hex. Measured contrast ≥ 4.5:1 for every glass label against the busiest backdrop we ship (the blueprint hero scrolled under the bar, and the darkest dark-mode canvas), light and dark. Icon-only glass controls carry an `accessibilityLabel`. Glass never holds more than one line of text. | [measured] frames with the hero under the bar |
+| Reduced transparency / contrast | System materials already honour Reduce Transparency and Increase Contrast; we add nothing and remove nothing. Frames at `accessibilityReduceTransparency` are part of the hand-off for any change that touches a glass surface. | [measured] |
+
+What this changes elsewhere in this document: "12pt above the tab bar" in §1.3b and §1.19 means "inside `safeAreaInset(edge: .bottom)`", which the system positions above the live bar height; D3's "above the tab bar" is measured to the bar's top edge in its full (not minimized) state at scroll offset 0.
+
+### 1.26 Widgets and Live Activity
 
 SF Symbols and the mono mark B template only; numbers `.rounded` tabular via `LHFormat.hours`; small: value + label; medium: value + current house render; Lock Screen/Island: mono glyph + hours; checked in accented and tinted modes; ≤ 2 text lines; no tool renders.
 
@@ -297,7 +314,7 @@ Classifier issue (separate fix): "Making Monthly Mortgage Payment" was proposed 
 | Locked preview | `Components/LockedPreview.swift` | `ProUnlockButtonStyle` → `LHButton`; `...xxxLarge` clamp goes. |
 | Export, Contact support, Delete all data, Profile sheets | respective files | Standard containers; button/close swaps. |
 | House hero | `House/HouseHeroView.swift` | The allowed tall card; eyebrow wraps to two lines at default ("MORE THAN ANYONE ELSE") → trim to one; compact variant for AX (D3c). |
-| Tab bar | `ContentView.swift` | Standard; 4 raw sizes → tokens. |
+| Tab bar | `ContentView.swift` | **Redesign (moved from Drift, 2026-10-23):** custom floating bar with its own material and a detached "+" circle → native `TabView` with system Liquid Glass, `.tabBarMinimizeBehavior(.onScrollDown)`, glass "+" action (§1.25). `LHIcon` custom tab shapes retire. |
 
 ### Standard
 
@@ -323,7 +340,7 @@ Builder runs these and puts the numbers in the hand-off; the gate re-measures an
 
 ### 5.2 Component conformance
 
-**[grep]** Every row, card, tag, chip, button, header, field, segmented control, stepper, empty state, toast, sheet and alert in the diff is a §1 component by name, listed in the hand-off. Zero new `.system(size:)`, `Color(hex:)`, `Image("bp_tool_`, `Lucide`, emoji, `.fontWeight` on symbols outside `LHButton.icon`, or `.dynamicTypeSize(` outside the two sites. Radii ∈ D10. `CategoryToolTile(size:)` ∈ {36, 56} and never in `Inbox/` or `Today/` rows. Frames at default, XXL, AX3, light and dark; no clipping, no mid-word break, no truncation at AX.
+**[grep]** Every row, card, tag, chip, button, header, field, segmented control, stepper, empty state, toast, sheet and alert in the diff is a §1 component by name, listed in the hand-off. Zero new `.system(size:)`, `Color(hex:)`, `Image("bp_tool_`, `Lucide`, emoji, `.fontWeight` on symbols outside `LHButton.icon`, or `.dynamicTypeSize(` outside the two sites. Radii ∈ D10. `CategoryToolTile(size:)` ∈ {36, 56} and never in `Inbox/` or `Today/` rows. Navigation (§1.25): the root is a `TabView` with `.tabBarMinimizeBehavior(.onScrollDown)`; no view named `*TabBar*`, no reserved bottom padding ≥ 60 at a tab root, one `plus` glass action, one `.badge(` on the Inbox tab, no `.ultraThinMaterial`/`.thinMaterial` on bar-shaped views, and glass text contrast ≥ 4.5:1 in the frames with the hero scrolled under the bar. Frames at default, XXL, AX3, light and dark; no clipping, no mid-word break, no truncation at AX.
 
 ### 5.3 Motion conformance
 
@@ -523,6 +540,7 @@ The project `CLAUDE.md` is stale against both documents: it still names radius 1
 > **Type.** SF Pro / SF Pro Rounded (numbers, tabular) / SF Mono (drafting labels, 11pt caps) / Fraunces (tab titles and display, ≥ 28pt only). DM Serif Display and DM Sans are retired.
 > **Corner radius.** Cards 20 (continuous), inner surfaces 12, stat tiles 16, tags 6, buttons and chips capsule. Nothing else.
 > **Icons.** SF Symbols for everything functional. Brand tool renders (`CategoryToolTile`) at 36 in browse rows and picker lists, 56 in picker grids and sheet headers, never in decision rows, never under 32. No Lucide (package removed), no emoji, no `Image("bp_tool_…")` outside the tile. Tab bar: SF Symbols (`LHIcon` custom shapes retired).
+> **Navigation.** Native `TabView` with system Liquid Glass, `.tabBarMinimizeBehavior(.onScrollDown)`, the "+" as a detached trailing glass action, system `.badge` on Inbox only, content scrolling under the bar with no reserved heights, system materials for every bar and sheet. No custom tab bars. Details: `DESIGN-STANDARD.md` §1.25.
 > **Components and density.** `docs/design/DESIGN-STANDARD.md` is the bar; its §5 is the gate rubric.
 
 ---
