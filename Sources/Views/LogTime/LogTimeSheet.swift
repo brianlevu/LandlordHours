@@ -892,6 +892,7 @@ struct LogTimeSheet: View {
         }
         if voice.permissionDenied {
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            noteFocused = false   // the keyboard would sit over the "Open Settings" line
             return
         }
         if voice.needsPermissionPrompt && !LogVoiceIntro.seen {

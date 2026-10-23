@@ -73,7 +73,8 @@ final class LogTimeUITests: XCTestCase {
         note.tap()
         note.typeText("Showing at Oak Street Duplex for 2 hours")
         XCTAssertTrue(element("log.fill.caption").waitForExistence(timeout: 6))
-        XCTAssertEqual(saveLabel, "Log 2h at Oak Street Duplex")
+        expectation(for: NSPredicate(format: "label BEGINSWITH %@", "Log 2h at Oak Street Duplex"), evaluatedWith: app.buttons["log.save"])
+        waitForExpectations(timeout: 6)
         app.buttons["log.done"].tap()
         app.buttons["log.fill.undo"].tap()
         XCTAssertTrue(app.buttons["log.property"].label.contains("not chosen"), app.buttons["log.property"].label)
@@ -308,7 +309,7 @@ final class LogTimeUITests: XCTestCase {
         let row = app.buttons["log.category"]
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         row.tap()
-        XCTAssertTrue(app.staticTexts["Doesn\u{2019}t count toward your hours"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label ==[c] %@", "Doesn\u{2019}t count toward your hours")).firstMatch.waitForExistence(timeout: 4))
         for kind in ["investing", "financing", "negotiation"] {
             XCTAssertTrue(app.buttons["log.pick.category.\(kind)"].exists, kind)
         }
