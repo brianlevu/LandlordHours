@@ -71,7 +71,7 @@ final class LogTimeUITests: XCTestCase {
         let note = element("log.note")
         XCTAssertTrue(note.waitForExistence(timeout: 8))
         note.tap()
-        note.typeText("Fixed the sink at Oak Street Duplex for 2 hours")
+        note.typeText("Fixed the sink at Oak St for 2 hours")
         XCTAssertTrue(element("log.fill.caption").waitForExistence(timeout: 6))
         expectation(for: NSPredicate(format: "label BEGINSWITH %@", "Log 2h at Oak Street Duplex"), evaluatedWith: app.buttons["log.save"])
         waitForExpectations(timeout: 6)
