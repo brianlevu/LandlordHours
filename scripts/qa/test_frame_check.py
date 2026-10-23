@@ -212,5 +212,93 @@ class DayHeaders(unittest.TestCase):
         self.assertFalse(failed(res, "D1"))
 
 
+class ScaleAware(unittest.TestCase):
+    def test_known_sizes_infer_scale(self):
+        for size, want in {(1206, 2622): 3.0, (1320, 2868): 3.0, (2752, 2064): 2.0, (2064, 2752): 2.0,
+                           (1398, 2034): 3.0, (2007, 2853): 3.0}.items():
+            self.assertEqual(fc.infer_scale(*size)[0], want, size)
+
+    def _ipad_list(self, row_pt=64, n=5, inset_pt=15):
+        """iPad Pro 13in portrait at 2x: one grouped card, 64pt rows, dividers stopping inset_pt short."""
+        w, h, sc = 2064, 2752, 2
+        a = np.zeros((h, w, 3), np.uint8)
+        a[:] = CANVAS
+        x0, x1, top = 40, 2024, 400
+        row = row_pt * sc
+        a[top:top + row * n, x0:x1] = CARD
+        for i in range(n):
+            y = top + i * row
+            if i:
+                a[y:y + 2, x0 + 100:x1 - inset_pt * sc] = RULE
+            a[y + row // 2 - 14:y + row // 2 + 14, x0 + 60:x0 + 420] = INK
+            a[y + row // 2 - 14:y + row // 2 + 14, x1 - 260:x1 - 60] = INK
+        path = os.path.join(tempfile.mkdtemp(prefix="fc-test-"), "ipad.png")
+        Image.fromarray(a).save(path)
+        return path
+
+    def test_ipad_rows_are_split_at_2x(self):
+        # dividers that stop 15pt short of the card edge (iPad inset-grouped) must still split rows
+        res = fc.analyse(self._ipad_list(), "default", 2.0, 0.97, None, "ipad")
+        rows = [float(r["h_pt"]) for r in res["cards"][0]["rows"]]
+        self.assertEqual(len(rows), 5, rows)
+        self.assertTrue(all(62 <= r <= 66 for r in rows), rows)
+
+    def test_ipad_progress_track_is_not_a_divider(self):
+        path = self._ipad_list(n=1)
+        a = np.asarray(Image.open(path)).copy()
+        a[400 + 70:400 + 76, 200:1100] = (214, 120, 20)   # coloured fill + track inside one row
+        a[400 + 70:400 + 76, 1100:1500] = RULE
+        Image.fromarray(a).save(path)
+        res = fc.analyse(path, "default", 2.0, 0.97, None, "ipad")
+        self.assertEqual(len(res["cards"][0]["rows"]) if res["cards"][0]["list_container"] else 1, 1)
+
+    def test_dark_navy_hairlines_still_split_rows(self):
+        a = np.zeros((H, W, 3), np.uint8)
+        a[:] = (11, 18, 48)
+        a[700:700 + 192 * 4, 60:1146] = (20, 28, 63)
+        for i in range(4):
+            y = 700 + i * 192
+            if i:
+                a[y:y + 2, 180:1146] = (42, 53, 96)
+            a[y + 78:y + 114, 100:420] = (242, 244, 250)
+            a[y + 78:y + 114, 800:1060] = (242, 244, 250)
+        path = os.path.join(tempfile.mkdtemp(prefix="fc-test-"), "dark.png")
+        Image.fromarray(a).save(path)
+        rows = [float(r["h_pt"]) for r in run(path)["cards"][0]["rows"]]
+        self.assertEqual(len(rows), 4, rows)
+        self.assertTrue(all(63 <= r <= 65 for r in rows), rows)
+
+    def test_density_cli_infers_scale_for_ipad(self):
+        import subprocess
+        out = subprocess.run([sys.executable, os.path.join(os.path.dirname(fc.__file__), "frame_check.py"),
+                              "density", self._ipad_list(), "--json", os.path.join(tempfile.mkdtemp(), "o.json")],
+                             capture_output=True, text=True)
+        self.assertIn("1/1 frames pass", out.stdout + out.stderr)
+
+    def test_legacy_modes_do_not_skip_ipad_frames(self):
+        import json
+        import subprocess
+        d = tempfile.mkdtemp(prefix="fc-legacy-")
+        os.replace(self._ipad_list(), os.path.join(d, "ipad13-port-list.png"))
+        outd = tempfile.mkdtemp()
+        subprocess.run([sys.executable, os.path.join(os.path.dirname(fc.__file__), "frame_check.py"), d, "--out", outd],
+                       capture_output=True, text=True)
+        rep = json.load(open(os.path.join(outd, "frame_check.json")))
+        self.assertEqual(rep["skipped"], [])
+        self.assertEqual(rep["frames"], 1)
+        self.assertEqual(rep["results"][0]["size"], [2064, 2752])
+
+    def test_unknown_size_is_reported_not_silently_checked(self):
+        import json
+        import subprocess
+        d = tempfile.mkdtemp(prefix="fc-legacy-")
+        Image.fromarray(np.full((900, 1800, 3), 200, np.uint8)).save(os.path.join(d, "odd.png"))
+        outd = tempfile.mkdtemp()
+        subprocess.run([sys.executable, os.path.join(os.path.dirname(fc.__file__), "frame_check.py"), d, "--out", outd],
+                       capture_output=True, text=True)
+        rep = json.load(open(os.path.join(outd, "frame_check.json")))
+        self.assertTrue(any("--scale" in why for _, why in rep["skipped"]))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

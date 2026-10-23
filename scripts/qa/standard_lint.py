@@ -99,6 +99,9 @@ def r_bp_tool(path, line):
     return bool(re.search(r'Image\(\s*"bp_tool_', line))
 
 
+CLAMP_MARKER = "standard:§1.27-sidebar-clamp"  # documented exception: the sidebar is capped at xxxLarge
+
+
 def r_dyn_type(path, line):
     return ".dynamicTypeSize(" in line and not line.lstrip().startswith("//")
 
@@ -145,7 +148,7 @@ RULES = [
     ("button-style", "only LHButton styles (1.13)", r_button_style),
     ("custom-swipe", "no DragGesture swipe / TodaySwipeRow, system .swipeActions only (1.3a)", r_swipe),
     ("bp-tool-image", "no Image(\"bp_tool_\") outside CategoryToolTile (1.17)", r_bp_tool),
-    ("dynamic-type-clamp", ".dynamicTypeSize( only on hero number and house art, max 2 sites (2)", r_dyn_type),
+    ("dynamic-type-clamp", ".dynamicTypeSize( only on hero number and house art, max 2 sites (2); a clamp marked // standard:§1.27-sidebar-clamp (same or previous line) is the sidebar exception and is not counted", r_dyn_type),
     ("spring-response", "springs are .spring(duration:bounce:), not response:/dampingFraction: (B.1)", r_spring_response),
     ("repeat-forever", "repeatForever only in scanningLine (B.1)", r_repeat_forever),
     ("onappear-animation", ".onAppear { withAnimation only in emptyStateEntrance / milestone (B.1)", r_onappear_anim),
@@ -156,20 +159,23 @@ RULES = [
 ]
 
 
-def scan():
+def scan(root=None):
+    root = root or ROOT
     out = []
-    for dirpath, _, files in os.walk(os.path.join(ROOT, SRC)):
+    for dirpath, _, files in os.walk(os.path.join(root, SRC)):
         for fn in sorted(files):
             if not fn.endswith(".swift"):
                 continue
             full = os.path.join(dirpath, fn)
-            rel = os.path.relpath(full, ROOT)
+            rel = os.path.relpath(full, root)
             try:
                 lines = open(full, encoding="utf-8").read().splitlines()
             except UnicodeDecodeError:
                 continue
             for i, line in enumerate(lines, 1):
                 for rule, _, fn_ in RULES:
+                    if rule == "dynamic-type-clamp" and (CLAMP_MARKER in line or (i > 1 and CLAMP_MARKER in lines[i - 2])):
+                        continue
                     if fn_(rel, line):
                         out.append(dict(rule=rule, file=rel, line=i, text=re.sub(r"\s+", " ", line.strip())[:160]))
     out.sort(key=lambda v: (v["rule"], v["file"], v["line"]))
