@@ -381,10 +381,14 @@ struct StdHeroCard: View {
     @Binding var focus: HomeProtoFocus
     @State private var rise: CGFloat = 1
     @State private var skyPhase: StdSkyPhase = StdSkyPhase.at(Date())
-    /// draftingPass (critique #10): one cyan line sweeps the newly built band as the mask rises.
-    @State private var sweep: CGFloat = 0
-    @State private var sweepOpacity: Double = 0
-    @State private var passTick = 0
+    /// buildStep: the app's own confirm language (HouseHeroView's timber beam + course glow),
+    /// re-timed to ≤ 0.6s for every logged or confirmed hour.
+    @State private var beamLabel: String?
+    @State private var beamAt: CGPoint = .zero
+    @State private var beamScale: CGFloat = 1
+    @State private var beamOpacity: Double = 0
+    @State private var glow: Double = 0
+    @State private var buildTick = 0
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -444,9 +448,9 @@ struct StdHeroCard: View {
         .background(StdHeroSky(phase: phase))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .onChange(of: hero.key) { _, _ in raise(from: 0.45) }
-        .onChange(of: hero.number) { old, new in if new > old { raise(from: 0.82); draftingPass() } }
+        .onChange(of: hero.number) { old, new in if new > old { buildStep(new - old) } }
         .sensoryFeedback(.selection, trigger: focus)
-        .sensoryFeedback(.impact(weight: .light, intensity: 0.5), trigger: passTick)
+        .sensoryFeedback(.impact(weight: .light), trigger: buildTick)
     }
 
     // MARK: Switching
@@ -468,8 +472,6 @@ struct StdHeroCard: View {
     }
 
     /// heroCountUp: the built house rises behind its linework (ringProgress 0.60) while the digits count (count 0.60).
-    /// draftingPass: a 1pt drafting-cyan line draws left → right along the rising mask edge
-    /// (sweep easeOut 0.45) and fades by 0.55s, then stillness. Reduce Motion: no line.
     /// `-LHStdSlow 4` plays the hero motions at quarter speed for review clips.
     private static let slow: Double = {
         let a = ProcessInfo.processInfo.arguments
@@ -477,15 +479,29 @@ struct StdHeroCard: View {
         return Double(a[i + 1]) ?? 1
     }()
 
-    private func draftingPass() {
-        guard !reduceMotion else { return }
-        StdMotionLog.mark("draftingPass")
-        passTick += 1
+    /// buildStep (replaces the drafting pass, Brian 2026-10-23): one timber plank, labelled with the
+    /// hours ("+1h", HouseBeam), flies from the number onto the house's newest course
+    /// (HouseKeyframe.courseAnchor) on the HouseMotion beam spring, lands with the course glow and
+    /// the light haptic, and is absorbed. A crossed stage crossfades to the next bp_house_k* keyframe.
+    /// Total 0.48s scripted: flight 0.18, absorb 0.12, glow out 0.18. Reduce Motion: number and house change in place.
+    private func buildStep(_ delta: Double) {
+        StdMotionLog.mark("buildStep")
+        guard !reduceMotion else { buildTick += 1; return }
         let k = Self.slow
+        beamLabel = HouseHeroView.deltaLabel(delta)
         var t = Transaction(); t.disablesAnimations = true
-        withTransaction(t) { sweep = 0; sweepOpacity = 0.9 }
-        withAnimation(.easeOut(duration: 0.45 * k)) { sweep = 1 }
-        withAnimation(.easeIn(duration: 0.2 * k).delay(0.35 * k)) { sweepOpacity = 0 }
+        withTransaction(t) { beamAt = CGPoint(x: -0.55, y: 0.25); beamScale = 1; beamOpacity = 1; glow = 0 }
+        withAnimation(.spring(response: HouseMotion.beamSpringResponse * k, dampingFraction: HouseMotion.beamSpringDamping)) {
+            beamAt = CGPoint(x: 0.5, y: 0.6)   // replaced by the course anchor in house(_:)
+        }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(HouseMotion.beamFlight * k * 1_000_000_000))
+            buildTick += 1
+            withAnimation(.easeOut(duration: HouseMotion.glowIn * k)) { glow = 1 }
+            withAnimation(.easeIn(duration: 0.12 * k)) { beamScale = 0.3; beamOpacity = 0 }
+            try? await Task.sleep(nanoseconds: UInt64(HouseMotion.glowIn * k * 1_000_000_000))
+            withAnimation(.easeOut(duration: 0.18 * k)) { glow = 0 }
+        }
     }
 
     private func raise(from start: CGFloat) {
@@ -576,29 +592,37 @@ struct StdHeroCard: View {
                     }
                 }
             HouseLineworkImage(name: keyframe.linesImageName).foregroundStyle(HouseTokens.drafting)
-            GeometryReader { g in
-                // The pen: a line drawn left → right along the top edge of what is built (the newest
-                // band), with a bright nib at its head. Bounds come from the built pass's own pixels.
-                let b = StdBuiltBounds.unit(for: keyframe.builtImageName)
-                let x0 = g.size.width * b.minX, w = g.size.width * b.width
-                let y = g.size.height * b.minY
-                ZStack(alignment: .leading) {
-                    Rectangle().fill(HouseTokens.drafting)
-                        .frame(width: w * sweep, height: 1.5)
-                    Circle().fill(HouseTokens.drafting)
-                        .frame(width: 5, height: 5)
-                        .shadow(color: HouseTokens.drafting.opacity(0.8), radius: 3)
-                        .offset(x: w * sweep - 2.5)
-                }
-                .offset(x: x0, y: y - 2.5)
-                .opacity(sweepOpacity)
-            }
-            .allowsHitTesting(false)
         }
         .id(keyframe)
         .transition(.opacity)
-        .animation(StdMotion.reveal, value: keyframe)
+        .animation(.easeInOut(duration: HouseMotion.keyframeCrossfade), value: keyframe)
+        .overlay { buildLayer(keyframe) }
         .accessibilityHidden(true)
+    }
+
+    /// The beam and the course glow, drawn over the house (HouseHeroView's look, shared tokens).
+    private func buildLayer(_ keyframe: HouseKeyframe) -> some View {
+        GeometryReader { g in
+            let s = min(g.size.width, g.size.height)
+            let anchor = keyframe.courseAnchor
+            Capsule()
+                .fill(RadialGradient(colors: [HouseTokens.window, HouseTokens.window.opacity(0)], center: .center, startRadius: 0, endRadius: s * 0.26))
+                .frame(width: s * 0.56, height: s * 0.13)
+                .blur(radius: 5)
+                .blendMode(.plusLighter)
+                .position(x: anchor.x * s, y: anchor.y * s)
+                .opacity(glow)
+            if let label = beamLabel {
+                // Flight target is the course anchor; the start is left of the house, by the number.
+                let landed = beamAt.x > 0
+                HouseBeam(label: label)
+                    .scaleEffect(beamScale * 0.8)
+                    .rotationEffect(.degrees(-6))
+                    .position(x: (landed ? anchor.x : beamAt.x) * s, y: (landed ? anchor.y : beamAt.y) * s)
+                    .opacity(beamOpacity)
+            }
+        }
+        .allowsHitTesting(false)
     }
 
     // MARK: Foot: the slim row of small houses (tileFocus: ring crossfade 0.15, no scale)
@@ -688,41 +712,3 @@ struct StdHeroCard: View {
 #endif
 
 
-#if DEBUG
-/// The unit bounding box of a built pass's opaque pixels (cached per keyframe). Its top edge is the
-/// newest built band, where the drafting pass draws.
-enum StdBuiltBounds {
-    private static var cache: [String: CGRect] = [:]
-    static func unit(for name: String) -> CGRect {
-        if let hit = cache[name] { return hit }
-        var r = CGRect(x: 0.2, y: 0.55, width: 0.6, height: 0.3)
-        if let cg = UIImage(named: name)?.cgImage {
-            let w = cg.width, h = cg.height
-            var px = [UInt8](repeating: 0, count: w * h * 4)
-            if let ctx = CGContext(data: &px, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
-                                   space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
-                ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
-                var minX = w, minY = h, maxX = 0, maxY = 0
-                for y in stride(from: 0, to: h, by: 2) {
-                    for x in stride(from: 0, to: w, by: 2) where px[(y * w + x) * 4 + 3] > 128 {
-                        minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
-                    }
-                }
-                if maxX > minX, maxY > minY {
-                    // Skip the tree on the left: the band is the top of the middle 76% of the footprint.
-                    let fw = Double(maxX - minX)
-                    let c0 = minX + Int(fw * 0.30), c1 = minX + Int(fw * 0.88)
-                    var top = maxY
-                    for y in stride(from: 0, to: h, by: 2) {
-                        if (stride(from: c0, to: c1, by: 2).contains { px[(y * w + $0) * 4 + 3] > 128 }) { top = y; break }
-                    }
-                    r = CGRect(x: (Double(minX) + fw * 0.12) / Double(w), y: Double(top) / Double(h),
-                               width: fw * 0.76 / Double(w), height: Double(maxY - top) / Double(h))
-                }
-            }
-        }
-        cache[name] = r
-        return r
-    }
-}
-#endif
