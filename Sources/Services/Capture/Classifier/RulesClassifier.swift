@@ -106,7 +106,7 @@ enum DealSignal {
     /// not "Closing the gate".
     static let closingContext = [
         "title company", "title", "escrow", "sale", "purchase", "buyer", "buyers", "seller", "sellers", "attorney",
-        "lender", "docs", "documents", "disclosure", "costs", "date", "table", "settlement",
+        "lender", "docs", "documents", "disclosure", "costs", "date", "table", "settlement", "wire", "payment", "payments", "funds",
     ]
     /// Who a purchase or sale negotiation is with. A tenant or lease negotiation stays Leasing.
     static let negotiationContext = [
@@ -128,6 +128,7 @@ enum DealSignal {
     static let transactionStages = [
         "escrow", "earnest money", "under contract", "contingency", "contingencies", "due diligence",
         "inspection period", "final walk through", "final walkthrough", "title search", "title commitment",
+        "wire to title", "wire to escrow", "wire to the title company", "wire funds to title", "wire earnest money",
     ]
     /// Words that need a purchase or sale around them to be a deal ("Walkthrough for the purchase").
     static let weakStages = ["walk through", "walkthrough", "inspection", "inspections", "survey", "appraisal review"]

@@ -319,6 +319,22 @@ final class ClassifierTests: XCTestCase {
         }
     }
 
+    /// Closing, escrow, earnest-money and wire-to-title events are deal activity (non-counting),
+    /// while property tax and mortgage payments stay Bookkeeping.
+    func testClosingAndEscrowPaymentsAreDealsButTaxAndMortgagePaymentsAreBookkeeping() async {
+        for title in ["Closing payment wire", "Wire to title for the Elm closing", "Wire earnest money", "Escrow payment - Elm fourplex",
+                      "Earnest money payment", "Closing costs payment"] {
+            for kind in [Suggestion.Kind.calendar, .gmail] {
+                let c = RulesClassifier().classifySync(candidate(title, kind: kind), properties: properties)
+                XCTAssertEqual(c.category?.countsForREPS, false, "\(kind): \(title)")
+            }
+        }
+        for title in ["Property tax payment - Oak", "Mortgage payment", "Making Monthly Mortgage Payment"] {
+            let c = RulesClassifier().classifySync(candidate(title, kind: .calendar), properties: properties)
+            XCTAssertEqual(c.category, .bookkeeping, title)
+        }
+    }
+
     func testAliasGroundingMatchesWholeWordsOnly() {
         let oakAlias = RentalProperty(name: "Birch House", address: "9 Elm Rd, Austin, TX", propertyType: .ltr, aliases: ["Oak"])
         func pick(_ title: String) -> UUID? {
