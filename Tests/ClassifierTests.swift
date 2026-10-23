@@ -197,7 +197,9 @@ final class ClassifierTests: XCTestCase {
         let withModel = ClassifierChain(onDevice: OnDeviceClassifier(backend: backend))
         let rulesOnly = ClassifierChain(onDevice: OnDeviceClassifier(backend: UnavailableOnDeviceBackend(reason: .osTooOld)))
         for item in fixture.items {
-            let expected = DealSignal.category(forTitle: item.title) ?? service.categorizeEvent(title: item.title.lowercased())
+            // A loan, HOA or property tax payment is Bookkeeping whatever 1.x said (it filed "Property tax payment" under Management).
+            let paid = DealSignal.isLoanPayment(" \(RulesEngine.normalize(item.title)) ")
+            let expected = DealSignal.category(forTitle: item.title) ?? (paid ? .bookkeeping : service.categorizeEvent(title: item.title.lowercased()))
             let a = await withModel.classify(candidate(item.title), properties: properties)
             let b = await rulesOnly.classify(candidate(item.title), properties: properties)
             XCTAssertEqual(a.category, expected, "chain+model: \(item.title)")
@@ -287,6 +289,49 @@ final class ClassifierTests: XCTestCase {
             }
             let rules = await RulesClassifier().classify(candidate(title, kind: .gmail), properties: properties)
             XCTAssertNotEqual(rules.category, .financing, "rules email: \(title)")
+        }
+    }
+
+    /// A clear payment title is Bookkeeping and confident on every source, whatever category came in
+    /// (the calendar's 1.x category for "Making Monthly Mortgage Payment" is Management).
+    func testPaymentTitlesAreConfidentBookkeeping() {
+        for title in ["Making Monthly Mortgage Payment", "Mortgage payment", "Monthly mortgage", "Pay mortgage",
+                      "Loan payment - Maple", "HOA payment - Lakeview", "Property tax payment - Oak"] {
+            for kind in [Suggestion.Kind.calendar, .location, .gmail] {
+                let c = RulesClassifier().classifySync(candidate(title, kind: kind), properties: properties)
+                XCTAssertEqual(c.category, .bookkeeping, "\(kind): \(title)")
+                XCTAssertGreaterThanOrEqual(c.confidence, ClassifierThresholds.likely, "\(kind): \(title)")
+                XCTAssertTrue(c.isLandlordWork, "\(kind): \(title)")
+            }
+        }
+        XCTAssertEqual(DealSignal.apply(.management, title: "Making Monthly Mortgage Payment"), .bookkeeping)
+    }
+
+    /// Refinances, new loans, closings and applications stay deals even with a payment word beside them.
+    func testPaymentWordsDoNotPullDealsIntoBookkeeping() {
+        for title in ["Refinance payment estimate", "Refi: compare new mortgage payment", "New loan payment options for the fourplex",
+                      "Closing costs and first mortgage payment", "Mortgage application - monthly payment review",
+                      "Loan application payment schedule", "Lender call about mortgage payment quote"] {
+            let c = DealSignal.apply(.management, title: title)
+            XCTAssertNotEqual(c, .bookkeeping, title)
+            XCTAssertNotEqual(c, .management, title)
+            XCTAssertEqual(c?.countsForREPS, false, title)
+        }
+    }
+
+    /// Closing, escrow, earnest-money and wire-to-title events are deal activity (non-counting),
+    /// while property tax and mortgage payments stay Bookkeeping.
+    func testClosingAndEscrowPaymentsAreDealsButTaxAndMortgagePaymentsAreBookkeeping() async {
+        for title in ["Closing payment wire", "Wire to title for the Elm closing", "Wire earnest money", "Escrow payment - Elm fourplex",
+                      "Earnest money payment", "Closing costs payment"] {
+            for kind in [Suggestion.Kind.calendar, .gmail] {
+                let c = RulesClassifier().classifySync(candidate(title, kind: kind), properties: properties)
+                XCTAssertEqual(c.category?.countsForREPS, false, "\(kind): \(title)")
+            }
+        }
+        for title in ["Property tax payment - Oak", "Mortgage payment", "Making Monthly Mortgage Payment"] {
+            let c = RulesClassifier().classifySync(candidate(title, kind: .calendar), properties: properties)
+            XCTAssertEqual(c.category, .bookkeeping, title)
         }
     }
 
