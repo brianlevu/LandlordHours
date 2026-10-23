@@ -1,5 +1,6 @@
 import XCTest
 #if canImport(StoreKitTest)
+import StoreKit
 import StoreKitTest
 #endif
 
@@ -33,11 +34,67 @@ enum UITestIsolation {
         #endif
     }
 
+    /// Ready once per runner process: set by `warmStoreKit()` once storekitd accepted the session.
+    nonisolated(unsafe) private static var storeKitWarm = false
+
+    private final class ProbeBox: @unchecked Sendable { var error: Error? }
+
+    private static func probe(_ session: SKTestSession) throws {
+        let done = DispatchSemaphore(value: 0)
+        let box = ProbeBox()
+        nonisolated(unsafe) let session = session
+        Task.detached {
+            do { try await session.buyProduct(identifier: "com.openclaw.landlordhours.pro") } catch { box.error = error }
+            done.signal()
+        }
+        if done.wait(timeout: .now() + 15) == .timedOut {
+            throw NSError(domain: "UITestIsolation", code: 1, userInfo: [NSLocalizedDescriptionKey: "StoreKit probe timed out after 15 s"])
+        }
+        if let error = box.error { throw error }
+    }
+
+    /// Cold-start guard. On a freshly created simulator the first `SKTestSession` can fail to save
+    /// its configuration (SKInternalErrorDomain 4); every StoreKit call then returns
+    /// SKServiceErrorDomain 2, so the first test class on a new sim failed. A throwing call
+    /// (`buyProduct`) is the readiness probe: it succeeds only when storekitd accepted the
+    /// session. On failure, rebuild the session after a short pause.
+    /// Bounded: 5 attempts, then fail loudly with the last error.
+    private static func warmStoreKit() {
+        #if canImport(StoreKitTest)
+        guard !storeKitWarm else { return }
+        var lastError = "no attempt ran"
+        // On a fresh simulator storekitd rejects the first session (notEntitled, then
+        // SKServiceErrorDomain 2 on every call) until the app has been launched once. Launch and
+        // quit it before the first session so the run starts clean.
+        let app = XCUIApplication()
+        app.launch()
+        app.terminate()
+        for attempt in 1...5 {
+            do {
+                session = nil
+                let made = try SKTestSession(configurationFileNamed: "LandlordHours")
+                made.disableDialogs = true
+                session = made
+                // Readiness probe: unlike the other session calls (which only log), buyProduct
+                // throws when storekitd could not take the configuration.
+                try probe(made)
+                made.clearTransactions()
+                storeKitWarm = true
+                print("UITestIsolation: StoreKit warm after \(attempt) attempt(s)")
+                return
+            } catch {
+                lastError = "\(error)"
+                print("UITestIsolation: StoreKit attempt \(attempt) failed: \(error)")
+            }
+            Thread.sleep(forTimeInterval: 2)
+        }
+        XCTFail("StoreKit test session never became ready: \(lastError)")
+        #endif
+    }
+
     static func resetStoreKit() {
         #if canImport(StoreKitTest)
-        if session == nil {
-            session = try? SKTestSession(configurationFileNamed: "LandlordHours")
-        }
+        warmStoreKit()
         guard let session else { return }
         session.resetToDefaultState()
         session.askToBuyEnabled = false
