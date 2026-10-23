@@ -173,9 +173,12 @@ final class RentalPlanTests: XCTestCase {
     }
 
     func testDefaultFocusPicksTheOwnTargetRentalWithMostHours() {
-        let c = ctx(.mp500, brians)
-        let hours: [UUID: Double] = [delaney.id: 10, santa.id: 30, yeandle.id: 40]
-        XCTAssertEqual(RentalPlanning.defaultFocus(c) { hours[$0] ?? 0 }, yeandle.id)
+        let allLong = ctx(.mp500, [delaney, yeandle])
+        let hours: [UUID: Double] = [delaney.id: 10, santa.id: 30, yeandle.id: 40, cabin.id: 50]
+        XCTAssertEqual(RentalPlanning.defaultFocus(allLong) { hours[$0] ?? 0 }, yeandle.id)
+        let mixed = ctx(.mp100, [delaney, santa, cabin])
+        XCTAssertEqual(RentalPlanning.defaultFocus(mixed) { $0 == delaney.id ? 400 : hours[$0] ?? 0 }, cabin.id,
+                       "the long stay has the most hours but no target")
     }
 
     func testDefaultFocusTieKeepsListOrder() {
