@@ -58,6 +58,8 @@ struct GoalCheckView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        // Like Tax profile: the floating tab bar would cover the Keep / Switch buttons.
+        .hidesAppTabBar()
         .accessibilityIdentifier("goalCheck.screen")
     }
 
