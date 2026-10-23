@@ -341,6 +341,17 @@ final class TaxProfileManager: ObservableObject {
 
     private var participationKey: String { scopedKey("noOneParticipatedMore") }
 
+    /// 2.1: the same answer, kept per rental. Keys are "<year>|<rental id>", or "<year>|all" for
+    /// a grouped activity. The 2.0 per-year map above is never rewritten or deleted (a downgrade
+    /// and the migration both still read it); `migrateParticipationAnswers` copies it in.
+    @Published private(set) var participationAnswers: [String: Bool] = [:]
+    private var participationAnswersKey: String { scopedKey("noOneParticipatedMore.v2") }
+    private var participationMigrationKey: String { scopedKey("noOneParticipatedMore.v2.migration") }
+
+    static func participationAnswerKey(year: Int, propertyId: UUID?) -> String {
+        "\(year)|\(propertyId?.uuidString ?? "all")"
+    }
+
     private init() {
         // Set defaults first (didSet won't fire during init)
         filingStatus = .marriedJoint
@@ -371,6 +382,9 @@ final class TaxProfileManager: ObservableObject {
             nonREWorkHours = ud.double(forKey: scopedKey("nonREWorkHours"))
         }
         loadParticipationConfirmations()
+        loadParticipationAnswers()
+        // The grouped activity's answer needs no rentals; each rental's follows when they load.
+        migrateParticipationAnswers(properties: [])
     }
 
     func resetForSignOut() {
@@ -382,6 +396,7 @@ final class TaxProfileManager: ObservableObject {
             nonREWorkHours = 0
         }
         noOneParticipatedMoreByYear = [:]
+        participationAnswers = [:]
     }
 
     func resetForDataReset() {
@@ -391,9 +406,11 @@ final class TaxProfileManager: ObservableObject {
         groupingElection = false
         nonREWorkHours = 0
         noOneParticipatedMoreByYear = [:]
+        participationAnswers = [:]
 
         let ud = UserDefaults.standard
-        for field in ["filingStatus", "spouseTracking", "taxYear", "groupingElection", "nonREWorkHours", "noOneParticipatedMore"] {
+        for field in ["filingStatus", "spouseTracking", "taxYear", "groupingElection", "nonREWorkHours", "noOneParticipatedMore",
+                      "noOneParticipatedMore.v2", "noOneParticipatedMore.v2.migration"] {
             ud.removeObject(forKey: scopedKey(field))
         }
         onDidChange?()
@@ -401,19 +418,115 @@ final class TaxProfileManager: ObservableObject {
 
     // MARK: - 100-Hour Test Confirmation
 
-    /// Answer for the given tax year: nil = unanswered, true = no one else participated
-    /// more, false = someone else did.
+    /// The grouped activity's answer for the year (the "all rentals" answer): nil = unanswered,
+    /// true = no one else participated more, false = someone else did. Since 2.1 each rental has
+    /// its own answer: use `noOneParticipatedMore(forYear:propertyId:)` anywhere a rental is named.
     func noOneParticipatedMore(forYear year: Int) -> Bool? {
-        noOneParticipatedMoreByYear[year]
+        noOneParticipatedMore(forYear: year, propertyId: nil)
     }
 
-    /// Records (or clears, when `value` is nil) the confirmation for a tax year and persists it.
+    /// Records (or clears) the grouped activity's answer for a tax year.
     func setNoOneParticipatedMore(_ value: Bool?, forYear year: Int) {
-        if let value {
-            noOneParticipatedMoreByYear[year] = value
-        } else {
-            noOneParticipatedMoreByYear.removeValue(forKey: year)
+        setNoOneParticipatedMore(value, forYear: year, propertyId: nil)
+    }
+
+    /// The answer for one rental (nil `propertyId`: the grouped activity) in a tax year.
+    func noOneParticipatedMore(forYear year: Int, propertyId: UUID?) -> Bool? {
+        participationAnswers[Self.participationAnswerKey(year: year, propertyId: propertyId)]
+    }
+
+    /// Records (or clears, when `value` is nil) one rental's answer and persists it.
+    func setNoOneParticipatedMore(_ value: Bool?, forYear year: Int, propertyId: UUID?) {
+        let key = Self.participationAnswerKey(year: year, propertyId: propertyId)
+        if let value { participationAnswers[key] = value } else { participationAnswers.removeValue(forKey: key) }
+        saveParticipationAnswers()
+    }
+
+    /// A closure the tax engine reads: this year's answer for a rental (nil id: the grouped one).
+    func participationAnswerLookup(year: Int) -> (UUID?) -> Bool? {
+        { [weak self] id in self?.noOneParticipatedMore(forYear: year, propertyId: id) }
+    }
+
+    /// Drops every answer for a deleted rental.
+    func forgetParticipationAnswers(for propertyId: UUID) {
+        let suffix = "|" + propertyId.uuidString
+        let before = participationAnswers.count
+        participationAnswers = participationAnswers.filter { !$0.key.hasSuffix(suffix) }
+        if participationAnswers.count != before { saveParticipationAnswers() }
+    }
+
+    // MARK: 2.0 → 2.1 migration (one answer per year → one per rental)
+
+    /// Copies the 2.0 per-year answers to the per-rental store. Every rental that existed when
+    /// the migration first ran inherits each year's answer (it was given for all of them), and
+    /// the grouped activity gets it too. A rental created later starts unanswered. The 2.0 map is
+    /// left exactly as it was. Safe to call any number of times (a rental that arrives later from
+    /// iCloud is picked up the first time it is seen, if it predates the migration).
+    func migrateParticipationAnswers(properties: [RentalProperty], now: Date = Date()) {
+        let legacy = noOneParticipatedMoreByYear
+        var state = loadMigrationState() ?? MigrationState(stamp: now, done: [])
+        var changed = false
+        for (year, value) in legacy {
+            let key = Self.participationAnswerKey(year: year, propertyId: nil)
+            if participationAnswers[key] == nil && !state.groupedDone.contains(year) {
+                participationAnswers[key] = value
+                state.groupedDone.insert(year)
+                changed = true
+            }
         }
+        for property in properties where property.createdAt <= state.stamp && !state.done.contains(property.id.uuidString) {
+            for (year, value) in legacy {
+                let key = Self.participationAnswerKey(year: year, propertyId: property.id)
+                if participationAnswers[key] == nil { participationAnswers[key] = value; changed = true }
+            }
+            state.done.insert(property.id.uuidString)
+            changed = true
+        }
+        if changed || loadMigrationState() == nil {
+            if changed { saveParticipationAnswers() }
+            saveMigrationState(state)
+        }
+    }
+
+    private struct MigrationState: Codable {
+        var stamp: Date
+        var done: Set<String>
+        var groupedDone: Set<Int> = []
+
+        init(stamp: Date, done: Set<String>) { self.stamp = stamp; self.done = done }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            stamp = try c.decode(Date.self, forKey: .stamp)
+            done = try c.decodeIfPresent(Set<String>.self, forKey: .done) ?? []
+            groupedDone = try c.decodeIfPresent(Set<Int>.self, forKey: .groupedDone) ?? []
+        }
+    }
+
+    private func loadMigrationState() -> MigrationState? {
+        UserDefaults.standard.data(forKey: participationMigrationKey).flatMap { try? JSONDecoder().decode(MigrationState.self, from: $0) }
+    }
+
+    private func saveMigrationState(_ state: MigrationState) {
+        if let data = try? JSONEncoder().encode(state) { UserDefaults.standard.set(data, forKey: participationMigrationKey) }
+    }
+
+    private func loadParticipationAnswers() {
+        guard let data = UserDefaults.standard.data(forKey: participationAnswersKey),
+              let decoded = try? JSONDecoder().decode([String: Bool].self, from: data) else {
+            participationAnswers = [:]
+            return
+        }
+        participationAnswers = decoded
+    }
+
+    private func saveParticipationAnswers() {
+        // Local to this device (not in the iCloud TaxProfile record), so no sync push.
+        if let data = try? JSONEncoder().encode(participationAnswers) { UserDefaults.standard.set(data, forKey: participationAnswersKey) }
+    }
+
+    /// 2.0 setter kept for tests and old call sites: writes the per-year map only.
+    func setLegacyNoOneParticipatedMore(_ value: Bool?, forYear year: Int) {
+        if let value { noOneParticipatedMoreByYear[year] = value } else { noOneParticipatedMoreByYear.removeValue(forKey: year) }
         saveParticipationConfirmations()
     }
 

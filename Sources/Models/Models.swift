@@ -603,7 +603,10 @@ struct TaxQualificationEngine {
         properties: [RentalProperty],
         year: Int,
         groupingElection: Bool,
-        noOneParticipatedMore: Bool? = nil
+        noOneParticipatedMore: Bool? = nil,
+        /// 2.1: the "did anyone else do more?" answer is per rental (nil id: the grouped activity).
+        /// When given it wins over the single `noOneParticipatedMore`.
+        answers: ((UUID?) -> Bool?)? = nil
     ) -> MaterialParticipationResult {
         func status(_ id: UUID?) -> MaterialParticipationResult {
             materialParticipationStatus(
@@ -611,7 +614,7 @@ struct TaxQualificationEngine {
                 year: year,
                 propertyId: id,
                 groupingElection: groupingElection,
-                noOneParticipatedMore: noOneParticipatedMore
+                noOneParticipatedMore: answers.map { $0(groupingElection ? nil : id) } ?? noOneParticipatedMore
             )
         }
         if groupingElection { return status(nil) }
