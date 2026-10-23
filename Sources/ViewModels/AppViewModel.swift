@@ -1975,6 +1975,7 @@ extension AppViewModel: CloudKitSyncDelegate {
         #if DEBUG
         applyTodayHoursSeedIfNeeded()
         applyPropertiesSeedIfNeeded()
+        applyHomeSeedIfNeeded()
         #endif
     }
 
