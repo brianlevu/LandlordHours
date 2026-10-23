@@ -248,6 +248,8 @@ Decision (2026-10-23, spec at `~/AgentScratch/landlordhours/2026-10-23/adaptive/
 | App Store | iPad 13" frames only of a build that has these layouts (Guideline 2.3.3); stretched frames invite 2.4.1. Duo ships as two sizes (outer 1398×2034, inner 2007×2853). | judgment |
 | Acceptance environments | iPad frames: iPad 10th gen (iPadOS 27), landscape and portrait, one Stage Manager window at 700 and one 1/3 tile, with Apple's Reminders, Health, Fitness and Settings captured on the same iPad beside each frame (§5.5). Duo frames: the Duo simulator in all four poses until a device exists. Frames at 599/600 and 899/900 in light and dark in every adaptive hand-off. | judgment |
 
+System chrome and contrast (2026-10-23, mock lane): system-provided sidebar section headers and sidebar badges use Apple's own colours and are **exempt from our AA check**; we never remove a header or badge to pass a contrast check, and our own text stays at ≥ 4.5:1 (≥ 3:1 for icons). The sidebar material (#182445 measured in dark) is system, not a token; gates sample sidebar text against the material. The system draws the selected sidebar row as white on the tint, so the regular-width `TabView` tint is **#4774C6 in dark** (white 4.58:1; unselected sidebar icons 3.3:1 on the material; top-bar selected label 5.5:1) and `action` (#1E3FA6) in light; each tab root re-applies `colors.action` so content keeps its own tint (#8FD3FF in dark).
+
 Density addendum: D3 and D4 are measured per column in band C; D6's 40% hero share is against the column; D9's gutter is 24 in B/C.
 
 ---
