@@ -178,7 +178,6 @@ struct AdaptiveShell: View {
     @State private var band: LayoutBand?
     @State private var showLog: Bool
     @State private var windowControls: CGFloat = 0
-    @State private var sidebarOpen = false
     @Environment(\.horizontalSizeClass) private var hsc
     @Environment(\.verticalSizeClass) private var vsc
     @Environment(\.displayScale) private var scale
@@ -241,11 +240,11 @@ struct AdaptiveShell: View {
         TabView(selection: $tab) {
             Tab(L("Today"), systemImage: "sun.max", value: AdaptiveTab.today) { root(L("Today")) { AdaptiveToday(seed: seed, openInbox: { tab = .inbox }) } }
             Tab(L("Inbox"), systemImage: "tray", value: AdaptiveTab.inbox) { root(L("Inbox")) { AdaptiveInbox(seed: seed, selectFirst: launch.select) } }
-                // No badge while the sidebar is open: the sidebar draws it in a grey we cannot set (3.2:1).
-                .badge(sidebarOpen ? 0 : seed.suggestions.count)
+                // System badge everywhere; in the sidebar it is system chrome in Apple's grey (exempt, §1.27).
+                .badge(seed.suggestions.count)
             Tab(L("Records"), systemImage: "list.bullet.rectangle", value: AdaptiveTab.records) { root(L("Records")) { AdaptiveRecords(selectFirst: launch.select) } }
             Tab(L("Rentals"), systemImage: "house", value: AdaptiveTab.rentals) { root(L("Rentals")) { placeholder(L("All rentals")) } }
-            TabSection {
+            TabSection(L("Rentals")) {
                 ForEach(seed.rentals.rentals) { r in
                     Tab(r.name, systemImage: "house", value: AdaptiveTab.rental(r.id)) { root(r.name) { placeholder(r.name) } }
                 }
@@ -257,9 +256,11 @@ struct AdaptiveShell: View {
         .tabViewStyle(.sidebarAdaptable)
         .tabViewSidebarHeader { AdaptiveSidebarHero(seed: seed) { tab = .today } }
         .tabViewSidebarFooter { sidebarFooter }
-        .tint(colors.action)
+        // The system draws the selected sidebar row as white on the tint: the dark action (#8FD3FF) gives
+        // 1.6:1. The bar/sidebar tint is #4774C6 in dark (white 4.58:1; unselected icons 3.3:1 on the
+        // material); each root re-applies colors.action so content keeps its own tint.
+        .tint(Self.selectionTint)
         .background { SidebarVisibilitySetter(shown: launch.sidebar.map { $0 == "shown" }) }
-        .background { SidebarVisibilityReader(shown: $sidebarOpen) }
         .sheet(isPresented: $showLog) {
             StdLogTimeSheet(seed: seed, launch: stdLaunch, onClose: { showLog = false }, onLog: { _ in showLog = false },
                             attachment: launch.screen == .logtime ? L("receipt-0423.pdf · 1 photo") : nil)
@@ -268,6 +269,8 @@ struct AdaptiveShell: View {
     }
 
     /// Every regular root: its own NavigationStack and the toolbar "+" (⌘N) in the same place.
+    static let selectionTint = Color.lhDynamic(light: "1E3FA6", dark: "4774C6")
+
     private func root<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
         NavigationStack {
             content()
@@ -283,6 +286,7 @@ struct AdaptiveShell: View {
                 .toolbar(removing: .title)
                 .navigationBarTitleDisplayMode(.inline)
         }
+        .tint(colors.action)
     }
 
     private func placeholder(_ title: String) -> some View {
@@ -466,44 +470,6 @@ struct AdaptivePlainTabs: View {
                 Tab("Inbox", systemImage: "tray") { Color.clear }
                 Tab("Records", systemImage: "list.bullet.rectangle") { Color.clear }
                 Tab("Rentals", systemImage: "house") { Color.clear }
-            }
-        }
-    }
-}
-
-/// Sidebar text we cannot restyle: iPadOS 27's SwiftUI sidebar ignores UITabSidebarItem content
-/// configurations (tried through a forwarding delegate: update(item:) runs, nothing changes), so its
-/// badge and section-header grey stay at 3.1–3.3:1. The fix is structural: no section header, and
-/// no badge while the sidebar is open (the top bar's red badge is fine). This proxy only reports
-/// sidebar visibility; every other delegate call goes to SwiftUI's own coordinator.
-@available(iOS 18.0, *)
-struct SidebarVisibilityReader: UIViewRepresentable {
-    @Binding var shown: Bool
-    final class Coordinator: NSObject, UITabBarController.Sidebar.Delegate {
-        weak var inner: UITabBarController.Sidebar.Delegate?
-        var onChange: (Bool) -> Void = { _ in }
-        override func responds(to aSelector: Selector!) -> Bool {
-            super.responds(to: aSelector) || (inner?.responds(to: aSelector) ?? false)
-        }
-        override func forwardingTarget(for aSelector: Selector!) -> Any? { inner }
-        func tabBarController(_ tabBarController: UITabBarController, sidebarVisibilityWillChange sidebar: UITabBarController.Sidebar,
-                              animator: any UITabBarController.Sidebar.Animating) {
-            inner?.tabBarController?(tabBarController, sidebarVisibilityWillChange: sidebar, animator: animator)
-            let hidden = sidebar.isHidden
-            DispatchQueue.main.async { self.onChange(!hidden) }
-        }
-    }
-    func makeCoordinator() -> Coordinator { Coordinator() }
-    func makeUIView(context: Context) -> UIView { let v = UIView(); v.isUserInteractionEnabled = false; return v }
-    func updateUIView(_ view: UIView, context: Context) {
-        let c = context.coordinator
-        c.onChange = { v in if shown != v { shown = v } }
-        for delay in [0.1, 0.9] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                guard let root = view.window?.rootViewController, let tbc = SidebarVisibilitySetter.find(root) else { return }
-                if tbc.sidebar.delegate !== c { c.inner = tbc.sidebar.delegate; tbc.sidebar.delegate = c }
-                let open = !tbc.sidebar.isHidden && tbc.traitCollection.horizontalSizeClass == .regular
-                if shown != open { shown = open }
             }
         }
     }
