@@ -69,6 +69,8 @@ struct StdSeeAllScreen: View {
             }
         }
         .listStyle(.insetGrouped)
+        .modifier(StdTopEdge())
+        .modifier(StdComposeBar())
         .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY - $0.safeAreaInsets.bottom } action: { y in
             StdGeom.log(String(format: "STDGEOM fold %.1f 0 0 0", y))
         }

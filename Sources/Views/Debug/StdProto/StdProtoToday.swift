@@ -48,8 +48,8 @@ struct StdProtoRoot: View {
     @available(iOS 26.0, *)
     private var nativeTabs: some View {
         TabView(selection: $tab) {
-            Tab(L("Today"), systemImage: "sun.max", value: 0) { today.stdComposeButton(onLog) }
-            Tab(L("Inbox"), systemImage: "tray", value: 1) { StdInboxScreen(seed: seed, launch: launch).stdComposeButton(onLog) }
+            Tab(L("Today"), systemImage: "sun.max", value: 0) { today.environment(\.stdCompose, StdComposeAction(run: onLog)) }
+            Tab(L("Inbox"), systemImage: "tray", value: 1) { StdInboxScreen(seed: seed, launch: launch).environment(\.stdCompose, StdComposeAction(run: onLog)) }
                 .badge(seed.suggestions.count)
             Tab(L("Records"), systemImage: "list.bullet.rectangle", value: 2) { records.stdComposeButton(onLog) }
             Tab(L("Properties"), systemImage: "house", value: 3) { records.stdComposeButton(onLog) }
@@ -144,6 +144,7 @@ struct StdTodayScreen: View {
             }
             .listStyle(.insetGrouped)
             .modifier(StdTopEdge())
+            .modifier(StdComposeBar())
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY - $0.safeAreaInsets.bottom } action: { y in
                 StdGeom.log(String(format: "STDGEOM fold %.1f 0 0 0", y))
             }
@@ -230,7 +231,7 @@ struct StdTodayScreen: View {
     private func topHeader(day: String?) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
-                StdScreenTitle(title: L("Today"), subtitle: typeSize.isAccessibilitySize ? nil : L("Fri, Oct 23"))
+                StdScreenTitle(title: L("Today"))
                 // iOS 26+: Log time is the tab bar's trailing glass button; earlier versions keep it here.
                 if #unavailable(iOS 26.0) {
                     Button { showLog = true } label: { Image(systemName: "plus") }
@@ -480,7 +481,7 @@ struct StdHeroCard: View {
             .accessibilityLabel(L("\(hero.flag), \(Int(hero.number)) \(hero.label). \(statusWords)"))
             .accessibilityAdjustableAction { dir in step(dir == .increment ? 1 : -1) }
             .accessibilityIdentifier("std.hero")
-            if !typeSize.isAccessibilitySize && !single {
+            if typeSize < .xxLarge && !single {
                 Rectangle().fill(HouseTokens.drafting.opacity(0.25)).frame(height: 0.5)
                 rentalRow
             }
@@ -576,7 +577,7 @@ struct StdHeroCard: View {
     }
 
     private func fullTop(_ night: Bool) -> some View {
-        let houseSize: CGFloat = single ? (typeSize >= .xxLarge ? 132 : 172) : 150
+        let houseSize: CGFloat = single ? (typeSize >= .xxLarge ? 112 : 148) : 150
         return VStack(alignment: .leading, spacing: 0) {
             if single {
                 Text(L("2026 · \(hero.flag)")).font(StdFont.drafting).textCase(.uppercase).tracking(StdFont.draftingTracking)
@@ -597,9 +598,11 @@ struct StdHeroCard: View {
                     .padding(.trailing, -8).padding(.bottom, -10)
             }
             // One rental: the pace line runs the card's full width under the number and house, on one line.
-            if single { status.padding(.top, 6) }
+            if single { status.padding(.top, 2) }
         }
-        .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, single ? 16 : 12)
+        .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 12)
+        // XXL: the rental switcher folds into a 44pt control in the corner (the row returns below XXL).
+        .overlay(alignment: .topTrailing) { if typeSize >= .xxLarge && !single { rentalMenu.padding(8) } }
         // The ambient sky: a fixed box in the top-right corner, behind the house, clear of the number.
         .background(alignment: .topTrailing) {
             StdHeroAmbient().frame(width: 190, height: 64)
@@ -757,29 +760,37 @@ struct StdHeroCard: View {
 #if DEBUG
 /// Space the floating Log time button takes at the trailing edge (pinned bars and toasts leave it).
 enum StdCompose {
-    static let size: CGFloat = 56
-    static var reserve: CGFloat { if #available(iOS 26.0, *) { return size + 12 } else { return 0 } }
+    static let size: CGFloat = 52
+    /// The button has its own safe-area band now, so nothing else needs to leave room.
+    static var reserve: CGFloat { 0 }
 }
 
 extension View {
-    /// The detached Log time glass button, bottom-trailing above the tab bar (iOS 26+).
+    /// The detached Log time glass button, bottom-trailing above the tab bar (iOS 26+). It lives in
+    /// a bottom safe-area band, so at rest every row, value and footer ends above it; content only
+    /// passes under it while scrolling.
     @ViewBuilder func stdComposeButton(_ action: @escaping () -> Void) -> some View {
         if #available(iOS 26.0, *) {
-            overlay(alignment: .bottomTrailing) {
-                Button(action: action) {
-                    Image(systemName: "plus")
-                        .font(.title2.weight(.semibold))
-                        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-                        .frame(width: StdCompose.size, height: StdCompose.size)
-                        .contentShape(Circle())
+            // A safe-area *bar* (iOS 26): content at rest ends above the button, and anything that
+            // scrolls beneath it gets the system bottom scroll-edge effect, as under the tab bar.
+            safeAreaBar(edge: .bottom, spacing: 0) {
+                HStack {
+                    Spacer()
+                    Button(action: action) {
+                        Image(systemName: "plus")
+                            .font(.title2.weight(.semibold))
+                            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                            .frame(width: StdCompose.size, height: StdCompose.size)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .glassEffect(.regular.interactive(), in: .circle)
+                    .keyboardShortcut("n", modifiers: .command)
+                    .accessibilityLabel(L("Log time"))
+                    .accessibilityIdentifier("compose.logTime")
                 }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: .circle)
-                .keyboardShortcut("n", modifiers: .command)
-                .accessibilityLabel(L("Log time"))
-                .accessibilityIdentifier("compose.logTime")
                 .padding(.trailing, 20)
-                .padding(.bottom, 12)
+                .padding(.bottom, 6)
             }
         } else {
             self
@@ -796,9 +807,31 @@ struct StdTopEdge: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
             content.scrollEdgeEffectStyle(.hard, for: .top)
+                .scrollEdgeEffectStyle(.soft, for: .bottom)
         } else {
             content
         }
+    }
+}
+#endif
+
+#if DEBUG
+/// The Log time action the tab shell hands its screens; a screen attaches the button to its own
+/// scroll view, so the system bottom scroll-edge effect covers the button's band too.
+struct StdComposeAction { let run: () -> Void }
+
+private struct StdComposeKey: EnvironmentKey { static let defaultValue: StdComposeAction? = nil }
+extension EnvironmentValues {
+    var stdCompose: StdComposeAction? {
+        get { self[StdComposeKey.self] }
+        set { self[StdComposeKey.self] = newValue }
+    }
+}
+
+struct StdComposeBar: ViewModifier {
+    @Environment(\.stdCompose) private var compose
+    func body(content: Content) -> some View {
+        if let compose { content.stdComposeButton(compose.run) } else { content }
     }
 }
 #endif
