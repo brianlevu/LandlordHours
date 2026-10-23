@@ -22,6 +22,14 @@ struct StdGoalCheckSheet: View {
     @State private var marker: Double = 100
     @State private var switched = false
     @State private var shownRows = 0
+    @State private var showWhy = false
+    /// `-LHWhyCase 500|100|750`: which recommendation the result shows (750 = a real estate pro household).
+    private static let whyCase: StdWhyCase = {
+        let a = ProcessInfo.processInfo.arguments
+        guard let i = a.firstIndex(of: "-LHWhyCase"), a.indices.contains(i + 1) else { return .t500 }
+        return StdWhyCase(rawValue: a[i + 1]) ?? .t500
+    }()
+    private static let openWhy = ProcessInfo.processInfo.arguments.contains("-LHWhyOpen")
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -33,9 +41,11 @@ struct StdGoalCheckSheet: View {
         self.demo = demo
         self.onClose = onClose
         _step = State(initialValue: start.step)
-        _answer = State(initialValue: start.step == .question ? nil : start.answer)
-        let moves = start.step != .question && [.cleaner].contains(start.answer)
-        _marker = State(initialValue: moves ? 500 : 100)
+        let why = Self.whyCase
+        let answer: StdGoalCheckStart.Answer = why == .t500 ? start.answer : .me
+        _answer = State(initialValue: start.step == .question ? nil : answer)
+        _marker = State(initialValue: start.step == .question ? 100 : Double(why == .t500 && answer == .cleaner ? 500 : why.target))
+        _showWhy = State(initialValue: Self.openWhy)
         _switched = State(initialValue: start.step == .summary)
         _shownRows = State(initialValue: start.step == .summary ? 99 : 0)
     }
@@ -79,6 +89,14 @@ struct StdGoalCheckSheet: View {
         .background(colors.background.ignoresSafeArea())
         .sensoryFeedback(.selection, trigger: answer)
         .task { await runDemo() }
+        .sheet(isPresented: $showWhy) {
+            StdWhyTargetSheet(rentalName: rental.name, recommended: Self.whyCase.target == 500 && answer != .cleaner ? 100 : Self.whyCase.target,
+                              why: answer == .cleaner && Self.whyCase == .t500 ? .t500 : Self.whyCase,
+                              onChange: { showWhy = false; withAnimation(StdMotion.flow) { step = .question; answer = nil; marker = 100 } },
+                              onClose: { showWhy = false })
+                .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
     }
 
     // MARK: Top bar: back, 3pt progress, close
@@ -301,6 +319,7 @@ struct StdGoalCheckSheet: View {
     }
 
     private var resultLine: String {
+        if Self.whyCase == .t750 { return L("Real estate is your main job, so the 750 fits.") }
         switch answer {
         case .cleaner: return L("A cleaner does more here, so the 500-hour test fits.")
         case .notSure: return L("No change for now.")
@@ -315,9 +334,12 @@ struct StdGoalCheckSheet: View {
                 Text(L("Target")).font(StdFont.drafting).textCase(.uppercase).tracking(StdFont.draftingTracking)
                     .foregroundStyle(colors.draftingInk)
                 if !typeSize.isAccessibilitySize { Spacer() }
-                Text(L("\(Int(marker.rounded())) hours")).font(.subheadline.weight(.semibold)).fontDesign(.rounded).monospacedDigit()
-                    .foregroundStyle(colors.action)
+                // Progressive disclosure: the target's reasons live one tap away, not in more body text.
+                Button(L("Why \(Int(marker.rounded()))?")) { StdMotionLog.mark("sheetUnfold.why"); showWhy = true }
+                    .buttonStyle(StdButtonStyle(.tertiary))
+                    .padding(.vertical, -12)
                     .contentTransition(.numericText(value: marker))
+                    .accessibilityHint(L("Shows how the three targets compare for you"))
             }
             // Read-only: a printed ruler. The target is a drafting tick with a pointer, not a knob.
             GeometryReader { g in
@@ -421,6 +443,12 @@ struct StdGoalCheckSheet: View {
     }
 
     private func runDemo() async {
+        if ProcessInfo.processInfo.arguments.contains("-LHWhyDemo") {
+            try? await Task.sleep(nanoseconds: 1_800_000_000)
+            StdMotionLog.mark("sheetUnfold.why")
+            showWhy = true
+            return
+        }
         guard demo else { return }
         try? await Task.sleep(nanoseconds: 1_800_000_000)
         pick(.cleaner)
@@ -440,6 +468,131 @@ struct StdPointer: Shape {
         p.addLine(to: CGPoint(x: r.midX, y: r.maxY))
         p.closeSubpath()
         return p
+    }
+}
+#endif
+
+#if DEBUG
+// MARK: - Why this target? (Brian: "I don't know why 500 was recommended")
+
+enum StdWhyCase: String {
+    case t500 = "500", t100 = "100", t750 = "750"
+    var target: Int { Int(rawValue) ?? 500 }
+}
+
+/// A medium sheet: the three targets as rows, each with its plain meaning and a ✓ / ✕ for this
+/// owner with the reason from their answers; the recommended row is highlighted. Then the one
+/// fact that decided it, with a way to change that answer, and the CPA line.
+struct StdWhyTargetSheet: View {
+    let rentalName: String
+    let recommended: Int
+    let why: StdWhyCase
+    let onChange: () -> Void
+    let onClose: () -> Void
+    @State private var shown = 0
+    @State private var emphasis = false
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
+
+    private struct Row { let target: Int; let meaning: String; let fits: Bool; let reason: String }
+
+    private var rows: [Row] {
+        let cleaner = why == .t500
+        let pro = why == .t750
+        return [
+            Row(target: 100, meaning: L("100 hours, and more than anyone else here"),
+                fits: !cleaner, reason: cleaner ? L("A cleaner does more hours here") : L("You do most of the work here")),
+            Row(target: 500, meaning: L("500 hours, no comparison"),
+                fits: true, reason: L("Doesn't depend on who else works here")),
+            Row(target: 750, meaning: L("750 hours, and more than half your working time, as a real estate pro"),
+                fits: pro, reason: pro ? L("You said real estate is your main job") : L("Needs real estate as your main job")),
+        ]
+    }
+
+    private var fact: String {
+        switch why {
+        case .t500: return L("You said a cleaner does most of the hands-on work at \(rentalName).")
+        case .t100: return L("You said you do most of the hands-on work at \(rentalName).")
+        case .t750: return L("You said real estate is your main job.")
+        }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                StdSheetHeader(eyebrow: rentalName, title: L("Why \(recommended)?"), onClose: onClose)
+                VStack(spacing: 0) {
+                    ForEach(Array(rows.enumerated()), id: \.offset) { i, r in
+                        if i > 0 { Rectangle().fill(colors.border).frame(height: 0.5).padding(.leading, 16) }
+                        row(r)
+                            .opacity(i < shown ? 1 : 0)
+                            .offset(y: i < shown || reduceMotion ? 0 : 6)
+                    }
+                }
+                .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(colors.backgroundSecondary))
+                VStack(alignment: .leading, spacing: 4) {
+                    StdSectionHeader(title: L("How we decided"))
+                    Text(fact).font(.subheadline).foregroundStyle(colors.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(L("Change this answer"), action: onChange)
+                        .buttonStyle(StdButtonStyle(.tertiary))
+                        .padding(.leading, -4)
+                }
+                StdCPAFootnote()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .background(colors.background.ignoresSafeArea())
+        .task {
+            // sheetUnfold: rows fade up 30ms apart, then the recommended row's highlight arrives.
+            for i in 0..<3 {
+                withAnimation(reduceMotion ? .easeOut(duration: 0.2) : StdMotion.reveal.delay(Double(i) * 0.03)) { shown = i + 1 }
+            }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            withAnimation(reduceMotion ? .easeOut(duration: 0.2) : StdMotion.flow) { emphasis = true }
+        }
+        .sensoryFeedback(.selection, trigger: emphasis)
+    }
+
+    private func row(_ r: Row) -> some View {
+        let isPick = r.target == recommended
+        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+        return layout {
+            Text(verbatim: "\(r.target)")
+                .font(.title3.weight(.bold)).fontDesign(.rounded).monospacedDigit()
+                .foregroundStyle(isPick ? colors.action : colors.textPrimary)
+                .frame(minWidth: typeSize.isAccessibilitySize ? nil : 48, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(r.meaning).font(.subheadline.weight(.semibold)).foregroundStyle(colors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Label {
+                    Text(r.reason).fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: r.fits ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .foregroundStyle(r.fits ? colors.positive : colors.textSecondary)
+                }
+                .font(.subheadline).foregroundStyle(colors.textSecondary)
+                .accessibilityLabel(r.fits ? L("Fits: \(r.reason)") : L("Doesn't fit: \(r.reason)"))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 6)
+        .background {
+            RoundedRectangle(cornerRadius: 20, style: .continuous).fill(colors.actionSurface)
+                .opacity(isPick && emphasis ? 1 : 0)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(colors.action, lineWidth: 1.5)
+                .opacity(isPick && emphasis ? 1 : 0)
+        }
+        .scaleEffect(isPick && !emphasis && !reduceMotion ? 0.985 : 1)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isPick ? .isSelected : [])
     }
 }
 #endif

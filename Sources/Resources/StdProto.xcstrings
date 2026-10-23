@@ -232,6 +232,17 @@
         }
       }
     },
+    "100 hours, and more than anyone else here": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "100 hours, and more than anyone else here"
+          }
+        }
+      }
+    },
     "2026 · %@": {
       "extractionState": "manual",
       "localizations": {
@@ -254,6 +265,28 @@
         }
       }
     },
+    "500 hours, no comparison": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "500 hours, no comparison"
+          }
+        }
+      }
+    },
+    "750 hours, and more than half your working time, as a real estate pro": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "750 hours, and more than half your working time, as a real estate pro"
+          }
+        }
+      }
+    },
     "A cleaner does more here": {
       "extractionState": "manual",
       "localizations": {
@@ -272,6 +305,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "A cleaner does more here, so the 500-hour test fits."
+          }
+        }
+      }
+    },
+    "A cleaner does more hours here": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A cleaner does more hours here"
           }
         }
       }
@@ -375,6 +419,17 @@
         }
       }
     },
+    "Change this answer": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change this answer"
+          }
+        }
+      }
+    },
     "Cleaner": {
       "extractionState": "manual",
       "localizations": {
@@ -441,6 +496,28 @@
         }
       }
     },
+    "Doesn't depend on who else works here": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Doesn't depend on who else works here"
+          }
+        }
+      }
+    },
+    "Doesn't fit: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Doesn't fit: %@"
+          }
+        }
+      }
+    },
     "Done": {
       "extractionState": "manual",
       "localizations": {
@@ -470,6 +547,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Financing"
+          }
+        }
+      }
+    },
+    "Fits: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fits: %@"
           }
         }
       }
@@ -591,6 +679,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hours"
+          }
+        }
+      }
+    },
+    "How we decided": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How we decided"
           }
         }
       }
@@ -888,6 +987,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Needs hours"
+          }
+        }
+      }
+    },
+    "Needs real estate as your main job": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs real estate as your main job"
           }
         }
       }
@@ -1233,6 +1343,17 @@
         }
       }
     },
+    "Real estate is your main job, so the 750 fits.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Real estate is your main job, so the 750 fits."
+          }
+        }
+      }
+    },
     "Recent": {
       "extractionState": "manual",
       "localizations": {
@@ -1438,6 +1559,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Showing at Oak Street"
+          }
+        }
+      }
+    },
+    "Shows how the three targets compare for you": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows how the three targets compare for you"
           }
         }
       }
@@ -1728,6 +1860,17 @@
         }
       }
     },
+    "Why %lld?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Why %lld?"
+          }
+        }
+      }
+    },
     "Yesterday": {
       "extractionState": "manual",
       "localizations": {
@@ -1783,6 +1926,17 @@
         }
       }
     },
+    "You do most of the work here": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You do most of the work here"
+          }
+        }
+      }
+    },
     "You do most of the work here, so 100 still fits.": {
       "extractionState": "manual",
       "localizations": {
@@ -1790,6 +1944,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "You do most of the work here, so 100 still fits."
+          }
+        }
+      }
+    },
+    "You said a cleaner does most of the hands-on work at %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You said a cleaner does most of the hands-on work at %@."
+          }
+        }
+      }
+    },
+    "You said real estate is your main job": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You said real estate is your main job"
+          }
+        }
+      }
+    },
+    "You said real estate is your main job.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You said real estate is your main job."
+          }
+        }
+      }
+    },
+    "You said you do most of the hands-on work at %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You said you do most of the hands-on work at %@."
           }
         }
       }
