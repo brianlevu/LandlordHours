@@ -128,6 +128,7 @@
 		8DCDA53C99D6607B2EB138B8 /* LocalProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1CAE53C865D5B8D680C6F0D /* LocalProfileTests.swift */; };
 		8DE67EB9BCEB8939B798F428 /* BlueprintList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A003429C65E153356A99393 /* BlueprintList.swift */; };
 		8E5DB75E645C996E2E7F0FC1 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294885677A14CB0F22849EF0 /* AppDelegate.swift */; };
+		8E8FF8976A3444154B35F0C0 /* StdHeroAmbient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F0FCCA807B71D0FCB4116C0 /* StdHeroAmbient.swift */; };
 		8EA3A49E03679E793FB9E46D /* SurfaceCaptureBoard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9450F642556AC44158906810 /* SurfaceCaptureBoard.swift */; };
 		8ED697DE6FEC7270E36DAABE /* VoiceEntryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 838ADFB389C9D4AD52D16B41 /* VoiceEntryService.swift */; };
 		8ED8AAEC6D50C47E9DC615C1 /* PropertyFigures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 517CDAB2F18F0A85D206CB47 /* PropertyFigures.swift */; };
@@ -378,6 +379,7 @@
 		69107CB3FEDA99A0E363D796 /* AppToastCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppToastCenter.swift; sourceTree = "<group>"; };
 		6B4C495D3F22E19737D9DDB4 /* BackfillJob.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackfillJob.swift; sourceTree = "<group>"; };
 		6D7987DD5DAFB64A0DD0B89D /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		6F0FCCA807B71D0FCB4116C0 /* StdHeroAmbient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StdHeroAmbient.swift; sourceTree = "<group>"; };
 		6F135C66FA2A748742B8DE33 /* StdProtoKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StdProtoKit.swift; sourceTree = "<group>"; };
 		6F3A37B5F2B28B58848A8FC9 /* LoadingFixRoundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingFixRoundTests.swift; sourceTree = "<group>"; };
 		704554FA174B868E4DADC6C6 /* DeleteAllDataView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteAllDataView.swift; sourceTree = "<group>"; };
@@ -690,6 +692,7 @@
 		8793F69F3E106B9EBE094600 /* StdProto */ = {
 			isa = PBXGroup;
 			children = (
+				6F0FCCA807B71D0FCB4116C0 /* StdHeroAmbient.swift */,
 				382429F8DFA482E1145CA492 /* StdProtoGoalCheck.swift */,
 				CEE65EB2F07FD47C0E16EF7F /* StdProtoInbox.swift */,
 				6F135C66FA2A748742B8DE33 /* StdProtoKit.swift */,
@@ -1331,6 +1334,7 @@
 				D22873F8F007BD7B0F0897C2 /* RulesClassifier.swift in Sources */,
 				7C2A2538C59DDE81E8BD4A0C /* RulesEngine.swift in Sources */,
 				CC3AD4AEC85263A4DB7CC2EE /* SettingsView.swift in Sources */,
+				8E8FF8976A3444154B35F0C0 /* StdHeroAmbient.swift in Sources */,
 				B483E0D058151819BA050312 /* StdProtoGoalCheck.swift in Sources */,
 				19D1586C28401404804B282C /* StdProtoInbox.swift in Sources */,
 				E098839B9FD95D7F63C9FE6A /* StdProtoKit.swift in Sources */,

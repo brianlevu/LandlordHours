@@ -22,6 +22,14 @@ struct StdSeed {
     let week: [StdEntry]
 
     static func make(_ id: String) -> StdSeed {
+        if id == "one" {
+            // Most owners: one rental (Santa Ray Ave only), with Brian's items.
+            let brian = make("brian")
+            let santa = brian.rentals.rentals.filter { $0.id == "santa" }
+            return StdSeed(id: "one", rentals: HomeProtoSeed(id: "one", rentals: santa, sharedTarget: nil),
+                           suggestions: brian.suggestions.filter { !$0.title.contains("Delaney") && !$0.title.contains("Yeandle") },
+                           week: brian.week.map { StdEntry(id: $0.id, title: $0.title, rental: "Santa Ray Ave", category: $0.category, day: $0.day, hours: $0.hours) })
+        }
         let rentals = HomeProtoSeed.make(id)
         switch id {
         case "reps750":

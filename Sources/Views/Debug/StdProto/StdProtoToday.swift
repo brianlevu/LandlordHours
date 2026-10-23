@@ -361,6 +361,8 @@ struct StdHeroCard: View {
     }
 
     private var statusWords: String { hero.status ?? "" }
+    /// One rental: no switcher; the card names it and gives the house and the sky the room.
+    private var single: Bool { seed.rentals.rentals.count == 1 && seed.rentals.sharedTarget == nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -373,7 +375,7 @@ struct StdHeroCard: View {
             .accessibilityLabel(L("\(hero.flag), \(Int(hero.number)) \(hero.label). \(statusWords)"))
             .accessibilityAdjustableAction { dir in step(dir == .increment ? 1 : -1) }
             .accessibilityIdentifier("std.hero")
-            if !typeSize.isAccessibilitySize {
+            if !typeSize.isAccessibilitySize && !single {
                 Rectangle().fill(HouseTokens.drafting.opacity(0.25)).frame(height: 0.5)
                 rentalRow
             }
@@ -436,19 +438,32 @@ struct StdHeroCard: View {
     }
 
     private var fullTop: some View {
-        HStack(alignment: .bottom, spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-                number
-                label
-                status.padding(.top, 8)
+        let houseSize: CGFloat = single ? 188 : 150
+        return VStack(alignment: .leading, spacing: 0) {
+            if single {
+                Text(L("2026 · \(hero.flag)")).font(StdFont.drafting).textCase(.uppercase).tracking(StdFont.draftingTracking)
+                    .foregroundStyle(HouseTokens.drafting)
+                    .lineLimit(1)
+                    .padding(.bottom, 4)
             }
-            .layoutPriority(1)
-            .padding(.bottom, 4)
-            Spacer(minLength: 0)
-            house.frame(width: 150, height: 150)
-                .padding(.trailing, -8).padding(.bottom, -10)
+            HStack(alignment: .bottom, spacing: 0) {
+                VStack(alignment: .leading, spacing: 0) {
+                    number
+                    label
+                    status.padding(.top, 8)
+                }
+                .layoutPriority(1)
+                .padding(.bottom, 4)
+                Spacer(minLength: 0)
+                house.frame(width: houseSize, height: houseSize)
+                    .padding(.trailing, -8).padding(.bottom, -10)
+            }
         }
-        .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 12)
+        .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, single ? 16 : 12)
+        // The ambient sky: a fixed box in the top-right corner, behind the house, clear of the number.
+        .background(alignment: .topTrailing) {
+            StdHeroAmbient().frame(width: 190, height: 64)
+        }
     }
 
     /// D3c: number + one label; art hidden. The rental switcher is one 44pt control in the card.
@@ -457,7 +472,7 @@ struct StdHeroCard: View {
             HStack(alignment: .center, spacing: 8) {
                 number
                 Spacer(minLength: 8)
-                rentalMenu
+                if !single { rentalMenu }
             }
             label
         }
