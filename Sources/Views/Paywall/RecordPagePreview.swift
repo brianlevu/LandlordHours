@@ -62,7 +62,8 @@ struct RecordPageModel: Equatable {
         let input = AuditReportBuilder.inputFromTaxProfile(
             entries: entries, properties: properties, taxYear: year,
             spouseTracking: tax.spouseTracking, nonREWorkHours: tax.nonREWorkHours,
-            groupingElection: tax.groupingElection, noOneParticipatedMore: tax.noOneParticipatedMore(forYear: year))
+            groupingElection: tax.groupingElection, noOneParticipatedMore: tax.noOneParticipatedMore(forYear: year),
+            propertyAnswers: tax.participationAnswers(forYear: year, properties: properties))
         return await Task.detached(priority: .userInitiated) {
             let report = AuditReportBuilder.build(input)
             return report.isEmpty ? .sample(year: year) : .from(report: report, owner: owner, properties: properties)

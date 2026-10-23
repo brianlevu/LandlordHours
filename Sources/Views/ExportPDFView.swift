@@ -386,7 +386,8 @@ struct ExportPDFView: View {
             spouseTracking: taxProfile.spouseTracking,
             nonREWorkHours: taxProfile.nonREWorkHours,
             groupingElection: taxProfile.groupingElection,
-            noOneParticipatedMore: taxProfile.noOneParticipatedMore(forYear: year)
+            noOneParticipatedMore: taxProfile.noOneParticipatedMore(forYear: year),
+            propertyAnswers: taxProfile.participationAnswers(forYear: year, properties: viewModel.properties)
         ))
     }
 

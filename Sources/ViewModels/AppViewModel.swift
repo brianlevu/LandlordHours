@@ -107,6 +107,7 @@ class AppViewModel: ObservableObject {
         if UserScope.userId != nil {
             migrateUnscopedLegacyData()
             loadData()
+            rentalsDidLoadOrChange()
             loadTimerState()
             refreshWidgetSnapshot()
         }
@@ -297,6 +298,8 @@ class AppViewModel: ObservableObject {
         GoalManager.shared.loadGoals()
         CategoryManager.shared.loadCategories()
         TaxProfileManager.shared.reload()
+        RentalPlanStore.shared.reload()
+        rentalsDidLoadOrChange()
         MilestoneTracker.shared.reload()
 
         userName = Self.resolvedProfileName(.standard)
@@ -489,6 +492,7 @@ class AppViewModel: ObservableObject {
         GoalManager.shared.resetForSignOut()
         CategoryManager.shared.resetForSignOut()
         TaxProfileManager.shared.resetForSignOut()
+        RentalPlanStore.shared.reload()
         MilestoneTracker.shared.reload()
         AppleSignInManager.shared.signOut()
     }
@@ -603,8 +607,11 @@ class AppViewModel: ObservableObject {
             "LandlordHours.taxProfile.spouseTracking",
             "LandlordHours.taxProfile.taxYear",
             "LandlordHours.taxProfile.groupingElection",
-            "LandlordHours.taxProfile.nonREWorkHours"
-        ]
+            "LandlordHours.taxProfile.nonREWorkHours",
+            "LandlordHours.taxProfile.noOneParticipatedMore",
+            "LandlordHours.taxProfile.noOneParticipatedMore.v2",
+            "LandlordHours.taxProfile.noOneParticipatedMore.v2.migration"
+        ] + RentalPlanStore.allKeys
 
         for key in Set(localDataKeys + CaptureOptIn.allBaseKeys) {
             defaults.removeObject(forKey: UserScope.key(key))
@@ -613,6 +620,7 @@ class AppViewModel: ObservableObject {
         GoalManager.shared.resetForDataReset()
         CategoryManager.shared.resetForDataReset()
         TaxProfileManager.shared.resetForDataReset()
+        RentalPlanStore.shared.resetAll()
         MilestoneTracker.shared.reload()
         SubscriptionManager.shared.reload()
         defaults.synchronize()
@@ -689,7 +697,9 @@ class AppViewModel: ObservableObject {
             "taxYear",
             "groupingElection",
             "nonREWorkHours",
-            "noOneParticipatedMore"
+            "noOneParticipatedMore",
+            "noOneParticipatedMore.v2",
+            "noOneParticipatedMore.v2.migration"
         ]
         let baseKeys = unscopedLegacyKeys + [
             "legacyDataMigrated",
@@ -717,7 +727,7 @@ class AppViewModel: ObservableObject {
             HouseCelebrationLedger.backfillShownBaseKey,
             ProfileRestore.profileNameKey,
             CapturePromptConsent.baseKey
-        ] + taxProfileFields.map { "LandlordHours.taxProfile.\($0)" } + CaptureOptIn.allBaseKeys
+        ] + taxProfileFields.map { "LandlordHours.taxProfile.\($0)" } + CaptureOptIn.allBaseKeys + RentalPlanStore.allKeys
 
         for key in Set(baseKeys) {
             defaults.removeObject(forKey: UserScope.key(key, userId: userId))
@@ -804,6 +814,7 @@ class AppViewModel: ObservableObject {
         let property = RentalProperty(name: name, address: address, propertyType: type)
         properties.append(property)
         saveData()
+        rentalsDidLoadOrChange()
         // 2.0: a toast, not the 1.x full-screen confetti (CelebrationType.propertyAdded is retired).
         if !suppressCelebrations && persistenceError == nil {
             LHToastCenter.shared.show(.success, "Added \(property.name)")
@@ -830,6 +841,7 @@ class AppViewModel: ObservableObject {
         deleteAttachmentFiles(for: removedEntries)
         timeEntries.removeAll { $0.propertyId == property.id }
         saveData()
+        rentalWasDeleted(property.id)
         // Tombstones the property AND its entries; the next push sends the deletes.
         syncService.deletePropertyFromCloud(property, cascadedEntryIds: removedEntries.map(\.id))
     }
@@ -1223,7 +1235,7 @@ class AppViewModel: ObservableObject {
             year: year,
             propertyId: propertyId,
             groupingElection: TaxProfileManager.shared.groupingElection,
-            noOneParticipatedMore: TaxProfileManager.shared.noOneParticipatedMore(forYear: year)
+            noOneParticipatedMore: participationAnswer(year: year, propertyId: propertyId)
         )
     }
 
@@ -1235,7 +1247,7 @@ class AppViewModel: ObservableObject {
             properties: properties,
             year: year,
             groupingElection: TaxProfileManager.shared.groupingElection,
-            noOneParticipatedMore: TaxProfileManager.shared.noOneParticipatedMore(forYear: year)
+            answers: TaxProfileManager.shared.participationAnswerLookup(year: year)
         )
     }
     
@@ -1762,6 +1774,7 @@ extension AppViewModel: CloudKitSyncDelegate {
             }
         }
         saveDataLocal()
+        rentalsDidLoadOrChange()
     }
 
     func syncDidReceiveEntries(_ remoteEntries: [TimeEntry]) {
@@ -1783,6 +1796,7 @@ extension AppViewModel: CloudKitSyncDelegate {
         properties.removeAll { ids.contains($0.id) }
         timeEntries.removeAll { ids.contains($0.propertyId) }
         saveDataLocal()
+        for id in ids { rentalWasDeleted(id) }
     }
 
     func syncDidDeleteEntryIds(_ ids: Set<UUID>) {
@@ -1893,6 +1907,8 @@ extension AppViewModel: CloudKitSyncDelegate {
         defaults.set(Self.launchMockEmail(defaultValue: "brianlevu@gmail.com"), forKey: ProfileKeys.localProfileEmail)
         defaults.set(Self.launchMockName(defaultValue: scenario.userName), forKey: ProfileKeys.localProfileName)
         defaults.set(LoginType.local.rawValue, forKey: ProfileKeys.loginType)
+        TaxProfileManager.shared.reload()
+        RentalPlanStore.shared.reload()
 
         isSignedIn = true
         userName = Self.launchMockName(defaultValue: scenario.userName)
@@ -1964,6 +1980,7 @@ extension AppViewModel: CloudKitSyncDelegate {
         }
 
         saveDataLocal()
+        rentalsDidLoadOrChange()
         goalManager.saveGoals()
         SubscriptionManager.shared.reload()
         CategoryManager.shared.loadCategories()

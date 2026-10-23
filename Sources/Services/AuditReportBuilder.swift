@@ -188,7 +188,11 @@ enum AuditReportBuilder {
         /// A missing person means "not entered": the more-than-half test is not evaluated.
         var nonRealEstateHours: [Participant: Double] = [:]
         var groupingElection: Bool = false
+        /// The grouped activity's "did anyone else do more?" answer (used under the grouping
+        /// election, and for every rental when `propertyAnswers` is nil, as before 2.1).
         var noOneParticipatedMore: Bool? = nil
+        /// 2.1: each rental's own answer (a rental missing here is unanswered). nil: not given.
+        var propertyAnswers: [UUID: Bool]? = nil
         var generatedAt: Date = Date()
         var calendar: Calendar = .current
     }
@@ -205,6 +209,7 @@ enum AuditReportBuilder {
         nonREWorkHours: Double,
         groupingElection: Bool,
         noOneParticipatedMore: Bool?,
+        propertyAnswers: [UUID: Bool]? = nil,
         generatedAt: Date = Date()
     ) -> Input {
         var participants: [Participant] = [.selfParticipant]
@@ -219,6 +224,7 @@ enum AuditReportBuilder {
             nonRealEstateHours: nonRE,
             groupingElection: groupingElection,
             noOneParticipatedMore: noOneParticipatedMore,
+            propertyAnswers: propertyAnswers,
             generatedAt: generatedAt
         )
     }
@@ -360,7 +366,8 @@ enum AuditReportBuilder {
                 for total in propertyTotals {
                     let result = TaxQualificationEngine.materialParticipationStatus(
                         entries: yearEntries, year: input.taxYear, propertyId: total.propertyId,
-                        groupingElection: false, noOneParticipatedMore: input.noOneParticipatedMore
+                        groupingElection: false,
+                        noOneParticipatedMore: input.propertyAnswers.map { $0[total.propertyId] } ?? input.noOneParticipatedMore
                     )
                     mpLines.append(mpLine(label: total.name, result))
                 }

@@ -357,7 +357,9 @@ enum ExportFingerprint {
     /// The live fingerprint for the active profile.
     @MainActor static func current(app: AppViewModel, year: Int) -> String {
         let tax = TaxProfileManager.shared
-        let mostHours = String(describing: tax.noOneParticipatedMore(forYear: year))
+        // Every rental's "did anyone else do more?" answer (and the grouped one): the report
+        // prints each rental's own, so a change to ANY of them makes the cached report stale.
+        let mostHours = tax.participationFingerprint(year: year)
         let profile = "\(tax.spouseTracking)|\(tax.nonREWorkHours)|\(tax.groupingElection)|\(mostHours)|\(tax.filingStatus)"
         return make(entries: app.timeEntries, properties: app.properties, year: year, profile: profile)
     }

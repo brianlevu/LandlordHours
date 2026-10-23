@@ -65,6 +65,12 @@ struct ReportsView: View {
         viewModel.materialParticipationOverview(year: selectedYear, includeSpouse: viewModel.tracksSpouseJointly)
     }
 
+    /// The rental the 100-hour question is about (nil under the grouping election).
+    private var participationRentalName: String? {
+        guard let id = materialParticipation.propertyId else { return nil }
+        return viewModel.properties.first { $0.id == id }?.name
+    }
+
     private var showsParticipationRow: Bool {
         selectedGoal == .mp100
             && materialParticipation.ownerAndSpouseHours > 100
@@ -148,9 +154,12 @@ struct ReportsView: View {
             .sheet(isPresented: $showingParticipationSheet) {
                 ParticipationConfirmationSheet(
                     year: selectedYear,
-                    currentAnswer: materialParticipation.noOneParticipatedMore
+                    currentAnswer: materialParticipation.noOneParticipatedMore,
+                    propertyName: participationRentalName
                 ) { answer in
-                    taxProfile.setNoOneParticipatedMore(answer, forYear: selectedYear)
+                    // The result names the rental it counted (nil under the grouping election:
+                    // the grouped activity's answer), so the answer lands on that rental.
+                    taxProfile.setNoOneParticipatedMore(answer, forYear: selectedYear, propertyId: materialParticipation.propertyId)
                 }
             }
             .onAppear {
@@ -273,7 +282,7 @@ struct ReportsView: View {
                     Text(title)
                         .font(.body.weight(.semibold))
                         .foregroundStyle(colors.textPrimary)
-                    Text(answer == nil ? "Answer for \(String(selectedYear)) to settle the 100-hour test." : "Tap to change your answer for \(String(selectedYear)).")
+                    participationRowSubtitle(answered: answer != nil)
                         .font(.subheadline)
                         .foregroundStyle(colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -292,6 +301,17 @@ struct ReportsView: View {
         .buttonStyle(.lhPressable)
         .accessibilityIdentifier("reports.mp100.confirmRow")
         .accessibilityHint("Opens the 100-hour test question")
+    }
+
+    /// Names the rental the answer is for, when the count is per rental.
+    private func participationRowSubtitle(answered: Bool) -> Text {
+        let year = String(selectedYear)
+        if let name = participationRentalName {
+            return answered
+                ? Text("Tap to change your answer for \(name) in \(year).", tableName: "Home")
+                : Text("Answer for \(name) in \(year) to settle the 100-hour test.", tableName: "Home")
+        }
+        return Text(answered ? "Tap to change your answer for \(year)." : "Answer for \(year) to settle the 100-hour test.")
     }
 
     // MARK: Breakdown
@@ -580,6 +600,9 @@ private struct StandingCard: View {
 struct ParticipationConfirmationSheet: View {
     let year: Int
     let currentAnswer: Bool?
+    /// 2.1: the rental this answer is for. With a name the question asks about that rental;
+    /// without one (the grouped activity, or a 2.0 caller) it asks about all of them.
+    var propertyName: String? = nil
     let onAnswer: (Bool?) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -597,7 +620,7 @@ struct ParticipationConfirmationSheet: View {
                             .tracking(1.3)
                             .foregroundStyle(colors.draftingInk)
 
-                        Text("Did anyone else, like a property manager or contractor, spend more time on any of your rentals than you and your spouse this year?")
+                        question
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(colors.textPrimary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -650,6 +673,13 @@ struct ParticipationConfirmationSheet: View {
         }
         .presentationDetents([.medium, .large])
         .accessibilityIdentifier("participation.sheet")
+    }
+
+    private var question: Text {
+        if let propertyName, !propertyName.isEmpty {
+            return Text("Did anyone else, like a property manager or contractor, spend more time at \(propertyName) than you and your spouse this year?", tableName: "Home")
+        }
+        return Text("Did anyone else, like a property manager or contractor, spend more time on any of your rentals than you and your spouse this year?")
     }
 
     private func answerButton(
