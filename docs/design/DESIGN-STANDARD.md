@@ -107,6 +107,8 @@ One struct replaces `LogHoursStepper` and `SuggestionConfirmSheet:252`. Two `LHB
 
 Anchor: Fitness Summary tiles. `backgroundSecondary`, radius 20, padding 16, hairline in dark only. Order: eyebrow (drafting: SF Mono 11 `.medium` caps +12% tracking, **`draftingInk`**) → value (`.largeTitle.rounded.bold` tabular) → label `.subheadline` `textSecondary` → optional `.footnote` → optional one `LHButton.secondary`, or the card is one `.lhPressable` target. Ceiling 160pt at default **[measured]**. The blueprint hero is the one exception (≤ 320pt; the only card with an illustration; eyebrow in drafting cyan `#8FD3FF` on blueprint per the brand doc).
 
+**Today decision (2026-10-23, after the first mockup pass):** the rental switcher lives **inside the bottom of the house card**, as one slim row of small houses (one per rental plus "All"), each ≤ 32pt tall in a 44pt tap frame, horizontally scrolling when they do not fit. The selected house carries a 1.5pt drafting-cyan ring; switching crossfades the hero number and art (`countChange`, `heroCountUp`). There is **no separate tile strip** under the hero; the hero's 320pt ceiling includes this row.
+
 ### 1.11 Stat tile `LHTile.Stat`
 
 Two-up, 12 gutter, radius 16, padding 14. Value `.title2.rounded.bold` tabular; label `.caption` `textSecondary` one line; optional trend glyph. 84–96pt **[measured]**. Read-only or whole-tile tap.
@@ -195,11 +197,11 @@ Default Dynamic Type, 402×874pt, light and dark, unless stated. The builder rep
 | # | Rule | Number | Kind |
 |---|---|---|---|
 | D1 | Actionable row height, divider to divider | 56–88; target 64 | measured |
-| D2 | One list item's share of viewport | ≤ 12% default; ≤ 30% AX3 | measured |
+| D2 | One list item's share of viewport | ≤ 12% default; ≤ 45% at AX3 (a two-line row at AX3 cannot meet 30%; mockup review 2026-10-23) | measured |
 | D3 | List tab (Inbox, Records, Properties) with ≥ 5 items present: complete rows visible under the title, above the tab bar | ≥ 5 at default, ≥ 4 at XXL | measured |
 | D3b | Today above the fold at default and XXL | title + hero + section header + ≥ 2 rows + next header | measured |
 | D3c | Today at AX1–AX3 | hero switches to its compact variant (number + label, art hidden, ≤ 160pt); title + compact hero + header + ≥ 1 row visible | measured |
-| D4 | Empty bands inside a card: pixel rows within the card inset 16 that are all card background (ΔE ≤ 3), as share of card height | ≤ 35% (hero excluded) | measured |
+| D4 | Empty bands inside a card: pixel rows within the card inset 16 that are all card background (ΔE ≤ 3), as share of card height | ≤ 35%. Applies to `LHCard.*` and the hero. Grouped value-row containers (Settings-style `LHRow.Value`/`LHRow.Toggle` groups, as in Settings, Log time and the confirm sheet) are exempt: their padding is the row rhythm, and Settings itself would fail | measured |
 | D5 | Primary actions per card; actions in a row | 1 per card; rows: one leading control, no pills | grep |
 | D6 | Non-hero card viewport share; hero incl. its header | ≤ 20%; ≤ 40% | measured |
 | D7 | Text lines per row | ≤ 3 (title ≤ 2, meta 1) | measured |
@@ -305,7 +307,7 @@ Builder runs these and puts the numbers in the hand-off; the gate re-measures an
 
 ### 5.1 Density (PIL) — `scripts/density_gate.py <frame.png> --rows <ids>`
 
-1. Item share = item bbox height ÷ frame height (D2). 2. Items above the fold = complete row boxes between the title's bottom and the tab bar's top, found by divider runs (`border`-coloured pixels ≥ 60% of card width) or XCUITest element bounds (D3/D3b/D3c). 3. Empty bands (D4). 4. Row height between dividers (D1). 5. Gutter = frame edge to first non-canvas pixel in the content column (D9). 6. Contrast ≥ 4.5:1 on every text pair including placeholders, disabled, secondary and tag ink on wash. 7. No two differently named state frames byte-identical.
+1. Item share = item bbox height ÷ frame height (D2). 2. Items above the fold = complete row boxes between the title's bottom and the tab bar's top, found by divider runs (`border`-coloured pixels ≥ 60% of card width) or XCUITest element bounds (D3/D3b/D3c). 3. Empty bands (D4), skipping exempt value-row groups. 4. Row height between dividers (D1); a card's foot action ("Confirm N likely", `today.confirm.batch`) is not a row and is excluded from D1 and from the D3 row count, identified by its accessibility identifier or by having no divider above it. 5. Gutter = frame edge to first non-canvas pixel in the content column (D9). 6. Contrast ≥ 4.5:1 on every text pair including placeholders, disabled, secondary and tag ink on wash. 7. No two differently named state frames byte-identical.
 
 ### 5.2 Component conformance
 
