@@ -603,6 +603,7 @@ private struct AutoCaptureSettingsSection: View {
     @State private var isAsking = false
 
     @State private var pccOn = PCCSettings().isEnabled
+    @State private var noteModelOn = NoteReadingSettings().isEnabled
 
     /// Must stay true to the code: calendar titles only ever reach the on-device model
     /// (ClassifierChain); a Log time note goes to the on-device model first and to Private
@@ -647,7 +648,18 @@ private struct AutoCaptureSettingsSection: View {
             .disabled(!calendarOn || isAsking || UserScope.userId == nil)
             .accessibilityIdentifier("settings.capture.prompts")
 
-            if Self.offersPCC {
+            SettingToggleRow(
+                symbol: "text.viewfinder",
+                title: String(localized: "Read my notes with Apple\u{2019}s model"),
+                subtitle: String(localized: "Fills Log time from what you write or say. Off, it still matches your own words, like a rental name or \u{201C}2 hours\u{201D}."),
+                isOn: Binding(get: { noteModelOn }, set: { on in
+                    noteModelOn = on
+                    NoteReadingSettings().isEnabled = on
+                })
+            )
+            .accessibilityIdentifier("settings.capture.noteModel")
+
+            if Self.offersPCC && noteModelOn {
                 SettingToggleRow(
                     symbol: "lock.icloud",
                     title: "Private Cloud Compute",
@@ -716,6 +728,7 @@ private struct AutoCaptureSettingsSection: View {
         calendarOn = CaptureOptIn.calendarSuggestionsEnabled()
         promptsOn = EventPromptsConsent.isEnabled()
         pccOn = PCCSettings().isEnabled
+        noteModelOn = NoteReadingSettings().isEnabled
         muteCount = AppModelHost.shared.suggestionStore?.muteRules.count ?? 0
     }
 

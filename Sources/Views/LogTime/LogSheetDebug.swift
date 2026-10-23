@@ -47,9 +47,9 @@ enum LogSheetDebug {
         guard let i = args.firstIndex(of: "-LHLogScript"), args.indices.contains(i + 1) else { return nil }
         switch args[i + 1] {
         case "full": return "fixed the sink at Pine Cabin, about 2 hours yesterday"
-        case "partial": return "met the plumber at Oak Street"
-        case "two": return "turnover clean at Pine Cabin and Oak Street"
-        case "swap": return "replaced the water heater at Oak Street, 3 hours"
+        case "partial": return "met the plumber at Oak St"
+        case "two": return "turnover clean at Pine Cabin and Oak St"
+        case "swap": return "replaced the water heater at Oak St, 3 hours"
         default: return nil
         }
         #else
@@ -155,11 +155,11 @@ enum LogSheetDebug {
         case "nfModel":
             read("fixed the sink at Pine Cabin, about 2 hours yesterday", model: .confirm)
         case "nfPartialHours":
-            read("met the plumber at Oak Street", model: .confirm)
+            read("met the plumber at Oak St", model: .confirm)
         case "nfPartialKind":
-            read("walked Oak Street with Mike")
+            read("walked Oak St with Mike")
         case "nfTwoRentals":
-            read("turnover clean at Pine Cabin and Oak Street", model: .confirm)
+            read("turnover clean at Pine Cabin and Oak St", model: .confirm)
         case "nfZero":
             preset.firstRunName = ""
         case "nfZeroNamed":
@@ -177,7 +177,7 @@ enum LogSheetDebug {
         case "nfMicIntro":
             voiceIntro = true
         case "nfSwap":
-            read("replaced the water heater at Oak Street, 3 hours", model: .swap)
+            read("replaced the water heater at Oak St, 3 hours", model: .swap)
         case "nfManual":
             preset.unfolded = true
             preset.manual = true
