@@ -66,18 +66,22 @@ Width arithmetic (402pt screen): an inset-grouped card is 362pt wide (20pt syste
 | Container | `List(.insetGrouped)` section; row insets 16/10/16/10; `minHeight: 56`; divider inset 50 (16+22+12). |
 | Leading control | 22pt circle, 1.5pt stroke `textTertiary`, inside a 44×44 tap frame. Tap: if `canQuickLog` → fills `positive` with a white `checkmark` (motion `rowConfirm`); else opens the sheet (the "Needs hours" tag says why). `accessibilityLabel` "Confirm 2 hours" / "Review and confirm". **[measured]** 22pt glyph, 44pt frame. |
 | Title | `.body.semibold`, `textPrimary`, `lineLimit(2)` at default, nil at AX. Source is one function, `InboxFormat.rowTitle(suggestion, propertyName)` → "Plumber at Pine Cabin" **[grep]**; whether the noun is the right noun is **[judgment]**. 216–265pt available (arithmetic above): "Plumber at Pine Cabin" 175pt fits on one line; titles over ~216pt wrap to two (row 86). |
-| Meta line | `.subheadline`, `textSecondary`, one line, tail-truncates at default, wraps at AX. SF source glyph via `Label` (`calendar` / `checklist`) · relative date · time range · one `LHTag`: category, or a status tag ("Not sure", "Needs hours", "Might be logged") which replaces the category. Max 2 tags, overflow "+1". |
+| Meta line | `.subheadline`, `textSecondary`, one line, tail-truncates at default, wraps at AX. SF source glyph via `Label` (`calendar` / `checklist`) · time range ("12–2", "9–10:30") · one `LHTag`: category, or a status tag ("Not sure", "Needs hours", "Might be logged") which replaces the category. **No date in the row**: the date is the day header above it (§1.15a). Max 2 tags, overflow "+1". |
 | Trailing: hours | `.subheadline.semibold` `.rounded` tabular, `textPrimary`, trailing-aligned, hugging its content: min 19pt ("2h"), max **68pt** (fits "12h 30m" at 65.1pt). "—" `textTertiary` when unknown. |
 | Row tap | Opens the confirm sheet. |
 | Swipe | System `.swipeActions` only (§1.3a). Trailing full swipe = "Not rental work" (`textSecondary` tint, `xmark`); leading full swipe = Confirm (`positive`, `checkmark`). |
 | Decline | Via trailing swipe or the sheet's "Not rental work" `.tertiary`. No ✕ in the row. |
-| Batch | Card foot: `LHButton.tertiary` "Confirm N likely" (N = rows with `canQuickLog` and not `notSure`); shown when N ≥ 2; one tap logs them with one toast "Logged 3 · Undo". Header keeps "See all". |
+| Batch | "Confirm N likely" (N = rows with `canQuickLog` and not `notSure`), shown when N ≥ 2; one tap logs them with one toast "Logged 3 · Undo". Two placements, one implementation: when the section fits the viewport, an `LHButton.tertiary` at the card foot; when the section's bottom edge is below the viewport (scroll geometry), a **pinned bar** (§1.3b). Header keeps "See all". |
 | Icons | SF Symbols only. No `CategoryToolTile` in a decision row; the render returns at 56pt in the sheet header. |
 | Height **[measured]** | 64 with a 1-line title; 86 with 2 lines; ceiling 88 at default. |
 
 #### 1.3a Swipe: one implementation, stated
 
 **Decision: fully system.** `List` + `.swipeActions(edge:allowsFullSwipe: true)` in both Inbox and Today. No custom threshold, no `DragGesture`, no 96pt projection, no peek hint. Consequence: Today's root becomes a `List` with `.listStyle(.insetGrouped)` for the whole screen (as Reminders and Things are lists). The hero, timer slot and pace tiles are rows with `.listRowBackground(Color.clear)`, `.listRowInsets(EdgeInsets())` and `.listRowSeparator(.hidden)`; the To confirm rows are an ordinary inset-grouped section so the system draws the card and the swipe backgrounds clip to its corners. No hand-built card (`.propertyCard()`, `clipShape`) around rows anywhere **[grep]**: a custom card cannot clip a system swipe background correctly. `TodaySwipeRow`, `TodaySwipeHint` and `TodayDebugSeed.swipePreviewOffset` are deleted **[grep]**. The leading control is the visible affordance; Reminders ships no hint either. The haptic on a full swipe is ours, bound to the state change (§B.3), because the system fires none.
+
+#### 1.3b Pinned batch bar
+
+Anchor: Copilot's pinned "Yes, these are probably duplicates". Rendered with `safeAreaInset(edge: .bottom)`, 12pt above the tab bar, horizontal inset 20, in the slot the toast uses (a toast stacks above it). Capsule, height 44, `.regularMaterial` with a hairline `border`, label "Confirm N likely" in `.subheadline.semibold` `action` ink, `countChange` on N. It is `.secondary`-sized, not a `.primary`, so D8 holds. Appears with `toastIn`, leaves with `toastOut` when the section scrolls fully into view or N < 2. Density treatment **[measured]**: it is not a row and is excluded from D1, D2, D3 counts and D6; D3/D3b are measured with the bar present (it takes 56pt of the fold), so "≥ 2 rows above the fold" must hold with it on screen. `accessibilityIdentifier` `today.confirm.batch`.
 
 ### 1.4 Browse row `LHRow.Browse`
 
@@ -134,9 +138,15 @@ Press = motion `press`. Disabled = 40% opacity. The symbol weight inside `.icon`
 
 Tab roots: **Fraunces 34/500** via `Font.custom("Fraunces", size: 34, relativeTo: .largeTitle)` (brand doc §3), optional one-line `.subheadline` `textSecondary` subtitle, 20 gutter, 8 below, one trailing `.icon` at most. Sheets: SF `.title2.semibold` with an optional drafting eyebrow ("TODAY · THU, OCT 22") in `draftingInk`. Display (Welcome, milestone): Fraunces 34. **[grep]** Fraunces never under 28pt and never inside a row, card or button.
 
+**Decision (2026-10-23): "See all" push roots may use Fraunces 34.** A pushed screen that presents a whole collection reached from a section header ("See all" → All rentals, All records, Muted suggestions) is a collection root and takes the tab-root title style (Fraunces 34 + subtitle), with a back `.icon` in the leading slot. A pushed screen about one item (a rental's detail, a record) takes SF `.title1.semibold`. Checkable: `LHScreenTitle(style:)` has two cases, `.collection` (Fraunces) and `.detail` (SF); `.collection` is allowed in tab roots and in the files listed as collection roots in the hand-off **[grep]**. All rentals is therefore conforming, not drift.
+
 ### 1.15 Section header `LHSectionHeader`
 
 Drafting label (SF Mono 11 `.medium` caps +12%) in **`draftingInk`**; when the header names a state ("NEEDS ATTENTION", "ON PACE") it may use `caution`/`positive` ink (intent colour on words, brand doc §2). Optional count capsule (height 20, `.caption2.semibold`, `actionSurface`/`action`). Trailing slot: one `.tertiary`. 24 above, 8 below. Replaces `TodaySectionHeader`, the inline header in `InboxView:85` and `BPSectionHeader` **[grep]**.
+
+#### 1.15a Day headers in actionable lists
+
+Anchor: Copilot's date dividers, Things' "Today / This Evening". Every actionable list (Today To confirm, Inbox) groups rows by day; the row's meta line carries no date. Header: `.subheadline.semibold` `textSecondary` in sentence case, **not** the drafting mono (that is for section headers; two caps-mono levels would read as one). Text: "Today", "Yesterday", then weekday + date without year for the last 6 days ("Mon Oct 19"), then "Oct 12" beyond that, "Oct 12, 2025" in another year; relative words come from `RelativeDateTimeFormatter`-equivalent rules in `InboxFormat.dayHeader(_:now:)` **[grep: one source]**. Layout: inside the inset-grouped section as the `Section` header, 16pt leading inset to align with the control, 16 above, 6 below; height 28 **[measured]**. A day header is not a row (excluded from D1/D3 counts). Ordering: newest day first; within a day, by start time. One header per day, even for a single row. Empty days are not shown.
 
 ### 1.16 Tags and chips
 
@@ -224,20 +234,22 @@ Three items at default, 402pt:
 ```
 TO CONFIRM  (3)                                             See all
 ┌────────────────────────────────────────────────────────────────┐
+│  Today                                                         │  ← day header, 28pt
 │  ◯   Plumber at Pine Cabin                                2h   │
-│      ▦ Calendar · Today 12–2 · [Repairs]                       │
-│     ─────────────────────────────────────────────────────────  │
+│      ▦ Calendar · 12–2 · [Repairs]                             │
+│                                                                │
+│  Thu Oct 8                                                     │
 │  ◯   Making monthly mortgage payment                       —   │
-│      ☑ Reminder · Oct 8 · [Needs hours]                        │
+│      ☑ Reminder · [Needs hours]                                │
 │     ─────────────────────────────────────────────────────────  │
 │  ◯   Showing at Oak Street                              1h 30m │
-│      ▦ Calendar · Oct 8 9–10:30 · [Not sure]                   │
+│      ▦ Calendar · 9–10:30 · [Not sure]                         │
 │     ─────────────────────────────────────────────────────────  │
 │                      Confirm 1 likely                          │  ← when N ≥ 2; here N = 1 so hidden
 └────────────────────────────────────────────────────────────────┘
 ```
 
-(▦ `calendar`, ☑ `checklist`; `[ ]` an `LHTag`; ◯ the 22pt leading control in a 44 frame. Row 2 wraps to 86pt because its title is 282pt wide. In this sample only row 1 is quick-loggable and likely, so the foot is hidden; with two such rows it reads "Confirm 2 likely".)
+(▦ `calendar`, ☑ `checklist`; `[ ]` an `LHTag`; ◯ the 22pt leading control in a 44 frame. Dates live in the day headers (§1.15a), so the meta line is source · time · tag. Row 2 wraps to 86pt because its title is 282pt wide. In this sample only row 1 is quick-loggable and likely, so the foot is hidden; with two such rows it reads "Confirm 2 likely", and if the section overflowed the viewport it would pin above the tab bar instead (§1.3b).)
 
 | Before | After | Why |
 |---|---|---|
@@ -371,6 +383,7 @@ Rules, all **[grep]** unless marked:
 | `count` | `.easeOut(0.60)` — hero digits only | new |
 | `ringProgress` | `.spring(duration: 0.60, bounce: 0)` — hero mask, ring | `spring(0.7, 0.82)` |
 | `stage` | `.spring(duration: 0.45, bounce: 0)` — milestone only | `logoEntrance` |
+| `sweep` | `.easeOut(0.45)` — the drafting pass line only | new |
 
 ### B.3 Named motions
 
@@ -384,6 +397,7 @@ Rules, all **[grep]** unless marked:
 | `tileFocus` | picker tile selected | ring stroke `border` → `action` crossfade (0.15); no scale | `quick` | `.selection` | same |
 | `countChange` | count capsule, row hours, stat values | `contentTransition(.numericText())` | `standard` | none | crossfade |
 | `heroCountUp` | hours value changes while Today is visible, never on appear | digits count from the previous value (0.60); house mask rises (0.60) | `count`, `ringProgress` | none | digits jump; mask crossfades 0.2 |
+| `draftingPass` | an hour is confirmed or logged while Today is visible (signature; the brand's own move) | as the house mask rises (`ringProgress`, 0.60), one 1pt drafting-cyan (`#8FD3FF`, `drafting` token) horizontal line sweeps once left → right across the newly built band of the house (0.45, opacity 0.9 → 0), as if a pen drew the line the mask then fills; then stillness. Bound to the same hours `value:` as `heroCountUp`; never on appear; one-shot (no `repeatForever`). Total ≤ 0.60. When hours cross a milestone, `houseStageAdvance` plays instead, never both. | `ringProgress` + `sweep` | the row's `.success`, fired on the same state change; the pass adds no second haptic (one haptic per event) | the new band crossfades from linework to solid (0.30), no line, no mask motion; haptic kept |
 | `houseStageAdvance` | hours cross 100 / 500 / 750 (signature) | linework → solid crossfade (0.22) while the new part scales 0.96 → 1 (0.45); brass sign fades in at 0.30; one confetti burst ≤ 0.60; total ≤ 0.60 | `reveal`, `stage` | `.success` once at the sign | solid part fades in 0.3; no scale, no confetti |
 | `toastIn` / `toastOut` | toast shown / dismissed | in: y +24 → 0 with opacity (0.22); out: opacity → 0, y 0 → +12 (0.15); swipe-down follows the finger then `settle` | `reveal` / `quick` | `.success` saves, `.error` failures, none info | opacity only |
 | `sheetUnfold` | section expands inside a sheet | height with content fade (0.30); ≤ 4 rows stagger at 30ms | `flow`, `reveal` | none | fade 0.2, no stagger |
@@ -393,6 +407,24 @@ Rules, all **[grep]** unless marked:
 | `emptyStateEntrance` | empty state replaces a list | glyph, headline, body fade and rise 8pt, 40ms apart (≤ 0.30 total) | `reveal` | none | fade only |
 | `scanningLine` | "Looking through your calendar" | line draws across; cycle ≥ 1.6s | linear | none | static dashed line |
 | `fieldFocus` | `LHField` focused | stroke `border` → `action` (0.15) | `quick` | none | same |
+
+### B.4 Ambient scenes on the house card
+
+Brian's pick (2026-10-23): "your work shows up" scenes on the hero. Four scenes: a **van** parked by the house after Repairs; a **guest car and a cleaner** at the door after a Turnover or Cleaning; a **person at the door** after a Showing or a tenant meeting; and a **sky** that follows the time of day. The sky is a state, not a scene: it changes on the hour, with no motion. Everything else is a scene.
+
+| Rule | Spec | Kind |
+|---|---|---|
+| When | A scene plays only after a matching entry for the shown rental is confirmed or logged **while Today is visible**, after `draftingPass` has finished. Once per entry, keyed by the entry id (`TodayScenePlayed` set); never on appear, never on a timer, never on a loop. A batch confirm plays at most one scene (the newest matching entry). | grep (trigger bound to the entry id; no `repeatForever`, no `TimelineView(.animation)` in `House/`) |
+| Duration | Enter ≤ 0.60 (`stage`), hold ≤ 2.4s static, exit ≤ 0.60 (`reveal` reversed). Total ≤ 3.6s. After the exit the prop may remain as a still detail (the van stays parked) until Today disappears; no motion after the exit. | measured in code |
+| Where | The scene band is the lower-right of the hero: below the number's baseline band and right of 45% of the card width; it never overlaps the number, the eyebrow, the pace line, the stage label or the switcher row **[measured: bbox intersection = 0]**. The sky sits behind the number only as a flat tint; white on the darkest sky tint stays ≥ 7:1 (today 9.06 on blueprint) **[measured contrast]**. | measured |
+| Over the number | Never. If a scene would need to cross the number's band, it is not a scene we ship. | measured |
+| Pause / skip | Skipped (not queued) when: Reduce Motion is on; Low Power Mode is on; the app is not active; a sheet or alert is presented; the hero is less than 50% visible; VoiceOver is running (the scene is `accessibilityHidden`, decorative); a `houseStageAdvance` is playing (the milestone wins). A scene in flight pauses when the app resigns active and finishes its exit on return. | grep |
+| Reduced motion | The still prop fades in (0.30) and stays; no path motion, no figure movement. | grep |
+| Battery | Transforms and opacity only, inside one `drawingGroup`; no per-frame work when idle; the sky updates via an hourly timer, not a `TimelineView`; Instruments Animation Hitches = 0 and Energy Impact "Low" on an iPhone 12-class device over a 5-scene session; no scene on Low Power Mode. | measured (Instruments) |
+| Density | Scenes add nothing to the hero's 320pt ceiling and never push the switcher row. | measured |
+| Copy | Scenes carry no text. No speech bubbles, no labels. | grep |
+
+A scene is the house acknowledging the record, once. If a reviewer can describe it as "the app is doing something in the background", it has failed **[judgment]**.
 
 ---
 
