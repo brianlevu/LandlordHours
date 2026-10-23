@@ -179,17 +179,30 @@ enum DealSignal {
     /// loan is bookkeeping, which counts, not a financing decision.
     static func isLoanPayment(_ padded: String) -> Bool {
         func has(_ phrase: String) -> Bool { padded.contains(" \(phrase) ") }
-        let pays = ["pay", "pays", "paid", "paying", "payment", "payments", "autopay", "installment"].contains(where: has)
-        let debt = ["mortgage", "mortgages", "loan", "loans", "heloc", "note"].contains(where: has)
-        return pays && debt
+        // A new loan, a refinance, a closing or a loan application is a deal, even beside "payment"
+        // ("Refinance payment estimate", "Closing costs and first mortgage payment").
+        if dealLoanWords.contains(where: has) { return false }
+        if has("monthly mortgage") { return true }
+        let paymentWord = ["pay", "pays", "paid", "paying", "payment", "payments", "autopay", "installment", "installments"].contains(where: has)
+        let debt = ["mortgage", "mortgages", "loan", "loans", "heloc", "note", "hoa", "property tax", "property taxes"].contains(where: has)
+        return paymentWord && debt
     }
+
+    /// Words that make a loan title a deal (non-countable) even when a payment word is beside them.
+    static let dealLoanWords = [
+        "refinance", "refinancing", "refi", "new loan", "new mortgage", "loan application", "loan applications",
+        "mortgage application", "application", "applications", "closing", "close", "pre approval", "preapproval",
+        "pre approved", "cash out", "rate lock", "origination", "underwriting", "underwriter", "lender", "lenders",
+        "mortgage broker", "quote", "apply", "applying",
+    ]
 
     /// The category to propose: a deal signal's non-countable category, else `category`. A loan
     /// or mortgage payment that came out as Financing (keyword table or model) is Bookkeeping.
     static func apply(_ category: ActivityCategory?, title: String) -> ActivityCategory? {
         if let deal = Self.category(forTitle: title) { return deal }
         let padded = " \(RulesEngine.normalize(title)) "
-        if category == .financing, isLoanPayment(padded) { return .bookkeeping }
+        // Whatever category came in (Financing from the table, Management from the calendar).
+        if isLoanPayment(padded) { return .bookkeeping }
         // The keyword table reads any "closing" as Financing; with no deal word beside it
         // ("closing the pool", "closing up for winter") it is ordinary upkeep.
         if category == .financing, padded.contains(" closing ") { return .management }
