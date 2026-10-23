@@ -1310,6 +1310,17 @@
         }
       }
     },
+    "Pick the kind": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick the kind"
+          }
+        }
+      }
+    },
     "Pick the kind of work": {
       "extractionState": "manual",
       "localizations": {

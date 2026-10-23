@@ -7,23 +7,13 @@ import SwiftUI
 // → the context line under the title ("Today · Me ⌄", unfolds) → a receipt link; the pinned Log
 // button states the record. The fill runs on a scripted backend so the timings are reproducible.
 //
-//   -LHLogSheet opaque|glass   A (designer's pick): opaque .large sheet, system push-back and dim;
-//                              glass only on the pinned Log button. B (Brian's ask): .fraction(0.9)
-//                              Liquid Glass sheet with Today blurred behind it.
+//   Presentation (Brian picked A, 2026-10-23): opaque .large sheet, system push-back and dim of Today;
+//   Liquid Glass only on the pinned Log button and the keyboard. The glass-sheet variant B is dropped.
 //   -LHStdState empty|typing|filled|missing|manual|tworentals|updated|timeout|context
 //   -LHStdDemo logfill|logmid  scripted runs: type → rules fill → reading → refinement → Log;
 //                              logmid taps Log mid-read (the read cancels)
 //   -LHLogBackend normal|slow|timeout|rulesonly   the scripted reader's timing
 //   -LHStdMotionLog            prints "STDMOTION <name> <t>" and "<name>.end dur=<s>" per motion
-
-enum StdLogStyle: String {
-    case opaque, glass
-    static let current: StdLogStyle = {
-        let args = ProcessInfo.processInfo.arguments
-        guard let j = args.firstIndex(of: "-LHLogSheet"), args.indices.contains(j + 1) else { return .opaque }
-        return StdLogStyle(rawValue: args[j + 1]) ?? .opaque
-    }()
-}
 
 enum StdLogField: Int, CaseIterable { case rental, kind, hours }
 /// Default (nothing said yet), from your note (✦), or yours (hand-set; a later fill never touches it).
@@ -110,7 +100,8 @@ struct StdLogTimeSheet: View {
     @State private var reading: Set<StdLogField>
     @State private var caption: Caption
     @State private var arrive: [StdLogField: Arrive] = [:]
-    @State private var wash: [StdLogField: Double] = [:]
+    @State private var washTick: [StdLogField: Int] = [:]
+    @State private var washPeak: [StdLogField: Double] = [:]
     @State private var openRow: StdLogField?
     @State private var contextOpen: Bool
     @State private var who = 0
@@ -125,16 +116,11 @@ struct StdLogTimeSheet: View {
     @State private var beforeModel: StdLogRecord?
     @FocusState private var noteFocused: Bool
     private let focusOnOpen: Bool
-    private let style = StdLogStyle.current
 
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
-    /// Text that sits straight on the sheet. On the glass sheet (B) the backdrop is Today's hero, so
-    /// secondary ink measured 3.2–3.9:1; there it takes textPrimary (measured ≥ 4.5:1 at the worst backdrop).
-    private var onSheetSecondary: Color { style == .glass ? colors.textPrimary : colors.textSecondary }
-
     private static var filledNote: String { L("Fixed the leaking tap at Santa Ray Ave, took about an hour and a half") }
     private static var gapNote: String { L("Showed the place to two families this morning") }
     private static var twoNote: String { L("Showed Santa Ray Ave and Delaney Ct, 2 hours each") }
@@ -198,7 +184,7 @@ struct StdLogTimeSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-                .padding(.horizontal, 20).padding(.top, 14)
+                .padding(.horizontal, 20).padding(.top, 8)
                 .stdMeasure("log.header")
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
@@ -206,9 +192,9 @@ struct StdLogTimeSheet: View {
                         contextCard.padding(.top, 4).padding(.bottom, 8)
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
-                    noteField.padding(.top, 4)
-                    captionSlot.padding(.top, 4)
-                    recordCard.padding(.top, 4)
+                    noteField.padding(.top, 2)
+                    captionSlot.padding(.top, 2)
+                    recordCard.padding(.top, 2)
                     // Dropping the keyboard reveals the receipt link (spec §3); while typing it would sit under the button.
                     if !noteFocused { receiptLink.padding(.top, 4).transition(.opacity) }
                 }
@@ -220,18 +206,8 @@ struct StdLogTimeSheet: View {
             .modifier(StdLogSoftBottomEdge())
             .safeAreaInset(edge: .bottom, spacing: 0) { buttonBar }
         }
-        // B: with the keyboard up iOS 26/27 raises the glass sheet to full height and draws it opaque
-        // (system white), so the canvas goes back in while the note has focus to keep the cards separated.
-        // B in dark: the hero's lit windows and sun glow through the glass, and textPrimary measured
-        // 4.27:1 at the worst backdrop. A 35% canvas tint on the glass (the spec's "raise the tint") brings it over 4.5.
-        .background {
-            if style == .opaque || noteFocused {
-                colors.background.ignoresSafeArea()
-            } else if scheme == .dark {
-                colors.background.opacity(0.35).ignoresSafeArea()
-            }
-        }
-        .modifier(StdLogPresentation(style: style))
+        .background(colors.background.ignoresSafeArea())
+        .presentationDetents([.large])
         .onChange(of: note) { _, new in noteChanged(new) }
         .sensoryFeedback(.impact(weight: .light), trigger: fillTick)
         .task { await start() }
@@ -257,8 +233,8 @@ struct StdLogTimeSheet: View {
                             .rotationEffect(.degrees(contextOpen ? 180 : 0))
                     }
                     .font(.subheadline.weight(.medium))
-                    .foregroundStyle(onSheetSecondary)
-                    .frame(minHeight: 36, alignment: .leading)
+                    .foregroundStyle(colors.textSecondary)
+                    .frame(minHeight: 32, alignment: .leading)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(StdPressStyle())
@@ -287,7 +263,7 @@ struct StdLogTimeSheet: View {
                     Text(L("Today, Oct 23")).font(.body).foregroundStyle(colors.textSecondary)
                     Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(colors.textTertiary)
                 }
-                .padding(.horizontal, 16).frame(minHeight: 52).contentShape(Rectangle())
+                .padding(.horizontal, 16).frame(minHeight: 56).contentShape(Rectangle())
             }
             .buttonStyle(StdPressStyle())
             hairline
@@ -296,7 +272,7 @@ struct StdLogTimeSheet: View {
                 Spacer(minLength: 8)
                 StdSegmented(options: [L("Me"), L("Spouse")], selection: $who).frame(maxWidth: isAX ? .infinity : 200)
             }
-            .padding(.horizontal, 16).padding(.vertical, isAX ? 10 : 0).frame(minHeight: 52)
+            .padding(.horizontal, 16).padding(.vertical, isAX ? 10 : 0).frame(minHeight: 56)
         }
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(colors.backgroundSecondary))
     }
@@ -350,52 +326,47 @@ struct StdLogTimeSheet: View {
     private var captionSlot: some View {
         ZStack(alignment: .leading) {
             switch caption {
-            case .recents: recents.transition(.opacity)
+            case .recents: recents.transition(captionSwap)
             case .blank: Color.clear
             case .reading:
-                HStack(spacing: 8) {
-                    StdLogLoader()
-                    Text(L("Reading your note")).foregroundStyle(onSheetSecondary)
-                }
-                .font(.footnote)
-                .transition(.opacity)
-                .accessibilityElement(children: .combine)
-            case .filled: undoCaption(L("Filled from your note")).transition(.opacity)
-            case .updated: undoCaption(L("Updated")).transition(.opacity)
+                // No loader glyph: the shimmer in the value column is the only loading cue.
+                Text(L("Reading your note")).font(.footnote).foregroundStyle(colors.textSecondary)
+                    .transition(captionSwap)
+            case .filled: undoCaption(L("Filled from your note")).transition(captionSwap)
+            case .updated: undoCaption(L("Updated")).transition(captionSwap)
             case .failure:
                 Text(L("Couldn’t tell which rental. Pick it below."))
-                    .font(.footnote).foregroundStyle(onSheetSecondary)
+                    .font(.footnote).foregroundStyle(colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .transition(.opacity)
+                    .transition(captionSwap)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .stdMeasure("slot.caption")
     }
 
+    /// Caption swap: the old caption blurs out (0.10), then the new one blurs in (0.14 after a 0.10
+    /// delay), so two captions are never on screen together. Total 0.24.
+    private var captionSwap: AnyTransition {
+        let fx = StdLogArriveFX(y: 0, blur: reduceMotion ? 0 : 2, opacity: 0)
+        return .asymmetric(insertion: .modifier(active: fx, identity: .identity).animation(.easeOut(duration: 0.14).delay(0.10)),
+                           removal: .modifier(active: fx, identity: .identity).animation(.easeOut(duration: 0.10)))
+    }
+
     private func undoCaption(_ text: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: "sparkle").font(.caption.weight(.semibold)).foregroundStyle(colors.timberInk)
                 .accessibilityHidden(true)
-            Text(text).foregroundStyle(onSheetSecondary).fixedSize(horizontal: false, vertical: true)
-            Text(verbatim: "·").foregroundStyle(onSheetSecondary).accessibilityHidden(true)
+            Text(text).foregroundStyle(colors.textSecondary).fixedSize(horizontal: false, vertical: true)
+            Text(verbatim: "·").foregroundStyle(colors.textSecondary).accessibilityHidden(true)
             undoButton
             Spacer(minLength: 0)
         }
         .font(.footnote)
     }
 
-    /// Undo is a .tertiary; on glass its action ink measured 4.0–4.2:1, so it takes textPrimary there.
-    @ViewBuilder private var undoButton: some View {
-        if style == .glass {
-            Button { undo() } label: {
-                Text(L("Undo")).font(.subheadline.weight(.semibold)).foregroundStyle(colors.textPrimary).underline()
-                    .padding(.horizontal, 4).frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
-            }
-            .buttonStyle(StdPressStyle()).padding(.leading, -4)
-        } else {
-            Button(L("Undo")) { undo() }.buttonStyle(StdButtonStyle(.tertiary)).padding(.leading, -4)
-        }
+    private var undoButton: some View {
+        Button(L("Undo")) { undo() }.buttonStyle(StdButtonStyle(.tertiary)).padding(.leading, -4)
     }
 
     private var recents: some View {
@@ -462,8 +433,8 @@ struct StdLogTimeSheet: View {
                 }
             }
             .padding(.horizontal, 16).padding(.vertical, isAX ? 10 : 0)
-            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-            .background(colors.timber.opacity(wash[f] ?? 0))
+            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .modifier(StdLogWash(tick: washTick[f] ?? 0, peak: washPeak[f] ?? 0.12, color: colors.timber))
             .contentShape(Rectangle())
         }
         .buttonStyle(StdPressStyle())
@@ -610,8 +581,8 @@ struct StdLogTimeSheet: View {
             stepper
         }
         .padding(.horizontal, 16).padding(.vertical, isAX ? 10 : 4)
-        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-        .background(colors.timber.opacity(wash[.hours] ?? 0))
+        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+        .modifier(StdLogWash(tick: washTick[.hours] ?? 0, peak: washPeak[.hours] ?? 0.12, color: colors.timber))
         .sensoryFeedback(.selection, trigger: record.hours)
         .stdMeasure("row.hours")
     }
@@ -632,18 +603,21 @@ struct StdLogTimeSheet: View {
         return "log-\(hoursText)-\(record.rental ?? "")"
     }
 
+    /// One line at every size (glass holds one line, §1.25): the full sentence when it fits, else the
+    /// short form ("Log 1h 30m"); the rental row above still says where.
     @ViewBuilder private var logLabelText: some View {
         if record.rental == nil {
-            Text(L("Pick a rental"))
+            Text(L("Pick a rental")).lineLimit(1)
         } else if record.kind == nil {
-            Text(L("Pick the kind of work"))
-        } else if isAX {
-            VStack(spacing: 0) {
-                Text(L("Log \(hoursText)"))
-                Text(L("at \(record.rental ?? "")"))
+            ViewThatFits(in: .horizontal) {
+                Text(L("Pick the kind of work")).lineLimit(1).fixedSize()
+                Text(L("Pick the kind")).lineLimit(1)
             }
         } else {
-            Text(L("Log \(hoursText) at \(record.rental ?? "")"))
+            ViewThatFits(in: .horizontal) {
+                Text(L("Log \(hoursText) at \(record.rental ?? "")")).lineLimit(1).fixedSize()
+                Text(L("Log \(hoursText)")).lineLimit(1)
+            }
         }
     }
 
@@ -677,9 +651,19 @@ struct StdLogTimeSheet: View {
 
     private var buttonBar: some View {
         logButton
-            .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 8)
+            .padding(.horizontal, 20).padding(.top, 4).padding(.bottom, 8)
             .frame(maxWidth: .infinity)
-            .modifier(StdLogFallbackBar())
+            .background {
+                // Rows fade out over 12pt above the button instead of sitting behind it.
+                VStack(spacing: 0) {
+                    LinearGradient(colors: [colors.background.opacity(0), colors.background], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 12)
+                    colors.background
+                }
+                .padding(.top, -12)
+                .ignoresSafeArea(edges: .bottom)
+                .allowsHitTesting(false)
+            }
             .stdMeasure("log.button")
     }
 
@@ -797,7 +781,7 @@ struct StdLogTimeSheet: View {
             }.filter { record.source($0) != .yours })
             withAnimation(.easeOut(duration: 0.10)) { reading = unknown }
             withAnimation(StdMotion.quick) { caption = .reading }
-            StdMotionLog.mark("scanningLine")
+            StdMotionLog.mark("reading.shimmer")
             if StdLogReader.backend == .timeout {
                 try await pause(StdLogReader.timeout)
                 timedOut()
@@ -888,16 +872,13 @@ struct StdLogTimeSheet: View {
         return changes.contains { $0.1 }
     }
 
-    /// The timber wash under a row: 0 → peak → 0 over 0.30.
+    /// The timber wash under a row: one keyframe run, 0 → peak (0.10) → 0 (0.20), 0.30 total.
     private func flash(_ f: StdLogField, peak: Double, delay: Double) {
         Task { @MainActor in
             try? await pause(delay)
-            let t0 = CACurrentMediaTime()
-            withAnimation(.easeOut(duration: 0.10)) { wash[f] = peak } completion: {
-                withAnimation(.easeOut(duration: 0.20)) { wash[f] = 0 } completion: {
-                    StdMotionLog.mark("wash.\(f).end dur=\(String(format: "%.3f", CACurrentMediaTime() - t0))")
-                }
-            }
+            washPeak[f] = peak
+            StdMotionLog.mark("wash.\(f) keyframes=0.10+0.20")
+            washTick[f, default: 0] += 1
         }
     }
 
@@ -937,31 +918,6 @@ struct StdLogTimeSheet: View {
     }
 }
 
-// MARK: - Presentation: A opaque .large (system push-back and dim) · B .fraction(0.9) Liquid Glass
-
-private struct StdLogPresentation: ViewModifier {
-    let style: StdLogStyle
-    func body(content: Content) -> some View {
-        switch style {
-        case .opaque:
-            content.presentationDetents([.large])
-        case .glass:
-            if #available(iOS 26.0, *) {
-                // Partial detent: the system draws the sheet in Liquid Glass. No dim, so Today reads
-                // through the glass, blurred.
-                content
-                    .presentationDetents([.fraction(0.9)])
-                    .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.9)))
-            } else {
-                content
-                    .presentationDetents([.fraction(0.9)])
-                    .presentationBackground(.thinMaterial)
-                    .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.9)))
-            }
-        }
-    }
-}
-
 /// Rows fade under the pinned button instead of a hairline (iOS 26+).
 private struct StdLogSoftBottomEdge: ViewModifier {
     func body(content: Content) -> some View {
@@ -973,18 +929,17 @@ private struct StdLogSoftBottomEdge: ViewModifier {
     }
 }
 
-/// iOS 17–25: the button sits on a bar with a hairline above it (the standard's LHButton.primary).
-private struct StdLogFallbackBar: ViewModifier {
-    @Environment(\.colorScheme) private var scheme
+/// The row wash as one keyframe run (no chained completions, so it ends at 0.30).
+private struct StdLogWash: ViewModifier {
+    let tick: Int
+    let peak: Double
+    let color: Color
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content
-        } else {
-            content
-                .background(.regularMaterial)
-                .overlay(alignment: .top) {
-                    Rectangle().fill(AdaptiveColors(colorScheme: scheme).border).frame(height: 0.5)
-                }
+        content.keyframeAnimator(initialValue: 0.0, trigger: tick) { view, value in
+            view.background(color.opacity(value))
+        } keyframes: { _ in
+            CubicKeyframe(peak, duration: 0.10)
+            CubicKeyframe(0, duration: 0.20)
         }
     }
 }
@@ -1016,11 +971,12 @@ struct StdLogShimmer: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         let colors = AdaptiveColors(colorScheme: scheme)
-        let highlight = scheme == .dark ? Color.white.opacity(0.16) : Color.white.opacity(0.85)
+        // On-token: actionSurface bar (#E3E9FA / #182A5C); the sweep is the card colour (#FFFFFF / #141C3F).
+        let highlight = colors.backgroundSecondary
         TimelineView(.animation) { ctx in
             let p = StdLogCycle.phase(ctx.date)
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(colors.textTertiary.opacity(scheme == .dark ? 0.28 : 0.16))
+                .fill(colors.actionSurface)
                 .overlay(alignment: .leading) {
                     if !reduceMotion {
                         LinearGradient(colors: [.clear, highlight, .clear], startPoint: .leading, endPoint: .trailing)
@@ -1034,30 +990,6 @@ struct StdLogShimmer: View {
         .frame(width: 72, height: 20)
         .accessibilityElement()
         .accessibilityLabel(L("Reading your note"))
-    }
-}
-
-/// scanningLine: a 1.5pt drafting line drawing once per 1.6 s cycle. Reduced motion: static dashes.
-struct StdLogLoader: View {
-    @Environment(\.colorScheme) private var scheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    var body: some View {
-        let ink = AdaptiveColors(colorScheme: scheme).draftingInk
-        Group {
-            if reduceMotion {
-                Circle().stroke(ink, style: StrokeStyle(lineWidth: 1.5, dash: [2, 2.5]))
-            } else {
-                TimelineView(.animation) { ctx in
-                    let p = StdLogCycle.phase(ctx.date)
-                    Circle()
-                        .trim(from: max(0, p * 1.25 - 0.25), to: min(1, p * 1.25))
-                        .stroke(ink, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                }
-            }
-        }
-        .frame(width: 13, height: 13)
-        .accessibilityHidden(true)
     }
 }
 
