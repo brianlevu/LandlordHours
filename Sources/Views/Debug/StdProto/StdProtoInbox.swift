@@ -61,7 +61,6 @@ struct StdInboxScreen: View {
                         StdDayHeader(title: g.name).stdDayRow(first: gi == 0, colors: colors)
                         ForEach(Array(g.items.enumerated()), id: \.element.id) { ii, item in
                             row(item)
-                                .listRowSeparator(ii == g.items.count - 1 && gi < groups.count - 1 ? .hidden : .automatic, edges: .bottom)
                         }
                     }
                     if !pinned && likely.count >= 2 {

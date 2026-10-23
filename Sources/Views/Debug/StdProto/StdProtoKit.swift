@@ -234,7 +234,9 @@ extension View {
     func stdDayRow(first: Bool, colors: AdaptiveColors) -> some View {
         listRowInsets(EdgeInsets(top: first ? 4 : 6, leading: 16, bottom: 0, trailing: 16))
             .listRowBackground(colors.backgroundSecondary)
-            .listRowSeparator(.hidden)
+            // Hairline above a new day (between groups), none between a header and its first row.
+            .listRowSeparator(first ? .hidden : .visible, edges: .top)
+            .listRowSeparator(.hidden, edges: .bottom)
     }
 }
 
@@ -573,7 +575,7 @@ struct StdBrowseRow<Leading: View>: View {
     var body: some View {
         HStack(alignment: typeSize.isAccessibilitySize ? .top : .center, spacing: 12) {
             if !typeSize.isAccessibilitySize { leading.frame(width: 36, height: 36) }
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: typeSize.isAccessibilitySize ? 0 : 2) {
                 Text(title).font(.body.weight(.semibold)).foregroundStyle(colors.textPrimary)
                     .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
                     .fixedSize(horizontal: false, vertical: typeSize.isAccessibilitySize)
@@ -589,7 +591,7 @@ struct StdBrowseRow<Leading: View>: View {
                         }
                     }
                     .frame(height: 3)
-                    .padding(.top, 5)
+                    .padding(.top, typeSize.isAccessibilitySize ? 2 : 5)
                     .accessibilityHidden(true)
                 }
             }

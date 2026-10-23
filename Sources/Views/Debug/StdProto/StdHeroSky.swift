@@ -32,13 +32,16 @@ enum StdSkyPhase: String, CaseIterable {
         }
     }
 
-    /// Top → bottom. Minimum contrast against every hero text colour (white, #C9D6F5, amber
-    /// #FFB454, green #7FE3A8, cyan #8FD3FF): dawn 4.94, day 5.14, dusk 5.46, night 8.32.
+    /// Top → bottom. No violet: dawn and dusk run navy → slate → warm amber-brown through
+    /// green-leaning midpoints, so no interpolated colour lands in hue 245–300. Minimum contrast of
+    /// every hero text colour (white, #C9D6F5, amber, green, cyan), and of white/#C9D6F5 on the
+    /// selected switcher chip (12% white over the sky), along the whole gradient: dawn 4.67,
+    /// day 5.14, dusk 5.65, night 8.32.
     var colors: [Color] {
         switch self {
-        case .dawn: return [Self.c(0x2A3D90), Self.c(0x45408A), Self.c(0x5E3F6E)]
+        case .dawn: return [Self.c(0x1E3A8C), Self.c(0x23405F), Self.c(0x3A3E3A), Self.c(0x5C3F24)]
         case .day: return [HouseTokens.blueprint, HouseTokens.blueprintDeep]
-        case .dusk: return [Self.c(0x24296E), Self.c(0x4A2C63), Self.c(0x6A324E)]
+        case .dusk: return [Self.c(0x18256A), Self.c(0x1D3050), Self.c(0x2E2F2E), Self.c(0x4A3220)]
         case .night: return [Self.c(0x0B1230), Self.c(0x121A45), Self.c(0x1A2456)]
         }
     }

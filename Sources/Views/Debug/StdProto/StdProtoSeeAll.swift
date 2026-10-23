@@ -40,8 +40,8 @@ struct StdSeeAllScreen: View {
                                 HomeProtoArt(size: 36, keyframe: HomeProtoStage.keyframe(for: rental))
                             }
                             .stdMeasure("row.\(rental.id)")
-                            .listRowInsets(EdgeInsets(top: typeSize.isAccessibilitySize ? 4 : 9, leading: 16,
-                                                      bottom: typeSize.isAccessibilitySize ? 4 : 9, trailing: 16))
+                            .listRowInsets(EdgeInsets(top: typeSize.isAccessibilitySize ? 0 : 9, leading: 16,
+                                                      bottom: typeSize.isAccessibilitySize ? 0 : 9, trailing: 16))
                     .listRowBackground(colors.backgroundSecondary)
                             .alignmentGuide(.listRowSeparatorLeading) { _ in 48 }
                             .alignmentGuide(.listRowSeparatorTrailing) { d in d[.trailing] + 16 }

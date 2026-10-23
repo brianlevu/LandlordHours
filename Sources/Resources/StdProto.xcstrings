@@ -1376,13 +1376,13 @@
         }
       }
     },
-    "Review all %@": {
+    "Review all": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Review all %@"
+            "value": "Review all"
           }
         }
       }
@@ -1405,17 +1405,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sat"
-          }
-        }
-      }
-    },
-    "See all": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "See all"
           }
         }
       }

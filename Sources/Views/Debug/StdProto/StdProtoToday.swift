@@ -152,33 +152,17 @@ struct StdTodayScreen: View {
                     StdDayHeader(title: g.name).stdDayRow(first: gi == 0, colors: colors)
                     ForEach(Array(g.items.enumerated()), id: \.element.id) { ii, item in
                         actionRow(item)
-                            .listRowSeparator(ii == g.items.count - 1 && gi < groups.count - 1 ? .hidden : .automatic, edges: .bottom)
                     }
                 }
-                // One foot row: "Confirm N likely" and, when more wait, "Review all N" (opens Inbox).
-                if likely.count >= 2 || waiting > shown.count {
-                    HStack(spacing: 8) {
-                        if likely.count >= 2 {
-                            Button(StdCanon.confirmLikely(likely.count)) { confirmLikely() }
-                                .buttonStyle(StdButtonStyle(.tertiary))
-                                .accessibilityIdentifier("today.confirmLikely")
-                        }
-                        Spacer(minLength: 8)
-                        if waiting > shown.count {
-                            Button(L("Review all \(waiting)")) { openInbox() }
-                                .buttonStyle(StdButtonStyle(.tertiary))
-                        }
-                    }
-                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-                    .listRowBackground(colors.backgroundSecondary)
-                    .stdMeasure("foot")
-                }
-                if typeSize.isAccessibilitySize {
-                    Button(L("See all")) {}
+                // §1.3 foot: "Confirm N likely", centred, only when N ≥ 2. "Review all N" lives in the header.
+                if likely.count >= 2 {
+                    Button(StdCanon.confirmLikely(likely.count)) { confirmLikely() }
                         .buttonStyle(StdButtonStyle(.tertiary))
                         .frame(maxWidth: .infinity)
                         .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                         .listRowBackground(colors.backgroundSecondary)
+                        .accessibilityIdentifier("today.confirmLikely")
+                        .stdMeasure("foot")
                 }
             } header: {
                 topHeader(day: nil)
@@ -215,8 +199,8 @@ struct StdTodayScreen: View {
             }
             .padding(.bottom, 8)
             StdHeroCard(seed: live, focus: $focus).stdMeasure("hero").padding(.top, 16)
-            StdSectionHeader(title: L("To confirm"), count: seed.suggestions.count - (seed.suggestions.prefix(3).count - items.count),
-                             trailing: nil)
+            StdSectionHeader(title: L("To confirm"), count: waiting,
+                             trailing: waiting > shown.count ? L("Review all") : nil, onTrailing: openInbox)
                 .padding(.top, 24)
             if let day { StdDayHeader(title: day).padding(.top, 4) }
         }
@@ -535,7 +519,7 @@ struct StdHeroCard: View {
     }
 
     private func fullTop(_ night: Bool) -> some View {
-        let houseSize: CGFloat = single ? 172 : 150
+        let houseSize: CGFloat = single ? (typeSize >= .xxLarge ? 132 : 172) : 150
         return VStack(alignment: .leading, spacing: 0) {
             if single {
                 Text(L("2026 · \(hero.flag)")).font(StdFont.drafting).textCase(.uppercase).tracking(StdFont.draftingTracking)
