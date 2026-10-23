@@ -183,6 +183,8 @@ struct AdaptiveShell: View {
     @Environment(\.displayScale) private var scale
     @Environment(\.supportsMultipleWindows) private var multiWindow
     @Environment(\.colorScheme) private var scheme
+    /// The reader's own text size, read above the sidebar cap and handed back to each root.
+    @Environment(\.dynamicTypeSize) private var readerTypeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
     private let seed = AdaptiveSeed.seed
 
@@ -238,15 +240,16 @@ struct AdaptiveShell: View {
 
     private var regular: some View {
         TabView(selection: $tab) {
-            Tab(L("Today"), systemImage: "sun.max", value: AdaptiveTab.today) { root(L("Today")) { AdaptiveToday(seed: seed, openInbox: { tab = .inbox }) } }
-            Tab(L("Inbox"), systemImage: "tray", value: AdaptiveTab.inbox) { root(L("Inbox")) { AdaptiveInbox(seed: seed, selectFirst: launch.select) } }
+            Tab(value: AdaptiveTab.today) { root(L("Today")) { AdaptiveToday(seed: seed, openInbox: { tab = .inbox }) } } label: { tabLabel(L("Today"), "sun.max") }
+            Tab(value: AdaptiveTab.inbox) { root(L("Inbox")) { AdaptiveInbox(seed: seed, selectFirst: launch.select) } } label: { tabLabel(L("Inbox"), "tray") }
                 // System badge everywhere; in the sidebar it is system chrome in Apple's grey (exempt, §1.27).
                 .badge(seed.suggestions.count)
-            Tab(L("Records"), systemImage: "list.bullet.rectangle", value: AdaptiveTab.records) { root(L("Records")) { AdaptiveRecords(selectFirst: launch.select) } }
-            Tab(L("Rentals"), systemImage: "house", value: AdaptiveTab.rentals) { root(L("Rentals")) { placeholder(L("All rentals")) } }
-            TabSection(L("Rentals")) {
+            Tab(value: AdaptiveTab.records) { root(L("Records")) { AdaptiveRecords(selectFirst: launch.select) } } label: { tabLabel(L("Records"), "list.bullet.rectangle") }
+            // Tab name per the standard's word list (C.4): "Properties" (the phone's tab); "rentals" in sentences.
+            Tab(value: AdaptiveTab.rentals) { root(L("Properties")) { placeholder(L("All rentals")) } } label: { tabLabel(L("Properties"), "house") }
+            TabSection(L("Your rentals")) {
                 ForEach(seed.rentals.rentals) { r in
-                    Tab(r.name, systemImage: "house", value: AdaptiveTab.rental(r.id)) { root(r.name) { placeholder(r.name) } }
+                    Tab(value: AdaptiveTab.rental(r.id)) { root(r.name) { placeholder(r.name) } } label: { tabLabel(r.name, "house") }
                 }
             }
             // Spec r2 used .defaultVisibility(.hidden, for: .tabBar): on iPadOS 27 the section still
@@ -260,6 +263,10 @@ struct AdaptiveShell: View {
         // 1.6:1. The bar/sidebar tint is #4774C6 in dark (white 4.58:1; unselected icons 3.3:1 on the
         // material); each root re-applies colors.action so content keeps its own tint.
         .tint(Self.selectionTint)
+        // The sidebar draws its labels itself (lineLimit is ignored) and its width is fixed (280), so at AX
+        // sizes words broke mid-way ("Recor/ds"). The bar and sidebar are capped at xxxLarge; every root
+        // restores the reader's own size below.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .background { SidebarVisibilitySetter(shown: launch.sidebar.map { $0 == "shown" }) }
         .sheet(isPresented: $showLog) {
             StdLogTimeSheet(seed: seed, launch: stdLaunch, onClose: { showLog = false }, onLog: { _ in showLog = false },
@@ -269,6 +276,11 @@ struct AdaptiveShell: View {
     }
 
     /// Every regular root: its own NavigationStack and the toolbar "+" (⌘N) in the same place.
+    /// Sidebar/bar label: one line, tail ellipsis, so AX sizes never break a word mid-way.
+    private func tabLabel(_ title: String, _ symbol: String) -> some View {
+        Label { Text(title).lineLimit(1).truncationMode(.tail) } icon: { Image(systemName: symbol) }
+    }
+
     static let selectionTint = Color.lhDynamic(light: "1E3FA6", dark: "4774C6")
 
     private func root<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
@@ -287,6 +299,7 @@ struct AdaptiveShell: View {
                 .navigationBarTitleDisplayMode(.inline)
         }
         .tint(colors.action)
+        .dynamicTypeSize(readerTypeSize)
     }
 
     private func placeholder(_ title: String) -> some View {
@@ -839,6 +852,10 @@ struct AdaptiveConfirmDetail: View {
             .padding(.horizontal, 24).padding(.vertical, 12)
             .frame(maxWidth: 560)
             .frame(maxWidth: .infinity)
+            // An opaque foot with a hairline: on short windows (Duo landscape, 669pt) the scroll content
+            // passes under the pinned Confirm instead of showing through it.
+            .background(colors.background.ignoresSafeArea())
+            .overlay(alignment: .top) { Rectangle().fill(colors.border).frame(height: 0.5) }
         }
     }
 
