@@ -242,10 +242,18 @@ struct HouseHeroCard: View {
     /// WP-L: a 90-day look-back is running. The words say so instead of the stage and next
     /// milestone ("An empty lot / Foundation at 100h" reads as final while hours are coming).
     var isLookingBack = false
+    /// 2.1: the house shows these hours instead of the number's (a rental's house is pinned at its
+    /// 500 line; a record-only rental or a rental's part of a shared total is a plain lot).
+    /// nil: the number's hours. Comes from `HomeStage`, the function the tiles use too.
+    var stageHours: Double? = nil
+    /// 2.1: the words under the number when nothing is being built ("Hours kept, no target");
+    /// replaces the stage name and hides the next milestone. nil: the stage name.
+    var stageTitle: String? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var shownHours: Double?
+    @State private var cardWidth: CGFloat = 0
     @State private var pop = false
     // Dynamic Type: the number, eyebrow and card grow with the text size (the house art keeps
     // its share of the card; the card is capped so the art never dominates the screen).
@@ -282,13 +290,28 @@ struct HouseHeroCard: View {
     /// The line under the stage name. A record has no target, so none. A 100-hour target shows only
     /// "Foundation at 100h" until it is reached (never "Roof at 500h" for someone aiming at 100).
     private var showsNextMilestone: Bool {
-        guard progress.nextStep != nil else { return false }
+        guard stageTitle == nil, artProgress.nextStep != nil else { return false }
         guard let copy = heroCopy else { return true }
         guard let target = copy.targetHours else { return false }
-        return target > 100 || progress.hours < 100
+        return target > 100 || artProgress.hours < 100
     }
 
     private var footerIsNil: Bool { if case .none = footer { return true }; return false }
+
+    /// What the house draws: the number's hours, or the caller's stage hours.
+    private var artProgress: HouseProgress {
+        stageHours.map { HouseProgress(hours: $0, goal: progress.goal) } ?? progress
+    }
+
+    /// The number and the art's hours together, so one change handler sees both: when the number
+    /// moves and the house does not (a plain lot, a house pinned at its roof), nothing lands a beam,
+    /// so the number counts up on its own.
+    private struct HeroHours: Equatable { let number: Double; let art: Double }
+    private var heroHours: HeroHours { HeroHours(number: progress.hours, art: artProgress.hours) }
+
+    /// Past the default text size the words grow with Dynamic Type and the card grows with them
+    /// (the fixed-height card is kept, pixel for pixel, at the default size and below).
+    private var usesFlowLayout: Bool { typeSize > .large }
 
     /// The caption and the pace are two lines: "of 500 hours", then "On pace for Dec 31" across the card's width.
     /// (The house sits lower to make room.) VoiceOver reads them as one: "of 500 hours · on pace for Dec 31".
@@ -319,6 +342,34 @@ struct HouseHeroCard: View {
     private var displayHours: Int { Int((shownHours ?? progress.hours).rounded(.down)) }
 
     var body: some View {
+        Group {
+            if usesFlowLayout { flowCard } else { fixedCard }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: HouseTokens.blueprint.opacity(0.25), radius: 16, y: 8)
+        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .easeInOut(duration: HouseMotion.loadCrossfade), value: isLoading)
+        .onAppear { if shownHours == nil { shownHours = isLoading ? 0 : progress.hours } }
+        .onChange(of: isLoading) { _, loading in
+            if loading {
+                shownHours = 0
+            } else {
+                // The data landed: the house has crossfaded in; the number counts up to it.
+                shownHours = 0
+                DispatchQueue.main.asyncAfter(deadline: .now() + (reduceMotion ? 0 : HouseMotion.loadCrossfade * 0.5)) {
+                    countUp(over: HouseMotion.loadCountUp)
+                }
+            }
+        }
+        .onChange(of: heroHours) { old, new in
+            // The house didn't move, so no beam lands: the number follows on its own.
+            if new.number != old.number && new.art == old.art && !isLoading { countUp() }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("house-hero-card")
+    }
+
+    /// 2.0.1's card, unchanged: a fixed-height sheet, words top-left, the house bottom-right.
+    private var fixedCard: some View {
         ZStack(alignment: .topLeading) {
             HouseBlueprintPaper()
             GeometryReader { g in
@@ -328,7 +379,9 @@ struct HouseHeroCard: View {
                 // A staked lot leaves room on the right for the name flag (approved onboarding landing).
                 // The empty lot is smaller too, so its words and button keep a clear column.
                 let staked = stakeName != nil
-                let shrink: CGFloat = staked ? 0.86 : ((footerIsWide || usesCombinedCaption) ? 0.8 : 1)
+                // A staked lot under a two-line caption (a rental's pace) sits smaller still, so the roof
+                // never reaches the pace line.
+                let shrink: CGFloat = staked ? (usesCombinedCaption ? 0.76 : 0.86) : ((footerIsWide || usesCombinedCaption) ? 0.8 : 1)
                 let houseSize = min(g.size.height * 0.84, g.size.width * 0.62) * shrink
                 let houseCenter = CGPoint(x: g.size.width - 4 - houseSize * 0.44 - (staked ? 40 : 0), y: g.size.height - 6 - houseSize * 0.417)
                 let houseOrigin = CGPoint(x: houseCenter.x - houseSize / 2, y: houseCenter.y - houseSize / 2)
@@ -342,7 +395,7 @@ struct HouseHeroCard: View {
                                 .transition(.opacity)
                         } else {
                             HouseHeroView(
-                                progress: progress,
+                                progress: artProgress,
                                 canvas: .blueprintHero,
                                 animatesConfirms: animatesChanges,
                                 beamOrigin: CGPoint(x: 72 - houseOrigin.x, y: 92 - houseOrigin.y),
@@ -484,13 +537,13 @@ struct HouseHeroCard: View {
                                     .fixedSize(horizontal: false, vertical: true)
                             } else if !(heroCopy != nil && typeSize.isAccessibilitySize) {
                                 // At accessibility sizes the target words take the room; the stage is in the VoiceOver label.
-                                Text(progress.stage.spokenName)
+                                Text(stageTitle ?? artProgress.stage.spokenName)
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(HouseTokens.onHeroPrimary)
                                     .lineLimit(2)
                                 // A record has no target, so no "Roof at 500h" line: the stage name alone.
                                 if showsNextMilestone {
-                                    Text(progress.nextMilestoneLabel)
+                                    Text(artProgress.nextMilestoneLabel)
                                         .font(.footnote)
                                         .foregroundStyle(HouseTokens.onHeroSecondary)
                                         .lineLimit(2)
@@ -512,23 +565,200 @@ struct HouseHeroCard: View {
             }
         }
         .frame(height: cardHeight)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: HouseTokens.blueprint.opacity(0.25), radius: 16, y: 8)
-        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .easeInOut(duration: HouseMotion.loadCrossfade), value: isLoading)
-        .onAppear { if shownHours == nil { shownHours = isLoading ? 0 : progress.hours } }
-        .onChange(of: isLoading) { _, loading in
-            if loading {
-                shownHours = 0
+    }
+
+    // MARK: Flowing layout (past the default text size)
+
+    /// The words lead and scale with Dynamic Type at every size (the eyebrow, the number, the
+    /// caption and the pace line); the card grows with them. Up to XXXL the house sits in a band
+    /// under the words with the stage words beside it; at accessibility sizes the stage words take
+    /// the full width and the house sits under them, so nothing collides.
+    private var flowCard: some View {
+        let inner = max(cardWidth - 40, 200)
+        let staked = stakeName != nil
+        return VStack(alignment: .leading, spacing: 2) {
+            flowEyebrow
+            numberView.padding(.top, 2)
+                .accessibilityLabel(isLoading ? "Loading your hours" : "\(progress.wholeHours) hours")
+            if usesCombinedCaption, let copy = heroCopy {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(copy.caption)
+                        .font(.title3.weight(.medium))
+                        .foregroundStyle(HouseTokens.onHeroSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    flowStatus(copy.status ?? "")
+                }
+                .accessibilityIdentifier("today.hero.caption")
             } else {
-                // The data landed: the house has crossfaded in; the number counts up to it.
-                shownHours = 0
-                DispatchQueue.main.asyncAfter(deadline: .now() + (reduceMotion ? 0 : HouseMotion.loadCrossfade * 0.5)) {
-                    countUp(over: HouseMotion.loadCountUp)
+                Text(heroCopy?.caption ?? "of \(Int(progress.goal.targetHours))h")
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(HouseTokens.onHeroSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("today.hero.caption")
+                if let status, !isLoading, !isLookingBack, footer == nil {
+                    flowStatus(status)
+                }
+            }
+            if typeSize.isAccessibilitySize {
+                flowLowerWords(width: inner)
+                    .padding(.top, 10)
+                let s = inner * 0.62 * 0.86
+                flowHouse(size: s, flagWidth: 32 + 0.32 * s + (staked ? 28 : 0))
+                    .padding(.trailing, staked ? 28 : 0)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            } else {
+                let s = inner * 0.62 * (staked ? 0.86 : 0.8)
+                let trailing: CGFloat = staked ? 36 : 0
+                let column = max(96, inner - s * 0.96 - trailing)
+                ZStack(alignment: .bottomLeading) {
+                    flowHouse(size: s, flagWidth: trailing + 32 + 0.32 * s)
+                        .padding(.trailing, trailing)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    flowLowerWords(width: column)
+                        .padding(.bottom, s * 0.06)
+                }
+                .padding(.top, 6)
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(HouseBlueprintPaper())
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { cardWidth = $0 }
+        .accessibilityElement(children: footerIsWide ? .contain : .combine)
+    }
+
+    @ViewBuilder private var flowEyebrow: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            if let copy = heroCopy {
+                // Large text: the year (and the rental's name) on one line, the target on its own,
+                // so "100-hour target" never breaks at its hyphen.
+                VStack(alignment: .leading, spacing: 1) {
+                    flowEyebrowText(copy.propertyName.map { "\(copy.eyebrowYear) · \($0)" } ?? copy.eyebrowYear)
+                    flowEyebrowText(copy.eyebrowTarget)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(copy.eyebrow)
+                .accessibilityIdentifier("today.hero.eyebrow")
+            } else {
+                flowEyebrowText(heroCopy?.eyebrow ?? "\(String(year)) · \(progress.goal.eyebrow)")
+                    .accessibilityIdentifier("today.hero.eyebrow")
+            }
+            if let qualifier = heroCopy?.qualifier {
+                Text(qualifier)
+                    .font(.system(size: eyebrowSize, weight: .medium, design: .monospaced))
+                    .textCase(.uppercase)
+                    .tracking(1.3)
+                    .foregroundStyle(HouseTokens.onHeroSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("today.hero.qualifier")
+            }
+        }
+    }
+
+    private func flowEyebrowText(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: eyebrowSize, weight: .medium, design: .monospaced))
+            .textCase(.uppercase)
+            .tracking(1.3)
+            .foregroundStyle(HouseTokens.drafting)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func flowStatus(_ text: String) -> some View {
+        let glyph = statusSymbol.map { Text(Image(systemName: $0)) + Text(" ") } ?? Text("")
+        return (glyph + Text(text))
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(statusColor)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("today.hero.status")
+    }
+
+    private var numberView: some View {
+        ZStack(alignment: .leading) {
+            Text("\(displayHours)")
+                .font(.system(size: min(numberSize, 96), weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(HouseTokens.onHeroPrimary)
+                .contentTransition(.identity)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .scaleEffect(pop ? HouseMotion.countPopScale : 1, anchor: .leading)
+                .opacity(isLoading ? 0 : 1)
+            if isLoading {
+                PlaceholderBar(width: min(numberSize, 96) * 1.7, height: min(numberSize, 96) * 0.62, surface: .blueprint)
+                    .transition(.opacity)
+            }
+        }
+    }
+
+    /// The words that share the house's band: loading bars, the empty lot or found hours, the
+    /// look-back, or the stage and next step.
+    @ViewBuilder private func flowLowerWords(width: CGFloat) -> some View {
+        Group {
+            if isLoading {
+                VStack(alignment: .leading, spacing: 8) {
+                    PlaceholderBar(width: min(width, 120), height: 12, surface: .blueprint)
+                    PlaceholderBar(width: min(width, 88), height: 12, surface: .blueprint)
+                }
+            } else if let footer {
+                footerView(footer)
+            } else if isLookingBack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Looking through your calendar")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(HouseTokens.onHeroPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("today.hero.lookingBack")
+                    Text("Rental work we find waits in your Inbox")
+                        .font(.footnote)
+                        .foregroundStyle(HouseTokens.onHeroSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(stageTitle ?? artProgress.stage.spokenName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(HouseTokens.onHeroPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if showsNextMilestone {
+                        Text(artProgress.nextMilestoneLabel)
+                            .font(.footnote)
+                            .foregroundStyle(HouseTokens.onHeroSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("house-hero-card")
+        .frame(width: width, alignment: .leading)
+        .transition(.opacity)
+    }
+
+    /// The house with its stake, at a fixed size.
+    private func flowHouse(size s: CGFloat, flagWidth: CGFloat) -> some View {
+        Group {
+            if isLoading {
+                DraftingLoader(sketch: .house, surface: .blueprint, subject: "your hours")
+                    .accessibilityHidden(true)
+                    .transition(.opacity)
+            } else {
+                HouseHeroView(
+                    progress: artProgress,
+                    canvas: .blueprintHero,
+                    animatesConfirms: animatesChanges,
+                    onLand: { _ in countUp() },
+                    onCelebration: onCelebration,
+                    debugConfirmStill: debugConfirmStill
+                )
+                .transition(.opacity)
+            }
+        }
+        .frame(width: s, height: s)
+        .overlay {
+            if let stakeName {
+                OnbMiniStake(name: stakeName, maxFlagWidth: flagWidth)
+            }
+        }
     }
 
     private var footerIsWide: Bool {

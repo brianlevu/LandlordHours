@@ -196,3 +196,139 @@ final class TodayHouseUITests: XCTestCase {
         XCTAssertTrue(waitForHeroLabel(containing: "reached · no one did more, based on your records"), hero.label)
     }
 }
+
+/// 2.1: Today with several rentals (`-LHHomeSeed`, HomeDebugSeed.swift). The hero's accessibility
+/// value is the rental on the flag; its label carries the eyebrow (with the same name).
+final class TodayRentalsUITests: XCTestCase {
+    private var app: XCUIApplication!
+
+    override func setUp() {
+        super.setUp()
+        UITestIsolation.resetStoreKit()
+        continueAfterFailure = false
+        app = XCUIApplication()
+    }
+
+    override func tearDown() {
+        app = nil
+        super.tearDown()
+    }
+
+    private func launch(_ args: [String]) {
+        app.terminate()
+        app.launchArguments = [
+            UITestIsolation.resetProfilesArgument,
+            "-LHInitialTab", "0",
+            "-LHNoSwipePeek",
+            "-AppleLanguages", "(en)",
+            "-AppleLocale", "en_US"
+        ] + args
+        app.launch()
+    }
+
+    private func launchSeed(_ seed: String, extra: [String] = []) {
+        launch(["-LHMockScenario", "emptyMainTabs", "-LHHomeSeed", seed] + extra)
+    }
+
+    private var hero: XCUIElement { app.descendants(matching: .any)["today.hero"] }
+    private var row: XCUIElement { app.descendants(matching: .any)["today.rentals"] }
+    private func tile(_ name: String) -> XCUIElement { app.buttons["today.rentals.tile.\(name)"] }
+
+    private func waitFor(_ element: XCUIElement, labelContains text: String, timeout: TimeInterval = 8) -> Bool {
+        let predicate = NSPredicate(format: "label CONTAINS %@", text)
+        let exp = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        return XCTWaiter().wait(for: [exp], timeout: timeout) == .completed
+    }
+
+    private func waitFor(_ element: XCUIElement, value: String, timeout: TimeInterval = 8) -> Bool {
+        let predicate = NSPredicate(format: "value == %@", value)
+        let exp = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        return XCTWaiter().wait(for: [exp], timeout: timeout) == .completed
+    }
+
+    func testThreeRentalsShowTheRowInListOrder() {
+        launchSeed("brian")
+        XCTAssertTrue(hero.waitForExistence(timeout: 20))
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "several rentals: the row under the hero")
+        for name in ["Delaney Ct", "Santa Ray Ave", "Yeandle Ave"] {
+            XCTAssertTrue(tile(name).exists, "tile \(name)")
+        }
+        let order = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'today.rentals.tile.'"))
+            .allElementsBoundByIndex.map(\.identifier)
+        XCTAssertEqual(order, ["today.rentals.tile.Delaney Ct", "today.rentals.tile.Santa Ray Ave", "today.rentals.tile.Yeandle Ave"],
+                       "Properties order, not sorted by hours")
+        XCTAssertTrue(app.descendants(matching: .any)["today.rentals.total"].label.contains("96h logged this year"))
+        XCTAssertTrue(app.buttons["today.rentals.add"].exists)
+        XCTAssertFalse(app.buttons["today.rentals.seeAll"].exists, "See all only from six rentals")
+    }
+
+    /// The Brian bug: the flag, the eyebrow and the subtitle name the same rental, and it is not
+    /// the first one added (Delaney Ct).
+    func testFlagEyebrowAndSubtitleNameTheSameRentalNotTheFirstAdded() {
+        launchSeed("brian")
+        XCTAssertTrue(hero.waitForExistence(timeout: 20))
+        XCTAssertTrue(waitFor(hero, value: "Santa Ray Ave"), "flag: \(String(describing: hero.value))")
+        XCTAssertTrue(hero.label.contains("Santa Ray Ave · 100-hour target"), hero.label)
+        XCTAssertFalse(hero.label.contains("Delaney"), hero.label)
+        let subtitle = app.staticTexts["today.header.subtitle"]
+        XCTAssertTrue(subtitle.label.contains("Santa Ray Ave"), subtitle.label)
+        XCTAssertTrue(tile("Santa Ray Ave").isSelected)
+        XCTAssertTrue(tile("Santa Ray Ave").label.hasSuffix("selected"), tile("Santa Ray Ave").label)
+    }
+
+    func testTappingATileMovesTheEyebrowAndTheFlagTogether() {
+        launchSeed("brian")
+        XCTAssertTrue(hero.waitForExistence(timeout: 20))
+        tile("Delaney Ct").tap()
+        XCTAssertTrue(waitFor(hero, value: "Delaney Ct"), "flag follows the tap")
+        XCTAssertTrue(hero.label.contains("Delaney Ct · Record only"), hero.label)
+        XCTAssertTrue(hero.label.contains("Hours kept, no target"), hero.label)
+        XCTAssertTrue(tile("Delaney Ct").isSelected)
+        XCTAssertFalse(tile("Santa Ray Ave").isSelected)
+        // The choice survives a relaunch (no reset).
+        app.terminate()
+        app.launchArguments = ["-LHInitialTab", "0", "-LHNoSwipePeek", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        XCTAssertTrue(hero.waitForExistence(timeout: 20))
+        XCTAssertTrue(waitFor(hero, value: "Delaney Ct"), "kept: \(String(describing: hero.value))")
+    }
+
+    func testAddUpSumsThePickedRentals() {
+        launchSeed("brian")
+        XCTAssertTrue(hero.waitForExistence(timeout: 20))
+        app.buttons["today.rentals.addUp"].tap()
+        XCTAssertTrue(waitFor(app.descendants(matching: .any)["today.rentals.total"], labelContains: "Tap rentals to add them up"))
+        tile("Delaney Ct").tap()   // Santa Ray Ave (the focus) is already picked
+        XCTAssertTrue(waitFor(hero, labelContains: "96 hours combined"), hero.label)
+        XCTAssertTrue(hero.label.contains("Santa Ray Ave + Delaney Ct"), hero.label)
+        XCTAssertTrue(hero.label.contains("Added up, no target"), hero.label)
+        XCTAssertTrue(waitFor(hero, value: "2 rentals"))
+        app.buttons["today.rentals.addUp"].tap()   // Done
+        XCTAssertTrue(waitFor(hero, value: "Santa Ray Ave"), "back to the focus")
+    }
+
+    func testSeeAllOpensAtEightRentals() {
+        launchSeed("eight")
+        XCTAssertTrue(hero.waitForExistence(timeout: 20))
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        let seeAll = app.buttons["today.rentals.seeAll"]
+        XCTAssertTrue(seeAll.waitForExistence(timeout: 5))
+        let scroller = app.scrollViews.containing(.button, identifier: "today.rentals.tile.Tahoe Cabin").element(boundBy: 0)
+        var tries = 0
+        while !seeAll.isHittable && tries < 6 { scroller.swipeLeft(); tries += 1 }
+        seeAll.tap()
+        let grid = app.descendants(matching: .any)["today.rentals.grid"]
+        XCTAssertTrue(grid.waitForExistence(timeout: 5), "See all opens the grid")
+        let lake = app.buttons["today.rentals.grid.Lake House"]
+        XCTAssertTrue(lake.waitForExistence(timeout: 3))
+        lake.tap()
+        XCTAssertTrue(waitFor(hero, value: "Lake House"), "picking in the grid focuses that rental")
+    }
+
+    func testOneRentalShowsNoRow() {
+        launch(["-LHMockScenario", "emptyMainTabs", "-LHTodayHours", "212"])
+        XCTAssertTrue(hero.waitForExistence(timeout: 20))
+        XCTAssertFalse(row.waitForExistence(timeout: 3), "one rental: 2.0.1's Today, no row")
+        XCTAssertTrue(hero.label.contains("212 of 750 hours"), hero.label)
+    }
+}

@@ -44,7 +44,7 @@ enum SurfaceSamples {
 
     static func snapshot(
         properties: Int = 2, hours: Double, goal: WidgetSurfaceSnapshot.Goal = .reps750, required: Double = 600,
-        pending: Int, timer: Bool = false
+        pending: Int, timer: Bool = false, focusName: String? = nil
     ) -> WidgetSurfaceSnapshot {
         let progress = HouseProgress(hours: properties == 0 ? 0 : hours, goal: .reps750)
         return WidgetSurfaceSnapshot(
@@ -53,9 +53,14 @@ enum SurfaceSamples {
             pendingCount: pending, timerStart: timer ? now.addingTimeInterval(-42 * 60) : nil,
             timerPropertyName: timer ? "Pine Cabin" : nil,
             houseKeyframe: progress.keyframe.rawValue, stageTitle: progress.stage.spokenName,
-            nextStepLabel: progress.nextMilestoneLabel
+            nextStepLabel: progress.nextMilestoneLabel,
+            focusName: focusName
         )
     }
+
+    /// 2.1: several rentals, Today focused on one with its own 100-hour target.
+    static let focused = snapshot(properties: 3, hours: 12, goal: .mp100, required: 81, pending: 0, focusName: "Santa Ray Ave")
+    static let focusedMet = snapshot(properties: 8, hours: 112, goal: .mp100, required: 81, pending: 2, focusName: "Lake House")
 
     static let behind = snapshot(hours: 212, pending: 3)
     static let onPace = snapshot(hours: 640, pending: 0)
@@ -79,6 +84,7 @@ struct SurfaceCaptureRoot: View {
         switch launch.name {
         case "widgets-home-a": WallpaperBoard(scheme: launch.scheme) { HomeWidgetsA() }
         case "widgets-home-b": WallpaperBoard(scheme: launch.scheme) { HomeWidgetsB() }
+        case "widgets-home-focus": WallpaperBoard(scheme: launch.scheme) { HomeWidgetsFocus() }
         case "widgets-home-c": WallpaperBoard(scheme: launch.scheme) { HomeWidgetsC() }
         case "widgets-tinted": WallpaperBoard(scheme: launch.scheme, dim: true) { HomeWidgetsA(look: .accented) }
         case "widgets-lock": WallpaperBoard(scheme: launch.scheme) { LockStatesBoard() }
@@ -194,6 +200,20 @@ private struct HomeWidgetsA: View {
             HomeTile(size: medium, look: look, caption: "Medium · on pace, caught up") {
                 WidgetMediumView(display: .init(snapshot: SurfaceSamples.onPace), look: look)
             }
+        }
+    }
+}
+
+/// 2.1: the widget follows Today's focus (one rental of several, named).
+private struct HomeWidgetsFocus: View {
+    var body: some View {
+        VStack(spacing: 14) {
+            HomeTile(size: medium, caption: "Medium · focused rental, behind") { WidgetMediumView(display: .init(snapshot: SurfaceSamples.focused)) }
+            HStack(spacing: 20) {
+                HomeTile(size: small, caption: "Small · focused rental") { WidgetSmallView(display: .init(snapshot: SurfaceSamples.focused)) }
+                HomeTile(size: small, caption: "Small · focused, 100 reached") { WidgetSmallView(display: .init(snapshot: SurfaceSamples.focusedMet)) }
+            }
+            HomeTile(size: medium, caption: "Medium · focused, 2 to confirm") { WidgetMediumView(display: .init(snapshot: SurfaceSamples.focusedMet)) }
         }
     }
 }
