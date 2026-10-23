@@ -21,7 +21,7 @@ struct StdProtoRoot: View {
                 if launch.screen == .seeall {
                     NavigationStack { StdSeeAllScreen(seed: seed) }
                 } else {
-                    StdTodayScreen(seed: seed, launch: launch)
+                    StdTodayScreen(seed: seed, launch: launch, openInbox: { tab = 1 })
                 }
             }
             .tabItem { Label(L("Today"), systemImage: "sun.max") }.tag(0)
@@ -42,6 +42,7 @@ struct StdProtoRoot: View {
 struct StdTodayScreen: View {
     let seed: StdSeed
     let launch: StdProtoLaunch
+    var openInbox: () -> Void = {}
     @State private var focus: HomeProtoFocus
     @State private var items: [StdSuggestion]
     @State private var confirmed: Set<String> = []
@@ -58,9 +59,10 @@ struct StdTodayScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
 
-    init(seed: StdSeed, launch: StdProtoLaunch) {
+    init(seed: StdSeed, launch: StdProtoLaunch, openInbox: @escaping () -> Void = {}) {
         self.seed = seed
         self.launch = launch
+        self.openInbox = openInbox
         _focus = State(initialValue: seed.rentals.focusOrder.first ?? .all)
         let byDay = seed.suggestions.enumerated().sorted { ($0.element.groupRank, $0.offset) < ($1.element.groupRank, $1.offset) }.map(\.element)
         _items = State(initialValue: Array(byDay.prefix(3)))
@@ -83,7 +85,17 @@ struct StdTodayScreen: View {
                        suggestions: seed.suggestions, week: seed.week)
     }
 
-    private var likely: [StdSuggestion] { items.prefix(rowLimit).filter { $0.isLikely && !confirmed.contains($0.id) } }
+    /// Rows shown on Today: at most 3 across day groups (2 at XXL+), and a row that would open a
+    /// new day group past the second row is left for Inbox, so "This week" stays above the tab bar.
+    private var shown: [StdSuggestion] {
+        var out = Array(items.prefix(rowLimit))
+        // Each extra day header costs a row's height: with two days on Today, show two rows.
+        if out.count > 2, Set(out.map(\.group)).count > 1 { out = Array(out.prefix(2)) }
+        return out
+    }
+    private var likely: [StdSuggestion] { shown.filter { $0.isLikely && !confirmed.contains($0.id) } }
+    /// Everything still waiting, across Today and Inbox.
+    private var waiting: Int { seed.suggestions.count - (3 - items.count) }
     /// D3b: at XXL and up Today shows two items so "This week" stays above the tab bar.
     private var rowLimit: Int { typeSize >= .xxLarge ? 2 : 3 }
 
@@ -125,7 +137,7 @@ struct StdTodayScreen: View {
     /// To confirm, grouped by day (§1.15a): the first day header sits under "TO CONFIRM"; the
     /// batch foot closes the last group.
     @ViewBuilder private var confirmSection: some View {
-        let groups = stdDayGroups(Array(items.prefix(rowLimit)))
+        let groups = stdDayGroups(shown)
         if groups.isEmpty {
             Section {
                 Label { Text(L("Nothing to confirm.")) } icon: { Image(systemName: "checkmark.circle.fill").foregroundStyle(colors.positive) }
@@ -143,14 +155,23 @@ struct StdTodayScreen: View {
                             .listRowSeparator(ii == g.items.count - 1 && gi < groups.count - 1 ? .hidden : .automatic, edges: .bottom)
                     }
                 }
-                if likely.count >= 2 {
-                    Button(StdCanon.confirmLikely(likely.count)) { confirmLikely() }
-                        .buttonStyle(StdButtonStyle(.tertiary))
-                        .frame(maxWidth: .infinity)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-                        .listRowBackground(colors.backgroundSecondary)
-                        .accessibilityIdentifier("today.confirmLikely")
-                        .stdMeasure("foot")
+                // One foot row: "Confirm N likely" and, when more wait, "Review all N" (opens Inbox).
+                if likely.count >= 2 || waiting > shown.count {
+                    HStack(spacing: 8) {
+                        if likely.count >= 2 {
+                            Button(StdCanon.confirmLikely(likely.count)) { confirmLikely() }
+                                .buttonStyle(StdButtonStyle(.tertiary))
+                                .accessibilityIdentifier("today.confirmLikely")
+                        }
+                        Spacer(minLength: 8)
+                        if waiting > shown.count {
+                            Button(L("Review all \(waiting)")) { openInbox() }
+                                .buttonStyle(StdButtonStyle(.tertiary))
+                        }
+                    }
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                    .listRowBackground(colors.backgroundSecondary)
+                    .stdMeasure("foot")
                 }
                 if typeSize.isAccessibilitySize {
                     Button(L("See all")) {}
@@ -195,7 +216,7 @@ struct StdTodayScreen: View {
             .padding(.bottom, 8)
             StdHeroCard(seed: live, focus: $focus).stdMeasure("hero").padding(.top, 16)
             StdSectionHeader(title: L("To confirm"), count: seed.suggestions.count - (seed.suggestions.prefix(3).count - items.count),
-                             trailing: typeSize.isAccessibilitySize ? nil : L("See all"))
+                             trailing: nil)
                 .padding(.top, 24)
             if let day { StdDayHeader(title: day).padding(.top, 4) }
         }

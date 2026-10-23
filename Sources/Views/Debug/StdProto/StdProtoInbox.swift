@@ -139,7 +139,8 @@ struct StdInboxScreen: View {
     private func row(_ item: StdSuggestion) -> some View {
         StdActionRow(item: item, confirmed: confirmed.contains(item.id), onConfirm: { confirm(item) }, showDay: false)
             .stdMeasure("row.\(item.id)")
-            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+            .listRowInsets(EdgeInsets(top: typeSize.isAccessibilitySize ? 4 : 10, leading: 16,
+                                      bottom: typeSize.isAccessibilitySize ? 4 : 10, trailing: 16))
             .listRowBackground(colors.backgroundSecondary)
             .alignmentGuide(.listRowSeparatorLeading) { _ in 34 }
             .alignmentGuide(.listRowSeparatorTrailing) { d in d[.trailing] + 16 }

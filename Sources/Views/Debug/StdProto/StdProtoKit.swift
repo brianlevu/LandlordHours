@@ -232,7 +232,7 @@ struct StdDayHeader: View {
 extension View {
     /// A day header drawn as a row inside the card: no separators, tight insets.
     func stdDayRow(first: Bool, colors: AdaptiveColors) -> some View {
-        listRowInsets(EdgeInsets(top: first ? 10 : 14, leading: 16, bottom: 0, trailing: 16))
+        listRowInsets(EdgeInsets(top: first ? 4 : 6, leading: 16, bottom: 0, trailing: 16))
             .listRowBackground(colors.backgroundSecondary)
             .listRowSeparator(.hidden)
     }
@@ -256,12 +256,14 @@ struct StdTag: View {
     let text: String
     let ink: Color
     var wash: Color? = nil
+    var wraps = false
 
     var body: some View {
         Text(text)
             .font(.caption2.weight(.medium))
             .foregroundStyle(ink)
-            .lineLimit(1)
+            .lineLimit(wraps ? nil : 1)
+            .fixedSize(horizontal: false, vertical: wraps)
             .padding(.horizontal, 6).padding(.vertical, 2)
             .frame(minHeight: 20)
             .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(wash ?? ink.opacity(0.12)))
@@ -438,7 +440,8 @@ struct StdActionRow: View {
                         }
                         VStack(alignment: .leading, spacing: 4) {
                             hours
-                            if let tag { StdTag(text: tag.0, ink: tag.1, wash: tag.2).fixedSize() }
+                            // Wraps instead of pushing the row past the card edge (AX3).
+                            if let tag { StdTag(text: tag.0, ink: tag.1, wash: tag.2, wraps: true) }
                         }
                     }
                 }

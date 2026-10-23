@@ -1365,6 +1365,17 @@
         }
       }
     },
+    "Review all %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review all %@"
+          }
+        }
+      }
+    },
     "Review and confirm": {
       "extractionState": "manual",
       "localizations": {

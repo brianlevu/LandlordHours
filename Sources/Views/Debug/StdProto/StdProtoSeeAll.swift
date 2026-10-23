@@ -40,7 +40,8 @@ struct StdSeeAllScreen: View {
                                 HomeProtoArt(size: 36, keyframe: HomeProtoStage.keyframe(for: rental))
                             }
                             .stdMeasure("row.\(rental.id)")
-                            .listRowInsets(EdgeInsets(top: 9, leading: 16, bottom: 9, trailing: 16))
+                            .listRowInsets(EdgeInsets(top: typeSize.isAccessibilitySize ? 4 : 9, leading: 16,
+                                                      bottom: typeSize.isAccessibilitySize ? 4 : 9, trailing: 16))
                     .listRowBackground(colors.backgroundSecondary)
                             .alignmentGuide(.listRowSeparatorLeading) { _ in 48 }
                             .alignmentGuide(.listRowSeparatorTrailing) { d in d[.trailing] + 16 }
@@ -48,14 +49,17 @@ struct StdSeeAllScreen: View {
                     } header: {
                         VStack(alignment: .leading, spacing: 0) {
                             if s == firstSection {
-                                // Flat back control, the same style as every close button (no glass hairline).
-                                Button {} label: { Image(systemName: "chevron.left") }
-                                    .buttonStyle(StdButtonStyle(.icon))
-                                    .accessibilityLabel(L("Back to Today"))
-                                    .padding(.bottom, 8)
-                                StdScreenTitle(title: L("All rentals"), subtitle: subtitle)
+                                // Back control in the title's leading slot (one band, not two).
+                                HStack(alignment: .center, spacing: 8) {
+                                    Button {} label: { Image(systemName: "chevron.left") }
+                                        .buttonStyle(StdButtonStyle(.icon))
+                                        .accessibilityLabel(L("Back to Today"))
+                                    StdScreenTitle(title: L("All rentals"))
+                                }
+                                Text(subtitle).font(.subheadline).foregroundStyle(colors.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
                                     .stdMeasure("title")
-                                    .padding(.bottom, 24)
+                                    .padding(.bottom, 16)
                             }
                             StdSectionHeader(title: title(s), count: list.count, ink: ink(s))
                         }
