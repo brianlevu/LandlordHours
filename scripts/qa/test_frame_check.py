@@ -40,7 +40,8 @@ def make_list(row_px, n=5, top=700, name="f.png", dt_suffix="", foot_px=0):
     return path
 
 
-def make_day_list(layout, top=500, name="days.png", bar=False, eyebrow_only=False):
+def make_day_list(layout, top=500, name="days.png", bar=False, eyebrow_only=False,
+                  action_label=False, divider_before_header=False):
     """layout: list of 'H' (day header) or 'R' (64pt actionable row with ring, title, meta, hours).
     Rows are 192px (64pt) with 30px insets; dividers between consecutive rows of one day only."""
     img = Image.new("RGB", (W, H), CANVAS)
@@ -51,8 +52,12 @@ def make_day_list(layout, top=500, name="days.png", bar=False, eyebrow_only=Fals
     prev = None
     for kind in layout:
         if kind == "H":
+            if divider_before_header and prev == "R":
+                d.rectangle([180, y, 1146, y + 1], fill=RULE)       # group divider above the header (r8)
             y += 40
-            d.rectangle([110, y, 330, y + 54], fill=INK)            # 18pt header text, left only
+            d.rectangle([110, y, 330, y + 54], fill=INK)            # 18pt header text
+            if action_label:
+                d.rectangle([880, y, 1090, y + 54], fill=INK)       # trailing action label ("Review all")
             y += 54 + 30
             prev = "H"
         else:
@@ -157,6 +162,22 @@ class DayHeaders(unittest.TestCase):
         self.assertEqual(len(hs), 4, hs)
         for h in hs:
             self.assertTrue(62 <= h <= 66, hs)
+        self.assertFalse(failed(res, "D1"))
+
+    def test_header_with_trailing_action_label_is_still_a_header(self):
+        res = run(make_day_list(self.LAYOUT, action_label=True))
+        card = res["cards"][0]
+        self.assertEqual(len(card["day_headers"]), 2)
+        hs = [float(r["h_pt"]) for r in card["rows"]]
+        self.assertEqual(len(hs), 4, hs)
+        self.assertTrue(all(62 <= h <= 66 for h in hs), hs)
+
+    def test_divider_above_a_header_leaves_no_phantom_row(self):
+        res = run(make_day_list(self.LAYOUT, divider_before_header=True))
+        card = res["cards"][0]
+        hs = [float(r["h_pt"]) for r in card["rows"]]
+        self.assertEqual(len(hs), 4, hs)
+        self.assertTrue(all(h > 50 for h in hs), hs)
         self.assertFalse(failed(res, "D1"))
 
     def test_without_header_detection_failure_mode_is_a_tall_row(self):
