@@ -78,11 +78,57 @@ struct DashboardView: View {
     private var houseGoal: HouseGoal { goalManager.houseGoal }
     private var totalHours: Double { viewModel.houseCountableHours(goal: houseGoal, year: currentYear) }
     private var targetHours: Double { houseGoal.targetHours }
-    private var isGoalMet: Bool { HouseProgress(hours: totalHours, goal: houseGoal).isGoalMet }
-    private var pace: TodayPace { TodayPace.resolve(hours: totalHours, goal: houseGoal) }
+    /// The pace follows the hero: the focused rental's own target, or the goal's total.
+    private var pace: TodayPace { TodayPace.resolve(hours: heroState.hours, goal: heroState.goal) }
 
-    /// The hero's words: target, whose count, and where you stand against Dec 31.
-    private var heroCopy: TodayHeroCopy {
+    // MARK: Focus (2.1): one value feeds the hero, the flag, the subtitle, the pace and the widget
+
+    /// Keeps Today in step with the focus the owner picks (and the plan answers).
+    @ObservedObject private var planStore = RentalPlanStore.shared
+    @State private var homeSelection = HomeSelection()
+    @State private var showRentalGrid = false
+    @State private var rentalRowScrollRequest: String?
+    @State private var didApplyHomeLaunch = false
+
+    /// Every rental (and "All rentals" when the goal is one shared total or a record), with its
+    /// own hours and plan.
+    private var homeRentals: HomeRentals {
+        let ctx = viewModel.rentalPlanContext
+        return HomeRentals.make(
+            properties: viewModel.properties, mode: RentalPlanning.mode(ctx), plans: RentalPlanning.plans(ctx),
+            hours: { viewModel.rentalHours($0, year: currentYear) }, totalHours: totalHours)
+    }
+
+    /// Two or more rentals: the row under the hero. One rental: 2.0.1's Today.
+    private var showsRentalRow: Bool { viewModel.properties.count >= 2 }
+
+    private var todayFocus: TodayFocusChoice {
+        _ = planStore.focusToken
+        return viewModel.resolvedTodayFocus(year: currentYear)
+    }
+
+    /// The hero for the focus (or the rentals added up).
+    private var heroState: HomeHeroState {
+        HomeHero.make(homeRentals, focus: todayFocus, summed: homeSelection.sumIds, .init(
+            year: currentYear,
+            now: InboxClock.now(),
+            daysOfData: daysOfData,
+            hasPendingToConfirm: inbox.badgeCount > 0 || foundInInbox.count > 0,
+            answer: { id in taxProfile.noOneParticipatedMore(forYear: currentYear, propertyId: id) },
+            totalCopy: totalHeroCopy,
+            totalHours: totalHours,
+            totalGoal: houseGoal,
+            totalFlag: showsRentalRow ? HomeRentals.allRentalsName : (isNewOwner ? viewModel.properties.first?.name : nil)))
+    }
+
+    /// The hero's words for the focus.
+    private var heroCopy: TodayHeroCopy { heroState.copy }
+
+    /// A pre-save total (a confirm build waiting to play) only applies when the hero shows that total.
+    private var heroOverrideApplies: Bool { heroState.isTotal || abs(heroState.hours - totalHours) < 0.001 }
+
+    /// The goal's total hero: target, whose count, and where you stand against Dec 31 (2.0.1).
+    private var totalHeroCopy: TodayHeroCopy {
         TodayHeroCopy.make(.init(
             goal: houseGoal,
             isRecord: goalManager.goalChoice == .record,
@@ -92,7 +138,7 @@ struct DashboardView: View {
             repsParticipant: goalManager.repsParticipant,
             halfTest: repsStatus.moreThanHalfStatus,
             noOneParticipatedMore: taxProfile.noOneParticipatedMore(forYear: currentYear),
-            propertyName: heroPropertyName,
+            propertyName: nil,
             daysOfData: daysOfData,
             hasPendingToConfirm: inbox.badgeCount > 0 || foundInInbox.count > 0))
     }
@@ -105,20 +151,28 @@ struct DashboardView: View {
         return max(0, calendar.dateComponents([.day], from: calendar.startOfDay(for: first), to: calendar.startOfDay(for: InboxClock.now())).day ?? 0)
     }
 
-    /// The rental the 100 or 500 hour count belongs to; nil when it covers every rental.
-    private var heroPropertyName: String? { viewModel.todayFocusProperty(year: currentYear)?.name }
-
-    /// The rental Today names in the eyebrow, the house flag and the subtitle: always the same
-    /// one. When the count covers every rental there is no focus; the first rental stands in
-    /// for the flag and subtitle only.
+    /// The rental Today names in the eyebrow, the house flag and the subtitle: always the focus
+    /// (never simply the first rental added). nil on "All rentals" with several rentals.
     private var todayFocusName: String? {
-        viewModel.todayFocusProperty(year: currentYear)?.name ?? viewModel.properties.first?.name
+        if viewModel.properties.count == 1 { return viewModel.properties[0].name }
+        return heroState.isTotal ? nil : heroState.flag
     }
     @State private var showParticipationSheet = false
 
     /// What the hero draws: the live hours, or the pre-save hours while a confirm build waits to play.
     private var heroProgress: HouseProgress {
-        HouseProgress(hours: heroHoursOverride ?? totalHours, goal: houseGoal)
+        HouseProgress(hours: (heroOverrideApplies ? heroHoursOverride : nil) ?? heroState.hours, goal: heroState.goal)
+    }
+
+    /// The house the hero draws, from the same stage function as the tiles. nil: the number's hours.
+    private var heroStageHours: Double? {
+        switch heroState.kind {
+        case .total: return nil
+        case .ownTarget:
+            let target = heroState.copy.targetHours ?? 500
+            return RentalStage.hours(track: .ownTarget(hours: target), hours: heroProgress.hours)
+        default: return heroState.stageHours
+        }
     }
 
     /// WP-L: the first iCloud pull of this launch hasn't landed, so the hours may not be final.
@@ -160,7 +214,7 @@ struct DashboardView: View {
     @State private var showRecordExport = false
     // The header line follows the hero: it keeps the pre-save total until the count-up lands.
     @State private var subtitleHoursOverride: Double?
-    private var headerHours: Double { subtitleHoursOverride ?? totalHours }
+    private var headerHours: Double { (heroOverrideApplies ? subtitleHoursOverride : nil) ?? totalHours }
     @State private var showLearningCenter = Self.shouldOpenLearningCenterFromLaunchArguments
     @State private var showHistory = false
     @State private var scrollOffset: CGFloat = 0
@@ -234,7 +288,10 @@ struct DashboardView: View {
         return nil
     }
 
+    /// The flag on the lot: with several rentals it always names the focus; with one, only until
+    /// the first hour is logged (2.0.1).
     private var heroStakeName: String? {
+        if showsRentalRow { return heroState.flag }
         guard isNewOwner else { return nil }
         return todayFocusName
     }
@@ -316,6 +373,10 @@ struct DashboardView: View {
                         // The house leads Today in every state (approved r6 concept); a new
                         // owner's setup steps sit right under the empty lot.
                         houseHero
+                        if showsRentalRow {
+                            rentalRow
+                                .id("today.section.rentals")
+                        }
                         if isNewOwner && !calendarSuggestionsOn {
                             findHoursCard
                         }
@@ -372,6 +433,7 @@ struct DashboardView: View {
                 #if DEBUG
                 .task {
                     TodayDebugSeed.applyIfNeeded(app: viewModel)
+                    applyHomeLaunchIfNeeded()
                     inbox.reload()
                     refreshNewOwnerState()
                     guard let target = TodayDebugSeed.scrollTarget else { return }
@@ -709,11 +771,16 @@ struct DashboardView: View {
             return "Every hour you log starts with a place."
         }
         if viewModel.timeEntries.isEmpty {
-            let name = todayFocusName ?? "Your rental"
+            guard let name = todayFocusName else {
+                return foundInInbox.count > 0
+                    ? String(localized: "Your rentals are staked. Confirm what we found, or log something new.", table: "Home")
+                    : String(localized: "Your rentals are staked. Log your first hour while it’s fresh.", table: "Home")
+            }
             return foundInInbox.count > 0
                 ? "\(name) is staked. Confirm what we found, or log something new."
                 : String(localized: "\(name) is staked. Log your first hour while it’s fresh.")
         }
+        if let line = HomeHero.headerLine(heroState) { return line }
         return TodayHeroCopy.headerLine(hours: headerHours, target: Int(targetHours), isRecord: goalManager.goalChoice == .record, year: currentYear)
     }
 
@@ -743,23 +810,30 @@ struct DashboardView: View {
     // MARK: - House hero
     private var houseHero: some View {
         VStack(spacing: 12) {
-            HouseHeroCard(
-                progress: heroProgress,
-                year: currentYear,
-                status: heroCopy.status,
-                statusTone: heroCopy.tone,
-                heroCopy: heroCopy,
-                onCelebration: { _ in presentNextCelebration() },
-                footer: heroFooter,
-                stakeName: heroStakeName,
-                isLoading: hoursPending,
-                animatesChanges: viewModel.lastEntriesChangeOrigin != .remote,
-                isLookingBack: backfill.isScanning
-            )
-            // The art has a fixed frame; past AX2 the words would wrap into it, so cap there.
-            // VoiceOver reads the whole hero as one element with the full words (the empty lot
-            // keeps its "Add property" button reachable).
-            .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+            ZStack {
+                HouseHeroCard(
+                    progress: heroProgress,
+                    year: currentYear,
+                    status: heroCopy.status,
+                    statusTone: heroCopy.tone,
+                    heroCopy: heroCopy,
+                    onCelebration: { _ in presentNextCelebration() },
+                    footer: heroFooter,
+                    stakeName: heroStakeName,
+                    isLoading: hoursPending,
+                    animatesChanges: viewModel.lastEntriesChangeOrigin != .remote,
+                    isLookingBack: backfill.isScanning,
+                    stageHours: heroStageHours,
+                    stageTitle: heroState.stageTitle
+                )
+                // A new focus cross-fades in (Reduce Motion: the same fade, shorter).
+                .id(heroState.key)
+                .transition(.opacity)
+            }
+            // The card grows with Dynamic Type at every size (2.1); VoiceOver reads the whole hero
+            // as one element with the full words (the empty lot keeps its "Add property" button reachable).
+            .contentShape(Rectangle())
+            .simultaneousGesture(heroSwipe, including: showsRentalRow ? .all : .subviews)
             .accessibilityElement(children: viewModel.properties.isEmpty && isNewOwner ? .contain : .ignore)
             .accessibilityLabel(heroAccessibilityLabel)
             .accessibilityIdentifier("today.hero")
@@ -768,16 +842,109 @@ struct DashboardView: View {
             .accessibilityAddTraits(heroCopy.needsConfirmation ? .isButton : [])
             .accessibilityHint(heroCopy.needsConfirmation ? "Opens the question about anyone else’s hours" : "")
             .sheet(isPresented: $showParticipationSheet) {
+                let propertyId = heroState.participationPropertyId
                 ParticipationConfirmationSheet(
                     year: currentYear,
-                    currentAnswer: taxProfile.noOneParticipatedMore(forYear: currentYear)
+                    propertyName: propertyId.flatMap { id in viewModel.properties.first { $0.id == id }?.name },
+                    currentAnswer: taxProfile.noOneParticipatedMore(forYear: currentYear, propertyId: propertyId)
                 ) { answer in
-                    taxProfile.setNoOneParticipatedMore(answer, forYear: currentYear)
+                    taxProfile.setNoOneParticipatedMore(answer, forYear: currentYear, propertyId: propertyId)
                 }
             }
 
         }
     }
+
+    // MARK: - Your rentals (2.1): the row under the hero
+
+    private var rentalRow: some View {
+        HomeRentalRow(
+            rentals: homeRentals,
+            focus: todayFocus,
+            selection: homeSelection,
+            onSelect: { selectRental($0) },
+            onToggleSum: { animateFocus { homeSelection.toggleSum(focus: todayFocus) } },
+            onSeeAll: { showRentalGrid = true },
+            onAdd: { openAddPropertyFromHome() },
+            scrollRequest: rentalRowScrollRequest
+        )
+        .sheet(isPresented: $showRentalGrid) {
+            HomeGridSheet(rentals: homeRentals, focus: todayFocus) { picked in
+                showRentalGrid = false
+                selectRental(picked)
+            }
+        }
+    }
+
+    /// A tap carries no momentum: no bounce. Reduce Motion: a cross-fade only.
+    private func animateFocus(_ updates: () -> Void) {
+        withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.3, dampingFraction: 1.0), updates)
+    }
+
+    /// Tap a tile: focus it (kept across launches), or pick it while adding up.
+    private func selectRental(_ tile: TodayFocusChoice) {
+        animateFocus {
+            switch homeSelection.tap(tile) {
+            case .focus(let focus): setTodayFocus(focus)
+            case .picked: break
+            }
+        }
+    }
+
+    private func setTodayFocus(_ focus: TodayFocusChoice) {
+        switch focus {
+        case .all: RentalPlanStore.shared.setFocusAll()
+        case .rental(let id): RentalPlanStore.shared.setFocus(rental: id)
+        }
+        // The widget follows the focus.
+        viewModel.refreshWidgetSurface()
+    }
+
+    /// The horizontal swipe on the hero steps the focus, like the tiles (not while adding up).
+    private var heroSwipe: some Gesture {
+        DragGesture(minimumDistance: 24).onEnded { v in
+            guard showsRentalRow, !homeSelection.summing,
+                  abs(v.translation.width) > 48, abs(v.translation.width) > abs(v.translation.height) * 1.5,
+                  let next = homeRentals.step(from: todayFocus, by: v.translation.width < 0 ? 1 : -1) else { return }
+            selectRental(next)
+        }
+    }
+
+    /// DEBUG launch hooks for captures and UI tests (`-LHHomeFocus`, `-LHHomeSum`, `-LHHomeSheet`,
+    /// `-LHHomeAutoplay`); compiled out of Release.
+    private func applyHomeLaunchIfNeeded() {
+        #if DEBUG
+        guard !didApplyHomeLaunch else { return }
+        didApplyHomeLaunch = true
+        let rentals = homeRentals
+        guard rentals.showsRow else { return }
+        if let index = HomeDebugLaunch.focusIndex, let focus = rentals.focus(at: index) { setTodayFocus(focus) }
+        let names = HomeDebugLaunch.sumNames
+        if !names.isEmpty {
+            homeSelection.summing = true
+            homeSelection.summed = names.compactMap { name in rentals.rentalTiles.first { $0.name == name }?.propertyId }
+        }
+        if HomeDebugLaunch.opensGrid { showRentalGrid = true }
+        if HomeDebugLaunch.autoplay { Task { await homeAutoplay() } }
+        #endif
+    }
+
+    #if DEBUG
+    /// A scripted tour for a video: tap through rentals, add two up, then See all.
+    private func homeAutoplay() async {
+        func pause(_ s: Double) async { try? await Task.sleep(nanoseconds: UInt64(s * 1_000_000_000)) }
+        let order = homeRentals.order
+        await pause(1.5)
+        for i in [1, 2] where order.indices.contains(i) { selectRental(order[i]); await pause(1.4) }
+        selectRental(order[0]); await pause(1.2)
+        animateFocus { homeSelection.toggleSum(focus: todayFocus) }; await pause(1.2)
+        for i in [1, 2] where order.indices.contains(i) { selectRental(order[i]); await pause(1.3) }
+        await pause(0.8)
+        animateFocus { homeSelection.toggleSum(focus: todayFocus) }; await pause(1.3)
+        rentalRowScrollRequest = "seeall"; await pause(1.4)
+        if homeRentals.showsSeeAll { showRentalGrid = true; await pause(2.8); showRentalGrid = false; await pause(1.0) }
+    }
+    #endif
 
     // MARK: - Pace cards (2-up; stacked from XXL)
 
@@ -792,11 +959,29 @@ struct DashboardView: View {
             layout {
                 TodayPaceCard(model: ruleCard, isPending: hoursPending)
                     .accessibilityIdentifier(isREPS ? "dashboard.fiftyPercent" : "dashboard.daysLeft")
-                TodayPaceCard(model: TodayPaceCards.finish(hours: totalHours, goal: houseGoal, pace: pace, now: Date(),
-                                                      paceReady: TodayHeroCopy.paceIsReady(hours: totalHours, daysOfData: daysOfData)),
-                              isPending: hoursPending)
-                    .accessibilityIdentifier("dashboard.finishPace")
+                if let finish = finishCard {
+                    TodayPaceCard(model: finish, isPending: hoursPending)
+                        .accessibilityIdentifier("dashboard.finishPace")
+                }
             }
+        }
+    }
+
+    /// "To finish by Dec 31" for the hero's target: the focused rental's own, or the goal's total
+    /// (a rental's part of a shared total shows the total's). None for a record-only rental or
+    /// rentals added up: there is no target to finish.
+    private var finishCard: TodayPaceCardModel? {
+        let hero = heroState
+        if hero.hasTarget && !hero.isTotal {
+            return TodayPaceCards.finish(hours: hero.hours, goal: hero.goal, pace: pace, now: Date(),
+                                         paceReady: TodayHeroCopy.paceIsReady(hours: hero.hours, daysOfData: daysOfData))
+        }
+        switch hero.kind {
+        case .total, .sharedPart:
+            return TodayPaceCards.finish(hours: totalHours, goal: houseGoal, pace: TodayPace.resolve(hours: totalHours, goal: houseGoal),
+                                         now: Date(), paceReady: TodayHeroCopy.paceIsReady(hours: totalHours, daysOfData: daysOfData))
+        default:
+            return nil
         }
     }
 
@@ -829,7 +1014,16 @@ struct DashboardView: View {
         if backfill.isScanning {
             return "\(currentYear). \(AppFormat.hours(totalHours)) confirmed so far. Looking through your calendar; work we find waits in your Inbox."
         }
-        let live = HouseProgress(hours: totalHours, goal: houseGoal)
+        let live = HouseProgress(hours: heroState.hours, goal: heroState.goal)
+        if let stageTitle = heroState.stageTitle {
+            // No target here (a record-only rental, a rental's part of the total, rentals added up).
+            let copy = heroState.copy
+            var parts = ["\(copy.eyebrow).", "\(Int(heroState.hours.rounded(.down))) \(copy.caption)."]
+            if let q = copy.qualifier { parts.append("\(q).") }
+            if let phrase = copy.phrase { parts.append("\(phrase).") }
+            parts.append("\(stageTitle).")
+            return parts.joined(separator: " ")
+        }
         switch heroFooter {
         case .emptyLot:
             return "\(currentYear). An empty lot. \(TodayHeroCopy.emptyLotLine(target: heroCopy.targetHours))"
