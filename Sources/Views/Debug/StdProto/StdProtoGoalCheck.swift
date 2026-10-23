@@ -264,7 +264,7 @@ struct StdGoalCheckSheet: View {
 
     /// One compact card: the target ruler with your hours on it, then who else works here.
     private var comparison: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: typeSize >= .xxLarge ? 5 : 8) {
             // Verdict first (critique #5): the sentence is the card's headline, the track is the evidence.
             Text(resultLine)
                 .font(.headline).foregroundStyle(colors.textPrimary)
@@ -278,7 +278,8 @@ struct StdGoalCheckSheet: View {
                 if !typeSize.isAccessibilitySize { Spacer(minLength: 0) }
             }
         }
-        .padding(16)
+        // Large text: 12pt padding keeps the card inside D6 (≤ 20% of the screen).
+        .padding(typeSize >= .xxLarge ? 10 : 16)
         .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(colors.backgroundSecondary))
         .stdMeasure("card.comparison")
         .accessibilityElement(children: .combine)
@@ -358,10 +359,10 @@ struct StdGoalCheckSheet: View {
                     if i > 0 { Rectangle().fill(colors.border).frame(height: 0.5).padding(.leading, 64) }
                     let row = summaryWords(r)
                     StdBrowseRow(title: r.name, meta: row.meta, value: row.value, valueInk: row.changed ? colors.action : colors.textSecondary,
-                                 chevron: false, metaLines: 3) {
+                                 chevron: false, metaLines: 3, stackValue: typeSize >= .xxLarge) {
                         HomeProtoArt(size: 36, keyframe: HomeProtoStage.keyframe(for: r))
                     }
-                    .padding(.horizontal, 16).padding(.vertical, 8)
+                    .padding(.horizontal, 16).padding(.vertical, typeSize >= .xxLarge ? 6 : 8)
                     .opacity(i < shownRows ? 1 : 0)
                     .offset(y: i < shownRows || reduceMotion ? 0 : 8)
                 }

@@ -567,6 +567,8 @@ struct StdBrowseRow<Leading: View>: View {
     var metaLines = 1
     /// A 3pt progress bar under the text (critique #7): fraction and intent ink.
     var progress: (Double, Color)? = nil
+    /// Put the value under the text (as at AX sizes) so the meta line gets the full width.
+    var stackValue = false
     @ViewBuilder var leading: Leading
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -576,9 +578,16 @@ struct StdBrowseRow<Leading: View>: View {
         HStack(alignment: typeSize.isAccessibilitySize ? .top : .center, spacing: 12) {
             if !typeSize.isAccessibilitySize { leading.frame(width: 36, height: 36) }
             VStack(alignment: .leading, spacing: typeSize.isAccessibilitySize ? 0 : 2) {
+HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(title).font(.body.weight(.semibold)).foregroundStyle(colors.textPrimary)
                     .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
                     .fixedSize(horizontal: false, vertical: typeSize.isAccessibilitySize)
+                    // Stacked value at large text: it rides the title line so the meta keeps full width.
+                    if stackValue && !typeSize.isAccessibilitySize, let value {
+                        Spacer(minLength: 4)
+                        valueText(value)
+                    }
+                }
                 Text(meta).font(.subheadline).foregroundStyle(colors.textSecondary)
                     .lineLimit(typeSize.isAccessibilitySize ? nil : metaLines)
                     .fixedSize(horizontal: false, vertical: typeSize.isAccessibilitySize)
@@ -596,7 +605,7 @@ struct StdBrowseRow<Leading: View>: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            if !typeSize.isAccessibilitySize, let value { valueText(value) }
+            if !typeSize.isAccessibilitySize && !stackValue, let value { valueText(value) }
             if chevron {
                 Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(colors.textTertiary)
                     .accessibilityHidden(true)
