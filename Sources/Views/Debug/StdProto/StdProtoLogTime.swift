@@ -77,7 +77,8 @@ struct StdLogTimeSheet: View {
             Button(primaryTitle) {}
                 .buttonStyle(StdButtonStyle(.primary))
                 .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 16)
-                .background(colors.background)
+                .frame(maxWidth: .infinity)
+                .background(.bar)
                 .accessibilityIdentifier("log.primary")
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { buttonH = $0 }
         }

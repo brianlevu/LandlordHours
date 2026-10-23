@@ -279,7 +279,11 @@ struct StdButtonStyle: ButtonStyle {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.isEnabled) private var enabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// .icon circles grow with Dynamic Type (44 at default, at most 60); the glyph is capped at
+    /// xxxLarge so it always sits inside its circle.
+    @ScaledMetric(relativeTo: .body) private var iconCircle: CGFloat = 44
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
+    private var circle: CGFloat { min(iconCircle, 60) }
 
     func makeBody(configuration: Configuration) -> some View {
         styled(configuration.label)
@@ -314,14 +318,16 @@ struct StdButtonStyle: ButtonStyle {
                 .contentShape(Rectangle())
         case .icon:
             label.font(.body.weight(.semibold))
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 .foregroundStyle(colors.textSecondary)
-                .frame(width: 44, height: 44)
+                .frame(width: circle, height: circle)
                 .background(Circle().fill(colors.backgroundTertiary))
                 .contentShape(Circle())
         case .iconOnBlueprint:
             label.font(.body.weight(.semibold))
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 .foregroundStyle(Color.white)
-                .frame(width: 44, height: 44)
+                .frame(width: circle, height: circle)
                 .background(Circle().fill(Color.white.opacity(0.14)))
                 .contentShape(Circle())
         }

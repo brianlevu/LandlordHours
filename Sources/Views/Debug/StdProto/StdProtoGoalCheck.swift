@@ -62,8 +62,11 @@ struct StdGoalCheckSheet: View {
                 }
                 .scrollBounceBehavior(.basedOnSize)
                 // The CTA is pinned under the content; the content scrolls above it (AX3).
+                // Content scrolls under a material bar; no canvas-coloured block is painted over it.
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    footer.background(colors.background)
+                    if step != .question {
+                        footer.frame(maxWidth: .infinity).background(.bar)
+                    }
                 }
                 .onAppear {
                     guard let target = StdProtoLaunch.current?.scroll else { return }
