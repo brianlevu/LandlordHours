@@ -93,7 +93,7 @@ final class LogFormFillTests: XCTestCase {
 
     func testValidationSaysWhatsMissingInPlainWords() {
         var form = LogForm.starting(properties: [pine, oak], entries: [])
-        XCTAssertEqual(form.missingMessage(properties: [pine, oak]), "Pick a property to log this.")
+        XCTAssertEqual(form.missingMessage(properties: [pine, oak]), "Pick a rental to log this.")
         form.setProperty(pine.id)
         form.setHours(0)
         XCTAssertEqual(form.missingMessage(properties: [pine, oak]), "Add how long it took to log this.")
@@ -101,7 +101,8 @@ final class LogFormFillTests: XCTestCase {
         XCTAssertEqual(form.missingMessage(properties: [pine, oak]), "Pick the kind of work to log this.")
         form.setCategory(.management)
         XCTAssertNil(form.missingMessage(properties: [pine, oak]))
-        XCTAssertEqual(LogForm.starting(properties: [], entries: []).missingMessage(properties: []), "Add a property to log this.")
+        XCTAssertEqual(LogForm.starting(properties: [], entries: []).missingMessage(properties: []), "Name your rental to log this.")
+        XCTAssertEqual(LogForm.starting(properties: [], entries: []).missingMessage(properties: [], firstRunName: "Pine Cabin"), "Pick the kind of work to log this.")
     }
 
     func testHoursStepInQuarterHoursAndClampToADay() {

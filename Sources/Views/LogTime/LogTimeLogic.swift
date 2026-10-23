@@ -47,6 +47,9 @@ enum LogFillSource: Equatable {
         }
     }
 
+    /// "Filled from your note" (the model's wording; the rules alone say "Matched from your words").
+    var caption: String { caption(tier: .model) }
+
     /// No trailing middot: "Undo" is its own button, so the caption never ends in a dangling "·".
     /// The note's model answered: "Filled from your note". Rules alone: "Matched from your words".
     func caption(tier: LogFillTier) -> String {
