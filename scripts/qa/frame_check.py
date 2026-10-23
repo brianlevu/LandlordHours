@@ -31,7 +31,10 @@ Mode `density` (the [measured] rules of docs/design/DESIGN-STANDARD.md section 2
   Standard amendments applied: D2 <= 45% at AX3; D4 skips grouped value-row containers (>= 3 rows of
   44-68pt, 88pt at XXL; D4 only, D1 and D2 still apply); a card's centred foot action ("Confirm N likely", last
   row < 56pt) is not a row for D1/D2/D3. Not counted as cards: sheets (a box that reaches the screen
-  edge; its inner cards are found against the sheet fill), header bands of a sheet, blue controls under
+  edge; its inner cards are found against the sheet fill), day section headers (1.15a: a left-only text
+  band above a row that starts with a ring control; not a row, and its spacing is not an empty band),
+  the pinned "Confirm N likely" bar (1.3b: two hairlines 38-48pt apart at the fold; its top edge becomes
+  the fold), header bands of a sheet, blue controls under
   120pt, outlined input fields, and at AX3 any block cut by the fold (judged by D2 on its visible part).
 """
 from __future__ import annotations
@@ -425,6 +428,25 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
     lab = rgb_to_lab(a)
     vp_pt = H / scale
     fold = int(H * fold_frac)
+    # pinned batch bar (standard 1.3b): a 44pt capsule just above the tab bar. It is not a row or a
+    # card; content under it is hidden, so the bar's top edge becomes the effective fold.
+    bar = None
+    xs_ = slice(int(54 * scale), W - int(54 * scale))
+    edge_rows = []
+    for y in range(max(fold - int(90 * scale), 8), min(fold + int(14 * scale), H - 8)):
+        up = (np.linalg.norm(lab[y, xs_] - lab[y - 4, xs_], axis=1) > 2).mean()
+        dn = (np.linalg.norm(lab[y, xs_] - lab[y + 4, xs_], axis=1) > 2).mean()
+        if up > 0.7 and dn > 0.7:
+            edge_rows.append(y)
+    for ytop in edge_rows:
+        for ybot in edge_rows:
+            if 38 * scale <= ybot - ytop <= 48 * scale:
+                bar = (ytop, ybot)
+                break
+        if bar:
+            break
+    if bar:
+        fold = min(fold, bar[0])
     canvas0 = lab[:, 4, :]  # per-row canvas colour
     probes = [int(40 * scale), W - int(40 * scale)]
     top_skip = int(62 * scale)  # status bar / dynamic island
@@ -533,14 +555,68 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
             for (a0, a1) in runs(cand, close_gap=1):
                 if a1 - a0 <= 4 and a0 > 8 and n - a1 > 8:
                     div_rows.append(y0 + (a0 + a1) // 2)
+        # day section headers (standard 1.15a): a left-aligned text band with no trailing value,
+        # directly above a row that starts with a leading ring control. Not a row.
+        headers = []
+        bands = []
+        if not c["hero"]:
+            ink = (np.linalg.norm(lab[y0:vis_y1, x0 + 6:x1 - 6, :] - c["fill"], axis=2) > 22)
+            bands = runs(ink.any(axis=1), min_len=int(5 * scale), close_gap=int(2 * scale))
+            cw = (x1 - x0) - 12
+
+            def extent(b):
+                cols = np.flatnonzero(ink[b[0]:b[1]].any(axis=0))
+                return cols[0], cols[-1]
+
+            def starts_with_ring(b, partial=False):
+                sub = ink[b[0]:b[1]]
+                cols = np.flatnonzero(sub.any(axis=0))
+                if cols.size == 0 or cols[0] > int(24 * scale):
+                    return False
+                run0 = runs(sub.any(axis=0), close_gap=int(2 * scale))[0]
+                w = run0[1] - run0[0]
+                blob = sub[:, run0[0]:run0[1]]
+                rr = np.flatnonzero(blob.any(axis=1))
+                h = rr[-1] - rr[0] + 1
+                fillr = blob[rr[0]:rr[-1] + 1].mean()
+                hmin = 4 * scale if partial else 16 * scale  # a ring clipped by the fold or the pinned bar
+                return 16 * scale <= w <= 30 * scale and hmin <= h <= 30 * scale and (partial or fillr < 0.45)
+            for bi in range(len(bands) - 1):
+                b = bands[bi]
+                lo, hi = extent(b)
+                if (lo <= int(24 * scale) and hi <= 0.62 * cw and (b[1] - b[0]) <= 30 * scale
+                        and starts_with_ring(bands[bi + 1], partial=bool(cut and bi + 1 == len(bands) - 1))):
+                    headers.append(dict(ink_top=y0 + b[0], ink_bot=y0 + b[1],
+                                        prev_bot=(y0 + bands[bi - 1][1]) if bi > 0 else None,
+                                        next_top=y0 + bands[bi + 1][0]))
+        if bands and cut and not c["hero"]:
+            b = bands[-1]
+            lo, hi = extent(b)
+            if (lo <= int(24 * scale) and hi <= 0.62 * cw and (b[1] - b[0]) <= 30 * scale
+                    and (vis_y1 - y0) - b[1] <= int(60 * scale)
+                    and not any(h["ink_top"] == y0 + b[0] for h in headers)):
+                headers.append(dict(ink_top=y0 + b[0], ink_bot=y0 + b[1],
+                                    prev_bot=(y0 + bands[-2][1]) if len(bands) > 1 else None, next_top=None))
+        pad = int(10 * scale)  # row insets 10/10
         bounds = [y0] + div_rows + [y1]
+        segs = [[bounds[i], bounds[i + 1]] for i in range(len(bounds) - 1)]
+        for h in headers:
+            for sg in list(segs):
+                if sg[0] <= h["ink_top"] < sg[1]:
+                    i = segs.index(sg)
+                    parts = []
+                    if h["prev_bot"] is not None:
+                        parts.append([sg[0], h["prev_bot"] + pad])
+                    if h["next_top"] is not None:
+                        parts.append([h["next_top"] - pad, sg[1]])
+                    segs[i:i + 1] = parts
+                    break
         rows = []
-        for i in range(len(bounds) - 1):
-            top, bot = bounds[i], bounds[i + 1]
-            last = i == len(bounds) - 2
+        for i, (top, bot) in enumerate(segs):
+            last = i == len(segs) - 1
             complete = bot <= fold and not (last and cut)
             rows.append(dict(y0=top, y1=bot, h_pt=round((bot - top) / scale, 1), complete=bool(complete), foot=False))
-        is_list = len(div_rows) >= 1
+        is_list = len(div_rows) >= 1 or len(headers) >= 1
         # foot action ("Confirm N likely"): the last row of a list container, shorter than the
         # D1 minimum, whose ink is one centred text run. It is not a list item.
         if is_list and len(rows) >= 2:
@@ -575,6 +651,10 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
                 near_fill = np.linalg.norm(reg - c["fill"], axis=2) <= 3
                 near_canvas = np.linalg.norm(reg - cv[iy0:iy1, None, :], axis=2) <= 3
                 empty_row = (near_fill | near_canvas).all(axis=1)
+                for h in headers:  # the spacing a day header adds (1.15a) is structure, not an empty band
+                    za = (h["prev_bot"] if h["prev_bot"] is not None else y0) + pad - iy0
+                    zb = ((h["next_top"] - pad) if h["next_top"] is not None else vis_y1) - iy0
+                    empty_row[max(za, 0):max(zb, 0)] = False
                 empty_share = round(float(empty_row.sum() / (vis_y1 - y0)), 3)
             else:
                 empty_share = 0.0
@@ -585,7 +665,8 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
             height_pt=round(h_pt, 1), visible_height_pt=round(vis_pt, 1),
             viewport_share=round(vis_pt / vp_pt, 3), cut_by_fold=bool(cut),
             empty_band_share=empty_share, d4_exempt_value_rows=bool(value_group),
-            rows=rows if is_list else [], gutter_pt=round(c["x0"] / scale, 1)))
+            rows=rows if is_list else [], gutter_pt=round(c["x0"] / scale, 1),
+            day_headers=[dict(y0=h["ink_top"], y1=h["ink_bot"], ink_h_pt=round((h["ink_bot"] - h["ink_top"]) / scale, 1)) for h in headers]))
         if is_list:
             all_rows += rows
 
@@ -637,7 +718,8 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
         fold_px=fold, cards=res_cards,
         ignored=dict(sheets=[[s["x0"], s["y0"], s["x1"], s["y1"]] for s in sheets],
                      controls=[[s["x0"], s["y0"], s["x1"], s["y1"]] for s in controls],
-                     fields=[[s["x0"], s["y0"], s["x1"], s["y1"]] for s in fields]),
+                     fields=[[s["x0"], s["y0"], s["x1"], s["y1"]] for s in fields],
+                     pinned_bar=[int(v) for v in bar] if bar else None),
         summary=dict(
             row_heights_pt=[r["h_pt"] for r in done],
             largest_card_share=max([c["viewport_share"] for c in res_cards], default=0.0),
