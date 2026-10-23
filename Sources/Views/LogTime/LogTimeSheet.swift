@@ -1,15 +1,23 @@
 import SwiftUI
 import PhotosUI
+import LucideIcons
 
-// MARK: - "+" Log time and the timer (redesign-specs.md §3; approved sandbox S2Log.swift r4)
+// MARK: - "+" Log time and the timer (note-first, 2.1)
 //
-// One `.large` sheet covers the tab bar, so the tab bar can never hide the field or the keyboard.
-// It moves between Log, the timer (idle / running) and the timer's review in place.
-// The note is read by NoteReaderChain (rules → Apple's on-device model → Private Cloud Compute;
-// Services/NoteReading). Wiring kept from 1.x TimeLogView: VoiceEntryService dictation
+// Say it. Check it. Log it. One `.large` sheet: the note on top (typed or spoken), one quiet
+// details line under it, and a Log button that names what it will do. At the first pause in the
+// note the details line unfolds into rows (rental, kind of work, how long, date); tapping a row
+// edits it in place. Nothing is saved until Log.
+//
+// The note is read by NoteReaderChain (rules at the pause → Apple's on-device model → Private
+// Cloud Compute; Services/NoteReading). The rules always run; "Read my notes with Apple's model"
+// (Settings) only closes the model tiers. Wiring kept from 1.x/2.0: VoiceEntryService dictation
 // (permission + denied path), the AppViewModel timer + Live Activity, the stopped-timer draft,
-// Self/Spouse honouring spouse tracking, the property limit (ProGate), analytics (inside
-// AppViewModel.logTimeEntry) and the iCloud push (saveData path).
+// Self/Spouse honouring spouse tracking, the property limit (ProGate), analytics and the iCloud
+// push (inside AppViewModel.logTimeEntry).
+//
+// This file is the shell: state, set-up, header, reading, saving, the timer. The pieces live in
+// LogNoteCard, LogDetailsLine, LogDetailRows, LogInlineEditors, LogZeroPropertyView.
 
 struct LogTimeSheet: View {
     let route: LogSheetRoute
@@ -32,69 +40,101 @@ struct LogTimeSheet: View {
         }
     }
 
+    /// The timer card still picks its rental and kind in a sheet; the Log form edits them in place.
     enum Picker: String, Identifiable { case category, property; var id: String { rawValue } }
 
-    @EnvironmentObject private var viewModel: AppViewModel
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ObservedObject private var voice = VoiceEntryService.shared
-    @ObservedObject private var taxProfile = TaxProfileManager.shared
+    @EnvironmentObject var viewModel: AppViewModel
+    @Environment(\.colorScheme) var colorScheme
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @ObservedObject var voice = VoiceEntryService.shared
+    @ObservedObject var taxProfile = TaxProfileManager.shared
 
-    @State private var mode: Mode = .log
-    @State private var form = LogForm()
-    @State private var didSetUp = false
-    @State private var picker: Picker?
-    @State private var isReading = false
-    @State private var readTask: Task<Void, Never>?
-    @State private var flash = 0.0
-    @State private var usedVoice = false
-    @State private var showVoiceIntro = false
-    @State private var showDatePicker = false
-    @State private var photoItems: [PhotosPickerItem] = []
-    @State private var attachments: [TimeAttachment] = []
-    @State private var saveError: String?
-    @State private var isSaving = false
-    @State private var stepTick = 0
+    @State var mode: Mode = .log
+    @State var form = LogForm()
+    @State var didSetUp = false
+    @State var picker: Picker?
+    /// The rows are on screen (the details line has unfolded).
+    @State var unfolded = false
+    /// The row whose editor is open (one at a time).
+    @State var expanded: LogField?
+    /// "Enter details yourself": no reading for this entry.
+    @State var manual = false
+    /// Leaving: the old content fades out before the new arrives (never two layouts at once).
+    @State var exiting = false
+    @State var isReading = false
+    @State var readTask: Task<Void, Never>?
+    /// Rows lit by the last fill (timber wash).
+    @State var flashing: Set<LogField> = []
+    @State var noteDirty = false
+    @State var noneFound = false
+    @State var mentioned: [RentalProperty] = []
+    @State var rulesFilledAt = Date()
+    @State var usedVoice = false
+    @State var showVoiceIntro = false
+    @State var showsMissing = false
+    @State var photoItems: [PhotosPickerItem] = []
+    @State var attachments: [TimeAttachment] = []
+    @State var saveError: String?
+    @State var isSaving = false
+    @State var stepTick = 0
+    @State var recents: [LogRecent] = []
+    @State var firstRunName = ""
+    @State var propertySearch = ""
+    @State var paywall: ProPaywallRequest?
+    @State var announcement: String?
+    @State var openedAt = Date()
     /// Smart-layer slots: empty today, so nothing renders.
-    @State private var prefills: [LogPrefill] = []
+    @State var prefills: [LogPrefill] = []
     /// Rules, then Apple's models (one chain per sheet).
-    @State private var noteReader = NoteReaderChain.live()
-    @FocusState private var noteFocused: Bool
+    @State var noteReader = NoteReaderChain.live()
+    @FocusState var noteFocused: Bool
+    @FocusState var nameFocused: Bool
     /// DEBUG capture of the listening state (the simulator has no microphone input).
-    @State private var debugListening = false
-    private var isListening: Bool { voice.isRecording || debugListening }
-    /// Room under the live words for the "Listening… tap to stop" line.
-    @ScaledMetric(relativeTo: .footnote) private var listeningInset: CGFloat = 24
+    @State var debugListening = false
+    var isListening: Bool { voice.isRecording || debugListening }
+    @ScaledMetric(relativeTo: .body) var chevronSize: CGFloat = 16
 
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-    private var spouseTracking: Bool { taxProfile.spouseTracking }
-    private var properties: [RentalProperty] { viewModel.properties }
-    private var isAX: Bool { dynamicTypeSize.isAccessibilitySize }
-    private var isReviewing: Bool {
+    var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+    var spouseTracking: Bool { taxProfile.spouseTracking }
+    var properties: [RentalProperty] { viewModel.properties }
+    var isAX: Bool { dynamicTypeSize.isAccessibilitySize }
+    var isReviewing: Bool {
         switch mode { case .review, .recovery: return true; default: return false }
     }
-    private var isTimer: Bool { mode == .timerIdle || mode == .timerRunning }
+    var isRecovery: Bool { if case .recovery = mode { return true } else { return false } }
+    var isTimer: Bool { mode == .timerIdle || mode == .timerRunning }
+    /// No rentals yet: the sheet asks which rental, then creates it with the first entry.
+    var isFirstRun: Bool { properties.isEmpty && mode == .log }
+    var firstRunNameArg: String? { properties.isEmpty ? firstRunName : nil }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                switch mode {
-                case .timerIdle: timerIdle
-                case .timerRunning: timerRunning
-                default: logContent
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    header
+                    switch mode {
+                    case .timerIdle: timerIdle
+                    case .timerRunning: timerRunning
+                    default: logContent
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 24)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .scrollBounceBehavior(.basedOnSize)
+            .onChange(of: expanded) { _, field in
+                guard let field else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo("log.row.\(field)", anchor: .center) }
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 24)
         }
-        .scrollDismissesKeyboard(.interactively)
-        .scrollBounceBehavior(.basedOnSize)
         .background(colors.background.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !isTimer && footerIsPinned { footer.transition(.opacity) }
+            if !isTimer { logBar }
         }
         .sheet(item: $picker) { kind in
             Group {
@@ -113,7 +153,7 @@ struct LogTimeSheet: View {
                         onClose()
                         NotificationCenter.default.post(name: .switchToPropertiesAndOpenAddProperty, object: nil)
                     })
-                    // At AX sizes the rows need the full height (medium otherwise, as approved).
+                    // At AX sizes the rows need the full height (medium otherwise).
                     .presentationDetents(isAX ? [.large] : [.medium, .large])
                 }
             }
@@ -121,6 +161,7 @@ struct LogTimeSheet: View {
             .presentationBackground(colors.background)
             .presentationDragIndicator(.hidden)
         }
+        .proPaywall($paywall)
         .sensoryFeedback(.selection, trigger: stepTick)
         .onAppear(perform: setUp)
         .onDisappear {
@@ -138,7 +179,7 @@ struct LogTimeSheet: View {
             form.note = cleaned
         }
         .onChange(of: voice.isRecording) { wasRecording, isRecording in
-            // On stop, read the note right away (no 600ms wait).
+            // On stop, read the note right away (no 600ms wait): rules, then the model.
             if wasRecording, !isRecording { readNote(delay: 0, source: .voice) }
         }
         .onChange(of: viewModel.isTimerRunning) { _, running in
@@ -147,17 +188,23 @@ struct LogTimeSheet: View {
         .onChange(of: photoItems) { _, items in
             Task { await loadPhotos(items) }
         }
+        .onChange(of: form.propertyId) { _, _ in
+            // A rental now chosen ends the "couldn't tell" and "mentions 2 rentals" prompts.
+            if form.propertyId != nil { noneFound = false; mentioned = [] }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("log.sheet")
     }
 
     // MARK: Set-up
 
-    private func setUp() {
+    func setUp() {
         guard !didSetUp else { return }
         didSetUp = true
+        openedAt = Date()
         voice.refreshPermissionState()
         form = LogForm.starting(properties: properties, entries: viewModel.timeEntries)
+        recents = LogRecents.derive(entries: viewModel.timeEntries, properties: properties)
         switch route {
         case .log:
             mode = .log
@@ -172,6 +219,7 @@ struct LogTimeSheet: View {
         case .recovery(let id):
             if let recovery = viewModel.staleTimerRecoveries.first(where: { $0.id == id }) {
                 mode = .recovery(recovery)
+                unfolded = true
                 form.propertyId = viewModel.staleTimerRecoveryNeedsProperty(recovery) ? (properties.count == 1 ? properties[0].id : nil) : recovery.propertyId
                 form.category = recovery.category
                 form.hours = LogForm.clampHours(recovery.suggestedHours)
@@ -179,26 +227,45 @@ struct LogTimeSheet: View {
                 form.participant = .selfParticipant
             }
         }
+        Analytics.logOpened(mode: analyticsMode, hasRentals: !properties.isEmpty, recentsShown: !recents.isEmpty)
         #if DEBUG
+        var preset = LogSheetDebug.Preset()
         LogSheetDebug.apply(to: &form, mode: &mode, picker: &picker, voiceIntro: &showVoiceIntro,
-                            saveError: &saveError, properties: properties, viewModel: viewModel, focus: { noteFocused = true })
+                            saveError: &saveError, preset: &preset, properties: properties, spouseTracking: spouseTracking,
+                            viewModel: viewModel, focus: { noteFocused = true })
+        unfolded = unfolded || preset.unfolded
+        expanded = preset.expanded ?? expanded
+        manual = manual || preset.manual
+        isReading = preset.isReading
+        noneFound = preset.noneFound
+        mentioned = preset.mentioned
+        if let name = preset.firstRunName { firstRunName = name }
         if ["aiNote", "aiPartial", "aiTwoRentals"].contains(LogSheetDebug.state ?? "") {
             readNote(delay: 0.6, source: .note)
         }
+        if preset.script { runDebugScript() }
         if LogSheetDebug.state == "listening" {
             debugListening = true
             form.note = "Fixed the sink at Pine"
         }
+        if preset.listening { debugListening = true }
         if let delayed = picker {
             // A sheet can't present on the frame its parent appears.
             picker = nil
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { picker = delayed }
         }
+        if LogSheetDebug.state != nil && !preset.focusNote { return }
         #endif
+        // Keyboard up, note focused: the note is the one thing the user has in their head.
+        guard mode == .log else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            if isFirstRun { nameFocused = true } else { noteFocused = true }
+        }
     }
 
-    private func beginReview(_ draft: StoppedTimerDraft) {
+    func beginReview(_ draft: StoppedTimerDraft) {
         mode = .review(draft)
+        unfolded = true
         form.propertyId = draft.propertyId
         form.category = draft.category
         form.hours = draft.reviewHours
@@ -207,60 +274,122 @@ struct LogTimeSheet: View {
         form.date = draft.startDate
     }
 
+    var analyticsMode: String {
+        switch mode {
+        case .log: return "log"
+        case .timerIdle, .timerRunning: return "timer"
+        case .review: return "timer_review"
+        case .recovery: return "recovery"
+        }
+    }
+
     // MARK: Header
 
-    private var header: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(eyebrow)
-                    .font(.footnote.weight(.semibold))
-                    .textCase(.uppercase)
-                    .tracking(0.3)
-                    .foregroundStyle(colors.textSecondary)
+    var header: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            eyebrowView
+            HStack(alignment: .center, spacing: 8) {
                 Text(title)
-                    .font(.title2.weight(.semibold))
+                    .font(.title.weight(.bold))
                     .foregroundStyle(colors.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("log.title")
+                Spacer(minLength: 8)
+                if isAX && mode == .log && !showVoiceIntro { micButton }
+                if showsTimerButton { timerButton }
+                LogSheetCloseButton { onClose() }
             }
-            Spacer(minLength: 8)
-            LogSheetCloseButton { onClose() }
         }
     }
 
-    private var eyebrow: String {
+    /// The day the entry is for. A new string fades in over a beat; the old one is gone at once,
+    /// so two dates are never on screen together.
+    var eyebrowView: some View {
+        let text = eyebrow
+        return ZStack(alignment: .leading) {
+            Text(text)
+                .id(text)
+                .font(.system(.caption2, design: .monospaced).weight(.medium))
+                .textCase(.uppercase)
+                .tracking(1.3)
+                .foregroundStyle(colors.draftingInk)
+                .fixedSize(horizontal: false, vertical: true)
+                .transition(.asymmetric(insertion: .opacity, removal: .identity))
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: text)
+        .accessibilityIdentifier("log.eyebrow")
+    }
+
+    var eyebrow: String {
         switch mode {
-        case .review(let draft): return "Timer\(LogTimeFormat.dot)\(InboxFormat.longDay(draft.startDate))"
-        case .recovery(let r): return "Timer\(LogTimeFormat.dot)\(InboxFormat.longDay(r.startTime))"
+        case .review(let draft): return String(localized: "Timer\(LogTimeFormat.dot)\(InboxFormat.longDay(draft.startDate))")
+        case .recovery(let r): return String(localized: "Timer\(LogTimeFormat.dot)\(InboxFormat.longDay(r.startTime))")
+        case .log: return LogTimeFormat.eyebrow(form.date)
         default: return LogTimeFormat.eyebrow(Date())
         }
     }
 
-    private var title: String {
+    var title: String {
         switch mode {
-        case .log: return "Log time"
-        case .timerIdle, .timerRunning: return "Timer"
-        case .review, .recovery: return "Log the timer"
+        case .log: return isFirstRun ? String(localized: "Log your first hour") : String(localized: "Log time")
+        case .timerIdle, .timerRunning: return String(localized: "Timer")
+        case .review, .recovery: return String(localized: "Log the timer")
         }
     }
 
-    // MARK: Log
+    /// The timer is a different moment (starting work, not recording it): a small button at the
+    /// top, only before anything is filled.
+    var showsTimerButton: Bool { mode == .log && !unfolded && !isFirstRun && !showVoiceIntro && !isListening }
 
-    @ViewBuilder private var logContent: some View {
-        if !prefills.isEmpty && !noteFocused { prefillStrip }
-        noteField
-        if showVoiceIntro { voiceIntro }
-        if voice.permissionDenied && !isReviewing { deniedLine }
-        captionSlot
-        LogHoursStepper(hours: Binding(get: { form.hours }, set: { form.setHours($0); persistReviewDraft() }),
-                        flash: form.filled.contains(.hours) ? flash : 0,
-                        stepTick: $stepTick)
-        rows
-        if !footerIsPinned { footer.padding(.horizontal, -20) }
+    var timerButton: some View {
+        Button {
+            Analytics.logTimerOpened()
+            withMotion { mode = viewModel.isTimerRunning ? .timerRunning : .timerIdle }
+        } label: {
+            HStack(spacing: 6) {
+                LucideIcon(image: Lucide.timer, size: 16)
+                if !isAX { Text("Timer").font(.subheadline.weight(.semibold)) }
+            }
+            .foregroundStyle(colors.textPrimary)
+            .padding(.horizontal, isAX ? 0 : 14)
+            .frame(minWidth: 44, minHeight: 44)
+            .background(Capsule().fill(colors.sheetCard))
+            .overlay(Capsule().strokeBorder(colors.sheetStroke, lineWidth: 1))
+        }
+        .buttonStyle(.lhPressable)
+        .accessibilityLabel("Timer")
+        .accessibilityHint("Starts a timer instead of logging time you already did.")
+        .accessibilityIdentifier("log.startTimer")
     }
 
-    private var prefillStrip: some View {
+    // MARK: Log content
+
+    @ViewBuilder var logContent: some View {
+        if !prefills.isEmpty && !noteFocused { prefillStrip }
+        if isFirstRun { rentalNameField }
+        noteField
+        toolsRow
+        if showVoiceIntro { voiceIntro.transition(arrive) }
+        if voice.permissionDenied && !isReviewing { deniedLine }
+        if unfolded {
+            rows.id("rows").opacity(exiting ? 0 : 1).transition(arrive)
+            if hoursQuestionable { hoursFootnote.opacity(exiting ? 0 : 1).transition(arrive) }
+            if manual { autoFillOff.opacity(exiting ? 0 : 1).transition(arrive) }
+            if !isRecovery { receiptRow.opacity(exiting ? 0 : 1).transition(arrive) }
+            if isReviewing { discardButton }
+        } else if !showVoiceIntro {
+            detailsLine.opacity(exiting ? 0 : 1).transition(.identity)
+            enterDetailsButton.opacity(exiting ? 0 : 1).transition(.identity)
+        }
+    }
+
+    /// New content slides in out of the line above it; old content leaves at once.
+    var arrive: AnyTransition {
+        .asymmetric(insertion: reduceMotion ? .opacity : .opacity.combined(with: .offset(y: -14)), removal: .identity)
+    }
+
+    var prefillStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(prefills) { item in
@@ -277,391 +406,24 @@ struct LogTimeSheet: View {
         .accessibilityIdentifier("log.prefills")
     }
 
-    private var notePlaceholder: String {
-        isReviewing ? "What did you work on?" : "What did you do? Try \u{201C}fixed the sink at Pine Cabin, 1 hour\u{201D}"
+    var discardButton: some View {
+        Button("Discard", action: discardReview)
+            .font(.body)
+            .foregroundStyle(colors.destructive)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .accessibilityIdentifier("log.discard")
     }
 
-    private var noteField: some View {
-        ZStack(alignment: .topLeading) {
-            if form.note.isEmpty {
-                Text(notePlaceholder)
-                    .font(.body)
-                    .foregroundStyle(colors.textTertiary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                    .padding(.trailing, 40)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
-            TextField("", text: $form.note, axis: .vertical)
-                .lineLimit(3...6)
-                .font(.body)
-                .foregroundStyle(colors.textPrimary)
-                .tint(colors.action)
-                .focused($noteFocused)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .padding(.trailing, 44)
-                .padding(.bottom, isListening ? listeningInset : 0)
-                .accessibilityLabel("Note")
-                .accessibilityHint(notePlaceholder)
-                .accessibilityIdentifier("log.note")
-        }
-        .frame(minHeight: 104, alignment: .topLeading)
-        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(noteFocused || isListening ? colors.action.opacity(0.5) : colors.border, lineWidth: 1)
-        )
-        .overlay(alignment: .bottomTrailing) { micButton.padding(6) }
-        .overlay(alignment: .bottomLeading) {
-            if isListening {
-                Text("Listening\u{2026} tap to stop")
-                    .font(.footnote)
-                    .foregroundStyle(colors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.leading, 16)
-                    .padding(.trailing, 56)
-                    .padding(.bottom, 14)
-                    .accessibilityIdentifier("log.listening")
-            }
-        }
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .onTapGesture { noteFocused = true }
+    // MARK: Log button (one filled button that names what it will do)
+
+    var buttonTitle: String {
+        LogTimeFormat.buttonTitle(form: form, properties: properties, firstRunName: firstRunNameArg, ax: isAX)
     }
 
-    private var micButton: some View {
-        let denied = voice.permissionDenied
-        return Button(action: micTapped) {
-            ZStack {
-                if isListening {
-                    LogMicLevelRing(level: voice.inputLevel).frame(width: 46, height: 46)
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(colors.onAction)
-                        .frame(width: 12, height: 12)
-                } else {
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(colors.onAction)
-                }
-            }
-            .frame(width: 36, height: 36)
-            .background(Circle().fill(colors.action))
-            .opacity(denied ? 0.4 : 1)
-            .frame(width: 44, height: 44)
-            .contentShape(Circle())
-        }
-        .buttonStyle(.lhPressable)
-        .accessibilityLabel(isListening ? "Stop listening" : "Talk instead of type")
-        .accessibilityHint(denied ? "Microphone is off in Settings" : "")
-        .accessibilityIdentifier("log.mic")
-    }
-
-    private var voiceIntro: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "waveform")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(colors.action)
-                .frame(width: 36, height: 36)
-                .background(Circle().fill(colors.actionSurface))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Talk like you\u{2019}d tell a friend. We\u{2019}ll fill the rest.")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(colors.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button("Start talking") {
-                    LogVoiceIntro.markSeen()
-                    withMotion { showVoiceIntro = false }
-                    startListening()
-                }
-                .buttonStyle(PropertyTintedButtonStyle())
-                .accessibilityIdentifier("log.voice.start")
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(16)
-        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("log.voice.intro")
-    }
-
-    private var deniedLine: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Turn on the microphone in Settings to talk instead of type.")
-                .font(.subheadline)
-                .foregroundStyle(colors.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Button("Open Settings") {
-                if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
-            }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(colors.action)
-            .frame(minHeight: 44)
-            .accessibilityIdentifier("log.voice.openSettings")
-        }
-        .padding(.horizontal, 4)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("log.voice.denied")
-    }
-
-    /// The line under the note: "Reading your note", "Filled from your note  Undo", or the
-    /// timer's run time. Reserved by content, never by blank space.
-    @ViewBuilder private var captionSlot: some View {
-        if isReading {
-            HStack(spacing: 8) {
-                DraftingLoader(sketch: .document, subject: "your note", lineWidth: 1.5)
-                    .frame(height: 18)
-                Text("Reading your note")
-                    .font(.footnote)
-                    .foregroundStyle(colors.textSecondary)
-                PlaceholderBar(width: 64, height: 10)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 4)
-            .transition(.opacity)
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("log.reading")
-        } else if let source = form.fillSource, form.canUndoFill {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                    .font(.footnote)
-                    .foregroundStyle(colors.timberInk)
-                    .accessibilityHidden(true)
-                Text(source.caption)
-                    .font(.footnote)
-                    .foregroundStyle(colors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button("Undo") {
-                    withMotion { form.undoFill() }
-                }
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(colors.action)
-                .frame(minWidth: 44, minHeight: 44)
-                .accessibilityLabel("Undo the fill")
-                .accessibilityIdentifier("log.fill.undo")
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 4)
-            .transition(.opacity)
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier("log.fill.caption")
-        } else if let reviewCaption {
-            Text(reviewCaption)
-                .font(.footnote)
-                .foregroundStyle(colors.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 4)
-                .accessibilityIdentifier("log.timer.ran")
-        }
-    }
-
-    private var reviewCaption: String? {
-        switch mode {
-        case .review(let draft):
-            if TimerReviewMath.wasCapped(elapsed: draft.elapsed) {
-                return "Timer ran over 24h. We stopped counting at 24h, so check the hours."
-            }
-            return TimerReviewMath.ranCaption(elapsed: draft.elapsed)
-        case .recovery(let r):
-            return r.wasCapped ? "\(r.ranLabel). We stopped counting at 24h, so check the hours." : "Timer \(r.ranLabel.lowercased())"
-        default: return nil
-        }
-    }
-
-    // MARK: Rows
-
-    private var rows: some View {
-        VStack(spacing: 0) {
-            valueRow("Property", flashing: form.filled.contains(.property), identifier: "log.property") {
-                picker = .property
-            } value: {
-                if let property = properties.first(where: { $0.id == form.propertyId }) {
-                    HStack(spacing: 8) {
-                        PropertySeal(property, in: properties, size: 24)
-                        Text(property.name)
-                            .foregroundStyle(colors.textPrimary)
-                            .multilineTextAlignment(.trailing)
-                            .lineLimit(2)
-                    }
-                } else if isReading {
-                    PlaceholderBar(width: 96, height: 14)
-                } else {
-                    Text("Choose").foregroundStyle(saveError != nil || showsMissing ? colors.caution : colors.action)
-                }
-            }
-            if let hint = form.propertyHint, form.propertyId == nil {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Image(systemName: "info.circle").accessibilityHidden(true)
-                    Text(hint).fixedSize(horizontal: false, vertical: true)
-                }
-                .font(.footnote)
-                .foregroundStyle(colors.textSecondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 12)
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("log.propertyHint")
-            }
-            if LogParticipantRule.showsPicker(spouseTracking: spouseTracking), !isRecovery {
-                divider
-                staticRow("Who", flashing: form.filled.contains(.participant)) {
-                    LogWhoPicker(participant: Binding(get: { form.participant }, set: { form.setParticipant($0); persistReviewDraft() }))
-                }
-            }
-            divider
-            valueRow("Category", flashing: form.filled.contains(.category), identifier: "log.category") {
-                picker = .category
-            } value: {
-                if let category = form.category {
-                    HStack(spacing: 8) {
-                        CategoryToolTile(category: category, size: 24)
-                        VStack(alignment: isAX ? .leading : .trailing, spacing: 0) {
-                            Text(category.inboxLabel).foregroundStyle(colors.textPrimary)
-                            if form.categoryIsRemembered && !isReviewing {
-                                Text("Last used").font(.caption).foregroundStyle(colors.textSecondary)
-                            }
-                        }
-                    }
-                } else if isReading {
-                    PlaceholderBar(width: 80, height: 14)
-                } else {
-                    Text("Choose").foregroundStyle(colors.action)
-                }
-            }
-            if !form.countsTowardHours, let category = form.category {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Image(systemName: "info.circle").accessibilityHidden(true)
-                    Text("\(category.inboxLabel) doesn\u{2019}t count toward your hours.")
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .font(.footnote)
-                .foregroundStyle(colors.textSecondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 12)
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("log.notCounted")
-            }
-            if form.recordDescription != nil {
-                // Smart-layer slot: the fact-checked sentence for the record from Apple's model
-                // (hidden until it exists). Editable in place; the note stays the user's words.
-                divider
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Description for your record").font(.subheadline).foregroundStyle(colors.textSecondary)
-                    TextField("", text: Binding(get: { form.recordDescription ?? "" }, set: { form.setDescription($0) }), axis: .vertical)
-                        .lineLimit(1...3)
-                        .foregroundStyle(colors.textPrimary)
-                        .tint(colors.action)
-                        .accessibilityLabel("Description for your record")
-                        .accessibilityIdentifier("log.description.field")
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(colors.timber.opacity(form.filled.contains(.description) ? flash : 0))
-                .accessibilityElement(children: .contain)
-                .accessibilityIdentifier("log.description")
-            }
-            divider
-            valueRow("Date", flashing: form.filled.contains(.date), identifier: "log.date") {
-                withMotion { showDatePicker.toggle() }
-            } value: {
-                Text(LogTimeFormat.dateRow(form.date)).foregroundStyle(colors.textPrimary)
-            }
-            if showDatePicker {
-                DatePicker("Date", selection: Binding(get: { form.date }, set: { form.setDate($0) }), in: ...Date(), displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .tint(colors.action)
-                    .labelsHidden()
-                    .padding(.horizontal, 8)
-                    .accessibilityIdentifier("log.datePicker")
-            }
-            if !isRecovery {
-                divider
-                PhotosPicker(selection: $photoItems, maxSelectionCount: 3, matching: .images) {
-                    HStack(spacing: 10) {
-                        Image(systemName: attachments.isEmpty ? "camera" : "checkmark.circle.fill")
-                            .foregroundStyle(attachments.isEmpty ? colors.action : colors.positive)
-                            .accessibilityHidden(true)
-                        Text(attachments.isEmpty ? "Add a receipt photo" : (attachments.count == 1 ? "1 photo added" : "\(attachments.count) photos added"))
-                            .foregroundStyle(attachments.isEmpty ? colors.action : colors.textPrimary)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .frame(minHeight: 52)
-                    .contentShape(Rectangle())
-                }
-                .accessibilityIdentifier("log.receipt")
-            }
-        }
-        .font(.body)
-        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private var isRecovery: Bool { if case .recovery = mode { return true } else { return false } }
-
-    private var divider: some View {
-        Rectangle().fill(colors.border.opacity(0.7)).frame(height: 0.5).padding(.leading, 16)
-    }
-
-    private var rowStack: AnyLayout {
-        isAX ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6)) : AnyLayout(HStackLayout(spacing: 12))
-    }
-
-    private func valueRow<V: View>(_ label: String, flashing: Bool, identifier: String, action: @escaping () -> Void,
-                                   @ViewBuilder value: () -> V) -> some View {
-        Button(action: action) {
-            rowStack {
-                Text(label).foregroundStyle(isAX ? colors.textSecondary : colors.textPrimary)
-                if !isAX { Spacer(minLength: 12) }
-                HStack(spacing: 6) {
-                    value()
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(colors.textSecondary)
-                        .accessibilityHidden(true)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.vertical, isAX ? 10 : 6)
-            .frame(minHeight: 52)
-            .background(colors.timber.opacity(flashing ? flash : 0))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.lhPressable)
-        .accessibilityIdentifier(identifier)
-    }
-
-    private func staticRow<V: View>(_ label: String, flashing: Bool, @ViewBuilder value: () -> V) -> some View {
-        rowStack {
-            Text(label).foregroundStyle(isAX ? colors.textSecondary : colors.textPrimary)
-            if !isAX { Spacer(minLength: 12) }
-            value()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, isAX ? 10 : 6)
-        .frame(minHeight: 52)
-        .background(colors.timber.opacity(flashing ? flash : 0))
-    }
-
-    // MARK: Footer
-
-    /// Pinned above the keyboard / home indicator; at AX sizes it scrolls with the form unless
-    /// the keyboard is up (then the Log button still rides on the keyboard).
-    private var footerIsPinned: Bool { !isAX || noteFocused }
-
-    private var missingMessage: String? { form.missingMessage(properties: properties) }
-    /// The caution line shows once something is typed or picked (an untouched sheet isn't scolded).
-    private var showsMissing: Bool {
-        missingMessage != nil && (!form.note.isEmpty || isReviewing || properties.isEmpty || LogSheetDebug.forcesInvalid)
-    }
-
-    private var footer: some View {
-        VStack(spacing: 8) {
+    var logBar: some View {
+        let label = buttonTitle
+        let gap = form.gap(properties: properties, firstRunName: firstRunNameArg)
+        return VStack(spacing: 8) {
             if let saveError {
                 Label(saveError, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote)
@@ -669,68 +431,80 @@ struct LogTimeSheet: View {
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("log.saveError")
-            } else if showsMissing, let missingMessage {
-                Text(missingMessage)
+            } else if showsMissing, gap != nil, let message = form.missingMessage(properties: properties, firstRunName: firstRunNameArg) {
+                Text(message)
                     .font(.footnote)
                     .foregroundStyle(colors.caution)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("log.missing")
             }
-            HStack(spacing: 12) {
-                Button(action: save) {
-                    Text(LogTimeFormat.logButton(form.hours))
-                        .contentTransition(.numericText(value: form.hours))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+            Button(action: primaryTapped) {
+                ZStack {
+                    // Only the words change: the old label leaves up, the new one arrives from below.
+                    Text(verbatim: label)
+                        .id(label)
+                        .transition(reduceMotion ? .opacity : .asymmetric(insertion: .opacity.combined(with: .offset(y: 8)),
+                                                                           removal: .opacity.combined(with: .offset(y: -8))))
                 }
-                .buttonStyle(InboxPrimaryButtonStyle())
-                .disabled(!form.canLog(properties: properties) || isSaving)
-                .accessibilityIdentifier("log.save")
-                if noteFocused {
-                    Button("Done") { noteFocused = false }
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(colors.action)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .fixedSize()
-                        .accessibilityIdentifier("log.done")
-                }
+                .font(.headline)
+                .foregroundStyle(colors.onAction)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, minHeight: 56)
+                .background(Capsule().fill(colors.action))
+                .clipShape(Capsule())
+                .contentShape(Capsule())
             }
-            if isReviewing {
-                Button("Discard", action: discardReview)
-                    .font(.body)
-                    .foregroundStyle(colors.destructive)
-                    .frame(minHeight: 44)
-                    .accessibilityIdentifier("log.discard")
-            } else if !noteFocused {
-                Button("Start a timer instead") {
-                    withMotion { mode = viewModel.isTimerRunning ? .timerRunning : .timerIdle }
-                }
-                .font(.body)
-                .foregroundStyle(colors.action)
-                .frame(minHeight: 44)
-                .accessibilityIdentifier("log.startTimer")
-            }
+            .buttonStyle(.lhPressable)
+            .animation(reduceMotion ? .easeOut(duration: 0.15) : .easeOut(duration: 0.14), value: label)
+            .disabled(isSaving)
+            .accessibilityLabel(label.replacingOccurrences(of: "\u{00A0}", with: " "))
+            .accessibilityHint(gap == nil ? "" : String(localized: "Opens the missing detail."))
+            .accessibilityIdentifier("log.save")
         }
         .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
-        .background(colors.background.ignoresSafeArea())
-        .overlay(alignment: .top) {
-            LinearGradient(colors: [colors.background.opacity(0), colors.background], startPoint: .top, endPoint: .bottom)
-                .frame(height: 20)
-                .offset(y: -20)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+        .padding(.top, 10)
+        .padding(.bottom, 10)
+        .background(colors.background.overlay(alignment: .top) { Rectangle().fill(colors.sheetStroke).frame(height: 1) }.ignoresSafeArea())
+    }
+
+    /// The button is never dead: with a gap it opens that editor; otherwise it logs.
+    func primaryTapped() {
+        if let gap = form.gap(properties: properties, firstRunName: firstRunNameArg) {
+            showsMissing = true
+            openEditor(for: gap)
+            return
+        }
+        if isReading { Analytics.logTappedWhileReading() }
+        cancelReading()
+        save()
+    }
+
+    func openEditor(for gap: LogGap) {
+        func open(_ field: LogField) {
+            Task { @MainActor in
+                await arriveRows { expanded = field }
+                if !unfolded { unfolded = true }
+            }
+        }
+        switch gap {
+        case .name: nameFocused = true
+        case .rental: open(.property)
+        case .kind: open(.category)
+        case .hours: open(.hours)
         }
     }
 
     // MARK: Timer
 
-    private var timerIdle: some View {
+    var timerIdle: some View {
         VStack(spacing: 24) {
             VStack(spacing: 0) {
-                valueRow("Property", flashing: false, identifier: "timer.property") { picker = .property } value: {
+                timerPickRow(label: "Rental", identifier: "timer.property") {
                     if let property = properties.first(where: { $0.id == form.propertyId }) {
                         HStack(spacing: 8) {
                             PropertySeal(property, in: properties, size: 24)
@@ -739,17 +513,18 @@ struct LogTimeSheet: View {
                     } else {
                         Text("Choose").foregroundStyle(colors.action)
                     }
-                }
-                divider
-                valueRow("Category", flashing: false, identifier: "timer.category") { picker = .category } value: {
+                } action: { picker = .property }
+                Rectangle().fill(colors.sheetStroke).frame(height: 1).padding(.horizontal, 12)
+                timerPickRow(label: "Kind of work", identifier: "timer.category") {
                     HStack(spacing: 8) {
                         CategoryToolTile(category: timerCategory, size: 24)
                         Text(timerCategory.inboxLabel).foregroundStyle(colors.textPrimary)
                     }
-                }
+                } action: { picker = .category }
             }
-            .font(.body)
-            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(4)
+            .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(colors.sheetCard))
+            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(colors.sheetStroke, lineWidth: 1))
 
             Text("0:00")
                 .font(.system(size: 64, weight: .bold, design: .rounded))
@@ -764,7 +539,7 @@ struct LogTimeSheet: View {
                     .disabled(form.propertyId == nil || viewModel.isTimerRunning)
                     .accessibilityIdentifier("timer.start")
                 if form.propertyId == nil {
-                    Text("Pick a property to start the timer.")
+                    Text("Pick a rental to start the timer.")
                         .font(.footnote)
                         .foregroundStyle(colors.caution)
                 }
@@ -777,9 +552,30 @@ struct LogTimeSheet: View {
         }
     }
 
-    private var timerCategory: ActivityCategory { form.category ?? .management }
+    func timerPickRow<V: View>(label: LocalizedStringKey, identifier: String, @ViewBuilder value: () -> V,
+                               action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            let stack = isAX ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6)) : AnyLayout(HStackLayout(spacing: 12))
+            stack {
+                Text(label).font(.subheadline).foregroundStyle(colors.textSecondary)
+                if !isAX { Spacer(minLength: 12) }
+                HStack(spacing: 6) {
+                    value().font(.body.weight(.semibold))
+                    LucideIcon(image: Lucide.chevronRight, size: chevronSize).foregroundStyle(colors.textSecondary).accessibilityHidden(true)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.lhPressable)
+        .accessibilityIdentifier(identifier)
+    }
 
-    private var timerRunning: some View {
+    var timerCategory: ActivityCategory { form.category ?? .management }
+
+    var timerRunning: some View {
         VStack(spacing: 16) {
             LiveTimerCard(
                 property: properties.first { $0.id == viewModel.timerPropertyId },
@@ -802,70 +598,94 @@ struct LogTimeSheet: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func startTimer() {
+    func startTimer() {
         guard let propertyId = form.propertyId else { return }
         viewModel.startTimer(propertyId: propertyId, category: timerCategory)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         withMotion { mode = .timerRunning }
     }
 
-    private func stopTimer() {
+    func stopTimer() {
         guard let draft = viewModel.stopTimerIntoDraft() else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         withMotion { beginReview(draft) }
     }
 
-    private func discardRunning() {
+    func discardRunning() {
         guard let propertyId = viewModel.timerPropertyId, let start = viewModel.timerStartTime else { return }
         let category = viewModel.timerCategory
         viewModel.cancelTimer()
         onClose()
-        AppToastCenter.shared.show("Timer discarded", kind: .neutral) { [weak viewModel = viewModel] in
+        AppToastCenter.shared.show(String(localized: "Timer discarded"), kind: .neutral) { [weak viewModel = viewModel] in
             viewModel?.restoreTimer(propertyId: propertyId, category: category, startTime: start)
         }
     }
 
-    private func discardReview() {
+    func discardReview() {
         switch mode {
         case .review(var draft):
             draft.notes = form.note
             StoppedTimerDraftStore.clear()
             onClose()
-            AppToastCenter.shared.show("Timer discarded", kind: .neutral) { StoppedTimerDraftStore.save(draft) }
+            AppToastCenter.shared.show(String(localized: "Timer discarded"), kind: .neutral) { StoppedTimerDraftStore.save(draft) }
         case .recovery(let recovery):
             viewModel.discardRecoveredStaleTimer(id: recovery.id)
             onClose()
-            AppToastCenter.shared.show("Timer discarded", kind: .neutral)
+            AppToastCenter.shared.show(String(localized: "Timer discarded"), kind: .neutral)
         default: break
         }
     }
 
     /// The note the user is writing for a stopped timer survives closing the sheet.
-    private func persistReviewDraft() {
+    func persistReviewDraft() {
         guard case .review(var draft) = mode else { return }
         draft.notes = form.note
         draft.participant = form.participant
         StoppedTimerDraftStore.save(draft)
     }
 
-    // MARK: Note reading
-
-    private func noteChanged(_ text: String) {
-        guard mode == .log else { return }
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { usedVoice = false }
-        guard !isListening else { return }
-        readNote(delay: 0.6, source: usedVoice ? .voice : .note)
+    var reviewCaption: String? {
+        switch mode {
+        case .review(let draft):
+            if TimerReviewMath.wasCapped(elapsed: draft.elapsed) {
+                return String(localized: "Timer ran over 24h. We stopped counting at 24h, so check the hours.")
+            }
+            return TimerReviewMath.ranCaption(elapsed: draft.elapsed)
+        case .recovery(let r):
+            return r.wasCapped ? String(localized: "\(r.ranLabel). We stopped counting at 24h, so check the hours.") : String(localized: "Timer \(r.ranLabel.lowercased())")
+        default: return nil
+        }
     }
 
-    /// After a 600ms pause the note is read: the rules fill at once, then Apple's on-device
-    /// model (and Private Cloud Compute when the phone's model can't answer) refine the fields
-    /// while the drafting line shows. Never a field the user set; nothing is saved until Log.
-    private func readNote(delay: Double, source: LogFillSource) {
+    // MARK: Note reading
+
+    func noteChanged(_ text: String) {
+        guard mode == .log, !manual else { return }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { usedVoice = false }
+        // Editing the note after a fill starts a new fill; the old caption goes away until it lands.
+        if form.canUndoFill || isReading || noneFound {
+            withAnimation(.easeOut(duration: 0.15)) { noteDirty = true; noneFound = false }
+        }
+        // While talking, the rules read on every pause; the model reads when the talking stops.
+        readNote(delay: 0.6, source: usedVoice ? .voice : .note, rulesOnly: isListening)
+    }
+
+    func cancelReading() {
+        readTask?.cancel()
+        withAnimation(.easeOut(duration: 0.15)) { isReading = false }
+    }
+
+    /// After a 600ms pause the note is read: the rules fill at once (the details line unfolds into
+    /// rows), then Apple's on-device model (and Private Cloud Compute when the phone's model can't
+    /// answer) refine the fields while "Reading your note" shows. Never a field the user set;
+    /// nothing is saved until Log.
+    func readNote(delay: Double, source: LogFillSource, rulesOnly: Bool = false) {
         readTask?.cancel()
         let text = form.trimmedNote
-        guard text.count >= 6, mode == .log, !LogSheetDebug.holdsReading else {
+        guard text.count >= 6, mode == .log, !manual, !LogSheetDebug.holdsReading else {
             isReading = false
+            noteDirty = false
             return
         }
         let request = NoteReadRequest(text: text, properties: properties, spouseTracking: spouseTracking)
@@ -874,42 +694,200 @@ struct LogTimeSheet: View {
             if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
             guard !Task.isCancelled, form.trimmedNote == text else { return }
             let rules = chain.rules(request)
-            fill(rules, source: source)
-            guard chain.hasModel else {
-                isReading = false
+            await fill(rules, source: source, tier: .rules, rulesBaseline: nil)
+            guard !Task.isCancelled, form.trimmedNote == text else { return }
+            guard !rulesOnly, chain.hasModel else {
+                finishRead(rules)
                 return
             }
             withAnimation(.easeOut(duration: 0.2)) { isReading = true }
             let outcome = await chain.read(request, rules: rules) { refined in
                 guard !Task.isCancelled, form.trimmedNote == text else { return }
-                fill(refined, source: source)
+                Task { @MainActor in await fill(refined, source: source, tier: .model, rulesBaseline: rules) }
             }
             guard !Task.isCancelled, form.trimmedNote == text else { return }
             withMotion { isReading = false }
-            fill(outcome.reading, source: source)
+            await fill(outcome.reading, source: source, tier: .model, rulesBaseline: rules)
+            if outcome.onDevice == .failed || outcome.onDevice == .timedOut || outcome.pcc == .failed || outcome.pcc == .timedOut {
+                Analytics.readFailed(reason: outcome.pcc == .notNeeded ? outcome.onDevice : outcome.pcc)
+            }
+            finishRead(outcome.reading)
         }
     }
 
-    private func fill(_ reading: NoteReading, source: LogFillSource) {
+    /// The read is over: settle the caption, and if nothing told which rental on an account with
+    /// several, say so.
+    func finishRead(_ reading: NoteReading) {
+        withAnimation(.easeOut(duration: 0.2)) {
+            noteDirty = false
+            isReading = false
+            noneFound = properties.count > 1 && form.propertyId == nil && reading.category == nil
+                && reading.mentionedPropertyCount == 0 && !form.isUserSet(.property)
+            if reading.mentionedPropertyCount >= 2 { mentioned = mentionedProperties(for: form.trimmedNote) }
+        }
+    }
+
+    func mentionedProperties(for text: String) -> [RentalProperty] {
+        NoteRules.mentionedProperties(normalized: RulesEngine.normalize(text), properties: properties)
+    }
+
+    /// Writes one reading into the form. The first fill unfolds the details line into rows.
+    func fill(_ reading: NoteReading, source: LogFillSource, tier: LogFillTier, rulesBaseline: NoteReading?) async {
+        let late = tier == .model && Date().timeIntervalSince(rulesFilledAt) > 1.5
         var wrote = Set<LogField>()
-        withMotion { wrote = form.apply(reading, source: source, spouseTracking: spouseTracking) }
-        if !wrote.isEmpty { playFlash() }
+        await arriveRows {
+            noteDirty = false
+            expanded = nil
+            wrote = form.apply(reading, source: source, spouseTracking: spouseTracking, tier: tier, late: late,
+                               rulesBaseline: rulesBaseline)
+            if tier == .rules { rulesFilledAt = Date() }
+        }
+        if !unfolded { return }
+        if !wrote.isEmpty {
+            pulse(wrote)
+            announce(wrote, tier: tier)
+            Analytics.noteFilled(tier: tier, fields: wrote.count, voice: source == .voice)
+        }
+        if !form.updatedAfterSeen.isEmpty { scheduleUpdateExpiry() }
+        if !form.updatedAfterSeen.isEmpty, tier == .model { Analytics.fillUpdatedAfterSeen(fields: form.updatedAfterSeen.count) }
     }
 
-    /// The timber wash on each filled value: 0 → 16% → 0 over 600ms.
-    private func playFlash() {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        withAnimation(.easeOut(duration: 0.3)) { flash = 0.16 }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            withAnimation(.easeIn(duration: 0.3)) { flash = 0 }
+    func scheduleUpdateExpiry() {
+        let fields = Array(form.updatedAfterSeen.keys)
+        guard !LogSheetDebug.holdsReading, LogSheetDebug.state == nil else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(6))
+            withMotion { for field in fields { form.dismissUpdate(field) } }
         }
+    }
+
+    /// The timber wash on each filled row: 0 → 16% → 0 over 300 + 300 ms, one light haptic per batch.
+    func pulse(_ fields: Set<LogField>) {
+        guard !fields.isEmpty, LogSheetDebug.state == nil || LogSheetDebug.animatesFills else { return }
+        if !reduceMotion { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+        withAnimation(.easeOut(duration: 0.3)) { flashing.formUnion(fields) }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            withAnimation(.easeOut(duration: 0.3)) { flashing.subtract(fields) }
+        }
+    }
+
+    /// One batched VoiceOver announcement per fill; a model refinement says "Updated" on its own.
+    func announce(_ fields: Set<LogField>, tier: LogFillTier) {
+        let names = fields.sorted { $0.order < $1.order }.map(\.spokenName)
+        guard !names.isEmpty else { return }
+        let list = ListFormatter.localizedString(byJoining: names)
+        let message = (tier == .model && form.updatedAfterSeen.keys.contains(where: fields.contains))
+            ? String(localized: "Updated \(list) from your note.")
+            : (form.fillSource == .voice ? String(localized: "Filled \(list) from what you said.") : String(localized: "Filled \(list) from your note."))
+        UIAccessibility.post(notification: .announcement, argument: message)
+    }
+
+    /// Leave, then arrive: what is on screen fades out (130 ms ease-in), then the new state comes in
+    /// (ease-out, one transaction). Old and new content are never on screen together. After the
+    /// rows exist, a change is just a spring. Reduce Motion: a 200 ms crossfade.
+    func arriveRows(_ body: @escaping () -> Void) async {
+        if unfolded || LogSheetDebug.instantUnfold {
+            withMotion { body(); unfolded = true }
+            return
+        }
+        if reduceMotion {
+            withAnimation(.easeOut(duration: 0.2)) { unfolded = true; body() }
+            return
+        }
+        withAnimation(.easeIn(duration: 0.13)) { exiting = true }
+        try? await Task.sleep(nanoseconds: 140_000_000)
+        guard !Task.isCancelled else { withAnimation(.easeOut(duration: 0.1)) { exiting = false }; return }
+        withAnimation(.easeOut(duration: 0.28)) { exiting = false; unfolded = true; body() }
+    }
+
+    // MARK: Actions on the form
+
+    func undoFill() {
+        readTask?.cancel()
+        Analytics.fillUndone()
+        withMotion {
+            form.undoFill()
+            isReading = false
+            noneFound = false
+            mentioned = []
+            noteDirty = false
+        }
+        UIAccessibility.post(notification: .layoutChanged, argument: nil)
+        noteFocused = true
+    }
+
+    func undoUpdate(_ field: LogField) {
+        withMotion { form.undoUpdate(field) }
+    }
+
+    func edited(_ field: LogField) {
+        Analytics.fieldEdited(field: field)
+        persistReviewDraft()
+        saveError = nil
+    }
+
+    func pick(property id: UUID) {
+        withMotion { form.setProperty(id); expanded = nil; mentioned = []; noneFound = false }
+        edited(.property)
+    }
+
+    func pick(category: ActivityCategory) {
+        withMotion { form.setCategory(category); expanded = nil }
+        edited(.category)
+    }
+
+    func set(hours: Double, collapse: Bool) {
+        withMotion { form.setHours(hours); if collapse { expanded = nil } }
+        stepTick += 1
+        edited(.hours)
+    }
+
+    func set(date: Date) {
+        withMotion { form.setDate(date); expanded = nil }
+        edited(.date)
+    }
+
+    func useRecent(_ recent: LogRecent) {
+        Analytics.recentUsed()
+        Task { @MainActor in
+            await arriveRows {
+                form.applyRecent(recent)
+                expanded = nil
+            }
+        }
+    }
+
+    func enterManual() {
+        readTask?.cancel()
+        Analytics.manualPathOpened()
+        Task { @MainActor in
+            await arriveRows {
+                manual = true
+                isReading = false
+                noneFound = false
+            }
+        }
+    }
+
+    func turnAutoFillOn() {
+        withMotion { manual = false }
+        if form.trimmedNote.count >= 6 { readNote(delay: 0, source: usedVoice ? .voice : .note) }
+    }
+
+    func toggle(_ field: LogField) {
+        withMotion { expanded = expanded == field ? nil : field }
     }
 
     // MARK: Voice
 
-    private func micTapped() {
+    func micTapped() {
         if voice.isRecording {
             voice.finishRecording()
+            return
+        }
+        if debugListening {
+            debugListening = false
             return
         }
         if voice.permissionDenied {
@@ -923,12 +901,12 @@ struct LogTimeSheet: View {
         startListening()
     }
 
-    private func startListening() {
+    func startListening() {
         noteFocused = false
         Task { await voice.startRecording(contextualStrings: voiceContextualStrings) }
     }
 
-    private var voiceContextualStrings: [String] {
+    var voiceContextualStrings: [String] {
         var phrases = properties.flatMap { [$0.name, $0.address] + $0.aliases }
         phrases += ActivityCategory.allCases.flatMap { [$0.rawValue, $0.inboxLabel] }
         phrases += ["spouse", "tenant", "receipt", "plumber", "showing"]
@@ -938,15 +916,41 @@ struct LogTimeSheet: View {
 
     // MARK: Save
 
-    private func save() {
-        guard form.canLog(properties: properties), let propertyId = form.propertyId, let category = form.category, !isSaving else { return }
+    func save() {
+        guard form.canLog(properties: properties, firstRunName: firstRunNameArg), let category = form.category, !isSaving else { return }
         isSaving = true
         saveError = nil
+        showsMissing = false
         defer { isSaving = false }
         noteFocused = false
+        nameFocused = false
         let participant = form.participantToSave(spouseTracking: spouseTracking)
-        let propertyName = properties.first { $0.id == propertyId }?.name
         let hours = form.hours
+
+        // The first log creates the rental with the entry, in one save.
+        if isFirstRun {
+            let name = FirstPropertyDraft(name: firstRunName).trimmedName
+            let result = viewModel.logFirstEntry(propertyName: name, participant: participant, category: category, hours: hours,
+                                                 date: form.date, notes: form.trimmedNote, attachments: attachments,
+                                                 source: usedVoice ? .voice : .manual, recordDescription: form.descriptionToSave)
+            switch result {
+            case .failed(let message): fail(message)
+            case .saved(let id):
+                Analytics.propertyCreatedInline()
+                succeed(LogTimeFormat.addedAndLoggedToast(hours: hours, propertyName: name)) { [weak viewModel = viewModel] in
+                    guard let viewModel else { return }
+                    if let entry = viewModel.timeEntries.first(where: { $0.id == id }) {
+                        let propertyId = entry.propertyId
+                        viewModel.deleteTimeEntry(entry)
+                        if let property = viewModel.properties.first(where: { $0.id == propertyId }) { viewModel.deleteProperty(property) }
+                    }
+                }
+            }
+            return
+        }
+
+        guard let propertyId = form.propertyId else { return }
+        let propertyName = properties.first { $0.id == propertyId }?.name
 
         switch mode {
         case .recovery(let recovery):
@@ -984,19 +988,19 @@ struct LogTimeSheet: View {
         }
     }
 
-    private func fail(_ message: String) {
+    func fail(_ message: String) {
         UINotificationFeedbackGenerator().notificationOccurred(.error)
         withMotion { saveError = message }
         UIAccessibility.post(notification: .announcement, argument: message)
     }
 
-    private func succeed(_ message: String, undo: (() -> Void)?) {
+    func succeed(_ message: String, undo: (() -> Void)?) {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         onClose()
         AppToastCenter.shared.show(message, kind: .success, undo: undo)
     }
 
-    private func loadPhotos(_ items: [PhotosPickerItem]) async {
+    func loadPhotos(_ items: [PhotosPickerItem]) async {
         var loaded: [TimeAttachment] = []
         for item in items {
             if let data = try? await item.loadTransferable(type: Data.self) {
@@ -1006,250 +1010,35 @@ struct LogTimeSheet: View {
         attachments = loaded
     }
 
-    private func withMotion(_ body: () -> Void) {
+    func withMotion(_ body: () -> Void) {
         if reduceMotion { withAnimation(.easeOut(duration: 0.2), body) } else { withAnimation(.spring(response: 0.3, dampingFraction: 1), body) }
     }
 }
 
-// MARK: - Parts
+// MARK: - Field helpers
 
-/// The confirm sheet's stepper ("How long?", 15-minute steps) with 30m / 1h / 2h / 4h presets.
-struct LogHoursStepper: View {
-    @Binding var hours: Double
-    var flash: Double = 0
-    @Binding var stepTick: Int
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    private let presets: [(String, Double)] = [("30m", 0.5), ("1h", 1), ("2h", 2), ("4h", 4)]
-
-    var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        let minutes = Int((hours * 60).rounded())
-        VStack(alignment: .leading, spacing: 10) {
-            Text("How long?")
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(colors.textSecondary)
-                .padding(.horizontal, 4)
-            VStack(spacing: 14) {
-                HStack(spacing: 12) {
-                    step("minus", enabled: hours > 0, colors: colors) { hours = max(0, hours - LogForm.step) }
-                        .accessibilityLabel("Less time")
-                        .accessibilityIdentifier("log.hours.minus")
-                    Spacer(minLength: 0)
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text("\(minutes / 60)")
-                            .font(.system(size: 40, weight: .semibold, design: .rounded))
-                            .contentTransition(.numericText(value: Double(minutes / 60)))
-                        Text("h").font(.title3).foregroundStyle(colors.textSecondary)
-                        Text(String(format: "%02d", minutes % 60))
-                            .font(.system(size: 40, weight: .semibold, design: .rounded))
-                            .contentTransition(.numericText(value: Double(minutes % 60)))
-                            .padding(.leading, 6)
-                        Text("m").font(.title3).foregroundStyle(colors.textSecondary)
-                    }
-                    .monospacedDigit()
-                    .foregroundStyle(hours > 0 ? colors.textPrimary : colors.textTertiary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("How long")
-                    .accessibilityValue(InboxFormat.spokenHours(hours))
-                    .accessibilityAdjustableAction { direction in
-                        switch direction {
-                        case .increment: hours = min(LogForm.maxHours, hours + LogForm.step)
-                        case .decrement: hours = max(0, hours - LogForm.step)
-                        @unknown default: break
-                        }
-                    }
-                    .accessibilityIdentifier("log.hours.value")
-                    Spacer(minLength: 0)
-                    step("plus", enabled: hours < LogForm.maxHours, colors: colors) { hours = min(LogForm.maxHours, hours + LogForm.step) }
-                        .accessibilityLabel("More time")
-                        .accessibilityIdentifier("log.hours.plus")
-                }
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: dynamicTypeSize.isAccessibilitySize ? 2 : 4), spacing: 8) {
-                    ForEach(presets, id: \.0) { preset in
-                        let on = abs(hours - preset.1) < 0.01
-                        Button {
-                            animate { hours = preset.1 }
-                            stepTick += 1
-                        } label: {
-                            Text(preset.0)
-                                .font(.subheadline.weight(.semibold))
-                                .monospacedDigit()
-                                .lineLimit(1)
-                                .fixedSize()
-                                .foregroundStyle(on ? colors.onAction : colors.textPrimary)
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                                .background(Capsule().fill(on ? colors.action : colors.backgroundTertiary))
-                                .overlay(Capsule().strokeBorder(on ? Color.clear : colors.border, lineWidth: 0.5))
-                                .contentShape(Capsule())
-                        }
-                        .buttonStyle(.lhPressable)
-                        .accessibilityLabel(InboxFormat.spokenHours(preset.1))
-                        .accessibilityAddTraits(on ? [.isSelected] : [])
-                        .accessibilityIdentifier("log.chip.\(preset.0)")
-                    }
-                }
-            }
-            .padding(16)
-            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.timber.opacity(flash)).allowsHitTesting(false))
+extension LogField {
+    /// Row order on the sheet.
+    var order: Int {
+        switch self {
+        case .property: return 0
+        case .category: return 1
+        case .hours: return 2
+        case .date: return 3
+        case .participant: return 4
+        case .description: return 5
         }
     }
 
-    private func animate(_ body: () -> Void) {
-        if reduceMotion { body() } else { withAnimation(.spring(response: 0.28, dampingFraction: 0.9), body) }
-    }
-
-    private func step(_ symbol: String, enabled: Bool, colors: AdaptiveColors, _ action: @escaping () -> Void) -> some View {
-        Button {
-            animate(action)
-            stepTick += 1
-        } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(enabled ? colors.textPrimary : colors.textTertiary)
-                .frame(width: 44, height: 44)
-                .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(colors.border, lineWidth: 0.5))
+    /// For the VoiceOver announcement ("Filled rental, kind of work and how long from your note.").
+    var spokenName: String {
+        switch self {
+        case .property: return String(localized: "rental")
+        case .category: return String(localized: "kind of work")
+        case .hours: return String(localized: "how long")
+        case .date: return String(localized: "date")
+        case .participant: return String(localized: "who")
+        case .description: return String(localized: "the record")
         }
-        .buttonStyle(.lhPressable)
-        .disabled(!enabled)
-    }
-}
-
-/// Me / Spouse on brand tokens (the system segmented control renders grey on iOS 27).
-struct LogWhoPicker: View {
-    @Binding var participant: Participant
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        HStack(spacing: 2) {
-            ForEach([Participant.selfParticipant, .spouse], id: \.self) { option in
-                let selected = participant == option
-                Button {
-                    if reduceMotion { participant = option } else { withAnimation(AppAnimation.quick) { participant = option } }
-                } label: {
-                    Text(option == .spouse ? "Spouse" : "Me")
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                        .fixedSize()
-                        .foregroundStyle(selected ? colors.onAction : colors.textPrimary)
-                        .padding(.horizontal, 16)
-                        .frame(minWidth: 64, minHeight: 36)
-                        .background(Capsule().fill(selected ? colors.action : Color.clear))
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(option == .spouse ? "Spouse" : "Me")
-                .accessibilityAddTraits(selected ? [.isSelected] : [])
-                .accessibilityIdentifier(option == .spouse ? "log.who.spouse" : "log.who.me")
-            }
-        }
-        .padding(3)
-        .background(Capsule().fill(colors.backgroundTertiary))
-        .overlay(Capsule().strokeBorder(colors.border, lineWidth: 1))
-        .fixedSize()
-        .accessibilityElement(children: .contain)
-    }
-}
-
-/// A 2pt drafting ring that follows the input level; still in silence and under Reduce Motion.
-struct LogMicLevelRing: View {
-    let level: Double
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        Circle()
-            .strokeBorder(AdaptiveColors(colorScheme: colorScheme).drafting, lineWidth: 2)
-            .scaleEffect(1 + (reduceMotion ? 0 : min(max(level, 0), 1)) * 0.18)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.08), value: level)
-            .accessibilityHidden(true)
-    }
-}
-
-/// The Live Activity layout at full size, on theme-fixed blueprint. No dial, ring or pulse.
-struct LiveTimerCard: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    let property: RentalProperty?
-    let properties: [RentalProperty]
-    let category: ActivityCategory
-    let start: Date
-    var onStop: () -> Void
-
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            let elapsed = min(context.date.timeIntervalSince(start), TimerReviewMath.cap)
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 8) {
-                    if let property {
-                        PropertySeal(property, in: properties, size: 24)
-                            .environment(\.colorScheme, .dark)
-                    }
-                    Text(property?.name ?? "Timer")
-                        .font(.headline)
-                        .foregroundStyle(OnBlueprint.primary)
-                        .lineLimit(2)
-                    Spacer(minLength: 8)
-                    if !dynamicTypeSize.isAccessibilitySize {
-                    Text("LandlordHours")
-                        .font(.caption2.monospaced().weight(.medium))
-                        .textCase(.uppercase)
-                        .tracking(1.5)
-                        .foregroundStyle(HouseTokens.drafting)
-                        .lineLimit(1)
-                        .fixedSize()
-                        .accessibilityHidden(true)
-                    }
-                }
-                Text(LogTimeFormat.clock(elapsed))
-                    .font(.system(size: 64, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(OnBlueprint.primary)
-                    .contentTransition(.numericText(countsDown: false))
-                    .animation(.easeOut(duration: 0.2), value: Int(elapsed))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .accessibilityLabel("Running for \(InboxFormat.spokenHours(elapsed / 3600))")
-                    .accessibilityIdentifier("timer.clock")
-                Text("\(category.inboxLabel)\(LogTimeFormat.dot)started \(InboxFormat.clockTime(start))")
-                    .font(.subheadline)
-                    .foregroundStyle(HouseTokens.onHeroSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button("Stop", action: onStop)
-                    .buttonStyle(OnBlueprintButtonStyle())
-                    .accessibilityIdentifier("timer.stop")
-            }
-            .padding(20)
-            .background(InboxBlueprintPaper(cornerRadius: 24))
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("timer.card")
-    }
-}
-
-/// "Talk like you'd tell a friend" shows once, before the system asks.
-enum LogVoiceIntro {
-    private static var key: String { UserScope.key("LandlordHours.voiceIntroSeen") }
-    static var seen: Bool { UserDefaults.standard.bool(forKey: key) }
-    static func markSeen() { UserDefaults.standard.set(true, forKey: key) }
-}
-
-extension AppViewModel {
-    /// Stops the running timer into a draft the review (and Today's draft card) can log.
-    /// The draft is stored before the timer ends, so nothing is lost if the app dies here.
-    @discardableResult
-    func stopTimerIntoDraft(now: Date = Date()) -> StoppedTimerDraft? {
-        guard isTimerRunning, let start = timerStartTime, let propertyId = timerPropertyId else { return nil }
-        let draft = StoppedTimerDraft(elapsed: now.timeIntervalSince(start), propertyId: propertyId, category: timerCategory,
-                                      startDate: start, participant: .selfParticipant, notes: "")
-        StoppedTimerDraftStore.save(draft)
-        cancelTimer()
-        return draft
     }
 }

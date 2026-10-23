@@ -909,6 +909,37 @@ class AppViewModel: ObservableObject {
         return .saved(entry.id)
     }
 
+    /// The first-run Log sheet's save: the rental (name only, long-term, no address) and the entry
+    /// land together or not at all. A failed write takes both back out. The free plan's one-rental
+    /// limit is checked here too, so a second path can never slip a rental past it.
+    @discardableResult
+    func logFirstEntry(
+        propertyName: String,
+        participant: Participant,
+        category: ActivityCategory,
+        hours: Double,
+        date: Date,
+        notes: String,
+        attachments: [TimeAttachment] = [],
+        source: EntrySource = .manual,
+        recordDescription: String? = nil
+    ) -> LogSaveResult {
+        let draft = FirstPropertyDraft(name: propertyName)
+        guard draft.isValid else { return .failed(LogSaveResult.missingNameMessage) }
+        guard canAddProperty() else { return .failed(LogSaveResult.missingPropertyMessage) }
+        let property = draft.makeProperty()
+        properties.append(property)
+        let result = logTimeEntry(propertyId: property.id, participant: participant, category: category, hours: hours,
+                                  date: date, notes: notes, attachments: attachments, source: source,
+                                  recordDescription: recordDescription)
+        guard result.entryId != nil else {
+            properties.removeAll { $0.id == property.id }
+            return result
+        }
+        Analytics.propertyAdded()
+        return result
+    }
+
 #if DEBUG
     /// DEBUG: the next persistent write fails (unit tests and the `-LHFailNextSave` capture).
     static var debugFailNextWrite = false

@@ -120,7 +120,7 @@ enum Analytics {
     /// Captures an event. No-op when analytics never configured or opted out. Kept private — call
     /// sites use the typed helpers below so the event taxonomy stays centralized and reviewable in
     /// one place.
-    private static func capture(_ event: String, properties: [String: Any]? = nil) {
+    static func capture(_ event: String, properties: [String: Any]? = nil) {
         #if DEBUG
         // Unit-test seam: a spy sees exactly what would be sent, and nothing reaches PostHog.
         if let spy = testSpy {
