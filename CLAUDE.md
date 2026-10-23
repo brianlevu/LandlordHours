@@ -1,12 +1,46 @@
 # LandlordHours Design System
 
 > **App Name:** LandlordHours
-> **Tagline:** *"Track your path to tax qualification"*
 > **Platform:** iOS 17.0+ (SwiftUI)
 > **Architecture:** MVVM
 > **Design Style:** 2.0 "Blueprint" — honest, crafted, earned (docs/design/2.0-brand-system.md). Violet and Lucide are retired.
 
 For full-screen-by-screen design audits, use `docs/design-audit-playbook.md` before changing UI.
+
+---
+
+## Design standard (the bar; supersedes any 1.x rule below)
+
+Every rule in the standard is tagged **[measured]**, **[grep]** or **[judgment]**. Builders run the checks below and put the numbers in the hand-off; the gate re-measures.
+
+**Colour.** Blueprint blue `#1E3FA6` is the brand and the light action colour; drafting cyan `#8FD3FF` is the dark action colour. Violet is retired. Tokens and contrast are in `docs/design/2.0-brand-system.md` §2; usage rules are in `docs/design/DESIGN-STANDARD.md`. Intent first: action, positive, caution, destructive, informational. Never hardcode a hex in a view; add a token or use `AdaptiveColors`. Every view supports dark mode.
+
+**Type.** SF Pro / SF Pro Rounded (numbers, tabular) / SF Mono (drafting labels, 11pt caps) / Fraunces (tab titles and display, ≥ 28pt only). DM Serif Display and DM Sans are retired. Use text styles, not `.system(size:)`.
+
+**Layout.** Gutter 20, section gap 24, header to content 8, card padding 16. Rows live in one grouped container with hairline dividers; a card per list item is a defect.
+
+**Corner radius.** Cards 20 (continuous), inner surfaces 12, stat tiles 16, tags 6, buttons and chips capsule. Nothing else.
+
+**Icons.** SF Symbols for everything functional. Brand tool renders (`CategoryToolTile`) at 36 in browse rows and picker lists, 56 in picker grids and sheet headers, never in decision rows, never under 32. No Lucide (package removed), no emoji, no `Image("bp_tool_…")` outside the tile. Tab bar: SF Symbols (`LHIcon` custom shapes retired).
+
+**Components and density.** `docs/design/DESIGN-STANDARD.md` is the bar; its §5 is the gate rubric. Components are named `LHButton` (4 cases), `LHRow.Action/.Browse/.Value/.Toggle`, `LHCard.Summary`, `LHTile.Stat`, `LHTag`, `LHChip`, `LHField`, `LHSegmented`, `LHStepper`, `LHSectionHeader`, `LHScreenTitle`, `LHEmptyState`, `LHToast`, `LHSheet`. A row is 56–88pt (target 64), one list item is ≤ 12% of the viewport, a non-hero card ≤ 20%, empty bands inside a card ≤ 35%. No button inside a row; swipes are system `.swipeActions` only.
+
+**Motion.** Named motions and tokens are in standard §B. Springs are `.spring(duration:bounce:)`, ≤ 0.30s; bounce only on gesture release; every animation is bound to a state change; honour reduce motion.
+
+**Voice.** Standard §C: short plain sentences (average ≤ 14 words), the word list, canonical strings by key, never "qualify/qualified", "audit-ready", "evidence", "proof", "compliance". All user-facing text goes through the String Catalog.
+
+### QA tooling that enforces the standard
+
+```bash
+python3 scripts/qa/frame_check.py density <frames...>   # D1, D2, D4, D6 (+ D3 with --items-present N) on 3x frames
+python3 scripts/qa/standard_lint.py                      # [grep] rules vs scripts/qa/standard_lint_baseline.json; fails on NEW violations
+python3 scripts/qa/standard_lint.py --baseline           # ratchet the baseline down after fixing violations
+```
+
+`scripts/qa/gate_rubric.md` is the addendum the `visual-gate` agent applies, including the written anchor-app judgment.
+
+---
+
 
 ---
 
@@ -359,341 +393,6 @@ Sources/
 - **Grouping Election:** IRS allows grouping multiple properties as single activity for material participation. Important for multi-property landlords
 
 ---
-
-## Figma Redesign — Implementation Specs
-
-> **Superseded for colour, type and icons by the 2.0 brand system** (see Brand Identity above). The violet palettes, DM Serif/DM Sans and the Lucide/LHIcon tab glyphs below describe 1.x; keep the layout notes only where 2.0 docs say nothing.
-
-> **Figma File:** `Mikfhrs0aGwyzgYQd3Utpu`
-> **HTML Mockups:** `figma-redesign/` directory — these are the **source of truth** for implementation, not the Figma captures
-> **Design Language:** Tiimo-inspired, soft rounded UI, DM Serif Display + DM Sans fonts
-
-### Figma vs Implementation Fidelity
-
-The Figma captures lose some visual fidelity due to HTML-to-design limitations:
-- No `backdrop-filter: blur()` — glass effects flatten
-- No CSS animations or spring physics
-- SVG `stroke-dasharray` segmented tracks render as solid
-- `filter: blur()` floating blobs disappear
-- Gradient vibrancy is reduced
-
-**IMPORTANT:** Always reference the HTML mockups (open in browser) as the true design target. SwiftUI natively supports all these effects and will look **better** than the HTML:
-- `Circle().trim(from:to:).stroke()` for ring progress
-- `.animation(.spring(response:dampingFraction:))` for spring physics
-- `.ultraThinMaterial` and `.blur()` for glass effects
-- `LinearGradient` / `MeshGradient` for backgrounds
-- `withAnimation(.spring())` for interactive transitions
-
----
-
-### Screen: Reports — Interactive Goal Switcher
-
-**Reference file:** `figma-redesign/reports-v3.html`
-**Figma node:** `33:2` (Reports — Interactive Goal Switcher)
-
-#### Architecture
-
-Single view with 3 goal modes driven by one data source. All UI elements (background, ring, pills, stats, properties) react to the selected goal.
-
-```swift
-// Data model — single source of truth
-struct GoalMode {
-    let type: GoalType           // .reps750, .mp500, .mp100
-    let outerTarget: CGFloat     // ring fill ratio (0...1)
-    let innerTarget: CGFloat     // inner ring fill ratio (0 for MP goals)
-    let showInnerRing: Bool      // true only for REPS
-    let outerGradient: [Color]   // ring stroke gradient
-    let innerGradient: [Color]   // inner ring gradient
-    let accent: Color            // pill active color, link color
-    let backgroundPalette: BackgroundPalette
-    let isMet: Bool              // triggers celebration state
-    // ... stats, pace, properties
-}
-```
-
-#### Dual-Ring Progress Indicator
-
-- **Outer ring:** 18pt stroke, r=108 in 260x260 viewBox. Circumference = 2π×108 ≈ 679
-- **Inner ring:** 10pt stroke, r=82. Circumference = 2π×82 ≈ 515. Only visible for REPS (shows 50% rule)
-- **Track background:** Segmented dashes (stroke-dasharray equivalent). Use `.dash([3, 5])` modifier in SwiftUI
-- **Progress fill:** Gradient stroke with spring animation
-- **Ambient glow:** Radial gradient behind ring, 240×240pt, transitions color per goal
-
-```swift
-// SwiftUI ring implementation
-Circle()
-    .trim(from: 0, to: progress)
-    .stroke(
-        LinearGradient(colors: goal.outerGradient, startPoint: .leading, endPoint: .trailing),
-        style: StrokeStyle(lineWidth: 18, lineCap: .round)
-    )
-    .rotationEffect(.degrees(-90))
-    .frame(width: 260, height: 260)
-    .animation(.spring(response: 0.8, dampingFraction: 0.75), value: progress)
-```
-
-#### Spring Physics Values
-
-| Parameter | Value | SwiftUI Equivalent |
-|-----------|-------|--------------------|
-| Stiffness | 0.065 | `response: 0.8` |
-| Damping | 0.78 | `dampingFraction: 0.75` |
-| Threshold | 0.15 | Automatic in SwiftUI |
-
-For the ring progress animation, use:
-```swift
-.animation(.spring(response: 0.8, dampingFraction: 0.75), value: goalProgress)
-```
-
-For pill bounce feedback:
-```swift
-.animation(.spring(response: 0.45, dampingFraction: 0.6), value: selectedGoal)
-// Scale: 1.0 → 1.08 → 0.97 → 1.0
-```
-
-#### Goal-Specific Color Palettes
-
-**REPS 750h (Muted Lavender)**
-| Element | Value |
-|---------|-------|
-| Outer ring gradient | `#8B5CF6` → `#A78BFA` |
-| Inner ring gradient | `#34D399` → `#6EE7B7` |
-| Track outer | `#EDE9FE` |
-| Track inner | `#ECFDF5` |
-| Accent | `#8B5CF6` |
-| Background | `linear-gradient(145deg, #DDD8EE → #E4DDFA → #ECE6FF → #F2EEFF → #F7F3FF → #FAF7F2)` |
-| Blob colors | `rgba(139,92,246,0.15)`, `rgba(167,139,250,0.10)` |
-
-**Material Participation 500h (Warm Purple/Coral)**
-| Element | Value |
-|---------|-------|
-| Outer ring gradient | `#8B5CF6` → `#C084FC` |
-| Inner ring | Hidden (showInner: false) |
-| Accent | `#A855F7` |
-| Background | `linear-gradient(145deg, #DDE0EE → #E4DCF5 → #EEDDEE → #F5E6EF → #FAEFF0 → #FFF8F5)` |
-| Blob colors | `rgba(168,85,247,0.14)`, `rgba(244,114,182,0.08)` |
-
-**Material Participation 100h — Goal Met (Green Celebration)**
-| Element | Value |
-|---------|-------|
-| Outer ring gradient | `#34D399` → `#6EE7B7` |
-| Ring fills to 100% | Full circle |
-| Accent | `#059669` |
-| Background | `linear-gradient(145deg, #D5E8DD → #DAEFDF → #DFFAE5 → #E5FAEB → #EDFFF0 → #F5FFF8)` |
-| Center text | Checkmark icon + "Goal met!" in `#059669` |
-| Blob colors | `rgba(52,211,153,0.15)`, `rgba(110,231,183,0.10)` |
-
-#### Background Gradient Morphing
-
-- 3 pre-defined gradient layers, crossfaded via opacity (0.9s cubic-bezier)
-- In SwiftUI: use `LinearGradient` with animated color stops, or layer 3 gradients with `.opacity()` transitions
-- 2 floating blobs: large circles with `.blur(radius: 70)` and `.blur(radius: 60)`, positioned at corners
-- Blob colors and positions transition per goal selection
-
-#### Ring Center Content
-
-- **Normal state:** Large number (52px bold) + "of X hours" label (14px)
-- **Goal met state:** Checkmark icon (32×32) + "Goal met!" label (16px bold, `#059669`)
-- **Transition:** Crossfade (opacity 0→1 with 250ms delay after fade-out)
-
-#### Stat Row
-
-3 equal-width chips with glass background (`rgba(255,255,255,0.65)` + blur):
-- Chip 1: Remaining hours
-- Chip 2: Days left in year
-- Chip 3: 50% Rule percentage (REPS) / Complete percentage (MP) / Test status (100h met)
-
-#### Property Cards
-
-- Color bar accent (4×40pt, rounded) matching property's assigned color
-- Property name + meta (type + location or hours progress)
-- Horizontal progress bar with gradient fill
-- Hours/percentage on right side
-
----
-
-### Screen: Track Time — AI-Assisted Entry
-
-**Reference file:** `figma-redesign/track-v3.html`
-**Figma node:** `13:2` (Track Time — V3)
-
-3 states in a single flow:
-
-#### State 1: Empty
-- Greeting: "Track Time" (DM Serif Display 28px) + date subtitle
-- Notes textarea with subtle border (`--snow`)
-- AI hint: sparkle icon + "Describe your work and we'll fill in the details" (12px, `--mist`)
-- Category chips: horizontal scroll, 11 categories with color dots
-- Property picker: icon + "Select property" + chevron
-- Hours stepper: -/+ buttons (44×44pt circles) + large display (DM Serif 40px)
-- Date picker row
-- Participant segment: Self / Spouse toggle
-- Attach receipt button
-- "Log Time" primary button (full-width capsule, `--violet`)
-
-#### State 2: AI Suggestion Active
-- Notes filled with user text, border changes to `--violet-soft`
-- AI suggestion bar appears: purple sparkle badge + detected chips (Category, Property, Hours) + "Auto-fill" button
-- All other fields remain in empty/default state
-
-#### State 3: After Auto-fill
-- Notes unchanged
-- Green checkmark + "Auto-filled from your description" confirmation
-- Category chip auto-selected (highlighted in `--violet`)
-- Property auto-selected (shows name instead of placeholder)
-- Hours auto-set (e.g., 2.0h)
-- "Log Time" button ready
-
-#### Key UI Specs
-- Card padding: 20px, border-radius: 20px
-- Category chips: `padding: 10px 16px`, `border-radius: 999px`, `font-size: 13px`
-- Active chip: `background: var(--violet)`, `color: white`
-- AI suggestion bar: `background: var(--violet-wash)`, `border: 1.5px solid var(--violet-soft)`, `border-radius: 14px`
-- AI sparkle badge: 28×28px, `border-radius: 8px`, `background: var(--violet)`, white star icon
-
----
-
-### Screen: Onboarding Flow
-
-**Reference file:** `figma-redesign/onboarding-full.html`
-**Figma node:** `25:2` (LandlordHours — Complete Onboarding Flow)
-
-7 screens (A through G):
-
-| Screen | Title | Purpose |
-|--------|-------|---------|
-| A. Welcome | "Track your path to tax qualification" | Logo, tagline, "Get Started" CTA |
-| B. Goal | "What's your goal?" | 3 goal cards: REPS 750h (recommended), General Hour Tracking, Material Participation |
-| C. Review | "Your tracking plan" | Summary of selected goal with explanation |
-| D. Property | "Add your first property" | Property type toggle (LTR/STR) + Who manages (3 radio cards: Self / Me & Spouse / Property Manager) + Address form |
-| E. Permissions | "Stay on track" | 3 permission cards: Notifications, Calendar sync, Location detection |
-| F. AI Demo | "AI does the heavy lifting" | Animated mockup of AI auto-fill feature |
-| G. Complete | "You're all set" | Motivational message + "Start Tracking" CTA |
-
-#### Screen D Details (Property Setup)
-- **Property Type toggle:** LTR / STR segment control
-- **Management cards:** 3 selection cards with icon + title + description + radio button
-  - "Just me" — person icon — "I self-manage this property"
-  - "Me & spouse" — two-person icon — "We manage together (counts toward 50% rule)"
-  - "Property manager" — building icon — "Professional management company"
-- **Address form:** Property Name + Street Address text fields
-- **Section divider** between management cards and address form
-
-#### Onboarding Shared Specs
-- Progress bar at top: thin rounded track, `height: 3px`, fill gradient `#7B68EE → #A78BFA`
-- Navigation: Back arrow (top-left) + Skip link (top-right, `13px 600 #A8A8BC`)
-- Primary CTA: full-width capsule button, `padding: 16px`, `border-radius: 999px`, `background: #7B68EE`
-- Screen background: white `#FFFFFF`
-- Content padding: `24px` horizontal
-
----
-
-### Screen: Property Setup + Tax Profile
-
-**Reference file:** `figma-redesign/property-and-tax-profile.html`
-**Figma node:** `22:2` (Property Setup + Tax Profile)
-
-2 screens side by side:
-
-#### Add Property (Updated)
-- Property type toggle (LTR/STR)
-- Management selection cards (3 options with radio buttons)
-- Address fields
-- "Add Property" primary CTA
-
-#### Tax Profile Setup
-- "Spouse Hours" toggle — enables/disables spouse tracking
-- 50% Rule tracking explanation
-- "Determines your Reports dashboard" subtitle
-- Filing status, tax year settings
-
----
-
-### Tab Bar (All Screens)
-
-5 tabs: Home, Properties, Track, Reports, Settings
-
-| Tab | Icon | Active Color |
-|-----|------|-------------|
-| Home | House + circle | `#7B68EE` (system) / `#8B5CF6` (reports) |
-| Properties | Two stacked cards | Same |
-| Track | Clock circle | Same |
-| Reports | Bar chart (3 bars) | Same |
-| Settings | Gear/sun | Same |
-
-- Tab bar: `height: 80px`, glass background (`rgba(255,255,255,0.85)` + blur 20px)
-- Active tab: colored icon + text + 4px dot indicator below text
-- Inactive: `#C4C4D4` (reports) / `var(--mist)` (#A8A8BC in other screens)
-- Font: 10px weight 500
-
----
-
-### Figma Redesign Color Tokens (Expanded)
-
-These colors extend the base design system for the redesigned screens:
-
-| Token | Hex | Context |
-|-------|-----|---------|
-| `reportsAccent` | `#8B5CF6` | Reports ring, pills, active states |
-| `reportsAccentSoft` | `#A78BFA` | Gradient end, secondary accent |
-| `reportsAccentWash` | `#EDE9FE` | Track background, year badge bg |
-| `mpAccent` | `#A855F7` | Material Participation 500h accent |
-| `mpAccentWash` | `#F3E8FF` | MP 500h backgrounds |
-| `successGreen` | `#059669` | Goal met state, qualified badge |
-| `successGreenLight` | `#34D399` | Progress fill (green), inner ring |
-| `successGreenWash` | `#ECFDF5` | Track inner bg, pace badge bg |
-| `successGreenSoft` | `#6EE7B7` | Gradient end, celebration ring |
-| `charcoal` | `#1A1A2E` | Primary text, ring center number |
-| `ink` | `#2D2D3F` | Secondary text |
-| `slate` | `#6E6E82` | Inactive pills, labels |
-| `mist` | `#A8A8BC` | Subtitles, ring label, stat labels |
-| `cloud` | `#D4D4E0` | Borders, inactive elements |
-| `snow` | `#F0EFF4` | Input backgrounds, segment bg |
-| `cream` | `#FAF7F2` | Page backgrounds |
-
-### CSS Custom Properties → SwiftUI Mapping
-
-```swift
-// Map HTML CSS vars to SwiftUI
-extension AppColors {
-    static let reportsAccent = Color(hex: "#8B5CF6")
-    static let reportsAccentSoft = Color(hex: "#A78BFA")
-    static let reportsAccentWash = Color(hex: "#EDE9FE")
-    static let successGreen = Color(hex: "#059669")
-    static let successGreenLight = Color(hex: "#34D399")
-    static let successGreenWash = Color(hex: "#ECFDF5")
-    static let charcoal = Color(hex: "#1A1A2E")
-    static let ink = Color(hex: "#2D2D3F")
-    static let slate = Color(hex: "#6E6E82")
-    static let mist = Color(hex: "#A8A8BC")
-    static let snow = Color(hex: "#F0EFF4")
-    static let cream = Color(hex: "#FAF7F2")
-}
-```
-
----
-
-### Typography (Redesign Specific)
-
-| Element | Font | Size | Weight | Tracking |
-|---------|------|------|--------|----------|
-| Screen title (Reports) | DM Serif Display | 28px | Regular | 0 |
-| Ring center number | DM Sans | 52px | 800 (Extra Bold) | -2px |
-| Ring label | DM Sans | 14px | 500 | 0 |
-| Goal pill | DM Sans | 13px | 600 | 0 |
-| Stat value | DM Sans | 18px | 700 | 0 |
-| Stat label | DM Sans | 11px | 500 | 0 |
-| Section title | DM Sans | 17px | 700 | 0 |
-| Property name | DM Sans | 15px | 600 | 0 |
-| Greeting name (Track) | DM Serif Display | 28px | Regular | 0 |
-| Stepper value (Track) | DM Serif Display | 40px | Regular | 0 |
-
-In SwiftUI, map DM Serif Display to `.system(design: .serif)` and DM Sans to `.system(design: .default)`.
-
----
-
-*Design System v2.0 — February 2026*
-
 
 ## Xcode Build Rules (MANDATORY)
 
