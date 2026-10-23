@@ -48,7 +48,12 @@ enum AdaptiveProbe {
     static let on = ProcessInfo.processInfo.arguments.contains("-lh.probe.layout") || StdGeom.on
     static func log(_ line: String) {
         guard on else { return }
-        FileHandle.standardError.write(("LHPROBE " + line + "\n").data(using: .utf8) ?? Data())
+        let data = ("LHPROBE " + line + "\n").data(using: .utf8) ?? Data()
+        FileHandle.standardError.write(data)
+        // Also to the app's tmp, so runs driven by a UI test (no stderr) leave a log.
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("lhprobe.log")
+        if let h = try? FileHandle(forWritingTo: url) { h.seekToEndOfFile(); h.write(data); try? h.close() }
+        else { try? data.write(to: url) }
     }
 }
 
@@ -170,6 +175,7 @@ struct AdaptiveShell: View {
     @State private var tab: AdaptiveTab
     @State private var band: LayoutBand?
     @State private var showLog: Bool
+    @State private var windowControls: CGFloat = 0
     @Environment(\.horizontalSizeClass) private var hsc
     @Environment(\.verticalSizeClass) private var vsc
     @Environment(\.displayScale) private var scale
@@ -200,6 +206,11 @@ struct AdaptiveShell: View {
             if hsc == .compact {
                 // Band A / compact: the phone layout, unchanged (bottom glass bar, glass "+").
                 StdProtoRoot(launch: stdLaunch)
+                    // R12: in a narrow iPadOS window the window controls sit over the top-leading
+                    // corner; the phone layout's in-content title moves down to clear them.
+                    // safeAreaPadding does not reach into TabView's tabs, so the whole TabView moves down.
+                    .padding(.top, windowControls)
+                    .background(colors.background.ignoresSafeArea())
             } else {
                 regular
             }
@@ -211,6 +222,8 @@ struct AdaptiveShell: View {
                                      r.width, r.height, scale, "\(hsc.map { "\($0)" } ?? "nil")", "\(vsc.map { "\($0)" } ?? "nil")",
                                      (band ?? .a).rawValue, multiWindow ? "yes" : "no"))
         }
+        .background { WindowControlsReader(extra: $windowControls) }
+        .background { if AdaptiveProbe.on { HingeProbe() } }
         .background {
             GeometryReader { g in
                 Color.clear.onAppear {
@@ -346,6 +359,90 @@ struct SidebarVisibilitySetter: UIViewRepresentable {
         for c in vc.children { if let t = find(c) { return t } }
         if let p = vc.presentedViewController { return find(p) }
         return nil
+    }
+}
+
+/// R12: how far the iPadOS 26+ window controls reach below the top safe area, read from UIKit's
+/// corner-adapted safe-area layout region (0 when the scene is full screen or on iPhone).
+struct WindowControlsReader: UIViewRepresentable {
+    @Binding var extra: CGFloat
+    final class Probe: UIView {
+        var onChange: (CGFloat) -> Void = { _ in }
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            guard #available(iOS 26.0, *), window != nil else { return }
+            let v = layoutGuide(for: .safeArea(cornerAdaptation: .vertical)).layoutFrame
+            let h = layoutGuide(for: .safeArea(cornerAdaptation: .horizontal)).layoutFrame
+            // Under 8pt is corner rounding (the Duo reports 2), not window controls.
+            let raw = max(0, (v.minY - safeAreaInsets.top).rounded())
+            let value = raw > 8 ? raw : 0
+            AdaptiveProbe.log(String(format: "windowControls extra=%.1f vGuide=(%.1f,%.1f,%.1f,%.1f) hGuide=(%.1f,%.1f,%.1f,%.1f) safe=(t%.1f l%.1f) bounds=%.1fx%.1f",
+                                     value, v.minX, v.minY, v.width, v.height, h.minX, h.minY, h.width, h.height,
+                                     safeAreaInsets.top, safeAreaInsets.left, bounds.width, bounds.height))
+            onChange(value)
+        }
+    }
+    func makeUIView(context: Context) -> Probe {
+        let v = Probe(); v.isUserInteractionEnabled = false
+        v.onChange = { value in DispatchQueue.main.async { if extra != value { extra = value } } }
+        return v
+    }
+    func updateUIView(_ view: Probe, context: Context) { view.setNeedsLayout() }
+}
+
+/// Table on iPadOS paints the system background (#000000 dark, #FFFFFF light). This clears its
+/// collection view and gives each row the card token, so the table sits on our canvas.
+struct TableThemer: UIViewRepresentable {
+    let canvas: UIColor
+    let row: UIColor
+    func makeUIView(context: Context) -> UIView { let v = UIView(); v.isUserInteractionEnabled = false; return v }
+    func updateUIView(_ view: UIView, context: Context) {
+        for delay in [0.1, 0.5, 1.5] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                guard let host = view.superview?.superview else { return }
+                for cv in Self.collectionViews(in: host) {
+                    cv.backgroundColor = canvas
+                    cv.backgroundView = nil
+                    for cell in cv.visibleCells {
+                        var bg = UIBackgroundConfiguration.clear()
+                        bg.backgroundColor = row
+                        if !cell.isSelected { cell.backgroundConfiguration = bg }
+                    }
+                }
+            }
+        }
+    }
+    static func collectionViews(in v: UIView) -> [UICollectionView] {
+        var out: [UICollectionView] = []
+        if let cv = v as? UICollectionView { out.append(cv) }
+        for s in v.subviews { out += collectionViews(in: s) }
+        return out
+    }
+}
+
+/// §9 probe: UIKit's hinge (iOS 27.1+; SwiftUI has no onHingeChange). Logs status and angle.
+struct HingeProbe: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let v = UIView(); v.isUserInteractionEnabled = false
+        if #available(iOS 27.1, *) {
+            let i = UIHingeInteraction { _, update in
+                if let h = update.hinge {
+                    AdaptiveProbe.log(String(format: "hinge status=%ld angle=%.1f", h.status.rawValue, h.angle))
+                } else {
+                    AdaptiveProbe.log("hinge none")
+                }
+            }
+            v.addInteraction(i)
+        } else {
+            AdaptiveProbe.log("hinge api unavailable (< iOS 27.1)")
+        }
+        return v
+    }
+    func updateUIView(_ view: UIView, context: Context) {
+        let s = view.window?.windowScene
+        AdaptiveProbe.log(String(format: "screen bounds=%.0fx%.0f nativeScale=%.1f scene=%.0fx%.0f",
+                                 s?.screen.bounds.width ?? 0, s?.screen.bounds.height ?? 0, s?.screen.nativeScale ?? 0,
+                                 s?.coordinateSpace.bounds.width ?? 0, s?.coordinateSpace.bounds.height ?? 0))
     }
 }
 
@@ -523,7 +620,6 @@ struct AdaptiveActionRow: View {
 
 @available(iOS 26.0, *)
 struct AdaptiveInbox: View {
-    static let nativeSplit = ProcessInfo.processInfo.arguments.contains("-LHAdaptiveNativeSplit")
     let seed: StdSeed
     @State private var selection: String?
     @State private var confirmed: Set<String> = []
@@ -539,26 +635,17 @@ struct AdaptiveInbox: View {
 
     var body: some View {
         AdaptiveContent(name: "inbox") { wc, two in
-            if band == .c && two && Self.nativeSplit {
-                // The spec's NavigationSplitView: on iPadOS 27 the list column stays 320pt whatever
-                // navigationSplitViewColumnWidth asks (kept for the evidence frames, -LHAdaptiveNativeSplit).
+            if band == .c && two {
+                // NavigationSplitView with the system's own column widths (list 320 on iPadOS 27;
+                // navigationSplitViewColumnWidth does not widen it, so we no longer ask).
                 NavigationSplitView(columnVisibility: $visibility) {
-                    list(width: nil)
-                        .navigationSplitViewColumnWidth(min: 360, ideal: AdaptiveColumns.width(wc: wc), max: 600)
+                    list(width: nil, gutter: 16)
                         .toolbar(removing: .sidebarToggle)
                         .stdMeasure("column.list")
                 } detail: {
                     detail.stdMeasure("column.detail")
                 }
                 .navigationSplitViewStyle(.balanced)
-            } else if band == .c && two {
-                // List + detail as two equal panes, (Wc − 24) / 2 each, so the spec's 492 + 492 holds.
-                let col = AdaptiveColumns.width(wc: wc)
-                HStack(spacing: 0) {
-                    list(width: col).frame(width: col + 2 * band.gutter).stdMeasure("column.list")
-                    Rectangle().fill(colors.border).frame(width: 0.5).ignoresSafeArea()
-                    detail.frame(maxWidth: .infinity).stdMeasure("column.detail")
-                }
             } else {
                 list(width: min(600, wc))
                     .frame(maxWidth: .infinity)
@@ -581,7 +668,8 @@ struct AdaptiveInbox: View {
 
     private var likely: [StdSuggestion] { seed.suggestions.filter { $0.isLikely && !confirmed.contains($0.id) } }
 
-    private func list(width: CGFloat?) -> some View {
+    /// `gutter`: 16 inside the 320pt split column (system list margin), the band gutter elsewhere.
+    private func list(width: CGFloat?, gutter: CGFloat? = nil) -> some View {
         List {
             Section {
                 ForEach(Array(stdDayGroups(seed.suggestions).enumerated()), id: \.element.name) { gi, g in
@@ -613,7 +701,7 @@ struct AdaptiveInbox: View {
             }
         }
         // Gutter before the shared style: the innermost contentMargins wins.
-        .contentMargins(.horizontal, band.gutter, for: .scrollContent)
+        .contentMargins(.horizontal, gutter ?? band.gutter, for: .scrollContent)
         .modifier(AdaptiveListStyle())
         .frame(maxWidth: width.map { $0 + 2 * band.gutter })
     }
@@ -621,6 +709,11 @@ struct AdaptiveInbox: View {
 
 struct AdaptiveQuestionCard: View {
     let rental: String
+    @ViewBuilder private var chips: some View {
+        StdChip(text: L("Cleaner"), selected: picked == 0, fill: true) { picked = 0 }
+        StdChip(text: L("Me"), selected: picked == 1, fill: true) { picked = 1 }
+        StdChip(text: L("Not sure"), selected: picked == 2, fill: true) { picked = 2 }
+    }
     @State private var picked: Int?
     @Environment(\.colorScheme) private var scheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
@@ -631,10 +724,10 @@ struct AdaptiveQuestionCard: View {
                 .foregroundStyle(colors.draftingInk)
             Text(L("Who does more of the work at \(rental)?")).font(.headline).foregroundStyle(colors.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 8) {
-                StdChip(text: L("Cleaner"), selected: picked == 0, fill: true) { picked = 0 }
-                StdChip(text: L("Me"), selected: picked == 1, fill: true) { picked = 1 }
-                StdChip(text: L("Not sure"), selected: picked == 2, fill: true) { picked = 2 }
+            // Three equal chips; in the 320pt split column they stack rather than truncate.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { chips }.fixedSize()
+                VStack(spacing: 8) { chips }
             }
         }
         .padding(16)
@@ -830,9 +923,13 @@ struct AdaptiveRecords: View {
                 Button(L("Delete"), systemImage: "trash", role: .destructive) {}
             }
             .scrollContentBackground(.hidden)
+            .background(colors.background)
+            .background { TableThemer(canvas: UIColor(colors.background), row: UIColor(colors.backgroundSecondary)) }
             .stdMeasure("table")
         }
         .padding(.top, 8)
+        // The inspector's container paints the system background above the table without this.
+        .background(colors.background.ignoresSafeArea())
         .searchable(text: $query, placement: .toolbar, prompt: L("Search records"))
         .inspector(isPresented: Binding(get: { inspectorFits && selection != nil }, set: { if !$0 { selection = nil } })) {
             if let id = selection, let r = AdaptiveSeed.records.first(where: { $0.id == id }) {
