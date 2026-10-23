@@ -167,8 +167,13 @@ struct HomeRentalRow: View {
                 .padding(.vertical, 4).padding(.horizontal, 2)
             }
             .scrollClipDisabled()
-            .onAppear { proxy.scrollTo(focus, anchor: .center) }
+            // Opens on the focus, or on the first rental picked when it starts adding up.
+            .onAppear { proxy.scrollTo(selection.summed.first.map(TodayFocusChoice.rental) ?? focus, anchor: .center) }
             .onChange(of: focus) { _, f in withAnimation(tap) { proxy.scrollTo(f, anchor: .center) } }
+            .onChange(of: selection.summed.first) { _, id in
+                guard let id else { return }
+                withAnimation(tap) { proxy.scrollTo(TodayFocusChoice.rental(id), anchor: .center) }
+            }
             .onChange(of: scrollRequest) { _, id in
                 guard let id else { return }
                 withAnimation(.easeInOut(duration: 0.6)) { proxy.scrollTo(id, anchor: .trailing) }

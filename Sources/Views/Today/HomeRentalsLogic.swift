@@ -330,10 +330,22 @@ enum HomeHero {
                              participationPropertyId: nil)
     }
 
-    /// "12h toward 100 at Santa Ray Ave." for a rental with its own target; nil: the total's line.
+    /// The line under Today's title for the focus: "12h toward 100 at Santa Ray Ave.",
+    /// "84h logged at Delaney Ct this year.", "96h across 2 rentals."; nil: the total's line.
     static func headerLine(_ hero: HomeHeroState) -> String? {
-        guard case .ownTarget = hero.kind, let target = hero.copy.targetHours, let name = hero.copy.propertyName else { return nil }
-        return String(localized: "\(OnbFormat.hours(hero.hours)) toward \(target) at \(name).", table: "Home")
+        let hours = OnbFormat.hours(hero.hours)
+        switch hero.kind {
+        case .ownTarget:
+            guard let target = hero.copy.targetHours, let name = hero.copy.propertyName else { return nil }
+            return String(localized: "\(hours) toward \(target) at \(name).", table: "Home")
+        case .recordOnly:
+            guard let name = hero.copy.propertyName else { return nil }
+            return String(localized: "\(hours) logged at \(name) this year.", table: "Home")
+        case .sum(let ids):
+            return String(localized: "\(hours) across \(ids.count) rentals.", table: "Home")
+        case .total, .sharedPart:
+            return nil
+        }
     }
 }
 

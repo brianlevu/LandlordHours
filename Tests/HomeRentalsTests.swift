@@ -143,7 +143,7 @@ final class HomeRentalsTests: XCTestCase {
         XCTAssertNil(hero.copy.phrase, "no pace")
         XCTAssertFalse(hero.hasTarget)
         XCTAssertEqual(hero.flag, "Delaney Ct")
-        XCTAssertNil(HomeHero.headerLine(hero))
+        XCTAssertEqual(HomeHero.headerLine(hero), "84h logged at Delaney Ct this year.")
     }
 
     func testSharedModeRentalShowsItsPartOfTheTotal() {
@@ -173,6 +173,7 @@ final class HomeRentalsTests: XCTestCase {
         XCTAssertNil(two.copy.targetHours)
         XCTAssertEqual(two.stageHours, 0)
         XCTAssertEqual(two.flag, "2 rentals")
+        XCTAssertEqual(HomeHero.headerLine(two), "96h across 2 rentals.")
         let three = HomeHero.make(r, focus: .all, summed: [delaney.id, santa.id, yeandle.id], input())
         XCTAssertEqual(three.copy.phrase, "Delaney Ct + Santa Ray Ave + 1 more")
     }

@@ -373,6 +373,7 @@ struct DashboardView: View {
                         // The house leads Today in every state (approved r6 concept); a new
                         // owner's setup steps sit right under the empty lot.
                         houseHero
+                            .id("today.section.hero")
                         if showsRentalRow {
                             rentalRow
                                 .id("today.section.rentals")
@@ -438,7 +439,7 @@ struct DashboardView: View {
                     refreshNewOwnerState()
                     guard let target = TodayDebugSeed.scrollTarget else { return }
                     try? await Task.sleep(nanoseconds: 700_000_000)
-                    scroller.scrollTo("today.section.\(target)", anchor: target == "week" ? .top : .center)
+                    scroller.scrollTo("today.section.\(target)", anchor: target == "week" ? .top : (target == "hero" ? .bottom : .center))
                 }
                 #endif
                 }
@@ -780,7 +781,8 @@ struct DashboardView: View {
                 ? "\(name) is staked. Confirm what we found, or log something new."
                 : String(localized: "\(name) is staked. Log your first hour while it’s fresh.")
         }
-        if let line = HomeHero.headerLine(heroState) { return line }
+        // Several rentals: the line names the focused rental (one rental keeps 2.0.1's line).
+        if showsRentalRow, let line = HomeHero.headerLine(heroState) { return line }
         return TodayHeroCopy.headerLine(hours: headerHours, target: Int(targetHours), isRecord: goalManager.goalChoice == .record, year: currentYear)
     }
 
