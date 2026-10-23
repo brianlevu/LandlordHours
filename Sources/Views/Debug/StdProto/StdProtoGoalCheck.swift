@@ -156,13 +156,16 @@ struct StdGoalCheckSheet: View {
             HouseBlueprintPaper()
             HStack(alignment: .bottom, spacing: 0) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(L("Rental 1 of \(count) · \(target)-hour target"))
+                    Text(L("Rental 1 of \(count)"))
                         .font(StdFont.drafting).textCase(.uppercase).tracking(StdFont.draftingTracking)
                         .foregroundStyle(HouseTokens.drafting)
+                        .lineLimit(1)
                     Spacer(minLength: 0)
                     Text(rental.name).font(.title2.weight(.semibold)).foregroundStyle(HouseTokens.onHeroPrimary)
                     Text(L("\(Int(rental.hours)) of \(target) hours")).font(.subheadline).monospacedDigit()
-                        .foregroundStyle(HouseTokens.onHeroSecondary)
+                        .foregroundStyle(HouseTokens.onHeroSecondary).lineLimit(1)
+                    Text(L("\(target)-hour target")).font(.subheadline)
+                        .foregroundStyle(HouseTokens.onHeroSecondary).lineLimit(1)
                 }
                 .padding(16)
                 Spacer(minLength: 0)
@@ -171,11 +174,11 @@ struct StdGoalCheckSheet: View {
                     Image(decorative: keyframe.builtImageName).resizable().interpolation(.high).scaledToFit()
                     HouseLineworkImage(name: keyframe.linesImageName).foregroundStyle(HouseTokens.drafting)
                 }
-                .frame(width: 132, height: 132)
-                .padding(.trailing, 4).padding(.bottom, -8)
+                .frame(width: 112, height: 112)
+                .padding(.trailing, 12).padding(.bottom, -4)
             }
         }
-        .frame(height: 120)
+        .frame(height: 132)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .accessibilityElement(children: .combine)
     }

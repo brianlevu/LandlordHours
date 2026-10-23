@@ -486,14 +486,22 @@ struct StdHeroCard: View {
     /// heroCountUp: the built house rises behind its linework (ringProgress 0.60) while the digits count (count 0.60).
     /// draftingPass: a 1pt drafting-cyan line draws left → right along the rising mask edge
     /// (sweep easeOut 0.45) and fades by 0.55s, then stillness. Reduce Motion: no line.
+    /// `-LHStdSlow 4` plays the hero motions at quarter speed for review clips.
+    private static let slow: Double = {
+        let a = ProcessInfo.processInfo.arguments
+        guard let i = a.firstIndex(of: "-LHStdSlow"), a.indices.contains(i + 1) else { return 1 }
+        return Double(a[i + 1]) ?? 1
+    }()
+
     private func draftingPass() {
         guard !reduceMotion else { return }
         StdMotionLog.mark("draftingPass")
         passTick += 1
+        let k = Self.slow
         var t = Transaction(); t.disablesAnimations = true
         withTransaction(t) { sweep = 0; sweepOpacity = 0.9 }
-        withAnimation(.easeOut(duration: 0.45)) { sweep = 1 }
-        withAnimation(.easeIn(duration: 0.2).delay(0.35)) { sweepOpacity = 0 }
+        withAnimation(.easeOut(duration: 0.45 * k)) { sweep = 1 }
+        withAnimation(.easeIn(duration: 0.2 * k).delay(0.35 * k)) { sweepOpacity = 0 }
     }
 
     private func raise(from start: CGFloat) {
@@ -501,7 +509,7 @@ struct StdHeroCard: View {
         guard !reduceMotion else { return }
         var t = Transaction(); t.disablesAnimations = true
         withTransaction(t) { rise = start }
-        withAnimation(StdMotion.ringProgress) { rise = 1 }
+        withAnimation(.spring(duration: 0.60 * Self.slow, bounce: 0)) { rise = 1 }
     }
 
     // MARK: Top: number and house
@@ -510,7 +518,7 @@ struct StdHeroCard: View {
         StdCountingText(value: hero.number)
             .font(AppTypography.heroNumber)
             .foregroundStyle(HouseTokens.onHeroPrimary)
-            .animation(reduceMotion ? nil : StdMotion.count, value: hero.number)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.60 * Self.slow), value: hero.number)
     }
 
     private var label: some View {
@@ -527,7 +535,7 @@ struct StdHeroCard: View {
     }
 
     private func fullTop(_ night: Bool) -> some View {
-        let houseSize: CGFloat = single ? 188 : 150
+        let houseSize: CGFloat = single ? 172 : 150
         return VStack(alignment: .leading, spacing: 0) {
             if single {
                 Text(L("2026 · \(hero.flag)")).font(StdFont.drafting).textCase(.uppercase).tracking(StdFont.draftingTracking)
@@ -539,7 +547,7 @@ struct StdHeroCard: View {
                 VStack(alignment: .leading, spacing: 0) {
                     number
                     label
-                    status.padding(.top, 8)
+                    if !single { status.padding(.top, 8) }
                 }
                 .layoutPriority(1)
                 .padding(.bottom, 4)
@@ -547,6 +555,8 @@ struct StdHeroCard: View {
                 house(night).frame(width: houseSize, height: houseSize)
                     .padding(.trailing, -8).padding(.bottom, -10)
             }
+            // One rental: the pace line runs the card's full width under the number and house, on one line.
+            if single { status.padding(.top, 6) }
         }
         .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, single ? 16 : 12)
         // The ambient sky: a fixed box in the top-right corner, behind the house, clear of the number.
@@ -583,10 +593,21 @@ struct StdHeroCard: View {
                 }
             HouseLineworkImage(name: keyframe.linesImageName).foregroundStyle(HouseTokens.drafting)
             GeometryReader { g in
-                Rectangle().fill(HouseTokens.drafting)
-                    .frame(width: g.size.width * 0.7 * sweep, height: 1.5)
-                    .offset(x: g.size.width * 0.15, y: g.size.height * (1 - rise) + g.size.height * 0.2)
-                    .opacity(sweepOpacity)
+                // The pen: a line drawn left → right along the top edge of what is built (the newest
+                // band), with a bright nib at its head. Bounds come from the built pass's own pixels.
+                let b = StdBuiltBounds.unit(for: keyframe.builtImageName)
+                let x0 = g.size.width * b.minX, w = g.size.width * b.width
+                let y = g.size.height * b.minY
+                ZStack(alignment: .leading) {
+                    Rectangle().fill(HouseTokens.drafting)
+                        .frame(width: w * sweep, height: 1.5)
+                    Circle().fill(HouseTokens.drafting)
+                        .frame(width: 5, height: 5)
+                        .shadow(color: HouseTokens.drafting.opacity(0.8), radius: 3)
+                        .offset(x: w * sweep - 2.5)
+                }
+                .offset(x: x0, y: y - 2.5)
+                .opacity(sweepOpacity)
             }
             .allowsHitTesting(false)
         }
@@ -634,8 +655,14 @@ struct StdHeroCard: View {
         let selected = focus == f
         return Button { select(f) } label: {
             HStack(spacing: 8) {
-                Image(decorative: w.keyframe.builtImageName).resizable().interpolation(.high).scaledToFit()
-                    .frame(width: 36, height: 36)
+                // The real blueprint mini-house: built pass plus its drafted linework, so an early
+                // stage still reads as a house (not a bare lot) at 36pt.
+                ZStack {
+                    Image(decorative: w.keyframe.builtImageName).resizable().interpolation(.high).antialiased(true).scaledToFit()
+                    HouseLineworkImage(name: w.keyframe.linesImageName).foregroundStyle(HouseTokens.drafting)
+                }
+                .scaleEffect(1.25)
+                .frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(w.name).font(.footnote.weight(.semibold)).foregroundStyle(HouseTokens.onHeroPrimary).lineLimit(1)
                     Text(w.hours).font(.caption).monospacedDigit().foregroundStyle(HouseTokens.onHeroSecondary).lineLimit(1)
@@ -676,3 +703,42 @@ struct StdHeroCard: View {
 }
 #endif
 
+
+#if DEBUG
+/// The unit bounding box of a built pass's opaque pixels (cached per keyframe). Its top edge is the
+/// newest built band, where the drafting pass draws.
+enum StdBuiltBounds {
+    private static var cache: [String: CGRect] = [:]
+    static func unit(for name: String) -> CGRect {
+        if let hit = cache[name] { return hit }
+        var r = CGRect(x: 0.2, y: 0.55, width: 0.6, height: 0.3)
+        if let cg = UIImage(named: name)?.cgImage {
+            let w = cg.width, h = cg.height
+            var px = [UInt8](repeating: 0, count: w * h * 4)
+            if let ctx = CGContext(data: &px, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                   space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
+                ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+                var minX = w, minY = h, maxX = 0, maxY = 0
+                for y in stride(from: 0, to: h, by: 2) {
+                    for x in stride(from: 0, to: w, by: 2) where px[(y * w + x) * 4 + 3] > 128 {
+                        minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
+                    }
+                }
+                if maxX > minX, maxY > minY {
+                    // Skip the tree on the left: the band is the top of the middle 76% of the footprint.
+                    let fw = Double(maxX - minX)
+                    let c0 = minX + Int(fw * 0.30), c1 = minX + Int(fw * 0.88)
+                    var top = maxY
+                    for y in stride(from: 0, to: h, by: 2) {
+                        if (stride(from: c0, to: c1, by: 2).contains { px[(y * w + $0) * 4 + 3] > 128 }) { top = y; break }
+                    }
+                    r = CGRect(x: (Double(minX) + fw * 0.12) / Double(w), y: Double(top) / Double(h),
+                               width: fw * 0.76 / Double(w), height: Double(maxY - top) / Double(h))
+                }
+            }
+        }
+        cache[name] = r
+        return r
+    }
+}
+#endif

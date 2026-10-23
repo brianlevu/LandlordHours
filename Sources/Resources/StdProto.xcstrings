@@ -166,6 +166,17 @@
         }
       }
     },
+    "%lld-hour target": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld-hour target"
+          }
+        }
+      }
+    },
     "%lldh": {
       "extractionState": "manual",
       "localizations": {
