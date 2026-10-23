@@ -104,6 +104,10 @@ enum LogSheetDebug {
         let oak = properties.first { $0.name.hasPrefix("Oak") } ?? properties.dropFirst().first
         let args = ProcessInfo.processInfo.arguments
         if args.contains("-LHFailNextSave") { AppViewModel.debugFailNextWrite = true }
+        // The 2.0 states show their rows (the note-first sheet folds them into the details line until a fill).
+        if ["filled", "voiceFilled", "saveFailed", "invalid", "keyboard", "notCounted", "quick", "listening"].contains(state) {
+            preset.unfolded = true
+        }
 
         func filled() {
             form.note = sample

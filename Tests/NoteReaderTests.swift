@@ -659,7 +659,7 @@ final class NoteTwoRentalsTests: XCTestCase {
     func testTheFormShowsTheHintAndClearsIt() {
         var f = LogForm()
         f.apply(NoteReading(category: .repairs, mentionedPropertyCount: 2), source: .note, spouseTracking: false, calendar: testCalendar)
-        XCTAssertEqual(f.propertyHint, "Your note mentions 2 rentals. Log each one separately.")
+        XCTAssertEqual(f.propertyHint, "Your note mentions 2 rentals. Log each one on its own.")
         f.setProperty(oak.id)
         XCTAssertNil(f.propertyHint)
         var g = LogForm()

@@ -50,10 +50,13 @@ final class LandlordHoursUITests: XCTestCase {
         launch(scenario: "frequent", tab: 2)
 
         XCTAssertTrue(app.buttons["log.close"].waitForExistence(timeout: 8))
-        XCTAssertTrue(app.buttons["log.property"].exists)
+        // The note comes first; "Enter details yourself" opens every row.
+        XCTAssertTrue(app.descendants(matching: .any)["log.note"].exists)
+        app.buttons["log.enterDetails"].tap()
+        XCTAssertTrue(app.buttons["log.property"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.buttons["log.category"].exists)
         XCTAssertTrue(app.buttons["log.date"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["log.hours.value"].exists)
+        XCTAssertTrue(app.buttons["log.hours"].exists)
     }
 
     func testTrackNoteTypingStaysInComposer() {
@@ -205,19 +208,13 @@ final class LandlordHoursUITests: XCTestCase {
         }
     }
 
-    func testTrackEmptyStateAddPropertyCTAOpensPropertySheet() {
+    func testTrackEmptyStateAsksWhichRentalAndLogsTheFirstHour() {
         launch(scenario: "emptyMainTabs", tab: 2)
 
-        assertVisibleText("Add a property to log this.", timeout: 8)
-        app.buttons["log.property"].tap()
-        let addProperty = app.buttons["picker.addProperty"]
-        XCTAssertTrue(addProperty.waitForExistence(timeout: 5))
-        addProperty.tap()
-
-        let propertyName = app.textFields["property.name"]
-        XCTAssertTrue(propertyName.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.textFields["property.address"].exists)
-        attachScreenshot(named: "track-empty-add-property-route")
+        let name = app.textFields["log.rentalName"]
+        XCTAssertTrue(name.waitForExistence(timeout: 8), "no rentals: the sheet asks which one, it does not send you away")
+        XCTAssertEqual(app.buttons["log.save"].label, "Name your rental")
+        attachScreenshot(named: "track-empty-first-log")
     }
 
     func testTimerLaunchStatesRemainReviewable() {
@@ -301,9 +298,8 @@ final class LandlordHoursUITests: XCTestCase {
 
         let logTime = app.buttons["log.save"]
         XCTAssertTrue(logTime.waitForExistence(timeout: 5))
-        let enabled = NSPredicate(format: "isEnabled == true")
-        expectation(for: enabled, evaluatedWith: logTime)
-        waitForExpectations(timeout: 5)
+        Thread.sleep(forTimeInterval: 1.5)   // the 600 ms pause, then the read
+        resolveLogGaps()
         logTime.tap()
 
         XCTAssertTrue(app.descendants(matching: .any)["shell.toast"].waitForExistence(timeout: 5))
@@ -450,5 +446,17 @@ final class LandlordHoursUITests: XCTestCase {
         expectation(for: hittable, evaluatedWith: element)
         waitForExpectations(timeout: timeout)
         element.tap()
+    }
+
+    /// The Log button names what is missing and opens that editor; fill each gap with the first choice until it says "Log ...".
+    private func resolveLogGaps() {
+        let save = app.buttons["log.save"]
+        for _ in 0..<4 {
+            if save.label.hasPrefix("Log ") { return }
+            save.tap()
+            let rental = app.buttons["log.pick.property.0"]
+            let kind = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'log.pick.category.'")).firstMatch
+            if rental.waitForExistence(timeout: 2) { rental.tap() } else if kind.waitForExistence(timeout: 2) { kind.tap() } else { return }
+        }
     }
 }

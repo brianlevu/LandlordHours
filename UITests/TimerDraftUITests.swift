@@ -69,7 +69,7 @@ final class TimerDraftUITests: XCTestCase {
         let save = app.buttons["log.save"]
         XCTAssertTrue(save.waitForExistence(timeout: 6))
         XCTAssertTrue(app.buttons["log.property"].label.contains("Pine Lake Cabin"), "the only rental left is preselected")
-        XCTAssertEqual(save.label, "Log 45m")
+        XCTAssertTrue(save.label.hasPrefix("Log 45m at Pine Lake Cabin"), save.label)
     }
 
     func testNoPropertiesShowsTheRunTimeAndDiscard() {
