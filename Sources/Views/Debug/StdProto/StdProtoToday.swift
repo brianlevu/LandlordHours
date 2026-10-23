@@ -365,9 +365,16 @@ struct StdHeroCard: View {
     private var single: Bool { seed.rentals.rentals.count == 1 && seed.rentals.sharedTarget == nil }
 
     var body: some View {
+        // The sky follows the clock: re-read once a minute, never per frame.
+        TimelineView(.everyMinute) { tl in
+            card(phase: StdSkyPhase.at(tl.date))
+        }
+    }
+
+    private func card(phase: StdSkyPhase) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Group {
-                if typeSize.isAccessibilitySize { compactTop } else { fullTop }
+                if typeSize.isAccessibilitySize { compactTop } else { fullTop(phase == .night) }
             }
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 24).onEnded(swipe))
@@ -381,7 +388,7 @@ struct StdHeroCard: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(HouseBlueprintPaper())
+        .background(StdHeroSky(phase: phase))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .onChange(of: hero.key) { _, _ in raise(from: 0.45) }
         .onChange(of: hero.number) { old, new in if new > old { raise(from: 0.82) } }
@@ -437,7 +444,7 @@ struct StdHeroCard: View {
         }
     }
 
-    private var fullTop: some View {
+    private func fullTop(_ night: Bool) -> some View {
         let houseSize: CGFloat = single ? 188 : 150
         return VStack(alignment: .leading, spacing: 0) {
             if single {
@@ -455,7 +462,7 @@ struct StdHeroCard: View {
                 .layoutPriority(1)
                 .padding(.bottom, 4)
                 Spacer(minLength: 0)
-                house.frame(width: houseSize, height: houseSize)
+                house(night).frame(width: houseSize, height: houseSize)
                     .padding(.trailing, -8).padding(.bottom, -10)
             }
         }
@@ -480,10 +487,13 @@ struct StdHeroCard: View {
         .padding(16)
     }
 
-    private var house: some View {
-        let keyframe = HouseProgress.keyframe(for: hero.stageHours)
+    /// Capture hook: `-LHHeroFinished` shows the finished house so the night windows can be judged.
+    private static let forceFinished = ProcessInfo.processInfo.arguments.contains("-LHHeroFinished")
+
+    private func house(_ night: Bool) -> some View {
+        let keyframe = Self.forceFinished ? HouseKeyframe.k18_finished : HouseProgress.keyframe(for: hero.stageHours)
         return ZStack {
-            Image(decorative: keyframe.builtImageName).resizable().interpolation(.high).scaledToFit()
+            StdNightHouse(builtImageName: keyframe.builtImageName, night: night)
                 .mask(alignment: .bottom) {
                     GeometryReader { g in
                         Rectangle().frame(height: g.size.height * rise).frame(maxHeight: .infinity, alignment: .bottom)
@@ -576,3 +586,4 @@ struct StdHeroCard: View {
     }
 }
 #endif
+
