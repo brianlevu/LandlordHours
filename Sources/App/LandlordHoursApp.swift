@@ -104,6 +104,21 @@ enum AppColors {
     /// Tile wash opacity behind a category tool.
     static let categoryWashOpacity: Double = 0.14
 
+    /// Tag text on its 12% wash (standard 1.16). Four light inks measured under 4.5:1 on their own
+    /// wash (management 4.30, negotiation 4.27, investing 4.31, renovation 4.67 at 12%), so tags use
+    /// a darker step of those four; every pair is >= 5.0:1. Dark mode keeps the category ink.
+    static let tagWashOpacity: Double = 0.12
+    static func categoryTagInkHex(_ category: ActivityCategory) -> (light: String, dark: String) {
+        let base = categoryInkHex(category)
+        switch category {
+        case .management: return ("7E5F00", base.dark)
+        case .contractNegotiation: return ("9E4D0D", base.dark)
+        case .investing: return ("636810", base.dark)
+        case .renovations: return ("AB3F2B", base.dark)
+        default: return base
+        }
+    }
+
     // MARK: - Light surfaces
     static let background = Color(hex: Hex.canvas)
     static let backgroundSecondary = Color.white
@@ -310,6 +325,14 @@ struct AdaptiveColors {
     }
     func categoryWash(_ category: ActivityCategory) -> Color {
         categoryInk(category).opacity(AppColors.categoryWashOpacity)
+    }
+    /// Tag text and its 12% wash (>= 5.0:1 in light, see `categoryTagInkHex`).
+    func categoryTagInk(_ category: ActivityCategory) -> Color {
+        let hex = AppColors.categoryTagInkHex(category)
+        return pick(hex.light, hex.dark)
+    }
+    func categoryTagWash(_ category: ActivityCategory) -> Color {
+        categoryTagInk(category).opacity(AppColors.tagWashOpacity)
     }
     func sealInk(_ palette: SealPalette) -> Color {
         let hex = AppColors.sealInkHex(palette)

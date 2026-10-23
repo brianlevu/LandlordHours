@@ -101,11 +101,11 @@ struct StdGoalCheckSheet: View {
 
     private var rentalStep: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(L("Rental 1 of \(count) · \(target)-hour target"))
+            Text(typeSize.isAccessibilitySize ? L("Rental 1 of \(count)") : L("Rental 1 of \(count) · \(target)-hour target"))
                 .font(StdFont.drafting).textCase(.uppercase).tracking(StdFont.draftingTracking)
                 .foregroundStyle(colors.draftingInk)
             (typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))) {
-                HomeProtoArt(size: 56, keyframe: HomeProtoStage.keyframe(for: rental))
+                if !typeSize.isAccessibilitySize { HomeProtoArt(size: 56, keyframe: HomeProtoStage.keyframe(for: rental)) }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(rental.name).font(.title2.weight(.semibold)).foregroundStyle(colors.textPrimary)
                     Text(L("\(Int(rental.hours)) of \(target) hours")).font(.subheadline).monospacedDigit()
@@ -122,6 +122,7 @@ struct StdGoalCheckSheet: View {
                     Text(resultLine)
                         .font(.subheadline).foregroundStyle(colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    if answer == .cleaner { StdCPAFootnote() }
                 }
                 .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: reduceMotion ? 0 : 8)), removal: .opacity))
             }
@@ -244,7 +245,7 @@ struct StdGoalCheckSheet: View {
 
     /// 0 … 750 with ticks at 100 / 500 / 750; your hours fill from 0; the target marker rides 100 → 500.
     private var ruler: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(L("Target")).font(StdFont.drafting).textCase(.uppercase).tracking(StdFont.draftingTracking)
                     .foregroundStyle(colors.draftingInk)
@@ -253,25 +254,24 @@ struct StdGoalCheckSheet: View {
                     .foregroundStyle(colors.action)
                     .contentTransition(.numericText(value: marker))
             }
+            // Read-only: a printed ruler. The target is a drafting tick with a pointer, not a knob.
             GeometryReader { g in
                 let w = g.size.width
                 let x: (Double) -> CGFloat = { CGFloat($0 / 750) * (w - 16) + 8 }
                 ZStack(alignment: .topLeading) {
-                    Capsule().fill(colors.border).frame(width: w - 16, height: 4).offset(x: 8, y: 10)
-                    Capsule().fill(colors.positive).frame(width: max(4, x(rental.hours) - 8), height: 4).offset(x: 8, y: 10)
+                    Rectangle().fill(colors.border).frame(width: w - 16, height: 2).offset(x: 8, y: 9)
+                    Rectangle().fill(colors.positive).frame(width: max(3, x(rental.hours) - 8), height: 4).offset(x: 8, y: 8)
                     ForEach([100.0, 500, 750], id: \.self) { t in
-                        Rectangle().fill(colors.textTertiary).frame(width: 1, height: 10).offset(x: x(t), y: 7)
+                        Rectangle().fill(colors.textTertiary).frame(width: 1, height: 6).offset(x: x(t), y: 11)
                         Text(verbatim: "\(Int(t))").font(StdFont.drafting).foregroundStyle(colors.textSecondary)
                             .fixedSize()
-                            .frame(width: 40).offset(x: x(t) - 20, y: 22)
+                            .frame(width: 40).offset(x: x(t) - 20, y: 18)
                     }
-                    Circle().fill(colors.backgroundSecondary)
-                        .overlay(Circle().strokeBorder(colors.action, lineWidth: 3))
-                        .frame(width: 18, height: 18)
-                        .offset(x: x(marker) - 9, y: 3)
+                    StdPointer().fill(colors.action).frame(width: 12, height: 8).offset(x: x(marker) - 6, y: -1)
+                    Rectangle().fill(colors.action).frame(width: 2, height: 12).offset(x: x(marker) - 1, y: 5)
                 }
             }
-            .frame(height: 40)
+            .frame(height: 32)
             .accessibilityHidden(true)
         }
     }
@@ -287,7 +287,7 @@ struct StdGoalCheckSheet: View {
                     if i > 0 { Rectangle().fill(colors.border).frame(height: 0.5).padding(.leading, 64) }
                     let row = summaryWords(r)
                     StdBrowseRow(title: r.name, meta: row.meta, value: row.value, valueInk: row.changed ? colors.action : colors.textSecondary,
-                                 chevron: false) {
+                                 chevron: false, metaLines: 2) {
                         HomeProtoArt(size: 36, keyframe: HomeProtoStage.keyframe(for: r))
                     }
                     .padding(.horizontal, 16).padding(.vertical, 8)
@@ -313,7 +313,7 @@ struct StdGoalCheckSheet: View {
                             : (L("You do most of the work"), L("\(target) hours"), false)
         }
         switch r.target {
-        case .record(let reason): return (reason.hasPrefix("Long") ? L("Long stays, no target") : L("A manager does most"), L("Record only"), false)
+        case .record(let reason): return (reason.hasPrefix("Long") ? L("Long-stay rental: hours kept, no target") : L("A manager does most"), L("Record only"), false)
         case .own(let t): return (L("No change"), L("\(t) hours"), false)
         case .counts: return (L("No change"), L("Counts toward \(seed.rentals.sharedTarget ?? 750)"), false)
         }
@@ -354,6 +354,20 @@ struct StdGoalCheckSheet: View {
         pick(.cleaner)
         try? await Task.sleep(nanoseconds: 3_200_000_000)
         finish(switching: true)
+    }
+}
+#endif
+
+#if DEBUG
+/// A small downward pointer for the read-only ruler.
+struct StdPointer: Shape {
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: r.minX, y: r.minY))
+        p.addLine(to: CGPoint(x: r.maxX, y: r.minY))
+        p.addLine(to: CGPoint(x: r.midX, y: r.maxY))
+        p.closeSubpath()
+        return p
     }
 }
 #endif

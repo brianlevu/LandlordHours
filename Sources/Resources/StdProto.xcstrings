@@ -23,6 +23,17 @@
         }
       }
     },
+    "%@, %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, %@"
+          }
+        }
+      }
+    },
     "%@, %lld %@. %@": {
       "extractionState": "manual",
       "localizations": {
@@ -100,17 +111,6 @@
         }
       }
     },
-    "%lld to confirm": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld to confirm"
-          }
-        }
-      }
-    },
     "%lld → 500": {
       "extractionState": "manual",
       "localizations": {
@@ -151,17 +151,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lldh %lldm"
-          }
-        }
-      }
-    },
-    "%lldh a week to finish": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lldh a week to finish"
           }
         }
       }
@@ -250,28 +239,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "A manager does most"
-          }
-        }
-      }
-    },
-    "Add": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Add"
-          }
-        }
-      }
-    },
-    "Add a rental": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Add a rental"
           }
         }
       }
@@ -463,17 +430,6 @@
         }
       }
     },
-    "Filled what your note said. Pick the rental.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filled what your note said. Pick the rental."
-          }
-        }
-      }
-    },
     "Financing": {
       "extractionState": "manual",
       "localizations": {
@@ -514,17 +470,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "From your calendar · weekly"
-          }
-        }
-      }
-    },
-    "From your note": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "From your note"
           }
         }
       }
@@ -716,6 +661,17 @@
         }
       }
     },
+    "Log %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log %@"
+          }
+        }
+      }
+    },
     "Log %@ at %@": {
       "extractionState": "manual",
       "localizations": {
@@ -771,13 +727,13 @@
         }
       }
     },
-    "Long stays, no target": {
+    "Long-stay rental: hours kept, no target": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Long stays, no target"
+            "value": "Long-stay rental: hours kept, no target"
           }
         }
       }
@@ -1255,6 +1211,17 @@
         }
       }
     },
+    "Rental 1 of %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rental 1 of %lld"
+          }
+        }
+      }
+    },
     "Rental 1 of %lld · %lld-hour target": {
       "extractionState": "manual",
       "localizations": {
@@ -1262,6 +1229,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rental 1 of %lld · %lld-hour target"
+          }
+        }
+      }
+    },
+    "Rental: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rental: %@"
           }
         }
       }
@@ -1636,17 +1614,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "You do most of the work"
-          }
-        }
-      }
-    },
-    "Your rentals": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Your rentals"
           }
         }
       }

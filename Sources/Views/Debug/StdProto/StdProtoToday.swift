@@ -45,6 +45,9 @@ struct StdTodayScreen: View {
     @State private var focus: HomeProtoFocus
     @State private var items: [StdSuggestion]
     @State private var confirmed: Set<String> = []
+    /// rowConfirm phase 2/3: faded, then collapsed to zero height (our spring), then removed without animation.
+    @State private var fading: Set<String> = []
+    @State private var collapsing: Set<String> = []
     @State private var extra: [String: Double] = [:]
     @State private var toast: LHToastSpec?
     @State private var successTick = 0
@@ -79,22 +82,14 @@ struct StdTodayScreen: View {
                        suggestions: seed.suggestions, week: seed.week)
     }
 
-    private var likely: [StdSuggestion] { items.filter { $0.isLikely && !confirmed.contains($0.id) } }
+    private var likely: [StdSuggestion] { items.prefix(rowLimit).filter { $0.isLikely && !confirmed.contains($0.id) } }
+    /// D3b: at XXL and up Today shows two items so "This week" stays above the tab bar.
+    private var rowLimit: Int { typeSize >= .xxLarge ? 2 : 3 }
 
     var body: some View {
         ScrollViewReader { proxy in
             List {
                 confirmSection
-                if typeSize.isAccessibilitySize {
-                    // Large text: the rentals row moves under the confirm list so a row stays above the fold (D3c).
-                    Section {} header: {
-                        VStack(alignment: .leading, spacing: 8) {
-                            StdSectionHeader(title: L("Your rentals"))
-                            StdRentalTiles(seed: live, focus: $focus).stdMeasure("tiles")
-                        }
-                        .stdHeaderInsets()
-                    }
-                }
                 weekSection
                 paceSection
             }
@@ -119,7 +114,6 @@ struct StdTodayScreen: View {
         .sensoryFeedback(.impact(weight: .light), trigger: dismissTick)
         .sheet(isPresented: $showLog) {
             StdLogTimeSheet(seed: seed, launch: launch) { showLog = false }
-                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
         .task { await demo() }
@@ -134,10 +128,12 @@ struct StdTodayScreen: View {
                     .font(.subheadline).foregroundStyle(colors.textSecondary)
                     .listRowBackground(colors.backgroundSecondary)
             }
-            ForEach(items) { item in
+            ForEach(items.prefix(rowLimit)) { item in
                 StdActionRow(item: item, confirmed: confirmed.contains(item.id)) { confirm(item) }
                     .stdMeasure("row.\(item.id)")
-                    .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                    .modifier(StdCollapse(fading: fading.contains(item.id), collapsed: collapsing.contains(item.id)))
+                    .listRowInsets(collapsing.contains(item.id) ? EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16)
+                                                                : EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
                     .listRowBackground(colors.backgroundSecondary)
                     .alignmentGuide(.listRowSeparatorLeading) { _ in 34 }
                     .alignmentGuide(.listRowSeparatorTrailing) { d in d[.trailing] + 16 }
@@ -160,6 +156,13 @@ struct StdTodayScreen: View {
                     .accessibilityIdentifier("today.confirmLikely")
                     .stdMeasure("foot")
             }
+            if typeSize.isAccessibilitySize {
+                Button(L("See all")) {}
+                    .buttonStyle(StdButtonStyle(.tertiary))
+                    .frame(maxWidth: .infinity)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                    .listRowBackground(colors.backgroundSecondary)
+            }
         } header: {
             // Title, hero and tiles live in the header: List masks a row's corners with its own
             // radius, which clips anything drawn to the row edge (measured: the tile's ring).
@@ -171,12 +174,9 @@ struct StdTodayScreen: View {
                         .accessibilityLabel(L("Log time"))
                 }
                 .padding(.bottom, 8)
-                StdHeroCard(hero: live.hero(focus)).stdMeasure("hero").padding(.top, 16)
-                if !typeSize.isAccessibilitySize {
-                    StdRentalTiles(seed: live, focus: $focus).stdMeasure("tiles").padding(.top, 12)
-                }
+                StdHeroCard(seed: live, focus: $focus).stdMeasure("hero").padding(.top, 16)
                 StdSectionHeader(title: L("To confirm"), count: seed.suggestions.count - (seed.suggestions.prefix(3).count - items.count),
-                                 trailing: L("See all"))
+                                 trailing: typeSize.isAccessibilitySize ? nil : L("See all"))
                     .padding(.top, 24)
             }
             .stdHeaderInsets()
@@ -186,13 +186,8 @@ struct StdTodayScreen: View {
     private func confirm(_ item: StdSuggestion, swipe: Bool = false) {
         guard item.canQuickLog, !confirmed.contains(item.id) else { return }
         StdMotionLog.mark(swipe ? "swipeConfirm" : "rowConfirm")
-        withAnimation(reduceMotion ? StdMotion.quick : StdMotion.feedback) { _ = confirmed.insert(item.id) }
         successTick += 1
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: swipe ? 0 : 120_000_000)
-            withAnimation(reduceMotion ? .easeOut(duration: 0.15) : StdMotion.collapse) {
-                items.removeAll { $0.id == item.id }
-            }
+        collapseRows([item.id], fill: true) {
             if let r = item.rental, let h = item.hours {
                 withAnimation(StdMotion.count) { extra[r, default: 0] += h }
             }
@@ -206,23 +201,32 @@ struct StdTodayScreen: View {
     private func decline(_ item: StdSuggestion) {
         StdMotionLog.mark("rowDismiss")
         dismissTick += 1
-        withAnimation(reduceMotion ? .easeOut(duration: 0.15) : StdMotion.collapse) { items.removeAll { $0.id == item.id } }
-        show(LHToastSpec(kind: .neutral, message: L("Marked not rental work."), actionTitle: L("Undo")))
+        collapseRows([item.id], fill: false) {
+            show(LHToastSpec(kind: .neutral, message: L("Marked not rental work."), actionTitle: L("Undo")))
+        }
     }
 
     private func confirmLikely() {
         let batch = likely
         StdMotionLog.mark("rowConfirm.batch")
-        withAnimation(StdMotion.feedback) { batch.forEach { confirmed.insert($0.id) } }
         successTick += 1
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 120_000_000)
-            withAnimation(StdMotion.collapse) { items.removeAll { item in batch.contains { $0.id == item.id } } }
+        collapseRows(batch.map(\.id), fill: true) {
             withAnimation(StdMotion.count) {
                 for item in batch { if let r = item.rental, let h = item.hours { extra[r, default: 0] += h } }
             }
             show(LHToastSpec(kind: .success, message: L("Logged \(batch.count)."), actionTitle: L("Undo")))
         }
+    }
+
+    /// fill → fade → collapse → remove (StdRowConfirm); `then` runs at the fill, so the hero and toast move with it.
+    private func collapseRows(_ ids: [String], fill: Bool, then: @escaping () -> Void) {
+        let set = Set(ids)
+        StdRowConfirm.run(id: ids.first ?? "", reduceMotion: reduceMotion,
+                          fill: { if fill { confirmed.formUnion(set) } },
+                          fade: { fading.formUnion(set) },
+                          collapse: { collapsing.formUnion(set) },
+                          remove: { items.removeAll { set.contains($0.id) }; fading.subtract(set); collapsing.subtract(set) })
+        then()
     }
 
     // MARK: Toast (§1.19, toastIn / toastOut)
@@ -326,14 +330,19 @@ extension View {
     }
 }
 
-// MARK: - Blueprint hero, compact (≈ 240pt, house beside the number)
+// MARK: - Blueprint hero with the rentals folded into its foot (Brian, round 2)
+//
+// One card: the number and the house on top, a slim row of small houses at the bottom (name +
+// hours each). Tap a small house, or swipe the card, to switch. No separate strip, no eyebrow.
 
 struct StdHeroCard: View {
-    let hero: StdSeed.Hero
+    let seed: StdSeed
+    @Binding var focus: HomeProtoFocus
     @State private var rise: CGFloat = 1
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ScaledMetric(relativeTo: .largeTitle) private var numberSize: CGFloat = 56
+
+    private var hero: StdSeed.Hero { seed.hero(focus) }
 
     private var statusColor: Color {
         switch hero.tone {
@@ -343,8 +352,6 @@ struct StdHeroCard: View {
         }
     }
 
-    private var statusWords: String { hero.status ?? "" }
-
     private var statusGlyph: String? {
         switch hero.tone {
         case .positive: return "checkmark.circle.fill"
@@ -353,18 +360,48 @@ struct StdHeroCard: View {
         }
     }
 
+    private var statusWords: String { hero.status ?? "" }
+
     var body: some View {
-        Group {
-            if typeSize.isAccessibilitySize { compact } else { full }
+        VStack(alignment: .leading, spacing: 0) {
+            Group {
+                if typeSize.isAccessibilitySize { compactTop } else { fullTop }
+            }
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 24).onEnded(swipe))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(L("\(hero.flag), \(Int(hero.number)) \(hero.label). \(statusWords)"))
+            .accessibilityAdjustableAction { dir in step(dir == .increment ? 1 : -1) }
+            .accessibilityIdentifier("std.hero")
+            if !typeSize.isAccessibilitySize {
+                Rectangle().fill(HouseTokens.drafting.opacity(0.25)).frame(height: 0.5)
+                rentalRow
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(HouseBlueprintPaper())
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(L("\(hero.flag), \(Int(hero.number)) \(hero.label). \(statusWords)"))
-        .accessibilityIdentifier("std.hero")
         .onChange(of: hero.key) { _, _ in raise(from: 0.45) }
         .onChange(of: hero.number) { old, new in if new > old { raise(from: 0.82) } }
+        .sensoryFeedback(.selection, trigger: focus)
+    }
+
+    // MARK: Switching
+
+    private func select(_ f: HomeProtoFocus) {
+        StdMotionLog.mark("tileFocus")
+        withAnimation(StdMotion.quick) { focus = f }
+    }
+
+    private func step(_ delta: Int) {
+        let order = seed.rentals.focusOrder
+        guard let i = order.firstIndex(of: focus), order.indices.contains(i + delta) else { return }
+        select(order[i + delta])
+    }
+
+    private func swipe(_ v: DragGesture.Value) {
+        guard abs(v.translation.width) > 48, abs(v.translation.width) > abs(v.translation.height) * 1.5 else { return }
+        step(v.translation.width < 0 ? 1 : -1)
     }
 
     /// heroCountUp: the built house rises behind its linework (ringProgress 0.60) while the digits count (count 0.60).
@@ -376,17 +413,11 @@ struct StdHeroCard: View {
         withAnimation(StdMotion.ringProgress) { rise = 1 }
     }
 
-    private var eyebrow: some View {
-        Text(hero.eyebrow).font(StdFont.drafting).textCase(.uppercase).tracking(StdFont.draftingTracking)
-            .foregroundStyle(HouseTokens.drafting)
-            .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
-            .fixedSize(horizontal: false, vertical: typeSize.isAccessibilitySize)
-    }
+    // MARK: Top: number and house
 
     private var number: some View {
         StdCountingText(value: hero.number)
-            .font(.system(size: min(numberSize, typeSize.isAccessibilitySize ? 64 : 80), weight: .bold, design: .rounded))
-            .monospacedDigit()
+            .font(AppTypography.heroNumber)
             .foregroundStyle(HouseTokens.onHeroPrimary)
             .animation(reduceMotion ? nil : StdMotion.count, value: hero.number)
     }
@@ -404,31 +435,33 @@ struct StdHeroCard: View {
         }
     }
 
-    private var full: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            eyebrow
-            HStack(alignment: .bottom, spacing: 0) {
-                VStack(alignment: .leading, spacing: 0) {
-                    number
-                    label
-                    status.padding(.top, 8)
-                }
-                .layoutPriority(1)
-                Spacer(minLength: 0)
-                house.frame(width: 164, height: 164)
-                    .padding(.top, -12).padding(.trailing, -10).padding(.bottom, -6)
+    private var fullTop: some View {
+        HStack(alignment: .bottom, spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
+                number
+                label
+                status.padding(.top, 8)
             }
+            .layoutPriority(1)
+            .padding(.bottom, 4)
+            Spacer(minLength: 0)
+            house.frame(width: 150, height: 150)
+                .padding(.trailing, -8).padding(.bottom, -10)
         }
-        .padding(16)
+        .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 12)
     }
 
-    /// D3c: number + one label, art and eyebrow hidden (the rental's name rides in the label).
-    private var compact: some View {
+    /// D3c: number + one label; art hidden. The rental switcher is one 44pt control in the card.
+    private var compactTop: some View {
         VStack(alignment: .leading, spacing: 2) {
-            number
-            Text(hero.label).font(.title3.weight(.medium)).foregroundStyle(HouseTokens.onHeroSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .center, spacing: 8) {
+                number
+                Spacer(minLength: 8)
+                rentalMenu
+            }
+            label
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
     }
 
@@ -448,33 +481,10 @@ struct StdHeroCard: View {
         .animation(StdMotion.reveal, value: keyframe)
         .accessibilityHidden(true)
     }
-}
 
-// MARK: - The rental tile row (tileFocus: ring crossfades border → action, 0.15, no scale)
+    // MARK: Foot: the slim row of small houses (tileFocus: ring crossfade 0.15, no scale)
 
-struct StdRentalTiles: View {
-    let seed: StdSeed
-    @Binding var focus: HomeProtoFocus
-    @Environment(\.colorScheme) private var scheme
-    @Environment(\.dynamicTypeSize) private var typeSize
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
-
-    var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(seed.rentals.focusOrder, id: \.self) { f in tile(f).id(f) }
-                    addTile
-                }
-                .padding(.vertical, 2)
-            }
-            .scrollClipDisabled()
-            .onChange(of: focus) { _, f in withAnimation(StdMotion.flow) { proxy.scrollTo(f, anchor: .center) } }
-        }
-        .sensoryFeedback(.selection, trigger: focus)
-    }
-
-    private func words(_ f: HomeProtoFocus) -> (String, String, HouseKeyframe) {
+    private func words(_ f: HomeProtoFocus) -> (name: String, hours: String, keyframe: HouseKeyframe) {
         switch f {
         case .all:
             let t = seed.rentals.sharedTarget ?? 750
@@ -492,48 +502,62 @@ struct StdRentalTiles: View {
         }
     }
 
-    private func tile(_ f: HomeProtoFocus) -> some View {
+    private var rentalRow: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(seed.rentals.focusOrder, id: \.self) { f in item(f).id(f) }
+                }
+                .padding(.horizontal, 8).padding(.vertical, 8)
+            }
+            .onChange(of: focus) { _, f in withAnimation(StdMotion.flow) { proxy.scrollTo(f, anchor: .center) } }
+        }
+        .stdMeasure("hero.rentals")
+    }
+
+    private func item(_ f: HomeProtoFocus) -> some View {
         let w = words(f)
         let selected = focus == f
-        return Button {
-            StdMotionLog.mark("tileFocus")
-            withAnimation(StdMotion.quick) { focus = f }
-        } label: {
-            HStack(spacing: 10) {
-                if !typeSize.isAccessibilitySize { HomeProtoArt(size: 44, keyframe: w.2) }
+        return Button { select(f) } label: {
+            HStack(spacing: 8) {
+                Image(decorative: w.keyframe.builtImageName).resizable().interpolation(.high).scaledToFit()
+                    .frame(width: 36, height: 36)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(w.0).font(.subheadline.weight(.semibold)).foregroundStyle(colors.textPrimary).lineLimit(1)
-                    Text(w.1).font(.caption).fontDesign(.rounded).monospacedDigit().foregroundStyle(colors.textSecondary).lineLimit(1)
+                    Text(w.name).font(.footnote.weight(.semibold)).foregroundStyle(HouseTokens.onHeroPrimary).lineLimit(1)
+                    Text(w.hours).font(.caption).monospacedDigit().foregroundStyle(HouseTokens.onHeroSecondary).lineLimit(1)
                 }
             }
-            .padding(.leading, 10).padding(.trailing, 14).padding(.vertical, 10)
-            .frame(minHeight: 64)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
-            .overlay {
+            .padding(.leading, 6).padding(.trailing, 12)
+            .frame(minHeight: 48)
+            .background {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(colors.border, lineWidth: 1)
-                    RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(colors.action, lineWidth: 2)
-                        .opacity(selected ? 1 : 0)
+                    RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.12))
+                    RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(HouseTokens.onHeroPrimary, lineWidth: 1.5)
                 }
+                .opacity(selected ? 1 : 0)
                 .animation(StdMotion.quick, value: selected)
             }
-            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .contentShape(Rectangle())
         }
         .buttonStyle(StdPressStyle())
+        .accessibilityLabel(L("\(w.name), \(w.hours)"))
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
-    private var addTile: some View {
-        Button {} label: {
-            Label(L("Add"), systemImage: "plus")
-                .font(.subheadline.weight(.semibold)).foregroundStyle(colors.action)
-                .padding(.horizontal, 16)
-                .frame(minHeight: 64)
-                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(colors.border, style: StrokeStyle(lineWidth: 1, dash: [4, 4])))
+    /// Large text: a 44pt control in the card that opens the list of rentals.
+    private var rentalMenu: some View {
+        Menu {
+            ForEach(seed.rentals.focusOrder, id: \.self) { f in
+                Button { select(f) } label: {
+                    let w = words(f)
+                    Label(L("\(w.name), \(w.hours)"), systemImage: focus == f ? "checkmark" : "house")
+                }
+            }
+        } label: {
+            Image(systemName: "chevron.up.chevron.down")
         }
-        .buttonStyle(StdPressStyle())
-        .accessibilityLabel(L("Add a rental"))
+        .buttonStyle(StdButtonStyle(.iconOnBlueprint))
+        .accessibilityLabel(L("Rental: \(words(focus).name)"))
     }
 }
 #endif

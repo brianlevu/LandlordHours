@@ -8,6 +8,9 @@ struct StdInboxScreen: View {
     let launch: StdProtoLaunch
     @State private var items: [StdSuggestion]
     @State private var confirmed: Set<String> = []
+    /// rowConfirm phase 2/3: faded, then collapsed to zero height (our spring), then removed without animation.
+    @State private var fading: Set<String> = []
+    @State private var collapsing: Set<String> = []
     @State private var toast: LHToastSpec?
     @State private var successTick = 0
     @State private var dismissTick = 0
@@ -41,7 +44,9 @@ struct StdInboxScreen: View {
                 ForEach(items) { item in
                     StdActionRow(item: item, confirmed: confirmed.contains(item.id)) { confirm(item) }
                         .stdMeasure("row.\(item.id)")
-                        .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                        .modifier(StdCollapse(fading: fading.contains(item.id), collapsed: collapsing.contains(item.id)))
+                        .listRowInsets(collapsing.contains(item.id) ? EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16)
+                                                                    : EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
                     .listRowBackground(colors.backgroundSecondary)
                         .alignmentGuide(.listRowSeparatorLeading) { _ in 34 }
                         .alignmentGuide(.listRowSeparatorTrailing) { d in d[.trailing] + 16 }
@@ -63,7 +68,7 @@ struct StdInboxScreen: View {
                 }
             } header: {
                 VStack(alignment: .leading, spacing: 0) {
-                    StdScreenTitle(title: L("Inbox"), subtitle: L("\(items.count) to confirm"))
+                    StdScreenTitle(title: L("Inbox"))
                         .padding(.bottom, 8)
                     if asksCleaner && !typeSize.isAccessibilitySize { questionCard.padding(.top, 16) }
                     StdSectionHeader(title: L("To confirm"), count: items.count).padding(.top, 24)
@@ -88,7 +93,7 @@ struct StdInboxScreen: View {
         .contentMargins(.top, 0, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(colors.background.ignoresSafeArea())
-        .environment(\.defaultMinListRowHeight, 44)
+        .environment(\.defaultMinListRowHeight, 1)
         .overlay(alignment: .bottom) {
             if let toast {
                 LHToast(spec: toast).padding(.horizontal, 16).padding(.bottom, 12).id(toast.id)
@@ -142,30 +147,31 @@ struct StdInboxScreen: View {
 
     private func confirm(_ item: StdSuggestion) {
         guard item.canQuickLog, !confirmed.contains(item.id) else { return }
-        withAnimation(StdMotion.feedback) { _ = confirmed.insert(item.id) }
         successTick += 1
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 120_000_000)
-            withAnimation(StdMotion.collapse) { items.removeAll { $0.id == item.id } }
-            show(LHToastSpec(kind: .success, message: L("Logged \(StdFormat.hours(item.hours))."), actionTitle: L("Undo")))
-        }
+        collapseRows([item.id], fill: true)
+        show(LHToastSpec(kind: .success, message: L("Logged \(StdFormat.hours(item.hours))."), actionTitle: L("Undo")))
     }
 
     private func decline(_ item: StdSuggestion) {
         dismissTick += 1
-        withAnimation(StdMotion.collapse) { items.removeAll { $0.id == item.id } }
+        collapseRows([item.id], fill: false)
         show(LHToastSpec(kind: .neutral, message: L("Marked not rental work."), actionTitle: L("Undo")))
     }
 
     private func confirmLikely() {
         let batch = likely
-        withAnimation(StdMotion.feedback) { batch.forEach { confirmed.insert($0.id) } }
         successTick += 1
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 120_000_000)
-            withAnimation(StdMotion.collapse) { items.removeAll { item in batch.contains { $0.id == item.id } } }
-            show(LHToastSpec(kind: .success, message: L("Logged \(batch.count)."), actionTitle: L("Undo")))
-        }
+        collapseRows(batch.map(\.id), fill: true)
+        show(LHToastSpec(kind: .success, message: L("Logged \(batch.count)."), actionTitle: L("Undo")))
+    }
+
+    private func collapseRows(_ ids: [String], fill: Bool) {
+        let set = Set(ids)
+        StdRowConfirm.run(id: ids.first ?? "", reduceMotion: reduceMotion,
+                          fill: { if fill { confirmed.formUnion(set) } },
+                          fade: { fading.formUnion(set) },
+                          collapse: { collapsing.formUnion(set) },
+                          remove: { items.removeAll { set.contains($0.id) }; fading.subtract(set); collapsing.subtract(set) })
     }
 
     private func show(_ spec: LHToastSpec) {

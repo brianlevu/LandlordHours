@@ -36,11 +36,11 @@ struct StdSeeAllScreen: View {
                 if !list.isEmpty {
                     Section {
                         ForEach(list) { rental in
-                            StdBrowseRow(title: rental.name, meta: meta(rental), value: value(rental)) {
+                            StdBrowseRow(title: rental.name, meta: meta(rental), value: value(rental), chevron: false, metaLines: 2) {
                                 HomeProtoArt(size: 36, keyframe: HomeProtoStage.keyframe(for: rental))
                             }
                             .stdMeasure("row.\(rental.id)")
-                            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                            .listRowInsets(EdgeInsets(top: 9, leading: 16, bottom: 9, trailing: 16))
                     .listRowBackground(colors.backgroundSecondary)
                             .alignmentGuide(.listRowSeparatorLeading) { _ in 48 }
                             .alignmentGuide(.listRowSeparatorTrailing) { d in d[.trailing] + 16 }
@@ -90,11 +90,11 @@ struct StdSeeAllScreen: View {
 
     private func meta(_ rental: HomeProtoRental) -> String {
         switch rental.target {
-        case .record(let reason): return reason.hasPrefix("Long") ? L("Long stays, no target") : L("A manager does most")
+        case .record(let reason): return reason.hasPrefix("Long") ? L("Long-stay rental: hours kept, no target") : L("A manager does most")
         case .counts: return L("\(Int((rental.hours / max(r.totalHours, 1) * 100).rounded()))% of the total")
         case .own(let t):
             switch rental.pace {
-            case .behind: return L("\(rental.weeklyNeed ?? 0)h a week to finish")
+            case .behind: return L("\(rental.weeklyNeed ?? 0)h a week to reach \(t)")
             case .done: let month = rental.reached ?? ""; return L("Reached \(t) in \(month)")
             default: return L("On pace for \(t)")
             }

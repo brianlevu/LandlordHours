@@ -16,6 +16,11 @@ struct StdLogTimeSheet: View {
     @State private var who = 0
     @State private var rowsShown = 0
     @State private var successTick = 0
+    /// The sheet fits its content (no dead canvas): header + content + pinned button.
+    @State private var headerH: CGFloat = 0
+    @State private var contentH: CGFloat = 0
+    @State private var buttonH: CGFloat = 0
+    @State private var detent: PresentationDetent = .large
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -41,6 +46,7 @@ struct StdLogTimeSheet: View {
         VStack(spacing: 0) {
             StdSheetHeader(eyebrow: L("Today · Fri, Oct 23"), title: L("Log time"), onClose: onClose)
                 .padding(.horizontal, 20).padding(.top, 12)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerH = $0 }
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     noteField
@@ -54,7 +60,8 @@ struct StdLogTimeSheet: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
-                .padding(.bottom, 24)
+                .padding(.bottom, 16)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentH = $0 }
             }
             .scrollBounceBehavior(.basedOnSize)
         }
@@ -65,15 +72,29 @@ struct StdLogTimeSheet: View {
                 .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 16)
                 .background(colors.background)
                 .accessibilityIdentifier("log.primary")
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { buttonH = $0 }
+        }
+        .presentationDetents(fitHeight.map { [.height($0), .large] } ?? [.large], selection: $detent)
+        .onChange(of: fitHeight) { _, h in
+            withAnimation(StdMotion.flow) { detent = h.map { .height($0) } ?? .large }
         }
         .sensoryFeedback(.success, trigger: successTick)
         .task { await demo() }
     }
 
+    /// Content height plus the grabber band and the home-indicator inset; nil when it needs the full sheet.
+    private var fitHeight: CGFloat? {
+        guard headerH > 0, contentH > 0, buttonH > 0 else { return nil }
+        let h = (headerH + contentH + buttonH + 34).rounded(.up)
+        return h < 780 ? h : nil
+    }
+
+    /// Large text keeps the label short so the button stays at two lines or fewer.
     private var primaryTitle: String {
         switch phase {
         case .gap: return L("Pick a rental")
-        case .empty, .filled: return L("Log \(StdFormat.hours(hours)) at \(rentalName)")
+        case .empty, .filled:
+            return typeSize.isAccessibilitySize ? L("Log \(StdFormat.hours(hours))") : L("Log \(StdFormat.hours(hours)) at \(rentalName)")
         }
     }
 
@@ -138,7 +159,7 @@ struct StdLogTimeSheet: View {
                 Image(systemName: "chevron.down").font(.footnote.weight(.semibold)).foregroundStyle(colors.textTertiary)
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 52)
+            .frame(minHeight: 56)
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(colors.backgroundSecondary))
             .contentShape(Rectangle())
         }
@@ -151,7 +172,7 @@ struct StdLogTimeSheet: View {
         let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(spacing: 6))
         return layout {
             Label {
-                Text(phase == .gap ? L("Filled what your note said. Pick the rental.") : L("Filled from your note."))
+                Text(L("Filled from your note."))
                     .foregroundStyle(colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             } icon: {
@@ -179,7 +200,7 @@ struct StdLogTimeSheet: View {
                 Spacer(minLength: 12)
                 StdSegmented(options: [L("Me"), L("Spouse")], selection: $who).frame(maxWidth: 200)
             }
-            .padding(.horizontal, 16).frame(minHeight: 52)
+            .padding(.horizontal, 16).frame(minHeight: 56)
             .stdUnfold(index: 4, shown: rowsShown)
         }
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(colors.backgroundSecondary))
@@ -195,9 +216,6 @@ struct StdLogTimeSheet: View {
         HStack(spacing: 8) {
             Text(label).font(.body).foregroundStyle(colors.textPrimary)
             Spacer(minLength: 12)
-            if fromNote, value != nil {
-                Image(systemName: "sparkles").font(.footnote).foregroundStyle(colors.timberInk).accessibilityLabel(L("From your note"))
-            }
             Text(value ?? L("Choose")).font(.body)
                 .foregroundStyle(value == nil ? colors.action : colors.textSecondary)
                 .fontWeight(value == nil ? .semibold : .regular)
@@ -205,7 +223,7 @@ struct StdLogTimeSheet: View {
             Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(colors.textTertiary)
         }
         .padding(.horizontal, 16)
-        .frame(minHeight: 52)
+        .frame(minHeight: 56)
         .stdUnfold(index: index, shown: rowsShown)
     }
 
@@ -223,7 +241,7 @@ struct StdLogTimeSheet: View {
             StdStepper(hours: $hours)
         }
         .padding(.horizontal, 16).padding(.vertical, 6)
-        .frame(minHeight: 52)
+        .frame(minHeight: 56)
     }
 
     private func unfold() {

@@ -199,13 +199,13 @@ struct StdSectionHeader: View {
             if typeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 4) {
                     label
-                    if let trailing { Button(trailing, action: onTrailing).buttonStyle(StdButtonStyle(.tertiary)) }
+                    if let trailing { Button(trailing, action: onTrailing).buttonStyle(StdButtonStyle(.tertiary)).padding(.vertical, -8) }
                 }
             } else {
                 HStack(alignment: .center, spacing: 8) {
                     label
                     Spacer(minLength: 8)
-                    if let trailing { Button(trailing, action: onTrailing).buttonStyle(StdButtonStyle(.tertiary)) }
+                    if let trailing { Button(trailing, action: onTrailing).buttonStyle(StdButtonStyle(.tertiary)).padding(.vertical, -8) }
                 }
             }
         }
@@ -352,18 +352,28 @@ struct StdActionRow: View {
     let onConfirm: () -> Void
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// One title line at the current text size, so the circle sits on the first line.
+    @ScaledMetric(relativeTo: .body) private var titleLine: CGFloat = 22
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
 
-    private var tag: (String, Color, Color?)? {
+    private var isStatus: Bool { item.status != .none }
+
+    private var tag: (String, Color, Color)? {
         switch item.status {
         case .notSure: return (L("Not sure"), colors.caution, colors.cautionSurface)
         case .needsHours: return (L("Needs hours"), colors.caution, colors.cautionSurface)
         case .mightBeLogged: return (L("Might be logged"), colors.informational, colors.informationalSurface)
         case .none:
             guard let c = item.category else { return nil }
-            return (c.stdLabel, colors.categoryInk(c), colors.categoryWash(c))
+            return (c.stdLabel, colors.categoryTagInk(c), colors.categoryTagWash(c))
         }
+    }
+
+    /// "Oct 19 9–10:30" → ("Oct 19", "9–10:30"); "Nov 1" → ("Nov 1", nil).
+    private var dayTime: (day: String, time: String?) {
+        let parts = item.when.split(separator: " ")
+        guard let last = parts.last, last.contains("–"), parts.count > 1 else { return (item.when, nil) }
+        return (parts.dropLast().joined(separator: " "), String(last))
     }
 
     var body: some View {
@@ -372,13 +382,19 @@ struct StdActionRow: View {
             if typeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 4) {
                     title
-                    metaText(word: false).font(.subheadline).foregroundStyle(colors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    HStack(alignment: .center, spacing: 8) {
-                        hours
-                        if let tag { StdTag(text: tag.0, ink: tag.1, wash: tag.2) }
+                    meta
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .center, spacing: 8) {
+                            hours
+                            if let tag { StdTag(text: tag.0, ink: tag.1, wash: tag.2).fixedSize() }
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            hours
+                            if let tag { StdTag(text: tag.0, ink: tag.1, wash: tag.2).fixedSize() }
+                        }
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 VStack(alignment: .leading, spacing: 2) {
                     title
@@ -394,20 +410,23 @@ struct StdActionRow: View {
         .accessibilityAction(named: Text(StdCanon.notRentalWork)) {}
     }
 
+    /// 22pt circle on the first title line, 16pt from the card edge; the tap area is 44 x 44.
     private var control: some View {
         Button(action: onConfirm) {
             ZStack {
                 Circle().strokeBorder(confirmed ? colors.positive : colors.textTertiary, lineWidth: 1.5)
                 Circle().fill(colors.positive).opacity(confirmed ? 1 : 0)
-                Image(systemName: "checkmark").font(.caption.weight(.bold)).foregroundStyle(Color.white)
+                Image(systemName: "checkmark").resizable().scaledToFit().frame(width: 10, height: 10)
+                    .foregroundStyle(Color.white)
                     .opacity(confirmed ? 1 : 0)
             }
             .frame(width: 22, height: 22)
-            .frame(width: 44, height: 44)
+            .frame(width: 22, height: max(22, titleLine))
+            .padding(11)
             .contentShape(Rectangle())
+            .padding(-11)
         }
         .buttonStyle(.borderless)
-        .padding(.leading, -11).padding(.vertical, -11)
         .accessibilityLabel(item.canQuickLog ? L("Confirm \(StdFormat.hours(item.hours))") : L("Review and confirm"))
         .accessibilityIdentifier("row.confirm.\(item.id)")
     }
@@ -423,33 +442,42 @@ struct StdActionRow: View {
     private var sourceIcon: String { item.source == .calendar ? "calendar" : "checklist" }
     private var sourceWord: String { item.source == .calendar ? L("Calendar") : L("Reminder") }
 
-    private func metaText(word: Bool) -> Text {
+    private func metaText(word: Bool, time: Bool) -> Text {
         let glyph = Text(Image(systemName: sourceIcon))
-        return word ? glyph + Text(verbatim: " ") + Text(L("\(sourceWord) · \(item.when)"))
-                    : glyph + Text(verbatim: " ") + Text(item.when)
+        // Word joiners keep "10–11:30" together when the meta wraps at large sizes.
+        let when = (time ? item.when : dayTime.day).replacingOccurrences(of: "–", with: "\u{2060}–\u{2060}")
+        return word ? glyph + Text(verbatim: " ") + Text(L("\(sourceWord) · \(when)"))
+                    : glyph + Text(verbatim: " ") + Text(when)
     }
 
+    /// Fit order: the word "Calendar" goes first, then the tag yields (a status tag keeps its place
+    /// and the time range yields instead). Nothing is cut mid-word. At AX the meta wraps.
     @ViewBuilder private var meta: some View {
         if typeSize.isAccessibilitySize {
-            VStack(alignment: .leading, spacing: 4) {
-                metaText(word: true).fixedSize(horizontal: false, vertical: true)
-                if let tag { StdTag(text: tag.0, ink: tag.1, wash: tag.2) }
-            }
-            .font(.subheadline).foregroundStyle(colors.textSecondary)
+            metaText(word: false, time: true)
+                .font(.subheadline).foregroundStyle(colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityLabel(L("\(sourceWord), \(item.when)"))
         } else {
             ViewThatFits(in: .horizontal) {
-                metaLine(word: true).fixedSize()
-                metaLine(word: false).fixedSize()
-                metaLine(word: false)
+                metaLine(word: true, time: true, tag: true)
+                metaLine(word: false, time: true, tag: true)
+                if isStatus {
+                    metaLine(word: false, time: false, tag: true)
+                    metaLine(word: false, time: true, tag: false)
+                } else {
+                    metaLine(word: false, time: true, tag: false)
+                    metaLine(word: false, time: false, tag: false)
+                }
             }
             .font(.subheadline).foregroundStyle(colors.textSecondary)
         }
     }
 
-    private func metaLine(word: Bool) -> some View {
+    private func metaLine(word: Bool, time: Bool, tag showTag: Bool) -> some View {
         HStack(spacing: 6) {
-            metaText(word: word).lineLimit(1)
-            if let tag { StdTag(text: tag.0, ink: tag.1, wash: tag.2).fixedSize() }
+            metaText(word: word, time: time).lineLimit(1).fixedSize()
+            if showTag, let tag { StdTag(text: tag.0, ink: tag.1, wash: tag.2).fixedSize().stdMeasure("tag.\(item.id).\(tag.0)") }
         }
     }
 
@@ -476,6 +504,7 @@ struct StdBrowseRow<Leading: View>: View {
     var value: String? = nil
     var valueInk: Color? = nil
     var chevron = true
+    var metaLines = 1
     @ViewBuilder var leading: Leading
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -483,13 +512,13 @@ struct StdBrowseRow<Leading: View>: View {
 
     var body: some View {
         HStack(alignment: typeSize.isAccessibilitySize ? .top : .center, spacing: 12) {
-            leading.frame(width: 36, height: 36)
+            if !typeSize.isAccessibilitySize { leading.frame(width: 36, height: 36) }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.body.weight(.semibold)).foregroundStyle(colors.textPrimary)
                     .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
                     .fixedSize(horizontal: false, vertical: typeSize.isAccessibilitySize)
                 Text(meta).font(.subheadline).foregroundStyle(colors.textSecondary)
-                    .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
+                    .lineLimit(typeSize.isAccessibilitySize ? nil : metaLines)
                     .fixedSize(horizontal: false, vertical: typeSize.isAccessibilitySize)
                 if typeSize.isAccessibilitySize, let value { valueText(value) }
             }
@@ -664,6 +693,49 @@ extension View {
             }
         } else {
             self
+        }
+    }
+}
+#endif
+
+#if DEBUG
+/// rowConfirm's second half: the row fades (0.08) before its height springs to zero (collapse 0.25),
+/// clipped, so nothing overlaps or ghosts while the rows below move up.
+struct StdCollapse: ViewModifier {
+    let fading: Bool
+    let collapsed: Bool
+    func body(content: Content) -> some View {
+        content
+            .opacity(fading ? 0 : 1)
+            .frame(height: collapsed ? 0 : nil, alignment: .top)
+            .clipShape(Rectangle().inset(by: collapsed ? 0 : -60))
+    }
+}
+
+/// The rowConfirm timeline shared by Today and Inbox: fill (feedback 0.12) → fade (0.08, starts at
+/// 0.12) → collapse (spring 0.25, starts at 0.14) → removal without animation. Total ≈ 0.39s.
+@MainActor
+enum StdRowConfirm {
+    static func run(id: String, reduceMotion: Bool,
+                    fill: @escaping () -> Void,
+                    fade: @escaping () -> Void,
+                    collapse: @escaping () -> Void,
+                    remove: @escaping () -> Void) {
+        withAnimation(reduceMotion ? StdMotion.quick : StdMotion.feedback) { fill() }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            withAnimation(.easeOut(duration: reduceMotion ? 0.15 : 0.08)) { fade() }
+            if reduceMotion {
+                try? await Task.sleep(nanoseconds: 150_000_000)
+                var t = Transaction(); t.disablesAnimations = true
+                withTransaction(t) { remove() }
+                return
+            }
+            try? await Task.sleep(nanoseconds: 20_000_000)
+            withAnimation(StdMotion.collapse) { collapse() }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            var t = Transaction(); t.disablesAnimations = true
+            withTransaction(t) { remove() }
         }
     }
 }
