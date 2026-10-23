@@ -1,6 +1,28 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%@ %@ %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ %@ %@"
+          }
+        }
+      }
+    },
+    "%@ now tracks 500.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ now tracks 500."
+          }
+        }
+      }
+    },
     "%@ · %@": {
       "extractionState": "manual",
       "localizations": {
@@ -41,17 +63,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@, %lld %@. %@"
-          }
-        }
-      }
-    },
-    "%lld": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld"
           }
         }
       }
@@ -100,6 +111,17 @@
         }
       }
     },
+    "%lld rentals checked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld rentals checked"
+          }
+        }
+      }
+    },
     "%lld rentals · %lldh logged in 2026": {
       "extractionState": "manual",
       "localizations": {
@@ -107,6 +129,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld rentals · %lldh logged in 2026"
+          }
+        }
+      }
+    },
+    "%lld to confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld to confirm"
           }
         }
       }
@@ -221,6 +254,17 @@
         }
       }
     },
+    "A cleaner does more here, so the 500-hour test fits.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A cleaner does more here, so the 500-hour test fits."
+          }
+        }
+      }
+    },
     "A cleaner or manager": {
       "extractionState": "manual",
       "localizations": {
@@ -309,24 +353,13 @@
         }
       }
     },
-    "Checked": {
+    "Calendar events and reminders that look like rental work show up here.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Checked"
-          }
-        }
-      }
-    },
-    "Choose": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Choose"
+            "value": "Calendar events and reminders that look like rental work show up here."
           }
         }
       }
@@ -397,28 +430,6 @@
         }
       }
     },
-    "Didn't say how long": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Didn't say how long"
-          }
-        }
-      }
-    },
-    "Does the cleaner do more hours at %@ than you?": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Does the cleaner do more hours at %@ than you?"
-          }
-        }
-      }
-    },
     "Done": {
       "extractionState": "manual",
       "localizations": {
@@ -463,6 +474,17 @@
         }
       }
     },
+    "Fri": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fri"
+          }
+        }
+      }
+    },
     "Fri, Oct 23": {
       "extractionState": "manual",
       "localizations": {
@@ -474,13 +496,13 @@
         }
       }
     },
-    "From your calendar · weekly": {
+    "From your calendar": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "From your calendar · weekly"
+            "value": "From your calendar"
           }
         }
       }
@@ -558,17 +580,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hours"
-          }
-        }
-      }
-    },
-    "I do": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I do"
           }
         }
       }
@@ -914,17 +925,6 @@
         }
       }
     },
-    "No change. The app keeps tracking %lld.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No change. The app keeps tracking %lld."
-          }
-        }
-      }
-    },
     "No record": {
       "extractionState": "manual",
       "localizations": {
@@ -932,6 +932,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "No record"
+          }
+        }
+      }
+    },
+    "No targets changed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No targets changed."
+          }
+        }
+      }
+    },
+    "Not picked": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not picked"
+          }
+        }
+      }
+    },
+    "Not said": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not said"
           }
         }
       }
@@ -947,6 +980,50 @@
         }
       }
     },
+    "Noted. %@ keeps 100.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noted. %@ keeps 100."
+          }
+        }
+      }
+    },
+    "Noted. %@ tracks 500 now.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noted. %@ tracks 500 now."
+          }
+        }
+      }
+    },
+    "Noted. We'll ask again later.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noted. We'll ask again later."
+          }
+        }
+      }
+    },
+    "Nothing to confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing to confirm"
+          }
+        }
+      }
+    },
     "Nothing to confirm.": {
       "extractionState": "manual",
       "localizations": {
@@ -954,6 +1031,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nothing to confirm."
+          }
+        }
+      }
+    },
+    "Nov": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nov"
           }
         }
       }
@@ -980,17 +1068,6 @@
         }
       }
     },
-    "Oct 17": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Oct 17"
-          }
-        }
-      }
-    },
     "Oct 18 4–4:30": {
       "extractionState": "manual",
       "localizations": {
@@ -998,6 +1075,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Oct 18 4–4:30"
+          }
+        }
+      }
+    },
+    "Oct 19": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oct 19"
           }
         }
       }
@@ -1288,6 +1376,17 @@
         }
       }
     },
+    "Sat": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sat"
+          }
+        }
+      }
+    },
     "See all": {
       "extractionState": "manual",
       "localizations": {
@@ -1343,17 +1442,6 @@
         }
       }
     },
-    "Someone else does more here, so the app would track %lld.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Someone else does more here, so the app would track %lld."
-          }
-        }
-      }
-    },
     "Spouse": {
       "extractionState": "manual",
       "localizations": {
@@ -1361,6 +1449,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Spouse"
+          }
+        }
+      }
+    },
+    "Sun": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sun"
           }
         }
       }
@@ -1405,17 +1504,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tenant call about the lease renewal"
-          }
-        }
-      }
-    },
-    "They do": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "They do"
           }
         }
       }
@@ -1471,6 +1559,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Today 12–2"
+          }
+        }
+      }
+    },
+    "Today 8–10": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today 8–10"
           }
         }
       }
@@ -1541,6 +1640,17 @@
         }
       }
     },
+    "Upcoming": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upcoming"
+          }
+        }
+      }
+    },
     "Wed": {
       "extractionState": "manual",
       "localizations": {
@@ -1585,6 +1695,17 @@
         }
       }
     },
+    "Who does more of the work at %@?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Who does more of the work at %@?"
+          }
+        }
+      }
+    },
     "Who does most of the hands-on work here?": {
       "extractionState": "manual",
       "localizations": {
@@ -1596,6 +1717,17 @@
         }
       }
     },
+    "Yesterday": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yesterday"
+          }
+        }
+      }
+    },
     "Yesterday 10–11:30": {
       "extractionState": "manual",
       "localizations": {
@@ -1603,6 +1735,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yesterday 10–11:30"
+          }
+        }
+      }
+    },
+    "Yesterday 4–4:30": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yesterday 4–4:30"
           }
         }
       }
@@ -1629,6 +1772,17 @@
         }
       }
     },
+    "You do most of the work here, so 100 still fits.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You do most of the work here, so 100 still fits."
+          }
+        }
+      }
+    },
     "Your spouse": {
       "extractionState": "manual",
       "localizations": {
@@ -1640,13 +1794,13 @@
         }
       }
     },
-    "a week to reach %lld": {
+    "best week": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "a week to reach %lld"
+            "value": "best week"
           }
         }
       }
@@ -1673,17 +1827,6 @@
         }
       }
     },
-    "days left in 2026": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "days left in 2026"
-          }
-        }
-      }
-    },
     "hours here": {
       "extractionState": "manual",
       "localizations": {
@@ -1706,17 +1849,6 @@
         }
       }
     },
-    "logged this year": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "logged this year"
-          }
-        }
-      }
-    },
     "of %lld hours": {
       "extractionState": "manual",
       "localizations": {
@@ -1724,17 +1856,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "of %lld hours"
-          }
-        }
-      }
-    },
-    "reached in %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "reached in %@"
           }
         }
       }
@@ -1768,6 +1889,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Confirm %lld likely"
+          }
+        }
+      }
+    },
+    "this week": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "this week"
           }
         }
       }

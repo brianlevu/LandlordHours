@@ -118,15 +118,19 @@ struct StdGoalCheckSheet: View {
 
     private var rentalStep: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(typeSize.isAccessibilitySize ? L("Rental 1 of \(count)") : L("Rental 1 of \(count) · \(target)-hour target"))
-                .font(StdFont.drafting).textCase(.uppercase).tracking(StdFont.draftingTracking)
-                .foregroundStyle(colors.draftingInk)
-            (typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))) {
-                if !typeSize.isAccessibilitySize { HomeProtoArt(size: 56, keyframe: HomeProtoStage.keyframe(for: rental)) }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(rental.name).font(.title2.weight(.semibold)).foregroundStyle(colors.textPrimary)
-                    Text(L("\(Int(rental.hours)) of \(target) hours")).font(.subheadline).monospacedDigit()
-                        .foregroundStyle(colors.textSecondary)
+            if step == .question && !typeSize.isAccessibilitySize {
+                rentalBand
+            } else {
+                Text(typeSize.isAccessibilitySize ? L("Rental 1 of \(count)") : L("Rental 1 of \(count) · \(target)-hour target"))
+                    .font(StdFont.drafting).textCase(.uppercase).tracking(StdFont.draftingTracking)
+                    .foregroundStyle(colors.draftingInk)
+                (typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))) {
+                    if !typeSize.isAccessibilitySize { HomeProtoArt(size: 56, keyframe: HomeProtoStage.keyframe(for: rental)) }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(rental.name).font(.title2.weight(.semibold)).foregroundStyle(colors.textPrimary)
+                        Text(L("\(Int(rental.hours)) of \(target) hours")).font(.subheadline).monospacedDigit()
+                            .foregroundStyle(colors.textSecondary)
+                    }
                 }
             }
             // Large text: once answered, the question gives its room to the answer and the picture.
@@ -139,14 +143,41 @@ struct StdGoalCheckSheet: View {
             if step == .result {
                 VStack(alignment: .leading, spacing: 8) {
                     comparison.id("chart")
-                    Text(resultLine)
-                        .font(.subheadline).foregroundStyle(colors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
                     if answer == .cleaner { StdCPAFootnote() }
                 }
                 .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: reduceMotion ? 0 : 8)), removal: .opacity))
             }
         }
+    }
+
+    /// Question state (critique #9): this rental's house on a 120pt blueprint band.
+    private var rentalBand: some View {
+        ZStack(alignment: .topLeading) {
+            HouseBlueprintPaper()
+            HStack(alignment: .bottom, spacing: 0) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L("Rental 1 of \(count) · \(target)-hour target"))
+                        .font(StdFont.drafting).textCase(.uppercase).tracking(StdFont.draftingTracking)
+                        .foregroundStyle(HouseTokens.drafting)
+                    Spacer(minLength: 0)
+                    Text(rental.name).font(.title2.weight(.semibold)).foregroundStyle(HouseTokens.onHeroPrimary)
+                    Text(L("\(Int(rental.hours)) of \(target) hours")).font(.subheadline).monospacedDigit()
+                        .foregroundStyle(HouseTokens.onHeroSecondary)
+                }
+                .padding(16)
+                Spacer(minLength: 0)
+                let keyframe = HomeProtoStage.keyframe(for: rental)
+                ZStack {
+                    Image(decorative: keyframe.builtImageName).resizable().interpolation(.high).scaledToFit()
+                    HouseLineworkImage(name: keyframe.linesImageName).foregroundStyle(HouseTokens.drafting)
+                }
+                .frame(width: 132, height: 132)
+                .padding(.trailing, 4).padding(.bottom, -8)
+            }
+        }
+        .frame(height: 120)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 
     private func words(_ a: StdGoalCheckStart.Answer) -> (String, String) {
@@ -230,7 +261,11 @@ struct StdGoalCheckSheet: View {
 
     /// One compact card: the target ruler with your hours on it, then who else works here.
     private var comparison: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
+            // Verdict first (critique #5): the sentence is the card's headline, the track is the evidence.
+            Text(resultLine)
+                .font(.headline).foregroundStyle(colors.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
             ruler
             (typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6)) : AnyLayout(HStackLayout(spacing: 16))) {
                 hoursChip(L("You"), StdFormat.hours(rental.hours), ink: colors.positive)
@@ -263,9 +298,9 @@ struct StdGoalCheckSheet: View {
 
     private var resultLine: String {
         switch answer {
-        case .cleaner: return L("Someone else does more here, so the app would track \(500).")
+        case .cleaner: return L("A cleaner does more here, so the 500-hour test fits.")
         case .notSure: return L("No change for now.")
-        default: return L("No change. The app keeps tracking \(target).")
+        default: return L("You do most of the work here, so 100 still fits.")
         }
     }
 
@@ -308,8 +343,13 @@ struct StdGoalCheckSheet: View {
 
     private var summary: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(L("Checked")).font(.title2.weight(.semibold)).foregroundStyle(colors.textPrimary)
-                .accessibilityAddTraits(.isHeader)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L("\(count) rentals checked")).font(.title2.weight(.semibold)).foregroundStyle(colors.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
+                Text(switched ? L("\(rental.name) now tracks 500.") : L("No targets changed."))
+                    .font(.subheadline).foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             VStack(spacing: 0) {
                 ForEach(Array(seed.rentals.rentals.enumerated()), id: \.element.id) { i, r in
                     if i > 0 { Rectangle().fill(colors.border).frame(height: 0.5).padding(.leading, 64) }

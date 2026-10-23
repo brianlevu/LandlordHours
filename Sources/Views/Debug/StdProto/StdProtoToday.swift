@@ -62,8 +62,9 @@ struct StdTodayScreen: View {
         self.seed = seed
         self.launch = launch
         _focus = State(initialValue: seed.rentals.focusOrder.first ?? .all)
-        _items = State(initialValue: Array(seed.suggestions.prefix(3)))
-        _showLog = State(initialValue: launch.screen == .logtime)
+        let byDay = seed.suggestions.enumerated().sorted { ($0.element.groupRank, $0.offset) < ($1.element.groupRank, $1.offset) }.map(\.element)
+        _items = State(initialValue: Array(byDay.prefix(3)))
+        _showLog = State(initialValue: launch.screen == .logtime || launch.demo == "postlog")
     }
 
     /// The rentals with confirmed hours added, so the hero moves on confirm.
@@ -113,7 +114,7 @@ struct StdTodayScreen: View {
         .sensoryFeedback(.success, trigger: successTick)
         .sensoryFeedback(.impact(weight: .light), trigger: dismissTick)
         .sheet(isPresented: $showLog) {
-            StdLogTimeSheet(seed: seed, launch: launch) { showLog = false }
+            StdLogTimeSheet(seed: seed, launch: launch, onClose: { showLog = false }, onLog: logged)
                 .presentationDragIndicator(.visible)
         }
         .task { await demo() }
@@ -121,66 +122,84 @@ struct StdTodayScreen: View {
 
     // MARK: To confirm
 
+    /// To confirm, grouped by day (§1.15a): the first day header sits under "TO CONFIRM"; the
+    /// batch foot closes the last group.
     @ViewBuilder private var confirmSection: some View {
-        Section {
-            if items.isEmpty {
+        let groups = stdDayGroups(Array(items.prefix(rowLimit)))
+        if groups.isEmpty {
+            Section {
                 Label { Text(L("Nothing to confirm.")) } icon: { Image(systemName: "checkmark.circle.fill").foregroundStyle(colors.positive) }
                     .font(.subheadline).foregroundStyle(colors.textSecondary)
                     .listRowBackground(colors.backgroundSecondary)
-            }
-            ForEach(items.prefix(rowLimit)) { item in
-                StdActionRow(item: item, confirmed: confirmed.contains(item.id)) { confirm(item) }
-                    .stdMeasure("row.\(item.id)")
-                    .modifier(StdCollapse(fading: fading.contains(item.id), collapsed: collapsing.contains(item.id)))
-                    .listRowInsets(collapsing.contains(item.id) ? EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16)
-                                                                : EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                    .listRowBackground(colors.backgroundSecondary)
-                    .alignmentGuide(.listRowSeparatorLeading) { _ in 34 }
-                    .alignmentGuide(.listRowSeparatorTrailing) { d in d[.trailing] + 16 }
-                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                        Button { confirm(item, swipe: true) } label: { Label(StdCanon.confirm, systemImage: "checkmark") }
-                            .tint(colors.positive)
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button { decline(item) } label: { Label(StdCanon.notRentalWork, systemImage: "xmark") }
-                            .tint(colors.textSecondary)
-                    }
-                    .transition(.opacity)
-            }
-            if likely.count >= 2 {
-                Button(StdCanon.confirmLikely(likely.count)) { confirmLikely() }
-                    .buttonStyle(StdButtonStyle(.tertiary))
-                    .frame(maxWidth: .infinity)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-                    .listRowBackground(colors.backgroundSecondary)
-                    .accessibilityIdentifier("today.confirmLikely")
-                    .stdMeasure("foot")
-            }
-            if typeSize.isAccessibilitySize {
-                Button(L("See all")) {}
-                    .buttonStyle(StdButtonStyle(.tertiary))
-                    .frame(maxWidth: .infinity)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-                    .listRowBackground(colors.backgroundSecondary)
-            }
-        } header: {
-            // Title, hero and tiles live in the header: List masks a row's corners with its own
-            // radius, which clips anything drawn to the row edge (measured: the tile's ring).
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top) {
-                    StdScreenTitle(title: L("Today"), subtitle: typeSize.isAccessibilitySize ? nil : L("Fri, Oct 23"))
-                    Button { showLog = true } label: { Image(systemName: "square.and.pencil") }
-                        .buttonStyle(StdButtonStyle(.icon))
-                        .accessibilityLabel(L("Log time"))
-                }
-                .padding(.bottom, 8)
-                StdHeroCard(seed: live, focus: $focus).stdMeasure("hero").padding(.top, 16)
-                StdSectionHeader(title: L("To confirm"), count: seed.suggestions.count - (seed.suggestions.prefix(3).count - items.count),
-                                 trailing: typeSize.isAccessibilitySize ? nil : L("See all"))
-                    .padding(.top, 24)
-            }
-            .stdHeaderInsets()
+            } header: { topHeader(day: nil) }
         }
+        if !groups.isEmpty {
+            Section {
+                ForEach(Array(groups.enumerated()), id: \.element.name) { gi, g in
+                    // Day header as a row inside the one card (§1.15a): the card never breaks per day.
+                    StdDayHeader(title: g.name).stdDayRow(first: gi == 0, colors: colors)
+                    ForEach(Array(g.items.enumerated()), id: \.element.id) { ii, item in
+                        actionRow(item)
+                            .listRowSeparator(ii == g.items.count - 1 && gi < groups.count - 1 ? .hidden : .automatic, edges: .bottom)
+                    }
+                }
+                if likely.count >= 2 {
+                    Button(StdCanon.confirmLikely(likely.count)) { confirmLikely() }
+                        .buttonStyle(StdButtonStyle(.tertiary))
+                        .frame(maxWidth: .infinity)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                        .listRowBackground(colors.backgroundSecondary)
+                        .accessibilityIdentifier("today.confirmLikely")
+                        .stdMeasure("foot")
+                }
+                if typeSize.isAccessibilitySize {
+                    Button(L("See all")) {}
+                        .buttonStyle(StdButtonStyle(.tertiary))
+                        .frame(maxWidth: .infinity)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                        .listRowBackground(colors.backgroundSecondary)
+                }
+            } header: {
+                topHeader(day: nil)
+            }
+        }
+    }
+
+    private func actionRow(_ item: StdSuggestion) -> some View {
+        StdActionRow(item: item, confirmed: confirmed.contains(item.id), onConfirm: { confirm(item) }, showDay: false)
+            .stdMeasure("row.\(item.id)")
+            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+            .listRowBackground(colors.backgroundSecondary)
+            .alignmentGuide(.listRowSeparatorLeading) { _ in 34 }
+            .alignmentGuide(.listRowSeparatorTrailing) { d in d[.trailing] + 16 }
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                Button { confirm(item, swipe: true) } label: { Label(StdCanon.confirm, systemImage: "checkmark") }
+                    .tint(colors.positive)
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button { decline(item) } label: { Label(StdCanon.notRentalWork, systemImage: "xmark") }
+                    .tint(colors.textSecondary)
+            }
+    }
+
+    /// Title, hero and the To confirm header live in the first section's header: List masks a
+    /// row's corners with its own radius, which clips anything drawn to the row edge.
+    private func topHeader(day: String?) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                StdScreenTitle(title: L("Today"), subtitle: typeSize.isAccessibilitySize ? nil : L("Fri, Oct 23"))
+                Button { showLog = true } label: { Image(systemName: "plus") }
+                    .buttonStyle(StdButtonStyle(.icon))
+                    .accessibilityLabel(L("Log time"))
+            }
+            .padding(.bottom, 8)
+            StdHeroCard(seed: live, focus: $focus).stdMeasure("hero").padding(.top, 16)
+            StdSectionHeader(title: L("To confirm"), count: seed.suggestions.count - (seed.suggestions.prefix(3).count - items.count),
+                             trailing: typeSize.isAccessibilitySize ? nil : L("See all"))
+                .padding(.top, 24)
+            if let day { StdDayHeader(title: day).padding(.top, 4) }
+        }
+        .stdHeaderInsets()
     }
 
     private func confirm(_ item: StdSuggestion, swipe: Bool = false) {
@@ -298,9 +317,26 @@ struct StdTodayScreen: View {
 
     // MARK: Scripted runs for the videos
 
+    /// The post-log beat: the sheet drops, then the hero counts up, the house rises with the
+    /// drafting pass, and the toast says what was logged.
+    private func logged(_ hours: Double) {
+        StdMotionLog.mark("postLog")
+        showLog = false
+        successTick += 1
+        guard let r = seed.rentals.rentals.first else { return }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            withAnimation(StdMotion.count) { extra[r.id, default: 0] += hours }
+            show(LHToastSpec(kind: .success, message: L("Logged \(StdFormat.hours(hours)) at \(r.name)."), actionTitle: L("Undo")))
+        }
+    }
+
     private func demo() async {
         func pause(_ s: Double) async { try? await Task.sleep(nanoseconds: UInt64(s * 1_000_000_000)) }
         switch launch.demo {
+        case "postlog":
+            await pause(2.2)
+            logged(1.5)
         case "confirm":
             await pause(2.0)
             if let first = items.first { confirm(first) }
@@ -339,6 +375,11 @@ struct StdHeroCard: View {
     let seed: StdSeed
     @Binding var focus: HomeProtoFocus
     @State private var rise: CGFloat = 1
+    @State private var skyPhase: StdSkyPhase = StdSkyPhase.at(Date())
+    /// draftingPass (critique #10): one cyan line sweeps the newly built band as the mask rises.
+    @State private var sweep: CGFloat = 0
+    @State private var sweepOpacity: Double = 0
+    @State private var passTick = 0
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -365,10 +406,17 @@ struct StdHeroCard: View {
     private var single: Bool { seed.rentals.rentals.count == 1 && seed.rentals.sharedTarget == nil }
 
     var body: some View {
-        // The sky follows the clock: re-read once a minute, never per frame.
-        TimelineView(.everyMinute) { tl in
-            card(phase: StdSkyPhase.at(tl.date))
-        }
+        // The sky is a state (B.4): read on appear, then on each hour boundary by one sleeping task.
+        card(phase: skyPhase)
+            .task {
+                skyPhase = StdSkyPhase.at(Date())
+                while !Task.isCancelled {
+                    let now = Date()
+                    let next = Calendar.current.nextDate(after: now, matching: DateComponents(minute: 0, second: 0), matchingPolicy: .nextTime) ?? now.addingTimeInterval(3600)
+                    try? await Task.sleep(nanoseconds: UInt64(max(1, next.timeIntervalSince(now)) * 1_000_000_000))
+                    skyPhase = StdSkyPhase.at(Date())
+                }
+            }
     }
 
     private func card(phase: StdSkyPhase) -> some View {
@@ -391,8 +439,9 @@ struct StdHeroCard: View {
         .background(StdHeroSky(phase: phase))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .onChange(of: hero.key) { _, _ in raise(from: 0.45) }
-        .onChange(of: hero.number) { old, new in if new > old { raise(from: 0.82) } }
+        .onChange(of: hero.number) { old, new in if new > old { raise(from: 0.82); draftingPass() } }
         .sensoryFeedback(.selection, trigger: focus)
+        .sensoryFeedback(.impact(weight: .light, intensity: 0.5), trigger: passTick)
     }
 
     // MARK: Switching
@@ -414,6 +463,18 @@ struct StdHeroCard: View {
     }
 
     /// heroCountUp: the built house rises behind its linework (ringProgress 0.60) while the digits count (count 0.60).
+    /// draftingPass: a 1pt drafting-cyan line draws left → right along the rising mask edge
+    /// (sweep easeOut 0.45) and fades by 0.55s, then stillness. Reduce Motion: no line.
+    private func draftingPass() {
+        guard !reduceMotion else { return }
+        StdMotionLog.mark("draftingPass")
+        passTick += 1
+        var t = Transaction(); t.disablesAnimations = true
+        withTransaction(t) { sweep = 0; sweepOpacity = 0.9 }
+        withAnimation(.easeOut(duration: 0.45)) { sweep = 1 }
+        withAnimation(.easeIn(duration: 0.2).delay(0.35)) { sweepOpacity = 0 }
+    }
+
     private func raise(from start: CGFloat) {
         StdMotionLog.mark("heroCountUp")
         guard !reduceMotion else { return }
@@ -500,6 +561,13 @@ struct StdHeroCard: View {
                     }
                 }
             HouseLineworkImage(name: keyframe.linesImageName).foregroundStyle(HouseTokens.drafting)
+            GeometryReader { g in
+                Rectangle().fill(HouseTokens.drafting)
+                    .frame(width: g.size.width * 0.7 * sweep, height: 1.5)
+                    .offset(x: g.size.width * 0.15, y: g.size.height * (1 - rise) + g.size.height * 0.2)
+                    .opacity(sweepOpacity)
+            }
+            .allowsHitTesting(false)
         }
         .id(keyframe)
         .transition(.opacity)

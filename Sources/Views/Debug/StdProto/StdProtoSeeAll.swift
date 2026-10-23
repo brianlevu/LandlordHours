@@ -36,7 +36,7 @@ struct StdSeeAllScreen: View {
                 if !list.isEmpty {
                     Section {
                         ForEach(list) { rental in
-                            StdBrowseRow(title: rental.name, meta: meta(rental), value: value(rental), chevron: false, metaLines: 3) {
+                            StdBrowseRow(title: rental.name, meta: meta(rental), value: value(rental), valueInk: valueInk(rental, s), chevron: false, metaLines: 3, progress: bar(rental, s)) {
                                 HomeProtoArt(size: 36, keyframe: HomeProtoStage.keyframe(for: rental))
                             }
                             .stdMeasure("row.\(rental.id)")
@@ -85,6 +85,22 @@ struct StdSeeAllScreen: View {
 
     private var firstSection: HomeProtoSeed.Section? {
         HomeProtoSeed.Section.allCases.first { !r.rentals(in: $0).isEmpty }
+    }
+
+    /// 3pt progress in the section's intent ink (critique #7); record-only rows get none.
+    private func bar(_ rental: HomeProtoRental, _ section: HomeProtoSeed.Section) -> (Double, Color)? {
+        switch rental.target {
+        case .own(let t): return (rental.hours / Double(t), ink(section))
+        case .counts: return (rental.hours / max(r.totalHours, 1), colors.action)
+        case .record: return nil
+        }
+    }
+
+    private func valueInk(_ rental: HomeProtoRental, _ section: HomeProtoSeed.Section) -> Color {
+        switch section {
+        case .needsAttention, .onPace, .done: return ink(section)
+        case .recordOnly, .counts: return colors.textPrimary
+        }
     }
 
     private func meta(_ rental: HomeProtoRental) -> String {

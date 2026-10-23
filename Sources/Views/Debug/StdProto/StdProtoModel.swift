@@ -59,9 +59,9 @@ struct StdSeed {
                 StdSuggestion(id: "s2", title: L("Monthly mortgage payment"), source: .reminder, when: L("Nov 1"), category: .bookkeeping, status: .none, hours: 0.25),
                 StdSuggestion(id: "s4", title: L("Showing at Delaney Ct"), source: .calendar, when: L("Oct 19 9–10:30"), category: .leasing, status: .notSure, hours: 1.5),
                 StdSuggestion(id: "s3", title: L("Turnover clean at Santa Ray Ave"), source: .calendar, when: L("Yesterday 10–11:30"), category: .management, status: .none, hours: 1.5, rental: "santa"),
-                StdSuggestion(id: "s5", title: L("Tenant call about the lease renewal"), source: .calendar, when: L("Oct 18 4–4:30"), category: .leasing, status: .none, hours: 0.5),
-                StdSuggestion(id: "s6", title: L("Hardware store run for Yeandle Ave"), source: .reminder, when: L("Oct 17"), category: .repairs, status: .needsHours, hours: nil),
-                StdSuggestion(id: "s7", title: L("Gutter cleaning at Delaney Ct"), source: .calendar, when: L("Oct 16 8–10"), category: .repairs, status: .mightBeLogged, hours: 2),
+                StdSuggestion(id: "s5", title: L("Tenant call about the lease renewal"), source: .calendar, when: L("Yesterday 4–4:30"), category: .leasing, status: .none, hours: 0.5),
+                StdSuggestion(id: "s6", title: L("Hardware store run for Yeandle Ave"), source: .reminder, when: L("Oct 19"), category: .repairs, status: .needsHours, hours: nil),
+                StdSuggestion(id: "s7", title: L("Gutter cleaning at Delaney Ct"), source: .calendar, when: L("Today 8–10"), category: .repairs, status: .mightBeLogged, hours: 2),
             ], week: [
                 StdEntry(id: "w1", title: L("Paid the mortgage"), rental: "Delaney Ct", category: .bookkeeping, day: L("Mon"), hours: 0.25),
                 StdEntry(id: "w2", title: L("Smoke alarm batteries"), rental: "Santa Ray Ave", category: .repairs, day: L("Tue"), hours: 0.75),
@@ -120,22 +120,43 @@ struct StdSeed {
         }
     }
 
-    /// Two stat tiles under the pace header.
+    /// Two stat tiles under the pace header: facts the hero doesn't say (critique #8).
     func paceTiles(_ focus: HomeProtoFocus) -> [(String, String, String?)] {
-        let days = (L("\(Self.daysLeft)"), L("days left in 2026"), nil as String?)
-        switch focus {
-        case .all:
-            let total = rentals.totalHours, target = Double(rentals.sharedTarget ?? 750)
-            let weekly = Int(((target - total) / (Double(Self.daysLeft) / 7)).rounded(.up))
-            return [(L("\(weekly)h"), L("a week to reach \(Int(target))"), "exclamationmark.circle.fill"), days]
-        case .rental(let id):
-            guard let r = rentals.rental(id) else { return [days] }
-            if case .own(let t) = r.target {
-                if r.pace == .done { let month = r.reached ?? ""; return [(L("\(t)h"), L("reached in \(month)"), "checkmark.circle.fill"), days] }
-                return [(L("\(r.weeklyNeed ?? 0)h"), L("a week to reach \(t)"), "exclamationmark.circle.fill"), days]
-            }
-            return [(StdFormat.hours(r.hours), L("logged this year"), nil), days]
+        let thisWeek = week.reduce(0) { $0 + $1.hours }
+        let best: Double = id == "eight" ? 14 : (id == "reps750" ? 11 : 6)
+        return [(StdFormat.hours(thisWeek), L("this week"), nil), (StdFormat.hours(best), L("best week"), nil)]
+    }
+}
+#endif
+
+#if DEBUG
+// MARK: - Day groups for the Inbox (critique #1): the date lives in the header, not the meta line
+
+extension StdSuggestion {
+    /// Friday Oct 23, 2026 is "today" for every seed.
+    var group: String {
+        let first = when.split(separator: " ").first.map(String.init) ?? ""
+        if first == L("Today") { return L("Today") }
+        if first == L("Yesterday") { return L("Yesterday") }
+        if when.hasPrefix(L("Nov")) { return L("Upcoming") }
+        let day = when.split(separator: " ").dropFirst().first.map(String.init) ?? ""
+        let weekday = ["16": L("Fri"), "17": L("Sat"), "18": L("Sun"), "19": L("Mon"), "20": L("Tue"), "21": L("Wed")][day] ?? ""
+        return L("\(weekday) \(first) \(day)")
+    }
+
+    var groupRank: Int {
+        switch group {
+        case L("Today"): return 0
+        case L("Yesterday"): return 1
+        case L("Upcoming"): return 99
+        default: return 2 + (30 - (Int(when.split(separator: " ").dropFirst().first.map(String.init) ?? "0") ?? 0))
         }
+    }
+
+    /// "12–2", or nil when the item has no time range.
+    var timeRange: String? {
+        guard let last = when.split(separator: " ").last, last.contains("–") else { return nil }
+        return String(last)
     }
 }
 #endif

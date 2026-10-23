@@ -9,11 +9,14 @@ struct StdLogTimeSheet: View {
     let seed: StdSeed
     let launch: StdProtoLaunch
     let onClose: () -> Void
+    /// The post-log beat: the sheet hands the hours back and Today does the rest.
+    var onLog: (Double) -> Void = { _ in }
 
     @State private var phase: Phase
     @State private var note: String
     @State private var hours: Double
     @State private var who = 0
+    @State private var hoursSaid = false
     @State private var rowsShown = 0
     @State private var successTick = 0
     /// The sheet fits its content (no dead canvas): header + content + pinned button.
@@ -29,11 +32,12 @@ struct StdLogTimeSheet: View {
     private static var filledNote: String { L("Fixed the leaking tap at Santa Ray Ave, took about an hour and a half") }
     private static var gapNote: String { L("Showed the place to two families this morning") }
 
-    init(seed: StdSeed, launch: StdProtoLaunch, onClose: @escaping () -> Void) {
+    init(seed: StdSeed, launch: StdProtoLaunch, onClose: @escaping () -> Void, onLog: @escaping (Double) -> Void = { _ in }) {
         self.seed = seed
         self.launch = launch
         self.onClose = onClose
-        let phase: Phase = launch.demo == "logtime" ? .empty : (launch.state == "filled" ? .filled : launch.state == "gap" ? .gap : .empty)
+        self.onLog = onLog
+        let phase: Phase = launch.demo == "logtime" ? .empty : launch.demo == "postlog" ? .filled : (launch.state == "filled" ? .filled : launch.state == "gap" ? .gap : .empty)
         _phase = State(initialValue: phase)
         _note = State(initialValue: phase == .filled ? Self.filledNote : phase == .gap ? Self.gapNote : "")
         _hours = State(initialValue: phase == .filled ? 1.5 : 1)
@@ -74,7 +78,7 @@ struct StdLogTimeSheet: View {
         }
         .background(colors.background.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
-            Button(primaryTitle) {}
+            Button(primaryTitle) { if phase != .gap { onLog(hours) } }
                 .buttonStyle(StdButtonStyle(.primary))
                 .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 16)
                 .frame(maxWidth: .infinity)
@@ -151,8 +155,11 @@ struct StdLogTimeSheet: View {
                     StdChip(text: L("Management · Santa Ray · 1h 30m"))
                     StdChip(text: L("Bookkeeping · Delaney · 15m"))
                 }
+                .padding(.trailing, 24)
             }
-            .scrollClipDisabled()
+            // Chips that run past the edge fade out instead of clipping.
+            .mask(LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.86),
+                                         .init(color: .clear, location: 1)], startPoint: .leading, endPoint: .trailing))
         }
     }
 
@@ -167,7 +174,7 @@ struct StdLogTimeSheet: View {
                 Image(systemName: "chevron.down").font(.footnote.weight(.semibold)).foregroundStyle(colors.textTertiary)
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 58)
+            .frame(minHeight: 59)
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(colors.backgroundSecondary))
             .contentShape(Rectangle())
         }
@@ -218,7 +225,7 @@ struct StdLogTimeSheet: View {
                     }
                 }
             }
-            .padding(.horizontal, 16).frame(minHeight: 58)
+            .padding(.horizontal, 16).frame(minHeight: 59)
             .stdUnfold(index: 4, shown: rowsShown)
         }
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(colors.backgroundSecondary))
@@ -234,32 +241,26 @@ struct StdLogTimeSheet: View {
         HStack(spacing: 8) {
             Text(label).font(.body).foregroundStyle(colors.textPrimary)
             Spacer(minLength: 12)
-            Text(value ?? L("Choose")).font(.body)
-                .foregroundStyle(value == nil ? colors.action : colors.textSecondary)
-                .fontWeight(value == nil ? .semibold : .regular)
+            // One missing-value treatment (critique #6): the value itself, in caution ink.
+            Text(value ?? L("Not picked")).font(.body)
+                .foregroundStyle(value == nil ? colors.caution : colors.textSecondary)
                 .lineLimit(1)
             Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(colors.textTertiary)
         }
         .padding(.horizontal, 16)
-        .frame(minHeight: 58)
+        .frame(minHeight: 59)
         .stdUnfold(index: index, shown: rowsShown)
     }
 
     private var hoursRow: some View {
         let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
         return layout {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(L("Hours")).font(.body).foregroundStyle(colors.textPrimary)
-                if phase == .gap {
-                    Label { Text(L("Didn't say how long")) } icon: { Image(systemName: "circle.fill").font(.caption2) }
-                        .font(.footnote).foregroundStyle(colors.caution)
-                }
-            }
+            Text(L("Hours")).font(.body).foregroundStyle(colors.textPrimary)
             Spacer(minLength: 8)
-            StdStepper(hours: $hours)
+            StdStepper(hours: $hours, missing: phase == .gap && !hoursSaid) { hoursSaid = true }
         }
-        .padding(.horizontal, 16).padding(.vertical, 6)
-        .frame(minHeight: 58)
+        .padding(.leading, 16).padding(.trailing, 16).padding(.vertical, 6)
+        .frame(minHeight: 59)
     }
 
     private func unfold() {

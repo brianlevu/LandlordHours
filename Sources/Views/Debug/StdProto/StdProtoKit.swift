@@ -214,6 +214,42 @@ struct StdSectionHeader: View {
     }
 }
 
+// MARK: - Day header (§1.15a): sentence case, subheadline semibold, textSecondary, 28pt
+
+struct StdDayHeader: View {
+    let title: String
+    @Environment(\.colorScheme) private var scheme
+    var body: some View {
+        Text(title)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(AdaptiveColors(colorScheme: scheme).textSecondary)
+            .textCase(nil)
+            .frame(maxWidth: .infinity, minHeight: 28, alignment: .bottomLeading)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+extension View {
+    /// A day header drawn as a row inside the card: no separators, tight insets.
+    func stdDayRow(first: Bool, colors: AdaptiveColors) -> some View {
+        listRowInsets(EdgeInsets(top: first ? 10 : 14, leading: 16, bottom: 0, trailing: 16))
+            .listRowBackground(colors.backgroundSecondary)
+            .listRowSeparator(.hidden)
+    }
+}
+
+/// Rows grouped by day, newest first (§1.15a); Upcoming last.
+func stdDayGroups(_ items: [StdSuggestion]) -> [(name: String, items: [StdSuggestion])] {
+    var order: [String] = []
+    var byGroup: [String: [StdSuggestion]] = [:]
+    let sorted = items.enumerated().sorted { ($0.element.groupRank, $0.offset) < ($1.element.groupRank, $1.offset) }.map(\.element)
+    for item in sorted {
+        if byGroup[item.group] == nil { order.append(item.group) }
+        byGroup[item.group, default: []].append(item)
+    }
+    return order.map { ($0, byGroup[$0] ?? []) }
+}
+
 // MARK: - LHTag (§1.16)
 
 struct StdTag: View {
@@ -237,6 +273,8 @@ struct StdTag: View {
 struct StdChip: View {
     let text: String
     var selected = false
+    /// Equal-width chips in a row (the Inbox question).
+    var fill = false
     var action: () -> Void = {}
     @Environment(\.colorScheme) private var scheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
@@ -248,7 +286,7 @@ struct StdChip: View {
                 .foregroundStyle(selected ? colors.onAction : colors.textPrimary)
                 .lineLimit(1)
                 .padding(.horizontal, 12)
-                .frame(minHeight: 34)
+                .frame(maxWidth: fill ? .infinity : nil, minHeight: 34)
                 .background(Capsule().fill(selected ? colors.action : colors.backgroundTertiary))
                 .overlay(Capsule().strokeBorder(colors.border, lineWidth: selected ? 0 : 0.5))
                 .frame(minHeight: 44)
@@ -356,6 +394,8 @@ struct StdActionRow: View {
     let item: StdSuggestion
     let confirmed: Bool
     let onConfirm: () -> Void
+    /// False under a day header (Inbox): the meta line carries the time only (critique #1).
+    var showDay = true
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
     /// One title line at the current text size, so the circle sits on the first line.
@@ -453,6 +493,13 @@ struct StdActionRow: View {
     private func metaText(word: Bool, time: Bool) -> Text {
         let glyph = Text(Image(systemName: sourceIcon))
         // Word joiners keep "10–11:30" together when the meta wraps at large sizes.
+        if !showDay {
+            // Under a day header: "Calendar · 12–2", or just the source when there is no time.
+            guard let range = item.timeRange?.replacingOccurrences(of: "–", with: "\u{2060}–\u{2060}") else {
+                return glyph + Text(verbatim: " ") + Text(sourceWord)
+            }
+            return word ? glyph + Text(verbatim: " ") + Text(L("\(sourceWord) · \(range)")) : glyph + Text(verbatim: " ") + Text(range)
+        }
         let when = (time ? item.when : dayTime.day).replacingOccurrences(of: "–", with: "\u{2060}–\u{2060}")
         return word ? glyph + Text(verbatim: " ") + Text(L("\(sourceWord) · \(when)"))
                     : glyph + Text(verbatim: " ") + Text(when)
@@ -513,6 +560,8 @@ struct StdBrowseRow<Leading: View>: View {
     var valueInk: Color? = nil
     var chevron = true
     var metaLines = 1
+    /// A 3pt progress bar under the text (critique #7): fraction and intent ink.
+    var progress: (Double, Color)? = nil
     @ViewBuilder var leading: Leading
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -529,6 +578,17 @@ struct StdBrowseRow<Leading: View>: View {
                     .lineLimit(typeSize.isAccessibilitySize ? nil : metaLines)
                     .fixedSize(horizontal: false, vertical: typeSize.isAccessibilitySize)
                 if typeSize.isAccessibilitySize, let value { valueText(value) }
+                if let progress {
+                    GeometryReader { g in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(colors.backgroundTertiary)
+                            Capsule().fill(progress.1).frame(width: max(3, g.size.width * min(1, progress.0)))
+                        }
+                    }
+                    .frame(height: 3)
+                    .padding(.top, 5)
+                    .accessibilityHidden(true)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if !typeSize.isAccessibilitySize, let value { valueText(value) }
@@ -639,23 +699,31 @@ struct StdSegmented: View {
 
 struct StdStepper: View {
     @Binding var hours: Double
+    /// "Not said": the missing-value treatment (caution ink, critique #6) until a step is taken.
+    var missing = false
+    var onStep: () -> Void = {}
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: scheme) }
 
+    /// One right rail (critique #6): − and + lead, the value ends on the same trailing line as the
+    /// other rows' values (a chevron's width in from the edge).
     var body: some View {
-        let layout = typeSize >= .accessibility3 ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 12))
+        let layout = typeSize >= .accessibility3 ? AnyLayout(VStackLayout(alignment: .trailing, spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
         layout {
-            Button { hours = max(0, hours - 0.25) } label: { Image(systemName: "minus") }
-                .buttonStyle(StdButtonStyle(.icon)).accessibilityLabel(L("Less"))
-            Text(StdFormat.hours(hours))
-                .font(.title2.weight(.semibold)).fontDesign(.rounded).monospacedDigit()
-                .foregroundStyle(colors.textPrimary)
+            HStack(spacing: 8) {
+                Button { hours = max(0, hours - 0.25); onStep() } label: { Image(systemName: "minus") }
+                    .buttonStyle(StdButtonStyle(.icon)).accessibilityLabel(L("Less"))
+                Button { hours = min(24, hours + 0.25); onStep() } label: { Image(systemName: "plus") }
+                    .buttonStyle(StdButtonStyle(.icon)).accessibilityLabel(L("More"))
+            }
+            Text(missing ? L("Not said") : StdFormat.hours(hours))
+                .font(missing ? .body : .title2.weight(.semibold)).fontDesign(missing ? .default : .rounded).monospacedDigit()
+                .foregroundStyle(missing ? colors.caution : colors.textPrimary)
                 .contentTransition(.numericText(value: hours))
                 .animation(StdMotion.standard, value: hours)
-                .frame(minWidth: 100)
-            Button { hours = min(24, hours + 0.25) } label: { Image(systemName: "plus") }
-                .buttonStyle(StdButtonStyle(.icon)).accessibilityLabel(L("More"))
+                .frame(minWidth: 100, alignment: .trailing)
+                .padding(.trailing, 17)
         }
         .sensoryFeedback(.selection, trigger: hours)
     }

@@ -6,8 +6,8 @@ import UIKit
 //
 // The hero paper follows the phone clock: dawn (5–8) a soft warm gradient, day (8–17) the
 // blueprint blue, dusk (17–20) warmer, night (20–5) deep navy with the house's windows lit.
-// It re-reads the clock once a minute (TimelineView .everyMinute), so CPU stays at idle, and a
-// change of phase is a slow 3s crossfade (none with Reduce Motion). The card is theme-fixed, so
+// It is a state, not a scene (standard B.4): read on appear and at each hour boundary by one
+// sleeping task, so CPU stays at idle; a change of phase is a 3s crossfade (none with Reduce Motion). The card is theme-fixed, so
 // light and dark mode share it. Every gradient stop keeps the hero text at AA: worst pair 4.94:1
 // (amber status on the dawn horizon), see StdSkyPhase.colors.
 //
