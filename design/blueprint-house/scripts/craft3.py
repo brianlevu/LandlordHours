@@ -15,6 +15,12 @@ usage (bpy 5.0.1 venv, headless):
   .venv/bin/python craft3.py --anim --variants light,dark --samples 64 --out DIR        # framing drop, lit (work lamp)
   .venv/bin/python craft3.py --probes DIR/probes.json --out DIR                          # camera probes for measure3.py
 Outputs: craft_<stage>_<variant>.png (lit) and craft_<stage>-unlit_<variant>.png, 1206² RGBA.
+
+Night framing moon rim (2026-10-24 fix): with the work lamp off, the NIGHT framing stages (started, frame70, framing)
+fell to p99 1.28:1 on the navy page. They now get one extra drafting-cyan moon rim (--moon-frame 4.0 from --moon-dir
+-0.6 1.0 0.6, model only), lit and unlit, and so does the night drop clip. Not on half/complete: a sun 2.7x the main
+rim would visibly relight their walls. --moon-frame 0 reproduces pass 3. Re-render just these with
+  --states started,frame70,framing --variants dark --lit on,off   and   --anim --variants dark --samples 64
 """
 import argparse, json, math, os, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -252,6 +258,11 @@ def apply_state(st, variant, lit=True):
             ob.material_slots[ob['glass_slot']].material = H.MATS['glass_lit' if lit else 'glass']
     set_emission(H.MATS['glass_lit'], ARGS.win_dark if variant == 'dark' else ARGS.win_light)
     set_emission(H.MATS['lamp_lens'], 40.0 if variant == 'dark' else 30.0)
+    if variant == 'dark' and st['stage'] == 2 and ARGS.moon_frame > 0:
+        # framing stages at night have no walls or windows to catch light, so with the lamp off the studs vanish
+        # into the navy page. A cool moonlight rim from behind (back-left, higher than the main rim) edges the studs and the lot's top
+        # edge: the frame reads as a silhouette. Framing stages only (lit and unlit); it never lights the page.
+        linked(C.sun('moon_rim', tuple(ARGS.moon_dir), ARGS.moon_frame, 3.0, H.lin(ARGS.moon_col)[:3]))
     if not lit:
         return
     if st['stage'] >= 5:
@@ -326,6 +337,9 @@ def main():
     ap.add_argument('--work-lawn', type=float, default=900.0)
     ap.add_argument('--dusk-scale', type=float, default=0.5)
     ap.add_argument('--dusk-work-scale', type=float, default=1.6)
+    ap.add_argument('--moon-frame', type=float, default=4.0)          # night framing-stage moon rim (0 = off)
+    ap.add_argument('--moon-dir', type=float, nargs=3, default=(-0.6, 1.0, 0.6))
+    ap.add_argument('--moon-col', default=RIM)
     a = ap.parse_args(); ARGS = a
     out = os.path.abspath(a.out); os.makedirs(out, exist_ok=True)
     t0 = time.time()
