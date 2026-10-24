@@ -282,6 +282,7 @@ struct OnbRoot: View {
             let trail = embedded ? 0 : g.safeAreaInsets.trailing
             let H = g.size.height + top + bottom
             let W = g.size.width
+            let hideHouse = flow.step == .welcome && !embedded && typeSize.isAccessibilitySize
             let full = flow.step.isFullBleed && !embedded
             let bandH = full ? H : (keyboardUp ? top + 50 + 96 : H * (embedded ? bandFraction + 0.02 : bandFraction))
             let scene = sceneFrame(W: W, H: H, top: top, bandH: bandH)
@@ -292,7 +293,8 @@ struct OnbRoot: View {
                     .frame(width: scene.width, height: scene.width)
                     .position(x: scene.midX, y: scene.midY)
                     // Accessibility sizes give the room to the words; the house returns on the steps.
-                    .opacity(flow.step == .welcome && !embedded && typeSize.isAccessibilitySize ? 0 : 1)
+                    .opacity(hideHouse ? 0 : 1)
+                    .accessibilityHidden(hideHouse)
 
                 if !full { chrome(top: top) }
 
@@ -302,7 +304,7 @@ struct OnbRoot: View {
                 }
 
                 if flow.step == .welcome && !embedded {
-                    OnbWelcomeContent(flow: flow, houseBottom: typeSize.isAccessibilitySize ? top + 12 : scene.maxY - scene.width * 0.08)
+                    OnbWelcomeContent(flow: flow, leadInset: lead, trailInset: trail, houseBottom: typeSize.isAccessibilitySize ? top + 12 : scene.maxY - scene.width * 0.08)
                         .frame(width: W, height: H)
                         .transition(.opacity)
                 }
@@ -340,7 +342,7 @@ struct OnbRoot: View {
     private func sceneFrame(W: CGFloat, H: CGFloat, top: CGFloat, bandH: CGFloat) -> CGRect {
         switch flow.step {
         case .welcome where !embedded:
-            let s = min(W * 0.92, H * (typeSize >= .xLarge ? 0.30 : 0.42))
+            let s = min(W * 0.92, H * (typeSize >= .xLarge ? 0.30 : (H < 760 ? 0.28 : 0.42)))
             return CGRect(x: (W - s) / 2, y: top + 4, width: s, height: s)
         case .staked where !embedded:
             let s = min(W * 0.96, H * 0.45)
@@ -420,6 +422,9 @@ struct OnbRoot: View {
 
 struct OnbWelcomeContent: View {
     let flow: OnbFlow
+    /// Side safe-area insets the scrims run under, so the paper has no seam beside the content.
+    var leadInset: CGFloat = 0
+    var trailInset: CGFloat = 0
     var houseBottom: CGFloat
     @EnvironmentObject private var viewModel: AppViewModel
     @Environment(\.onbBottomInset) private var bottomInset
@@ -458,7 +463,7 @@ struct OnbWelcomeContent: View {
                         VStack(alignment: .leading, spacing: 8) { chips }
                     }
                     .padding(.top, 18)
-                    .padding(.bottom, 28)          // clears the scrim above the pinned buttons
+                    .padding(.bottom, 52)          // clears both scrims (44 pt fade + 40 pt button scrim) so the last chip stays readable
                     // Accessibility sizes: only "Get started" stays pinned; the returning-user rows
                     // scroll with the words, so the headline gets the room and nothing is cut off.
                     if typeSize.isAccessibilitySize {
@@ -474,6 +479,9 @@ struct OnbWelcomeContent: View {
             .overlay(alignment: .bottom) {
                 LinearGradient(colors: [HouseTokens.blueprintDeep.opacity(0), HouseTokens.blueprintDeep], startPoint: .top, endPoint: .bottom)
                     .frame(height: 44)
+                    .padding(.horizontal, -24)
+                    .padding(.leading, -leadInset)
+                    .padding(.trailing, -trailInset)
                     .allowsHitTesting(false)
             }
             VStack(spacing: 10) {
@@ -488,6 +496,9 @@ struct OnbWelcomeContent: View {
             .background(alignment: .top) {
                 LinearGradient(colors: [HouseTokens.blueprintDeep.opacity(0), HouseTokens.blueprintDeep.opacity(0.85)], startPoint: .top, endPoint: .init(x: 0.5, y: 0.25))
                     .padding(.top, -40)
+                    .padding(.horizontal, -24)
+                    .padding(.leading, -leadInset)
+                    .padding(.trailing, -trailInset)
                     .allowsHitTesting(false)
             }
         }

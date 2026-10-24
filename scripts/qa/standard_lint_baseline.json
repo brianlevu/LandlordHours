@@ -272,7 +272,7 @@
   "fixed-size|Sources/Views/Onboarding/OnboardingSteps.swift|.fixedSize()": 1,
   "fixed-size|Sources/Views/Onboarding/OnboardingSteps.swift|.fixedSize(horizontal: false, vertical: true)": 13,
   "fixed-size|Sources/Views/Onboarding/OnboardingSteps.swift|.fixedSize(horizontal: false, vertical: typeSize >= .xxLarge)": 1,
-  "fixed-size|Sources/Views/Onboarding/OnboardingView.swift|.fixedSize()": 1,
+  "fixed-size|Sources/Views/Onboarding/OnboardingView.swift|.fixedSize(horizontal: !typeSize.isAccessibilitySize, vertical: true)": 1,
   "fixed-size|Sources/Views/Onboarding/OnboardingView.swift|.fixedSize(horizontal: false, vertical: true)": 10,
   "fixed-size|Sources/Views/Paywall/PaywallView.swift|.fixedSize(horizontal: false, vertical: true)": 3,
   "fixed-size|Sources/Views/Paywall/PaywallView.swift|Button { openURL(Self.privacyURL) } label: { Text(\"Privacy\\u{00A0}Policy\").lineLimit(1).fixedSize() }": 1,
