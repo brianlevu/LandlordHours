@@ -38,6 +38,13 @@ enum AppColors {
     static let terracotta = Color(hex: Hex.terracotta)
     static let plaster = Color(hex: Hex.plaster)
 
+    // MARK: - Today page (crafted house at dusk)
+    static let pageTop = Color.lhDynamic(light: Hex.duskTop, dark: Hex.darkNightTop)
+    static let pageMid = Color.lhDynamic(light: Hex.duskMid, dark: Hex.darkNightTop)
+    static let pageBottom = Color.lhDynamic(light: Hex.duskBottom, dark: Hex.darkNightBottom)
+    /// Warm light pooled under the lot. Opacity is per mode (`AdaptiveColors.spillPool`).
+    static let spill = Color(hex: Hex.spill)
+
     // MARK: - Category inks (2.0 r4: one colour map, app-wide)
     /// Each category's ink is taken from its 3D tool's material, so bars, labels and the tile wash
     /// match the icon. Light inks are text-safe on white (≥4.5:1); dark inks on the dark card.
@@ -307,6 +314,13 @@ struct AdaptiveColors {
     var backgroundSecondary: Color { pick(H.card, H.darkCard) }
     var backgroundTertiary: Color { pick(H.tertiary, H.darkTertiary) }
     var primarySurface: Color { pick(H.actionSurface, H.darkActionSurface) }
+
+    // Today page: dusk gradient (light) / navy (dark), and the spill pool under the lot
+    var pageTop: Color { pick(H.duskTop, H.darkNightTop) }
+    var pageMid: Color { pick(H.duskMid, H.darkNightTop) }
+    var pageBottom: Color { pick(H.duskBottom, H.darkNightBottom) }
+    /// The warm pool under the lot, with its per-mode strength baked in.
+    var spillPool: Color { AppColors.spill.opacity(isDark ? H.darkSpillOpacity : H.spillOpacity) }
 
     // Brand (new in 2.0)
     var brand: Color { AppColors.brand }

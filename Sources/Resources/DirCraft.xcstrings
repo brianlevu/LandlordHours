@@ -67,17 +67,6 @@
         }
       }
     },
-    "House, %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "House, %@"
-          }
-        }
-      }
-    },
     "Inbox": {
       "extractionState": "manual",
       "localizations": {
@@ -261,6 +250,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "roof on, siding half done"
+          }
+        }
+      }
+    },
+    "House, %@, %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "House, %@, %@"
+          }
+        }
+      }
+    },
+    "lights on": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "lights on"
+          }
+        }
+      }
+    },
+    "lights off": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "lights off"
           }
         }
       }

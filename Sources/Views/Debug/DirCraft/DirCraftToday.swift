@@ -9,10 +9,13 @@ import UIKit
 //   -LHHomeSeed craft|goal750             which owner (default craft: three rentals on the 100h/500h tests)
 //   -LHDirFocus <n>                       start on rental n (1 = Delaney Ct, just started)
 //   -LHDirDemo log|switch|confirm         scripted run for the videos (starts at 2.0s)
+//   -LHCraftWindows lit|dark              force the windows state for captures (default: from the day's entries)
 //
 // The house is a lit Blender diorama (design/blueprint-house/scripts/craft.py): stills in
 // Assets.xcassets/Craft (light/dark appearances), the build motion as HEVC-with-alpha in
 // Resources/Craft. Rows, tags, the log sheet and the type come from Direction A (DirA kit).
+// Windows are state: lit when hours were logged today (TodayWindowState), dark when none. Each still has an
+// "<asset>-unlit" twin from the art lane; a missing twin falls back to the lit asset.
 // Every string goes through CL(...) (table "DirCraft").
 
 func CL(_ key: String.LocalizationValue) -> String { String(localized: key, table: "DirCraft") }
@@ -21,6 +24,8 @@ struct CraftLaunch {
     let seedID: String
     let demo: String?
     let focusIndex: Int
+    /// DEBUG/QA: force the windows state. nil = derive from the day's entries.
+    let windows: Bool?
 
     static let current: CraftLaunch? = {
         let args = ProcessInfo.processInfo.arguments
@@ -31,7 +36,8 @@ struct CraftLaunch {
         guard value("-LHDirection")?.uppercased() == "CRAFT" else { return nil }
         return CraftLaunch(seedID: value("-LHHomeSeed") ?? "craft",
                            demo: value("-LHDirDemo"),
-                           focusIndex: Int(value("-LHDirFocus") ?? "") ?? 0)
+                           focusIndex: Int(value("-LHDirFocus") ?? "") ?? 0,
+                           windows: ["lit": true, "dark": false][value("-LHCraftWindows")?.lowercased() ?? ""])
     }()
 }
 
@@ -40,14 +46,17 @@ struct CraftLaunch {
 struct CraftColors {
     let dark: Bool
     private func pick(_ l: String, _ d: String) -> Color { Color(hex: dark ? d : l) }
-    var pageTop: Color { pick("F6F2EB", "121A3A") }
-    var pageBottom: Color { pick("E9E2D6", "070B1C") }
-    /// The pool of light the diorama sits in.
-    var glow: Color { dark ? Color(hex: "3A4F95").opacity(0.55) : Color.white.opacity(0.9) }
+    // Page: dusk-tinted neutral by day, deep navy by night; tokens live in AppColors / AdaptiveColors.
+    private var a: AdaptiveColors { AdaptiveColors(colorScheme: dark ? .dark : .light) }
+    var pageTop: Color { a.pageTop }
+    var pageMid: Color { a.pageMid }
+    var pageBottom: Color { a.pageBottom }
+    /// Warm light spilling from the windows onto the lot.
+    var spill: Color { a.spillPool }
     var ink: Color { pick("121B33", "F2F4FA") }
     var textSecondary: Color { pick("4A5068", "B4BCD2") }
     var action: Color { pick("1E3FA6", "8FD3FF") }
-    var behind: Color { pick("A8402C", "F08A70") }
+    var behind: Color { pick("9A3624", "F08A70") }
     var positive: Color { pick("0C5A30", "4ED48A") }
     var chip: Color { dark ? Color.white.opacity(0.08) : Color.white.opacity(0.65) }
     var chipBorder: Color { dark ? Color.white.opacity(0.14) : Color(hex: "C9BFA8").opacity(0.8) }
@@ -85,6 +94,15 @@ struct CraftFocus: Identifiable, Equatable {
     let goal: Double
     var art: CraftArt
 
+    /// Stable id for this mock rental's time entries; the aggregate "all" focus covers every rental.
+    var rentalIDs: Set<UUID>? { id == "all" ? nil : [Self.rentalID(id)] }
+    static func rentalID(_ id: String) -> UUID {
+        let known = ["santa": "5A17A000-0000-4000-8000-000000000001",
+                     "delaney": "5A17A000-0000-4000-8000-000000000002",
+                     "pine": "5A17A000-0000-4000-8000-000000000003"]
+        return UUID(uuidString: known[id] ?? "5A17A000-0000-4000-8000-0000000000FF")!
+    }
+
     static let dayOfYear = 296.0   // Fri Oct 23, 2026
     static let daysLeft = 69.0
     var expected: Double { goal * Self.dayOfYear / 365 }
@@ -116,18 +134,30 @@ struct CraftFocus: Identifiable, Equatable {
 struct CraftSeed {
     var focuses: [CraftFocus]
     let suggestions: [StdSuggestion]
+    /// Real `TimeEntry` values, so the windows use the same logic as the app (TodayWindowState).
+    var entries: [TimeEntry]
+
+    private static func entry(_ rental: String, hours: Double, at date: Date) -> TimeEntry {
+        TimeEntry(propertyId: CraftFocus.rentalID(rental), participant: .selfParticipant, category: .repairs, hours: hours, date: date)
+    }
 
     static func make(_ id: String) -> CraftSeed {
         let base = StdSeed.make("brian")
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date()).addingTimeInterval(60)
+        let yesterday = cal.date(byAdding: .day, value: -1, to: today) ?? today.addingTimeInterval(-86_400)
         if id == "goal750" {
             return CraftSeed(focuses: [CraftFocus(id: "all", name: CL("All rentals"), logged: 750, goal: 750, art: .complete)],
-                             suggestions: base.suggestions)
+                             suggestions: base.suggestions,
+                             entries: [entry("santa", hours: 2, at: today)])
         }
+        // Santa Ray logged today (lit); Delaney nothing (dark); Pine Cabin only yesterday (dark).
         return CraftSeed(focuses: [
             CraftFocus(id: "santa", name: "Santa Ray Ave", logged: 46, goal: 100, art: .frame70),
             CraftFocus(id: "delaney", name: "Delaney Ct", logged: 4, goal: 100, art: .started),
             CraftFocus(id: "pine", name: "Pine Cabin", logged: 262, goal: 500, art: .half),
-        ], suggestions: base.suggestions)
+        ], suggestions: base.suggestions,
+           entries: [entry("santa", hours: 1.5, at: today), entry("pine", hours: 3, at: yesterday)])
     }
 }
 
@@ -190,11 +220,14 @@ private struct CraftTint: ViewModifier {
     func body(content: Content) -> some View { content.tint(CraftColors(dark: scheme == .dark).action) }
 }
 
-/// The lit room: a soft vertical gradient. Today adds the pool of light behind the house.
+/// The page at dusk: a gentle vertical gradient that darkens behind the hero and lifts again for the rows.
 struct CraftPage: View {
     private var env = CraftEnv()
     var body: some View {
-        LinearGradient(colors: [env.c.pageTop, env.c.pageBottom], startPoint: .top, endPoint: .bottom)
+        LinearGradient(stops: [.init(color: env.c.pageTop, location: 0),
+                               .init(color: env.c.pageMid, location: 0.32),
+                               .init(color: env.c.pageBottom, location: 1)],
+                       startPoint: .top, endPoint: .bottom)
             .ignoresSafeArea()
             .accessibilityHidden(true)
     }
@@ -209,6 +242,9 @@ struct CraftTodayScreen: View {
     let openLog: () -> Void
 
     @State private var seed: CraftSeed
+    @State private var entries: [TimeEntry]
+    /// Focus ids whose lights wait for the timber drop to finish before fading on.
+    @State private var windowsHeld: Set<String> = []
     @State private var focusID: String
     @State private var slideEdge: Edge = .trailing
     @State private var confirmed: Set<String> = []
@@ -229,6 +265,7 @@ struct CraftTodayScreen: View {
         self.launch = launch; self.logSerial = logSerial; self.logged = logged; self.openLog = openLog
         let s = CraftSeed.make(launch.seedID)
         _seed = State(initialValue: s)
+        _entries = State(initialValue: s.entries)
         _focusID = State(initialValue: s.focuses[min(launch.focusIndex, s.focuses.count - 1)].id)
     }
 
@@ -236,6 +273,11 @@ struct CraftTodayScreen: View {
     private var focus: CraftFocus { seed.focuses.first { $0.id == focusID } ?? seed.focuses[0] }
     private var focusIndex: Int { seed.focuses.firstIndex { $0.id == focusID } ?? 0 }
     private var ax: Bool { typeSize.isAccessibilitySize }
+    /// Hours logged today on the selected rental (all rentals for the aggregate focus), or the QA override.
+    private func lightsOn(_ f: CraftFocus) -> Bool {
+        launch.windows ?? TodayWindowState.loggedToday(entries: entries, rentalIDs: f.rentalIDs)
+    }
+    private var windowsLit: Bool { lightsOn(focus) && !windowsHeld.contains(focus.id) }
     /// The diorama's square frame: 390pt at every size, 44.6% of an 874pt screen (was 49%). At AX sizes it holds
     /// so the house stays tall and the page scrolls beneath it.
     private var artSide: CGFloat { 390 }
@@ -267,20 +309,10 @@ struct CraftTodayScreen: View {
         .onAppear(perform: runDemo)
     }
 
-    // MARK: Background: page gradient + the pool of light the house sits in
+    // MARK: Background: the dusk page gradient
 
     private var background: some View {
-        ZStack {
-            CraftPage()
-            GeometryReader { g in
-                // Square frame larger than the gradient's reach, so the pool of light never shows an edge.
-                RadialGradient(colors: [c.glow, c.glow.opacity(0)], center: .center, startRadius: 10, endRadius: g.size.width * 0.62)
-                    .frame(width: g.size.width * 1.4, height: g.size.width * 1.4)
-                    .position(x: g.size.width / 2, y: g.safeAreaInsets.top + (ax ? 150 : 250))
-                    .ignoresSafeArea()
-            }
-        }
-        .accessibilityHidden(true)
+        CraftPage()   // the warm spill pool is drawn under the lot, inside CraftHouseArt, so it follows the house
     }
 
     // MARK: Rental switcher: one quiet menu, page dots under the house, swipe on the house
@@ -314,7 +346,8 @@ struct CraftTodayScreen: View {
     private var hero: some View {
         VStack(spacing: 0) {
             ZStack {
-                CraftHouseArt(art: focus.art, dark: scheme == .dark, side: artSide, building: building, buildTick: buildTick) {
+                CraftHouseArt(art: focus.art, dark: scheme == .dark, side: artSide, building: building, buildTick: buildTick,
+                              windowsLit: windowsLit) {
                     finishBuild()
                 }
                 .id(focus.id)
@@ -330,7 +363,7 @@ struct CraftTodayScreen: View {
                 if v.translation.width < -40 { step(+1) } else if v.translation.width > 40 { step(-1) }
             })
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(CL("House, \(focus.art.label)"))
+            .accessibilityLabel(CL("House, \(focus.art.label), \(windowsLit ? CL("lights on") : CL("lights off"))"))
             .accessibilityAdjustableAction { dir in step(dir == .increment ? 1 : -1) }
             if seed.focuses.count > 1 && !ax {
                 dots.padding(.top, -48)
@@ -453,9 +486,18 @@ struct CraftTodayScreen: View {
         let before = seed.focuses[i]
         let after = before.logged + hours
         let next = CraftFocus.art(hours: after, goal: before.goal)
+        // The first hour of the day lights the windows, but only once the timber has landed.
+        let firstOfDay = !lightsOn(before)
+        entries.append(TimeEntry(propertyId: CraftFocus.rentalID(before.id == "all" ? "santa" : before.id),
+                                 participant: .selfParticipant, category: .repairs, hours: hours))
+        let willBuild = !reduceMotion && CraftHouseArt.buildClip(from: before.art, to: next, dark: scheme == .dark) != nil
+        if firstOfDay && launch.windows == nil {
+            windowsHeld.insert(before.id)
+            if !willBuild { DADemo.after(0.30) { windowsHeld.remove(before.id) } }   // after the art settles
+        }
         withAnimation(.spring(duration: 0.3, bounce: 0)) { toast = text }
         DADemo.after(2.8) { withAnimation(.easeIn(duration: 0.2)) { toast = nil } }
-        if !reduceMotion && CraftHouseArt.buildClip(from: before.art, to: next, dark: scheme == .dark) != nil {
+        if willBuild {
             building = true
             buildTick += 1
             pendingArt = (i, next, after)
@@ -476,6 +518,7 @@ struct CraftTodayScreen: View {
         withAnimation(.spring(duration: 0.40, bounce: 0)) { seed.focuses[i].logged = hours }
         knock += 1
         pendingArt = nil
+        windowsHeld.remove(seed.focuses[i].id)   // the drop is done: lights fade on
         DADemo.after(0.05) { building = false }
     }
 
@@ -511,6 +554,8 @@ struct CraftHouseArt: View {
     let side: CGFloat
     let building: Bool
     let buildTick: Int
+    /// Lit windows (hours logged today). Drives the crossfade between the asset and its "-unlit" twin.
+    var windowsLit: Bool = true
     let onBuilt: () -> Void
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -529,17 +574,49 @@ struct CraftHouseArt: View {
     }
     static func hasBuild(dark: Bool) -> Bool { buildURL(dark: dark) != nil }
 
+    /// The art lane names the dark-window render "<asset>-unlit". nil when it has not landed (use the lit asset).
+    static func unlitName(for art: CraftArt) -> String? {
+        let name = art.rawValue + "-unlit"
+        return UIImage(named: name) == nil ? nil : name
+    }
+
+    /// 0.4s warm-up; a plain linear fade under Reduce Motion.
+    private var windowsFade: Animation { reduceMotion ? .linear(duration: 0.4) : .easeInOut(duration: 0.4) }
+
+    private var spill: Color { CraftColors(dark: scheme == .dark).spill }
+
+    /// The dark-window render underneath, the lit render fading in over it. No twin yet: lit only.
+    @ViewBuilder private var stills: some View {
+        let lit = Image(art.rawValue).resizable().interpolation(.high).scaledToFit()
+        if let unlit = Self.unlitName(for: art) {
+            ZStack {
+                Image(unlit).resizable().interpolation(.high).scaledToFit()
+                lit.opacity(windowsLit ? 1 : 0).animation(windowsFade, value: windowsLit)
+            }
+        } else {
+            lit
+        }
+    }
+
     var body: some View {
         ZStack {
             // Contact shadow under the block, drawn here so the page always has weight under the object
             // (the baked render shadow is faint on a light page).
+            // Spill pool: warm light from the windows on the lot. Fades with the windows.
+            Circle()
+                .fill(RadialGradient(colors: [spill, spill.opacity(0)], center: .center, startRadius: 0, endRadius: side * 0.48))
+                .frame(width: side * 0.96, height: side * 0.96)
+                .scaleEffect(y: 0.34)
+                .offset(y: side * 0.345)
+                .opacity(windowsLit ? 1 : 0.2)
+                .animation(windowsFade, value: windowsLit)
+                .accessibilityHidden(true)
             Ellipse()
                 .fill(Color.black.opacity(dark ? 0.55 : 0.30))
                 .frame(width: side * 0.80, height: side * 0.07)
                 .blur(radius: side * 0.035)
                 .offset(y: side * 0.355)
-            Image(art.rawValue)
-                .resizable().interpolation(.high).scaledToFit()
+            stills
                 .id(art)
                 .transition(reduceMotion ? .opacity : .asymmetric(
                     insertion: .opacity.combined(with: .scale(scale: 0.97)),

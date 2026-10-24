@@ -14,6 +14,7 @@
 		03A51EB8A8E2BD88E7F540E3 /* AppViewModel+Capture.swift in Sources */ = {isa = PBXBuildFile; fileRef = D05C18E16E505EEE666FF7CC /* AppViewModel+Capture.swift */; };
 		063B1B913810D3C73CD378C4 /* CategoryManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02AE3372F32CD60F04CF317C /* CategoryManagementView.swift */; };
 		064956073D858B11B4FA3CDB /* DirALogTime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B4B13B5558AA468F03EA87D /* DirALogTime.swift */; };
+		07601362A3AE9715A57F65FC /* TodayWindowState.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0572D37F073CA07F161C11 /* TodayWindowState.swift */; };
 		08C0C118818BAEDF043B0B44 /* CaptureOptIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E98020616099455FC14D1A1 /* CaptureOptIn.swift */; };
 		0944E4FE307628EF3B154FB8 /* ClassifierChain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E3335EA8A409DEA55AE7EAE /* ClassifierChain.swift */; };
 		09FFD621E34A33D9F32EC12F /* LearnAndWhatsNewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40795DEE577B245A805AD8B8 /* LearnAndWhatsNewTests.swift */; };
@@ -186,6 +187,7 @@
 		B7EE89E0AFD88DD021946318 /* CalendarImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BDA44BD54B97B0B3D60A429 /* CalendarImportService.swift */; };
 		B865919D28E13FB618CE1ACB /* HomeProtoViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C3693F281CD0A1482B59D44 /* HomeProtoViews.swift */; };
 		B9687060260268B573989B02 /* CaptureActionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A6155D766135551C32EC91A /* CaptureActionSupport.swift */; };
+		B97745C3696506E554DEE704 /* TodayWindowStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D6F3B35F2EFEC3249A5553A /* TodayWindowStateTests.swift */; };
 		BBEC352A3CCB3B91F191241E /* NoteEvalSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF67C4B070290BFF3024504F /* NoteEvalSupport.swift */; };
 		BC8F6E92451777ADF3C1AE40 /* ColorContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1240689FADA6EC9A0D1883B /* ColorContrastTests.swift */; };
 		BFF6F8AE069FE01CE9E5414F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE13F908989158FDAB28BF57 /* Models.swift */; };
@@ -327,6 +329,7 @@
 		287714393B454D0826EED824 /* SurfacesNotificationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfacesNotificationUITests.swift; sourceTree = "<group>"; };
 		294885677A14CB0F22849EF0 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		2BEE2CF6FCD6116BAC0787F9 /* TodayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTests.swift; sourceTree = "<group>"; };
+		2D6F3B35F2EFEC3249A5553A /* TodayWindowStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayWindowStateTests.swift; sourceTree = "<group>"; };
 		2F2F3D79FA076E4AEDF11086 /* InboxComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxComponents.swift; sourceTree = "<group>"; };
 		301638903EBA477566BCEDF5 /* TodayHouseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayHouseTests.swift; sourceTree = "<group>"; };
 		31A39D3EEA4003C1B931EDA8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -477,6 +480,7 @@
 		C976B97E05FA0DD306218404 /* SurfacesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfacesTests.swift; sourceTree = "<group>"; };
 		CA2074D17A6358EF6451A083 /* CaptureFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureFlowTests.swift; sourceTree = "<group>"; };
 		CBF39EBE443D66C2EA654096 /* ProMoments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProMoments.swift; sourceTree = "<group>"; };
+		CC0572D37F073CA07F161C11 /* TodayWindowState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayWindowState.swift; sourceTree = "<group>"; };
 		CC8D329A6B3A79C54A584FAB /* PropertiesUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertiesUITests.swift; sourceTree = "<group>"; };
 		CCE30070327091F72B0D4F65 /* CalendarCaptureCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarCaptureCoordinator.swift; sourceTree = "<group>"; };
 		CD4B4980260EB2F39906C0E9 /* ClassifierTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassifierTests.swift; sourceTree = "<group>"; };
@@ -552,6 +556,7 @@
 				DE13F908989158FDAB28BF57 /* Models.swift */,
 				177A9D74876C4039825F19FA /* Suggestion.swift */,
 				3BAAF42493E4F3A16978B2B2 /* TaxProfileModels.swift */,
+				CC0572D37F073CA07F161C11 /* TodayWindowState.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -837,6 +842,7 @@
 				BDAC9A2FCA588960D010499D /* SyncGateAndTimerDraftTests.swift */,
 				301638903EBA477566BCEDF5 /* TodayHouseTests.swift */,
 				2BEE2CF6FCD6116BAC0787F9 /* TodayTests.swift */,
+				2D6F3B35F2EFEC3249A5553A /* TodayWindowStateTests.swift */,
 				82E0459733C21A2960E1B6BA /* WPRReskinTests.swift */,
 				A84A6850D05E888F5A54AED1 /* Fixtures */,
 			);
@@ -1418,6 +1424,7 @@
 				70D541578CDEBFFF0DE8591C /* TodayHouse.swift in Sources */,
 				A4605D49F7FFCCC945007522 /* TodayLogic.swift in Sources */,
 				A4294F6F1C1E361CED2A5781 /* TodayTimerSection.swift in Sources */,
+				07601362A3AE9715A57F65FC /* TodayWindowState.swift in Sources */,
 				8ED697DE6FEC7270E36DAABE /* VoiceEntryService.swift in Sources */,
 				5234E6574DCCFD5F2C378E52 /* WidgetSurface.swift in Sources */,
 				E921C9D24124044AB465A7DB /* WidgetSurfaceBuilder.swift in Sources */,
@@ -1475,6 +1482,7 @@
 				5237EDB83B597E6CAE0D5272 /* SyncGateAndTimerDraftTests.swift in Sources */,
 				74917696E05B000CA0E13CC7 /* TodayHouseTests.swift in Sources */,
 				1D20E658B574498C4400B595 /* TodayTests.swift in Sources */,
+				B97745C3696506E554DEE704 /* TodayWindowStateTests.swift in Sources */,
 				2D84EC7495B3850F73C92F1A /* WPRReskinTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -15,6 +15,18 @@ enum BrandHex {
     static let terracotta = "C8553D"
     static let plaster = "F4EFE6"
 
+    // Today page (crafted house): the house is shown at dusk, so the page is a warm dusk-tinted
+    // neutral in light and deep navy in dark. Vertical gradient top -> mid (behind the hero) -> bottom.
+    static let duskTop = "EAE3D7"
+    static let duskMid = "D8CFC0"
+    static let duskBottom = "E8E0D3"
+    static let darkNightTop = "0B1230"
+    static let darkNightBottom = "080C1D"
+    /// The warm light that spills from the windows onto the lot (hue ~35, soft). Same hue both modes.
+    static let spill = "E9A558"
+    static let spillOpacity = 0.34
+    static let darkSpillOpacity = 0.12
+
     // Light
     static let canvas = "EEF2FA"
     static let card = "FFFFFF"
