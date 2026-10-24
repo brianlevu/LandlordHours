@@ -71,6 +71,9 @@ struct LandlordHoursApp: App {
             if let board = SurfaceBoardLaunch.current {
                 // Surfaces capture boards (-LHSurfaceBoard <name>); see SurfaceCaptureBoard.swift.
                 SurfaceCaptureRoot(launch: board)
+            } else if let dirA = DirALaunch.current {
+                // Direction A, Job Site (-LHDirection A); see Views/Debug/DirA.
+                DirARoot(launch: dirA)
             } else if let stdProto = StdProtoLaunch.current {
                 // Design-standard mockups (-LHStdProto <screen>); see Views/Debug/StdProto.
                 StdProtoRoot(launch: stdProto)
