@@ -109,26 +109,30 @@ Say which anchor, what matches (row rhythm, type scale, spacing, motion), and wh
 
 ---
 
-# Gate rubric addendum: design standard v2, the crafted object (2026-10-24)
+# Gate rubric addendum: design standard v2, the crafted object (2026-10-24, r2)
 
 Source of truth: `docs/design/DESIGN-STANDARD.md` §H and §F. Applies to every hero screen (Today, the rental page, Welcome, the Inbox empty state, the milestone) on top of the sections above. Tool changes are specified in `scripts/qa/NOTES-standard-v2.md`; until they land, the gate measures these by hand in PIL and prints the numbers.
 
 ## 6. The hero (measured)
 
-- The house art bounding box is **36–46%** of the window height at default Dynamic Type, **24–32%** at AX; the frame is a square of side `min(W − 12, round(0.446 × H))` (390 on 402×874; 295 at AX). Art hidden at AX is a BLOCKER (D3c v2).
+- The house art bounding box is **36–46%** of the window height at default Dynamic Type, **24–32%** at AX, taken from the still's alpha at the known placement (stage scale and lift, §H.1), never from a count of non-page pixels (that count includes the night backlight and the spill pool). The frame is a square of side `min(W − 12, round(0.446 × H))` (390 on 402×874; 295 at AX; 297 on SE), derived on a frame as `lot_width / (0.96 × stage_scale)`. The ground line is an asset check, not a frame check. Art hidden at AX is a BLOCKER (D3c v2).
 - The art sits on the page: no closed card edge around it. A card around the hero is a BLOCKER.
-- Art p99 contrast vs the page: **≥ 3.0:1** lit (and framing with the lamp), **≥ 2.4:1** unlit at night. Below = BLOCKED.
+- Art p99 contrast vs the page (a highlight proxy) plus the mean-luma lift (house minus page, ≥ +5). Lit and framing with the lamp: p99 **≥ 3.0:1**. Unlit at night: **PASS ≥ 2.55, MARGINAL 2.40–2.55 (to Brian with the frame), BLOCKED < 2.40**. Today's half (2.51) and finished (2.48) unlit night frames are MARGINAL.
 - Lit and unlit frames of one state differ (hashes and window-box luma); the `-unlit` frame is darker in the windows. Equal = "state not captured", BLOCKED.
 - The number block overlaps the frame bottom by 44 ± 4pt at default (0 at AX); the chip, dots and number never intersect the art otherwise.
 - The page is the gradient (`#EAE3D7 → #D8CFC0 → #E8E0D3` light; `#0B1230 → #080C1D` dark), never flat, never a grid. The spill pool and (dark) backlight are present and fade with the windows.
-- Text on the light page is one of `textPrimary`, `textSecondary`, `action`, `behind #9A3624`, `positiveOnPage #0C5A30`, measured against the gradient step behind it. Any other ink on the page is a finding with its ratio (they all measure 3.5–3.9:1 on `#D8CFC0`).
+- Text on the light page is one of `textPrimary`, `textSecondary`, `action`, `behind #9A3624`, `positiveOnPage #0C5A30`, measured against the gradient step behind it. Any other ink on the page is a finding with its ratio (they all measure 3.5–3.9:1 on `#D8CFC0`); a `caution` state header on the page is a FAIL (§1.15).
 - Cards on the page carry a 1pt `pageCardEdge` (`#A3966F` / `#2A3560`).
-- Tab bar: native `TabView`, five items, "Log time" is the `plus` item with `role: .search`; selected-label contrast ≥ 4.5:1 in both appearances (a fixed light tint in dark measured 3.21:1 and is the known defect).
-- Today at default: chip + hero + number + pace + "To confirm · N" + 2 rows + "See all" foot above the tab bar. At AX: chip + hero + number + pace above the bar; the AX chip never truncates mid-word.
+- Tab bar: native `TabView`, five items (Today, Inbox, Records, Rentals, Log time), "Log time" is the `plus` item with `role: .search`, the fifth item inside the bar as in the locked iOS 27 frame; frames on iOS 18, 26 and 27 compared to it; VoiceOver reads "Log time", not "Search"; selected-label contrast ≥ 4.5:1 in both appearances (a fixed light tint in dark measured 3.21:1 and is the known defect).
+- Today at default: chip + hero + number + pace + "To confirm · N" + 2 rows + "See all" foot above the tab bar; under 700pt of window height (SE, Duo closed), 1 row. At AX: chip + hero + number + pace above the bar; the AX chip never truncates mid-word.
+- Open finding to judge on the first AX3 Today frame: the 54pt numeral renders smaller than "of 100 hours" (the hierarchy inverts). Measure both glyph heights and report; do not pass it silently.
+- The hero toast sits in the chip's slot and the chip is hidden while it shows; a toast overlapping the chip or a roof is a FAIL.
+- The launch frame and its handoff are `pageTop`/night, never blueprint `#1E3FA6` (§H.5).
+- Light-mode tab-switch capture (Today → Inbox → Today): write one sentence on whether the warm-to-cool jump reads as a seam.
 
 ## 7. Motion (measured on a 30 fps capture)
 
-The log flow shows the timber drop (≥ 24 consecutive changed frames in the lot region), no hard cuts outside the two crossfade windows, then the windows fading on over 0.30–0.47 s when it was the first hour of the day. Order: drop → windows → (later) scene. Nothing moves on appear, on a timer or on scroll. A static capture of a flow that should animate is BLOCKED ("no-animation capture").
+The log flow shows the timber drop (≥ 24 consecutive changed frames in the lot region), no hard cuts outside the two crossfade windows, then the windows fading on over 0.30–0.47 s when it was the first hour of the day. Order: drop → windows → (milestone) one confetti beat → (later) scene. A milestone with a sign, words in the scene or linework is a FAIL. `rentalSlide` ≤ 0.30 s. A two-stage jump plays no in-between stage (§H.6). Nothing moves on appear, on a timer or on scroll. A static capture of a flow that should animate is BLOCKED ("no-animation capture").
 
 ## 8. Anchor question for hero screens (judgment, written)
 
