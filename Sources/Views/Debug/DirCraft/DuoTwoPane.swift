@@ -38,6 +38,8 @@ enum DuoGeo {
     static var pane: CGFloat { (open.width - hinge) / 2 }      // 463.5
     static let topInset: CGFloat = 24                           // landscape status bar (assumed)
     static let bottomInset: CGFloat = 20                        // home indicator (assumed)
+    /// Room the floating tab bar takes at the foot of a pane (bar ~62pt + its float gap + a little air).
+    static let barClearance: CGFloat = 84
 }
 
 enum DuoRight: Equatable { case list, detail(String), log }
@@ -341,9 +343,9 @@ struct DuoWorkstation: View {
                 }
             }
             .padding(.horizontal, 16).padding(.top, 8)
-            if let s = selected, maxRows == nil { loggedToday(s).padding(.horizontal, 16).padding(.top, 12) }
-            Color.clear.frame(height: 16)
+            if let s = selected { loggedToday(s).padding(.horizontal, 16).padding(.top, 10) }
         }
+        .contentMargins(.bottom, DuoGeo.barClearance, for: .scrollContent)   // at rest the last card ends above the bar
         .scrollIndicators(.hidden)
     }
 
@@ -356,14 +358,18 @@ struct DuoWorkstation: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(CL("On the record today")).font(.headline).foregroundStyle(c.ink).accessibilityAddTraits(.isHeader)
                 Spacer()
-                Text(StdFormat.hours(entries.reduce(0) { $0 + $1.2 })).font(.headline).monospacedDigit().foregroundStyle(c.ink)
+                if !entries.isEmpty {
+                    Text(StdFormat.hours(entries.reduce(0) { $0 + $1.2 })).font(.headline).monospacedDigit().foregroundStyle(c.ink)
+                }
             }
-            .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 10)
+            .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 8)
             if entries.isEmpty {
-                DAHairline()
-                Text(CL("Nothing logged at \(r.name) yet today."))
+                // Zero logged: one honest line, no figure, no button. The card keeps its place so the page doesn't jump.
+                DAHairline().padding(.leading, 16)
+                Text(CL("Nothing logged yet today."))
                     .font(.subheadline).foregroundStyle(c.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading).padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16).padding(.vertical, 14)
             }
             ForEach(Array(entries.enumerated()), id: \.offset) { _, e in
                 DAHairline().padding(.leading, 16)
@@ -375,7 +381,7 @@ struct DuoWorkstation: View {
                     Spacer(minLength: 8)
                     Text(StdFormat.hours(e.2)).font(.subheadline.weight(.semibold)).monospacedDigit().foregroundStyle(c.ink)
                 }
-                .padding(.horizontal, 16).padding(.vertical, 10).frame(minHeight: 56)
+                .padding(.horizontal, 16).padding(.vertical, 8).frame(minHeight: 52)
             }
         }
     }
@@ -569,6 +575,8 @@ struct DuoShelf: View {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .footnote) private var labelHeight: CGFloat = 40
+    @ScaledMetric(relativeTo: .footnote) private var slotW: CGFloat = 108   // wide enough that labels wrap at word breaks
+    @Environment(\.dynamicTypeSize) private var typeSize
     static let model: CGFloat = 104
     static let slot: CGFloat = 108
 
@@ -591,13 +599,17 @@ struct DuoShelf: View {
             }
             .scrollIndicators(.hidden)
             .defaultScrollAnchor(.center, for: .alignment)   // centred when every rental fits
-            .mask {   // soft edges once the shelf scrolls, so a clipped neighbour reads as "more", not as a cut label
-                LinearGradient(stops: items.count > 4
-                               ? [.init(color: .clear, location: 0), .init(color: .clear, location: 0.05),
-                                  .init(color: .black, location: 0.16), .init(color: .black, location: 0.84),
-                                  .init(color: .clear, location: 0.95), .init(color: .clear, location: 1)]
-                               : [.init(color: .black, location: 0), .init(color: .black, location: 1)],
-                               startPoint: .leading, endPoint: .trailing)
+            .mask {   // edges once the shelf scrolls: steep, so a label is either readable (>= 4.5:1) or cut, never mid-fade
+                GeometryReader { g in
+                    let w = max(g.size.width, 1)
+                    LinearGradient(stops: (items.count > 4 || typeSize.isAccessibilitySize)
+                                   ? [.init(color: .clear, location: 0), .init(color: .clear, location: 9 / w),
+                                      .init(color: .black.opacity(0.8), location: 13 / w), .init(color: .black, location: 36 / w),
+                                      .init(color: .black, location: 1 - 36 / w), .init(color: .black.opacity(0.8), location: 1 - 13 / w),
+                                      .init(color: .clear, location: 1 - 9 / w), .init(color: .clear, location: 1)]
+                                   : [.init(color: .black, location: 0), .init(color: .black, location: 1)],
+                                   startPoint: .leading, endPoint: .trailing)
+                }
             }
             .onAppear { proxy.scrollTo(selectedID, anchor: .center) }
         }
@@ -624,7 +636,7 @@ struct DuoShelf: View {
                 .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(on ? c.chipBorder : .clear, lineWidth: 0.8))
                 .shadow(color: .black.opacity(on ? 0.10 : 0), radius: 4, y: 1)
             }
-            .frame(width: Self.slot)
+            .frame(width: max(Self.slot, slotW))
         }
         .buttonStyle(DAPress())
         .accessibilityLabel(CL("\(r.name), \(status(r))"))
@@ -694,13 +706,22 @@ struct DuoFrontDoor: View {
                     }
                     .frame(width: door.width, height: door.height).offset(x: door.minX, y: door.minY)
                     .opacity(glow)
-                Ellipse()
-                    .fill(RadialGradient(colors: [warm.opacity(dark ? 0.85 : 0.45), warm.opacity(0)], center: .center,
-                                         startRadius: 0, endRadius: door.width * 1.6))
-                    .frame(width: door.width * 3.2, height: door.width * 1.3)
-                    .offset(x: door.minX - door.width * 0.6, y: door.maxY - door.width * 0.45)
+                // Spill on the step and path: a smooth radial falloff (no edge), brightest at the threshold, pushed
+                // forward and to the viewer's left by the leaf's swing (a shear that grows with the door angle).
+                let spill = door.width * 3.4
+                RadialGradient(stops: [.init(color: warm.opacity(dark ? 0.62 : 0.42), location: 0),
+                                       .init(color: warm.opacity(dark ? 0.40 : 0.27), location: 0.22),
+                                       .init(color: warm.opacity(dark ? 0.19 : 0.13), location: 0.48),
+                                       .init(color: warm.opacity(dark ? 0.06 : 0.03), location: 0.76),
+                                       .init(color: warm.opacity(0), location: 1)],
+                               center: .center, startRadius: 0, endRadius: spill / 2)
+                    .frame(width: spill, height: spill * 0.62)
+                    .transformEffect(CGAffineTransform(a: 1, b: 0, c: 0.45 * open, d: 1, tx: 0, ty: 0))
+                    .rotationEffect(.degrees(16 * open))
+                    .offset(x: door.midX - spill / 2 + door.width * (0.5 + 0.9 * open), y: door.maxY - spill * 0.62 / 2 + door.width * 0.5)
                     .blendMode(dark ? .plusLighter : .screen)
-                    .opacity(glow * 0.9)
+                    .opacity(glow)
+                    .allowsHitTesting(false)
                 // The leaf: the still's own door pixels, swung on its left hinge in perspective (a sheared quad that
                 // narrows and turns away), darkening as it turns out of the light.
                 Image(art.rawValue).resizable().interpolation(.high)
@@ -739,7 +760,7 @@ struct DuoProppedView: View {
                         .frame(height: half, alignment: .top)
                         .background { CraftPage().ignoresSafeArea() }
                     Color.clear.frame(height: DuoGeo.hinge)
-                    DuoWorkstation(rentals: DuoV2Seed.three, selectedID: $selectedID, right: $right, maxRows: 3,
+                    DuoWorkstation(rentals: DuoV2Seed.three, selectedID: $selectedID, right: $right, maxRows: 1,
                                    glowCenter: UnitPoint(x: 0.5, y: -0.05))
                         .frame(maxHeight: .infinity)
                 }
@@ -769,11 +790,18 @@ struct DuoCard<Content: View>: View {
     /// Light: pageCardEdge. Night: duoNightCardEdge #3A4778 (new, Duo only): 2.06:1 on the night room #0B1230, inside
     /// the H.4 card-edge band (1.9-2.2); the shared dark edge #2A3560 measures 1.55 there.
     private var edge: Color { scheme == .dark ? Color(hex: "3A4778") : craft.c.cardEdge }
+    /// Night: a slightly brighter edge on the fold side only, where the card crosses the warm pool (2.0:1 there).
+    private var edgeStyle: AnyShapeStyle {
+        scheme == .dark
+            ? AnyShapeStyle(LinearGradient(stops: [.init(color: Color(hex: "424F84"), location: 0), .init(color: edge, location: 0.55)],
+                                           startPoint: .leading, endPoint: .trailing))
+            : AnyShapeStyle(edge)
+    }
     var body: some View {
         VStack(spacing: 0) { content }
             .background(env.c.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(edge, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(edgeStyle, lineWidth: 1))
             .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
     }
 }
@@ -804,6 +832,10 @@ enum DuoV2Snapshotter {
                     ("open-logtime\(sfx)", AnyView(DuoOpenView(right: .log)), size),
                 ]
             }
+            shots += [
+                ("open-3rentals-AX3", AnyView(DuoOpenView()), .accessibility3),
+                ("open-zerologged", AnyView(DuoOpenView(rentals: DuoV2Seed.eight, selectedID: "oak")), .large),
+            ]
             shots.append(("open-allrentals", AnyView(DuoOpenView(selectedID: "all")), .large))
             shots.append(("open-hinge-annotated", AnyView(DuoOpenView(annotate: true)), .large))
             for (name, view, size) in shots {

@@ -286,6 +286,17 @@
           }
         }
       }
+    },
+    "Nothing logged yet today.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing logged yet today."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
