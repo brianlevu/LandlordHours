@@ -236,19 +236,21 @@ struct CraftTodayScreen: View {
     private var focus: CraftFocus { seed.focuses.first { $0.id == focusID } ?? seed.focuses[0] }
     private var focusIndex: Int { seed.focuses.firstIndex { $0.id == focusID } ?? 0 }
     private var ax: Bool { typeSize.isAccessibilitySize }
-    /// The diorama's square frame. 430pt puts the object itself at ~41% of an 874pt screen;
-    /// at AX sizes it steps down so a row still shows above the tab bar.
-    private var artSide: CGFloat { ax ? 200 : 430 }
+    /// The diorama's square frame: 390pt at every size, 44.6% of an 874pt screen (was 49%). At AX sizes it holds
+    /// so the house stays tall and the page scrolls beneath it.
+    private var artSide: CGFloat { 390 }
     private var numeralPt: CGFloat { min(heroSize, ax ? 72 : 84) }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                switcher.padding(.top, 4)
+                if ax { switcher.padding(.top, 4) }
                 hero
+                    .padding(.top, ax ? 0 : 10)     // headroom so the rental chip clears the roof ridge at "finished"
+                    .overlay(alignment: .top) { if !ax { switcher.padding(.top, 4) } }   // in the diorama's headroom
                 numberBlock
-                    .padding(.top, ax ? 4 : -34)     // the number sits in the diorama's shadow, like a score under a gem
-                confirmBlock.padding(.top, ax ? 16 : 28)
+                    .padding(.top, ax ? 8 : -44)     // the number sits in the diorama's shadow, like a score under a gem
+                confirmBlock.padding(.top, ax ? 16 : 8)
             }
             .padding(.bottom, 24)
         }
@@ -312,7 +314,7 @@ struct CraftTodayScreen: View {
     private var hero: some View {
         VStack(spacing: 0) {
             ZStack {
-                CraftHouseArt(art: focus.art, building: building, buildTick: buildTick) {
+                CraftHouseArt(art: focus.art, dark: scheme == .dark, side: artSide, building: building, buildTick: buildTick) {
                     finishBuild()
                 }
                 .id(focus.id)
@@ -453,7 +455,7 @@ struct CraftTodayScreen: View {
         let next = CraftFocus.art(hours: after, goal: before.goal)
         withAnimation(.spring(duration: 0.3, bounce: 0)) { toast = text }
         DADemo.after(2.8) { withAnimation(.easeIn(duration: 0.2)) { toast = nil } }
-        if before.art == .frame70 && next == .framing && !reduceMotion && CraftHouseArt.hasBuild(dark: scheme == .dark) {
+        if !reduceMotion && CraftHouseArt.buildClip(from: before.art, to: next, dark: scheme == .dark) != nil {
             building = true
             buildTick += 1
             pendingArt = (i, next, after)
@@ -505,10 +507,22 @@ private struct CraftGlassCapsule: ViewModifier {
 
 struct CraftHouseArt: View {
     let art: CraftArt
+    let dark: Bool
+    let side: CGFloat
     let building: Bool
     let buildTick: Int
     let onBuilt: () -> Void
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Hook for the art lane: a build sequence for a stage advance (alpha clip), or nil to use the
+    /// default stage change (0.25s fade with a small scale settle). Add cases here as clips arrive.
+    static func buildClip(from: CraftArt, to: CraftArt, dark: Bool) -> URL? {
+        switch (from, to) {
+        case (.frame70, .framing): return buildURL(dark: dark)
+        default: return nil
+        }
+    }
 
     static func buildURL(dark: Bool) -> URL? {
         Bundle.main.url(forResource: dark ? "craft_build_dark" : "craft_build_light", withExtension: "mov")
@@ -517,12 +531,24 @@ struct CraftHouseArt: View {
 
     var body: some View {
         ZStack {
+            // Contact shadow under the block, drawn here so the page always has weight under the object
+            // (the baked render shadow is faint on a light page).
+            Ellipse()
+                .fill(Color.black.opacity(dark ? 0.55 : 0.30))
+                .frame(width: side * 0.80, height: side * 0.07)
+                .blur(radius: side * 0.035)
+                .offset(y: side * 0.355)
             Image(art.rawValue)
                 .resizable().interpolation(.high).scaledToFit()
+                .id(art)
+                .transition(reduceMotion ? .opacity : .asymmetric(
+                    insertion: .opacity.combined(with: .scale(scale: 0.97)),
+                    removal: .opacity))
             if building, let url = Self.buildURL(dark: scheme == .dark) {
                 CraftVideo(url: url, tick: buildTick, onEnd: onBuilt)
             }
         }
+        .animation(.easeOut(duration: reduceMotion ? 0.15 : 0.25), value: art)
     }
 }
 
