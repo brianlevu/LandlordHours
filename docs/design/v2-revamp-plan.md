@@ -114,6 +114,8 @@ Each package owns its files; every file appears in exactly one package. Later pa
 
 ### Package J · Adaptive: two-pane on Duo and iPad (added 2026-10-24)
 
+> **iPad sizing is settled in this build (Brian, 2026-10-25).** The consistency sheet (`~/AgentScratch/landlordhours/2026-10-25/consistency/sheet.jpg`, prototype branch `proto/ipad-two-pane`) proves the pane order matches on every device, but it renders the iPad panes at phone sizes, which leaves about 40% empty wall. J scales the hero, shelf, rows and cards per pane width, so no pane exceeds DU4's 20% empty wall. It applies the 800×645 rule (the sheet used the old 784), and puts the compact iPad tab bar at the foot, not the system top bar. The gate measures all three on iPad 13" and 11" in both orientations. There is no separate mockup round.
+
 The standard's §1.27 was rewritten as one model for iPhone, iPad and the Duo: compact (one column) below 800×645pt; two-pane (house left, workstation right, the same on iPad and the Duo) at 800×645 and up or with the Duo held open; stacked when the Duo is propped. J builds two-pane and stacked; C to I build only compact screens and expose their content so J can host it.
 
 - **J1 · Contract (small, lands right after A, before C–G start their detail work).** `LayoutMode`, `PaneContext`, an empty `TwoPaneLayout` that shows the compact root at every width. Each of C (Today), D (Inbox), E (Log time), F (Rentals), G (Records), H (Settings) then builds its detail and create flows as **views** that read `PaneContext` and present as a sheet (compact) or push in place (pane); they never check widths themselves.
