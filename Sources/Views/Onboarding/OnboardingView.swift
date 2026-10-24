@@ -276,24 +276,25 @@ struct OnbRoot: View {
         GeometryReader { g in
             let top = embedded ? 0 : g.safeAreaInsets.top
             let bottom = embedded ? 0 : g.safeAreaInsets.bottom
+            // Side insets (iPhone Duo folded: an 84 pt vertical status bar on the trailing edge).
+            // Content stays inside them; the blueprint paper runs under them.
+            let lead = embedded ? 0 : g.safeAreaInsets.leading
+            let trail = embedded ? 0 : g.safeAreaInsets.trailing
             let H = g.size.height + top + bottom
             let W = g.size.width
+            let hideHouse = flow.step == .welcome && !embedded && typeSize.isAccessibilitySize
             let full = flow.step.isFullBleed && !embedded
             let bandH = full ? H : (keyboardUp ? top + 50 + 96 : H * (embedded ? bandFraction + 0.02 : bandFraction))
             let scene = sceneFrame(W: W, H: H, top: top, bandH: bandH)
 
             ZStack(alignment: .top) {
-                OnbColor.card
-
-                HouseBlueprintPaper()
-                    .frame(width: W, height: bandH)
-                    .clipped()
-                    .accessibilityHidden(true)
-
                 OnbScene(flow: flow, step: flow.step)
                     .dynamicTypeSize(.large)                  // decorative drawing; the sheet carries the readable copy
                     .frame(width: scene.width, height: scene.width)
                     .position(x: scene.midX, y: scene.midY)
+                    // Accessibility sizes give the room to the words; the house returns on the steps.
+                    .opacity(hideHouse ? 0 : 1)
+                    .accessibilityHidden(hideHouse)
 
                 if !full { chrome(top: top) }
 
@@ -303,7 +304,7 @@ struct OnbRoot: View {
                 }
 
                 if flow.step == .welcome && !embedded {
-                    OnbWelcomeContent(flow: flow, houseBottom: scene.maxY - scene.width * 0.08)
+                    OnbWelcomeContent(flow: flow, leadInset: lead, trailInset: trail, houseBottom: typeSize.isAccessibilitySize ? top + 12 : scene.maxY - scene.width * 0.08)
                         .frame(width: W, height: H)
                         .transition(.opacity)
                 }
@@ -314,6 +315,15 @@ struct OnbRoot: View {
                 }
             }
             .frame(width: W, height: H)
+            // Paper and card are backgrounds so the wider paper never changes the layout width.
+            .background(alignment: .top) {
+                HouseBlueprintPaper()
+                    .frame(width: W + lead + trail, height: bandH)
+                    .clipped()
+                    .offset(x: (trail - lead) / 2)
+                    .accessibilityHidden(true)
+            }
+            .background(OnbColor.card)
             .environment(\.onbBottomInset, max(bottom, 16))
             .offset(y: -top)
         }
@@ -332,7 +342,7 @@ struct OnbRoot: View {
     private func sceneFrame(W: CGFloat, H: CGFloat, top: CGFloat, bandH: CGFloat) -> CGRect {
         switch flow.step {
         case .welcome where !embedded:
-            let s = min(W * 0.92, H * (typeSize >= .xLarge ? 0.30 : 0.42))
+            let s = min(W * 0.92, H * (typeSize >= .xLarge ? 0.30 : (H < 760 ? 0.28 : 0.42)))
             return CGRect(x: (W - s) / 2, y: top + 4, width: s, height: s)
         case .staked where !embedded:
             let s = min(W * 0.96, H * 0.45)
@@ -412,12 +422,16 @@ struct OnbRoot: View {
 
 struct OnbWelcomeContent: View {
     let flow: OnbFlow
+    /// Side safe-area insets the scrims run under, so the paper has no seam beside the content.
+    var leadInset: CGFloat = 0
+    var trailInset: CGFloat = 0
     var houseBottom: CGFloat
     @EnvironmentObject private var viewModel: AppViewModel
     @Environment(\.onbBottomInset) private var bottomInset
     @Environment(\.onbWelcomeAccount) private var account
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.onbLeaveWelcome) private var leaveWelcome
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var restorable: [DiscoveredProfile] = []
     @State private var cloudProblem = false
     @State private var isRetrying = false
@@ -449,7 +463,14 @@ struct OnbWelcomeContent: View {
                         VStack(alignment: .leading, spacing: 8) { chips }
                     }
                     .padding(.top, 18)
-                    .padding(.bottom, 28)          // clears the scrim above the pinned buttons
+                    .padding(.bottom, 52)          // clears both scrims (44 pt fade + 40 pt button scrim) so the last chip stays readable
+                    // Accessibility sizes: only "Get started" stays pinned; the returning-user rows
+                    // scroll with the words, so the headline gets the room and nothing is cut off.
+                    if typeSize.isAccessibilitySize {
+                        VStack(spacing: 10) { secondaryRows }
+                            .frame(maxWidth: .infinity)
+                            .padding(.bottom, 28)
+                    }
                 }
                 .padding(.horizontal, 24)
             }
@@ -458,36 +479,16 @@ struct OnbWelcomeContent: View {
             .overlay(alignment: .bottom) {
                 LinearGradient(colors: [HouseTokens.blueprintDeep.opacity(0), HouseTokens.blueprintDeep], startPoint: .top, endPoint: .bottom)
                     .frame(height: 44)
+                    .padding(.horizontal, -24)
+                    .padding(.leading, -leadInset)
+                    .padding(.trailing, -trailInset)
                     .allowsHitTesting(false)
             }
             VStack(spacing: 10) {
                 Button("Get started") { flow.start(OnbMotion.morph(reduce)) }
                     .buttonStyle(OnbHeroPill())
                     .accessibilityIdentifier("onb-start")
-                if account == .shown {
-                    // Apple's own button (App Review): white on the blueprint, small, under the pill.
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 10) { accountLead; appleButton }
-                        VStack(spacing: 8) { accountLead; appleButton }
-                    }
-                    .padding(.top, 4)
-                    if !restorable.isEmpty || cloudProblem {
-                        Button { showRestore = true } label: {
-                            if restorable.count <= 1 { Text("Restore earlier records") } else { Text("Restore earlier records (\(restorable.count))") }
-                        }
-                            .buttonStyle(OnbLink(color: HouseTokens.onHeroPrimary))
-                            .font(.footnote.weight(.semibold))
-                            // Wraps to a second line at large sizes; never truncates, never overlaps.
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("welcome.restoreEarlierData")
-                    }
-                }
-                Text("Your records stay on your iPhone and in your iCloud.")
-                    .font(.footnote)
-                    .foregroundStyle(HouseTokens.onHeroSecondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 2)
+                if !typeSize.isAccessibilitySize { secondaryRows }
             }
             .padding(.horizontal, 24)
             .padding(.top, 12)
@@ -495,6 +496,9 @@ struct OnbWelcomeContent: View {
             .background(alignment: .top) {
                 LinearGradient(colors: [HouseTokens.blueprintDeep.opacity(0), HouseTokens.blueprintDeep.opacity(0.85)], startPoint: .top, endPoint: .init(x: 0.5, y: 0.25))
                     .padding(.top, -40)
+                    .padding(.horizontal, -24)
+                    .padding(.leading, -leadInset)
+                    .padding(.trailing, -trailInset)
                     .allowsHitTesting(false)
             }
         }
@@ -527,6 +531,34 @@ struct OnbWelcomeContent: View {
         } message: {
             Text(AppleSignInFlow.failureMessage)
         }
+    }
+
+    /// Returning-user rows under "Get started": Sign in with Apple, restore, and the privacy line.
+    @ViewBuilder private var secondaryRows: some View {
+                if account == .shown {
+                    // Apple's own button (App Review): white on the blueprint, small, under the pill.
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 10) { accountLead; appleButton }
+                        VStack(spacing: 8) { accountLead; appleButton }
+                    }
+                    .padding(.top, 4)
+                    if !restorable.isEmpty || cloudProblem {
+                        Button { showRestore = true } label: {
+                            if restorable.count <= 1 { Text("Restore earlier records") } else { Text("Restore earlier records (\(restorable.count))") }
+                        }
+                            .buttonStyle(OnbLink(color: HouseTokens.onHeroPrimary))
+                            .font(.footnote.weight(.semibold))
+                            // Wraps to a second line at large sizes; never truncates, never overlaps.
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("welcome.restoreEarlierData")
+                    }
+                }
+                Text("Your records stay on your iPhone and in your iCloud.")
+                    .font(.footnote)
+                    .foregroundStyle(HouseTokens.onHeroSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
     }
 
     private func search(announce: Bool) async {
@@ -583,8 +615,10 @@ struct OnbWelcomeContent: View {
             Text(h).font(.subheadline.weight(.bold)).monospacedDigit().foregroundStyle(HouseTokens.onHeroPrimary)
             Text(label).font(.subheadline).foregroundStyle(HouseTokens.onHeroSecondary)
         }
-        .lineLimit(1)
-        .fixedSize()
+        // Accessibility sizes: a chip wraps inside the screen instead of running past it (a chip
+        // wider than the screen widened the whole page and pushed the headline off the edge).
+        .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+        .fixedSize(horizontal: !typeSize.isAccessibilitySize, vertical: true)
         .padding(.horizontal, 10)
         .frame(minHeight: 32)
         .overlay(Capsule().strokeBorder(HouseTokens.drafting.opacity(0.45), lineWidth: 1))
