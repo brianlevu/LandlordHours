@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - Today, below the house: the rules (pure, unit-tested)
 //
@@ -7,14 +8,15 @@ import Foundation
 // views. The views in TodayComponents.swift only draw what these return.
 
 /// The "To confirm" block. Its items and its count come from the Inbox's own list
-/// (`InboxViewModel.visible`), so the capsule, "Review all N" and the Inbox tab badge are one
-/// number and can never drift apart.
+/// (`InboxViewModel.visible`), so the count, "See all N" and the Inbox tab badge are one number
+/// and can never drift apart. v2 (§H.8): at most two rows on Today (one under 700pt of window
+/// height or at XXL), then a "See all N" foot.
 enum TodayConfirm {
-    /// Rows shown in the card before "Review all N".
-    static let rowLimit = 3
+    /// Rows shown on Today at the default size (§H.8).
+    static let rowLimit = 2
 
     enum State: Equatable {
-        /// No property yet: the hero's empty lot carries the one action, so the block is hidden.
+        /// No property yet: the hero's own action carries the screen, so the block is hidden.
         case hidden
         /// One or more items waiting (rows, most likely first).
         case rows
@@ -34,13 +36,22 @@ enum TodayConfirm {
     /// The badge number: every visible pending item (the Inbox's `badgeCount`).
     static func count(visible: [Suggestion]) -> Int { visible.count }
 
-    /// The rows Today shows: most likely first (the Inbox's backfill ranking), at most three.
-    static func rows(visible: [Suggestion]) -> [Suggestion] {
-        Array(InboxLogic.ranked(visible).prefix(rowLimit))
+    /// The rows Today shows: most likely first (the Inbox's backfill ranking), at most `limit`.
+    static func rows(visible: [Suggestion], limit: Int = rowLimit) -> [Suggestion] {
+        Array(InboxLogic.ranked(visible).prefix(max(0, limit)))
     }
 
-    /// "Review all 8" shows only when there is more than the card holds.
-    static func showsReviewAll(count: Int) -> Bool { count > rowLimit }
+    /// The "See all N" foot shows when more are waiting than the rows hold.
+    static func showsReviewAll(count: Int, limit: Int = rowLimit) -> Bool { count > max(0, limit) }
+
+    /// §H.8 / D3b: 2 rows at default; 1 when the window is under 700pt tall or the text is at XXL
+    /// or XXXL (the AX sizes scroll, so they keep 2).
+    static func rowLimit(windowHeight: CGFloat, typeSize: DynamicTypeSize) -> Int {
+        if typeSize.isAccessibilitySize { return rowLimit }
+        if windowHeight > 0 && windowHeight < 700 { return 1 }
+        if typeSize >= .xxLarge { return 1 }
+        return rowLimit
+    }
 }
 
 // MARK: - This week
@@ -337,5 +348,141 @@ struct TodayHeroCopy: Equatable {
         return i.hours >= expected
             ? result(String(localized: "on pace for Dec 31"), .positive)
             : result(finishLine, .caution)
+    }
+}
+
+// MARK: - v2: the crafted hero's focus, figures and pace sentence (standard §H.1 H10, §H.8)
+
+/// How a status line reads: met/on pace, behind, or nothing to judge yet. (Moved here from the
+/// retired `HouseHeroView`; `TodayHeroCopy` still speaks it.)
+enum HouseStatusTone: Equatable, Sendable {
+    case positive, caution, neutral
+}
+
+/// A save the hero should show: hours moved from `oldHours` to `newHours`. (Moved here from the
+/// retired `ConfirmBuildAnimation`; `TodayHouseEvents` queues it.)
+struct HouseConfirmEvent: Equatable {
+    let id = UUID()
+    let oldHours: Double
+    let newHours: Double
+}
+
+/// One page of the rental switcher: one rental, or "All rentals" (H10).
+struct TodayFocus: Identifiable, Equatable, Sendable {
+    /// nil = All rentals.
+    let rentalID: UUID?
+    let name: String
+    /// Confirmed, countable hours this tax year.
+    let hours: Double
+    /// The goal the house measures against.
+    let goal: Double
+
+    /// Stable id: the rental's UUID string, or "all" (the drop ledger's key).
+    var id: String { CraftDropLedger.focus(rentalID: rentalID) }
+    var totals: CraftHeroTotals { CraftHeroTotals(hours: hours, goal: goal) }
+    /// The one stage function, through `CraftHeroTotals`.
+    var stage: CraftStage { totals.stage }
+    /// The rentals whose entries light the windows (nil = all of them).
+    var rentalIDs: Set<UUID>? { rentalID.map { [$0] } }
+    var isAllRentals: Bool { rentalID == nil }
+}
+
+enum TodayFocusList {
+    struct Rental: Equatable, Sendable {
+        let id: UUID
+        let name: String
+        let hours: Double
+    }
+
+    /// One page per rental; with two or more rentals, "All rentals" leads as the first page (H10):
+    /// the sum of their hours against the largest goal, through the same stage function.
+    static func make(rentals: [Rental], goal: Double, allRentalsName: String) -> [TodayFocus] {
+        let singles = rentals.map { TodayFocus(rentalID: $0.id, name: $0.name, hours: $0.hours, goal: goal) }
+        guard singles.count > 1 else { return singles }
+        let all = CraftHeroTotals.allRentals(singles.map(\.totals))
+        return [TodayFocus(rentalID: nil, name: allRentalsName, hours: all.hours, goal: all.goal)] + singles
+    }
+
+    /// Which page Today opens on: the remembered one if it still exists, else the rental the goal is
+    /// counted on (`todayFocusProperty`), else the first page.
+    static func initialFocusID(_ focuses: [TodayFocus], remembered: String?, countedRental: UUID?) -> String? {
+        if let remembered, focuses.contains(where: { $0.id == remembered }) { return remembered }
+        if let countedRental, let match = focuses.first(where: { $0.rentalID == countedRental }) { return match.id }
+        return focuses.first?.id
+    }
+
+    /// The page `step` away from `current`, wrapping (swipe on the house, VoiceOver adjust).
+    static func step(_ focuses: [TodayFocus], from current: String?, by step: Int) -> String? {
+        guard !focuses.isEmpty else { return nil }
+        let i = focuses.firstIndex { $0.id == current } ?? 0
+        let n = focuses.count
+        return focuses[((i + step) % n + n) % n].id
+    }
+}
+
+/// The plain pace line under the number (§H.8): "Behind by 14h. 9h a week gets you to 100."
+/// The lead is `behind` or `positiveOnPage` semibold (neutral leads use `textPrimary`); the rest
+/// is `textSecondary`. Never says qualify, never rounds in the user's favour.
+struct TodayPaceSentence: Equatable {
+    enum Tone: Equatable { case behind, positive, neutral }
+
+    let lead: String?
+    let rest: String
+    let tone: Tone
+
+    /// One line for VoiceOver.
+    var spoken: String { [lead, rest].compactMap { $0 }.joined(separator: " ") }
+
+    struct Input {
+        var hours: Double
+        var goal: Double
+        var year: Int
+        var now: Date
+        var calendar: Calendar = .current
+        /// "Just keep a record": no target, no pace.
+        var isRecord = false
+        /// Two weeks of data or ten hours (`TodayHeroCopy.paceIsReady`).
+        var paceReady = true
+        var hasPendingToConfirm = false
+        /// The goal is reached but something is still open (the 750's half rule, the 100-hour
+        /// "did anyone do more?"): said instead of "Done".
+        var reachedCaveat: String? = nil
+    }
+
+    static func make(_ i: Input) -> TodayPaceSentence {
+        let goal = Int(i.goal.rounded())
+        if i.isRecord || i.goal <= 0 {
+            return TodayPaceSentence(lead: nil, rest: String(localized: "today.pace.record", defaultValue: "Hours on your \(String(i.year)) record.", table: "Today"), tone: .neutral)
+        }
+        if i.hours >= i.goal {
+            if let caveat = i.reachedCaveat {
+                return TodayPaceSentence(lead: String(localized: "today.pace.reached", defaultValue: "\(goal) reached.", table: "Today"),
+                                         rest: caveat, tone: .neutral)
+            }
+            return TodayPaceSentence(lead: String(localized: "today.pace.done", defaultValue: "Done for \(String(i.year)).", table: "Today"),
+                                     rest: String(localized: "today.pace.doneRest", defaultValue: "\(goal) hours on the record.", table: "Today"),
+                                     tone: .positive)
+        }
+        if i.hours <= 0 {
+            return TodayPaceSentence(lead: nil, rest: String(localized: "today.pace.none", defaultValue: "No hours yet. Log your first one while it’s fresh.", table: "Today"), tone: .neutral)
+        }
+        if !i.paceReady {
+            return TodayPaceSentence(lead: nil, rest: i.hasPendingToConfirm
+                ? String(localized: "today.pace.confirmFirst", defaultValue: "Confirm your found hours to see your pace.", table: "Today")
+                : String(localized: "today.pace.notReady", defaultValue: "Log a few weeks to see your pace.", table: "Today"),
+                tone: .neutral)
+        }
+        let day = Double(i.calendar.ordinality(of: .day, in: .year, for: i.now) ?? 1)
+        let daysInYear = Double(i.calendar.range(of: .day, in: .year, for: i.now)?.count ?? 365)
+        let expected = i.goal * day / daysInYear
+        let weeks = TodayPaceCards.weeksLeft(now: i.now, calendar: i.calendar)
+        let weekly = max(1, Int((max(i.goal - i.hours, 0) / weeks).rounded(.up)))
+        let rest = String(localized: "today.pace.weekly", defaultValue: "\(weekly)h a week gets you to \(goal).", table: "Today")
+        let behind = Int((expected - i.hours).rounded())
+        if behind >= 1 {
+            return TodayPaceSentence(lead: String(localized: "today.pace.behind", defaultValue: "Behind by \(behind)h.", table: "Today"),
+                                     rest: rest, tone: .behind)
+        }
+        return TodayPaceSentence(lead: String(localized: "today.pace.onPace", defaultValue: "On pace.", table: "Today"), rest: rest, tone: .positive)
     }
 }

@@ -1,681 +1,327 @@
 import SwiftUI
 
-// MARK: - Today, below the house: the views (redesign-specs.md §2, sandbox-screens S2Today)
+// MARK: - Today v2: the parts under the crafted house (standard §H.8)
 //
-// Order under the hero: timer/draft slot → To confirm → This week → pace cards (2-up) →
-// Your record (free only). The rules live in TodayLogic.swift; the confirm/not-work writes go
-// through the Inbox's own model (`InboxViewModel`), so Today, the Inbox and the tab badge read
-// and write one list.
+//   chip · hero (H1) + dots · number (Fraunces 84) · "of 100 hours" · pace sentence ·
+//   "To confirm · N" · one grouped container on the page with ≤ 2 `LHRow.Action` rows and a
+//   "See all N" foot · nothing else.
+//
+// The rules live in `TodayLogic.swift`; these views only draw what it returns. Strings are in the
+// package catalog `Today.xcstrings` (`String(localized:defaultValue:table: "Today")`).
 
-// MARK: Section header
-
-/// The one section header: 13 semibold caps, +0.3 tracking, `textSecondary`, then a trailing
-/// slot. To confirm passes two things there (the count, and later a batch action) plus "See all".
-struct TodaySectionHeader<Trailing: View>: View {
-    let title: String
-    @ViewBuilder var trailing: () -> Trailing
-    @Environment(\.colorScheme) private var colorScheme
-
-    init(_ title: String, @ViewBuilder trailing: @escaping () -> Trailing) {
-        self.title = title
-        self.trailing = trailing
+/// Today's own strings.
+enum TodayText {
+    static var allRentals: String { String(localized: "today.allRentals", defaultValue: "All rentals", table: "Today") }
+    static var toConfirmTitle: String { String(localized: "today.confirm.title", defaultValue: "To confirm", table: "Today") }
+    static func toConfirm(_ count: Int) -> String {
+        String(localized: "today.confirm.titleCount", defaultValue: "To confirm · \(count)", table: "Today")
     }
+    static func seeAll(_ count: Int) -> String {
+        String(localized: "today.confirm.seeAll", defaultValue: "See all \(count)", table: "Today")
+    }
+    static func ofHours(_ goal: Int) -> String {
+        String(localized: "today.number.of", defaultValue: "of \(goal) hours", table: "Today")
+    }
+    static func hoursIn(_ year: Int) -> String {
+        String(localized: "today.number.record", defaultValue: "hours in \(String(year))", table: "Today")
+    }
+    static func logged(_ hours: String, at rental: String) -> String {
+        String(localized: "today.toast.logged", defaultValue: "Logged \(hours) at \(rental).", table: "Today")
+    }
+    static func loggedPlain(_ hours: String) -> String {
+        String(localized: "today.toast.loggedPlain", defaultValue: "Logged \(hours).", table: "Today")
+    }
+    static var undo: String { String(localized: "today.toast.undo", defaultValue: "Undo", table: "Today") }
+    static var markedNotWork: String {
+        String(localized: "today.toast.notWork", defaultValue: "Marked not rental work.", table: "Today")
+    }
+}
+
+// MARK: - The number block
+
+/// The number tied to the house: the Fraunces numeral, "of 100 hours", the pace sentence.
+struct TodayNumberBlock: View {
+    let hours: Double
+    let goal: Double
+    let year: Int
+    let isRecord: Bool
+    let pace: TodayPaceSentence
+    /// The numeral's size (84 default, 64 under 700pt of height, 54 at AX; H3/H7).
+    let numeralSize: CGFloat
+    /// While the first iCloud pull is pending the number shows a dash.
+    var isPending = false
+    /// The pace line opens a question ("did anyone else do more?").
+    var onPaceTap: (() -> Void)? = nil
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+    private var whole: Int { Int(max(0, hours).rounded(.down)) }
 
     var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        HStack(alignment: .center, spacing: 8) {
-            Text(title)
-                .font(.footnote.weight(.semibold))
-                .textCase(.uppercase)
-                .tracking(0.3)
+        VStack(spacing: 2) {
+            Text(isPending ? "—" : "\(whole)")
+                .font(LHFont.heroNumeral(size: numeralSize))
+                .tracking(-2)
+                .foregroundStyle(colors.textPrimary)
+                .contentTransition(.numericText(value: Double(whole)))
+                .animation(reduceMotion ? nil : AppAnimation.count, value: whole)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .accessibilityIdentifier("today.number")
+            Text(isRecord ? TodayText.hoursIn(year) : TodayText.ofHours(Int(goal.rounded())))
+                .font(.body)
                 .foregroundStyle(colors.textSecondary)
-                .accessibilityAddTraits(.isHeader)
-            trailing()
+            paceLine
+                .padding(.top, 8)
         }
-        .padding(.horizontal, 4)
-        .frame(minHeight: 32)
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("today.numberBlock")
     }
-}
 
-extension TodaySectionHeader where Trailing == EmptyView {
-    init(_ title: String) { self.init(title, trailing: { EmptyView() }) }
-}
+    @ViewBuilder private var paceLine: some View {
+        let line = paceText
+            .font(.subheadline)
+            .fixedSize(horizontal: false, vertical: true)
+            .contentTransition(.opacity)
+            .accessibilityIdentifier("today.pace")
+        if let onPaceTap {
+            Button(action: onPaceTap) { line }
+                .buttonStyle(LHButton.press)
+                .accessibilityHint(String(localized: "today.pace.questionHint",
+                                          defaultValue: "Opens the question about anyone else’s hours", table: "Today"))
+        } else {
+            line
+        }
+    }
 
-/// The count capsule (`action` on `actionSurface`).
-struct TodayCountCapsule: View {
-    let count: Int
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        Text("\(count)")
-            .font(.footnote.weight(.semibold))
-            .monospacedDigit()
-            .foregroundStyle(colors.action)
-            .padding(.horizontal, 8)
-            .frame(minWidth: 24, minHeight: 22)
-            .background(Capsule().fill(colors.actionSurface))
-            .contentTransition(.numericText(value: Double(count)))
-            .accessibilityLabel("\(count) to confirm")
-            .accessibilityIdentifier("today.confirm.count")
+    private var paceText: Text {
+        let rest = Text(pace.rest).foregroundStyle(colors.textSecondary)
+        guard let lead = pace.lead else { return rest }
+        let ink: Color
+        switch pace.tone {
+        case .behind: ink = colors.behind
+        case .positive: ink = colors.positiveOnPage
+        case .neutral: ink = colors.textPrimary
+        }
+        return Text(lead).foregroundStyle(ink).fontWeight(.semibold) + Text(verbatim: " ") + rest
     }
 }
 
 // MARK: - To confirm
 
-/// The To confirm block. Reads the Inbox model; every action is the Inbox's own action.
-struct TodayConfirmSection: View {
+/// "To confirm · N", at most `limit` `LHRow.Action` rows in one grouped container on the page,
+/// and a "See all N" foot. Reads the Inbox model; every action is the Inbox's own.
+struct TodayConfirmBlock: View {
     @ObservedObject var inbox: InboxViewModel
     let state: TodayConfirm.State
     let isScanning: Bool
+    let limit: Int
     var onSeeAll: () -> Void
     var onTurnOn: () -> Void
-    /// Called after a row was logged (the hero plays its build from the live hours).
-    var onLogged: () -> Void = {}
+    /// A row was logged (the hero rolls from the live hours; the caller posts the toast).
+    var onLogged: (Suggestion) -> Void = { _ in }
+    var onNotWork: (Suggestion) -> Void = { _ in }
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var logTick = 0
-    @State private var dismissTick = 0
+    /// Rows whose control has filled (`rowConfirm`), before the row collapses.
+    @State private var confirming: Set<String> = []
 
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     private var count: Int { inbox.badgeCount }
-    private var rows: [Suggestion] { TodayConfirm.rows(visible: inbox.visible) }
+    private var rows: [Suggestion] { TodayConfirm.rows(visible: inbox.visible, limit: limit) }
 
     var body: some View {
         if state != .hidden {
-            VStack(alignment: .leading, spacing: 10) {
-                TodaySectionHeader("To confirm") {
-                    if state == .rows {
-                        TodayCountCapsule(count: count)
-                    }
-                    Spacer(minLength: 8)
-                    // Second trailing slot: the smart layer's batch action ("Log 5 likely") goes
-                    // here (design-implications §1). Empty for now.
-                    batchActionSlot
-                    if state == .rows {
-                        Button("See all", action: onSeeAll)
-                            .font(.subheadline)
-                            .foregroundStyle(colors.action)
-                            .frame(minHeight: 44)
-                            .accessibilityHint("Opens your Inbox")
-                            .accessibilityIdentifier("today.confirm.seeAll")
-                    }
-                }
-                if isScanning, state == .rows || state == .loading {
-                    scanningLine
-                }
+            VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+                Text(state == .rows ? TodayText.toConfirm(count) : TodayText.toConfirmTitle)
+                    .font(.headline)
+                    .foregroundStyle(colors.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("today.confirm.count")
+                    .padding(.horizontal, 4)
                 switch state {
                 case .rows: card
-                case .loading: ghostRows
+                case .loading: scanning
                 case .caughtUp(let captureOn): caughtUp(captureOn: captureOn)
                 case .hidden: EmptyView()
                 }
             }
-            .sensoryFeedback(.success, trigger: logTick)
-            .sensoryFeedback(.impact(weight: .light), trigger: dismissTick)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("today.confirm")
         }
-    }
-
-    @ViewBuilder private var batchActionSlot: some View { EmptyView() }
-
-    private static var debugSwipeOffset: CGFloat? {
-        #if DEBUG
-        return TodayDebugSeed.swipePreviewOffset
-        #else
-        return nil
-        #endif
     }
 
     // MARK: Rows
 
     private var card: some View {
         let shown = rows
-        return VStack(spacing: 0) {
+        return LHRowGroup(onPage: true) {
             ForEach(Array(shown.enumerated()), id: \.element.sourceKey) { index, suggestion in
-                TodaySwipeRow(
-                    suggestion: suggestion,
-                    propertyName: inbox.propertyName(for: suggestion),
-                    badges: inbox.badges(for: suggestion),
-                    canQuickLog: inbox.canQuickLog(suggestion),
-                    peek: index == 0 && TodaySwipeHint.shouldPeek,
-                    previewOffset: index == 0 ? Self.debugSwipeOffset : nil,
-                    onOpen: { inbox.sheetSuggestion = suggestion },
-                    onConfirm: { confirm(suggestion) },
-                    onNotWork: { notWork(suggestion) }
-                )
-                .transition(reduceMotion ? .opacity : .asymmetric(
-                    insertion: .opacity,
-                    removal: .opacity.combined(with: .scale(scale: 0.98, anchor: .top))
-                ))
-                if index < shown.count - 1 {
-                    PropertyInsetDivider(leading: 16 + 108)
-                }
+                if index > 0 { LHDivider(leadingInset: LHRow.actionDividerInset) }
+                row(suggestion)
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
             }
-            if TodayConfirm.showsReviewAll(count: count) {
-                Button("Review all \(count)", action: onSeeAll)
-                    .buttonStyle(TodayTintedButtonStyle(fullWidth: true))
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-                    .padding(.bottom, 16)
-                    .accessibilityIdentifier("today.confirm.reviewAll")
+            if TodayConfirm.showsReviewAll(count: count, limit: limit) {
+                LHDivider()
+                Button(TodayText.seeAll(count), action: onSeeAll)
+                    .buttonStyle(LHButton.tertiary)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityHint(String(localized: "today.confirm.seeAllHint", defaultValue: "Opens your Inbox", table: "Today"))
+                    .accessibilityIdentifier("today.confirm.seeAll")
             }
         }
-        // Rows and their swipe circles stay inside the card's rounded corners.
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .propertyCard()
-        .background(alignment: .bottom) {
-            // More than the card holds: a deck card 6pt behind it.
-            if TodayConfirm.showsReviewAll(count: count) {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(colors.backgroundSecondary)
-                    .scaleEffect(x: 0.96, y: 1, anchor: .bottom)
-                    .opacity(0.6)
-                    .offset(y: 6)
-                    .accessibilityHidden(true)
-            }
-        }
-        .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.32, dampingFraction: 0.86),
-                   value: shown.map(\.sourceKey))
+        .animation(reduceMotion ? AppAnimation.quick : AppAnimation.collapse, value: shown.map(\.sourceKey))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("today.confirm.card")
     }
 
-    private func confirm(_ suggestion: Suggestion) {
-        TodaySwipeHint.markUsed()
-        switch inbox.swipeLog(suggestion) {
-        case .logged:
-            logTick += 1
-            onLogged()
-            UIAccessibility.post(notification: .announcement, argument: "Logged. Undo is available.")
-        case .needsSheet, .failed:
-            break
+    private func row(_ suggestion: Suggestion) -> some View {
+        let badges = inbox.badges(for: suggestion)
+        let quick = inbox.canQuickLog(suggestion)
+        let hours = badges.needsHours ? nil : suggestion.proposedHours
+        let title = Self.title(suggestion, propertyName: inbox.propertyName(for: suggestion))
+        return LHRow.Action(
+            title: title,
+            sourceSymbol: InboxFormat.kindSymbol(suggestion.kind),
+            meta: Self.meta(suggestion),
+            tag: Self.tag(suggestion, badges: badges, colors: colors),
+            hours: hours,
+            control: confirming.contains(suggestion.sourceKey) ? .confirmed : .open,
+            controlLabel: quick
+                ? String(localized: "today.row.confirmHours", defaultValue: "Confirm \(InboxFormat.spokenHours(hours ?? 0))", table: "Today")
+                : String(localized: "today.row.review", defaultValue: "Review and confirm", table: "Today"),
+            onControl: { confirm(suggestion, quick: quick) },
+            onOpen: { inbox.sheetSuggestion = suggestion },
+            identifier: "today.row.\(suggestion.sourceKey)"
+        )
+        .accessibilityAction(named: String(localized: "today.row.notWork", defaultValue: "Not rental work", table: "Today")) {
+            notWork(suggestion)
+        }
+        .contextMenu {
+            if quick {
+                Button { confirm(suggestion, quick: true) } label: {
+                    Label(String(localized: "today.menu.confirm", defaultValue: "Confirm", table: "Today"), systemImage: "checkmark")
+                }
+            }
+            Button { inbox.sheetSuggestion = suggestion } label: {
+                Label(String(localized: "today.menu.open", defaultValue: "Open", table: "Today"), systemImage: "arrow.up.right")
+            }
+            Button { notWork(suggestion) } label: {
+                Label(String(localized: "today.row.notWork", defaultValue: "Not rental work", table: "Today"), systemImage: "xmark")
+            }
+        }
+    }
+
+    /// "Plumber at Pine Cabin" (§1.3 title).
+    static func title(_ suggestion: Suggestion, propertyName: String?) -> String {
+        guard let propertyName, !propertyName.isEmpty else { return suggestion.title }
+        return String(localized: "today.row.title", defaultValue: "\(suggestion.title) at \(propertyName)", table: "Today")
+    }
+
+    /// "Calendar · 12–2" (no date: Today's rows are this week's work; the Inbox has the day headers).
+    static func meta(_ suggestion: Suggestion) -> String {
+        let kind = InboxFormat.kindLabel(suggestion.kind)
+        if suggestion.kind == .receipt { return kind }
+        return "\(kind) · \(InboxFormat.timeRange(start: suggestion.start, end: suggestion.end))"
+    }
+
+    /// One tag: a status tag replaces the category.
+    static func tag(_ suggestion: Suggestion, badges: SuggestionBadges, colors: AdaptiveColors) -> LHTag? {
+        if badges.mightAlreadyBeLogged {
+            return LHTag(String(localized: "today.tag.mightBeLogged", defaultValue: "Might be logged", table: "Today"), tone: .informational)
+        }
+        if badges.needsHours {
+            return LHTag(String(localized: "today.tag.needsHours", defaultValue: "Needs hours", table: "Today"), tone: .caution)
+        }
+        if badges.notSure {
+            return LHTag(String(localized: "today.tag.notSure", defaultValue: "Not sure", table: "Today"), tone: .neutral)
+        }
+        guard let category = suggestion.proposedCategory else { return nil }
+        return LHTag(category.inboxLabel, tone: .custom(ink: colors.categoryInk(category), wash: colors.categoryWash(category)))
+    }
+
+    // MARK: Actions
+
+    private func confirm(_ suggestion: Suggestion, quick: Bool) {
+        guard quick else {
+            inbox.sheetSuggestion = suggestion
+            return
+        }
+        guard !confirming.contains(suggestion.sourceKey) else { return }
+        // `rowConfirm`: the control fills (the row's `.success` fires with it), then the row collapses.
+        confirming.insert(suggestion.sourceKey)
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(0.12 + 0.25))
+            if inbox.swipeLog(suggestion) == .logged { onLogged(suggestion) }
+            confirming.remove(suggestion.sourceKey)
         }
     }
 
     private func notWork(_ suggestion: Suggestion) {
-        TodaySwipeHint.markUsed()
         inbox.dismiss(suggestion)
-        dismissTick += 1
-        UIAccessibility.post(notification: .announcement, argument: "Marked not rental work. Undo is available.")
+        onNotWork(suggestion)
     }
 
     // MARK: States
 
-    private var scanningLine: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Looking through your calendar")
+    private var scanning: some View {
+        LHRowGroup(onPage: true) {
+            Text(String(localized: "today.confirm.scanning", defaultValue: "Looking through your calendar. Work we find shows up here.", table: "Today"))
                 .font(.subheadline)
                 .foregroundStyle(colors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-            TodayDraftingLine()
-                .frame(height: 1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(LHRow.insets)
+                .frame(minHeight: LHMetrics.rowMinHeight)
         }
-        .padding(.horizontal, 4)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Looking through your calendar. Work we find shows up here and in your Inbox.")
         .accessibilityIdentifier("today.lookingBack")
     }
 
-    private var ghostRows: some View {
-        VStack(spacing: 0) {
-            ForEach(0..<2, id: \.self) { index in
-                HStack(spacing: 10) {
-                    PlaceholderBar(width: 36, height: 22).frame(width: 52)
-                    PlaceholderBar(width: 36, height: 36)
-                    VStack(alignment: .leading, spacing: 8) {
-                        PlaceholderBar(width: 120, height: 10)
-                        PlaceholderBar(width: index == 0 ? 170 : 140, height: 14)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, 16)
-                .frame(minHeight: 76)
-                if index == 0 { PropertyInsetDivider(leading: 16 + 108) }
-            }
-        }
-        .propertyCard()
-        .accessibilityHidden(true)
-    }
-
     private func caughtUp(captureOn: Bool) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: "checkmark.circle")
-                .font(.title2)
-                .foregroundStyle(colors.positive)
-                .accessibilityHidden(true)
-            Text("All caught up")
-                .font(.headline)
-                .foregroundStyle(colors.textPrimary)
-            Text(captureOn
-                 ? "We’ll put new work here when your calendar looks like rental work."
-                 : "Turn on suggestions and we’ll spot the work for you.")
-                .font(.subheadline)
-                .foregroundStyle(colors.textSecondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+        LHRowGroup(onPage: true) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "checkmark.circle")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(colors.positive)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "today.caughtUp.title", defaultValue: "All caught up", table: "Today"))
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(colors.textPrimary)
+                    Text(captureOn
+                         ? String(localized: "today.caughtUp.on", defaultValue: "New work from your calendar shows up here.", table: "Today")
+                         : String(localized: "today.caughtUp.off", defaultValue: "Turn on suggestions and we’ll spot the work for you.", table: "Today"))
+                        .font(.subheadline)
+                        .foregroundStyle(colors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(LHRow.insets)
+            .frame(minHeight: LHMetrics.rowMinHeight)
+            .accessibilityElement(children: .combine)
             if !captureOn {
-                Button("Turn on", action: onTurnOn)
-                    .buttonStyle(TodayTintedButtonStyle())
-                    .padding(.top, 6)
+                LHDivider()
+                Button(String(localized: "today.caughtUp.turnOn", defaultValue: "Turn on suggestions", table: "Today"), action: onTurnOn)
+                    .buttonStyle(LHButton.tertiary)
+                    .frame(maxWidth: .infinity)
                     .accessibilityIdentifier("today.confirm.turnOn")
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(24)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(captureOn ? "today.caughtUp" : "today.caughtUp.off")
     }
 }
 
-/// One suggestion row on Today: tap opens the confirm sheet; the visible Confirm / Not work
-/// buttons and the two swipes do the same as the Inbox's.
-struct TodaySwipeRow: View {
-    let suggestion: Suggestion
-    let propertyName: String?
-    let badges: SuggestionBadges
-    let canQuickLog: Bool
-    var peek = false
-    /// DEBUG captures: draw the row already slid by this much.
-    var previewOffset: CGFloat? = nil
-    var onOpen: () -> Void
-    var onConfirm: () -> Void
-    var onNotWork: () -> Void
+// MARK: - Timer slot
 
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var dx: CGFloat = 0
-    @State private var isHorizontal: Bool?
-    @State private var checkPop = false
-    @State private var didPeek = false
-    /// The row moves with the finger, so a swipe would also end as a tap on it: a swipe in progress
-    /// (and the moment after) never opens the sheet.
-    @State private var suppressTap = false
-
-    /// Past this the release commits (log or not work).
-    static let threshold: CGFloat = 96
-
-    var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        ZStack {
-            // What a swipe will do, revealed under the row as it moves.
-            HStack {
-                actionCircle("checkmark", label: canQuickLog ? "Log" : "Review",
-                             fill: colors.positive, ink: colorScheme == .dark ? colors.background : .white,
-                             armed: dx > Self.threshold)
-                    .scaleEffect(checkPop && !reduceMotion ? 1.15 : 1)
-                    .opacity(dx > 8 ? 1 : 0)
-                Spacer()
-                actionCircle("xmark", label: "Not rental work", fill: colors.textSecondary,
-                             ink: colorScheme == .dark ? colors.background : .white,
-                             armed: -dx > Self.threshold)
-                    .opacity(dx < -8 ? 1 : 0)
-            }
-            .padding(.horizontal, 20)
-            .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 0) {
-                Button {
-                    guard !suppressTap else { return }
-                    onOpen()
-                } label: {
-                    SuggestionRowView(suggestion: suggestion, propertyName: propertyName, badges: badges)
-                }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(SuggestionRowView.accessibilityLabel(for: suggestion, propertyName: propertyName,
-                                                                         badges: badges, now: InboxClock.now()))
-                .accessibilityHint("Opens the details to confirm")
-                .accessibilityAddTraits(.isButton)
-                .accessibilityAction(named: canQuickLog ? "Log \(InboxFormat.hours(suggestion.proposedHours ?? 0))" : "Review and log") {
-                    onConfirm()
-                }
-                .accessibilityAction(named: "Not rental work") { onNotWork() }
-                .accessibilityIdentifier("today.row.\(suggestion.sourceKey)")
-                InboxRowActions(key: suggestion.sourceKey, onConfirm: onConfirm, onNotWork: onNotWork)
-                    .padding(.bottom, 10)
-            }
-            .padding(.horizontal, 16)
-            .background(colors.backgroundSecondary)
-            .offset(x: dx)
-        }
-        .clipped()
-        .contentShape(Rectangle())
-        // Simultaneous, so a vertical drag that starts on a row still scrolls Today.
-        .simultaneousGesture(swipe)
-        .onAppear {
-            if let previewOffset { dx = previewOffset } else { peekIfNeeded() }
-        }
-    }
-
-    private var swipe: some Gesture {
-        DragGesture(minimumDistance: 18)
-            .onChanged { value in
-                if isHorizontal == nil {
-                    isHorizontal = abs(value.translation.width) > abs(value.translation.height) * 1.2
-                }
-                guard isHorizontal == true else { return }
-                suppressTap = true
-                dx = value.translation.width
-            }
-            .onEnded { value in
-                defer {
-                    isHorizontal = nil
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { suppressTap = false }
-                }
-                guard isHorizontal == true else { return }
-                let projected = value.translation.width + (value.predictedEndTranslation.width - value.translation.width) * 0.3
-                if projected > Self.threshold {
-                    if !reduceMotion {
-                        withAnimation(.spring(response: 0.26, dampingFraction: 0.5)) { checkPop = true }
-                    }
-                    settle()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + (reduceMotion ? 0 : 0.18)) { onConfirm() }
-                } else if projected < -Self.threshold {
-                    settle()
-                    onNotWork()
-                } else {
-                    settle()
-                }
-            }
-    }
-
-    private func settle() {
-        withAnimation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.3, dampingFraction: 0.86)) {
-            dx = 0
-        }
-    }
-
-    /// The swipe affordance: the first row slides a little to show the Log circle under it, once
-    /// per profile, until a row has been swiped or confirmed. Never under Reduce Motion.
-    private func peekIfNeeded() {
-        guard peek, !didPeek, !reduceMotion, !dynamicTypeSize.isAccessibilitySize else { return }
-        didPeek = true
-        TodaySwipeHint.markPeeked()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
-            withAnimation(.easeOut(duration: 0.28)) { dx = 56 }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-                withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) { dx = 0 }
-            }
-        }
-    }
-
-    private func actionCircle(_ symbol: String, label: String, fill: Color, ink: Color, armed: Bool) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: symbol)
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(ink)
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(fill.opacity(armed ? 1 : 0.7)))
-            Text(label)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(AdaptiveColors(colorScheme: colorScheme).textSecondary)
-        }
-    }
-}
-
-/// Keeps scrolled content (the blueprint hero above all) out from under the status bar: a canvas
-/// band over the top safe area that fades out below it, so the system's dark status-bar ink
-/// always sits on the light canvas (and the light ink on the dark one).
-struct TodayTopEdgeFade: View {
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        let canvas = AdaptiveColors(colorScheme: colorScheme).background
-        GeometryReader { proxy in
-            VStack(spacing: 0) {
-                canvas.frame(height: proxy.safeAreaInsets.top)
-                LinearGradient(colors: [canvas, canvas.opacity(0)], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 16)
-                Spacer(minLength: 0)
-            }
-            .ignoresSafeArea(edges: .top)
-        }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-}
-
-/// Remembers, per profile, that the swipe was shown (peek) or used, so the hint stops.
-enum TodaySwipeHint {
-    static let baseKey = "LandlordHours.today.swipeHintSeen"
-
-    static var shouldPeek: Bool {
-        #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-LHNoSwipePeek") { return false }
-        #endif
-        return !UserDefaults.standard.bool(forKey: UserScope.key(baseKey))
-    }
-
-    static func markPeeked() { UserDefaults.standard.set(true, forKey: UserScope.key(baseKey)) }
-    static func markUsed() { markPeeked() }
-}
-
-/// The 1pt drafting line that draws itself while the look-back runs (static under Reduce Motion).
-struct TodayDraftingLine: View {
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        let ink = AdaptiveColors(colorScheme: colorScheme).draftingInk
-        GeometryReader { proxy in
-            if reduceMotion {
-                Rectangle().fill(ink).frame(width: proxy.size.width * 0.6)
-            } else {
-                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
-                    let t = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.8) / 1.8
-                    let head = min(1, t / 0.7)
-                    let tail = max(0, (t - 0.55) / 0.45)
-                    Rectangle()
-                        .fill(ink)
-                        .frame(width: proxy.size.width * max(0, head - tail))
-                        .offset(x: proxy.size.width * tail)
-                }
-            }
-        }
-        .accessibilityHidden(true)
-    }
-}
-
-// MARK: - Buttons
-
-/// Tinted (44pt, `action` on `actionSurface`, 15 semibold); optionally full width.
-struct TodayTintedButtonStyle: ButtonStyle {
-    var fullWidth = false
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    func makeBody(configuration: Configuration) -> some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        configuration.label
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(colors.action)
-            .multilineTextAlignment(.center)
-            .padding(.horizontal, 18)
-            .padding(.vertical, 8)
-            .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: 44)
-            .background(Capsule().fill(colors.actionSurface))
-            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
-            .animation(reduceMotion ? nil : AppAnimation.feedback, value: configuration.isPressed)
-            .contentShape(Capsule())
-    }
-}
-
-// MARK: - This week
-
-struct TodayWeekSection: View {
-    let days: [TodayWeekDay]
-    var onOpenDay: (TodayWeekDay) -> Void
-
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
-    var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        let total = TodayWeek.total(days)
-        VStack(alignment: .leading, spacing: 10) {
-            TodaySectionHeader("This week") {
-                Spacer(minLength: 8)
-                Text(InboxFormat.hours(total))
-                    .font(.subheadline.weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(colors.textPrimary)
-                    .contentTransition(.numericText(value: total))
-                    .accessibilityLabel("\(InboxFormat.spokenHours(total)) this week")
-                    .accessibilityIdentifier("today.week.total")
-            }
-            if dynamicTypeSize >= .xxLarge { list(colors) } else { strip(colors) }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("today.week")
-    }
-
-    private func strip(_ colors: AdaptiveColors) -> some View {
-        let peak = days.compactMap(\.hours).max() ?? 0
-        let labelled = TodayWeek.labelledIndex(days)
-        return HStack(alignment: .bottom, spacing: 0) {
-            ForEach(Array(days.enumerated()), id: \.element.id) { index, day in
-                Button { onOpenDay(day) } label: {
-                    VStack(spacing: 6) {
-                        Spacer(minLength: 0)
-                        if index == labelled, let hours = day.hours {
-                            Text(InboxFormat.hours(hours))
-                                .font(.caption2.weight(.semibold))
-                                .monospacedDigit()
-                                .foregroundStyle(colors.textSecondary)
-                                .lineLimit(1)
-                                .fixedSize()
-                        }
-                        bar(day, peak: peak, colors: colors)
-                        Text(day.letter)
-                            .font(.caption.weight(day.isToday ? .semibold : .regular))
-                            .foregroundStyle(day.isToday ? colors.action : colors.textSecondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(TodayWeek.spoken(day))
-                .accessibilityHint("Opens Records")
-                .accessibilityIdentifier("today.week.day.\(index)")
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 12)
-        .frame(height: 112)
-        .propertyCard()
-    }
-
-    @ViewBuilder private func bar(_ day: TodayWeekDay, peak: Double, colors: AdaptiveColors) -> some View {
-        if let hours = day.hours {
-            if hours > 0 {
-                Capsule()
-                    .fill(colors.action)
-                    .frame(width: 10, height: TodayWeek.barHeight(hours: hours, peak: peak))
-            } else {
-                Circle()
-                    .fill(colors.border)
-                    .frame(width: 4, height: 4)
-                    .padding(.top, 6)
-            }
-        } else {
-            // Not yet: drawn as unbuilt, like the house's linework.
-            Capsule()
-                .strokeBorder(colors.draftingInk.opacity(0.8), style: StrokeStyle(lineWidth: 1, dash: [2.5, 2.5]))
-                .frame(width: 10, height: 11)
-        }
-    }
-
-    private func list(_ colors: AdaptiveColors) -> some View {
-        VStack(spacing: 0) {
-            ForEach(Array(days.enumerated()), id: \.element.id) { index, day in
-                Button { onOpenDay(day) } label: {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text(day.shortName)
-                            .fontWeight(day.isToday ? .semibold : .regular)
-                            .foregroundStyle(day.isToday ? colors.action : colors.textPrimary)
-                        Spacer(minLength: 8)
-                        Text(day.hours.map { $0 > 0 ? InboxFormat.hours($0) : "None" } ?? "Not yet")
-                            .monospacedDigit()
-                            .foregroundStyle(colors.textSecondary)
-                    }
-                    .font(.body)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .frame(minHeight: 52)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(TodayWeek.spoken(day))
-                .accessibilityAddTraits(.isButton)
-                .accessibilityIdentifier("today.week.day.\(index)")
-                if index < days.count - 1 { PropertyInsetDivider() }
-            }
-        }
-        .propertyCard()
-    }
-}
-
-// MARK: - Pace cards
-
-struct TodayPaceCard: View {
-    let model: TodayPaceCardModel
-    var isPending = false
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        VStack(alignment: .leading, spacing: 4) {
-            Text(model.label)
-                .font(.subheadline)
-                .foregroundStyle(colors.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(model.value)
-                .font(.system(.title2, design: .rounded, weight: .bold))
-                .monospacedDigit()
-                .foregroundStyle(colors.textPrimary)
-                .fixedSize(horizontal: false, vertical: true)
-                .opacity(isPending ? 0 : 1)
-                .overlay(alignment: .leading) {
-                    if isPending { PlaceholderBar(width: 96, height: 20).transition(.opacity) }
-                }
-            if let status = model.status {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    if model.tone == .caution {
-                        Image(systemName: "exclamationmark.circle.fill").accessibilityHidden(true)
-                    }
-                    Text(status).fixedSize(horizontal: false, vertical: true)
-                }
-                .font(.footnote.weight(model.tone == .caution ? .semibold : .regular))
-                .foregroundStyle(tint(colors))
-                .opacity(isPending ? 0 : 1)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .propertyCard()
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(isPending ? "\(model.label). Loading" : [model.label, model.value, model.status].compactMap { $0 }.joined(separator: ". "))
-    }
-
-    private func tint(_ colors: AdaptiveColors) -> Color {
-        switch model.tone {
-        case .caution: return colors.caution
-        case .positive: return colors.positiveText
-        case .neutral: return colors.textSecondary
-        }
-    }
-}
-
-// MARK: - Draft card (generic)
-
-/// Today's timer/draft slot (redesign-specs §2: first below the house). The card itself is
-/// wp-log's generic `DraftCard` inside `TodayTimerSection` (running timer, stopped timer,
-/// recovered drafts); Today only owns where it sits.
+/// A running or stopped timer (package E's `TodayTimerSection`); renders nothing otherwise.
 struct TodayTimerSlot: View {
     var body: some View {
         TodayTimerSection()
@@ -684,23 +330,112 @@ struct TodayTimerSlot: View {
 
 // MARK: - Your record (free)
 
-/// Today's Pro surface: "Your record" for a free user with 10 confirmed hours or more. The card is
-/// wp-paywall's `TodayRecordLockCard` (`LockedPreview(.card)`, entry `.todayRecord`); the rule is
-/// ProGate's. `onUnlock` runs after a purchase (Today opens the export).
+/// Today's Pro surface for a free user with 10 confirmed hours or more, below the fold (the rule
+/// is ProGate's). `onUnlock` runs after a purchase (Today opens the export).
 struct TodayRecordSlot: View {
     let year: Int
     let confirmedHours: Double
     var onUnlock: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
 
     static func isShown(isPro: Bool, confirmedHours: Double) -> Bool {
         ProGate.showsTodayRecordLock(isPro: isPro, confirmedHours: confirmedHours)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            TodaySectionHeader("Your record")
+        VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+            Text(String(localized: "today.record.title", defaultValue: "Your record", table: "Today"))
+                .font(.headline)
+                .foregroundStyle(AdaptiveColors(colorScheme: colorScheme).textPrimary)
+                .accessibilityAddTraits(.isHeader)
+                .padding(.horizontal, 4)
             TodayRecordLockCard(year: year, confirmedHours: confirmedHours, onUnlocked: onUnlock)
         }
         .accessibilityElement(children: .contain)
+    }
+}
+
+/// Today's "Your record" card for a free user: a page thumbnail with its top third sharp, the rest
+/// under the lock. "Unlock Pro" opens the paywall about the user's own hours; afterwards it opens
+/// the export.
+struct TodayRecordLockCard: View {
+    let year: Int
+    let confirmedHours: Double
+    /// Runs after a purchase. The card itself disappears once Pro is on, so Today owns what comes next.
+    var onUnlocked: () -> Void
+    @EnvironmentObject private var viewModel: AppViewModel
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var page: RecordPageModel?
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    private static let pageHeight: CGFloat = 300
+    private static let sharpPage: CGFloat = 104
+
+    var body: some View {
+        LockedPreview(
+            size: .card,
+            entry: .todayRecord,
+            line: ProGate.lockLine(.todayRecord, confirmedHours: confirmedHours),
+            keeps: ProGate.keepsLine(.todayRecord),
+            surface: colors.backgroundSecondary,
+            onUnlock: {
+                ProPaywallPresenter.shared.present(entry: .todayRecord, confirmedHours: confirmedHours, onUnlocked: onUnlocked)
+            }
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    Image(systemName: "doc.richtext").font(.title3).foregroundStyle(colors.action)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "today.record.cardTitle", defaultValue: "Your \(String(year)) record", table: "Today"))
+                            .font(.headline).foregroundStyle(colors.textPrimary)
+                        Text(String(localized: "today.record.cardMeta", defaultValue: "PDF and spreadsheet · \(entryCount) entries", table: "Today"))
+                            .font(.subheadline).foregroundStyle(colors.textSecondary)
+                    }
+                }
+                pageView
+                    .frame(height: Self.sharpPage, alignment: .top)
+                    .clipShape(UnevenRoundedRectangle(topLeadingRadius: LHMetrics.innerRadius, topTrailingRadius: LHMetrics.innerRadius, style: .continuous))
+            }
+            .padding([.horizontal, .top], LHMetrics.cardPadding)
+        } locked: {
+            pageView
+                .offset(y: -Self.sharpPage)
+                .frame(height: Self.pageHeight - Self.sharpPage, alignment: .top)
+                .clipped()
+                .padding(.horizontal, LHMetrics.cardPadding)
+                .padding(.bottom, LHMetrics.cardPadding)
+        }
+        .background(RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous).fill(colors.backgroundSecondary))
+        .overlay(RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous).strokeBorder(colors.pageCardEdge, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("today.yourRecord")
+        .task { await load() }
+    }
+
+    private var entryCount: Int {
+        viewModel.timeEntries.filter { Calendar.current.component(.year, from: $0.date) == year }.count
+    }
+
+    @ViewBuilder private var pageView: some View {
+        Group {
+            if let page {
+                RecordPagePreview(model: page)
+            } else {
+                DraftingLoader(sketch: .document, surface: .adaptive, subject: "your record")
+                    .padding(40)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .frame(height: Self.pageHeight, alignment: .top)
+        .overlay(RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous).strokeBorder(colors.border, lineWidth: 0.5))
+    }
+
+    private func load() async {
+        guard page == nil else { return }
+        page = await RecordPageModel.load(entries: viewModel.timeEntries, properties: viewModel.properties,
+                                          owner: viewModel.userName, year: year)
     }
 }

@@ -70,21 +70,15 @@ final class HouseMotionTests: XCTestCase {
         XCTAssertEqual(HouseMotion.roofDropPoints, 12)
         XCTAssertEqual(HouseMotion.confirmFrameNames.first, "bp_confirm_row_00")
         XCTAssertEqual(HouseMotion.confirmFrameNames.last, "bp_confirm_row_12")
-        XCTAssertEqual(HouseHeroView.deltaLabel(2), "+2h")
-        XCTAssertEqual(HouseHeroView.deltaLabel(1.5), "+1.5h")
-        XCTAssertEqual(HouseHeroView.deltaLabel(0.25), "+15m")
     }
 
     func testCelebrationCopyNeverOverclaims() {
         XCTAssertTrue(MilestoneCelebrationView.detail(for: .stage(.roof500), hours: 500).contains("needs more than 500"))
-        XCTAssertTrue(MilestoneCelebrationView.detail(for: .stage(.roof500), hours: 502).contains("met, based on your records"))
+        XCTAssertTrue(MilestoneCelebrationView.detail(for: .stage(.roof500), hours: 502).contains("Past the 500-hour line"))
         XCTAssertTrue(MilestoneCelebrationView.detail(for: .stage(.foundation100), hours: 100).contains("needs more than 100"))
-        XCTAssertEqual(MilestoneCelebrationView.eyebrow(for: .goalMet(.mp500)), "Goal met")
-        XCTAssertNil(MilestoneCelebrationView.eyebrow(for: .stage(.roof500)))
-        XCTAssertEqual(MilestoneCelebrationView.title(for: .goalMet(.mp100)), "Keys in the door.")
+        XCTAssertEqual(MilestoneCelebrationView.title(for: .goalMet(.mp100)), "100 hours.")
+        XCTAssertEqual(MilestoneCelebrationView.title(for: .stage(.roof500)), "500 hours.")
         XCTAssertEqual(MilestoneCelebrationView.hoursLine(for: .goalMet(.reps750), hours: 751.4, year: 2026), "751 confirmed hours in 2026")
-        XCTAssertNotNil(MilestoneCelebrationView.keyPlacement(for: .goalMet(.mp500)))
-        XCTAssertNil(MilestoneCelebrationView.keyPlacement(for: .stage(.keys750)))
         let all: [HouseCelebration] = [.stage(.foundation100), .stage(.roof500), .stage(.keys750), .goalMet(.reps750), .goalMet(.mp500), .goalMet(.mp100)]
         for c in all {
             for hours in [c.thresholdHours, c.thresholdHours + 1] {
@@ -211,20 +205,15 @@ final class HouseAssetTests: XCTestCase {
         return renderer.uiImage?.pngData()
     }
 
+    /// v2: the Today hero is `CraftHouseView`; every stage draws its own still (lit and unlit).
     @MainActor
-    func testHeroRendersTheExpectedKeyframePerStage() throws {
-        let samples: [(Double, HouseKeyframe)] = [
-            (0, .k00_lot), (120, .k01_slab), (212, .k03_frame020), (499, .k10_frame090),
-            (500, .k12_roof), (680, .k15_siding060), (750, .k17_siding100), (751, .k18_finished),
-        ]
+    func testCraftHeroRendersADistinctStillPerStage() throws {
         for scheme in [ColorScheme.light, .dark] {
-            for (hours, keyframe) in samples {
-                let hero = try XCTUnwrap(render(HouseHeroView(progress: HouseProgress(hours: hours, goal: .reps750), animatesConfirms: false), scheme: scheme))
-                let expected = try XCTUnwrap(render(HouseArtView(keyframe: keyframe), scheme: scheme))
-                XCTAssertEqual(hero, expected, "\(hours)h \(scheme) should draw \(keyframe.rawValue)")
-                let neighbor = HouseKeyframe.allCases[keyframe.index == 0 ? 1 : keyframe.index - 1]
-                let other = try XCTUnwrap(render(HouseArtView(keyframe: neighbor), scheme: scheme))
-                XCTAssertNotEqual(hero, other, "\(hours)h must not look like \(neighbor.rawValue)")
+            var seen: [Data] = []
+            for stage in CraftStage.allCases {
+                let lit = try XCTUnwrap(render(CraftHouseView(stage: stage, windowsLit: true, side: 160), scheme: scheme))
+                XCTAssertFalse(seen.contains(lit), "\(stage) \(scheme) must not look like an earlier stage")
+                seen.append(lit)
             }
         }
     }

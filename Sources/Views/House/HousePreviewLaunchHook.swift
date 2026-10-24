@@ -1,7 +1,7 @@
 import SwiftUI
 
 #if DEBUG
-// MARK: - DEBUG launch hook for house captures
+// MARK: - DEBUG launch hook for house captures (v2: the crafted house)
 //
 //   -LHHousePreview <hours> <goal> <scheme>
 //       hours: countable hours (e.g. 212, 499.5)
@@ -9,9 +9,9 @@ import SwiftUI
 //       scheme: light | dark
 //   Optional:
 //   -LHHouseScene hero|confirm|milestone|backfill   (default hero)
-//   -LHHouseConfirmHours <h>    confirm scene: hours added by the confirm (default 2)
-//   -LHHouseConfirmDelay <s>    confirm scene: seconds before the confirm plays (default 1.5)
-//   -LHHouseConfirmStill <n>    show board frame n (0...12) statically over the hero
+//   -LHHouseConfirmHours <h>    confirm scene: hours added (default 2); the hero plays the stage change
+//   -LHHouseConfirmDelay <s>    confirm scene: seconds before the hours land (default 1.5)
+//   -LHHouseUnlit               hero/confirm: windows dark before the hours land (windowsOn plays)
 //   -LHHouseMilestone 100|500|750|goal   milestone scene: which celebration (default: the
 //                               highest one this goal has earned at these hours)
 //   -LHHouseStartDelay <s>      milestone/backfill scene: hold the first frame this long
@@ -30,7 +30,7 @@ struct HousePreviewLaunch: Equatable {
     var scene: Scene = .hero
     var confirmHours: Double = 2
     var confirmDelay: Double = 1.5
-    var confirmStill: Int? = nil
+    var unlit = false
     var milestone: String? = nil
     var startDelay: Double = 0
     var settled = false
@@ -51,11 +51,11 @@ struct HousePreviewLaunch: Equatable {
         if let raw = value("-LHHouseScene"), let scene = Scene(rawValue: raw.lowercased()) { config.scene = scene }
         if let raw = value("-LHHouseConfirmHours"), let h = Double(raw) { config.confirmHours = h }
         if let raw = value("-LHHouseConfirmDelay"), let s = Double(raw) { config.confirmDelay = s }
-        if let raw = value("-LHHouseConfirmStill"), let n = Int(raw) { config.confirmStill = n }
         if let raw = value("-LHHouseMilestone") { config.milestone = raw.lowercased() }
         if let raw = value("-LHHouseStartDelay"), let s = Double(raw) { config.startDelay = s }
         if let raw = value("-LHHouseSuggestions"), let n = Int(raw) { config.suggestions = n }
         config.settled = args.contains("-LHHouseSettled")
+        config.unlit = args.contains("-LHHouseUnlit")
         return config
     }
 
@@ -76,58 +76,43 @@ struct HousePreviewLaunch: Equatable {
 struct HousePreviewRoot: View {
     let config: HousePreviewLaunch
     @State private var hours: Double
-    @State private var celebration: HouseCelebration?
+    @State private var lit: Bool
 
     init(config: HousePreviewLaunch) {
         self.config = config
         _hours = State(initialValue: config.hours)
+        _lit = State(initialValue: !config.unlit)
     }
 
     var body: some View {
-        switch config.scene {
-        case .hero, .confirm:
-            content
-                .preferredColorScheme(config.scheme)
-                .environment(\.colorScheme, config.scheme)
-        case .milestone, .backfill:
-            // Full-blueprint screens style themselves dark; the art follows `artScheme`.
-            content
-        }
+        content
+            .preferredColorScheme(config.scheme)
+            .environment(\.colorScheme, config.scheme)
     }
 
     @ViewBuilder
     private var content: some View {
         switch config.scene {
         case .hero, .confirm:
-            ZStack(alignment: .top) {
-                HouseTokens.canvas(config.scheme).ignoresSafeArea()
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Today")
-                        .font(.largeTitle.bold())
-                        .foregroundStyle(config.scheme == .dark ? Color.white : Color(hex: "121B33"))
-                        .padding(.top, 8)
-                    HouseHeroCard(
-                        progress: HouseProgress(hours: hours, goal: config.goal),
-                        onCelebration: { celebration = $0 },
-                        debugConfirmStill: config.confirmStill
-                    )
-                    Spacer()
-                }
-                .padding(.horizontal, 20)
+            VStack {
+                CraftHouseView(stage: CraftStage.stage(hours: hours, goal: config.goal.targetHours), windowsLit: lit, side: 390)
+                Spacer()
             }
+            .padding(.top, 60)
+            .frame(maxWidth: .infinity)
+            .background { LHPage() }
             .task {
-                guard config.scene == .confirm, config.confirmStill == nil else { return }
-                try? await Task.sleep(nanoseconds: UInt64(config.confirmDelay * 1_000_000_000))
+                guard config.scene == .confirm else { return }
+                try? await Task.sleep(for: .seconds(config.confirmDelay))
                 hours += config.confirmHours
-            }
-            .fullScreenCover(item: $celebration) { item in
-                MilestoneCelebrationView(celebration: item, hours: hours, artScheme: config.scheme) { celebration = nil }
+                lit = true
             }
         case .milestone:
             MilestoneCelebrationView(
                 celebration: config.resolvedCelebration,
                 hours: hours,
-                artScheme: config.scheme,
+                windowsLit: !config.unlit,
+                goalHours: config.goal.targetHours,
                 startSettled: config.settled,
                 startDelay: config.startDelay,
                 onContinue: {}
@@ -136,7 +121,6 @@ struct HousePreviewRoot: View {
             BackfillRevealView(
                 foundHours: hours,
                 suggestionCount: config.suggestions,
-                artScheme: config.scheme,
                 startSettled: config.settled,
                 startDelay: config.startDelay
             )

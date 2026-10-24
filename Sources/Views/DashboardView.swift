@@ -51,360 +51,235 @@ enum TodayPresentation {
     }
 }
 
+// MARK: - Today (standard §H.8; plan package C)
+//
+// The crafted house on the dusk/night page: rental chip (Menu) in the toast's slot · the hero
+// (`CraftHouseView`, H1–H3, H10 "All rentals") with page dots and a swipe · the Fraunces number ·
+// "of 100 hours" · the pace sentence · "To confirm · N" with ≤ 2 `LHRow.Action` rows and a
+// "See all N" foot. Pace tiles and "This week" left Today (rental page, Reports).
+//
+// Motion is the house's own (`timberDrop`, `windowsOn`, `stageFade`) and `rentalSlide`, bound to
+// the live hours while Today is visible. While Today is off screen the hero is frozen, and on
+// return it remounts at the new state with no motion (§H.6 "never on appear").
+
 struct DashboardView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @EnvironmentObject var goalManager: GoalManager
     @StateObject private var subscriptionManager = SubscriptionManager.shared
-    @Environment(\.colorScheme) var colorScheme
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+    @Environment(\.layoutBand) private var band
     /// The Inbox's model (shell-owned): Today's To confirm reads and writes the same list, so the
     /// count here, the Inbox and its tab badge are one number.
     @ObservedObject var inbox: InboxViewModel
-    /// The "did anyone else do more?" answer lives here; the hero's words follow it.
     @ObservedObject private var taxProfile = TaxProfileManager.shared
+    @ObservedObject private var houseEvents = TodayHouseEvents.shared
+    @ObservedObject private var backfill = BackfillJob.shared
 
+    /// The selected page, remembered per scene (§1.27 scenes).
+    @SceneStorage("today.focus") private var rememberedFocus = ""
+    @State private var focusID: String?
+    @State private var slideEdge: Edge = .trailing
+    @State private var window: CGSize = .zero
+    @State private var heroSide: CraftHeroSide?
+    @State private var isVisible = false
+    /// The hero as it was when Today left the screen; nil while Today is visible.
+    @State private var frozen: HeroSnapshot?
+    /// Bumped to remount the hero without motion (return to Today, a DEBUG seed).
+    @State private var heroMount = 0
+    /// The number waits for the last timber to land (`heroCountUp` after `timberDrop`).
+    @State private var numberHold: (focus: String, hours: Double)?
+    @State private var calendarSuggestionsOn = CaptureOptIn.calendarSuggestionsEnabled()
+    @State private var showParticipationSheet = false
+    @State private var showRecordExport = false
+    @State private var showCaptureSetup = false
+    @State private var showLearningCenter = ProcessInfo.processInfo.arguments.contains("-LHOpenLearningCenter")
+    @State private var shownCelebration: TodayCelebration?
+    @State private var shownBackfill: HouseBackfillReveal?
+    @ScaledMetric(relativeTo: .largeTitle) private var scaledNumeral: CGFloat = 84
+
+    private struct HeroSnapshot: Equatable {
+        let focus: String
+        let stage: CraftStage
+        let lit: Bool
+        let hours: Double
+    }
+
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     private var currentYear: Int { Calendar.current.component(.year, from: Date()) }
-    /// The real estate professional's own count: yours, or your spouse's when they answered that
-    /// their spouse is the pro.
-    private var repsStatus: TaxQualificationEngine.REPSResult {
-        viewModel.repsStatus(participant: goalManager.repsParticipant, year: currentYear)
-    }
-
-    // MARK: House inputs
-    // The hero counts the goal's countable hours only (TodayHouse.swift): REPS = your own
-    // real-estate hours; MP = owner (+ spouse when tracked jointly). Investor-only tasks never count.
+    private var ax: Bool { dynamicTypeSize.isAccessibilitySize }
     private var houseGoal: HouseGoal { goalManager.houseGoal }
-    private var totalHours: Double { viewModel.houseCountableHours(goal: houseGoal, year: currentYear) }
-    private var targetHours: Double { houseGoal.targetHours }
-    private var isGoalMet: Bool { HouseProgress(hours: totalHours, goal: houseGoal).isGoalMet }
-    private var pace: TodayPace { TodayPace.resolve(hours: totalHours, goal: houseGoal) }
+    private var isRecord: Bool { goalManager.goalChoice == .record }
+    private var hoursPending: Bool { viewModel.isAwaitingInitialPull }
 
-    /// The hero's words: target, whose count, and where you stand against Dec 31.
-    private var heroCopy: TodayHeroCopy {
-        TodayHeroCopy.make(.init(
-            goal: houseGoal,
-            isRecord: goalManager.goalChoice == .record,
-            hours: totalHours,
-            year: currentYear,
-            now: InboxClock.now(),
-            repsParticipant: goalManager.repsParticipant,
-            halfTest: repsStatus.moreThanHalfStatus,
-            noOneParticipatedMore: taxProfile.noOneParticipatedMore(forYear: currentYear),
-            propertyName: heroPropertyName,
-            daysOfData: daysOfData,
-            hasPendingToConfirm: inbox.badgeCount > 0 || foundInInbox.count > 0))
+    // MARK: Figures
+
+    private var focuses: [TodayFocus] {
+        let rentals = viewModel.properties.map {
+            TodayFocusList.Rental(id: $0.id, name: $0.name,
+                                  hours: viewModel.propertyCountableHours($0.id, goal: houseGoal, year: currentYear))
+        }
+        return TodayFocusList.make(rentals: rentals, goal: houseGoal.targetHours, allRentalsName: TodayText.allRentals)
     }
 
-    /// Days since the first hour logged this year (the pace waits for two weeks or ten hours).
+    private var focus: TodayFocus? {
+        let all = focuses
+        return all.first { $0.id == focusID } ?? all.first
+    }
+
+    private var focusIndex: Int { focuses.firstIndex { $0.id == focus?.id } ?? 0 }
+
+    private func lit(_ focus: TodayFocus) -> Bool {
+        TodayWindowState.loggedToday(entries: viewModel.timeEntries, rentalIDs: focus.rentalIDs, now: InboxClock.now())
+    }
+
+    /// What the hero draws: the live state, or the frozen one while Today is off screen.
+    private var heroState: HeroSnapshot {
+        frozen ?? liveHeroState()
+    }
+
+    /// The number shown: held at the pre-save value through a drop.
+    private var shownHours: Double {
+        if let hold = numberHold, hold.focus == heroState.focus { return hold.hours }
+        return heroState.hours
+    }
+
+    private var side: CGFloat {
+        heroSide?.side ?? CraftHeroSize.hero(windowWidth: max(window.width, 402), windowHeight: max(window.height, 874), accessibility: ax)
+    }
+
+    private var numeralSize: CGFloat {
+        let cap = CraftHeroSize.numeralCap(windowHeight: window.height > 0 ? window.height : 874, accessibility: ax) ?? 84
+        return min(scaledNumeral, cap)
+    }
+
+    private var rowLimit: Int { TodayConfirm.rowLimit(windowHeight: window.height, typeSize: dynamicTypeSize) }
+
     private var daysOfData: Int {
         let calendar = Calendar.current
-        let year = currentYear
-        guard let first = viewModel.timeEntries.filter({ calendar.component(.year, from: $0.date) == year }).map(\.date).min() else { return 0 }
+        guard let first = viewModel.timeEntries.filter({ calendar.component(.year, from: $0.date) == currentYear }).map(\.date).min() else { return 0 }
         return max(0, calendar.dateComponents([.day], from: calendar.startOfDay(for: first), to: calendar.startOfDay(for: InboxClock.now())).day ?? 0)
     }
 
-    /// The rental the 100 or 500 hour count belongs to; nil when it covers every rental.
-    private var heroPropertyName: String? { viewModel.todayFocusProperty(year: currentYear)?.name }
-
-    /// The rental Today names in the eyebrow, the house flag and the subtitle: always the same
-    /// one. When the count covers every rental there is no focus; the first rental stands in
-    /// for the flag and subtitle only.
-    private var todayFocusName: String? {
-        viewModel.todayFocusProperty(year: currentYear)?.name ?? viewModel.properties.first?.name
-    }
-    @State private var showParticipationSheet = false
-
-    /// What the hero draws: the live hours, or the pre-save hours while a confirm build waits to play.
-    private var heroProgress: HouseProgress {
-        HouseProgress(hours: heroHoursOverride ?? totalHours, goal: houseGoal)
+    /// The 1.x hero words, per page: they carry the goal-reached caveats (the 750's half rule, the
+    /// 100-hour "did anyone do more?").
+    private func heroCopy(_ focus: TodayFocus) -> TodayHeroCopy {
+        TodayHeroCopy.make(.init(
+            goal: houseGoal, isRecord: isRecord, hours: focus.hours, year: currentYear, now: InboxClock.now(),
+            repsParticipant: goalManager.repsParticipant,
+            halfTest: viewModel.repsStatus(participant: goalManager.repsParticipant, year: currentYear).moreThanHalfStatus,
+            noOneParticipatedMore: taxProfile.noOneParticipatedMore(forYear: currentYear),
+            propertyName: nil, daysOfData: daysOfData, hasPendingToConfirm: inbox.badgeCount > 0))
     }
 
-    /// WP-L: the first iCloud pull of this launch hasn't landed, so the hours may not be final.
-    /// Only the hours wait (placeholder bar + drafting loader); the rest of Today is usable.
-    private var hoursPending: Bool { viewModel.isAwaitingInitialPull }
-
-    private var isREPS: Bool { goalManager.globalGoalType == .reps || goalManager.globalGoalType == .both }
-
-    // 50% rule compliance: ratio of RE hours to total working hours (incl. non-RE employment)
-    private var fiftyPercentCompliance: Double {
-        min(repsStatus.realEstateWorkPercentage, 1.0)
-    }
-
-    /// The 50% rule can't be checked until other work hours are entered (same rule as the export).
-    private var otherWorkHoursMissing: Bool {
-        isREPS && repsStatus.moreThanHalfStatus == .notEntered
-    }
-
-    private var fiftyPercentValue: String {
-        otherWorkHoursMissing ? TaxQualificationEngine.MoreThanHalfStatus.notEnteredValue : "\(Int(fiftyPercentCompliance * 100))%"
-    }
-
-    private var fiftyPercentDetail: String? {
-        switch repsStatus.moreThanHalfStatus {
-        case .notEntered: return TaxQualificationEngine.MoreThanHalfStatus.notEnteredPrompt
-        case .notMet: return "Not met yet: under half your work hours"
-        case .met: return nil
+    private var pace: TodayPaceSentence {
+        if hoursPending {
+            return TodayPaceSentence(lead: nil, rest: String(localized: "today.pace.loading", defaultValue: "Bringing in your latest hours from iCloud.", table: "Today"), tone: .neutral)
         }
+        guard let focus else {
+            return TodayPaceSentence(lead: nil, rest: TodayHeroCopy.emptyLotLine(target: isRecord ? nil : Int(houseGoal.targetHours)), tone: .neutral)
+        }
+        let copy = heroCopy(focus)
+        let caveat = (focus.hours >= focus.goal && !copy.claimsReached) ? copy.status : nil
+        return TodayPaceSentence.make(.init(
+            hours: shownHours, goal: focus.goal, year: currentYear, now: InboxClock.now(), isRecord: isRecord,
+            paceReady: TodayHeroCopy.paceIsReady(hours: focus.hours, daysOfData: daysOfData),
+            hasPendingToConfirm: inbox.badgeCount > 0, reachedCaveat: caveat))
     }
 
-    // Pace calculations
-    private var daysLeftInYear: Int {
-        let cal = Calendar.current
-        guard let endOfYear = cal.date(from: DateComponents(year: currentYear, month: 12, day: 31)) else { return 0 }
-        let remaining = cal.dateComponents([.day], from: Date(), to: endOfYear).day ?? 0
-        return max(remaining, 1)
+    private var paceTap: (() -> Void)? {
+        guard let focus, !hoursPending, heroCopy(focus).needsConfirmation else { return nil }
+        return { showParticipationSheet = true }
     }
 
-    @State private var showRecordExport = false
-    // The header line follows the hero: it keeps the pre-save total until the count-up lands.
-    @State private var subtitleHoursOverride: Double?
-    private var headerHours: Double { subtitleHoursOverride ?? totalHours }
-    @State private var showLearningCenter = Self.shouldOpenLearningCenterFromLaunchArguments
-    @State private var showHistory = false
-    @State private var scrollOffset: CGFloat = 0
-
-    // House: confirm build, milestone celebrations, Day-1 backfill reveal.
-    @ObservedObject private var houseEvents = TodayHouseEvents.shared
-    @State private var heroHoursOverride: Double?
-    @State private var shownCelebration: TodayCelebration?
-    @State private var shownBackfill: HouseBackfillReveal?
-    @State private var isVisible = false
-
-    private static var shouldOpenLearningCenterFromLaunchArguments: Bool {
-        ProcessInfo.processInfo.arguments.contains("-LHOpenLearningCenter")
-    }
-
-    @ObservedObject private var backfill = BackfillJob.shared
-    /// Backfill items in the Inbox (the same count as its tab badge), for the look-back card.
-    private var inboxBackfillCount: Int { inbox.backfillCount }
-    @State private var showCaptureSetup = false
-
-    // MARK: Below the house
-
-    /// To confirm. A new owner who said "Not now" to the calendar already has "Find hours in my
-    /// calendar" under the hero, so the block stays out of the way until they turn it on.
     private var confirmState: TodayConfirm.State {
-        if isNewOwner && !calendarSuggestionsOn && inbox.badgeCount == 0 { return .hidden }
-        return TodayConfirm.state(
-            hasProperties: !viewModel.properties.isEmpty,
-            pendingCount: inbox.badgeCount,
-            backfillScanning: backfill.isScanning,
-            captureOn: calendarSuggestionsOn
-        )
+        TodayConfirm.state(hasProperties: !viewModel.properties.isEmpty, pendingCount: inbox.badgeCount,
+                           backfillScanning: backfill.isScanning, captureOn: calendarSuggestionsOn)
     }
 
-    /// This week's countable hours, Monday first, with the house's spouse rule.
-    private var weekDays: [TodayWeekDay] {
-        TodayWeek.days(entries: viewModel.timeEntries, goal: houseGoal,
-                       includeSpouse: viewModel.tracksSpouseJointly,
-                       repsParticipant: goalManager.repsParticipant, now: InboxClock.now())
-    }
+    private var countedHours: Double { viewModel.houseCountableHours(goal: houseGoal, year: currentYear) }
 
     private var showsRecordSlot: Bool {
         !hoursPending && !viewModel.timeEntries.isEmpty
-            && TodayRecordSlot.isShown(isPro: subscriptionManager.isPro, confirmedHours: totalHours)
+            && TodayRecordSlot.isShown(isPro: subscriptionManager.isPro, confirmedHours: countedHours)
     }
 
-    private var mode: TodayPresentation.Mode {
-        TodayPresentation.mode(
-            hoursPending: hoursPending,
-            backfillScanning: backfill.isScanning,
-            hasProperties: !viewModel.properties.isEmpty,
-            hasEntries: !viewModel.timeEntries.isEmpty
-        )
+    private var dropAllowed: Bool {
+        guard let focus else { return false }
+        return !CraftDropLedger().hasPlayed(rentalID: focus.rentalID, stage: .framing, year: currentYear)
     }
 
-    // MARK: New-owner landing (2.0 onboarding hands off here)
-
-    /// Calendar suggestions found by the look-back, still waiting in the Inbox (the Inbox's own
-    /// items; countable hours only).
-    @State private var foundInInbox: OnbFound = .none
-    @State private var calendarSuggestionsOn = CaptureOptIn.calendarSuggestionsEnabled()
-    @State private var isAskingCalendar = false
-
-    private var isNewOwner: Bool { viewModel.timeEntries.isEmpty }
-
-    private var heroFooter: HouseHeroFooter? {
-        guard isNewOwner else { return nil }
-        if viewModel.properties.isEmpty { return .emptyLot(onAddProperty: { openAddPropertyFromHome() }) }
-        // While the look-back runs, WP-L's "Looking through your calendar" words lead instead.
-        if !backfill.isScanning, foundInInbox.count > 0, foundInInbox.hasDisplayableHours { return .found(hoursText: foundInInbox.hoursText) }
-        return nil
-    }
-
-    private var heroStakeName: String? {
-        guard isNewOwner else { return nil }
-        return todayFocusName
-    }
-
-    private func refreshNewOwnerState() {
-        calendarSuggestionsOn = CaptureOptIn.calendarSuggestionsEnabled()
-        foundInInbox = OnbFound.from(AppModelHost.shared.suggestionStore?.suggestions ?? [], now: InboxClock.now())
-    }
-
-    /// "Find hours in my calendar": the same ask as onboarding's calendar step, for people who
-    /// said "Not now". The system prompt only when iOS has never asked; after a no, Settings.
-    private var findHoursCard: some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image("bp_tool_repairs_36")
-                .resizable().scaledToFit()
-                .frame(width: 40, height: 40)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Find hours in my calendar")
-                    .font(.headline)
-                    .foregroundStyle(colors.textPrimary)
-                Text("We can look back 90 days for things like a plumber visit or a showing. You confirm each one.")
-                    .font(.subheadline)
-                    .foregroundStyle(colors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button("Look at my calendar") { Task { await lookAtCalendar() } }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(colors.action)
-                    .frame(minHeight: 44)
-                    .disabled(isAskingCalendar)
-                    .accessibilityIdentifier("today-find-hours")
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(16)
-        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .accessibilityElement(children: .contain)
-    }
-
-    private func lookAtCalendar() async {
-        isAskingCalendar = true
-        defer { isAskingCalendar = false }
-        let environment = CaptureSetupEnvironment.current
-        let access = await environment.requestCalendar()
-        guard access == .fullAccess else {
-            // iOS answers at once (no prompt) after an earlier no: the switch is in Settings.
-            if let url = URL(string: UIApplication.openSettingsURLString) { await UIApplication.shared.open(url) }
-            return
-        }
-        CaptureOptIn.setCalendarSuggestionsEnabled(true)
-        Analytics.onboarding(.calendarResult(.allowed))
-        if let store = AppModelHost.shared.suggestionStore {
-            BackfillJob.shared.start(environment.makeScanner(viewModel, store))
-        }
-        refreshNewOwnerState()
-    }
-
-    /// The empty lot carries its own "Add property"; the setup card follows the first property.
-    private var shouldShowActivationCard: Bool { mode.showsActivationCard && !viewModel.properties.isEmpty }
+    // MARK: Body
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                LHMobileCanvas()
-
-                ScrollViewReader { scroller in
-                ScrollView(showsIndicators: false) {
-                    GeometryReader { proxy in
-                        Color.clear
-                            .preference(
-                                key: DashboardScrollOffsetPreferenceKey.self,
-                                value: proxy.frame(in: .named("dashboardScroll")).minY
-                            )
-                    }
-                    .frame(height: 0)
-
-                    VStack(spacing: 22) {
-                        headerSection
-                        // The house leads Today in every state (approved r6 concept); a new
-                        // owner's setup steps sit right under the empty lot.
-                        houseHero
-                        if isNewOwner && !calendarSuggestionsOn {
-                            findHoursCard
-                        }
-                        // Below the house (redesign-specs §2): timer/draft slot → To confirm →
-                        // This week → pace cards → Your record (free only).
-                        VStack(alignment: .leading, spacing: 32) {
-                            TodayTimerSlot()
-                                .id("today.section.draft")
-                            if mode == .lookingBack && viewModel.properties.isEmpty {
-                                // No property yet: the To confirm block is hidden, so WP-L's
-                                // look-back card says the scan is running.
-                                BackfillProgressHeader(job: backfill, found: inboxBackfillCount, onRetry: {}, onOpen: {
-                                    NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex)
-                                })
-                                .accessibilityAddTraits(.isButton)
-                                .accessibilityHint("Opens your Inbox")
-                                .accessibilityIdentifier("today.lookingBack")
-                            }
-                            TodayConfirmSection(
-                                inbox: inbox,
-                                state: confirmState,
-                                isScanning: backfill.isScanning,
-                                onSeeAll: { NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex) },
-                                onTurnOn: { showCaptureSetup = true }
-                            )
-                            .id("today.section.confirm")
-                            if shouldShowActivationCard {
-                                homeActivationCard
-                                    .id("today.section.setup")
-                            }
-                            if !viewModel.properties.isEmpty {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    TodayWeekSection(days: weekDays) { _ in
-                                        NotificationCenter.default.post(name: .switchToTab, object: ShellTab.recordsIndex)
-                                    }
-                                    paceCards
-                                }
-                                .id("today.section.week")
-                            }
-                            if showsRecordSlot {
-                                TodayRecordSlot(year: currentYear, confirmedHours: totalHours) { showRecordExport = true }
-                                    .id("today.section.record")
-                            }
-                        }
-                        .padding(.top, 10)
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 8)
-                    .padding(.bottom, AppSpacing.tabContentBottomInset)
-                    // WP-L: the hours settle in with a crossfade when the first pull lands.
-                    .lhMotion(AppAnimation.standard, value: hoursPending)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    page
+                        .frame(maxWidth: band == .a ? .infinity : (band == .c ? 960 : LHMetrics.readingColumn))
+                        .frame(maxWidth: .infinity)
+                        .padding(.bottom, 24)
                 }
-                .coordinateSpace(name: "dashboardScroll")
+                .scrollIndicators(.hidden)
                 #if DEBUG
                 .task {
                     TodayDebugSeed.applyIfNeeded(app: viewModel)
                     inbox.reload()
-                    refreshNewOwnerState()
-                    guard let target = TodayDebugSeed.scrollTarget else { return }
-                    try? await Task.sleep(nanoseconds: 700_000_000)
-                    scroller.scrollTo("today.section.\(target)", anchor: target == "week" ? .top : .center)
+                    refreshCaptureState()
+                    resolveFocus()
+                    if let i = TodayDebugSeed.focusIndex, focuses.indices.contains(i) { focusID = focuses[i].id }
+                    heroMount += 1   // the seed replaced the data: remount, no motion
+                    guard TodayDebugSeed.scrollsToEnd else { return }
+                    try? await Task.sleep(for: .seconds(1.2))
+                    withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo("today.end", anchor: .bottom) }
                 }
                 #endif
-                }
-                .onPreferenceChange(DashboardScrollOffsetPreferenceKey.self) { value in
-                    scrollOffset = value
-                }
-                // The hero never scrolls under the status bar (the sandbox's top edge).
-                .overlay(alignment: .top) { TodayTopEdgeFade() }
-                .overlay(alignment: .top) {
-                    if isCompactHeaderVisible {
-                        compactDashboardBar
-                            .padding(.horizontal, 24)
-                            .padding(.top, 8)
-                            .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            .background { LHPage() }
+            .background {
+                // The window size (H1 uses the whole window, safe areas included).
+                Color.clear
+                    .onGeometryChange(for: CGSize.self) { proxy in
+                        CGSize(width: proxy.size.width + proxy.safeAreaInsets.leading + proxy.safeAreaInsets.trailing,
+                               height: proxy.size.height + proxy.safeAreaInsets.top + proxy.safeAreaInsets.bottom)
+                    } action: { size in
+                        window = size
+                        resolveHeroSide()
                     }
-                }
             }
-            .navigationBarHidden(true)
-            .sheet(isPresented: $showRecordExport) {
-                ExportPDFView(year: currentYear)
+            .toolbar(.hidden, for: .navigationBar)
+            .sensoryFeedback(.selection, trigger: focusID)
+            .onAppear(perform: appeared)
+            .onDisappear(perform: disappeared)
+            .onChange(of: dynamicTypeSize) { _, _ in resolveHeroSide() }
+            .onChange(of: band) { _, _ in resolveHeroSide() }
+            .onChange(of: focuses.map(\.id)) { _, _ in resolveFocus() }
+            .onChange(of: focus?.hours) { old, new in hoursChanged(from: old, to: new) }
+            .onReceive(NotificationCenter.default.publisher(for: .captureSuggestionsDidChange)) { _ in refreshCaptureState() }
+            .onChange(of: hoursPending) { wasPending, isPending in
+                guard wasPending, !isPending else { return }
+                UIAccessibility.post(notification: .announcement, argument: pace.spoken)
             }
-            // Tapping a To confirm row (or a confirm that needs a decision) opens the Inbox's own
-            // confirm sheet, on the Inbox's own model.
+            .onChange(of: houseEvents.pendingConfirm) { _, confirm in
+                // The hero builds from the live hours; consume the event so nothing replays later.
+                guard confirm != nil, isVisible else { return }
+                houseEvents.takeConfirm()
+            }
+            .onChange(of: houseEvents.celebrationTick) { _, _ in
+                guard isVisible else { return }
+                scheduleCelebration(after: numberHold != nil ? Self.afterDrop : Self.afterSettle)
+            }
+            .onChange(of: houseEvents.pendingBackfill) { _, reveal in
+                guard reveal != nil, isVisible else { return }
+                presentBackfillIfNeeded()
+            }
+            .sheet(isPresented: $showRecordExport) { ExportPDFView(year: currentYear) }
             .sheet(item: $inbox.sheetSuggestion) { suggestion in
                 SuggestionConfirmSheet(suggestion: suggestion, model: inbox)
             }
             .sheet(isPresented: $showCaptureSetup, onDismiss: {
-                refreshNewOwnerState()
+                refreshCaptureState()
                 inbox.reload()
             }) {
                 CaptureSetupFlow(mode: .whatsNew, environment: .current, startAtBackfill: false) { _ in
@@ -412,69 +287,27 @@ struct DashboardView: View {
                 }
                 .environmentObject(viewModel)
             }
-            .navigationDestination(isPresented: $showLearningCenter) {
-                LearningCenterView()
-            }
-            .navigationDestination(isPresented: $showHistory) {
-                HistoryView()
-            }
-            .onAppear {
-                refreshNewOwnerState()
-                isVisible = true
-                // A save while Today was away (log via +, timer stop, inbox confirm): mount the
-                // house at the pre-save height, then build up to the new one once it is on screen.
-                if let confirm = houseEvents.pendingConfirm {
-                    heroHoursOverride = confirm.oldHours
-                    subtitleHoursOverride = confirm.oldHours
-                }
-                // Today renders its real content at once (records are local), so there is no
-                // loading skeleton; the build starts once the card has been seen.
-                DispatchQueue.main.asyncAfter(deadline: .now() + Self.confirmStartDelay) {
-                    playPendingHouseWork()
+            .sheet(isPresented: $showParticipationSheet) {
+                ParticipationConfirmationSheet(year: currentYear,
+                                               currentAnswer: taxProfile.noOneParticipatedMore(forYear: currentYear)) { answer in
+                    taxProfile.setNoOneParticipatedMore(answer, forYear: currentYear)
                 }
             }
-            .onDisappear { isVisible = false }
-            .onReceive(NotificationCenter.default.publisher(for: .captureSuggestionsDidChange)) { _ in
-                refreshNewOwnerState()
-            }
-            // VoiceOver: say once when the hours finish loading (the loader itself stays quiet).
-            .onChange(of: hoursPending) { wasPending, isPending in
-                guard wasPending, !isPending else { return }
-                UIAccessibility.post(notification: .announcement,
-                                     argument: "Hours up to date. \(Int(totalHours.rounded(.down))) of \(Int(targetHours)) hours.")
-            }
-            // Live: a save while Today is on screen. The hero builds from the live hours change
-            // itself; consume the event so it does not replay on the next appear.
-            .onChange(of: houseEvents.pendingConfirm) { _, confirm in
-                guard confirm != nil, isVisible, heroHoursOverride == nil else { return }
-                houseEvents.takeConfirm()
-            }
-            .onChange(of: houseEvents.celebrationTick) { _, _ in
-                guard isVisible else { return }
-                schedulePendingCelebration()
-            }
-            .onChange(of: houseEvents.pendingBackfill) { _, reveal in
-                guard reveal != nil, isVisible else { return }
-                presentBackfillIfNeeded()
-            }
+            .navigationDestination(isPresented: $showLearningCenter) { LearningCenterView() }
             .fullScreenCover(item: $shownCelebration, onDismiss: {
                 presentBackfillIfNeeded()
                 presentNextCelebration()
             }) { item in
-                MilestoneCelebrationView(
-                    celebration: item.celebration,
-                    hours: totalHours,
-                    artScheme: colorScheme,
-                    onContinue: { shownCelebration = nil }
-                )
+                MilestoneCelebrationView(celebration: item.celebration, hours: countedHours,
+                                         windowsLit: TodayWindowState.loggedToday(entries: viewModel.timeEntries, now: InboxClock.now()),
+                                         onContinue: { shownCelebration = nil })
             }
         }
         .fullScreenCover(item: $shownBackfill, onDismiss: { presentNextCelebration() }) { reveal in
             BackfillRevealView(
                 foundHours: reveal.foundHours,
                 suggestionCount: reveal.suggestionCount,
-                confirmedHours: totalHours,
-                artScheme: colorScheme,
+                confirmedHours: countedHours,
                 onReview: {
                     shownBackfill = nil
                     NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex)
@@ -484,39 +317,266 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - House events
+    // MARK: Layout
 
-    /// Wait after Today appears before the beam flies, so the eye is on the card.
-    private static let confirmStartDelay: Double = 0.45
-    /// The confirm build (beam, board, crossfade) settles within this; celebrations follow it.
-    private static let confirmSettle: Double = 2.2
-    /// When the hero's count-up has landed: beam flight, then the whole-hour steps.
-    private static var countUpLands: Double { HouseMotion.beamFlight + 0.04 + HouseMotion.countUpMax + 0.05 }
-
-    private func playPendingHouseWork() {
-        guard isVisible else { return }
-        let hadConfirm = houseEvents.takeConfirm() != nil && heroHoursOverride != nil
-        // The hero sees its hours change from the pre-save value and plays the build; it reports
-        // the celebration when the build settles (at once under Reduce Motion).
-        heroHoursOverride = nil
-        // The header total changes when the hero's number lands, not before it.
-        if subtitleHoursOverride != nil {
-            DispatchQueue.main.asyncAfter(deadline: .now() + (reduceMotion ? 0 : Self.countUpLands)) {
-                subtitleHoursOverride = nil
+    @ViewBuilder private var page: some View {
+        if band == .c {
+            // H6 band C: the hero and the number on the left, To confirm on the right.
+            HStack(alignment: .top, spacing: LHMetrics.sectionGap) {
+                VStack(spacing: 0) { heroColumn }
+                    .frame(maxWidth: .infinity)
+                VStack(spacing: 0) { belowHero }
+                    .frame(maxWidth: 420)
+                    .padding(.top, 64)
             }
-        }
-        if hadConfirm {
-            schedulePendingCelebration()
+            .padding(.horizontal, LHMetrics.wideGutter)
         } else {
-            presentBackfillIfNeeded()
-            presentNextCelebration()
+            VStack(spacing: 0) {
+                heroColumn
+                belowHero
+            }
         }
     }
 
-    /// Fallback for when the hero's own callback does not fire (e.g. a build interrupted by a
-    /// tab switch, or a milestone queued in the background).
-    private func schedulePendingCelebration() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + (reduceMotion ? 0.3 : Self.confirmSettle)) {
+    @ViewBuilder private var heroColumn: some View {
+        if ax { chipRow }
+        hero
+            .padding(.top, ax ? 0 : 10)   // headroom so the chip clears the roof ridge at "finished"
+            .overlay(alignment: .top) { if !ax { chipRow.padding(.top, 4) } }
+        TodayNumberBlock(hours: shownHours, goal: focus?.goal ?? houseGoal.targetHours, year: currentYear,
+                         isRecord: isRecord, pace: pace, numeralSize: numeralSize, isPending: hoursPending,
+                         onPaceTap: paceTap)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
+            .padding(.top, ax ? 0 : -44)   // the number sits in the diorama's shadow (H4)
+        if viewModel.properties.isEmpty {
+            Button(String(localized: "today.addRental", defaultValue: "Add a rental", table: "Today")) {
+                NotificationCenter.default.post(name: .switchToPropertiesAndOpenAddProperty, object: nil)
+            }
+            .buttonStyle(LHButton.primary)
+            .padding(.horizontal, LHMetrics.gutter)
+            .padding(.top, LHMetrics.sectionGap)
+            .accessibilityIdentifier("today.addRental")
+        }
+    }
+
+    @ViewBuilder private var belowHero: some View {
+        TodayTimerSlot()
+            .padding(.horizontal, LHMetrics.gutter)
+            .padding(.top, 12)
+        TodayConfirmBlock(inbox: inbox, state: confirmState, isScanning: backfill.isScanning, limit: rowLimit,
+                          onSeeAll: { NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex) },
+                          onTurnOn: { showCaptureSetup = true },
+                          onLogged: rowLogged, onNotWork: { _ in
+                              AppToastCenter.shared.show(TodayText.markedNotWork, kind: .neutral, undo: { inbox.undo() })
+                          })
+            .padding(.top, ax ? 12 : 8)
+            .padding(.horizontal, LHMetrics.gutter)
+        if showsRecordSlot {
+            TodayRecordSlot(year: currentYear, confirmedHours: countedHours) { showRecordExport = true }
+                .padding(.horizontal, LHMetrics.gutter)
+                .padding(.top, LHMetrics.sectionGap)
+                .id("today.section.record")
+        }
+        Color.clear.frame(height: 1).id("today.end")
+    }
+
+    // MARK: Chip
+
+    /// The rental chip (a `Menu`), with the account menu at the trailing edge. The top toast
+    /// replaces the row while it shows (`LHToastChipSlot`, §H.8).
+    private var chipRow: some View {
+        LHToastChipSlot {
+            ZStack {
+                switcher
+                HStack {
+                    Spacer()
+                    accountMenu
+                }
+                .padding(.horizontal, LHMetrics.gutter)
+            }
+        }
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+    }
+
+    @ViewBuilder private var switcher: some View {
+        if let focus {
+            let pages = focuses
+            Menu {
+                Picker(String(localized: "today.chip.picker", defaultValue: "Rental", table: "Today"),
+                       selection: Binding(get: { focus.id }, set: { select($0) })) {
+                    ForEach(pages) { page in Text(page.name).tag(page.id) }
+                }
+            } label: {
+                // The whole name when it fits beside the account button; only long names shorten
+                // ("Santa Ray…" at AX3 was a FAIL, §H.8).
+                LHHeroChip(focus.name, showsChevron: pages.count > 1)
+                    .frame(maxWidth: max(160, min(window.width > 0 ? window.width : 402, 402) - 2 * (LHMetrics.gutter + LHMetrics.minTap)))
+                .contentTransition(.opacity)
+            }
+            .disabled(pages.count < 2)
+            .accessibilityLabel(String(localized: "today.chip.label", defaultValue: "Rental: \(focus.name)", table: "Today"))
+            .accessibilityHint(pages.count > 1 ? String(localized: "today.chip.hint", defaultValue: "Switches the rental", table: "Today") : "")
+            .accessibilityIdentifier("today.chip")
+        }
+    }
+
+    /// Reports and Settings open in the Today tab (`TodayRoute`), so Today keeps one quiet way in.
+    private var accountMenu: some View {
+        Menu {
+            Button {
+                NotificationCenter.default.post(name: .switchToTab, object: ShellTab.reportsIndex)
+            } label: {
+                Label(String(localized: "today.account.reports", defaultValue: "Reports", table: "Today"), systemImage: "chart.bar")
+            }
+            Button {
+                NotificationCenter.default.post(name: .switchToTab, object: ShellTab.settingsIndex)
+            } label: {
+                Label(String(localized: "today.account.settings", defaultValue: "Settings", table: "Today"), systemImage: "gearshape")
+            }
+        } label: {
+            Image(systemName: "person.crop.circle")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(colors.textSecondary)
+                .frame(width: 36, height: 36)
+                .background(colors.heroChipFill, in: Circle())
+                .overlay(Circle().strokeBorder(colors.heroChipHairline, lineWidth: 0.5))
+                .frame(width: LHMetrics.minTap, height: LHMetrics.minTap)
+                .contentShape(Circle())
+        }
+        .accessibilityLabel(String(localized: "today.account.label", defaultValue: "Reports and settings", table: "Today"))
+        .accessibilityIdentifier("today.account")
+    }
+
+    // MARK: Hero
+
+    private var hero: some View {
+        let state = heroState
+        let pages = focuses
+        return VStack(spacing: 0) {
+            ZStack {
+                CraftHouseView(
+                    stage: state.stage,
+                    windowsLit: state.lit,
+                    side: side,
+                    fillsStage: !ax,
+                    dropAllowed: dropAllowed,
+                    onStageSettled: stageSettled,
+                    onSwipe: pages.count > 1 ? { step($0) } : nil
+                )
+                .id("\(state.focus)#\(heroMount)")
+                .transition(CraftHouseView.rentalSlide(edge: slideEdge, reduceMotion: reduceMotion))
+            }
+            .frame(width: side, height: side)
+            .frame(maxWidth: .infinity)
+            .clipped()
+            .accessibilityIdentifier("today.hero")
+            if pages.count > 1 && !ax {
+                LHPageDots(count: pages.count, current: focusIndex)
+                    .padding(.top, -48)
+            }
+        }
+    }
+
+    // MARK: Actions
+
+    private func select(_ id: String) {
+        guard id != focus?.id else { return }
+        let pages = focuses
+        let to = pages.firstIndex { $0.id == id } ?? 0
+        slideEdge = to > focusIndex ? .trailing : .leading
+        numberHold = nil
+        withAnimation(CraftHouseView.rentalSlideAnimation(reduceMotion: reduceMotion)) { focusID = id }
+        rememberedFocus = id
+    }
+
+    private func step(_ delta: Int) {
+        guard let next = TodayFocusList.step(focuses, from: focus?.id, by: delta) else { return }
+        let pages = focuses
+        let from = focusIndex
+        let to = pages.firstIndex { $0.id == next } ?? 0
+        select(next)
+        // A wrap-around swipe still slides the way the finger went.
+        if (delta > 0 && to < from) || (delta < 0 && to > from) { slideEdge = delta > 0 ? .trailing : .leading }
+    }
+
+    private func resolveFocus() {
+        let pages = focuses
+        if let focusID, pages.contains(where: { $0.id == focusID }) { return }
+        focusID = TodayFocusList.initialFocusID(pages, remembered: rememberedFocus.isEmpty ? nil : rememberedFocus,
+                                                countedRental: viewModel.todayFocusProperty(year: currentYear)?.id)
+    }
+
+    private func resolveHeroSide() {
+        guard window.width > 0, window.height > 0 else { return }
+        heroSide = CraftHeroSide.resolve(previous: heroSide, kind: .hero, window: window, band: band, accessibility: ax)
+    }
+
+    /// Hours on the shown page changed while Today is on screen. If the stage change will be the
+    /// timber drop, the number waits for the last timber (`heroCountUp`).
+    private func hoursChanged(from old: Double?, to new: Double?) {
+        guard isVisible, frozen == nil, let old, let new, new > old, let focus else { return }
+        let motion = CraftMotion.stageMotion(from: CraftStage.stage(hours: old, goal: focus.goal),
+                                             to: CraftStage.stage(hours: new, goal: focus.goal))
+        let clip = CraftHouseView.buildClipURL(dark: colorScheme == .dark) != nil
+        if motion == .timberDrop && dropAllowed && !reduceMotion && clip {
+            numberHold = (focus.id, old)
+        }
+    }
+
+    private func stageSettled(_ motion: CraftStageMotion) {
+        if motion == .timberDrop, let focus {
+            CraftDropLedger().markPlayed(rentalID: focus.rentalID, stage: .framing, year: currentYear)
+        }
+        numberHold = nil
+    }
+
+    private func rowLogged(_ suggestion: Suggestion) {
+        let hours = InboxFormat.hours(suggestion.proposedHours ?? 0)
+        let message = inbox.propertyName(for: suggestion).map { TodayText.logged(hours, at: $0) } ?? TodayText.loggedPlain(hours)
+        AppToastCenter.shared.show(message, kind: .success, undo: { inbox.undo() })
+    }
+
+    private func refreshCaptureState() {
+        calendarSuggestionsOn = CaptureOptIn.calendarSuggestionsEnabled()
+    }
+
+    private func appeared() {
+        isVisible = true
+        refreshCaptureState()
+        resolveFocus()
+        if let frozen, frozen != liveHeroState() {
+            // Saved while away: show the new state at once, with no motion (§H.6).
+            heroMount += 1
+        }
+        frozen = nil
+        numberHold = nil
+        houseEvents.takeConfirm()
+        scheduleCelebration(after: Self.afterAppear)
+    }
+
+    private func disappeared() {
+        frozen = heroState
+        isVisible = false
+    }
+
+    private func liveHeroState() -> HeroSnapshot {
+        guard let focus else { return HeroSnapshot(focus: "none", stage: .started, lit: false, hours: 0) }
+        return HeroSnapshot(focus: focus.id, stage: focus.stage, lit: lit(focus), hours: focus.hours)
+    }
+
+    // MARK: Celebrations and the Day-1 reveal
+
+    /// After Today appears, the milestone waits a beat so the eye is on the house.
+    private static let afterAppear: Double = 0.45
+    /// After a stage fade and the windows (0.25 + 0.30 + 0.40).
+    private static let afterSettle: Double = 1.0
+    /// After the drop (0.20 + 2.0 + 0.30) and the windows (0.40).
+    private static let afterDrop: Double = 3.0
+
+    private func scheduleCelebration(after delay: Double) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(reduceMotion ? min(delay, 0.3) : delay))
+            presentBackfillIfNeeded()
             presentNextCelebration()
         }
     }
@@ -530,512 +590,12 @@ struct DashboardView: View {
         shownCelebration = TodayCelebration(celebration: next.celebration, year: next.year)
     }
 
-    /// The Day-1 reveal, once per profile.
+    /// The Day-1 reveal, once per profile; never over onboarding or What's new.
     private func presentBackfillIfNeeded() {
-        // Never over onboarding or What's new: the flow hands the reveal back when it closes.
         guard isVisible, shownCelebration == nil, shownBackfill == nil, !OnbBackfill.flowActive,
               let reveal = houseEvents.pendingBackfill else { return }
         houseEvents.markBackfillShown()
         shownBackfill = reveal
-    }
-
-    private func animate(_ animation: Animation = AppAnimation.smooth, _ updates: () -> Void) {
-        if reduceMotion {
-            updates()
-        } else {
-            withAnimation(animation, updates)
-        }
-    }
-
-    private var isCompactHeaderVisible: Bool {
-        scrollOffset < -70
-    }
-
-    // MARK: - Header
-    private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center) {
-                Button {
-                    NotificationCenter.default.post(name: .switchToTab, object: 4)
-                } label: {
-                    Circle()
-                        .fill(colors.backgroundTertiary)
-                        .frame(width: 54, height: 54)
-                        .overlay {
-                            // No name is collected at onboarding: a neutral person glyph.
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundStyle(colors.textSecondary)
-                        }
-                        .overlay(alignment: .bottomTrailing) {
-                            Circle()
-                                .fill(colors.backgroundSecondary)
-                                .frame(width: 22, height: 22)
-                                .overlay {
-                                    Image(systemName: "gearshape.fill")
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundStyle(colors.textSecondary)
-                                }
-                                .overlay {
-                                    Circle()
-                                        .strokeBorder(colors.border.opacity(0.38), lineWidth: 1)
-                                }
-                        }
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Open profile and settings")
-
-                Spacer()
-
-                Button {
-                    NotificationCenter.default.post(name: .switchToTab, object: 3)
-                } label: {
-                    Image(systemName: "chart.bar")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(colors.textPrimary)
-                        .frame(width: 48, height: 48)
-                        .background(colors.backgroundTertiary)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Open reports")
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                // 2.0: Fraunces display (34pt, never scaled below the 28pt floor).
-                Text(dashboardTitle)
-                    .lhDisplayFont(.largeTitle)
-                    .foregroundStyle(colors.textPrimary)
-                    .lineSpacing(-1)
-                    .minimumScaleFactor(0.83)
-                    .accessibilityIdentifier("today.header.title")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Text(dashboardSubtitle)
-                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                    .foregroundStyle(colors.textSecondary)
-                    .lineSpacing(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("today.header.subtitle")
-            }
-
-            // 2.0: the action chips are gone (redesign-specs §2); "+" in the tab bar logs time.
-        }
-    }
-
-    private var compactDashboardBar: some View {
-        HStack(spacing: 12) {
-            Button {
-                NotificationCenter.default.post(name: .switchToTab, object: 4)
-            } label: {
-                Image(systemName: "person.fill")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(colors.textSecondary)
-                    .frame(width: 34, height: 34)
-                    .background(colors.backgroundTertiary)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Open profile and settings")
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(compactHeaderTitle)
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                    .lineLimit(1)
-                Text(compactHeaderSubtitle)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(colors.textSecondary)
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 8)
-
-            Button {
-                NotificationCenter.default.post(name: .switchToTab, object: 2)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .bold))
-                    Text("Log")
-                        .font(.system(size: 13, weight: .black, design: .rounded))
-                }
-                .foregroundStyle(AppColors.onAction)
-                .padding(.horizontal, 14)
-                .frame(height: 34)
-                .background(colors.action)
-                .clipShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Log time")
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.88 : 0.94))
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(colors.border.opacity(0.28), lineWidth: 1)
-        }
-        .shadow(color: colors.textPrimary.opacity(colorScheme == .dark ? 0.22 : 0.08), radius: 12, y: 6)
-        .lhMotion(AppAnimation.reveal, value: isCompactHeaderVisible)
-    }
-
-    private var displayName: String {
-        let name = viewModel.userName
-        if name.isEmpty || name == "User" { return "Dashboard" }
-        // Use first name only
-        return name.components(separatedBy: " ").first ?? name
-    }
-
-    private var dashboardTitle: String {
-        if let title = mode.title { return title }
-        if viewModel.properties.isEmpty {
-            return "Add your first property"
-        }
-        if viewModel.timeEntries.isEmpty {
-            return "Log your first hour"
-        }
-        return "Today’s work"
-    }
-
-    private var dashboardSubtitle: String {
-        if let subtitle = mode.subtitle { return subtitle }
-        if viewModel.properties.isEmpty {
-            return "Every hour you log starts with a place."
-        }
-        if viewModel.timeEntries.isEmpty {
-            let name = todayFocusName ?? "Your rental"
-            return foundInInbox.count > 0
-                ? "\(name) is staked. Confirm what we found, or log something new."
-                : String(localized: "\(name) is staked. Log your first hour while it’s fresh.")
-        }
-        return TodayHeroCopy.headerLine(hours: headerHours, target: Int(targetHours), isRecord: goalManager.goalChoice == .record, year: currentYear)
-    }
-
-    private var compactHeaderTitle: String {
-        if let title = mode.compactTitle { return title }
-        if shouldShowActivationCard { return "Finish setup" }
-        return String(localized: "\(OnbFormat.hours(headerHours)) logged")
-    }
-
-    private var compactHeaderSubtitle: String {
-        if let subtitle = mode.compactSubtitle { return subtitle }
-        if shouldShowActivationCard {
-            return "\(completedActivationSteps)/2 essentials complete"
-        }
-        return heroCopy.status ?? pace.text
-    }
-
-    private var userInitials: String {
-        let source = displayName == "Dashboard" ? "LH" : displayName
-        let pieces = source.split(separator: " ")
-        if pieces.count >= 2 {
-            return pieces.prefix(2).compactMap { $0.first }.map(String.init).joined().uppercased()
-        }
-        return String(source.prefix(2)).uppercased()
-    }
-
-    // MARK: - House hero
-    private var houseHero: some View {
-        VStack(spacing: 12) {
-            HouseHeroCard(
-                progress: heroProgress,
-                year: currentYear,
-                status: heroCopy.status,
-                statusTone: heroCopy.tone,
-                heroCopy: heroCopy,
-                onCelebration: { _ in presentNextCelebration() },
-                footer: heroFooter,
-                stakeName: heroStakeName,
-                isLoading: hoursPending,
-                animatesChanges: viewModel.lastEntriesChangeOrigin != .remote,
-                isLookingBack: backfill.isScanning
-            )
-            // The art has a fixed frame; past AX2 the words would wrap into it, so cap there.
-            // VoiceOver reads the whole hero as one element with the full words (the empty lot
-            // keeps its "Add property" button reachable).
-            .dynamicTypeSize(...DynamicTypeSize.accessibility2)
-            .accessibilityElement(children: viewModel.properties.isEmpty && isNewOwner ? .contain : .ignore)
-            .accessibilityLabel(heroAccessibilityLabel)
-            .accessibilityIdentifier("today.hero")
-            // Over 100 hours with "did anyone do more?" unanswered: the hero opens that question.
-            .onTapGesture { if heroCopy.needsConfirmation && !hoursPending { showParticipationSheet = true } }
-            .accessibilityAddTraits(heroCopy.needsConfirmation ? .isButton : [])
-            .accessibilityHint(heroCopy.needsConfirmation ? "Opens the question about anyone else’s hours" : "")
-            .sheet(isPresented: $showParticipationSheet) {
-                ParticipationConfirmationSheet(
-                    year: currentYear,
-                    currentAnswer: taxProfile.noOneParticipatedMore(forYear: currentYear)
-                ) { answer in
-                    taxProfile.setNoOneParticipatedMore(answer, forYear: currentYear)
-                }
-            }
-
-        }
-    }
-
-    // MARK: - Pace cards (2-up; stacked from XXL)
-
-    /// The empty lot (no property yet) shows no pace maths: nothing can be counted.
-    @ViewBuilder
-    private var paceCards: some View {
-        if !viewModel.properties.isEmpty {
-            // Stacked from XXL (the week list switches at the same size): "53h a week" never wraps.
-            let layout = dynamicTypeSize >= .xxLarge
-                ? AnyLayout(VStackLayout(spacing: 12))
-                : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
-            layout {
-                TodayPaceCard(model: ruleCard, isPending: hoursPending)
-                    .accessibilityIdentifier(isREPS ? "dashboard.fiftyPercent" : "dashboard.daysLeft")
-                TodayPaceCard(model: TodayPaceCards.finish(hours: totalHours, goal: houseGoal, pace: pace, now: Date(),
-                                                      paceReady: TodayHeroCopy.paceIsReady(hours: totalHours, daysOfData: daysOfData)),
-                              isPending: hoursPending)
-                    .accessibilityIdentifier("dashboard.finishPace")
-            }
-        }
-    }
-
-    /// REPS: the 50% rule (never checked until other work hours exist). Material participation:
-    /// days left in the year.
-    private var ruleCard: TodayPaceCardModel {
-        guard isREPS else {
-            return TodayPaceCardModel(label: "Days left", value: "\(daysLeftInYear)", status: "in \(currentYear)", tone: .neutral)
-        }
-        let tone: TodayPaceCardModel.Tone
-        switch repsStatus.moreThanHalfStatus {
-        case .notMet: tone = .caution
-        case .met: tone = .positive
-        case .notEntered: tone = .neutral
-        }
-        return TodayPaceCardModel(label: "50% rule", value: fiftyPercentValue, status: fiftyPercentDetail ?? "Met: over half your work hours", tone: tone)
-    }
-
-    private var heroStatusTone: HouseStatusTone {
-        switch pace.tone {
-        case .positive: return .positive
-        case .caution: return .caution
-        case .neutral: return .neutral
-        }
-    }
-
-    /// The WP-H words (hours, goal, stage, next step) plus the pace line, for the live hours.
-    private var heroAccessibilityLabel: String {
-        if hoursPending { return "\(currentYear). Loading your hours from iCloud." }
-        if backfill.isScanning {
-            return "\(currentYear). \(AppFormat.hours(totalHours)) confirmed so far. Looking through your calendar; work we find waits in your Inbox."
-        }
-        let live = HouseProgress(hours: totalHours, goal: houseGoal)
-        switch heroFooter {
-        case .emptyLot:
-            return "\(currentYear). An empty lot. \(TodayHeroCopy.emptyLotLine(target: heroCopy.targetHours))"
-        case .found(let hours):
-            return "\(currentYear). \(live.accessibilityLabel) \(hours) found in your calendar, not counted until you confirm."
-        case nil:
-            return "\(heroCopy.propertyName == nil ? String(currentYear) : heroCopy.eyebrow). \(live.accessibilityLabel(claimsGoalReached: heroCopy.claimsReached)) \(heroCopy.qualifier.map { "\($0). " } ?? "")\(heroCopy.spoken)."
-        }
-    }
-
-    // MARK: - Activation
-    private var homeActivationCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            let isLarge = dynamicTypeSize.isAccessibilitySize
-            let badge = Text("\(completedActivationSteps)/2")
-                .font(.system(.caption, design: .rounded, weight: .black))
-                .foregroundStyle(colors.textSecondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(colors.backgroundTertiary)
-                .clipShape(Capsule())
-            let words = VStack(alignment: .leading, spacing: 4) {
-                Text("Finish setting up")
-                    .font(.system(.headline, design: .rounded, weight: .black))
-                    .foregroundStyle(colors.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text("A few quick steps make every hour easier to review later.")
-                    .font(.system(.footnote, design: .rounded, weight: .medium))
-                    .foregroundStyle(colors.textSecondary)
-                    .lineSpacing(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if isLarge {
-                // Past the accessibility sizes the words take the full width; tile and count share a row above.
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack { SetupHeaderTile(symbol: "checklist"); Spacer(minLength: 8); badge }
-                    words
-                }
-            } else {
-                HStack(alignment: .top, spacing: 12) {
-                    SetupHeaderTile(symbol: "checklist")
-                    words
-                    Spacer(minLength: 8)
-                    badge
-                }
-            }
-
-            // A plain Grid, not LazyVGrid: four tiles need no laziness, and since WP-L removed the
-            // launch splash the lazy grid left its first row out of the accessibility tree.
-            // At accessibility sizes the 2x2 grid becomes one column, so the scaled words fit.
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(spacing: 10) {
-                    ForEach(activationTiles, id: \.identifier) { activationActionTile($0) }
-                }
-            } else {
-                let tiles = activationTiles
-                Grid(horizontalSpacing: 10, verticalSpacing: 10) {
-                    GridRow { activationActionTile(tiles[0]); activationActionTile(tiles[1]) }
-                    GridRow { activationActionTile(tiles[2]); activationActionTile(tiles[3]) }
-                }
-            }
-        }
-        .padding(18)
-        .background(colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(colors.border.opacity(0.28), lineWidth: 1)
-        }
-        .accessibilityElement(children: .contain)
-    }
-
-    private var completedActivationSteps: Int {
-        (viewModel.properties.isEmpty ? 0 : 1) + (viewModel.timeEntries.isEmpty ? 0 : 1)
-    }
-
-    private func openAddPropertyFromHome() {
-        if viewModel.properties.isEmpty {
-            NotificationCenter.default.post(name: .switchToPropertiesAndOpenAddProperty, object: nil)
-        } else {
-            NotificationCenter.default.post(name: .switchToTab, object: 1)
-        }
-    }
-
-    private struct ActivationTile {
-        let title: String
-        let subtitle: String
-        let symbol: String
-        let isComplete: Bool
-        let identifier: String
-        let action: () -> Void
-    }
-
-    private var activationTiles: [ActivationTile] {
-        [
-            ActivationTile(
-                title: String(localized: "Property"),
-                subtitle: viewModel.properties.isEmpty ? String(localized: "Add first") : String(localized: "\(viewModel.properties.count) ready"),
-                symbol: "building.2", isComplete: !viewModel.properties.isEmpty,
-                identifier: "home.activation.property", action: { openAddPropertyFromHome() }),
-            ActivationTile(
-                title: String(localized: "First hour"),
-                subtitle: viewModel.timeEntries.isEmpty ? String(localized: "Log now") : AppFormat.hours(totalHours),
-                symbol: "clock", isComplete: !viewModel.timeEntries.isEmpty,
-                identifier: "home.activation.firstHour",
-                action: { NotificationCenter.default.post(name: .switchToTab, object: 2) }),
-            ActivationTile(
-                title: String(localized: "Learn"), subtitle: String(localized: "What counts"),
-                symbol: "book", isComplete: false,
-                identifier: "home.activation.learn", action: { showLearningCenter = true }),
-            ActivationTile(
-                title: String(localized: "Report"), subtitle: String(localized: "Check pace"),
-                symbol: "chart.bar", isComplete: false,
-                identifier: "home.activation.report",
-                action: { NotificationCenter.default.post(name: .switchToTab, object: 3) }),
-        ]
-    }
-
-    private func activationActionTile(_ tile: ActivationTile) -> some View {
-        ActivationTileView(tile: tile.title, subtitle: tile.subtitle, symbol: tile.symbol,
-                           isComplete: tile.isComplete, identifier: tile.identifier, action: tile.action)
-    }
-
-}
-
-// MARK: - Shared Entry Row (used in Dashboard & History)
-struct EntryListRow: View {
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    let entry: TimeEntry
-    let propertyName: String
-
-    private var categoryIconName: String {
-        entry.category.lucideIconName
-    }
-
-    private var categoryColor: Color {
-        entry.category.color
-    }
-
-    private var categoryWash: Color {
-        let c = AdaptiveColors(colorScheme: colorScheme)
-        switch entry.category {
-        case .repairs, .renovations: return c.coralWash
-        case .management, .investing: return c.sageWash
-        case .leasing, .travel: return c.skyWash
-        case .bookkeeping, .financing: return c.honeyWash
-        case .legal: return c.roseWash
-        case .insurance, .contractNegotiation: return c.primarySurface
-        }
-    }
-
-    var body: some View {
-        HStack(spacing: 14) {
-            JellyBadge(
-                systemName: categoryIconName,
-                color: categoryColor,
-                wash: categoryWash,
-                size: 44
-            )
-            VStack(alignment: .leading, spacing: 2) {
-                Text(entry.category.rawValue)
-                    .font(.system(size: 15, weight: .medium, design: .rounded))
-                    .foregroundStyle(colors.textPrimary)
-                Text(propertyName)
-                    .font(AppTypography.bodySmall)
-                    .foregroundStyle(colors.textSecondary)
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
-                HStack(spacing: 4) {
-                    if entry.isCalendarImport {
-                        HStack(spacing: 2) {
-                            Image(systemName: "calendar")
-                                .font(.system(size: 9, weight: .medium))
-                                .accessibilityHidden(true)
-                            Text("Cal")
-                                .font(.system(size: 9, weight: .medium, design: .rounded))
-                        }
-                        .foregroundStyle(AppColors.sky)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(colors.skyWash)
-                        .clipShape(Capsule())
-                    }
-                    if !entry.countsForREPS {
-                        Text("Not counted")
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .foregroundStyle(AppColors.coral)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(AppColors.coralWash)
-                            .clipShape(Capsule())
-                    }
-                    Text(String(format: "%.1fh", entry.hours))
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(colors.textPrimary)
-                }
-                Text(entry.date, style: .date)
-                    .font(AppTypography.caption)
-                    .foregroundStyle(colors.textSecondary)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 13)
     }
 }
 
@@ -1046,177 +606,8 @@ struct TodayCelebration: Identifiable, Equatable {
     var id: String { HouseCelebrationLedger.token(celebration, year: year) }
 }
 
-private struct DashboardScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
 #Preview {
     DashboardView(inbox: InboxViewModel(app: nil, storeProvider: { nil }))
         .environmentObject(AppViewModel())
         .environmentObject(GoalManager.shared)
-}
-
-/// Today's "Your record" card for a free user: a page thumbnail with its top third sharp, the rest
-/// under the lock. "Unlock Pro" opens the paywall about the user's own hours; afterwards it opens
-/// the export.
-struct TodayRecordLockCard: View {
-    let year: Int
-    let confirmedHours: Double
-    /// Runs after a purchase. The card itself disappears once Pro is on, so Today owns what comes next.
-    var onUnlocked: () -> Void
-    @EnvironmentObject private var viewModel: AppViewModel
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var page: RecordPageModel?
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    private static let pageHeight: CGFloat = 300
-    private static let sharpPage: CGFloat = 104
-
-    var body: some View {
-        LockedPreview(
-            size: .card,
-            entry: .todayRecord,
-            line: ProGate.lockLine(.todayRecord, confirmedHours: confirmedHours),
-            keeps: ProGate.keepsLine(.todayRecord),
-            surface: colors.backgroundSecondary,
-            onUnlock: {
-                ProPaywallPresenter.shared.present(entry: .todayRecord, confirmedHours: confirmedHours, onUnlocked: onUnlocked)
-            }
-        ) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 12) {
-                    Image(systemName: "doc.richtext").font(.system(size: 20)).foregroundStyle(colors.action)
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Your \(String(year)) record").font(.headline).foregroundStyle(colors.textPrimary)
-                        Text("PDF and spreadsheet · \(entryCount) \(entryCount == 1 ? "entry" : "entries")")
-                            .font(.subheadline).foregroundStyle(colors.textSecondary)
-                    }
-                }
-                pageView
-                    .frame(height: Self.sharpPage, alignment: .top)
-                    .clipShape(UnevenRoundedRectangle(topLeadingRadius: 10, topTrailingRadius: 10, style: .continuous))
-            }
-            .padding([.horizontal, .top], 16)
-        } locked: {
-            pageView
-                .offset(y: -Self.sharpPage)
-                .frame(height: Self.pageHeight - Self.sharpPage, alignment: .top)
-                .clipped()
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
-        }
-        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(colors.backgroundSecondary))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("today.yourRecord")
-        .task { await load() }
-    }
-
-    private var entryCount: Int {
-        viewModel.timeEntries.filter { Calendar.current.component(.year, from: $0.date) == year }.count
-    }
-
-    @ViewBuilder private var pageView: some View {
-        Group {
-            if let page {
-                RecordPagePreview(model: page)
-            } else {
-                DraftingLoader(sketch: .document, surface: .adaptive, subject: "your record")
-                    .padding(40)
-                    .frame(maxWidth: .infinity)
-            }
-        }
-        .frame(height: Self.pageHeight, alignment: .top)
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(colors.border, lineWidth: 0.5))
-    }
-
-    private func load() async {
-        guard page == nil else { return }
-        page = await RecordPageModel.load(entries: viewModel.timeEntries, properties: viewModel.properties,
-                                          owner: viewModel.userName, year: year)
-    }
-}
-
-
-/// The setup card's header tile: a blueprint action tile with an SF Symbol (brand system §4:
-/// function icons are symbols; the 3D tool renders are for categories).
-private struct SetupHeaderTile: View {
-    let symbol: String
-    @Environment(\.colorScheme) private var colorScheme
-    @ScaledMetric(relativeTo: .headline) private var side: CGFloat = 42
-
-    var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        Image(systemName: symbol)
-            .font(.system(size: side * 0.45, weight: .regular))
-            .foregroundStyle(colors.action)
-            .frame(width: side, height: side)
-            .background(colors.actionSurface, in: RoundedRectangle(cornerRadius: side * 0.28, style: .continuous))
-            .accessibilityHidden(true)
-    }
-}
-
-
-/// One setup tile. Fonts are text styles and the glyph box is a scaled metric, so the tile grows
-/// with Dynamic Type; at accessibility sizes the icon sits beside the words instead of above.
-private struct ActivationTileView: View {
-    let tile: String
-    let subtitle: String
-    let symbol: String
-    let isComplete: Bool
-    let identifier: String
-    let action: () -> Void
-
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .body) private var box: CGFloat = 40
-    @ScaledMetric(relativeTo: .body) private var minHeight: CGFloat = 92
-
-    var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        let layout = dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(HStackLayout(alignment: .center, spacing: 14))
-            : AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
-        Button(action: action) {
-            layout {
-                ZStack {
-                    RoundedRectangle(cornerRadius: box * 0.35, style: .continuous)
-                        .fill(isComplete ? colors.positiveSurface : colors.backgroundTertiary)
-                    Image(systemName: isComplete ? "checkmark.circle" : symbol)
-                        .font(.system(size: box * 0.47, weight: .regular))
-                        .foregroundStyle(isComplete ? colors.positive : colors.textPrimary)
-                        .accessibilityHidden(true)
-                }
-                .frame(width: box, height: box)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(tile)
-                        .font(.system(.subheadline, design: .rounded, weight: .bold))
-                        .foregroundStyle(colors.textPrimary)
-                    Text(subtitle)
-                        .font(.system(.footnote, design: .rounded, weight: .medium))
-                        .foregroundStyle(colors.textSecondary)
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                if dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 0 : minHeight, alignment: .topLeading)
-            .padding(12)
-            .background(colors.backgroundSecondary.opacity(colorScheme == .dark ? 0.72 : 0.9))
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(colors.border.opacity(0.22), lineWidth: 1)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(tile). \(subtitle)")
-        .accessibilityIdentifier(identifier)
-    }
 }
