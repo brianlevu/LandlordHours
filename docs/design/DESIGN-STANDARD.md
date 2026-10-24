@@ -1,8 +1,73 @@
 # LandlordHours Design Standard
 
-Draft r2, 2026-10-23. Status: proposal for Brian's review, not committed. Revision history: r1 reviewed independently → NOT READY (row contradicted its anchors, springs not measurable, swipe split, copy rewrites changed meaning, grammar gaps). r2 applies every finding. r2 is itself UNASSESSED until a fresh-context reviewer re-reads it.
+**v2, 2026-10-24.** Status: the system Brian locked ("the crafted house"); every screen is redone against it in one pass (`docs/design/v2-revamp-plan.md`; plain-English summary in `docs/design/v2-summary.md`). v1 (draft r2, 2026-10-23) covered components, density, motion, voice and adaptive layout; most of it stands. v2 adds **§H The crafted object** and **§F Future extensions**, and amends the rules listed in the changelog. **v2 r2 (same day)** applies every fix from the fresh-context review (`~/AgentScratch/landlordhours/2026-10-24/v2-review/review.md`, verdict READY AFTER FIXES); the review response table is below the changelog. The hero rules were measured on the CRAFT reference frames, not on production code.
+
+## Changelog: v1 → v2
+
+Brian's locked decisions (2026-10-24): the house is the hero (a rendered diorama on Today at ~44% of the screen, ~28% at AX, never in a card); dusk in light, night in dark, one key light, a cool rim and warm interior light; windows show state (lit when hours were logged today; a work lamp on the framing stages); the motion signature is the timber drop then the windows; a native iOS 27 tab bar with "+" as a native fifth "Log time" item; new tokens `behind`, `positiveOnPage`, `pageCardEdge`, the dusk page gradient and the spill pool; the blueprint-grid canvas, tape measure, stamp, kraft and vellum dropped; Porch Light and The Record dropped; minimum OS iOS 18.
+
+| # | Rule | v1 said | v2 says | Where |
+|---|---|---|---|---|
+| 1 | Hero container | the blueprint hero is a card ≤ 320pt (§1.10 exception) | the house sits on the page, never in a card; frame 390 (44.6%) at default, 295 (art 24–32%) at AX | §H.1, §1.10 |
+| 2 | D3c | hero switches to a compact variant, **art hidden**, ≤ 160pt at AX | the art holds at 28% and the page scrolls beneath; nothing is hidden | §2 D3c, §H.1 H3 |
+| 3 | D3b | title + hero + section header + ≥ 2 rows + "This week" header above the fold | chip + hero + number + pace + "To confirm" + 2 rows + foot; pace tiles leave Today | §2 D3b, §H.8 |
+| 4 | D6 | hero incl. header ≤ 40% of viewport | the hero is not a card; D6 applies to cards only; the hero is measured by H2/H3 | §2 D6 |
+| 5 | Rental switcher | a row of small houses inside the hero card | a quiet `Menu` chip above the hero, page dots, swipe on the house | §1.10, §H.8 |
+| 6 | Hero number | 56/700 SF Rounded | Fraunces 84/600 opsz 144 (54 at AX); the one numeral in Fraunces | §1.14 |
+| 7 | Section header on hero screens | SF Mono 11 caps drafting label | `.headline` sentence case with the count ("To confirm · 7"); the drafting label stays only in the PDF and Reports eyebrows | §1.15 |
+| 8 | Create action | detached glass "+" beside the bar; "Log time is not a tab" | native fifth tab "Log time", `plus`, `role: .search`, restores the previous tab | §1.25, §H.7 |
+| 9 | Canvas | one canvas `#EEF2FA` / `#0B1230`; the blueprint grid on hero surfaces | hero screens take the dusk/night page gradient; lists and forms keep the plain canvas; the grid, tape measure, stamp, kraft and vellum are retired | §H.4 |
+| 10 | Text on the page | — | only `textPrimary`, `textSecondary`, `action`, `behind`, `positiveOnPage` may be text on the light page (measured: every other ink < 4.5:1 on `#D8CFC0`) | §H.4 |
+| 11 | Card on the page | hairline in dark only | 1pt `pageCardEdge` on hero screens (a card is 1.3–1.5:1 on the page) | §H.4 |
+| 12 | Toast | 12pt above the tab bar everywhere | on hero screens a glass capsule at the top that replaces the rental chip while it shows, announced to VoiceOver; elsewhere unchanged | §1.19 |
+| 13 | Signature motion | `buildStep`: the new band builds in the framing style ≤ 0.60 | `timberDrop` (2.0 s pre-rendered clip, the one motion over 0.60 s) then `windowsOn` 0.40; `stageFade` 0.25 for other stage changes; `rentalSlide` 0.30; the milestone adds one confetti beat, no sign | §B.1, §B.2, §B.3, §H.6 |
+| 14 | Ambient scenes | sky follows the time of day; van, guest car, person scenes | sky retired (the appearance is the clock); scenes become §F.2's ambient layer with z-layers, regions, caps and a rendering contract; not built in v2 | §B.4 → §F.2 |
+| 15 | Dynamic Type clamps | ≤ 2 sites | 3 sites: numeral, art frame, rental chip | §2, §H.1 H9 |
+| 16 | Empty Inbox | blueprint art ≤ 40% | the diorama of the first rental, frame ≤ 240 (≤ 28%), on the page | §1.18, §H.5 |
+| 17 | Paywall | blueprint band ≤ 40% with the record preview | the record preview on the plain canvas; no house, no blueprint band | §1.23 |
+| 18 | Welcome | theme-fixed blueprint blue | the dusk/night page with the finished house lit, follows the appearance | §1.24, §H.5 |
+| 19 | Properties row ornament | house tile at 36 | house-only thumbnail at 44, lit state by `loggedToday` | §1.4, §H.5 |
+| 20 | §A "Quietly crafted" | blueprint grid, mono eyebrows, the brass sign | the lit house, one drop, the windows; no mascots, no idle motion, no load-in choreography (unchanged) | §A |
+| 21 | Batch confirm on Today | foot "Confirm N likely" or a pinned bar | Today shows ≤ 2 rows and a "See all N" foot; batch confirm lives in Inbox | §1.3 |
+| 22 | Brand doc | — | conflicts listed in §D for the same-revision update of `2.0-brand-system.md` | §D |
+| 23 | Future features | — | §F: per-rental house customisation and the ambient layer, designed for and not built | §F |
+| 24 | Tool changes | — | specified, not coded: `scripts/qa/NOTES-standard-v2.md` | §5 |
+
+### Review response (v2 r2, 2026-10-24)
+
+Each finding of the fresh-context review and what r2 did. "Plan" is `v2-revamp-plan.md`, "Notes" is `scripts/qa/NOTES-standard-v2.md`.
+
+| # | Finding | What r2 did | Where |
+|---|---|---|---|
+| R1 | `int/2.1` lacks `main`, the standard, the QA tools and the CRAFT code and art | Plan step 0: build `int/2.1-v2` from `int/2.1`, merge `origin/design/standard-v2` (carries `main`), `origin/proto/dir-craft`, and `origin/chore/qa-v2-tools` if pushed by then; expected conflicts named. The orchestrator merges. | Plan §0 |
+| R2 | Packages not file-disjoint (`BlueprintList`, `CategoryToolTile`, `InboxBlueprintPaper`, the toast, `ProfileManagementViews`) | New package **0 Shared components**, built first in the same lane as A; the others consume and never edit. `ProfileManagementViews` is used by Onboarding (B) and Settings (H), not by rentals, so it goes to 0, not F as the review suggested. | Plan §4 |
+| R3 | Unowned files; `HouseProgress` vs `CraftStage` | Every file in `Sources/Views/` on `origin/int/2.1` has one owner, checked against `git ls-tree`; the unowned ones are listed with their new owner. Stage logic goes to 0: `CraftStage.stage(hours:goal:)` is the one function and `HouseProgress` forwards to it. | Plan §4, §H.3 |
+| R4 | Launch screen missing; flashes blueprint blue before a dusk Welcome | Added (plan row 0, package B): launch colour = `pageTop` per appearance, mark B in ink; never `#1E3FA6`. | §H.5, Plan §2 |
+| R5 | "Check my goal" is not on `int/2.1` | Marked future: it lives on `origin/feat/home-2.1` (`Sources/Views/GoalCheck/`), not merged; DEBUG mocks on `proto/dir-craft`. Removed from the §H.5 citations; §1.27 mentions marked "when it lands". | §H.5, §1.27 |
+| R6 | §1.15 allows `caution` on hero pages; §H.4 bans it | One rule: on the page, state headers use `behind`/`positiveOnPage` only; `caution` only inside a card or on the plain canvas. | §1.15, §H.4 |
+| R7 | Mono eyebrows still in §1.10, §1.14 and §D row 2 | Deleted from the Summary card and sheet titles; kept only in the PDF and the Reports eyebrow; §D row 2 struck; §1.2 and §1.15a aligned. | §1.2, §1.10, §1.14, §1.15a, §D |
+| R8 | "Log time" drawn detached on iOS 26+, but the locked frame shows it inside the bar | Described as the fifth item inside the bar; captures on iOS 18, 26 and 27 required; explicit `accessibilityLabel("Log time")` because `role: .search` may announce "Search". | §1.25, §H.7 |
+| R9 | "Text over glass" names the blueprint hero and a glass action | Busiest backdrop is now the diorama under the bar; every "glass action" / "glass +" reference replaced by the fifth tab. | §1.25, §1.27, §4, §5.2 |
+| R10 | `houseStageAdvance` keeps linework and a brass sign | Rewritten: the stage change (`timberDrop` or `stageFade`), then `windowsOn`, then one confetti beat in the house palette; no sign, no words, no linework. Plan row 13 fixed. | §B.3, Plan §2 |
+| R11 | `rentalSlide` 0.45 s breaks the 0.30 spring cap | 0.30 s; removed from the signature-token list. | §B.1, §B.2, §H.6 |
+| R12 | "≤ 3 lights" does not match `craft3.py` | Replaced with the rig's actual light list per stage and appearance (from `setup_lights` and `apply_state` on `proto/dir-craft`), including the night framing moon rim. | §H.2 |
+| R13 | `craft3.py --list-objects` does not exist | Specified as a flag to build (Notes §11); marked "to build" in §H.2. | §H.2, Notes §11 |
+| R14 | §F.1 masks "rendered but unused" vs asset_check FAIL; trim swatch hex | Masks live in `design/` only, never in the bundle, until §F.1 is built; trim named `#A98666`. | §F.1 |
+| R15 | Undefined: "All" hero, two-stage jumps, D3b on SE | "All rentals" hero defined (H10); jump rule in §H.6; D3b at `H < 700` is 1 row. | §H.1, §H.6, §2, §H.8 |
+| R16 | Ground-line check breaks on scaled, lifted early stages | Ground line is an asset check only; on screen the frame side is derived from the art's width and the stage scale. | §H.1, §5.1, Notes §1, §3 |
+| R17 | Art share counts the night backlight and spill pool | Art share comes from the still's alpha at the known placement; the glow and pool are excluded. | §H.1 H2, Notes §1 |
+| R18 | p99 is a highlight proxy; night bar has no margin; 2.51/2.48 vs 2.40 | p99 called a proxy; mean-luma lift added; stated margin: PASS ≥ 2.55, MARGINAL 2.40–2.55, BLOCKED < 2.40; art target ≥ 2.8. Today half and finished are MARGINAL. | §H.2, Notes §3 |
+| R19 | AX3: the 54pt numeral reads smaller than "of 100 hours" | Routed to the visual gate as an open finding; not changed here. | Rubric §6, Plan §5 |
+| R20 | §F.1 "starting set, all checked" is false; recolouring unproven | Relabelled "proposed, unchecked"; a required spike (neutral render, mask pass, 6-swatch check against the locked art) comes before any customisation build. | §F.1, Plan §6 |
+| R21 | §F.2 fractions assume a 390 frame; van vs guest car | Keep-outs in points from the number block, chip and dots, at every hero size (SE 297, Duo 287); street band holds one occupant at a time. | §F.2, §B.4 |
+| R22 | Owner summary: jargon, two wrong lines, three missing risks | Rewritten in plain words, every sentence ≤ 20 words; the two lines fixed; the asset budget, night readability and untested colours added. | `v2-summary.md` |
+| R23 | Open questions 1, 4, 5 need follow-ups | Tab name written as "Rentals" everywhere; a light-mode tab-switch capture added to the gate; the hero toast replaces the chip while it shows and is announced. | §1.19, §1.25, §H.4, §H.7, Rubric §6 |
+
+Kept from v1 without change: component grammar §1.1–1.9, 1.11–1.13, 1.16, 1.17, 1.20–1.22, 1.26; density D1, D2, D4, D5, D7–D10; the voice rules §C in full; the adaptive bands §1.27 (hero rows added); the gate rubric §5 (hero measures added).
 
 Why this exists. Brian, on the Today "To confirm" card: "These card designs also waste too much space. I feel like we don't have a standard and bar for the design system and harness, which results in some amateur design like this." CLAUDE.md holds tokens, the brand doc holds the blueprint world, and nothing says how a row, a card, a button or a sentence is built, or how dense a screen must be. Each screen was composed alone, which is why the app has four tinted-capsule button styles, three primary pill styles, six hand-built close buttons and two hours steppers (§4).
+
+Platform: iOS 18.0 minimum for 2.1 (§1.25); Liquid Glass on iOS 26+ behind `#available`, system materials below it.
 
 Every rule here is one of three kinds, and says which: **[measured]** a number a script or PIL checks; **[grep]** a pattern a code search checks; **[judgment]** a call the independent reviewer makes in writing. Nothing else counts as a rule.
 
@@ -10,7 +75,140 @@ Evidence: `docs/design/2.0-brand-system.md`; code at `/Users/brian/tmp/lh-releas
 
 ---
 
-## 0. The measured problem
+## H. The crafted object
+
+Brian's pick, 2026-10-24, after the taste board (`~/AgentScratch/landlordhours/2026-10-24/taste-board/`): the "crafted object" cluster, anchored on [Opal](https://mobbin.com/screens/1b3deee1-a193-4e36-93b0-7e89740f9c5c) (a lit gem on a plinth in a dark cave), [(Not Boring) Weather](https://mobbin.com/screens/fd38c9a5-7d60-491b-8b41-d710c27b9ac5) (the data is the sculpted object) and [Tolan](https://mobbin.com/screens/36a924c2-a748-43f5-bfd1-bc5861191977) (a lit place you visit). Direction CRAFT (`proto/dir-craft`, `Sources/Views/Debug/DirCraft/DirCraftToday.swift`) is the reference implementation; its frames (`dir-craft-final2/frames`, 21 frames, regate PASS 2026-10-24 08:20 with two FAILs fixed since) are the acceptance reference for the rules below. Every number here was measured on those frames or in the render pipeline (`dir-craft3/README.md`, `dir-craft2/verdict.md`).
+
+What it means in one line: **the house is a small lit object the user keeps, placed on a page that has a time of day. Nothing else on the screen competes with it.**
+
+### H.1 The hero: sizes and placement
+
+The house is a rendered 3D diorama (one Blender rig, `design/blueprint-house/scripts/craft3.py`) shown directly on the page. It is the only picture on Today. It never sits inside a card, a rounded rectangle or a tinted band **[grep]** (no `.background(…, in: RoundedRectangle…)`, `.clipShape`, `LHCard` or `.propertyCard()` around `CraftHouseView`; the frame is `.clipped()` to a plain square only) **[measured]** (no closed rectangle of edge pixels around the art; the page gradient runs under and around it).
+
+| Rule | Spec | Kind |
+|---|---|---|
+| H1 hero frame, band A, default to XXL | A square frame, side `min(W − 12, round(0.446 × H))` where `W` and `H` are the window size. 402×874 → **390pt (44.6%)**. 393×852 → 380. 375×667 (SE class) → 297. Content inside is the 1206² still scaled to fit, then scaled about its bottom centre and lifted per stage (table below). In the **asset** the lot's ground line sits at 92% of the still; on screen it moves with the stage scale and lift, so the ground line is checked on assets only (§H.3). **On a frame, the side is derived from the art's horizontal extent:** `side = lot_width / (0.96 × stage_scale)` (H5), where `lot_width` is the widest row of the still's opaque pixels as placed. | measured |
+| Stage placement | `started` scale 1.18, lift 30pt · `frame70` 1.08, 12pt · `framing`, `half`, `complete` 1.0, 0 · lifts are at a 390 frame and scale with `side / 390`; the scaled art is clipped to the frame (`CraftHouseView.stageScale`/`stageLift`, from `DirCraftToday.swift` on `proto/dir-craft`). | grep: one table |
+| H2 house art share, default | Art bounding box **36–46% of the window height**. The box is the still's alpha bbox (alpha ≥ 0.5) mapped through the known placement (frame origin and side, stage scale, lift), never a count of non-page pixels: that count includes the night backlight (0.88 × side) and the spill pool, which are page layers, not art. Measured on the reference frames: 37% (just started, scaled 1.18 about the ground line, lifted 30pt), 40% (frame70, 1.08, +12pt), 42% (half, finished). Early stages are scaled and lifted so the frame never shows dead space under the rental chip. | measured |
+| H3 hero at AX1–AX5 | The frame holds at **295pt** on a 402 window (`round(0.337 × H)`, same clamp to `W − 12`), the art is **24–32%** of the window height (measured 31.6% light, 27.1% dark at AX3), the numerals cap at **54pt**, the rental chip moves above the frame, the pace sentence stays above the tab bar, and the rows scroll beneath. The art is never hidden. This amends D3c. | measured |
+| H4 position | Frame top ≤ 110pt from the window top at default (status bar 54 + chip 36 + gaps); the number block overlaps the frame bottom by 44pt (the number sits in the diorama's shadow, as a score under a gem); at AX the overlap is 0. | measured |
+| H5 width | The lot fills 96% of the frame width (the spill ellipse); the house footprint is about 60% of the frame width at `craft_complete`. | measured on the stills |
+| H6 bands B and C (§1.27) | Frame side **390 fixed**, centred in the ≤ 600 column; the share of height is whatever that gives (iPad 10th gen portrait 1180: 33%). Band C two-column Today: the hero and number block in the left column, the To confirm list in the right. Sidebar header: the **house-only thumbnail at 120pt** (H.5), never the diorama. | measured |
+| H7 iPhone Duo | Closed, outer display (app area 382×644): side `min(370, 287)` = **287**; numerals cap at **64pt** whenever `H < 700`. Inner display portrait (669×951, band C, `Wc` 621): one column, side 390. Landscape with the sidebar docked (`Wc` 623): one column, side 390. The frame never straddles the fold: when `reservedRegions(kind: .division)` intersects the hero column, the column moves to the pane the chip is in. | measured on the Duo simulator |
+| H8 hysteresis | The side is recomputed only when the band changes (§1.27's 8pt hysteresis) or the window height changes by ≥ 40pt; never per pixel during a resize. | grep |
+| H9 clamps | `.dynamicTypeSize(` is allowed at exactly three sites: the hero numeral (cap 54 at AX), the house art frame, the rental chip (`…accessibility2`). The §2 clamp rule moves from 2 sites to 3. | grep |
+| H10 "All rentals" | When the chip shows "All rentals", the hero is the stage of the **sum of confirmed hours across rentals against the largest goal any rental uses** (the 750 when one uses it), through the same `CraftStage.stage(hours:goal:)`; windows lit when any rental logged today (H.2); the number block reads the same sum and goal. It is the first page dot. The drop and `windowsOn` play on "All" exactly as on one rental, keyed to the aggregate stage. | grep: no second stage function |
+
+### H.2 Art direction: the lighting rig, the palette, the kitsch list
+
+One rig, two exposures. Light appearance is **dusk**; dark appearance is **night**. There is no noon render and no moon **key** light (the night framing stages carry a moon **rim**, listed below). The appearance is the clock: a user with automatic Dark Mode at sunset gets dusk by day and night after dark for free, with no clock logic in the app.
+
+| Rule | Spec | Kind |
+|---|---|---|
+| Key light | Dusk: one low sun, ~3000K, behind-right of the house, sun disc clipped from the sky HDRI (it was a hidden second key). Night: no sun; sky fill at 5–8% in cool `#4A5A8A`; **one** low rim in drafting cyan `#8FD3FF` from the dusk sun's direction, kissing ridge, chimney and gutter beads. | judgment |
+| The rig's lights, as shipped | From `craft3.py` `setup_lights` and `apply_state` (`proto/dir-craft` cdfeec5). **Every state:** the sky world fill (tinted `#A3ADC4` dusk, `#4A5A8A` night) and a shadow catcher. **Dusk:** `dusk_sun` (key, model only) and a `rim` sun at strength 0 (present, off). **Night:** `rim` sun 1.5, model only. **Night, framing stages (`started`, `frame70`, `framing`), lit and unlit:** plus `moon_rim`, one drafting-cyan sun at 4.0 from back-left, model only (`--moon-frame 4.0`, bcebadd; it lifted unlit night framing from p99 1.28 to ~3.3). **Lit only:** framing stages: `work_lamp` (area, model) + `work_lamp_lawn` (its lawn-only twin); `half`: two interior point lamps, one per storey; `complete`: one area spill lamp per ground-floor window and door glass (lawn only), `porch_light` (model) + `porch_spill` (lawn only). **Emission:** window glass (camera-only) and the work-lamp lens. **Unlit:** no interior, spill, porch or work lamp. Nothing else may emit or light the scene; a new light is a standard change, not an art tweak. | judgment, checked against this list (by reading `craft3.py` until `--list-objects` exists, Notes §11) |
+| Interior light | Window glass glows to the camera only (emission); the light that reaches the lawn comes from one aimed area lamp per lit ground-floor window plus the porch bulb, light-linked to the lawn. The porch bulb sits low behind the railing so the balusters throw long shadows across the grass. | judgment |
+| Windows show state | Base asset = **lit** (hours logged today on the shown rental, or on any rental for "All"). `-unlit` twin = dark glass, no interior light, no porch light. Same sky and rim. On the framing stages (no windows) a small tripod **work lamp on the slab** plays the lit role and fans stud shadows across the front-left lawn. "Someone worked here today" reads the same from the first stud to the finished house. | grep: `TodayWindowState.loggedToday(entries:rentalIDs:)` is the one source |
+| Palette | Warm family: cream siding, pine framing, trim in timber one shade darker than the framing (ochre retired). Cool family: sage lawn and leaves, near-black loam, one muted clay band. Accent: the terracotta roof; brick pulled into the same family. Door: greyed blueprint `#3A4A6E`. Gutters and porch roof: warm greys. ≤ 6 material families counted by hand. | judgment + count |
+| Night values | Shadow-side siding V ≤ 0.28 (measured 0.27). Unlit lawn V ≤ 0.12 and S ≤ 0.45 (0.09 / 0.32). Spill pool on the lawn: hue 35–50°, S 0.50–0.70, V 0.33–0.45 (47–49° / 0.60–0.66 / 0.33–0.44). Night unlit grass S ≤ dusk grass S. | measured, `measure3.py` probes |
+| Dusk values | Lawn S ≈ 0.35 (0.35), hue 76–95° (76). Saturated pixel share (S ≥ 0.25) ≤ 40% light (36%), ≤ 28% dark (25%); mean S ≤ 0.52 (0.50). | measured |
+| Readability on the page | Two numbers, both in the house box. **p99 contrast** (relative luminance of the 99th-percentile art pixel vs the page) is a **proxy**: it measures the brightest highlight, not the silhouette. **Mean-luma lift** (house mean minus page mean, 0–255) measures the silhouette. Lit, and framing stages with the lamp: p99 **≥ 3.0:1** and lift ≥ +5. Unlit at night, with a stated margin: p99 **PASS ≥ 2.55**, **MARGINAL 2.40–2.55** (goes to Brian with the frame), **BLOCKED < 2.40**, and lift ≥ +5. The 0.15 margin is the spread two tools gave on the same art (gate 2.51 vs the final2 self-check 2.40). Measured 2026-10-24 (`qa/gate-log.jsonl`, `dir-craft-final2/README.md`): unlit night framing 3.09–3.89 (about 3.3, PASS); half 2.51 and finished 2.48 (MARGINAL); lift +6.9 to +15.5. **Art target for the sculpt pass: unlit night half and finished ≥ 2.8.** | measured, `frame_check.py` hero probe (Notes §3) |
+| The 400px read | Every one of the 20 stills (5 stages × lit/unlit × dusk/night) is identified by a fresh reviewer at a 400px thumbnail: stage and lit state both named correctly. | judgment, written |
+| Materials | Roughness ≥ 0.45 on every opaque material (no toy gloss); glass is the only specular surface. Grain, tiles, gutters, downpipes and porch stay. CAD-clean boxes are a known gap: a sculpt pass (chamfers, ridge sag) is owed and does not change any rule here. | judgment |
+| Forbidden kitsch | Flower boxes, blooms, planters, pebbles in the soil cut, lanterns, a second chimney pot, garden ornaments, pets, string lights, seasonal decoration, snow, weather, smoke, sway, flags, mailboxes, signage with words, cartoon outlines, exaggerated proportions. One chimney, one tree, two shrubs at most. | grep on the scene object list + judgment. The list comes from `craft3.py --list-objects`, a flag **to build** (Notes §11; it does not exist yet). Until then the gate reads the object names in `craft2.py`/`craft3.py` by hand. |
+| Cost | A still ≤ 25s at 128 spp and an animation frame ≤ 20s at 64 spp on the Mini; the full set (20 stills + 120 frames) regenerates in ≤ 60 min. | measured |
+
+### H.3 Asset contract
+
+Stage thresholds are a share of the rental's chosen goal (100, 500 or 750): `started` < 0.20 · `frame70` < 0.47 · `framing` < 0.60 · `half` < 1.0 · `complete` ≥ 1.0 **[grep: one function, `CraftStage.stage(hours:goal:)`]**. The v1 `Services/House/HouseProgress.swift` stage logic (used by Today, Onboarding, Reports, the widget and `TodayHouse`) forwards to it, so there is one answer for "what stage is this rental"; the forwarder is deleted when its last caller moves (plan package 0). Hours crossing 100 / 500 / 750 still play `houseStageAdvance` (§B.3); the stage art is what the house shows between milestones.
+
+| Asset | Name | Files | Notes |
+|---|---|---|---|
+| Stills, lit | `craft_started`, `craft_frame70`, `craft_framing`, `craft_half`, `craft_complete` | one imageset each, **Any** = dusk, **Dark** = night, universal, 3x only | Swift: `Image(stage.rawValue + (loggedToday ? "" : "-unlit"))` |
+| Stills, unlit | `<stage>-unlit` × 5 | same layout | a missing twin falls back to the lit asset and is a gate FAIL |
+| Build clip | `craft_build_light.mov`, `craft_build_dark.mov` in `Sources/Resources/Craft/` | HEVC with alpha, 60 frames at 30 fps (2.0 s), frame70 → framing, work lamp on | no `-unlit` clip: the drop always follows a log, so it is always lit. First frame = `craft_frame70` + lamp; last frame = `craft_framing` within mean ΔE 2 |
+| Thumbnail | `craft_thumb_<stage>` × 5 | **house only** (camera framed at 90% of the house bounding box, no lot, contact shadow only), Any/Dark, 2x + 3x at 120pt (240 / 360px) | lit only; used at 44, 56 and 120pt (H.5) |
+| Source | 1206×1206 RGBA PNG renders in `design/blueprint-house/renders/` | not in the app bundle | regenerate with `craft3.py`, `craft3_post.py`; "pass 3" in `design/blueprint-house/README.md` |
+
+Formats and budget **[measured by `scripts/qa/asset_check.py`, spec in `scripts/qa/NOTES-standard-v2.md`]**: the catalog ships **HEIC (HEIF with alpha)** at 3x only, quality 0.85, ≤ **450 KB** per still, ≤ **10 MB** for the 20 stills; clips ≤ **1.5 MB** each; thumbnails ≤ **40 KB** each; the whole hero set ≤ **14 MB**. Today the proto carries 18.0 MB of PNG stills plus 2.2 MB of clips, which is over budget: the HEIC pass is a merge condition. If a target OS fails to decode alpha HEIC in the build test, the fallback is lossless-optimised PNG at 3x only (never palette PNG; the gradients band).
+
+Integrity checks **[measured]**: every imageset has Any + Dark; every stage has lit + unlit; `sha256(lit) ≠ sha256(unlit)` and `sha256(Any) ≠ sha256(Dark)` for every stage; the camera is pinned (ground line at 92% ± 1% of the frame; house bbox left and right edges within ± 4px across stages and states); alpha edges are clean (no dark fringe: edge-pixel luminance within 10% of the adjacent opaque pixels). Naming for future styles and material variants is reserved in §F.1 and must not be used before that section is built.
+
+### H.4 Page treatment: dusk, night, the pool
+
+The page under a hero is a vertical gradient, never flat, never a drawn grid.
+
+| Token | Light (dusk) | Dark (night) | Where |
+|---|---|---|---|
+| `pageTop` | `#EAE3D7` at 0 | `#0B1230` at 0 | `BrandHex.duskTop` / `darkNightTop` |
+| `pageMid` | `#D8CFC0` at 0.32 (behind the hero) | `#0B1230` at 0.32 | `duskMid` |
+| `pageBottom` | `#E8E0D3` at 1.0 | `#080C1D` at 1.0 | `duskBottom` / `darkNightBottom` |
+| `spillPool` | `#E9A558` at 0.34 | `#E9A558` at 0.12 | radial ellipse 0.96 × 0.33 of the frame, centred at y = 0.345 × side; opacity × 0.2 when unlit; fades with the windows (0.4 s) |
+| `backlight` (night only) | none | `#5E86D6` 0.50 → 0 inside 0.88 × side, plus a rim ellipse 0.34 → 0 | so the silhouette reads against the page |
+| contact shadow | black 0.30 | black 0.55 | 0.80 × 0.07 of the frame, blur 0.035 × side |
+| `pageCardEdge` | `#A3966F` 1pt | `#2A3560` 1pt | the grouped container's edge on the page (a white card is 1.31:1 on `pageBottom`, 1.54 on `pageMid`; the edge reads at 2.2 / 1.9) |
+| `behind` | `#9A3624` | `#F08A70` | "Behind by 14h." 5.03:1 at the pace row (4.65 on `pageMid`), 7.73 dark |
+| `positiveOnPage` | `#0C5A30` | `#4ED48A` | "On pace." / "Done for 2026." 5.84 light, 10.01 dark; the standard `positive` is 3.50 on `pageMid` and is not used as text on the page |
+
+**Which inks may be text on the page [measured]:** on the light gradient only `textPrimary` (11.1:1 on `pageMid`), `textSecondary` (5.2), `action` (5.9), `behind` (4.65) and `positiveOnPage` (5.4) clear 4.5:1. `textTertiary` (3.55), `positive` (3.50), `caution` (3.67), `destructive` (3.63), `informational` (3.90), `draftingInk` (3.62) and `rose` (3.56) do not, so they appear only inside a card on the page, never on the gradient. Dark is unconstrained (every dark ink ≥ 5.2:1 on the night page). The gate samples every text pair on hero frames against the gradient step behind it.
+
+**Which screens get the page:** Today, the rental page, Welcome, the Inbox empty state and the milestone (H.5). **Every other screen keeps the plain `background` canvas (`#EEF2FA` / `#0B1230`)**, because the intent inks fail on the warm page and lists need all of them. Two canvases in one app is deliberate: the hero screens are rooms with a time of day; lists and forms are paper. The dark canvas and the night page share `#0B1230`, so dark mode reads as one world; in light the handoff is the push or sheet transition, never a visible seam inside one screen **[judgment]**. A tab switch (Today → Inbox) has no push, so in light the warm-to-cool jump is visible: every hand-off that touches a hero screen includes a **light-mode tab-switch capture** (Today → Inbox → Today, 30 fps), and the gate judges it in writing. A warm-neutral canvas for lists is logged as a test to run against the intent inks (plan §5), not adopted.
+
+**State headers on the page:** a header or line on the gradient that names a state uses `behind` or `positiveOnPage` only. `caution` (3.67:1) never sits on the page; it appears only inside a card on the page or on the plain canvas. §1.15 says the same.
+
+The Job Site blueprint-grid canvas, the tape measure, the stamp, kraft and vellum are retired **[grep: no `BlueprintGrid`, `InboxBlueprintPaper`, `TapeMeasure`, `StampView`, `kraft`, `vellum` in `Sources/`]**. Directions "Porch Light" and "The Record" are dropped entirely.
+
+### H.5 Where the house appears
+
+| Screen | Treatment | Size | Reason |
+|---|---|---|---|
+| **Today** | the hero (H.1) | H1–H3 | The one place the house is the subject. |
+| **Rental page** (Properties detail) | the hero at the **medium** size: frame `min(W − 12, round(0.343 × H))` = **300** on 402×874, art 28–34%; AX frame 220, art 20–26%; number block below, same rules | 300 / 220 | The rental is the thing the user owns; §F.1 customisation lands here, so the user must see "their" house full size with its name as the title. One size smaller than Today so the tab root stays the biggest. |
+| **Properties list** (All rentals, `LHRow.Browse`) | house-only thumbnail, lit state by `loggedToday` | **44** in a 56–64 row (min) | One ornament per row (§1.4); replaces the 36 house tile and the 40 seal. Identity, not stage: the row's meta line says the stage in words. |
+| **Launch screen** (`LaunchScreen.storyboard`, then `LaunchHandoffView`) | no house; mark B at 112pt in `textPrimary` per appearance, on a named colour that is `pageTop` (`#EAE3D7` light, `#0B1230` dark) with Any and Dark entries | — | The first frame of the conversion path. Today's `LaunchBlueprint` (`#1E3FA6` in both appearances) flashes blueprint blue before a dusk Welcome; it is retired **[grep: no `LaunchBlueprint`; the launch colour set has a Dark entry]**. `LaunchHandoffView` repeats the launch frame exactly, then crossfades (`reveal`) into Welcome or the restored tab **[measured: launch, handoff and first screen frames in light and dark; no frame whose mean colour is ΔE > 20 from `pageTop`/the canvas]**. |
+| **Welcome** (onboarding) | the hero, `craft_complete`, lit, on the dusk/night page | H1 (AX: H3) | The conversion path sells the object. "This is what the year builds." |
+| **Onboarding, add-a-rental step** | thumbnail of `craft_started`, lit, beside the name field | **120** | "Every hour you log starts with a place." One picture, no hero, so the step stays quick. |
+| **Other onboarding steps** | none | | Questions, not pictures. |
+| **Inbox, empty** | the diorama of the first rental (unlit if nothing today) as the empty-state picture, on the page | frame ≤ **240** (≤ 28% of height), one headline, one line, one `.primary` | The world is the empty state (Flighty's globe); it is the screen users see most often when the Inbox is clear. |
+| **Inbox rows, To confirm rows, Suggestion confirm sheet** | none | | Decision rows carry no identity art (§1.3). The confirm sheet header keeps the 56 category tool render. |
+| **Records** | none; `CategoryToolTile` 36 stays | | A record is about an activity. The tool carries identity; the house belongs to rentals. |
+| **Reports** | thumbnail in the per-rental breakdown rows only | **44** | Reports is the ring's screen (§1.12). Two heroes compete. |
+| **Settings, Learn, Export, Contact, Delete, Profiles, Capture setup** | none | | Utility. Mark C (the LH monogram, brand doc §5) may sit in the Settings header. |
+| **Paywall** | none; the record preview is the picture, on the plain canvas | | The paywall sells the PDF record and must open about the thing tapped. Two pictures compete; the preview title stays `pdf.title`. |
+| **Log time sheet, confirm sheet** | none | | "No hero art in task sheets" (§1.20) stands. |
+| **Check my goal** (future) | none when it lands | | **Not on `int/2.1`.** It lives on `origin/feat/home-2.1` (`Sources/Views/GoalCheck/GoalCheckView.swift`, `GoalCheckLogic.swift`, `Models/RentalPlan.swift`), unmerged; DEBUG mocks are on `proto/dir-craft` (`HomeProtoGoalCheck`, `StdProtoGoalCheck`). It gets a §H.5 row and a plan package when that branch is scheduled. |
+| **Milestone celebration** (100 / 500 / 750) | the hero on the page; `houseStageAdvance` plays here | H1 | The signature moment. |
+| **Widgets** | medium, large, extra large: house-only thumbnail at 120, lit by `loggedToday`, appearance by the widget's scheme; small and accessory: the mono mark B | 120 | A 3D bitmap cannot tint; the mark can (§1.26). |
+| **Live Activity, Dynamic Island** | mono mark B | 10pt glyph | §1.26 |
+| **Thumbnail minimum** | **44pt**, house only. The diorama (with lot) is never shown under 220pt. | | At 44 the house reads; the lot does not. |
+
+### H.6 The motion signature
+
+Two moves, in this order, and then stillness: **the 39-piece timber drop, then the windows coming on.** Nothing loops. There is no idle gimmick (no smoke, sway, birds, clouds, weather). Named motions are in §B.3 (`timberDrop`, `windowsOn`, `stageFade`, `rentalSlide`).
+
+| Rule | Spec | Kind |
+|---|---|---|
+| The drop | On a log or confirm that carries the shown rental from `frame70` to `framing` while Today is visible: the clip fades in over the still (0.20), plays 2.0 s, crossfades to `craft_framing` (0.30); the number rolls as the last timber lands, with one `.impact(flexibility: .rigid, intensity: 0.8)` (the wood knock). Pre-rendered, so it may exceed the 0.60 signature cap; it plays at most once per stage per rental. | measured on a 30 fps capture: ≥ 24 consecutive frames with changed pixels in the lot region; no frame-to-frame luma step > 25% in the lot region outside the two crossfade windows |
+| Lights on | When the log is the first of the day: windows are **held dark** through the drop (the lit clip is multiplied to the unlit still's mean luma, 0.66 night / 0.76 dusk), then fade on over **0.40 s** after the crossfade. Without a drop: fade on 0.30 s after the still settles. The spill pool fades with them. | measured (luma 22.9 → 28.3 over ~11 frames in the reference capture) |
+| Other stage changes | 0.25 s crossfade with a 0.97 → 1 scale settle, no clip. | grep: `stageFade` |
+| One log, two or more stages | The house never plays the stages in between. If the new stage is `framing` (from `started` or `frame70`), the drop plays: its 0.20 fade-in covers the jump from the old still. Any other jump (for example `frame70` → `half`, `started` → `complete`) is one `stageFade` straight to the new stage, with no drop. | grep: `CraftHouseView` picks the motion from (old, new) in one switch |
+| Rental switch | Slide the diorama in from the trailing edge (**0.30 s** spring, bounce 0), `.selection` haptic, number `numericText` 0.40. | grep: `rentalSlide` |
+| Reduce Motion | No clip (the still crossfades 0.15); windows fade linear 0.40; slides become 0.20 fades. | grep: every branch present |
+| Never | On appear. On a timer. On scroll. Twice for one event. | grep: no `onAppear { withAnimation` in `House/`; no `TimelineView`, no `repeatForever` |
+
+### H.7 Chrome: the native tab bar and the fifth item
+
+Native `TabView` only (§1.25 stands). **The create action is a native fifth tab, "Log time", `plus`, `role: .search`.** The locked iOS 27 frame shows it as the **fifth item inside the bar**, and that is the spec. Whether a given OS draws the `.search` tab inside the bar or in its own position is the system's call, so every hand-off that touches the shell includes captures on **iOS 18, 26 and 27**, and the gate compares each to the locked frame. Because `role: .search` may make VoiceOver announce "Search", the tab carries an explicit `accessibilityLabel("Log time")`, checked with VoiceOver on each of those OS versions **[measured]**. Selecting it opens the Log time sheet and restores the previous tab (`onChange(of: tab)`), so it never becomes the selected tab **[grep]**. The detached glass "+" of v1 §1.25 and the "+" in any title row are retired. Tabs: Today (`sun.horizon`), Inbox (`tray`, badge), Records (`book.closed`), **Rentals** (`house`; the locked frames already say Rentals; confirmed 2026-10-24), Log time (`plus`). Tint is `action` per appearance; measured selected-label contrast: dark `#9BE1FF` on `#0D1430` 12.6:1, light `#143497` on `#E3DACB` 7.7:1. The old hardcoded light `.tint` on the `TabView` (3.21:1 in dark) is the defect that failed look 2 on 2026-10-24 and must not return **[measured]**.
+
+### H.8 Today, the anatomy at default size
+
+Top to bottom on 402×874, light: rental chip (`Menu`, capsule 36, `.subheadline.semibold` ink + `chevron.down`, white 0.65 fill with a `#C9BFA8` 0.8 hairline; dark: white 0.08 / 0.14) · the hero (H1) with page dots (6pt, 7 gap) under the house when there is more than one rental · the number (Fraunces 84/600 opsz 144, tracking −2, `textPrimary`, `numericText`) · "of 100 hours" `.body` `textSecondary` · the pace sentence (`.subheadline`: lead in `behind` or `positiveOnPage` semibold, rest `textSecondary`; "Behind by 14h. 9h a week gets you to 100.") · "To confirm · 7" (`.headline`) · one grouped container (`backgroundSecondary`, radius 20, `pageCardEdge`) with **≤ 2** `LHRow.Action` rows and a foot `.tertiary` "See all 7" · nothing else. The toast on hero screens is a glass capsule at the **top**, in the chip's slot: it **replaces the chip while it shows** (the chip fades out, the toast fades in, then back), because 48pt under the status bar lands on the chip and the half and finished roofs reach the chip's band. It never covers a row or the house, and VoiceOver announces it (everywhere else §1.19 stands). Pace tiles and "This week" leave Today; they live on the rental page and in Reports. Swiping the house changes the rental (the one allowed `DragGesture` outside rows; lint allow-list `CraftHouseView`).
+
+**D3b amended:** at default, chip + hero + number block + pace + "To confirm" header + 2 rows + foot are above the tab bar (measured on `today-light-L-windows-lit`). At XXL, 1 row. **When the window is under 700pt tall** (SE class 667, Duo closed 644): 1 row and the foot (arithmetic for 375×667: status 20 + chip 36 + frame 297 − overlap 44 + numeral 64 + "of 100 hours" 22 + pace 20 + header 30 + row 64 + foot 44 + gaps ≈ 585 of 618 above the bar); Duo closed keeps §1.27's allowance that rows may sit below the fold. At AX, the hero (H3), the number and the pace sentence are above the tab bar and the rows scroll (`today-*-AX3-scrolled`); the AX3 chip must never truncate mid-word ("Might b…" with 33pt free was the FAIL on 2026-10-24).
+
+---
+
+## 0. The measured problem (v1 background)
 
 One To confirm item on Today (`TodayComponents.swift:275`, `SuggestionRowView.swift`, `InboxComponents.swift:287`), default Dynamic Type, 402×874pt:
 
@@ -43,7 +241,7 @@ From the anchors: Reminders, Things and Copilot never put a button in a row. The
 
 ### 1.2 Tokens the components use
 
-Page gutter **20** (Today's 24 and Properties' 16 retire) · section gap **24** · header→content **8** · card padding **16** · card radius **20 continuous** · inner surface **12** · tag **6** · stat tile **16** · hairline `border` 0.5 · type: system text styles, `design: .rounded` for numbers (always `monospacedDigit()`), `design: .monospaced` for drafting labels, Fraunces only for tab titles and display (§1.14) · colours: intent tokens only. **[grep]** no `.system(size:)`, no `Color(hex:)` outside the token files.
+Page gutter **20** (Today's 24 and Properties' 16 retire) · section gap **24** · header→content **8** · card padding **16** · card radius **20 continuous** · inner surface **12** · tag **6** · stat tile **16** · hairline `border` 0.5 · type: system text styles, `design: .rounded` for numbers (always `monospacedDigit()`), `design: .monospaced` for drafting labels only in the PDF and the Reports eyebrow (v2: retired on every other screen), Fraunces only for tab titles and display (§1.14) · colours: intent tokens only. **[grep]** no `.system(size:)`, no `Color(hex:)` outside the token files.
 
 Hours format **[grep]**: one formatter `LHFormat.hours(_:)` → `"2h"`, `"30m"`, `"1h 30m"`, `"12h 30m"`, `"—"` for unknown. Replaces `InboxFormat.hours` and `AppFormat.hours` ("1.5h"). Decimal hours ("14.5") are allowed only inside the PDF/CSV tables. Measured widths (SF Pro Rounded semibold, tabular, AppKit): `.subheadline` 15: "12h 30m" 65.1pt, "1h 30m" 55.2; `.body` 17: 72.9 / 61.8; `.title2` 22 ≈ 94 (title3 20 measured 85.2). Column widths below come from these.
 
@@ -66,12 +264,12 @@ Width arithmetic (402pt screen): an inset-grouped card is 362pt wide (20pt syste
 | Container | `List(.insetGrouped)` section; row insets 16/10/16/10; `minHeight: 56`; divider inset 50 (16+22+12). |
 | Leading control | 22pt circle, 1.5pt stroke `textTertiary`, inside a 44×44 tap frame. Tap: if `canQuickLog` → fills `positive` with a white `checkmark` (motion `rowConfirm`); else opens the sheet (the "Needs hours" tag says why). `accessibilityLabel` "Confirm 2 hours" / "Review and confirm". **[measured]** 22pt glyph, 44pt frame. |
 | Title | `.body.semibold`, `textPrimary`, `lineLimit(2)` at default, nil at AX. Source is one function, `InboxFormat.rowTitle(suggestion, propertyName)` → "Plumber at Pine Cabin" **[grep]**; whether the noun is the right noun is **[judgment]**. 216–265pt available (arithmetic above): "Plumber at Pine Cabin" 175pt fits on one line; titles over ~216pt wrap to two (row 86). |
-| Meta line | `.subheadline`, `textSecondary`, one line, tail-truncates at default, wraps at AX. SF source glyph via `Label` (`calendar` / `checklist`) · relative date · time range · one `LHTag`: category, or a status tag ("Not sure", "Needs hours", "Might be logged") which replaces the category. Max 2 tags, overflow "+1". |
+| Meta line | `.subheadline`, `textSecondary`, one line, tail-truncates at default, wraps at AX. SF source glyph via `Label` (`calendar` / `checklist`) · time range ("12–2", "9–10:30") · one `LHTag`: category, or a status tag ("Not sure", "Needs hours", "Might be logged") which replaces the category. **No date in the row**: the date is the day header above it (§1.15a). Max 2 tags, overflow "+1". |
 | Trailing: hours | `.subheadline.semibold` `.rounded` tabular, `textPrimary`, trailing-aligned, hugging its content: min 19pt ("2h"), max **68pt** (fits "12h 30m" at 65.1pt). "—" `textTertiary` when unknown. |
 | Row tap | Opens the confirm sheet. |
 | Swipe | System `.swipeActions` only (§1.3a). Trailing full swipe = "Not rental work" (`textSecondary` tint, `xmark`); leading full swipe = Confirm (`positive`, `checkmark`). |
 | Decline | Via trailing swipe or the sheet's "Not rental work" `.tertiary`. No ✕ in the row. |
-| Batch | Card foot: `LHButton.tertiary` "Confirm N likely" (N = rows with `canQuickLog` and not `notSure`); shown when N ≥ 2; one tap logs them with one toast "Logged 3 · Undo". Header keeps "See all". |
+| Batch | **Inbox only (v2).** "Confirm N likely" (N = rows with `canQuickLog` and not `notSure`), shown when N ≥ 2; one tap logs them with one toast "Logged 3 · Undo". Two placements, one implementation: when the section fits the viewport, an `LHButton.tertiary` at the card foot; when the section's bottom edge is below the viewport (scroll geometry), a **pinned bar** (§1.3b). **Today** shows ≤ 2 rows and one foot `.tertiary` "See all N" (N > 2); it has no batch action and no pinned bar (§H.8). |
 | Icons | SF Symbols only. No `CategoryToolTile` in a decision row; the render returns at 56pt in the sheet header. |
 | Height **[measured]** | 64 with a 1-line title; 86 with 2 lines; ceiling 88 at default. |
 
@@ -79,13 +277,17 @@ Width arithmetic (402pt screen): an inset-grouped card is 362pt wide (20pt syste
 
 **Decision: fully system.** `List` + `.swipeActions(edge:allowsFullSwipe: true)` in both Inbox and Today. No custom threshold, no `DragGesture`, no 96pt projection, no peek hint. Consequence: Today's root becomes a `List` with `.listStyle(.insetGrouped)` for the whole screen (as Reminders and Things are lists). The hero, timer slot and pace tiles are rows with `.listRowBackground(Color.clear)`, `.listRowInsets(EdgeInsets())` and `.listRowSeparator(.hidden)`; the To confirm rows are an ordinary inset-grouped section so the system draws the card and the swipe backgrounds clip to its corners. No hand-built card (`.propertyCard()`, `clipShape`) around rows anywhere **[grep]**: a custom card cannot clip a system swipe background correctly. `TodaySwipeRow`, `TodaySwipeHint` and `TodayDebugSeed.swipePreviewOffset` are deleted **[grep]**. The leading control is the visible affordance; Reminders ships no hint either. The haptic on a full swipe is ours, bound to the state change (§B.3), because the system fires none.
 
+#### 1.3b Pinned batch bar
+
+Anchor: Copilot's pinned "Yes, these are probably duplicates". Rendered with `safeAreaInset(edge: .bottom)`, 12pt above the tab bar, horizontal inset 20, in the slot the toast uses (a toast stacks above it). Capsule, height 44, `.regularMaterial` with a hairline `border`, label "Confirm N likely" in `.subheadline.semibold` `action` ink, `countChange` on N. It is `.secondary`-sized, not a `.primary`, so D8 holds. Appears with `toastIn`, leaves with `toastOut` when the section scrolls fully into view or N < 2. Density treatment **[measured]**: it is not a row and is excluded from D1, D2, D3 counts and D6; D3/D3b are measured with the bar present (it takes 56pt of the fold), so "≥ 2 rows above the fold" must hold with it on screen. `accessibilityIdentifier` `today.confirm.batch`.
+
 ### 1.4 Browse row `LHRow.Browse`
 
-Records, Properties, Learn, picker lists. Same grid as 1.3: leading **36pt** tile (`CategoryToolTile(36)` in Records; the house tile at 36 in Properties; an SF glyph in a 36 wash tile elsewhere), 12 gap, title 1 line + meta 1 line, trailing value (`LHFormat.hours`, `.subheadline.rounded`) and `chevron.right` `textTertiary`. Height 56–64. One ornament per row **[grep]**: Properties shows the house tile OR the monogram seal, never both (today `PropertyRow` has a 40pt seal, a 48pt house tile and a chevron).
+Records, Properties, Learn, picker lists. Same grid as 1.3: leading **36pt** tile (`CategoryToolTile(36)` in Records; the **house-only thumbnail at 44** in Properties (`LHThumb.house(44)`, lit state by `loggedToday`, §H.5); an SF glyph in a 36 wash tile elsewhere), 12 gap, title 1 line + meta 1 line, trailing value (`LHFormat.hours`, `.subheadline.rounded`) and `chevron.right` `textTertiary`. Height 56–64. One ornament per row **[grep]**: Properties shows the thumbnail, never the monogram seal beside it (today `PropertyRow` has a 40pt seal, a 48pt house tile and a chevron).
 
 ### 1.5 Value row `LHRow.Value` (pickers)
 
-Inside sheets and forms, in an inner surface (radius 12, `backgroundTertiary`): height 52, label `.body` left, value `.body` `textSecondary` right + `chevron.right` (or `chevron.up.chevron.down` for a menu). Tap opens a sheet (≥ 6 options) or a `Menu` (≤ 5). Replaces the hand-built value rows in `LogTimeSheet:593` and `SuggestionConfirmSheet`. **[measured]** 52pt.
+Inside sheets and forms, in an inner surface (radius 12, `backgroundTertiary`): `minHeight` **56** (D1's floor; r2's 52 contradicted it), label `.body` left, value `.body` `textSecondary` right + `chevron.right` (or `chevron.up.chevron.down` for a menu). Tap opens a sheet (≥ 6 options) or a `Menu` (≤ 5). Replaces the hand-built value rows in `LogTimeSheet:593` and `SuggestionConfirmSheet`. **[measured]** 56–88pt, like every row.
 
 ### 1.6 Toggle row `LHRow.Toggle`
 
@@ -105,7 +307,9 @@ One struct replaces `LogHoursStepper` and `SuggestionConfirmSheet:252`. Two `LHB
 
 ### 1.10 Summary card `LHCard.Summary`
 
-Anchor: Fitness Summary tiles. `backgroundSecondary`, radius 20, padding 16, hairline in dark only. Order: eyebrow (drafting: SF Mono 11 `.medium` caps +12% tracking, **`draftingInk`**) → value (`.largeTitle.rounded.bold` tabular) → label `.subheadline` `textSecondary` → optional `.footnote` → optional one `LHButton.secondary`, or the card is one `.lhPressable` target. Ceiling 160pt at default **[measured]**. The blueprint hero is the one exception (≤ 320pt; the only card with an illustration; eyebrow in drafting cyan `#8FD3FF` on blueprint per the brand doc).
+Anchor: Fitness Summary tiles. `backgroundSecondary`, radius 20, padding 16, hairline in dark only. Order: value (`.largeTitle.rounded.bold` tabular) → label `.subheadline` `textSecondary` → optional `.footnote` → optional one `LHButton.secondary`, or the card is one `.lhPressable` target. Ceiling 160pt at default **[measured]**. **v2: there is no hero card.** The house sits on the page (§H.1); no `LHCard` carries an illustration. The blueprint hero card and its drafting-cyan eyebrow are retired. **v2: the Summary card has no eyebrow**; the SF Mono drafting label is kept only in the PDF and as the Reports eyebrow over the ring (§1.15) **[grep: no `.monospaced` in `LHCard`]**.
+
+**Today decision (2026-10-24, supersedes 2026-10-23):** the rental switcher is a quiet `Menu` chip above the hero (capsule 36, the rental's name + `chevron.down`), page dots under the house, and a swipe on the house (§H.8). The row of small houses inside the hero card is retired with the card. Switching slides the diorama (`rentalSlide`) and rolls the number (`numericText`).
 
 ### 1.11 Stat tile `LHTile.Stat`
 
@@ -130,11 +334,17 @@ Press = motion `press`. Disabled = 40% opacity. The symbol weight inside `.icon`
 
 ### 1.14 Screen titles `LHScreenTitle`
 
-Tab roots: **Fraunces 34/500** via `Font.custom("Fraunces", size: 34, relativeTo: .largeTitle)` (brand doc §3), optional one-line `.subheadline` `textSecondary` subtitle, 20 gutter, 8 below, one trailing `.icon` at most. Sheets: SF `.title2.semibold` with an optional drafting eyebrow ("TODAY · THU, OCT 22") in `draftingInk`. Display (Welcome, milestone): Fraunces 34. **[grep]** Fraunces never under 28pt and never inside a row, card or button.
+Tab roots: **Fraunces 34/500** via `Font.custom("Fraunces", size: 34, relativeTo: .largeTitle)` (brand doc §3), optional one-line `.subheadline` `textSecondary` subtitle, 20 gutter, 8 below, one trailing `.icon` at most. Sheets: SF `.title2.semibold`, no eyebrow (v2: the drafting eyebrow is retired from sheets; a date goes in a `.subheadline` `textSecondary` subtitle, "Today, Thu Oct 22"). Display (Welcome, milestone): Fraunces 34. **The hero numeral (v2): Fraunces 84/600, opsz 144, tracking −2, `textPrimary`; 54 at AX; 64 when the window is under 700pt tall** (§H.8). It is the one numeral set in Fraunces; every other number stays SF Rounded tabular. **[grep]** Fraunces never under 28pt and never inside a row, card or button.
+
+**Decision (2026-10-23): "See all" push roots may use Fraunces 34.** A pushed screen that presents a whole collection reached from a section header ("See all" → All rentals, All records, Muted suggestions) is a collection root and takes the tab-root title style (Fraunces 34 + subtitle), with a back `.icon` in the leading slot. A pushed screen about one item (a rental's detail, a record) takes SF `.title1.semibold`. Checkable: `LHScreenTitle(style:)` has two cases, `.collection` (Fraunces) and `.detail` (SF); `.collection` is allowed in tab roots and in the files listed as collection roots in the hand-off **[grep]**. All rentals is therefore conforming, not drift.
 
 ### 1.15 Section header `LHSectionHeader`
 
-Drafting label (SF Mono 11 `.medium` caps +12%) in **`draftingInk`**; when the header names a state ("NEEDS ATTENTION", "ON PACE") it may use `caution`/`positive` ink (intent colour on words, brand doc §2). Optional count capsule (height 20, `.caption2.semibold`, `actionSurface`/`action`). Trailing slot: one `.tertiary`. 24 above, 8 below. Replaces `TodaySectionHeader`, the inline header in `InboxView:85` and `BPSectionHeader` **[grep]**.
+**v2:** `.headline` `textPrimary`, sentence case, the count after a middle dot ("To confirm · 7", "Your rentals · 3"); no count capsule. When the header names a state ("Needs attention", "On pace") it uses `behind`/`positiveOnPage` on the hero page (never `caution`, 3.67:1 there; §H.4) and `caution`/`positive` on the plain canvas or inside a card. Trailing slot: one `.tertiary`. 24 above, 8 below. The SF Mono 11 caps drafting label (`draftingInk`) is kept **only** in the PDF record and as the Reports eyebrow over the ring; it no longer heads sections **[grep: `LHSectionHeader` has no `.monospaced` style]**. Replaces `TodaySectionHeader`, the inline header in `InboxView:85` and `BPSectionHeader` **[grep]**.
+
+#### 1.15a Day headers in actionable lists
+
+Anchor: Copilot's date dividers, Things' "Today / This Evening". Every actionable list (Today To confirm, Inbox) groups rows by day; the row's meta line carries no date. Header: `.subheadline.semibold` `textSecondary` in sentence case, **not** the drafting mono (v2: retired on screens; it survives only in the PDF and the Reports eyebrow). Text: "Today", "Yesterday", then weekday + date without year for the last 6 days ("Mon Oct 19"), then "Oct 12" beyond that, "Oct 12, 2025" in another year; relative words come from `RelativeDateTimeFormatter`-equivalent rules in `InboxFormat.dayHeader(_:now:)` **[grep: one source]**. Layout: inside the inset-grouped section as the `Section` header, 16pt leading inset to align with the control, 16 above, 6 below; height 28 **[measured]**. A day header is not a row (excluded from D1/D3 counts). Ordering: newest day first; within a day, by start time. One header per day, even for a single row. Empty days are not shown.
 
 ### 1.16 Tags and chips
 
@@ -156,15 +366,17 @@ Drafting label (SF Mono 11 `.medium` caps +12%) in **`draftingInk`**; when the h
 
 ### 1.18 Empty state `LHEmptyState`
 
-In a container: SF Symbol 28 in `positive`/`action` → `.headline` → `.subheadline` `textSecondary` ≤ 2 lines → optional `.secondary`. Padding 20, total ≤ 160 **[measured]**. Full-screen (Inbox with nothing): blueprint art ≤ 40% of viewport, one headline, one line, one `.primary`.
+In a container: SF Symbol 28 in `positive`/`action` → `.headline` → `.subheadline` `textSecondary` ≤ 2 lines → optional `.secondary`. Padding 20, total ≤ 160 **[measured]**. Full-screen (Inbox with nothing): **v2: the diorama of the first rental** (unlit when nothing was logged today) on the dusk/night page, frame ≤ 240pt (≤ 28% of the viewport), one headline, one line, one `.primary` (§H.5). The blueprint art is retired.
 
 ### 1.19 Toast `LHToast`
 
-Current component (radius 22, min 52): one glyph + ≤ 2 lines + one `.tertiary`. 12 above the tab bar. 4s; 8s with an action. Swipe down dismisses. One at a time, crossfade on replace.
+Current component (radius 22, min 52): one glyph + ≤ 2 lines + one `.tertiary`. 12 above the tab bar. **v2, hero screens (Today, the rental page, the milestone): a glass capsule at the top, in the rental chip's slot, replacing the chip while it shows (chip out, toast in, `quick`; reversed on dismiss), so it never covers a row or the roof** (§H.8). It posts a VoiceOver announcement (`AccessibilityNotification.Announcement`) with its text **[grep]**. The placement is one parameter of the toast center (`.top` on hero screens, `.bottom` elsewhere), owned by plan package 0; `.glassEffect(.regular, in: .capsule)` on iOS 26+, `.regularMaterial` below. 4s; 8s with an action. Swipe down (or up, at the top) dismisses. One at a time, crossfade on replace.
 
 ### 1.20 Sheet `LHSheet`
 
 System `.sheet`, detents `[.medium, .large]` when content allows, drag indicator visible. Header 56: title (§1.14 sheet style) left, `.icon` close right. Gutter 20. `.primary` pinned via `safeAreaInset`, 16 inset; ≤ 1 `.tertiary` above it. No hero art in task sheets.
+
+**Focused-entry sheets (Log time, the confirm sheet), decided by Brian 2026-10-23:** an **opaque** `.large` sheet on `backgroundSecondary`, with the system's push-back and dim of the screen behind it, so the task has the whole screen and nothing shows through. Liquid Glass appears only on the Log (`.primary`) button and on the system keyboard; the sheet surface itself is never glass or translucent material. **[grep]** no `.presentationBackground(.thinMaterial/.ultraThinMaterial/.glass…)` on `LogTimeSheet` or `SuggestionConfirmSheet`; `.presentationDetents([.large])` on both; the primary button carries the glass style only inside the `#available(iOS 26, *)` branch.
 
 ### 1.21 Alerts and dialogs
 
@@ -176,15 +388,67 @@ System `.alert` only for irreversible destructive acts (delete all data, remove 
 
 ### 1.23 Paywall scaffold
 
-Blueprint band ≤ 40% of viewport with the record preview (the preview's title string is the same key as the real PDF title, §C.5) → plan card radius 20: name + `LHTag` "PAY ONCE" → price `.largeTitle.rounded.bold` + "once, yours to keep" `.subheadline` → one body line → `.primary` "Unlock for $29.99" → `.tertiary` "Restore purchase" → status line → benefits as 52pt `LHRow.Browse` with SF glyphs → legal `.footnote` links in 44 frames. Close is `.icon` on blueprint. No countdowns, no fake scarcity, no `dynamicTypeSize` clamp.
+**v2: on the plain canvas, no blueprint band, no house.** The record preview (≤ 40% of viewport; its title string is the same key as the real PDF title, §C.5) → plan card radius 20: name + `LHTag` "PAY ONCE" → price `.largeTitle.rounded.bold` + "once, yours to keep" `.subheadline` → one body line → `.primary` "Unlock for $29.99" → `.tertiary` "Restore purchase" → status line → benefits as 56pt `LHRow.Browse` with SF glyphs → legal `.footnote` links in 44 frames. Close is `.icon`. No countdowns, no fake scarcity, no `dynamicTypeSize` clamp. The paywall opens about the thing tapped (the record, the export, the second rental) and names it in its first line.
 
 ### 1.24 Onboarding scaffold
 
-Uses the app's components and tokens; `OnbColor` and the `Onb*` styles are deleted **[grep]**. Progress: 3pt track `border`, fill `action`. Back `.icon`, Skip `.tertiary`. Step title SF `.title1.semibold` (Fraunces only on Welcome). Option cards are `LHRow.Browse` rows in one grouped container; selection is shown the Apple Settings way, with a **trailing `checkmark` in `action`** (`.body.semibold`, 44 frame) on the selected row and the row's hairline stroke turning `action`; the leading slot holds the option's SF glyph. The 22pt leading circle is reserved for confirm in §1.3 and never appears in onboarding or pickers **[grep]**. One `.primary` pinned. No Dynamic Type clamps; frames at AX3 required.
+Uses the app's components and tokens; `OnbColor` and the `Onb*` styles are deleted **[grep]**. **Welcome (v2):** the dusk/night page with `craft_complete` lit at the Today hero size (§H.5), the headline in Fraunces 34, one `.primary` pinned in a `safeAreaInset`, "Have an account?" as a `.tertiary` that never truncates; frames at AX5 required (the 2026-10-23 Duo probe found the headline clipped under the button at AX5). The add-a-rental step shows the 120pt `craft_started` thumbnail beside the field. Progress: 3pt track `border`, fill `action`. Back `.icon`, Skip `.tertiary`. Step title SF `.title1.semibold` (Fraunces only on Welcome). Option cards are `LHRow.Browse` rows in one grouped container; selection is shown the Apple Settings way, with a **trailing `checkmark` in `action`** (`.body.semibold`, 44 frame) on the selected row and the row's hairline stroke turning `action`; the leading slot holds the option's SF glyph. The 22pt leading circle is reserved for confirm in §1.3 and never appears in onboarding or pickers **[grep]**. One `.primary` pinned. No Dynamic Type clamps; frames at AX3 required.
 
-### 1.25 Widgets and Live Activity
+### 1.25 Navigation and Liquid Glass
+
+**Minimum OS for 2.1: iOS 18.0** (Brian's decision, 2026-10-23; up from 17. Drops no iPhone; on iPad it drops the iPad 6th gen and the iPad Pro 2nd gen). Every Liquid Glass API below sits behind `#available(iOS 26, *)`; on iOS 18–25 the same view uses the system material the OS ships (`TabView` draws its own bar, including the fifth "Log time" item; `.regularMaterial` for the batch bar and toast). The fallback is the system's material, never a hand-made imitation of glass. **[grep]** every `.glassEffect(`, `.glass`, `.glassProminent`, `.tabBarMinimizeBehavior(` and `.tabViewBottomAccessory` is inside an `if #available(iOS 26, *)` branch; the deployment target in the project is 18.0; no `#available(iOS 17` checks remain.
+
+Brian's question, 2026-10-23: does the navigation use the latest Liquid Glass design? Today it does not: `ContentView.swift` draws a custom floating tab bar with its own material, a detached "+" circle and hand-set sizes. Decision: **the native `TabView` only**, so the system draws the Liquid Glass bar and keeps it current with every iOS release. (v2: the detached "+" is gone; "Log time" is the fifth tab, §H.7.)
+
+| Rule | Spec | Kind |
+|---|---|---|
+| Tab bar | SwiftUI `TabView` with `Tab` items (Today `sun.horizon`, Inbox `tray`, Records `book.closed`, **Rentals** `house` (confirmed 2026-10-24), **Log time `plus` with `role: .search`** and `accessibilityLabel("Log time")`), SF Symbols, `.tint(colors.action)` per appearance (never a fixed light tint: the hardcoded light tint measured 3.21:1 in dark on 2026-10-24). No custom tab bar, no `ZStack` overlay bar, no `UITabBar` appearance hacks. | **[grep]** `TabView(` present at the root; five `Tab(`s, one with `role: .search`; zero views named `*TabBar*` outside previews; zero `.toolbar(.hidden, for: .tabBar)` at the root. |
+| Minimize behaviour | `.tabBarMinimizeBehavior(.onScrollDown)`: the bar shrinks to the active tab as the user scrolls down and returns on scroll up. Nothing else may react to the bar's size; use the system safe-area insets. | [grep] modifier present once, at the root |
+| Create action | **v2 (Brian, 2026-10-24): "Log time" is the native fifth tab**, `plus`, `role: .search`, shown as the **fifth item inside the bar** as in the locked iOS 27 frame. Captures on iOS 18, 26 and 27 are required with every shell change, each compared to that frame; an explicit `accessibilityLabel("Log time")` stops VoiceOver reading the `.search` role as "Search", checked on each OS. Selecting it opens `LogTimeSheet` and restores the previous tab in `onChange(of: tab)`, so it is never the selected tab and the sheet always returns to where the user was. The detached glass "+" `Button` in a `safeAreaInset` is retired. One create action for the whole app; screens never add a second "+" in their title row (Rentals' "Add rental" moves to the list's empty state and the screen's `.toolbar` trailing item). | [grep] one `Tab(… role: .search)` whose selection is reverted and which carries an `accessibilityLabel`; zero `.buttonStyle(.glass)` "+" buttons; no `plus` in `LHScreenTitle` trailing slots. [measured] iOS 18/26/27 captures and a VoiceOver read |
+| Badges | System `.badge(_:)` on the Inbox tab only, with the To confirm count (likely + not sure; muted excluded). Hidden at 0. No badge on Today, Records or Rentals. Red system badge is accepted (it is the system's semantic, not our `destructive`). | [grep] one `.badge(` call, on the Inbox `Tab` |
+| Content under the bar | Scroll views and lists run edge to edge under the bar; **no reserved bottom heights** (`padding(.bottom, 100)`, `Spacer(minLength: 80)`, fixed `tabBarHeight` constants are deleted). Bottom-anchored controls (`LHButton.primary` in sheets, the pinned batch bar §1.3b, `LHToast`) use `safeAreaInset(edge: .bottom)` so they follow the bar as it minimizes. The system scroll-edge effect replaces our `TodayTopEdgeFade`. | [grep] no bottom padding ≥ 60 at a tab root; `TodayTopEdgeFade` deleted |
+| System materials | Bars, sheets, popovers and menus use the system: `TabView`, `NavigationStack` toolbars, `.sheet`, `Menu`, `.glassEffect()` on the few floating controls we own (the pinned batch bar, the toast, the Log time sheet's `.primary` on iOS 26+). No hand-made glass: no `.ultraThinMaterial` + hairline + shadow stacks imitating a bar, no blurred `Rectangle`s, no `backdrop`-style layers. Light and dark follow the system; we never force a material's tint. | [grep] `.glassEffect(` / `.glass` only in `LHButton` (the sheet `.primary` and the `.icon` glass variant), `LHToast`, the batch bar; zero `.ultraThinMaterial`/`.thinMaterial` on bar-shaped views |
+| Text over glass | Text on a glass surface uses `textPrimary`/`textSecondary` with the system's vibrancy (`.foregroundStyle(.primary/.secondary)` inside the glass container), never a fixed hex. Measured contrast ≥ 4.5:1 for every glass label against the busiest backdrop we ship (**the diorama** scrolled under the bar at AX, where the rows and the house pass beneath it, and the darkest dark-mode night page), light and dark. Icon-only glass controls carry an `accessibilityLabel`. Glass never holds more than one line of text. | [measured] frames with the diorama under the bar |
+| Reduced transparency / contrast | System materials already honour Reduce Transparency and Increase Contrast; we add nothing and remove nothing. Frames at `accessibilityReduceTransparency` are part of the hand-off for any change that touches a glass surface. | [measured] |
+
+What this changes elsewhere in this document: "12pt above the tab bar" in §1.3b and §1.19 means "inside `safeAreaInset(edge: .bottom)`", which the system positions above the live bar height; D3's "above the tab bar" is measured to the bar's top edge in its full (not minimized) state at scroll offset 0.
+
+### 1.26 Widgets and Live Activity
 
 SF Symbols and the mono mark B template only; numbers `.rounded` tabular via `LHFormat.hours`; small: value + label; medium: value + current house render; Lock Screen/Island: mono glyph + hours; checked in accented and tinted modes; ≤ 2 text lines; no tool renders.
+
+### 1.27 Adaptive layout (iPad, iPhone Duo, windows)
+
+Decision (2026-10-23, spec at `~/AgentScratch/landlordhours/2026-10-23/adaptive/spec.md` r2, reviewed READY WITH CHANGES): one layout system for every width, two inputs that never overlap. **Window width `W`** (the scene's width from `onGeometryChange` on the root; never the screen, idiom or orientation) picks the band: **A** < 600 (gutter 20, the phone layout), **B** 600–899 (gutter 24, one column ≤ 600 centred, pushes), **C** ≥ 900 (gutter 24; `NavigationSplitView` allowed; `Table` allowed when `Wc ≥ 720`). **Content width `Wc = W − sidebar − 48`** (sidebar **280** when the system sidebar is docked, which iPadOS does only in landscape; 0 when hidden, compact or overlaid in portrait) picks the columns: two iff **band C** and `Wc ≥ 744`, each `(Wc − 24)/2` capped at 600, content ≤ 1224; otherwise one column ≤ 600 centred. The 600 cap is for reading layouts (Today, a rental page, Reports, sheets); split layouts and the `Table` use the full `Wc`. Band B is always one column ≤ 600 (the portrait sidebar is an overlay and does not change `Wc`). Band and column changes carry 8pt hysteresis (A↔B at 592/608, B↔C at 892/908, columns at 736/752). The horizontal size class picks only the navigation container (compact: bottom bar with the fifth "Log time" tab; regular: `.sidebarAdaptable` and a toolbar "+"). Band C does not promise two columns: with the sidebar open, Duo landscape (951) and 13" portrait (1032) show the sidebar and one column. `Info.plist` stays `~iphone` portrait-only and `~ipad` all orientations; Duo open landscape is kept pending the orientation probe. **Minimum OS: iOS 18.0** (decided 2026-10-23, no longer pending; iOS 18 drops no iPhone, iPadOS 18 drops the iPad 6th gen and the iPad Pro 2nd gen); glass stays behind `#available(iOS 26, *)` with the system-material fallback on 18–25 (§1.25).
+
+**[grep]** zero `userInterfaceIdiom`, zero `UIDevice.orientation`, zero `*Pad*`/`*iPad*` view names; `horizontalSizeClass` read in one place (the root) and passed down with `LayoutBand`; `LayoutBand.resolve(previous:width:)` is the only place bands are computed.
+
+| Rule | Spec | Kind |
+|---|---|---|
+| Navigation | One `TabView` with `Tab`s Today, Inbox, Records, **Rentals** (v2: the locked frames use it; confirmed 2026-10-24; C.4) and a `TabSection("Your rentals")` of per-rental tabs kept out of the bars with **`.tabPlacement(.sidebarOnly)`** (`.defaultVisibility(.hidden, for: .tabBar)` left a fifth top-bar item on iPadOS 27); `.tabViewStyle(.sidebarAdaptable)`; `tabViewSidebarHeader` = the house-only thumbnail at 120 (§H.5), never the diorama; Settings at the sidebar foot. The sidebar is **280** wide (system), **docked in landscape and an overlay in portrait** (as in Notes and Mail), so `Wc` subtracts it only when docked. The bar and sidebar are capped at Dynamic Type xxxLarge (the sidebar draws its own labels at a fixed width and broke words mid-way at AX sizes); every tab root restores the reader's size. **Closed iPhone Duo:** the system draws the `TabView` as a **vertical rail on the trailing edge** (a plain `TabView` does the same), with the status bar and camera in that 84pt strip; we follow it, and the `.search`-role "Log time" sits at the foot of the rail. | grep + measured |
+| Create action | Compact: the §1.25 fifth "Log time" tab. Regular: toolbar `.primaryAction` `plus` "Log time" on every root + `.keyboardShortcut("n", modifiers: .command)`; the sidebar does not show the fifth tab. One `LogTimeSheet`, `.large` in compact, `.presentationSizing(.form)` in regular; the same for Check my goal when it lands (future, §H.5). Not a popover, not an inspector. | grep |
+| Window controls | In a compact iPadOS window the window controls (≈ 50×26, top-leading) sat over the phone layout's in-content title. The compact root reads `layoutGuide(for: .safeArea(cornerAdaptation: .vertical))` and moves the `TabView` down by the difference to the safe area (43pt measured; under 8pt is corner rounding and ignored). `safeAreaPadding` does not reach into a `TabView`'s tabs. | measured |
+| List + detail | Inbox and Rentals use `NavigationSplitView` with the **system's own column widths** (list 320 on iPadOS 27; `navigationSplitViewColumnWidth` does not widen it; list gutter 16; detail = content − 320) when band C and `Wc ≥ 744`, else `NavigationStack` pushes. Band B is always one column. The confirm sheet's content is the Inbox detail, with an opaque pinned foot so short windows scroll content under Confirm. The record detail is a trailing `.inspector` (**280**) beside Records' `Table` only when the table keeps ≥ 720 (`Wc − 280 ≥ 720`); otherwise (13" portrait, Duo landscape) the record opens as a form sheet. Decisions with a pinned `.primary` (Log time; Check my goal when it lands) are sheets in every band. | grep + measured |
+| Today, two columns | Left: chip + the hero (frame 390, §H.1 H6) + number block + pace + CPA footnote. Right: To confirm (its own `List`, system swipes, the "See all" foot). Columns scroll independently. Empty To confirm → the §1.18 in-container empty state in its slot (≤ 160); the full-screen diorama empty state is for Inbox only. | measured |
+| Records | `Table` with Date (default sort ▾), What (min 240, 36 tile inline), Rental, Kind (`LHTag`), Who, Hours (`.rounded` tabular), Source when `Wc ≥ 720` and Dynamic Type ≤ XXL; otherwise the `LHRow.Browse` list with the `LHChip` strip. Table row actions are the context menu and ⌫ (no swipes in a `Table`). **Rows 70pt** (cells `minHeight 48` over the system row; D1 56–88 applies to tables too); ≥ 11 rows on 13" landscape. Cell text uses tokens (Date, Rental, Who `textSecondary`; What, Hours `textPrimary`); the table sits on `background` with `backgroundSecondary` rows (the system paints #000000/#FFFFFF otherwise). | grep + measured |
+| Row grammar | `LHRow.*`, `LHTag`, `LHChip`, `LHButton` identical in every band; width grows only the title column; no band-specific row or card type. | grep |
+| Widths | Text ≤ 640pt wide; explainer cards ≤ 560; `LHTile.Stat` 2-up only in columns ≥ 440, else 1-up; **hero: band A by the H1 formula, bands B and C a fixed 390 frame centred in the column (§H.1 H6), numeral 84 (64 under 700pt of height)**; the rental `Menu` chip is the switcher in every band; below 360pt the hours label drops "of N". | measured |
+| Hero on iPad and Duo | iPad 10th gen portrait (820×1180, band B): frame 390 = 33% of height, art ≈ 30%. 13" landscape (band C, sidebar docked): hero column 600 wide, frame 390. Duo closed (382×644): frame 287, numeral 64, two rows of To confirm below the fold are acceptable (the chip, the hero and the pace sentence are above it). Duo open portrait (669×951): one column, frame 390. The frame never straddles the fold (`reservedRegions(kind: .division)`). | measured (Duo on the iOS 27.1 simulator, iPad on the 10th gen) |
+| Rows visible | 13" landscape: ≥ 8 To confirm rows in Today's right column; Duo landscape ≥ 6; band B ≥ 6 under the title. | measured |
+| **D8 amended** | One `.primary` per **column or sheet** (not per screen); ≤ 2 `.secondary` visible per column. A screen shows two primaries only when it shows two columns with their own tasks (Inbox list + confirm detail). | grep |
+| Pointer and keyboard | `.hoverEffect(.highlight)` on rows and chips; `.help()` on `.icon` buttons; `.contextMenu` on To confirm rows (Confirm · Change hours… · Not rental work · Open), Records rows (Open · Edit · Duplicate · Delete) and rental rows (Open · Open in New Window · Log time here; Check my goal added when it lands). ⌘N log, ⌘⇧N timer, ⌘F Records search (not while a text field is focused), Space confirm / ⌫ not rental work on a focused To confirm row, Esc dismiss, ⌘Return log in sheets. ⌘1–4 only if verified free on iPadOS. All via `.keyboardShortcut` / `.onKeyPress`. | grep |
+| Drop | `.dropDestination` for images and PDFs on the Log time sheet, To confirm rows, Records rows and Today's canvas (opens Log time with the receipt attached); the target takes a 1.5pt `action` stroke on hover (`tileFocus`); ≤ 5 attachments per record; ⌘V pastes the same payload; a rejected type shows nothing. | grep + measured |
+| Scenes | `UIApplicationSupportsMultipleScenes` is already true. Tab, navigation path, column state, selection, drafts (`LogTimeDraft`, `SuggestionDraft`; `GoalCheckDraft` when Check my goal lands), toast, scroll anchor and band live in a per-scene `SceneState`; records, rentals, hours and the timer in the shared `AppModel`. `@SceneStorage` restores tab, selected rental and path; drafts persist per scene on background and reopen with "Draft from earlier · Discard". `WindowGroup(for: RentalID.self)` + `openWindow` for "Open in New Window" (hidden when `supportsMultipleWindows` is false). A fold, unfold or resize rebuilds views and loses nothing. | grep + measured (kill and relaunch with a draft open) |
+| Continuity | No custom transition on fold or resize; the system animates. `onHingeChange`, if available, only pauses §B.4 scenes between poses. | grep |
+| Widgets | Adds `systemLarge` (house + number + 3 To confirm rows with an interactive Confirm), `systemExtraLarge` (iPad Home Screen: mini Today left column + 5 rows) and `systemExtraLargePortrait` (iPad Lock Screen in landscape: stacked mini column + 3 rows). §1.26 rules apply. | measured in accented and tinted |
+| Dynamic Type | Two columns collapse to one at AX1+; `Table` → list at AX1+; XXL and AX3 frames per band required. | measured |
+| Hardware | **Measured on the iOS 27.1 iPhone Duo simulator (2026-10-23):** outer 466×678pt @3x (screenshot 1398×2034), inner 669×951pt @3x (2007×2853); closed: app area 382×644, safe area trailing 84 and bottom 34, compact/regular, hinge Closed 0°, portrait-only honoured. Hinge API is UIKit `UIHingeInteraction` (`UIHinge.status`, `angle`, iOS 27.1); SwiftUI has no `onHingeChange`. Open poses are not yet measured (posture needs Device Hub); full-bleed surfaces read `safeAreaInsets`. | measured |
+| App Store | iPad 13" frames only of a build that has these layouts (Guideline 2.3.3); stretched frames invite 2.4.1. Duo ships as two sizes (outer 1398×2034, inner 2007×2853). | judgment |
+| Acceptance environments | iPad frames: iPad 10th gen (iPadOS 27), landscape and portrait, one Stage Manager window at 700 and one 1/3 tile, with Apple's Reminders, Health, Fitness and Settings captured on the same iPad beside each frame (§5.5). Duo frames: the Duo simulator in all four poses until a device exists. Frames at 599/600 and 899/900 in light and dark in every adaptive hand-off. | judgment |
+
+System chrome and contrast (2026-10-23, mock lane): system-provided sidebar section headers and sidebar badges use Apple's own colours and are **exempt from our AA check**; we never remove a header or badge to pass a contrast check, and our own text stays at ≥ 4.5:1 (≥ 3:1 for icons). The sidebar material (#182445 measured in dark) is system, not a token; gates sample sidebar text against the material. The system draws the selected sidebar row as white on the tint, so the regular-width `TabView` tint is **#4774C6 in dark** (white 4.58:1; unselected sidebar icons 3.3:1 on the material; top-bar selected label 5.5:1) and `action` (#1E3FA6) in light; each tab root re-applies `colors.action` so content keeps its own tint (#8FD3FF in dark).
+
+Density addendum: D3 and D4 are measured per column in band C; D6's 40% hero share is against the column; D9's gutter is 24 in B/C.
 
 ---
 
@@ -195,13 +459,13 @@ Default Dynamic Type, 402×874pt, light and dark, unless stated. The builder rep
 | # | Rule | Number | Kind |
 |---|---|---|---|
 | D1 | Actionable row height, divider to divider | 56–88; target 64 | measured |
-| D2 | One list item's share of viewport | ≤ 12% default; ≤ 30% AX3 | measured |
+| D2 | One list item's share of viewport | ≤ 12% default; ≤ 45% at AX3 (a two-line row at AX3 cannot meet 30%; mockup review 2026-10-23) | measured |
 | D3 | List tab (Inbox, Records, Properties) with ≥ 5 items present: complete rows visible under the title, above the tab bar | ≥ 5 at default, ≥ 4 at XXL | measured |
-| D3b | Today above the fold at default and XXL | title + hero + section header + ≥ 2 rows + next header | measured |
-| D3c | Today at AX1–AX3 | hero switches to its compact variant (number + label, art hidden, ≤ 160pt); title + compact hero + header + ≥ 1 row visible | measured |
-| D4 | Empty bands inside a card: pixel rows within the card inset 16 that are all card background (ΔE ≤ 3), as share of card height | ≤ 35% (hero excluded) | measured |
+| D3b | Today above the fold **at default size only** | **v2:** rental chip + hero (H1) + number block + pace sentence + "To confirm · N" + 2 rows + the "See all" foot, all above the tab bar's top edge. At XXL, 1 row. **When the window is under 700pt tall (SE, Duo closed): 1 row** (§H.8). **Features are never dropped to fit; the hero shrinks first** (H3), then row text wraps. Pace tiles and "This week" are not on Today (they are on the rental page and in Reports). | measured |
+| D3c | Today at AX1–AX5 | **v2 (amended by Brian's decision):** the hero holds at the H3 size (frame 295 on 402, art 24–32% of the viewport), numerals 54, chip above the frame; chip + hero + number + pace sentence are above the tab bar and the rows scroll beneath. The art is never hidden. | measured |
+| D4 | Empty bands inside a card: pixel rows within the card inset 16 that are all card background (ΔE ≤ 3), as share of card height | ≤ 35%. Applies to `LHCard.*` and the hero. Grouped value-row containers (Settings-style `LHRow.Value`/`LHRow.Toggle` groups, as in Settings, Log time and the confirm sheet) are exempt: their padding is the row rhythm, and Settings itself would fail | measured |
 | D5 | Primary actions per card; actions in a row | 1 per card; rows: one leading control, no pills | grep |
-| D6 | Non-hero card viewport share; hero incl. its header | ≤ 20%; ≤ 40% | measured |
+| D6 | Non-hero card viewport share | ≤ 20%. **v2: the hero is not a card and is excluded from D6; it is measured by H2 (36–46% at default) and H3 (24–32% at AX).** `frame_check.py density` must stop treating the hero frame as a card (tool spec in `scripts/qa/NOTES-standard-v2.md`). | measured |
 | D7 | Text lines per row | ≤ 3 (title ≤ 2, meta 1) | measured |
 | D8 | Buttons per screen | 1 `.primary`; ≤ 2 `.secondary` visible | grep |
 | D9 | Gutter / card padding / section gap | 20 / 16 / 24, ±1 | measured |
@@ -211,7 +475,7 @@ Dynamic Type (XXL and AX3 frames required):
 - Rows grow and reflow: at AX sizes `LHRow.Action` stacks (control + title; meta below; hours after the meta).
 - `lineLimit(nil)` and `fixedSize(horizontal: false, vertical: true)` at AX **[grep]**.
 - `minimumScaleFactor` ≥ 0.8, never on `.body` **[grep]**.
-- `.dynamicTypeSize(` clamps only on the hero number and the house art **[grep: ≤ 2 sites]**.
+- `.dynamicTypeSize(` clamps only on the hero numeral, the house art frame and the rental chip **[grep: ≤ 3 sites]** (§H.1 H9).
 
 ---
 
@@ -222,20 +486,22 @@ Three items at default, 402pt:
 ```
 TO CONFIRM  (3)                                             See all
 ┌────────────────────────────────────────────────────────────────┐
+│  Today                                                         │  ← day header, 28pt
 │  ◯   Plumber at Pine Cabin                                2h   │
-│      ▦ Calendar · Today 12–2 · [Repairs]                       │
-│     ─────────────────────────────────────────────────────────  │
+│      ▦ Calendar · 12–2 · [Repairs]                             │
+│                                                                │
+│  Thu Oct 8                                                     │
 │  ◯   Making monthly mortgage payment                       —   │
-│      ☑ Reminder · Oct 8 · [Needs hours]                        │
+│      ☑ Reminder · [Needs hours]                                │
 │     ─────────────────────────────────────────────────────────  │
 │  ◯   Showing at Oak Street                              1h 30m │
-│      ▦ Calendar · Oct 8 9–10:30 · [Not sure]                   │
+│      ▦ Calendar · 9–10:30 · [Not sure]                         │
 │     ─────────────────────────────────────────────────────────  │
 │                      Confirm 1 likely                          │  ← when N ≥ 2; here N = 1 so hidden
 └────────────────────────────────────────────────────────────────┘
 ```
 
-(▦ `calendar`, ☑ `checklist`; `[ ]` an `LHTag`; ◯ the 22pt leading control in a 44 frame. Row 2 wraps to 86pt because its title is 282pt wide. In this sample only row 1 is quick-loggable and likely, so the foot is hidden; with two such rows it reads "Confirm 2 likely".)
+(▦ `calendar`, ☑ `checklist`; `[ ]` an `LHTag`; ◯ the 22pt leading control in a 44 frame. Dates live in the day headers (§1.15a), so the meta line is source · time · tag. Row 2 wraps to 86pt because its title is 282pt wide. In this sample only row 1 is quick-loggable and likely, so the foot is hidden; with two such rows it reads "Confirm 2 likely", and if the section overflowed the viewport it would pin above the tab bar instead (§1.3b).)
 
 | Before | After | Why |
 |---|---|---|
@@ -282,8 +548,8 @@ Classifier issue (separate fix): "Making Monthly Mortgage Payment" was proposed 
 | Milestone | `House/MilestoneCelebrationView.swift` | Signature, allowed big; 8 raw sizes → tokens. |
 | Locked preview | `Components/LockedPreview.swift` | `ProUnlockButtonStyle` → `LHButton`; `...xxxLarge` clamp goes. |
 | Export, Contact support, Delete all data, Profile sheets | respective files | Standard containers; button/close swaps. |
-| House hero | `House/HouseHeroView.swift` | The allowed tall card; eyebrow wraps to two lines at default ("MORE THAN ANYONE ELSE") → trim to one; compact variant for AX (D3c). |
-| Tab bar | `ContentView.swift` | Standard; 4 raw sizes → tokens. |
+| House hero | `House/HouseHeroView.swift` | **Redesign (v2):** the card hero is deleted; `CraftHouseView` on the page replaces it (§H.1, §H.8). No compact variant: the art holds at 28% at AX (H3). |
+| Tab bar | `ContentView.swift` | **Redesign (moved from Drift, 2026-10-23):** custom floating bar with its own material and a detached "+" circle → native `TabView` with system Liquid Glass, `.tabBarMinimizeBehavior(.onScrollDown)`, "Log time" as the fifth tab (§1.25, §H.7). `LHIcon` custom tab shapes retire. |
 
 ### Standard
 
@@ -295,7 +561,7 @@ Classifier issue (separate fix): "Making Monthly Mortgage Payment" was proposed 
 
 ### Consistency inventory
 
-Every touched screen is labelled **new-system**, **recoloured-legacy** or **untouched**, literally. Today, Inbox, Log time and Properties are recoloured-legacy now.
+Every touched screen is labelled **new-system**, **recoloured-legacy** or **untouched**, literally. The v2 inventory of every screen, with its label, its v2 changes, its order and its build package, is `docs/design/v2-revamp-plan.md`. As of 2026-10-24 nothing shipped is new-system; every shipped screen is recoloured-legacy or untouched.
 
 ---
 
@@ -305,11 +571,11 @@ Builder runs these and puts the numbers in the hand-off; the gate re-measures an
 
 ### 5.1 Density (PIL) — `scripts/density_gate.py <frame.png> --rows <ids>`
 
-1. Item share = item bbox height ÷ frame height (D2). 2. Items above the fold = complete row boxes between the title's bottom and the tab bar's top, found by divider runs (`border`-coloured pixels ≥ 60% of card width) or XCUITest element bounds (D3/D3b/D3c). 3. Empty bands (D4). 4. Row height between dividers (D1). 5. Gutter = frame edge to first non-canvas pixel in the content column (D9). 6. Contrast ≥ 4.5:1 on every text pair including placeholders, disabled, secondary and tag ink on wash. 7. No two differently named state frames byte-identical.
+1. Item share = item bbox height ÷ frame height (D2). 2. Items above the fold = complete row boxes between the title's bottom and the tab bar's top, found by divider runs (`border`-coloured pixels ≥ 60% of card width) or XCUITest element bounds (D3/D3b/D3c). 3. Empty bands (D4), skipping exempt value-row groups. 4. Row height between dividers (D1); a card's foot action ("Confirm N likely", `today.confirm.batch`) is not a row and is excluded from D1 and from the D3 row count, identified by its accessibility identifier or by having no divider above it. 5. Gutter = frame edge to first non-canvas pixel in the content column (D9). 6. Contrast ≥ 4.5:1 on every text pair including placeholders, disabled, secondary and tag ink on wash; on hero frames each pair is sampled against the gradient step behind it and the ink must be one of the §H.4 page inks. 7. No two differently named state frames byte-identical. **8. Hero (v2):** the house art bbox share of the viewport from the still's alpha at the known placement, never a non-page pixel count (H2 36–46% default, H3 24–32% AX); the frame side derived from the art's width and the stage scale (H1), with the ground line checked on assets only; no closed edge rectangle around the art (not in a card); art p99 contrast vs the page ≥ 3.0 lit, and unlit night PASS ≥ 2.55 / MARGINAL 2.40–2.55 / BLOCKED < 2.40, plus the mean-luma lift ≥ +5 (§H.2); the number block overlaps the frame bottom by 44pt at default and the chip, dots and number never intersect the art's bbox except that overlap; lit and unlit frames of one state differ; the `-unlit` frame is darker in the window region. 9. Assets: `asset_check.py` (§H.3 budget and integrity). 10. Motion capture: ≥ 24 consecutive changed frames in the lot region during the drop, no hard cuts outside the crossfade windows (§H.6).
 
 ### 5.2 Component conformance
 
-**[grep]** Every row, card, tag, chip, button, header, field, segmented control, stepper, empty state, toast, sheet and alert in the diff is a §1 component by name, listed in the hand-off. Zero new `.system(size:)`, `Color(hex:)`, `Image("bp_tool_`, `Lucide`, emoji, `.fontWeight` on symbols outside `LHButton.icon`, or `.dynamicTypeSize(` outside the two sites. Radii ∈ D10. `CategoryToolTile(size:)` ∈ {36, 56} and never in `Inbox/` or `Today/` rows. Frames at default, XXL, AX3, light and dark; no clipping, no mid-word break, no truncation at AX.
+**[grep]** Every row, card, tag, chip, button, header, field, segmented control, stepper, empty state, toast, sheet and alert in the diff is a §1 component by name, listed in the hand-off. Zero new `.system(size:)`, `Color(hex:)`, `Image("bp_tool_`, `Lucide`, emoji, `.fontWeight` on symbols outside `LHButton.icon`, or `.dynamicTypeSize(` outside the three sites (§H.1 H9). Radii ∈ D10. `CategoryToolTile(size:)` ∈ {36, 56} and never in `Inbox/` or `Today/` rows. Navigation (§1.25): the root is a `TabView` with `.tabBarMinimizeBehavior(.onScrollDown)`; no view named `*TabBar*`, no reserved bottom padding ≥ 60 at a tab root, five `Tab`s with one `role: .search` "Log time" carrying an `accessibilityLabel` and no `plus` glass button, one `.badge(` on the Inbox tab, no `.ultraThinMaterial`/`.thinMaterial` on bar-shaped views, and glass text contrast ≥ 4.5:1 in the frames with the diorama scrolled under the bar. Shell changes carry captures on iOS 18, 26 and 27. Frames at default, XXL, AX3, light and dark; no clipping, no mid-word break, no truncation at AX.
 
 ### 5.3 Motion conformance
 
@@ -321,7 +587,94 @@ Copy gate + §C: **[grep over `Localizable.xcstrings`]** banned words absent; pe
 
 ### 5.5 Anchor question **[judgment]**
 
-The gate puts the frame beside the anchor (Copilot, Reminders, Things, Fitness, Apple Settings) and writes the answer to: "Would this sit next to the anchor app without looking like the hobby version?" Passing numbers with a "no" here is MARGINAL and goes to Brian with both frames.
+The gate puts the frame beside the anchor (Copilot, Reminders, Things, Fitness, Apple Settings for lists and forms; **Opal, (Not Boring) Weather and Tolan for the hero screens**, §H) and writes the answer to: "Would this sit next to the anchor app without looking like the hobby version?" For the hero the question is sharper: "Is this a lit object someone keeps, or a toy on a background?" Passing numbers with a "no" here is MARGINAL and goes to Brian with both frames.
+
+---
+
+## F. Future extensions (designed for, not built)
+
+Brian, 2026-10-24: v2 must take two later features without a redesign. Neither is built in the v2 revamp. The rules below fix the contracts (naming, layers, budgets, guard rails) so the house art, the data model and the hero component are built once. Backlog items: `docs/design/v2-revamp-plan.md` §6.
+
+### F.1 A house of their own: per-rental customisation
+
+What the user will change: roof colour or material, siding colour, trim colour, door colour; later, a small set of house styles. Brian already asked for "roof colour per house".
+
+**What stays fixed, for the brand [grep + judgment]:** the lighting rig (H.2), the camera and the frame (H.3 integrity checks), the lot (lawn, loam, path, slab, tree, shrubs), the window glow and the spill colour `#E9A558`, and **the timber framing stages** (`started`, `frame70`, `framing` and the drop clip). Timber is timber: the framing is identical for every rental, which also keeps one drop clip. Identity before the roof goes on is the rental's name in the chip. Only `half` and `complete` carry slots.
+
+**Slots:** `roof`, `siding`, `trim`, `door`. Four, no more. Windows, gutters, chimney and porch are not slots.
+
+**Approach, compared:**
+
+| | A · pre-rendered variants | B · neutral base + per-slot masks, recoloured at runtime | C · pre-rendered material variants |
+|---|---|---|---|
+| What ships | one still per combination | one neutral still per state + one mask pack per stage | one still set per material |
+| Count for 6 roof × 8 siding × 3 trim × 4 door | 576 × 2 stages × lit/unlit × dusk/night = **4,608 stills** | 20 stills + **2 mask packs** (+2 for thumbnails) | 20 stills × materials |
+| Size | impossible | +0.6 MB | +10 MB per material |
+| Render time | weeks | none per swatch | one full pass per material |
+| Can change | colour only | colour only | texture and geometry (tile → metal roof) |
+| Runtime cost | 0 | one Core Image composite per (rental, stage, lit, appearance), cached | 0 |
+
+**Recommendation: B for colour, now; C only for roof material, later, capped at 3 materials.** B keeps the lighting baked and the brand fixed, costs nothing per swatch, and the whole swatch matrix can be checked offline with the same maths.
+
+**Pipeline contract for B [measured]:**
+- Blender renders `half` and `complete` (lit, unlit, dusk, night) with the four slot materials set to a **neutral albedo** (linear 0.5 grey, each slot's own roughness and normal map). These are the shipped stills from the day customisation lands; until then the stills carry the default swatches baked in. **Mask packs and neutral renders live in `design/blueprint-house/` only and never enter the app bundle before §F.1 is built** (`asset_check.py` FAILs on any `craft_slots_*` in the catalog, §H.3).
+- A **mask pack** per stage, `craft_slots_<stage>` (half, complete), one RGBA PNG at 1206²: R = roof, G = siding, B = trim, A = door coverage, antialiased, from a material-index pass (`craft3.py` has no material-index AOV today; the spike below adds it). Thumbnails get `craft_thumb_slots_<stage>` at 360px. Masks depend only on geometry and camera, so they are shared across lit/unlit/dusk/night.
+- Composite, in linear light: `out = base × Π_slots (1 + mask_s × (swatch_s / 0.5 − 1))`, Core Image (`CIBlendWithMask` × 4 over `CIColorMatrix`), rendered once per (rental, stage, lit, appearance) into a cached image (memory ≤ 4 composites at 5.8 MB; disk cache in `Caches/` keyed by swatch set + asset version). Budget ≤ 40 ms per composite on an A15; a cache hit is free. The widget reads the same cache through the app group.
+- The window glow and the lawn spill are part of the base and are not multiplied (they sit outside every mask), so a dark siding still shows warm windows.
+
+**Palette guard rails [measured, `scripts/qa/swatch_matrix.py`, spec in `scripts/qa/NOTES-standard-v2.md`]:** swatches only, named, never a colour picker or a hex field. Per slot: roof S ≤ 0.70, V 0.20–0.80; siding S ≤ 0.50, V 0.30–0.96; trim S ≤ 0.65; door S ≤ 0.70, V 0.12–0.80; no hue in 252–300 (violet is retired); ≤ 8 swatches per slot. Every roof/siding pair keeps a relative-luminance ratio ≥ 1.3:1 either way so the silhouette reads (navy siding `#2F3E5C` with a charcoal roof `#2B2F38` is 1.26 and is therefore not offered together). Every allowed combination passes the H.2 night readability bar (unlit p99 PASS ≥ 2.55, lift ≥ +5) and the 400px read before a swatch ships. **Proposed set, unchecked** (no neutral base, mask pass or `swatch_matrix.py` exists yet): roof {Terracotta `#C8553D` default, Slate `#4A5560`, Charcoal `#2B2F38`, Cedar `#8A5A3C`, Moss `#55684A`, Clay `#9E4B3B`}; siding {Cream `#F1E9DA` default, Chalk `#EDEDE6`, Sage `#9AA88F`, Dove `#B8BCC2`, Harbour `#5C7A96`, Navy `#2F3E5C`, Barn `#8E3B32`}; trim {Timber `#A98666` default (one shade darker than the framing pine, §H.2), White `#F3F1EA`, Charcoal `#2B2F38`}; door {Blueprint `#3A4A6E` default, Terracotta `#C8553D`, Sage `#5F7A5A`, Black `#1E2024`}.
+
+**Required spike before any customisation build [measured + judgment].** Multiplying a grey render to recolour it is the riskiest assumption here and is unproven. Before F1-a (data model) or any picker work, one spike must pass: (1) **a neutral render** of `half` and `complete`, lit and unlit, dusk and night, with the four slots at linear 0.5 grey; (2) **a mask pass**: a material-index AOV added to `craft3.py` and the two `craft_slots_<stage>` packs, edge-checked at 3x; (3) **a swatch check on 6 swatches** composited with the formula above in Python: siding Navy `#2F3E5C` and Barn `#8E3B32`, roof Charcoal `#2B2F38` and Slate `#4A5560`, door Black `#1E2024`, plus the default set as the control. Each is judged **beside the locked art** (`dir-craft-final3/frames`) by a fresh reviewer at full size and at 400px, and measured: unlit night p99 and lift (§H.2), 8-bit banding in the dark slots after the HEIC pass (night values already sit at V ≤ 0.28), and whether the baked grey bounce light reads wrong next to a coloured wall. The default-swatch composite must match the shipped still within mean ΔE 2. If the spike fails, §F.1 falls back to approach C for the one slot that failed, or that swatch is not offered.
+
+**Where it lives in the UI (not built):** the rental edit sheet gets one `LHRow.Value` "House" that opens a sheet with four swatch rows (44pt `LHChip` swatches, `tileFocus` on select) above a live 300pt preview using the same composite; saving updates the Today hero with `stageFade`. Data: `RentalProperty.houseLook: HouseLook { roof, siding, trim, door, style }`, swatch **names** not hex, default `.standard`, synced with the rental.
+
+**Styles later:** the current names are the implicit default style. A second style ships as `craft_<style>_<stage>`, `craft_<style>_<stage>-unlit`, `craft_<style>_build_<light|dark>.mov`, `craft_<style>_slots_<stage>`, with all five stages, both appearances, both window states and its own drop clip, or it does not ship. Styles are brand-authored (≤ 3), never user-generated.
+
+### F.2 The ambient layer: life around the house
+
+Earlier decisions kept: vehicles now, people later (a contractor van after a repair, the guest car leaving at a turnover); each scene plays once and lasts ≤ 3.6 s; no looping gimmicks; one moment at a time; never on top of the timber drop. **Changed:** "the sky follows the time of day" is retired, because the rig has one dusk and one night exposure and the appearance already follows the user's clock (H.2). Clouds are therefore static or absent, never a scene.
+
+**Z-layers inside the hero frame (back to front), [grep: one `ZStack` in `CraftHouseView`, layers in this order]:**
+
+| Z | Layer | Owner |
+|---|---|---|
+| Z0 | page gradient (`CraftPage`) | page |
+| Z1 | night backlight | hero |
+| Z2 | spill pool + contact shadow | hero |
+| **Z3** | **sky band**: ambient *behind* the lot (birds, balloons; clouds only if ever rendered into the still) | ambient |
+| Z4 | the house still, the drop clip, the F.1 composite | hero |
+| **Z5** | **street band**: ambient *in front of* the lot (van, guest car, people) | ambient |
+| Z6 | chip, page dots, toast | page |
+
+**Regions are relative to the hero frame, never a fixed 390pt frame [measured: bbox intersection with every keep-out = 0 on every captured frame, at every hero size].** The bands are fractions of the frame side, as placed on screen: sky band y 0.00–0.62, behind the house (occlusion is natural); street band, the lot's front-right corner, x 0.66–0.94, y 0.76–0.90; people on the porch path x 0.40–0.60, y 0.70–0.86. **Keep-outs are in points from the live layout, not fractions:** the number block (numeral bbox + "of N hours" + the pace sentence) grown by 8pt, the chip grown by 8pt, the page dots grown by 8pt, and the bottom 10% of the frame. A band's usable area is the band minus the keep-outs. At SE (frame 297) the 44pt overlap puts the numeral top at y 0.85 of the frame, inside the street band's x 0.66–0.69, so the usable street band there starts right of the numeral's box; Duo closed (287, numeral 64) is computed the same way. If a size leaves the usable street band narrower than 0.20 × side, street scenes do not play at that size. The `ambient_check.py` capture set includes SE and Duo closed.
+
+**Entry and exit:** vehicles enter and leave through the **right frame edge only**, along the lot's front edge, stopping at the kerb. Sky elements enter at the left or right edge inside the sky band and leave by the far edge or the top. Nothing appears or vanishes mid-frame; opacity changes only within 24pt of an edge and last ≤ 0.30 s. People enter from the vehicle or the right edge and leave the same way.
+
+**Scale, against the `craft_complete` house (footprint ≈ 0.60 of the frame width, height ≈ 0.50) [measured on the sprite's bbox]:** van 0.45–0.55 of the house width; car 0.40–0.48; a person 0.22–0.26 of the house height; a balloon cluster ≤ 0.15 of the frame height; birds 8–14pt each, 3–5 per flock; a cloud ≤ 0.35 of the frame width at ≤ 0.6 opacity dusk, ≤ 0.35 night.
+
+**Lighting match [measured]:** every ambient asset is rendered through the same camera and rig, in both exposures (dusk, night); its ground shadow direction is within ±10° of the house's; its mean luminance is within ±15% of the lit siding at the same stage and appearance; S ≤ 0.55. Vehicles carry no headlights, no beacons; people carry no faces at this scale.
+
+**Triggers, real events only [grep: trigger bound to the entry id; no timers]:**
+
+| Scene | Fires when | Then |
+|---|---|---|
+| `contractorVan` | Repairs or Maintenance logged or confirmed for the shown rental, while Today is visible | arrives (≤ 0.6), idles (≤ 2.4), engine-off settle (≤ 0.6); stays parked as a still until Today disappears. While it is parked it **occupies the street band**: no other street scene plays (a `guestCarLeaves` trigger is skipped, not queued) |
+| `guestCarLeaves` | Turnover or Cleaning logged | starts parked, pulls away right; nothing remains |
+| `visitorAtDoor` (people, later) | Showing or tenant meeting logged | walks to the door, pauses, leaves |
+| `balloons` | goal reached (750, or the chosen goal) | one release from the porch, exits the top; plays once per goal per year, after `houseStageAdvance` |
+| windows on | first log of the day | H.6; not a scene, always first |
+
+**Order and caps [grep + measured]:** drop → windows → scene, never overlapping, and no scene starts within 0.5 s of the clip's end. One scene at a time; **the street band holds one occupant at a time** (a parked prop counts); ≤ 1 per entry (keyed by id in `TodayScenePlayed`); ≤ 3 per Today appearance; ≤ 6 per day; ≥ 20 s between scenes; a batch confirm plays at most one (the newest matching entry). Skipped, never queued, under the §B.4 conditions (Reduce Motion, Low Power, inactive, a sheet or alert up, hero < 50% visible, VoiceOver, a milestone playing). Total ≤ 3.6 s: enter ≤ 0.6, hold ≤ 2.4, exit ≤ 0.6. Reduce Motion: the still prop fades in over 0.30 and stays; no path.
+
+**Rendering approach, compared:**
+
+| | Blender rig clips (HEVC alpha) | Stills from the rig + SwiftUI transform | SwiftUI-drawn shapes |
+|---|---|---|---|
+| Matches the lighting | yes, by construction | yes for the sprite, no self-motion (wheels, walk) | no |
+| Size per scene, both appearances | ≤ 2.4 MB (two sub-frame clips 1206 × ≤ 480px, ≤ 108 frames) | ≤ 0.2 MB | 0 |
+| Fit | vehicles, people | birds, balloons, clouds | nothing in this system |
+
+**Recommendation: rig clips for the street band, rig stills moved by SwiftUI (translation and opacity only, one `drawingGroup`) for the sky band, nothing hand-drawn.** Budget ≤ 8 MB for the whole ambient set in 2.x, ≤ 6 scenes. The camera and the lot's ground plane are frozen in `design/blueprint-house/scenes/camera.json` so every clip composites at the frame origin with no per-device offset; ambient clips never include the house, so F.1 recolours never invalidate them. Tests: bbox rules above, durations, no overlap, no scene inside the drop window, Instruments hitches = 0 over a 5-scene session.
 
 ---
 
@@ -334,7 +687,7 @@ The house is the brand: progress you can see, numbers you can stand behind. The 
 | **A calm friend who knows the rules** | One plain sentence per number; points to your CPA for the verdict; never raises its voice. "206 of 750. Your CPA decides what that means." | Not a lawyer (no disclaimer per line), not a cheerleader (no "Amazing!", no streak guilt), not an advisor. |
 | **A good contractor** | Says what was done, with the count. Shows the work: every hour has a date and a source. | Not a salesman: never "powerful", "seamless", "effortless"; never a number behind a metaphor. |
 | **Honest about uncertainty** | "Not sure" is a tag, not a failure. Nothing counts until you confirm it. Hatched parts are drawn, not built. | Never claims an unconfirmed hour; never "qualified", "audit-ready", "proof". |
-| **Quietly crafted** | Blueprint grid, mono eyebrows, the brass sign at 500h. Motion shows cause and effect, then stops. | Not playful for its own sake: no confetti outside the three milestones, no mascots, no load-in choreography. |
+| **Quietly crafted** | A small lit house on a page with a time of day; timber that drops once; windows that come on when you worked. Motion shows cause and effect, then stops. | Not playful for its own sake: no confetti outside the three milestones, no mascots, no idle motion, no load-in choreography, no kitsch on the lot (§H.2). |
 
 Test **[judgment]**: would the contractor who built the house say this in the doorway, in under ten words?
 
@@ -347,7 +700,7 @@ Test **[judgment]**: would the contractor who built the house say this in the do
 Motion is for three things: cause and effect (you pressed it, it moved), progress (the number counts, the house rises), confirmation (one beat that says saved, then stillness).
 
 Rules, all **[grep]** unless marked:
-- Springs are written `.spring(duration:bounce:)` (iOS 17+). A single animation ≤ 0.30s; a two-step sequence ≤ 0.40s total; the signature tokens (`stage`, `ringProgress`, `count`) ≤ 0.60s.
+- Springs are written `.spring(duration:bounce:)` (available on every OS we ship; minimum iOS 18). A single animation ≤ 0.30s; a two-step sequence ≤ 0.40s total; the signature tokens (`stage`, `ringProgress`, `count`) ≤ 0.60s (`rentalSlide` is 0.30 since v2 r2, inside the normal cap). **One exception (v2): `timberDrop` is a pre-rendered 2.0 s clip** (§H.6); it is not a SwiftUI animation, plays at most once per stage per rental, and is the only motion in the app longer than 0.60 s.
 - `bounce` > 0 only on a gesture release (swipe commit, drag settle). Taps get `bounce: 0`. The existing `checkPop` (`spring(response: 0.26, dampingFraction: 0.5)` on swipe commit in `TodaySwipeRow:373`) is the gesture case and maps to `pop`; a tap on the leading control never pops.
 - Every animation is bound to a state change (`.animation(_:value:)`, `withAnimation` in an action, or a gesture). `.onAppear { withAnimation` is allowed in exactly two places (`emptyStateEntrance`, the milestone's `houseStageAdvance`). `repeatForever` only in `scanningLine`. That is what "never decoration" means here.
 - Haptics: one per event; the `.sensoryFeedback(trigger:)` state is the same state the animation watches, so they fire on the same frame; no `asyncAfter` before a haptic.
@@ -369,6 +722,9 @@ Rules, all **[grep]** unless marked:
 | `count` | `.easeOut(0.60)` — hero digits only | new |
 | `ringProgress` | `.spring(duration: 0.60, bounce: 0)` — hero mask, ring | `spring(0.7, 0.82)` |
 | `stage` | `.spring(duration: 0.45, bounce: 0)` — milestone only | `logoEntrance` |
+| `windows` | `.easeInOut(0.40)` (linear under Reduce Motion) — the windows and the spill pool only | new (v2) |
+| `stageFade` | `.easeOut(0.25)` with scale 0.97 → 1 — a stage change without a clip | new (v2) |
+| `rentalSlide` | `.spring(duration: 0.30, bounce: 0)` — the diorama sliding on a rental switch (0.45 in r1 broke the 0.30 spring cap) | new (v2) |
 
 ### B.3 Named motions
 
@@ -381,8 +737,12 @@ Rules, all **[grep]** unless marked:
 | `segmentSlide` | `LHSegmented` change | thumb x translates (0.25), labels crossfade (0.15) | `.spring(duration: 0.25, bounce: 0)`, `quick` | `.selection` | crossfade only |
 | `tileFocus` | picker tile selected | ring stroke `border` → `action` crossfade (0.15); no scale | `quick` | `.selection` | same |
 | `countChange` | count capsule, row hours, stat values | `contentTransition(.numericText())` | `standard` | none | crossfade |
-| `heroCountUp` | hours value changes while Today is visible, never on appear | digits count from the previous value (0.60); house mask rises (0.60) | `count`, `ringProgress` | none | digits jump; mask crossfades 0.2 |
-| `houseStageAdvance` | hours cross 100 / 500 / 750 (signature) | linework → solid crossfade (0.22) while the new part scales 0.96 → 1 (0.45); brass sign fades in at 0.30; one confetti burst ≤ 0.60; total ≤ 0.60 | `reveal`, `stage` | `.success` once at the sign | solid part fades in 0.3; no scale, no confetti |
+| `heroCountUp` | hours value changes while Today is visible, never on appear | digits roll with `numericText` (0.40); if the stage changes, `stageFade` or `timberDrop` carries the art | `count` | none (the row's `.success` already fired) | digits jump; art crossfades 0.15 |
+| `timberDrop` (v2, replaces `buildStep`) | a log or confirm carries the shown rental from `frame70` to `framing` while Today is visible (signature; the brand's own move) | the 39-piece framing clip fades in over the still (0.20), plays 2.0 s, crossfades to `craft_framing` (0.30); the number rolls as the last timber lands. Bound to the stage `value:`; never on appear; one-shot. When the same log crosses a milestone, the drop is the first move of `houseStageAdvance` (§B.3), so it never plays twice and nothing plays on top of it. | clip + `stageFade` | `.impact(flexibility: .rigid, intensity: 0.8)` once, as the last timber lands; the row's `.success` is the only other haptic | no clip: the still crossfades 0.15; the knock is kept |
+| `windowsOn` (v2) | the first log or confirm of the day for the shown rental | windows held dark through any drop, then the lit still fades over the unlit one (0.40); the spill pool fades with it | `windows` | none | linear 0.40 |
+| `stageFade` (v2) | any other stage change | crossfade 0.25 with scale 0.97 → 1 | `stageFade` | none | crossfade 0.15 |
+| `rentalSlide` (v2) | the rental chip or a swipe on the house changes the rental | the diorama slides in from the trailing edge (leading when going back) with opacity; the number rolls | `rentalSlide`, `count` | `.selection` | 0.20 fade |
+| `houseStageAdvance` | hours cross 100 / 500 / 750 (signature) | the house's own moves first: the stage change (`timberDrop` when it ends at `framing`, else `stageFade`, §H.6), then `windowsOn` if it was the first log of the day; then **one milestone beat**: a single confetti burst in the house palette (timber `#A98666`, terracotta, cream; ≤ 24 pieces, no streamers, stars or glitter) falling once from above the frame behind the chip, ≤ 0.60, never over the number; the Fraunces display line ("500 hours.") fades in with it. No sign, no words in the scene, no linework (§H.2). | `stageFade` / clip, `windows`, `reveal` | `.success` once at the beat | no confetti; the still crossfades 0.15, the line fades in |
 | `toastIn` / `toastOut` | toast shown / dismissed | in: y +24 → 0 with opacity (0.22); out: opacity → 0, y 0 → +12 (0.15); swipe-down follows the finger then `settle` | `reveal` / `quick` | `.success` saves, `.error` failures, none info | opacity only |
 | `sheetUnfold` | section expands inside a sheet | height with content fade (0.30); ≤ 4 rows stagger at 30ms | `flow`, `reveal` | none | fade 0.2, no stagger |
 | `buttonStateChange` | Confirm → Logged, Save → Saved | label crossfade with 2pt blur (0.22) | `reveal` | carried by the event | crossfade, no blur |
@@ -391,6 +751,24 @@ Rules, all **[grep]** unless marked:
 | `emptyStateEntrance` | empty state replaces a list | glyph, headline, body fade and rise 8pt, 40ms apart (≤ 0.30 total) | `reveal` | none | fade only |
 | `scanningLine` | "Looking through your calendar" | line draws across; cycle ≥ 1.6s | linear | none | static dashed line |
 | `fieldFocus` | `LHField` focused | stroke `border` → `action` (0.15) | `quick` | none | same |
+
+### B.4 Ambient scenes on the hero (v2: designed in §F.2, not built)
+
+Brian's pick (2026-10-23): "your work shows up" scenes on the hero: a **van** parked by the house after Repairs; a **guest car** leaving after a Turnover or Cleaning; a **person at the door** after a Showing or a tenant meeting (later). **The time-of-day sky is retired in v2**: the rig has one dusk and one night exposure and the appearance follows the user's clock (§H.2). The rules below stand and §F.2 adds the z-layers, regions, scale, lighting match, triggers, caps and the rendering contract. Nothing in this section ships in the v2 revamp.
+
+| Rule | Spec | Kind |
+|---|---|---|
+| When | A scene plays only after a matching entry for the shown rental is confirmed or logged **while Today is visible**, after `timberDrop` and `windowsOn` have finished (≥ 0.5 s after the clip's end). Once per entry, keyed by the entry id (`TodayScenePlayed` set); never on appear, never on a timer, never on a loop. A batch confirm plays at most one scene (the newest matching entry). | grep (trigger bound to the entry id; no `repeatForever`, no `TimelineView(.animation)` in `House/`) |
+| Duration | Enter ≤ 0.60 (`stage`), hold ≤ 2.4s static, exit ≤ 0.60 (`reveal` reversed). Total ≤ 3.6s. After the exit the prop may remain as a still detail (the van stays parked) until Today disappears; no motion after the exit. | measured in code |
+| Where | §F.2's street and sky bands, minus the keep-outs, which are in points from the number block, the chip and the dots at every hero size (SE 297, Duo 287, 390, AX 295); the street band holds one occupant at a time **[measured: bbox intersection with every keep-out = 0]**. | measured |
+| Over the number | Never. If a scene would need to cross the number's band, it is not a scene we ship. | measured |
+| Pause / skip | Skipped (not queued) when: Reduce Motion is on; Low Power Mode is on; the app is not active; a sheet or alert is presented; the hero is less than 50% visible; VoiceOver is running (the scene is `accessibilityHidden`, decorative); a `houseStageAdvance` is playing (the milestone wins). A scene in flight pauses when the app resigns active and finishes its exit on return. | grep |
+| Reduced motion | The still prop fades in (0.30) and stays; no path motion, no figure movement. | grep |
+| Battery | Transforms and opacity only, inside one `drawingGroup`; no per-frame work when idle; the sky updates via an hourly timer, not a `TimelineView`; Instruments Animation Hitches = 0 and Energy Impact "Low" on an iPhone 12-class device over a 5-scene session; no scene on Low Power Mode. | measured (Instruments) |
+| Density | Scenes add nothing to the hero frame (H1/H3) and never move the chip, the dots or the number block. | measured |
+| Copy | Scenes carry no text. No speech bubbles, no labels. | grep |
+
+A scene is the house acknowledging the record, once. If a reviewer can describe it as "the app is doing something in the background", it has failed **[judgment]**.
 
 ---
 
@@ -481,20 +859,27 @@ Conflicts between this standard and `2.0-brand-system.md`, resolved in the same 
 | Topic | Brand doc said | Standard says | Resolution |
 |---|---|---|---|
 | Tool renders | "Category rows, Inbox, the category picker and the milestone share get the tool renders on a plaster tile at 36–48pt", and "unreadable under 28pt" | 36 in browse rows and picker lists, 56 in picker grids and sheet headers, never in decision rows, never under 32 | Standard wins; brand doc §4 updated to the same sentence. |
-| Eyebrow / drafting label colour | `draftingInk` on cards (`#2369B5` / `#60A8E6`), drafting cyan on blueprint | r1 said `textSecondary` | `draftingInk` everywhere on canvas and cards; cyan on blueprint; intent ink allowed when the header names a state. r1 corrected. |
+| Eyebrow / drafting label colour | `draftingInk` on cards (`#2369B5` / `#60A8E6`), drafting cyan on blueprint | ~~`draftingInk` everywhere on canvas and cards~~ (struck in v2 r2) | **v2:** no eyebrows on screens, cards or sheets; the drafting label survives only in the PDF and the Reports eyebrow, in `draftingInk`. See the "Drafting labels (v2)" row below. |
 | Fraunces | Tab titles 34/500, display 34, never under 28pt | r1 omitted it | §1.14 names it. |
+| **Canvas (v2)** | blueprint paper `#0B1230` in dark, `#EEF2FA` in light, the drafting grid on hero surfaces | hero screens take the dusk/night page gradient (§H.4); lists keep the plain canvas; the grid, tape measure, stamp, kraft and vellum are retired | Standard wins; brand doc §2 and §4 to be updated in the brand-doc pass (`v2-revamp-plan.md` P0). |
+| **Hero (v2)** | "the Today hero restyled" as a blueprint card with a cyan eyebrow and the half-drawn/half-built house | a rendered diorama on the page, no card, no linework, windows show state | Standard wins; the linework/mask metaphor survives only in mark B and the widgets' mono glyph. |
+| **Dark action vs page (v2)** | dark action `#8FD3FF` on `#0B1230` | unchanged; the night page is the same hex, so the ink-on-paper story holds | none |
+| **Drafting labels (v2)** | SF Mono 11 caps eyebrows on cards | only in the PDF and the Reports eyebrow | Standard wins (§1.15). |
+| **Hero numeral (v2)** | heroNumber 56/700 SF Rounded | Fraunces 84/600 on Today and the rental page | Standard wins (§1.14); brand doc §3 scale to add `display numeral 84/600`. |
 
 The project `CLAUDE.md` is stale against both documents: it still names radius 12 for cards, Lucide as the primary icon library, violet `#7C6FF7` as `primary`, and DM Serif/DM Sans. Proposed replacement for its "Icon System" and "Corner Radius" sections and the colour header (not applied; Brian's call):
 
 > **Colour.** Blueprint blue `#1E3FA6` is the brand and the light action colour; drafting cyan `#8FD3FF` is the dark action colour. Violet is retired. Tokens and contrast are in `docs/design/2.0-brand-system.md` §2; usage rules are in `docs/design/DESIGN-STANDARD.md`.
-> **Type.** SF Pro / SF Pro Rounded (numbers, tabular) / SF Mono (drafting labels, 11pt caps) / Fraunces (tab titles and display, ≥ 28pt only). DM Serif Display and DM Sans are retired.
+> **Type.** SF Pro / SF Pro Rounded (numbers, tabular) / SF Mono (drafting labels, 11pt caps, only in the PDF and the Reports eyebrow) / Fraunces (tab titles and display, ≥ 28pt only). DM Serif Display and DM Sans are retired.
 > **Corner radius.** Cards 20 (continuous), inner surfaces 12, stat tiles 16, tags 6, buttons and chips capsule. Nothing else.
 > **Icons.** SF Symbols for everything functional. Brand tool renders (`CategoryToolTile`) at 36 in browse rows and picker lists, 56 in picker grids and sheet headers, never in decision rows, never under 32. No Lucide (package removed), no emoji, no `Image("bp_tool_…")` outside the tile. Tab bar: SF Symbols (`LHIcon` custom shapes retired).
+> **Navigation.** Native `TabView` with system Liquid Glass, `.tabBarMinimizeBehavior(.onScrollDown)`, "Log time" as the native fifth tab (`plus`, `role: .search`, reverts the selection), system `.badge` on Inbox only, content scrolling under the bar with no reserved heights, system materials for every bar and sheet. No custom tab bars. Details: `DESIGN-STANDARD.md` §1.25 and §H.7.
+> **The house.** A rendered diorama on the page, never in a card: 44% of Today at default, 28% at AX; dusk in light, night in dark; windows lit when hours were logged today; the timber drop then the windows as the only signature motion; `behind`, `positiveOnPage`, `pageCardEdge`, the dusk page and the spill pool as tokens. Where it appears and at what size: `DESIGN-STANDARD.md` §H.5. Future customisation and ambient scenes: §F.
 > **Components and density.** `docs/design/DESIGN-STANDARD.md` is the bar; its §5 is the gate rubric.
 
 ---
 
-## Appendix: rollout order
+## Appendix: rollout order (v1; superseded by `docs/design/v2-revamp-plan.md`)
 
 1. `Components/`: `LHButton`, `LHTag`, `LHChip`, `LHSectionHeader`, `LHScreenTitle`, `LHRow.Action/.Browse/.Value`, `LHField`, `LHSegmented`, `LHStepper`, `LHEmptyState`, `LHFormat.hours`, the revised `AppAnimation`; `scripts/density_gate.py`, `scripts/copy_gate.py`. **Create `Sources/Resources/Localizable.xcstrings`** with the canonical keys from §C.5 and migrate the view literals into it (today only `Learn.xcstrings` exists; the copy gate greps both catalogs, and a string that is not in a catalog is a gate fail).
 2. Today (as a `List` root) + Inbox rows on `LHRow.Action`, one lane. Frames default/XXL/AX3, light/dark; density numbers in the hand-off; visual gate with the anchor question; Brian's eye on the first frame before polish rounds.
