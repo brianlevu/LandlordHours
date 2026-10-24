@@ -71,6 +71,8 @@ struct LandlordHoursApp: App {
             if let board = SurfaceBoardLaunch.current {
                 // Surfaces capture boards (-LHSurfaceBoard <name>); see SurfaceCaptureBoard.swift.
                 SurfaceCaptureRoot(launch: board)
+            } else if IPadTwoPaneLaunch.enabled, #available(iOS 26.0, *) {
+                IPadTwoPaneRoot()   // iPad two-pane prototype; see Views/Debug/DirCraft/IPadTwoPane.swift
             } else if let craft = CraftLaunch.current {
                 // Direction CRAFT, Crafted house (-LHDirection CRAFT); see Views/Debug/DirCraft.
                 DirCraftRoot(launch: craft)
