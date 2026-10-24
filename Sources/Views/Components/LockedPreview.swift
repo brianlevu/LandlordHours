@@ -280,7 +280,7 @@ struct LockStamp: View {
     var body: some View {
         let ink = AdaptiveColors(colorScheme: colorScheme).draftingInk
         Text(text)
-            .font(.system(size: 11, weight: .bold, design: .monospaced)).tracking(1.5)
+            .font(.caption.weight(.bold)).tracking(1.5)
             .foregroundStyle(ink)
             .padding(.horizontal, 10).padding(.vertical, 4)
             .background(RoundedRectangle(cornerRadius: 4).fill(AdaptiveColors(colorScheme: colorScheme).backgroundSecondary))

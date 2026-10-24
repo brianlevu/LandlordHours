@@ -1,24 +1,17 @@
 import SwiftUI
 
-// MARK: - Blueprint list language (2.0)
+// MARK: - Blueprint list language (2.0), now thin wrappers over the v2 LH* components
 //
-// The shared pieces Records, Reports and Settings are built from, so the three screens read as
-// one product with Today and the Inbox: Fraunces large titles, uppercase footnote section
-// labels, native inset-grouped lists on the brand canvas, SF Symbols in secondary ink, SF Pro
-// Rounded tabular numbers. docs/design/2.0-brand-system.md + 2.0-hifi-reference-spec.md §g–§j.
+// Package 0b: every type here keeps its old signature so callers compile, and renders through
+// the LH* component that replaces it (docs/design/v2-revamp-plan.md §4). Each lane removes its own
+// uses; the whole file is deleted in cleanup. New code uses LH* directly.
 
-/// Tab-root title in Fraunces, the same face and size as "Inbox" and "Today".
+/// Tab-root title. Wraps `LHScreenTitle` (collection style).
 struct BPScreenTitle: View {
     let text: String
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        Text(text)
-            .lhDisplayFont(.largeTitle)
-            .foregroundStyle(AdaptiveColors(colorScheme: colorScheme).textPrimary)
-            .lineLimit(2)
-            .minimumScaleFactor(0.8)
-            .accessibilityAddTraits(.isHeader)
+        LHScreenTitle(text)
     }
 }
 
@@ -59,7 +52,7 @@ enum AppVersionInfo {
     }
 }
 
-/// Uppercase footnote section label with an optional trailing value ("OCTOBER 2026 … 41h").
+/// Section label with an optional trailing value ("October 2026 ... 41h"). Wraps `LHSectionHeader`.
 struct BPSectionHeader: View {
     let title: String
     var trailing: String? = nil
@@ -71,15 +64,9 @@ struct BPSectionHeader: View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
         let layout = dynamicTypeSize.isAccessibilitySize
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
-            : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
         layout {
-            Text(title)
-                .font(.footnote.weight(.semibold))
-                .textCase(.uppercase)
-                .tracking(0.3)
-                .foregroundStyle(colors.textSecondary)
-                .accessibilityAddTraits(.isHeader)
-            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
+            LHSectionHeader(title)
             if let trailing {
                 Text(trailing)
                     .font(.system(.footnote, design: .rounded, weight: .semibold))
@@ -91,9 +78,9 @@ struct BPSectionHeader: View {
     }
 }
 
-/// One settings row: monochrome SF Symbol, 17pt label, optional subtitle and trailing value.
-/// The chevron is drawn by the List for NavigationLinks; buttons that open something pass
-/// `showsChevron: true`.
+/// One settings row. Wraps `LHRow.Browse` (36pt glyph tile, title, meta, value, chevron).
+/// A destructive row or a coloured value has no LH equivalent yet, so those two draw the legacy
+/// face until their lane moves them to `LHRow.Browse` plus a tag.
 struct SettingRow: View {
     let symbol: String
     let title: String
@@ -106,50 +93,51 @@ struct SettingRow: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        if isDestructive || valueColor != nil {
+            legacyFace
+        } else {
+            LHRow.Browse(title: title, meta: subtitle, value: value, systemImage: symbol, tint: .neutral,
+                         showsChevron: showsChevron)
+        }
+    }
+
+    private var legacyFace: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
-        HStack(alignment: subtitle == nil ? .center : .top, spacing: 14) {
-            Image(systemName: symbol)
-                .font(.system(size: 19, weight: .regular))
-                .symbolRenderingMode(.monochrome)
-                .foregroundStyle(isDestructive ? colors.destructive : colors.textSecondary)
-                .frame(width: 28, alignment: .center)
-                .padding(.top, subtitle == nil ? 0 : 1)
-                .accessibilityHidden(true)
+        return HStack(alignment: subtitle == nil ? .center : .top, spacing: 12) {
+            LHRowGlyph(systemImage: symbol, tint: isDestructive ? .caution : .neutral)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.body)
                     .foregroundStyle(isDestructive ? colors.destructive : colors.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
                 if let subtitle {
-                    Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(colors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(subtitle).font(.subheadline).foregroundStyle(colors.textSecondary)
                 }
             }
             Spacer(minLength: 8)
             if let value {
                 Text(value)
-                    .font(.body)
+                    .font(.subheadline)
+                    .fontDesign(.rounded)
                     .monospacedDigit()
                     .foregroundStyle(valueColor ?? colors.textSecondary)
                     .multilineTextAlignment(.trailing)
             }
             if showsChevron {
                 Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
+                    .font(.footnote)
                     .foregroundStyle(colors.textTertiary)
                     .accessibilityHidden(true)
             }
         }
-        .padding(.vertical, 6)
-        .frame(minHeight: 44)
+        .padding(LHRow.insets)
+        .frame(minHeight: LHMetrics.rowMinHeight)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
 }
 
-/// Toggle row with a subtitle (Wispr Flow's privacy toggles), drawn with the visible-off switch.
+/// Toggle row. Wraps `LHRow.Toggle`; the leading symbol and badge are dropped (v2 toggle rows
+/// carry a label and one subtitle only), the badge folds into the subtitle.
 struct SettingToggleRow: View {
     let symbol: String
     let title: String
@@ -157,48 +145,13 @@ struct SettingToggleRow: View {
     var badge: String? = nil
     @Binding var isOn: Bool
 
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.isEnabled) private var isEnabled
-
     var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        Toggle(isOn: $isOn) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: symbol)
-                    .font(.system(size: 19, weight: .regular))
-                    .foregroundStyle(isEnabled ? colors.textSecondary : colors.textTertiary)
-                    .frame(width: 28)
-                    .padding(.top, 1)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(title)
-                            .font(.body)
-                            .foregroundStyle(isEnabled ? colors.textPrimary : colors.textSecondary)
-                        if let badge {
-                            Text(badge)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(colors.textSecondary)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 2)
-                                .overlay(Capsule().strokeBorder(colors.border, lineWidth: 1))
-                        }
-                    }
-                    if let subtitle {
-                        Text(subtitle)
-                            .font(.subheadline)
-                            .foregroundStyle(isEnabled ? colors.textSecondary : colors.textTertiary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
-        }
-        .toggleStyle(InboxSwitchStyle())
-        .padding(.vertical, 6)
+        LHRow.Toggle(badge.map { "\(title) (\($0))" } ?? title, subtitle: subtitle, isOn: $isOn)
     }
 }
 
-/// Filter chip (Mercury): 32pt capsule; the selected one fills with the action colour.
+/// Filter chip face (a label; callers supply the Button or Menu). Matches `LHChip`: 34pt capsule,
+/// selected fills with the action colour.
 struct BPFilterChip: View {
     let title: String
     var isActive: Bool = false
@@ -209,7 +162,7 @@ struct BPFilterChip: View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
         HStack(spacing: 4) {
             Text(title)
-                .font(.subheadline.weight(isActive ? .semibold : .regular))
+                .font(.subheadline.weight(.medium))
                 .lineLimit(1)
             if showsChevron {
                 Image(systemName: "chevron.down")
@@ -218,22 +171,21 @@ struct BPFilterChip: View {
             }
         }
         .foregroundStyle(isActive ? colors.onAction : colors.textPrimary)
-        .padding(.horizontal, 14)
-        .frame(minHeight: 34)
-        .background(Capsule().fill(isActive ? colors.action : colors.backgroundSecondary))
-        .overlay(Capsule().strokeBorder(isActive ? Color.clear : colors.border, lineWidth: 1))
+        .padding(.horizontal, 12)
+        .frame(minHeight: LHChip.height)
+        .background(isActive ? colors.action : colors.backgroundTertiary, in: Capsule())
+        .overlay(Capsule().strokeBorder(isActive ? Color.clear : colors.border, lineWidth: 0.5))
         .contentShape(Capsule())
     }
 }
 
-/// Branded segmented control: the same capsules as Settings' Appearance pills (selected fills
-/// with the action colour). Text scales with Dynamic Type; when the options no longer fit side
-/// by side (accessibility sizes) they stack vertically instead of clipping.
+/// Segmented control. Two or three options wrap `LHSegmented`; four or more keep the stacked
+/// capsule fallback (the standard sends those to `LHRow.Value`).
 struct BPSegmentedPicker<Option: Hashable>: View {
     let options: [Option]
     @Binding var selection: Option
     let title: (Option) -> String
-    /// `.horizontalOnly` never stacks, so a parent `ViewThatFits` can try it side by side first.
+    /// Kept for source compatibility; `LHSegmented` never stacks.
     var layout: Layout = .automatic
 
     enum Layout { case automatic, horizontalOnly }
@@ -244,6 +196,14 @@ struct BPSegmentedPicker<Option: Hashable>: View {
     @ScaledMetric(relativeTo: .subheadline) private var minHeight: CGFloat = 40
 
     var body: some View {
+        if (2...3).contains(options.count) {
+            LHSegmented(options.map { LHSegmented<Option>.Option($0, title($0)) }, selection: $selection)
+        } else {
+            fallback
+        }
+    }
+
+    private var fallback: some View {
         Group {
             if layout == .horizontalOnly {
                 HStack(spacing: 8) { segments }
@@ -291,7 +251,8 @@ struct BPSegmentedPicker<Option: Hashable>: View {
     }
 }
 
-/// Small bordered capsule action ("Export", "Share") for title rows.
+/// Small capsule action label ("Export", "Share") for title rows. Draws the `LHButton.secondary`
+/// face (callers still wrap it in their own Button until each lane moves to `LHButton.secondary`).
 struct BPCapsuleButtonLabel: View {
     let title: String
     var symbol: String? = nil
@@ -309,47 +270,24 @@ struct BPCapsuleButtonLabel: View {
                 .font(.subheadline.weight(.semibold))
         }
         .foregroundStyle(colors.action)
-        .padding(.horizontal, 16)
-        .frame(minHeight: 44)
-        .background(Capsule().fill(colors.backgroundSecondary))
-        .overlay(Capsule().strokeBorder(colors.border, lineWidth: 1))
+        .padding(.horizontal, LHButton.Metrics.secondaryPadding)
+        .padding(.vertical, 10)
+        .frame(minHeight: LHButton.Metrics.controlHeight)
+        .background(colors.actionSurface, in: Capsule())
         .contentShape(Capsule())
     }
 }
 
-/// Centered empty state: 56pt circle + symbol, title, one line (spec §k).
+/// Centered empty state. Wraps `LHEmptyState` (no action).
 struct BPEmptyState: View {
     let symbol: String
     let title: String
     let message: String
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        VStack(spacing: 10) {
-            Circle()
-                .fill(colors.backgroundSecondary)
-                .frame(width: 56, height: 56)
-                .overlay(
-                    Image(systemName: symbol)
-                        .font(.system(size: 22, weight: .regular))
-                        .foregroundStyle(colors.textSecondary)
-                )
-                .overlay(Circle().strokeBorder(colors.border, lineWidth: 1))
-                .accessibilityHidden(true)
-            Text(title)
-                .font(.headline)
-                .foregroundStyle(colors.textPrimary)
-                .multilineTextAlignment(.center)
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(colors.textSecondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 24)
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .combine)
+        LHEmptyState(systemImage: symbol, tone: .action, headline: title, message: message)
+            .padding(.horizontal, 24)
+            .frame(maxWidth: .infinity)
     }
 }
 
@@ -475,21 +413,17 @@ struct BPLoadingPlaceholder: View {
 
 // MARK: - Hours formatting
 
+/// Forwards to `LHFormat`. The one difference kept for the existing tests: zero reads "0h".
 enum BPHours {
-    /// "2h", "1h 30m", "45m", "0h". Whole minutes, never rounded up.
+    /// "2h", "1h 30m", "45m", "0h".
     static func short(_ hours: Double) -> String {
-        let totalMinutes = Int((max(hours, 0) * 60).rounded())
-        let h = totalMinutes / 60
-        let m = totalMinutes % 60
-        if h == 0 && m == 0 { return "0h" }
-        if h == 0 { return "\(m)m" }
-        if m == 0 { return "\(h)h" }
-        return "\(h)h \(m)m"
+        guard let minutes = LHFormat.minutes(hours), minutes > 0 else { return "0h" }
+        return LHFormat.hours(hours)
     }
 
-    /// Spoken: "2 hours 30 minutes".
+    /// Spoken: "2 hours 30 minutes" (no comma; the existing tests and Reports labels read this way).
     static func spoken(_ hours: Double) -> String {
-        let totalMinutes = Int((max(hours, 0) * 60).rounded())
+        guard let totalMinutes = LHFormat.minutes(hours) else { return "0 hours" }
         let h = totalMinutes / 60
         let m = totalMinutes % 60
         var parts: [String] = []

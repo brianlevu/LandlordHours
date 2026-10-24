@@ -41,13 +41,8 @@ struct ProfileRestoreSheet: View {
                     Spacer(minLength: 8)
                     Button { dismiss() } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(colors.textPrimary)
-                            .frame(width: 44, height: 44)
-                            .background(Circle().fill(colors.backgroundSecondary))
-                            .overlay(Circle().strokeBorder(colors.border, lineWidth: 0.5))
                     }
-                    .buttonStyle(.lhPressable)
+                    .buttonStyle(LHButton.icon)
                     .accessibilityLabel(Text("Close"))
                     .accessibilityIdentifier("restore.close")
                 }
@@ -335,7 +330,7 @@ struct ProfileSwitchConfirmSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             Button("Switch", action: onConfirm)
-                .buttonStyle(InboxPrimaryButtonStyle())
+                .buttonStyle(LHButton.primary)
                 .padding(.top, 6)
                 .accessibilityIdentifier("switchConfirm.switch")
 
