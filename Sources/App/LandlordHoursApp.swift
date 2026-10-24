@@ -1,5 +1,4 @@
 import SwiftUI
-import LucideIcons
 
 // MARK: - Design System for LandlordHours
 // 2.0 Blueprint brand system. Source of truth: docs/design/2.0-brand-system.md + design/brand/
@@ -325,8 +324,22 @@ struct AdaptiveColors {
     /// Positive text on the Today page.
     var positiveOnPage: Color { pick(H.positiveOnPage, H.darkPositive) }
     /// Edge of a grouped container on the Today page.
-    var pageCardEdge: Color { pick(H.pageCardEdge, H.darkBorder) }
+    var pageCardEdge: Color { pick(H.pageCardEdge, H.darkPageCardEdge) }
     var spillPool: Color { AppColors.spill.opacity(isDark ? H.darkSpillOpacity : H.spillOpacity) }
+
+    // v2 hero (standard §H.4, §H.8): the night backlight, the contact shadow, the rental chip, the dots
+    /// Cool light behind the lot at night (`backlight`, drawn 0.50 → 0). Light mode draws none.
+    var backlight: Color { Color(hex: H.darkBacklight) }
+    /// The contact shadow under the lot: black 0.30 at dusk, 0.55 at night.
+    var contactShadow: Color { Color.black.opacity(isDark ? 0.55 : 0.30) }
+    /// The rental `Menu` chip's fill on the page: white 0.65 at dusk, white 0.08 at night.
+    var heroChipFill: Color { Color.white.opacity(isDark ? 0.08 : 0.65) }
+    /// The chip's hairline: #C9BFA8 at 0.8 at dusk, white 0.14 at night.
+    var heroChipHairline: Color { isDark ? Color.white.opacity(0.14) : Color(hex: H.heroChipHairline).opacity(0.8) }
+    /// The idle page dot (draw at 0.5); the current dot is `textPrimary`.
+    var heroDot: Color { pick(H.heroDot, H.darkHeroDot) }
+    /// §1.27: the tab tint in regular width (the sidebar's selected row is white on it).
+    var sidebarTint: Color { pick(AppColors.actionLightHex, H.darkSidebarTint) }
 
     // Brand (new in 2.0)
     var brand: Color { AppColors.brand }
@@ -643,6 +656,46 @@ enum LHFont {
         return min(scaled, heroNumberMaxSize)
     }
 
+    /// The hero numeral (v2, §1.14): Fraunces 84/600, opsz 144, tabular figures. Callers set the
+    /// size (84 default, 64 under 700pt of window height, 54 at accessibility sizes) and the
+    /// tracking (−2). It is the one numeral set in Fraunces.
+    static func heroNumeral(size: CGFloat) -> Font {
+        Font(frauncesUIFont(size: size, weight: 600, opticalSize: 144, tabular: true))
+    }
+
+    /// Screen titles at tab roots and collection roots (§1.14): Fraunces 34/500, scaled with
+    /// `.largeTitle`. Display lines (Welcome, the milestone) use the same face.
+    static func screenTitle(size: CGFloat = 34) -> Font {
+        guard isFrauncesAvailable else { return Font.system(.largeTitle, design: .serif, weight: .medium) }
+        return Font.custom(frauncesFamily, size: max(size, frauncesMinimumSize), relativeTo: .largeTitle).weight(.medium)
+    }
+
+    /// Fraunces at a fixed size with its axes set; falls back to the system serif.
+    static func frauncesUIFont(size: CGFloat, weight: CGFloat, opticalSize: CGFloat, softness: CGFloat = 50,
+                               tabular: Bool = false) -> UIFont {
+        let size = max(size, frauncesMinimumSize)
+        let variations: [NSNumber: CGFloat] = [
+            NSNumber(value: axisTag("wght")): weight,
+            NSNumber(value: axisTag("opsz")): opticalSize,
+            NSNumber(value: axisTag("SOFT")): softness,
+            NSNumber(value: axisTag("WONK")): 0,
+        ]
+        var attributes: [UIFontDescriptor.AttributeName: Any] = [
+            .family: frauncesFamily,
+            UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String): variations,
+        ]
+        if tabular {
+            attributes[.featureSettings] = [[UIFontDescriptor.FeatureKey.type: kNumberSpacingType,
+                                             UIFontDescriptor.FeatureKey.selector: kMonospacedNumbersSelector]]
+        }
+        let font = UIFont(descriptor: UIFontDescriptor(fontAttributes: attributes), size: size)
+        guard font.familyName == frauncesFamily else {
+            let base = UIFont.systemFont(ofSize: size, weight: .semibold)
+            return base.fontDescriptor.withDesign(.serif).map { UIFont(descriptor: $0, size: size) } ?? base
+        }
+        return font
+    }
+
     static func axisTag(_ tag: String) -> UInt32 {
         tag.unicodeScalars.reduce(UInt32(0)) { ($0 << 8) | UInt32($1.value & 0xFF) }
     }
@@ -711,8 +764,10 @@ enum AppSpacing {
     static let xl: CGFloat = 24
     static let xxl: CGFloat = 32
     static let xxxl: CGFloat = 48
-    static let tabContentBottomInset: CGFloat = 176
-    static let floatingTabBarReservedHeight: CGFloat = 132
+    /// v2 (§1.25): the native tab bar sets the bottom safe area, so tab roots reserve no bottom
+    /// height of their own. This is the ordinary end-of-page gap; it was 176 under the 1.x custom bar.
+    /// Delete with its last caller.
+    static let tabContentBottomInset: CGFloat = 24
 }
 
 // MARK: - Corner Radius
@@ -725,19 +780,45 @@ enum AppCornerRadius {
 }
 
 // MARK: - Animation
+// Standard §B.2 (v2). Springs are `.spring(duration:bounce:)`; a single animation ≤ 0.30 s, the
+// signature tokens (`count`, `ringProgress`, `stage`) ≤ 0.60 s. `bounce` > 0 only on a gesture
+// release (`settle`, `pop`). The pre-rendered `timberDrop` clip is not a SwiftUI animation
+// (`CraftMotion`). Every event that moves has a Reduce Motion branch (`AppAnimation.reduced`).
 enum AppAnimation {
-    static let quick = SwiftUI.Animation.easeInOut(duration: 0.15)
-    static let standard = SwiftUI.Animation.easeInOut(duration: 0.24)
-    static let smooth = SwiftUI.Animation.spring(response: 0.28, dampingFraction: 0.9)
     static let feedback = SwiftUI.Animation.easeOut(duration: 0.12)
+    static let quick = SwiftUI.Animation.easeInOut(duration: 0.15)
     static let reveal = SwiftUI.Animation.easeOut(duration: 0.22)
-    static let flow = SwiftUI.Animation.spring(response: 0.34, dampingFraction: 0.88)
-    static let bouncy = SwiftUI.Animation.spring(response: 0.32, dampingFraction: 0.86)
+    static let standard = SwiftUI.Animation.easeInOut(duration: 0.24)
+    static let smooth = SwiftUI.Animation.spring(duration: 0.28, bounce: 0)
+    static let flow = SwiftUI.Animation.spring(duration: 0.30, bounce: 0)
+    /// Row height → 0 (`rowConfirm`, `rowDismiss`).
+    static let collapse = SwiftUI.Animation.spring(duration: 0.25, bounce: 0)
+    /// Gesture release only (drag settle, toast swipe).
+    static let settle = SwiftUI.Animation.spring(duration: 0.30, bounce: 0.15)
+    /// Gesture commit only (swipe confirm). A tap never pops.
+    static let pop = SwiftUI.Animation.spring(duration: 0.26, bounce: 0.30)
+    /// Hero digits only.
+    static let count = SwiftUI.Animation.easeOut(duration: 0.60)
+    /// Ring and hero mask.
+    static let ringProgress = SwiftUI.Animation.spring(duration: 0.60, bounce: 0)
+    /// Milestone only.
+    static let stage = SwiftUI.Animation.spring(duration: 0.45, bounce: 0)
+    /// The windows and the spill pool (`windowsOn`); linear under Reduce Motion (`windowsReduced`).
+    static let windows = SwiftUI.Animation.easeInOut(duration: 0.40)
+    static let windowsReduced = SwiftUI.Animation.linear(duration: 0.40)
+    /// A stage change without a clip: 0.25 crossfade with a 0.97 → 1 scale settle.
+    static let stageFade = SwiftUI.Animation.easeOut(duration: 0.25)
+    /// The diorama sliding on a rental switch.
+    static let rentalSlide = SwiftUI.Animation.spring(duration: 0.30, bounce: 0)
+    /// `segmentSlide`: the segmented thumb.
+    static let segmentSlide = SwiftUI.Animation.spring(duration: 0.25, bounce: 0)
+    /// Reduce Motion: opacity and colour only, as a short crossfade.
+    static let reduced = SwiftUI.Animation.easeOut(duration: 0.15)
 
-    // Specific presets from design system
-    static let ringProgress = SwiftUI.Animation.spring(response: 0.7, dampingFraction: 0.82)
-    static let pillPop = SwiftUI.Animation.spring(response: 0.26, dampingFraction: 0.82)
-    static let logoEntrance = SwiftUI.Animation.spring(response: 0.45, dampingFraction: 0.86)
+    // 1.x names kept so existing callers compile; they resolve to the v2 tokens.
+    static let bouncy = settle
+    static let pillPop = pop
+    static let logoEntrance = stage
 }
 
 // MARK: - Hours Formatting
@@ -1029,19 +1110,10 @@ struct JellyBadge: View {
                         )
                 )
 
-            // Icon — try Lucide first, fall back to SF Symbol
-            if let uiImage = UIImage(lucideId: systemName) {
-                Image(uiImage: uiImage)
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: size * 0.45, height: size * 0.45)
-                    .foregroundStyle(AppColors.onAction)
-            } else {
-                Image(systemName: systemName)
-                    .font(.system(size: size * 0.42, weight: .medium))
-                    .foregroundStyle(AppColors.onAction)
-            }
+            // SF Symbols only (standard §1.17: Lucide retired).
+            Image(systemName: systemName)
+                .font(.system(size: size * 0.42, weight: .medium))
+                .foregroundStyle(AppColors.onAction)
         }
         .shadow(color: color.opacity(0.35), radius: size * 0.25, y: size * 0.1)
     }

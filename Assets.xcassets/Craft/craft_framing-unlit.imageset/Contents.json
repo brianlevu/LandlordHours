@@ -1,7 +1,7 @@
 {
   "images": [
     {
-      "filename": "craft_framing-unlit_light.png",
+      "filename": "craft_framing-unlit_light.heic",
       "idiom": "universal",
       "scale": "3x"
     },
@@ -12,7 +12,7 @@
           "value": "dark"
         }
       ],
-      "filename": "craft_framing-unlit_dark.png",
+      "filename": "craft_framing-unlit_dark.heic",
       "idiom": "universal",
       "scale": "3x"
     }

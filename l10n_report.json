@@ -1,0 +1,110 @@
+[
+ {
+  "file": "Sources/App/LandlordHoursAppIntents.swift",
+  "line": 310,
+  "kind": "concatenation",
+  "text": "(Text(Image(systemName: status.symbol)) + Text(\" \" + status.text))"
+ },
+ {
+  "file": "Sources/Views/Components/LockedPreview.swift",
+  "line": 159,
+  "kind": "string-var-in-ui",
+  "text": "var title = \"Unlock Pro\""
+ },
+ {
+  "file": "Sources/Views/DashboardView.swift",
+  "line": 1028,
+  "kind": "text-from-String",
+  "text": "Text(String(format: \"%.1fh\", entry.hours))"
+ },
+ {
+  "file": "Sources/Views/Debug/SurfaceCaptureBoard.swift",
+  "line": 141,
+  "kind": "string-var-in-ui",
+  "text": "var text = \"Mock of system UI\""
+ },
+ {
+  "file": "Sources/Views/HistoryView.swift",
+  "line": 205,
+  "kind": "text-from-String",
+  "text": "Text(String(year)).tag(year)"
+ },
+ {
+  "file": "Sources/Views/Inbox/SuggestionConfirmSheet.swift",
+  "line": 270,
+  "kind": "text-from-String",
+  "text": "Text(String(format: \"%02d\", minutes % 60))"
+ },
+ {
+  "file": "Sources/Views/LogTime/LogTimeSheet.swift",
+  "line": 1045,
+  "kind": "text-from-String",
+  "text": "Text(String(format: \"%02d\", minutes % 60))"
+ },
+ {
+  "file": "Sources/Views/Onboarding/OnboardingView.swift",
+  "line": 645,
+  "kind": "text-from-String",
+  "text": "Text(String(localized: \"\\(flow.displayName) is staked\")).onbDrafting(HouseTokens.drafting)"
+ },
+ {
+  "file": "Sources/Views/PropertiesView.swift",
+  "line": 696,
+  "kind": "string-var-in-ui",
+  "text": "let meta = \"\\(entry.date.formatted(.dateTime.month(.abbreviated).day())) \u00b7 \\(Self.sourceText(entry))\""
+ },
+ {
+  "file": "Sources/Views/ReportsView.swift",
+  "line": 205,
+  "kind": "text-from-String",
+  "text": "Text(String(year)).tag(year)"
+ },
+ {
+  "file": "Sources/Views/ReportsView.swift",
+  "line": 364,
+  "kind": "text-from-String",
+  "text": "Text(String(label.prefix(1)))"
+ },
+ {
+  "file": "Sources/Views/SettingsView.swift",
+  "line": 1004,
+  "kind": "text-from-String",
+  "text": "Text(String(year)).tag(year)"
+ },
+ {
+  "file": "Sources/Views/TimeEntryDetailView.swift",
+  "line": 429,
+  "kind": "text-from-String",
+  "text": "Text(String(format: \"%02d\", total % 60))"
+ },
+ {
+  "file": "Sources/App/Info.plist",
+  "line": 12,
+  "kind": "plist-literal",
+  "text": "CFBundleDisplayName = LandlordHours"
+ },
+ {
+  "file": "Sources/App/Info.plist",
+  "line": 43,
+  "kind": "plist-literal",
+  "text": "NSCalendarsFullAccessUsageDescription = LandlordHours reads event titles on your iPhone to suggest rental work, like a p"
+ },
+ {
+  "file": "Sources/App/Info.plist",
+  "line": 45,
+  "kind": "plist-literal",
+  "text": "NSMicrophoneUsageDescription = LandlordHours listens only while you\u2019re dictating a note, so you can say what yo"
+ },
+ {
+  "file": "Sources/App/Info.plist",
+  "line": 47,
+  "kind": "plist-literal",
+  "text": "NSSpeechRecognitionUsageDescription = LandlordHours turns what you say into a written note. You check it and confirm b"
+ },
+ {
+  "file": "Sources/Widget/Info.plist",
+  "line": 7,
+  "kind": "plist-literal",
+  "text": "CFBundleDisplayName = LandlordHours"
+ }
+]

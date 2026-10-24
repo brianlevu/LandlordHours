@@ -2,7 +2,9 @@ name: LandlordHours
 options:
   bundleIdPrefix: com.openclaw
   deploymentTarget:
-    iOS: "17.0"
+    # Minimum OS for 2.1: iOS 18.0 (DESIGN-STANDARD §1.25, Brian 2026-10-23). Liquid Glass APIs sit
+    # behind #available(iOS 26, *) with the system-material fallback on 18–25.
+    iOS: "18.0"
   xcodeVersion: "15.0"
 
 settings:
@@ -13,6 +15,9 @@ settings:
     CURRENT_PROJECT_VERSION: "2026102101"
 
 packages:
+  # Lucide is retired (standard §1.17). Package A removed its own uses; the package stays linked
+  # until the last callers go (AppDesignSystem, LHIcons bridge: package 0b/cleanup; CelebrationOverlay
+  # and the HomeProto mocks: package C; EngagementLab and ExportJob: package H). Drop it then.
   LucideIcons:
     url: https://github.com/JakubMazur/lucide-icons-swift.git
     from: 0.575.0

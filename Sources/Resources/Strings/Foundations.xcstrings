@@ -1,0 +1,270 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "field.clear": {
+      "comment": "Clears a text field",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear text"
+          }
+        }
+      }
+    },
+    "format.hours": {
+      "comment": "Whole hours, e.g. 2h",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lldh"
+          }
+        }
+      }
+    },
+    "format.hoursMinutes": {
+      "comment": "Hours and minutes, e.g. 1h 30m",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lldh %2$lldm"
+          }
+        }
+      }
+    },
+    "format.minutes": {
+      "comment": "Minutes only, e.g. 30m",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lldm"
+          }
+        }
+      }
+    },
+    "format.unknown.spoken": {
+      "comment": "VoiceOver: hours not known yet",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "unknown"
+          }
+        }
+      }
+    },
+    "format.zero.spoken": {
+      "comment": "VoiceOver: zero hours",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "0 minutes"
+          }
+        }
+      }
+    },
+    "hero.label": {
+      "comment": "VoiceOver label for the house: its stage, then whether the lights are on",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "House, %1$@, %2$@"
+          }
+        }
+      }
+    },
+    "hero.lightsOff": {
+      "comment": "VoiceOver, the house: windows dark, nothing logged today",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "lights off"
+          }
+        }
+      }
+    },
+    "hero.lightsOn": {
+      "comment": "VoiceOver, the house: windows lit because hours were logged today",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "lights on"
+          }
+        }
+      }
+    },
+    "hero.swipeHint": {
+      "comment": "VoiceOver hint on the house when there is more than one rental",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Swipe up or down to change the rental"
+          }
+        }
+      }
+    },
+    "section.titleCount": {
+      "comment": "Section header with a count after a middle dot, e.g. To confirm · 7",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · %2$lld"
+          }
+        }
+      }
+    },
+    "sheet.close": {
+      "comment": "Closes a sheet",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        }
+      }
+    },
+    "shell.tab.inbox": {
+      "comment": "Tab bar",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inbox"
+          }
+        }
+      }
+    },
+    "shell.tab.logTime": {
+      "comment": "Tab bar: the fifth item, opens the Log time sheet",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log time"
+          }
+        }
+      }
+    },
+    "shell.tab.records": {
+      "comment": "Tab bar",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Records"
+          }
+        }
+      }
+    },
+    "shell.tab.rentals": {
+      "comment": "Tab bar",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rentals"
+          }
+        }
+      }
+    },
+    "shell.tab.today": {
+      "comment": "Tab bar",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today"
+          }
+        }
+      }
+    },
+    "shell.toast.help": {
+      "comment": "Toast action after records failed to load",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Help"
+          }
+        }
+      }
+    },
+    "shell.toast.retry": {
+      "comment": "Toast action after a save failed",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry"
+          }
+        }
+      }
+    },
+    "stepper.less": {
+      "comment": "Stepper: 15 minutes less",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Less"
+          }
+        }
+      }
+    },
+    "stepper.more": {
+      "comment": "Stepper: 15 minutes more",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More"
+          }
+        }
+      }
+    },
+    "title.back": {
+      "comment": "Back button on a pushed collection screen",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

@@ -1,0 +1,90 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "common.cpaFootnote": {
+      "comment": "Canonical footnote (standard 1.22, C.5)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your CPA decides what the numbers mean."
+          }
+        }
+      }
+    },
+    "common.nothingCountsUntilConfirm": {
+      "comment": "Canonical line (standard C.5)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing counts until you confirm it."
+          }
+        }
+      }
+    },
+    "pdf.title": {
+      "comment": "Canonical: the PDF title, the CSV file name and the paywall preview; the number is the tax year",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rental hours record %lld"
+          }
+        }
+      }
+    },
+    "row.action.confirm": {
+      "comment": "Canonical: confirm a suggestion",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm"
+          }
+        }
+      }
+    },
+    "row.action.dontSuggestAgain": {
+      "comment": "Canonical: mute a kind of suggestion",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Don't suggest this again"
+          }
+        }
+      }
+    },
+    "row.action.notRentalWork": {
+      "comment": "Canonical: decline a suggestion (also the swipe label)",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not rental work"
+          }
+        }
+      }
+    },
+    "row.batch.confirmLikely": {
+      "comment": "Canonical: batch-confirm the likely suggestions",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm %lld likely"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

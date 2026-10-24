@@ -35,6 +35,15 @@ enum BrandHex {
     static let darkBacklight = "5E86D6"
     /// Edge of a grouped container on the dusk page (the card #F4EFE6 is only 1.19:1 on the page).
     static let pageCardEdge = "A3966F"
+    /// The same edge on the night page (§H.4 `pageCardEdge` dark).
+    static let darkPageCardEdge = "2A3560"
+    /// The rental chip's hairline on the dusk page (§H.8; drawn at 0.8 opacity). Dark: white 0.14.
+    static let heroChipHairline = "C9BFA8"
+    /// Page dots under the house (§H.8): the current dot is `textPrimary`, the rest this at 0.5.
+    static let heroDot = "8A8FA3"
+    static let darkHeroDot = "5D6788"
+    /// §1.27: the regular-width tab tint in dark (white on it 4.58:1 in the selected sidebar row).
+    static let darkSidebarTint = "4774C6"
 
     // Light
     static let canvas = "EEF2FA"
