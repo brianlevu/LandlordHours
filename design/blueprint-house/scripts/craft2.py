@@ -443,7 +443,7 @@ def halfpipe_fn(a, b, r, seg=14):
 
 def detail_gutters():
     """Half-round gutters on every eave the camera sees + downpipes at the corners (stage 4, with the porch)."""
-    zg = H.E - 0.1
+    zg = H.E + H.RT - H.OH * H.TT - 0.027      # just under the eave line (= E - 0.1 at OH 0.35)
     gx = 2.6 + H.OH + 0.07
     runs = [((-gx, -2.4 - H.OH - 0.05, zg), (-gx, 3.0 + H.OH + 0.05, zg)),      # left eave (replaces the old tube)
             ((gx, -2.4 - H.OH - 0.05, zg), (gx, 0.6 - H.OH - 0.02, zg)),        # right eave, front of the wing
@@ -481,14 +481,14 @@ def detail_windows(walls):
         for k, o in enumerate(w.openings):
             if o['type'] != 'win': continue
             u0, u1, z0, z1 = o['u0'], o['u1'], o['z0'], o['z1']
-            fw = 0.09; bx = []
+            fw = H.KN['fw']; bx = []
             def B(ua, ub, za, zb, off0, off1, lst):
                 c = w.P((ua + ub) / 2, (off0 + off1) / 2, (za + zb) / 2)
                 lst.append(H.M_box(c, (ub - ua, off1 - off0, zb - za), w.ang))
             if not o.get('lintel'):
                 B(u0 - 0.15, u1 + 0.15, z1 + fw, z1 + fw + 0.11, 0.0, 0.12, bx)          # head casing
                 B(u0 - 0.19, u1 + 0.19, z1 + fw + 0.11, z1 + fw + 0.145, 0.0, 0.16, bx)  # drip cap
-            B(u0 - 0.06, u1 + 0.06, z0 - fw - 0.07 - 0.13, z0 - fw - 0.07, 0.0, 0.07, bx)   # apron
+            B(u0 - 0.06, u1 + 0.06, z0 - fw - H.KN['sill'][2] + 0.01 - 0.13, z0 - fw - H.KN['sill'][2] + 0.01, 0.0, 0.07, bx)   # apron
             ob = H.new_obj('casing_%s_%d' % (w.name, k), [('trim', bx, [])], 4, 0.0, 'major', 'unit', bevel=0.008)
             island_uvs(ob, seed=k)
             if w.name == 'front' and z0 < H.F + 1.5:
