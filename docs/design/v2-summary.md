@@ -52,6 +52,10 @@ Twenty-four rules changed. The big ones: the house is not in a box, and it never
 
 **Life around the house.** Later, a contractor van shows up after a repair. A guest car leaves after a turnover. People come later. Each scene plays once and lasts under four seconds. It never plays during the timber drop. It never covers the number, on any phone size.
 
+## One layout for iPhone, iPad and the folding phone
+
+iPhone, iPad and the folding phone now share one layout logic. A narrow screen shows one column: the house on top, then your work. A wide screen shows two panes: the house on the left, your work on the right. The iPad uses the same two panes as the open folding phone. Opening the folding phone swings the house's door open and lights the right pane. Four new calls on this are in the plan, each with my pick.
+
 ## What needs you
 
 Five small calls, each with my pick, are in the plan under "Open questions". The reviewer agreed with all five.
