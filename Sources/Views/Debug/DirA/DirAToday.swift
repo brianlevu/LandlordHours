@@ -530,9 +530,14 @@ struct DAActionRow: View {
                 VStack(alignment: .leading, spacing: 4) {
                     title
                     meta
-                    HStack(spacing: 8) {
-                        hours
-                        if let tag { DATag(text: tag.0, ink: tag.1, wash: tag.2) }
+                    // Hours and tag share a line when both fit; otherwise the tag drops to its own line.
+                    // Either way it renders in full (wraps to 2 lines at most), with no width cap.
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 8) { hours; tagView }
+                        VStack(alignment: .leading, spacing: 4) {
+                            hours
+                            if let tag { DATag(text: tag.0, ink: tag.1, wash: tag.2) }
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

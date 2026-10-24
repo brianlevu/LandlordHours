@@ -256,7 +256,8 @@ struct DATag: View {
         Text(text)
             .font(.caption2.weight(.medium))
             .foregroundStyle(ink)
-            .lineLimit(1)
+            // Never truncates: callers that pin the width with .fixedSize() stay on one line; otherwise it wraps.
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 6).padding(.vertical, 2)
             .frame(minHeight: 20)
             .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(wash))
