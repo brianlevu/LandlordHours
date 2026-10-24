@@ -59,3 +59,25 @@ ffmpeg -framerate 30 -i $OUT/renders/anim/build_light/f_%03d.png -c:v hevc_video
 python3 install_craft3.py --stills $OUT/renders/stills --clips $OUT/renders/anim --repo ../../..
 ```
 The Python is the bpy 5.0.1 venv (any venv with `bpy==5.0.1` works, for example `~/tmp/lh-craft/.venv`). Run it headless. The Blender.app cask is broken on the Mini.
+
+## Craft direction, pass 5: the sculpt pass (2026-10-24, branch `art/house-sculpt`, not yet in the catalog)
+
+Same rig, palette, stages, drop and camera as pass 3/4; only the forms change. `craft5.py` runs on top of `craft3.py`:
+
+- Soft forms on one radius ladder (`RADII` in `craft5.py`): fine 0.014, medium 0.03, large 0.05, round 3–4-segment bevels with hardened normals. Rounded lot block (0.28 plan corners, 0.06 lawn rim).
+- Roof: overhang 0.45 (was 0.35), 0.07 tiles, thick verge boards and fascia, a 0.045 ridge sag. Chunkier casings, sills, sashes, door casing, porch posts and beam; a softer one-pot chimney.
+- Geometry knobs live in `house.py` `KN` (defaults reproduce pass 1–4 exactly); `craft5.py` `SCULPT` sets the pass-5 values.
+- The camera is pinned to pass 3 (`scripts/camera_pin.json`, dumped with `craft5.py --no-sculpt --dump-camera`), so the bigger overhang does not reframe the art.
+- §F.1 slots: `SLOTS` in `craft5.py` (roof = tile + ridge, siding = plaster, trim, door). Materials are renamed `LH_slot_<slot>` and tagged `lh_slot`. `--neutral` renders them at linear 0.5 grey; `--masks half,complete` writes `craft_slots_<stage>.png` (R roof, G siding, B trim, A door).
+- `craft_house.blend` is the pass-5 scene (last state rendered; textures are external, see `fetch_ph.py`).
+
+```
+cd design/blueprint-house/scripts; OUT=~/AgentScratch/landlordhours/<date>/dir-craft5; PY=~/tmp/lh-craft/.venv/bin/python
+$PY craft5.py --states started,frame70,framing,half,complete --variants light,dark --lit on,off --out $OUT/renders/stills   # ~21 s/still
+$PY craft5.py --anim --variants light,dark --samples 64 --out $OUT/renders/anim                                        # ~23 s/frame
+$PY craft5.py --masks half,complete --out $OUT/renders/masks
+python3 craft_post.py $OUT/renders/stills/*.png $OUT/renders/anim/build_*/f_*.png && python3 craft3_post.py $OUT/renders/stills/*.png $OUT/renders/anim/build_*/f_*.png
+python3 sheets5.py compare --before <pass-3 stills> --after $OUT/renders/stills --out $OUT/compare.jpg
+python3 measure3.py --probes <probes.json> --light ... --dark ...;  python3 measure_night.py $OUT/renders/stills/*_dark.png
+```
+Clips and install are the same as pass 3 (`ffmpeg ... hevc_videotoolbox`, `install_craft3.py`).

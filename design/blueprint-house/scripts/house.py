@@ -24,6 +24,22 @@ PL = 0.08                        # plate thickness
 
 random.seed(41100)
 
+# Sculpt knobs (craft5.py sets these before build_all). Defaults reproduce pass 1-4 geometry exactly.
+KN = dict(
+    fw=0.09,            # window / door casing width
+    frame_d=0.10,       # casing depth proud of the wall
+    sill=(0.16, 0.17, 0.08),   # sill overhang each side, depth, height
+    sash=0.045,         # sash border
+    mull=0.05,          # mullion width
+    tile_th=0.05,       # roof tile thickness
+    tile_bevel=0.008,
+    barge=(0.06, 0.3),  # barge board width, height
+    barge_off=-0.06,    # barge centre offset along the slope normal
+    fascia=(0.05, 0.26),
+    post=0.16,          # porch post section
+    beam=0.18,          # porch beam height
+)
+
 # ---------------------------------------------------------------- colour/materials
 
 def lin(h):
@@ -465,7 +481,7 @@ def build_roof():
             items.append((1, k, 'sheath_%s_%d' % (key, k), [('ply', [M], [])], ''))
     # tiles: rows bottom-up
     phi = math.radians(6)
-    rowh, tl, tw, gap, th = 0.33, 0.42, 0.44, 0.016, 0.05
+    rowh, tl, tw, gap, th = 0.33, 0.42, 0.44, 0.016, KN['tile_th']
     for key, sl in SL.items():
         nrows = int(math.ceil((sl.S - 0.05) / rowh))
         for i in range(nrows):
@@ -496,16 +512,16 @@ def build_roof():
     for key in ('mainL', 'mainR'):
         sl = SL[key]
         for yb in (-2.4 - OH - 0.03, 3.0 + OH + 0.03):
-            a = sl.P(-0.03, yb, -0.06); b = sl.P(sl.S, yb, -0.06)
-            trimb.append(M_line(a, b, 0.06, 0.3, sl.n))
+            a = sl.P(-0.03, yb, KN['barge_off']); b = sl.P(sl.S, yb, KN['barge_off'])
+            trimb.append(M_line(a, b, KN['barge'][0], KN['barge'][1], sl.n))
         xf = sl.P(0, 0, 0)
-        trimb.append(M_box((xf.x + (-0.03 if key == 'mainL' else 0.03), 0.3, xf.z - 0.1), (0.05, 5.4 + 2 * OH + 0.12, 0.26)))
+        trimb.append(M_box((xf.x + (-0.03 if key == 'mainL' else 0.03), 0.3, xf.z - 0.1), (KN['fascia'][0], 5.4 + 2 * OH + 0.12, KN['fascia'][1])))
     for key in ('wingF', 'wingB'):
         sl = SL[key]
-        a = sl.P(-0.03, 4.4 + OH + 0.03, -0.06); b = sl.P(sl.S, 4.4 + OH + 0.03, -0.06)
-        trimb.append(M_line(a, b, 0.06, 0.3, sl.n))
+        a = sl.P(-0.03, 4.4 + OH + 0.03, KN['barge_off']); b = sl.P(sl.S, 4.4 + OH + 0.03, KN['barge_off'])
+        trimb.append(M_line(a, b, KN['barge'][0], KN['barge'][1], sl.n))
         xf = sl.P(0, 0, 0)
-        trimb.append(M_box((3.0 + OH / 2 + 0.2, xf.y + (-0.03 if key == 'wingF' else 0.03), xf.z - 0.1), (2.9 + OH, 0.05, 0.26)))
+        trimb.append(M_box((3.0 + OH / 2 + 0.2, xf.y + (-0.03 if key == 'wingF' else 0.03), xf.z - 0.1), (2.9 + OH, KN['fascia'][0], KN['fascia'][1])))
     # decorative gable truss (front)
     yt = -2.4 - OH + 0.12
     cz = E + 1.25
@@ -530,7 +546,7 @@ def build_roof():
         a, b = phase_span[ph]
         for j, it in enumerate(grp):
             t = a + (b - a) * (j + 1) / len(grp)
-            new_obj(it[2], it[3], 3, t, it[4], 'roof', bevel=0.01 if ph != 2 else 0.008)
+            new_obj(it[2], it[3], 3, t, it[4], 'roof', bevel=0.01 if ph != 2 else KN['tile_bevel'])
 
 # ---------------------------------------------------------------- siding (stage 4)
 
@@ -600,23 +616,24 @@ def build_units(walls):
             def B(ua, ub, za, zb, off0, off1, lst=tb):
                 c = w.P((ua + ub) / 2, (off0 + off1) / 2, (za + zb) / 2)
                 lst.append(M_box(c, (ub - ua, off1 - off0, zb - za), w.ang))
-            fw = 0.09
+            fw = KN['fw']; fd = KN['frame_d']
             if o['type'] == 'win':
-                B(u0 - fw, u0, z0 - fw, z1 + fw, 0.0, 0.1)
-                B(u1, u1 + fw, z0 - fw, z1 + fw, 0.0, 0.1)
-                B(u0, u1, z1, z1 + fw, 0.0, 0.1)
-                B(u0, u1, z0 - fw, z0, 0.0, 0.1)
-                B(u0 - 0.16, u1 + 0.16, z0 - fw - 0.07, z0 - fw + 0.01, 0.0, 0.17)   # sill
+                B(u0 - fw, u0, z0 - fw, z1 + fw, 0.0, fd)
+                B(u1, u1 + fw, z0 - fw, z1 + fw, 0.0, fd)
+                B(u0, u1, z1, z1 + fw, 0.0, fd)
+                B(u0, u1, z0 - fw, z0, 0.0, fd)
+                so, sd, sh = KN['sill']
+                B(u0 - so, u1 + so, z0 - fw - sh + 0.01, z0 - fw + 0.01, 0.0, sd)   # sill
                 # sash border + mullions (recessed)
-                sb = 0.045
+                sb = KN['sash']; mw = KN['mull'] / 2
                 B(u0, u0 + sb, z0, z1, -0.06, 0.0); B(u1 - sb, u1, z0, z1, -0.06, 0.0)
                 B(u0 + sb, u1 - sb, z1 - sb, z1, -0.06, 0.0); B(u0 + sb, u1 - sb, z0, z0 + sb, -0.06, 0.0)
                 cols = o.get('cols', 2)
                 for c in range(1, cols):
                     uc = u0 + (u1 - u0) * c / cols
-                    B(uc - 0.025, uc + 0.025, z0 + sb, z1 - sb, -0.055, -0.005)
+                    B(uc - mw, uc + mw, z0 + sb, z1 - sb, -0.055, -0.005)
                 zm = z0 + (z1 - z0) * 0.55
-                B(u0 + sb, u1 - sb, zm - 0.025, zm + 0.025, -0.055, -0.005)
+                B(u0 + sb, u1 - sb, zm - mw, zm + mw, -0.055, -0.005)
                 B(u0, u1, z0, z1, -0.09, -0.07, gl)
                 extra = []
                 if o.get('lintel'):
@@ -635,9 +652,9 @@ def build_units(walls):
                 ob = new_obj('unit_%s_%d' % (w.name, k), [('trim', tb, [])] + extra + [('glass', gl, [])], 4, 0.0, 'major', 'unit', bevel=0.008)
                 ob['glass_slot'] = len(extra) + 1
             else:   # door
-                B(u0 - fw, u0, z0, z1 + fw, 0.0, 0.11)
-                B(u1, u1 + fw, z0, z1 + fw, 0.0, 0.11)
-                B(u0 - fw, u1 + fw, z1 + fw, z1 + fw + 0.05, 0.0, 0.13)
+                B(u0 - fw, u0, z0, z1 + fw, 0.0, fd + 0.01)
+                B(u1, u1 + fw, z0, z1 + fw, 0.0, fd + 0.01)
+                B(u0 - fw, u1 + fw, z1 + fw, z1 + fw + 0.05, 0.0, fd + 0.03)
                 db = []
                 B(u0, u1, z0, z1, -0.07, -0.02, db)
                 # raised panels
@@ -674,14 +691,14 @@ def build_porch():
     posts = [(-0.45, -3.85), (2.8, -3.85)]
     ztop = F + 2.62
     for (x, y) in posts:
-        pb.append(M_box((x, y, (F - 0.05 + ztop) / 2), (0.16, 0.16, ztop - F + 0.05)))
+        pb.append(M_box((x, y, (F - 0.05 + ztop) / 2), (KN['post'], KN['post'], ztop - F + 0.05)))
         pb.append(M_box((x, y, F - 0.05 + 0.06), (0.24, 0.24, 0.12)))    # plinth block
         for sx in (-1, 1):
             if (x < 0 and sx < 0) or (x > 2 and sx > 0):
                 continue
             a = Vector((x, y, ztop - 0.6)); b = Vector((x + sx * 0.55, y, ztop - 0.05))
             pb.append(M_line(a, b, 0.09, 0.09, (0, -1, 0)))
-    pb.append(M_box((1.175, -3.85, ztop + 0.09), (3.55, 0.16, 0.18)))   # beam
+    pb.append(M_box((1.175, -3.85, ztop + 0.09), (3.55, KN['post'], KN['beam'])))   # beam
     # shed roof
     y0, z0 = -2.4 - 0.06, F + 3.08
     y1, z1 = -4.12, ztop + 0.2

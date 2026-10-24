@@ -230,7 +230,7 @@ def spill_lamps(variant, scale):
                 z0 = z0 + 1.15
             uc, zc = (u0 + u1) / 2, (z0 + z1) / 2
             d = w.n * math.cos(math.radians(38)) + Vector((0, 0, -math.sin(math.radians(38))))
-            area('spill_%s_%d' % (w.name, k), w.P(uc, 0.16, zc), d, (u1 - u0, z1 - z0),
+            area('spill_%s_%d' % (w.name, k), w.P(uc, getattr(ARGS, 'spill_off', 0.16), zc), d, (u1 - u0, z1 - z0),
                  ARGS.spill * scale * (u1 - u0) * (z1 - z0), LAWN_LAMP, ARGS.spread, lawn=True)
     # porch ceiling light: low and behind the railing -> baluster shadows fan out over the grass
     p = C.point('porch_light', (1.0, -2.8, H.F + 1.45), ARGS.porch * scale, H.lin(LAMP)[:3], 0.03)
