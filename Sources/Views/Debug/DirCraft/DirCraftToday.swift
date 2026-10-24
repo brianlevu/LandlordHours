@@ -214,6 +214,7 @@ struct DirCraftRoot: View {
             .presentationBackground(env.c.sheet)
         }
         .onAppear {
+            if DuoSnapshot.requested { DADemo.after(1.0) { DuoSnapshot.run() } }   // Duo concept B (DuoInside.swift)
             if launch.demo == "log" {
                 DADemo.after(1.6) { showLog = true }
                 DADemo.after(3.6) { logged = 1.5; logSerial += 1; showLog = false }   // the sheet's 1h 30m
