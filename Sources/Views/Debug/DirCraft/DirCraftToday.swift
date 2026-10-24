@@ -634,12 +634,18 @@ struct CraftHouseArt: View {
     }
     private var stageLift: CGFloat { fillStage ? Self.stageLift(art) * side / 390 : 0 }
 
-    /// Added to the house's RGB at night (0.065 x 255 = +17 levels).
-    static let nightLift: Double = 0.065
+    /// Added to the house's RGB at night for the stages without a rim light (0.065 x 255 = +17 levels).
+    /// The framing stages carry their own moon rim (art pass, bcebadd), so they get none.
+    static func nightLift(_ art: CraftArt) -> Double {
+        switch art {
+        case .started, .frame70, .framing: return 0
+        case .half, .complete: return 0.065
+        }
+    }
 
     /// The build clip is rendered with the windows lit. While they should still be dark (the first hour of the day),
-    /// it is dimmed to the unlit still's mean luminance (0.36 at night, 0.76 by day, measured on the stills).
-    private var clipDim: Double { windowsLit ? 1 : (scheme == .dark ? 0.36 : 0.76) }
+    /// it is dimmed to the unlit still's mean luminance (0.66 at night after the moon-rim art, 0.76 by day, measured on the stills).
+    private var clipDim: Double { windowsLit ? 1 : (scheme == .dark ? 0.66 : 0.76) }
 
     /// 0.4s warm-up; a plain linear fade under Reduce Motion.
     private var windowsFade: Animation { reduceMotion ? .linear(duration: 0.4) : .easeInOut(duration: 0.4) }
@@ -711,7 +717,7 @@ struct CraftHouseArt: View {
                         .transition(.opacity)
                 }
             }
-            .brightness(scheme == .dark ? Self.nightLift : 0)   // night ambient: lifts the house off the page, SwiftUI only
+            .brightness(scheme == .dark ? Self.nightLift(art) : 0)   // night ambient: lifts the house off the page, SwiftUI only
             .scaleEffect(stageScale, anchor: UnitPoint(x: 0.5, y: 0.92))
             .offset(y: -stageLift)   // the lot's ground line sits at 92% of the frame
         }
