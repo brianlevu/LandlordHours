@@ -209,7 +209,15 @@ def render_masks(stages, out):
     black = em((0, 0, 0))
     slot_of = {k: s for s, ks in SLOTS.items() for k in ks}
     passes = {0: em((1, 0, 0)), 1: em((0, 1, 0)), 2: em((0, 0, 1)), 3: em((1, 1, 1))}
-    from PIL import Image
+    def load(fn):
+        im = bpy.data.images.load(fn); im.colorspace_settings.name = 'Non-Color'
+        px = np.empty(len(im.pixels), np.float32); im.pixels.foreach_get(px)
+        w, h = im.size; bpy.data.images.remove(im); return px.reshape(h, w, 4)
+    def save(arr, fn):
+        h, w = arr.shape[:2]
+        im = bpy.data.images.new('mask_out', w, h, alpha=True); im.colorspace_settings.name = 'Non-Color'
+        im.pixels.foreach_set(arr.astype(np.float32).ravel()); im.filepath_raw = fn; im.file_format = 'PNG'; im.save()
+        bpy.data.images.remove(im)
     files = []
     for st in stages:
         T.apply_state(C.STATES[st], 'dark', False)
@@ -225,13 +233,12 @@ def render_masks(stages, out):
                     ch = MASK_CHANNEL.get(slot_of.get(key, ''), -1)
                     sl.material = passes[ch] if ch in chans else black
             fn = os.path.join(out, f'_mask_{st}_{pname}.png'); C.render_to(fn); pngs[pname] = fn
-        a = np.asarray(Image.open(pngs['rgb']).convert('RGBA')).astype(np.float32) / 255
-        b = np.asarray(Image.open(pngs['door']).convert('RGBA')).astype(np.float32) / 255
+        a = load(pngs['rgb']); b = load(pngs['door'])
         cov = a[..., :3] * a[..., 3:4]                       # straight alpha -> coverage
         door = b[..., 0] * b[..., 3]
         mask = np.dstack([cov, door])
         fo = os.path.join(out, f'craft_slots_{st}.png')
-        Image.fromarray((mask * 255 + 0.5).clip(0, 255).astype(np.uint8), 'RGBA').save(fo, optimize=True)
+        save(mask.clip(0, 1), fo)
         for f in pngs.values(): os.remove(f)
         print('MASK', fo, {k: round(float((mask[..., i] > 0.5).mean()), 4) for k, i in MASK_CHANNEL.items()}, flush=True)
         files.append(fo)
