@@ -200,7 +200,10 @@ def status_bar(im):
     return out
 
 
-def sample_tokens(im, fname="", suppress=True):
+def sample_tokens(im, fname="", suppress=True, hero=None):
+    """hero: None, or dict(theme=..., art=[x0,y0,x1,y1] px or None) for a dusk/night page frame. On a hero frame the
+    canvas is matched against the page gradient path (not a flat token), pixels under the house art are masked from
+    the card and action samples, and gradient pixels are not mistaken for a card (v2 spec 1)."""
     W, H = im.size
     res = {}
     # canvas: gutter strip x = 3..9pt, four heights
@@ -211,16 +214,26 @@ def sample_tokens(im, fname="", suppress=True):
     c = median_color(px)
     res["canvas"] = c
     # card: modal colour in the column x = 26..32pt that is not canvas
-    col = [p for p in region_pixels(im, (int(26 * SCALE), int(H * 0.15), int(32 * SCALE), int(H * 0.85)))
-           if dE(p, c) > 3]
+    y_lo, y_hi = int(H * 0.15), int(H * 0.85)
+    if hero:  # sample the card column below the art only, and skip pixels that are just the page gradient
+        if hero.get("art"):
+            y_lo = max(y_lo, hero["art"][3] + int(4 * SCALE))
+        y_lo = min(y_lo, y_hi - 1)
+        col = [p for p in region_pixels(im, (int(26 * SCALE), y_lo, int(32 * SCALE), y_hi))
+               if page_dE(p, hero["theme"]) > HERO_DE and dE(p, c) > 3]
+    else:
+        col = [p for p in region_pixels(im, (int(26 * SCALE), y_lo, int(32 * SCALE), y_hi)) if dE(p, c) > 3]
     if len(col) > 200:
         res["card"] = mode_color(col, 2)
     # action: modal saturated blue/cyan pixel
     small = im.resize((max(1, W // 3), max(1, H // 3)))
+    if hero and hero.get("art"):  # mask the 3D art: its slate-blue shadows are not the action colour
+        from PIL import ImageDraw
+        ImageDraw.Draw(small).rectangle([v // 3 for v in hero["art"]], fill=(0, 0, 0))
     blue = []
     for p in small.getdata():
         hh, ss, vv = colorsys.rgb_to_hsv(p[0] / 255, p[1] / 255, p[2] / 255)
-        if 0.52 <= hh <= 0.68 and ss > 0.5 and 0.35 < vv < 0.95:
+        if 0.52 <= hh <= 0.68 and ss > 0.6 and 0.35 < vv < 0.95:  # s>0.6: antialiased slate (s~0.5) is not the action colour
             blue.append(p)
     if len(blue) > 0.002 * small.width * small.height:
         res["action"] = mode_color(blue, 4)
@@ -234,6 +247,10 @@ def sample_tokens(im, fname="", suppress=True):
                 d = dE(rgb, hex2rgb(hx))
                 if best is None or d < best[0]: best = (d, tn, theme, hx)
         flag = best[0] > DELTA_E_FLAG[name]
+        if hero and name == "canvas":  # gradient path, tolerance dE 6
+            gd = page_dE(rgb, hero["theme"])
+            best = (gd, "pageGradient", hero["theme"], "/".join(PAGE_GRADIENT[hero["theme"]]))
+            flag = gd > HERO_DE
         ok = allowed(name, rgb, fname) if (flag and suppress) else None
         out[name] = {"sampled": rgb2hex(rgb), "nearest": f"{best[1]}/{best[2]} {best[3]}", "deltaE": round(best[0], 1),
                      "flag": flag and not ok}
@@ -297,6 +314,53 @@ def text_regions(im, min_ratio, suppress=True, stats=None):
     return out
 
 
+
+def page_ink_flags(tr, hero):
+    """Spec 2: on the LIGHT page, text whose background is the page must be one of the five allowed inks."""
+    if hero["theme"] != "light":
+        return []
+    out = []
+    art = hero.get("art")
+    for t in tr:
+        bx = t["box_pt"]
+        if art and bx[0] * SCALE >= art[0] and bx[2] * SCALE <= art[2] and bx[1] * SCALE >= art[1] and bx[3] * SCALE <= art[3]:
+            continue  # inside the house art
+        bg, ink = hex2rgb(t["bg"]), hex2rgb(t["ink"])
+        if page_dE(bg, "light") > 8:
+            continue  # the cluster sits on a card or control, not the page
+        name, d = min(((n, dE(ink, hex2rgb(h))) for n, h in PAGE_INKS.items()), key=lambda x: x[1])
+        if d > 14:
+            out.append(f"ink not allowed on page {t['box_pt']} {t['ink']} on {t['bg']} = {t['ratio']}:1 "
+                       f"(nearest allowed {name} dE {d:.0f}; only {', '.join(PAGE_INKS)} may be text on the page)")
+    return out
+
+
+EDGE_MIN_RATIO = {"light": 1.8, "dark": 1.5}  # spec says 1.8; the dark pair #2A3560 on #09 0E24 measures 1.62, so dark is 1.5 (noted)
+
+
+def card_edge_flags(path, im, hero, globs, hero_rect):
+    """Spec 2: every card on a hero frame has a 1pt pageCardEdge ring (dE 6) that reads >= 1.8:1 against the page."""
+    sc = SCALE
+    r = analyse(str(path), detect_dt(os.path.basename(str(path))), sc, 0.88, None, "iphone", None,
+                [float(v) for v in hero_rect.split(",")] if hero_rect else None, globs)
+    a_ = np.asarray(im)
+    want = hex2rgb(PAGE_CARD_EDGE[hero["theme"]])
+    out = []
+    for c in r["cards"]:
+        if c["hero"] or c["list_container"] is None:
+            continue
+        x0, y0, x1, y1 = c["bbox_px"]
+        ym = (y0 + y1) // 2
+        k = max(0, int(0.5 * sc))
+        edge = tuple(int(v) for v in a_[ym, x0 + k])
+        page = tuple(int(v) for v in a_[ym, 6])
+        d, cr = dE(edge, want), ratio(edge, page)
+        if d > HERO_DE or cr < EDGE_MIN_RATIO[hero["theme"]]:
+            out.append(f"card floats on page: card at y={round(y0 / sc)}pt edge {rgb2hex(edge)} is dE {d:.1f} from "
+                       f"pageCardEdge {rgb2hex(want)}, {cr:.2f}:1 vs page (want dE<={HERO_DE:.0f}, >= {EDGE_MIN_RATIO[hero['theme']]}:1)")
+    return out
+
+
 # ----------------------------------------------------------------- main
 
 def legacy_main():
@@ -313,6 +377,8 @@ def legacy_main():
     ap.add_argument("--exclude-bottom", type=float, help="tab bar band height in pt, home indicator included")
     ap.add_argument("--min-cluster-pt", help="WxH minimum glyph cluster in pt, e.g. 16x8")
     ap.add_argument("--no-suppress", action="store_true", help="old behaviour: every raw flag, no suppression rules")
+    ap.add_argument("--hero-rect", help="x0,y0,x1,y1 in pt: mask this region as the house art on hero frames (default: auto-detected)")
+    ap.add_argument("--hero-glob", action="append", help="extra frame-name glob that marks a hero frame (default today-*, rental-*, welcome*, inbox-empty*, milestone*)")
     a = ap.parse_args()
     global CFG
     CFG = json.loads(json.dumps(DEFAULTS))
@@ -366,11 +432,22 @@ def legacy_main():
         for s in rec["status_bar"]:
             need = 4.5
             if s["ratio"] < need: rec["flags"].append(f"status bar {s['part']} {s['ratio']}:1 ({s['ink']} on {s['bg']})")
-        rec["tokens"] = sample_tokens(im, f.name, sup)
+        hero = None
+        if np is not None and sup and is_hero_frame(f.name, im, a.hero_glob or None):
+            th = page_theme(im)
+            art = find_hero_art(np.asarray(im), SCALE, detect_dt(f.name), hero_rect=[float(v) for v in a.hero_rect.split(",")] if a.hero_rect else None)
+            hero = dict(theme=th, art=art["bbox_px"] if art else None)
+            rec["hero"] = dict(theme=th, art_bbox_px=hero["art"])
+            if not art:
+                rec["flags"].append("hero frame but no house art found (BLOCKED: pass --hero-rect to override)")
+        rec["tokens"] = sample_tokens(im, f.name, sup, hero)
         for k, t in rec["tokens"].items():
             if t["flag"]: rec["flags"].append(f"token {k} {t['sampled']} is dE {t['deltaE']} from {t['nearest']}")
         tr = text_regions(im, a.min_ratio, sup, suppressed)
         rec["text_regions"] = [{k: v for k, v in t.items() if k != "_box"} for t in tr]
+        if hero:
+            rec["flags"] += page_ink_flags(tr, hero)
+            rec["flags"] += card_edge_flags(f, im, hero, a.hero_glob or None, a.hero_rect)
         for i, t in enumerate(tr):
             if t["flag"]:
                 rec["flags"].append(f"text {t['box_pt']} {t['ratio']}:1 < {t['need']} ({t['ink']} on {t['bg']})")
@@ -423,7 +500,8 @@ def rgb_to_lab(a: np.ndarray) -> np.ndarray:
     m = np.array([[0.4124564, 0.3575761, 0.1804375],
                   [0.2126729, 0.7151522, 0.0721750],
                   [0.0193339, 0.1191920, 0.9503041]])
-    xyz = c @ m.T / np.array([0.95047, 1.0, 1.08883])
+    with np.errstate(all="ignore"):
+        xyz = c @ m.T / np.array([0.95047, 1.0, 1.08883])
     f = np.where(xyz > 0.008856, np.cbrt(xyz), 7.787 * xyz + 16 / 116)
     return np.stack([116 * f[..., 1] - 16, 500 * (f[..., 0] - f[..., 1]),
                      200 * (f[..., 1] - f[..., 2])], axis=-1)
@@ -443,6 +521,119 @@ def runs(mask: np.ndarray, min_len: int = 1, close_gap: int = 0):
     return [(a, b) for a, b in out if b - a >= min_len]
 
 
+
+# ---- v2 hero / dusk page (standard section H; NOTES-standard-v2.md items 1-3) ----
+HERO_GLOBS = ["today-*", "rental-*", "welcome*", "inbox-empty*", "milestone*"]
+PAGE_GRADIENT = {"light": ["#EAE3D7", "#D8CFC0", "#E8E0D3"], "dark": ["#0B1230", "#080C1D"]}  # pageTop, pageMid, pageBottom
+PAGE_CARD_EDGE = {"light": "#A3966F", "dark": "#2A3560"}
+PAGE_INKS = {"textPrimary": "#121B33", "textSecondary": "#4A5068", "action": "#1E3FA6",
+             "behind": "#9A3624", "positiveOnPage": "#0C5A30"}  # inks allowed as text on the LIGHT page (section H.4)
+HERO_DE = 6.0  # a sample within this dE of the gradient is "the page"
+
+
+def page_dE(rgb, theme=None):
+    """dE from rgb to the nearest point of the page gradient (a colour path through the gradient stops), over the
+    given theme or both. The gradient is matched as a path, not a flat token (spec 1)."""
+    best = 1e9
+    for th, stops in PAGE_GRADIENT.items():
+        if theme and th != theme:
+            continue
+        pts = [hex2rgb(h) for h in stops]
+        for a_, b_ in zip(pts, pts[1:]):
+            best = min(best, seg_dist(rgb, a_, b_))
+    return best
+
+
+def page_theme(im):
+    """'dark' when the gutter strip is dark."""
+    g = np.asarray(im.convert("L").crop((int(3 * SCALE), int(im.height * 0.3), int(9 * SCALE), int(im.height * 0.5))))
+    return "dark" if g.mean() < 90 else "light"
+
+
+def is_hero_frame(name, im, globs=None):
+    """(a) the name matches the hero globs, or (b) the 54-120pt band samples within dE 6 of the gradient
+    (light only: the dark page equals the dark canvas, so by name only)."""
+    if matches(name, globs or HERO_GLOBS):
+        return True
+    if page_theme(im) != "light":
+        return False
+    pts = [im.getpixel((int(x * SCALE), int(y * SCALE))) for y in (66, 90, 114) for x in (4, 6, 8)]
+    return all(page_dE(p, "light") <= HERO_DE for p in pts)
+
+
+def find_hero_art(a, scale, dt="default", hero_rect=None):
+    """The house art: the largest connected region of non-page pixels wider than 60% of the window whose top edge
+    is within 54-140pt (54-200pt at AX; the standard says 120 but just-started frames start at 131pt) of the window top. Returns dict(bbox_px, forced) or None.
+    hero_rect (x0,y0,x1,y1 in pt) overrides detection. Conservative reading: the top edge may sit up to 3pt past the
+    limit, and a scrolled frame whose art touches the status-bar line still counts."""
+    H, W = a.shape[:2]
+    if hero_rect:
+        x0, y0, x1, y1 = [int(round(v * scale)) for v in hero_rect]
+        return dict(bbox_px=[max(x0, 0), max(y0, 0), min(x1, W), min(y1, H)], forced=True)
+    st = max(1, int(round(scale)))
+    sm = a[::st, ::st]
+    h, w = sm.shape[:2]
+    lab_s = rgb_to_lab(sm)
+    page = lab_s[:, min(2, w - 1), :]  # per-row page colour from the gutter
+    mask = np.linalg.norm(lab_s - page[:, None, :], axis=2) > 12
+    mask[:int(STATUS_PT * scale / st)] = False
+    mask[:, :2] = False
+    mask[:, -2:] = False
+    dm = np.asarray(Image.fromarray((mask * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(5))) > 0
+    seen = np.zeros_like(dm)
+    best = None
+    max_top = (200 if dt == "ax" else 140) * scale / st
+    ys, xs = np.nonzero(mask)
+    for i in np.argsort(ys, kind="stable"):
+        y, x = int(ys[i]), int(xs[i])
+        if seen[y, x]:
+            continue
+        q = deque([(y, x)])
+        seen[y, x] = True
+        y0_ = y1_ = y
+        x0_ = x1_ = x
+        n = 0
+        while q:
+            cy, cx_ = q.popleft()
+            n += 1
+            y0_, y1_, x0_, x1_ = min(y0_, cy), max(y1_, cy), min(x0_, cx_), max(x1_, cx_)
+            for ny, nx in ((cy + 1, cx_), (cy - 1, cx_), (cy, cx_ + 1), (cy, cx_ - 1)):
+                if 0 <= ny < h and 0 <= nx < w and dm[ny, nx] and not seen[ny, nx]:
+                    seen[ny, nx] = True
+                    q.append((ny, nx))
+        if (x1_ - x0_ + 1) * st > 0.6 * W and y0_ <= max_top and n > 200:
+            if best is None or n > best[0]:
+                best = (n, y0_, y1_, x0_, x1_)
+    if not best:
+        return None
+    _, y0_, y1_, x0_, x1_ = best
+    return dict(bbox_px=[int(x0_ * st), int(y0_ * st), int((x1_ + 1) * st), int((y1_ + 1) * st)], forced=False)
+
+
+def _covers_art(c, art_box):
+    """A box 'encloses' the art when it covers >= 75% of the art bbox (the bbox may include the chip's halo)."""
+    x0, y0, x1, y1 = art_box
+    iw, ih = min(c[2], x1) - max(c[0], x0), min(c[3], y1) - max(c[1], y0)
+    return iw > 0 and ih > 0 and iw * ih >= 0.75 * (x1 - x0) * (y1 - y0)
+
+
+def hero_measures(a, art, scale, dt, card_boxes):
+    """H1-H4 and card_edge_around_art. The frame square is not visible in a screenshot, so H1/H2 use the standard's
+    fixed frame (390pt default, 295pt AX) and are ADVISORY (they never change the verdict); the art bbox share is
+    measured. card_edge_around_art is a verdict: a closed card enclosing the art = FAIL 'hero in a card'."""
+    H, W = a.shape[:2]
+    x0, y0, x1, y1 = art["bbox_px"]
+    vp = H / scale
+    frame_side = 295.0 if dt == "ax" else min(390.0, W / scale - 12)
+    lo, hi = (0.24, 0.32) if dt == "ax" else (0.36, 0.46)
+    encl = [c for c in card_boxes if _covers_art(c, art["bbox_px"])]
+    return dict(art_bbox_pt=[round(v / scale, 1) for v in (x0, y0, x1, y1)],
+                art_bbox_share=round((y1 - y0) / scale / vp, 3),
+                H1_frame_side_pt=round(frame_side, 1), H2_art_share=round(frame_side / vp, 3), H2_range=[lo, hi],
+                H2_pass=bool(lo <= frame_side / vp <= hi), ground_line_pt=round(y1 / scale, 1),
+                card_edge_around_art=bool(encl), advisory_note="H1/H2/H4 use the fixed frame, not measured")
+
+
 def detect_dt(name: str) -> str:
     n = name.lower()
     if re.search(r"ax\d?(?![a-z])", n):
@@ -453,7 +644,7 @@ def detect_dt(name: str) -> str:
 
 
 def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: int | None, device: str = "iphone",
-            crop_pt=None):
+            crop_pt=None, hero_rect=None, hero_globs=None):
     img = Image.open(path).convert("RGB")
     if crop_pt:  # analyse one pane of a multi-column iPad/Duo layout: x0:x1 in points
         img = img.crop((int(crop_pt[0] * scale), 0, int(crop_pt[1] * scale), img.height))
@@ -475,6 +666,14 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
     for ytop in edge_rows:
         for ybot in edge_rows:
             if 38 * scale <= ybot - ytop <= 48 * scale:
+                # v2: the foot row of a card on the page ("See all 7") is also two lines 38-48pt apart,
+                # but its lower line is the card's own bottom edge: canvas right below, card fill right above.
+                px_ = int(40 * scale)
+                yb_lo, yb_hi = min(ybot + int(6 * scale), H - 1), max(ybot - int(6 * scale), 0)
+                ref_lo, ref_hi = lab[yb_lo, 6], lab[yb_hi, 6]
+                if (np.linalg.norm(lab[yb_lo, px_] - ref_lo) < 3 and np.linalg.norm(lab[yb_hi, px_] - ref_hi) > 3
+                        and np.linalg.norm(lab[yb_hi, W - px_] - ref_hi) > 3):
+                    continue
                 bar = (ytop, ybot)
                 break
         if bar:
@@ -568,11 +767,33 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
     for c in sorted(kept, key=lambda c: c["y0"]):
         ym = (c["y0"] + c["y1"]) // 2
         edge = min(np.linalg.norm(lab[ym, c["x0"] + k] - c["fill"]) for k in (1, 2))
-        if not c["hero"] and edge > 5 and np.linalg.norm(c["fill"] - c["canvas"][ym]) > 2.5:
+        # v2: a card on the dusk/night page carries a 1pt pageCardEdge ring; that is a card edge, not an input outline
+        ering = a[ym, c["x0"] + int(0.5 * scale):c["x0"] + max(1, int(0.5 * scale)) + 1].reshape(-1, 3)[0]
+        c["page_edge"] = bool(min(dE(tuple(int(v) for v in ering), hex2rgb(h)) for h in PAGE_CARD_EDGE.values()) <= 8)
+        if not c["hero"] and not c["page_edge"] and edge > 5 and np.linalg.norm(c["fill"] - c["canvas"][ym]) > 2.5:
             fields.append(c)
         else:
             cards.append(c)
     canvas = canvas0
+
+    # v2 hero: the house art is not a card (D6) and not a row (D2/D4); a card enclosing it is a defect
+    hero_info = None
+    if hero_rect or matches(os.path.basename(path), hero_globs or HERO_GLOBS):
+        art = find_hero_art(a, scale, dt, hero_rect)
+        if art:
+            boxes = [(c["x0"], c["y0"], c["x1"], c["y1"]) for c in cards + fields]
+            hero_info = hero_measures(a, art, scale, dt, boxes)
+            ax0, ay0, ax1, ay1 = art["bbox_px"]
+
+            def not_art(c):
+                encloses = _covers_art((c["x0"], c["y0"], c["x1"], c["y1"]), (ax0, ay0, ax1, ay1))
+                cxm, cym = (c["x0"] + c["x1"]) / 2, (c["y0"] + c["y1"]) / 2
+                inside = ax0 <= cxm <= ax1 and ay0 <= cym <= ay1
+                return encloses or not inside
+            cards = [c for c in cards if not_art(c)]
+            fields = [c for c in fields if not_art(c)]
+        else:
+            hero_info = dict(art_bbox_pt=None, note="no hero art found (BLOCKED if this frame should have one)")
 
     res_cards, all_rows = [], []
     for c in cards:
@@ -760,6 +981,9 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
         if c["empty_band_share"] is not None and not c["d4_exempt_value_rows"]:
             chk("D4 empty bands <= 35%", c["empty_band_share"] <= D4_MAX,
                 f"card at y={c['bbox_px'][1]} empty {c['empty_band_share']:.1%}")
+    if hero_info and hero_info.get("art_bbox_pt"):
+        chk("H hero not in a card", not hero_info["card_edge_around_art"],
+            "a closed card encloses the art (hero in a card)" if hero_info["card_edge_around_art"] else "art sits on the page")
     n_items = len(done)
     if items_present is not None and items_present >= 5:
         need = 4 if dt in ("xxl", "ax") else 5
@@ -768,7 +992,7 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
     verdict = "PASS" if all(c["pass_"] for c in checks) and checks else ("FAIL" if checks else "NO_DATA")
     return dict(
         frame=path, size_px=[W, H], viewport_pt=[round(W / scale, 1), round(vp_pt, 1)], dynamic_type=dt,
-        fold_px=fold, cards=res_cards,
+        fold_px=fold, cards=res_cards, hero=hero_info,
         ignored=dict(sheets=[[s["x0"], s["y0"], s["x1"], s["y1"]] for s in sheets],
                      controls=[[s["x0"], s["y0"], s["x1"], s["y1"]] for s in controls],
                      fields=[[s["x0"], s["y0"], s["x1"], s["y1"]] for s in fields],
@@ -802,7 +1026,8 @@ def cmd_density(args) -> int:
         fold = args.fold if args.fold else (0.88 if dev in ("iphone", "unknown", "custom") else 0.97)
         use_scale(sc)
         crop = [float(v) for v in args.crop.split(":")] if args.crop else None
-        r = analyse(f, dt, sc, fold, args.items_present, dev, crop)
+        hr = [float(v) for v in args.hero_rect.split(",")] if args.hero_rect else None
+        r = analyse(f, dt, sc, fold, args.items_present, dev, crop, hr, args.hero_glob or None)
         r["scale"], r["device"] = sc, dev
         results.append(r)
     if args.json:
@@ -813,6 +1038,11 @@ def cmd_density(args) -> int:
     for r in results:
         s = r["summary"]
         fails = [c["rule"] for c in r["checks"] if not c["pass_"]]
+        if r.get("hero") and r["hero"].get("art_bbox_pt"):
+            hh = r["hero"]
+            print(f"        hero {os.path.basename(r['frame'])}: art bbox {hh['art_bbox_pt']}pt ({hh['art_bbox_share']:.0%} of window), "
+                  f"H1 frame {hh['H1_frame_side_pt']}pt, H2 {hh['H2_art_share']:.1%} (want {hh['H2_range']}), "
+                  f"card_edge_around_art={hh['card_edge_around_art']} [H1/H2 advisory]", file=sys.stderr if not args.json else sys.stdout)
         print(f"{r['verdict']:7} {os.path.basename(r['frame'])} rows={[float(x) for x in s['row_heights_pt']]} "
               f"maxcard={s['largest_card_share']:.0%} items={s['items_above_fold']} "
               f"empty={s['max_empty_band_share']:.0%}" + (f" fails={fails}" if fails else ""),
@@ -839,6 +1069,8 @@ def main():
         p.add_argument("--fold", type=float, help="fold as a fraction of frame height (default 0.88 phone with tab bar, 0.97 iPad/Duo)")
         p.add_argument("--crop", help="x0:x1 in pt: analyse one pane of a multi-column layout (list pane, detail pane)")
         p.add_argument("--items-present", type=int, help="items that exist in the screen's data; enables D3")
+        p.add_argument("--hero-rect", help="x0,y0,x1,y1 in pt: the hero art region (default: auto-detected on hero frames)")
+        p.add_argument("--hero-glob", action="append", help="frame-name glob that marks a hero frame (repeatable; default today-*, rental-*, welcome*, inbox-empty*, milestone*)")
         return cmd_density(p.parse_args())
     return legacy_main()
 
