@@ -106,3 +106,17 @@ Rule: §H.2 "Forbidden kitsch" and "The rig's lights, as shipped". The flag does
 - **Launch:** launch → handoff → first screen, light and dark, cold start (§H.5).
 - **Small windows:** Today on 375×667 and Duo closed (382×644) at default: D3b's 1-row rule (§H.8).
 - **AX3 numeral:** package C's first AX3 Today frame names the open finding "54pt numeral smaller than 'of 100 hours'" for the gate.
+
+## 13. Landscape and per-pane `frame_check` (§1.27 two-pane and stacked; added 2026-10-25)
+
+Today `frame_check.py` assumes one full-width portrait screen: the tab-bar band spans the whole width, `KNOWN_SIZES` has no iPad 10th gen, mini or 11" sizes, and an unknown size defaults to 3x although iPad renders at 2x. Per-pane D3, D4 and D6 cannot be measured. The changes:
+
+- **`KNOWN_SIZES` additions (px → scale, class):** iPad 10th gen and Air 11" 1640×2360 / 2360×1640 (2x, `ipad`); iPad mini 1488×2266 / 2266×1488 (2x, `ipad`); iPad Pro 11" 1668×2420 / 2420×1668 (2x, `ipad`); the existing 13" 2064×2752 / 2752×2064 stay. Duo open 2853×2007 and propped 2007×2853 stay (3x).
+- **`--scale` and `--device` flags:** Stage Manager and Split View captures have arbitrary sizes. An unknown size **fails** unless both are given (`--scale 2 --device ipad`); the 3x default for unknown sizes is removed.
+- **Landscape:** orientation is inferred from `w > h`. Landscape bands: status bar 24, home indicator 20; the tab bar band applies only where a bar is drawn (below).
+- **`--pane left|right|top|bottom` (new):** crops the frame to one pane before every density check. Pane geometry comes from `--split <pt>` (the fold or gap's leading edge) and `--gap <pt>` (default 24), or from a sidecar `<frame>.panes.json` (`{"panes": [[x, y, w, h], ...], "gap": [x, y, w, h], "bar": [x, y, w, h]}`) that the capture writes from `reservedRegions` or the `TwoPaneLayout` geometry. The sidecar wins when present.
+- **Bar band per pane:** in two-pane the tab-bar band applies to the right pane only (the left pane has no bar); in stacked, to the bottom half only. It is taken from the sidecar's `bar` rect, not assumed full-width.
+- **Per-pane measures:** D3 (rows visible) and D4 (empty bands) per pane; D6 and H2 against the pane height; DU4 and DU13 (wall between the last card and the bar ≤ 20%) on the right pane or bottom half; DU2 (0 text-edge pixels) inside the gap rect.
+- **`two_pane_check.py`** (package J, `scripts/adaptive/`): the DU1–DU14 checks; it starts from `duo-gate6/aa.py` and `duo-concept-v7/selfcheck/measure7.py`, which are **copied into `scripts/adaptive/`** (the originals sit in swept scratch).
+- **Capture set (every adaptive hand-off):** iPhone 402×874; Duo closed 382×644, open 951×669, propped 669×951; iPad 10th gen 820×1180 and 1180×820; iPad mini 744×1133 (compact) and 1133×744 (two-pane); iPad Pro or Air 11" 1180×820 at 2/3 Split View (compact, both paths) and 834×1210; 13" 1376×1032; Stage Manager windows at 799 and 800 wide, and 644 and 645 tall, each reached from both sides and settled; light and dark; default, XXL and AX3. Shell frames on iOS 18, 26 and 27 (§12) include the iPad right-pane bar.
+- **`standard_lint.py` rule `allRentalsNoAggregate` (§H.1 H10):** in `Sources/Views/` and `Sources/ViewModels/`, fail on a `reduce` whose closure reads `.goal`, and on a `CraftStage.stage(` call whose `hours:` argument is a `reduce`/`sum` expression or a property named `total*`/`all*`. The prototype's `DuoTwoPane.swift:82–83` is the test fixture that must fail.
