@@ -6,6 +6,10 @@ import SwiftUI
 // system (`LHToastCenter` + `LHToast`, surfaces lane). This type keeps the build-1 call sites
 // (`show(_:kind:undo:)`, `undo()`, `dismiss()`) and forwards them; it draws nothing itself.
 // Identifiers stay `shell.toast` / `inbox.undo` so the build-1 UI tests keep finding them.
+//
+// v2 (plan package 0a): where the toast shows is the center's `placement` (`.top` in the rental
+// chip's slot while a hero screen is on screen, `.bottom` elsewhere), and every toast is announced
+// to VoiceOver by the center. Callers here never choose a placement themselves.
 
 @MainActor
 final class AppToastCenter {
@@ -15,6 +19,8 @@ final class AppToastCenter {
     var center: LHToastCenter = .shared
     /// DEBUG capture hooks set this to hold a toast on screen; nil uses the toast's own timing.
     var undoWindow: TimeInterval?
+    /// Where the next toast shows (read-only; hero screens claim `.top` through `LHToastChipSlot`).
+    var placement: LHToastPlacement { center.placement }
     /// The toast this facade last queued (so `dismiss()` never closes someone else's toast).
     private(set) var lastSpecId: UUID?
 

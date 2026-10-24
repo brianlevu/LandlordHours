@@ -165,12 +165,15 @@ final class PropertyHouseStageTests: XCTestCase {
         XCTAssertEqual(PropertyHouseStage.keyframe(for: 501), .k12_roof, "never past the roof")
         XCTAssertEqual(PropertyHouseStage.keyframe(for: 900), .k12_roof)
 
-        XCTAssertEqual(PropertyHouseStage.stage(for: 0), .emptyLot)
-        XCTAssertEqual(PropertyHouseStage.stage(for: 99), .groundwork)
-        XCTAssertEqual(PropertyHouseStage.stage(for: 100), .slab)
-        XCTAssertEqual(PropertyHouseStage.stage(for: 499), .framing)
-        XCTAssertEqual(PropertyHouseStage.stage(for: 500), .roofed)
-        XCTAssertEqual(PropertyHouseStage.stage(for: 501), .roofed)
+        // v2 (plan 0a): the stage forwards to CraftStage (share of the 750 the mini-house uses,
+        // capped at 500h); the words follow the crafted house until package F redesigns the rental.
+        XCTAssertEqual(PropertyHouseStage.stage(for: 0), .started)
+        XCTAssertEqual(PropertyHouseStage.stage(for: 149), .started)
+        XCTAssertEqual(PropertyHouseStage.stage(for: 150), .frame70)
+        XCTAssertEqual(PropertyHouseStage.stage(for: 352.5), .framing)
+        XCTAssertEqual(PropertyHouseStage.stage(for: 499), .half)
+        XCTAssertEqual(PropertyHouseStage.stage(for: 500), .half)
+        XCTAssertEqual(PropertyHouseStage.stage(for: 900), .half, "never past the 500h cap")
     }
 
     func testBelow500ItMatchesTodaysKeyframes() {

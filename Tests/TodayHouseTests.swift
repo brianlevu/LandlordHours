@@ -38,8 +38,9 @@ final class TodayHouseCountableHoursTests: CaptureTestCase {
         XCTAssertEqual(hours, 120, accuracy: 0.001)
         XCTAssertEqual(hours, vm.repsStatus(participant: .selfParticipant, year: Calendar.current.component(.year, from: Date())).realEstateHours,
                        accuracy: 0.001, "The house reuses the tax engine's REPS hours")
-        // 120h = the slab, not the frame the 610h total would draw.
-        XCTAssertEqual(HouseProgress(hours: hours, goal: .reps750).stage, .slab)
+        // 120h of 750 = just started, not the framing the 610h total would draw.
+        XCTAssertEqual(HouseProgress(hours: hours, goal: .reps750).stage, .started)
+        XCTAssertEqual(HouseProgress(hours: 610, goal: .reps750).stage, .half)
     }
 
     func testMaterialParticipationCountsSpouseOnlyWhenTrackedJointly() {
@@ -51,13 +52,13 @@ final class TodayHouseCountableHoursTests: CaptureTestCase {
         TaxProfileManager.shared.spouseTracking = true
         let joint = vm.houseCountableHours(goal: .mp100)
         XCTAssertEqual(joint, 110, accuracy: 0.001)
-        XCTAssertEqual(HouseProgress(hours: joint, goal: .mp100).stage, .slab)
+        XCTAssertEqual(HouseProgress(hours: joint, goal: .mp100).stage, .complete)
         XCTAssertTrue(HouseProgress(hours: joint, goal: .mp100).isGoalMet)
 
         TaxProfileManager.shared.spouseTracking = false
         let solo = vm.houseCountableHours(goal: .mp100)
         XCTAssertEqual(solo, 70, accuracy: 0.001)
-        XCTAssertEqual(HouseProgress(hours: solo, goal: .mp100).stage, .groundwork)
+        XCTAssertEqual(HouseProgress(hours: solo, goal: .mp100).stage, .half)
         XCTAssertFalse(HouseProgress(hours: solo, goal: .mp100).isGoalMet)
     }
 

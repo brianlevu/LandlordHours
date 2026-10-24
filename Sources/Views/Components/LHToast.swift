@@ -14,6 +14,12 @@ import UIKit
 // textSecondary / caution. Action text: `action`. At accessibility sizes the action drops under
 // the message. The glyph scales with Dynamic Type.
 //
+// v2 (standard §1.19, §H.8; plan package 0a): the placement is one parameter of the center.
+// Hero screens (Today, the rental page, the milestone) claim `.top` while they are on screen; the
+// toast is then a glass capsule in the rental chip's slot that replaces the chip while it shows
+// (`LHToastChipSlot`), so it never covers a row or the roof. Everywhere else it stays `.bottom`,
+// just above the tab bar. Every toast is announced to VoiceOver. 4 s; 8 s with an action.
+//
 // Use it two ways:
 //   - `LHToastCenter.shared.show(...)` from anywhere: queued, timed, shown by the shell.
 //   - `LHToast(spec:onAction:)` directly when a screen owns its own toast state (the Inbox).
@@ -24,6 +30,14 @@ enum LHToastMetrics {
     static let shadowRadius: CGFloat = 16
     static let shadowY: CGFloat = 4
     static func shadowOpacity(_ scheme: ColorScheme) -> Double { scheme == .dark ? 0.4 : 0.12 }
+}
+
+/// Where the shell shows the toast.
+enum LHToastPlacement: Equatable, Sendable {
+    /// Hero screens: a glass capsule in the rental chip's slot, under the status bar.
+    case top
+    /// Everywhere else: full width, 12pt above the tab bar.
+    case bottom
 }
 
 struct LHToastSpec: Equatable, Identifiable {
@@ -60,12 +74,12 @@ struct LHToastSpec: Equatable, Identifiable {
         }
     }
 
-    /// Seconds on screen: an action needs time to reach; a problem stays longest.
+    /// Seconds on screen (§1.19): 4 s; 8 s when there is an action to reach, and for a problem.
     var duration: TimeInterval {
         if let holdSeconds { return holdSeconds }
         switch kind {
         case .problem: return 8
-        case .success, .neutral: return actionTitle == nil ? 4 : 5
+        case .success, .neutral: return actionTitle == nil ? 4 : 8
         }
     }
 
@@ -82,6 +96,8 @@ struct LHToast: View {
     /// Accessibility identifiers: `<prefix>` on the toast, `<prefix>.action` on its button.
     var identifier = "toast"
     var actionIdentifier: String? = nil
+    /// `.bottom`: the card above the tab bar. `.top`: the glass capsule in the chip's slot.
+    var placement: LHToastPlacement = .bottom
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -129,19 +145,53 @@ struct LHToast: View {
         .padding(.vertical, 6)
         .frame(minHeight: LHToastMetrics.minHeight)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: LHToastMetrics.radius, style: .continuous)
-                .fill(colors.toastSurface)
-                .shadow(color: .black.opacity(LHToastMetrics.shadowOpacity(colorScheme)),
-                        radius: LHToastMetrics.shadowRadius, y: LHToastMetrics.shadowY)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: LHToastMetrics.radius, style: .continuous)
-                .strokeBorder(colors.border, lineWidth: 1)
-        )
-        .compositingGroup()
+        .modifier(LHToastSurface(placement: placement))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(identifier)
+    }
+}
+
+/// The toast's surface. Bottom: the opaque card (radius 22, hairline, shadow). Top: a glass
+/// capsule (`.glassEffect(.regular, in: .capsule)` on iOS 26+, `.regularMaterial` below).
+private struct LHToastSurface: ViewModifier {
+    let placement: LHToastPlacement
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    func body(content: Content) -> some View {
+        switch placement {
+        case .bottom:
+            content
+                .background(
+                    RoundedRectangle(cornerRadius: LHToastMetrics.radius, style: .continuous)
+                        .fill(colors.toastSurface)
+                        .shadow(color: .black.opacity(LHToastMetrics.shadowOpacity(colorScheme)),
+                                radius: LHToastMetrics.shadowRadius, y: LHToastMetrics.shadowY)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: LHToastMetrics.radius, style: .continuous)
+                        .strokeBorder(colors.border, lineWidth: 1)
+                )
+                .compositingGroup()
+        case .top:
+            // A capsule while the toast is one or two short lines; at accessibility sizes the
+            // action drops under the message and a tall capsule would read as a blob, so the same
+            // glass takes the toast radius instead.
+            let shape = dynamicTypeSize.isAccessibilitySize
+                ? AnyShape(RoundedRectangle(cornerRadius: LHToastMetrics.radius, style: .continuous))
+                : AnyShape(Capsule())
+            if #available(iOS 26.0, *) {
+                content
+                    .padding(.horizontal, 4)
+                    .glassEffect(.regular, in: shape)
+            } else {
+                content
+                    .padding(.horizontal, 4)
+                    .background(.regularMaterial, in: shape)
+                    .overlay(shape.stroke(colors.border, lineWidth: 1))
+            }
+        }
     }
 }
 
@@ -165,6 +215,34 @@ final class LHToastCenter: ObservableObject {
     @Published private(set) var current: LHToastSpec?
     private(set) var queue: [LHToastSpec] = []
     var maxQueued = 3
+
+    /// Where the toast shows: `.top` while any hero screen holds a claim, else `.bottom`.
+    @Published private(set) var placement: LHToastPlacement = .bottom
+    /// Hero screens on screen right now (a tab switch may run the new screen's appear before the
+    /// old one's disappear, so claims are counted, not toggled).
+    private var topClaims: Set<UUID> = []
+
+    /// True while a toast shows in the rental chip's slot: the hero screen fades its chip out.
+    var hidesHeroChip: Bool { placement == .top && current != nil }
+
+    /// A hero screen appeared: toasts show at the top until it releases the claim.
+    @discardableResult
+    func claimTopPlacement(_ id: UUID = UUID()) -> UUID {
+        topClaims.insert(id)
+        updatePlacement()
+        return id
+    }
+
+    /// The hero screen went away.
+    func releaseTopPlacement(_ id: UUID) {
+        topClaims.remove(id)
+        updatePlacement()
+    }
+
+    private func updatePlacement() {
+        let next: LHToastPlacement = topClaims.isEmpty ? .bottom : .top
+        if placement != next { placement = next }
+    }
 
     private var actions: [UUID: () -> Void] = [:]
     private var timer: Task<Void, Never>?
@@ -217,7 +295,8 @@ final class LHToastCenter: ObservableObject {
         if !queue.isEmpty { present(queue.removeFirst()) }
     }
 
-    /// Removes everything (sign-out, profile switch).
+    /// Removes everything (sign-out, profile switch). Placement claims belong to the screens on
+    /// screen and are left alone.
     func clear() {
         timer?.cancel()
         timer = nil
@@ -250,21 +329,73 @@ final class LHToastCenter: ObservableObject {
     }
 }
 
-/// The shell's toast slot: shows `LHToastCenter.current` with a slide (Reduce Motion: none).
+/// A toast slot. The shell hosts the `.bottom` slot above the tab bar; a hero screen hosts the
+/// `.top` slot through `LHToastChipSlot`. A slot draws only while the center's placement is its own,
+/// so a toast never shows twice. Motion (§B.3 `toastIn` / `toastOut`): in, 24pt from its edge with
+/// opacity (`reveal`); out, opacity and 12pt toward its edge (`quick`); a replacement crossfades.
+/// Reduce Motion: opacity only.
 struct LHToastHost: View {
     @ObservedObject var center: LHToastCenter
+    var slot: LHToastPlacement = .bottom
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
-            if let spec = center.current {
+            if center.placement == slot, let spec = center.current {
                 LHToast(spec: spec, onAction: { center.performAction() },
-                        identifier: spec.identifier ?? "toast", actionIdentifier: spec.actionIdentifier)
+                        identifier: spec.identifier ?? "toast", actionIdentifier: spec.actionIdentifier,
+                        placement: slot)
                     .id(spec.id)
-                    // Slides only: a fade would let row text show through mid-transition.
-                    .transition(reduceMotion ? .identity : .move(edge: .bottom))
+                    .transition(LHToastMotion.transition(slot: slot, reduceMotion: reduceMotion))
             }
         }
         .lhMotion(AppAnimation.reveal, value: center.current?.id)
+    }
+}
+
+/// The toast's transitions, by slot.
+enum LHToastMotion {
+    /// Points the toast travels in from its edge, and out toward it.
+    static let inOffset: CGFloat = 24
+    static let outOffset: CGFloat = 12
+
+    static func transition(slot: LHToastPlacement, reduceMotion: Bool) -> AnyTransition {
+        if reduceMotion { return .opacity }
+        let sign: CGFloat = slot == .bottom ? 1 : -1
+        return .asymmetric(
+            insertion: .offset(y: sign * inOffset).combined(with: .opacity),
+            removal: .offset(y: sign * outOffset).combined(with: .opacity).animation(AppAnimation.quick)
+        )
+    }
+}
+
+/// The rental chip's slot on a hero screen (Today, the rental page, the milestone). While the
+/// screen is on screen it claims the `.top` placement; when a toast shows, the chip fades out and
+/// the toast fades in in its place (`quick`), and back on dismiss (§1.19, §H.8). The slot keeps the
+/// chip's height so nothing under it moves.
+struct LHToastChipSlot<Chip: View>: View {
+    @ObservedObject var center: LHToastCenter
+    @ViewBuilder var chip: () -> Chip
+    @State private var claim: UUID?
+
+    init(center: LHToastCenter = .shared, @ViewBuilder chip: @escaping () -> Chip) {
+        self.center = center
+        self.chip = chip
+    }
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            chip()
+                .opacity(center.hidesHeroChip ? 0 : 1)
+                .allowsHitTesting(!center.hidesHeroChip)
+                .accessibilityHidden(center.hidesHeroChip)
+            LHToastHost(center: center, slot: .top)
+        }
+        .lhMotion(AppAnimation.quick, value: center.hidesHeroChip)
+        .onAppear { if claim == nil { claim = center.claimTopPlacement() } }
+        .onDisappear {
+            if let claim { center.releaseTopPlacement(claim) }
+            claim = nil
+        }
     }
 }

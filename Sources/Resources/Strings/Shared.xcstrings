@@ -1,0 +1,66 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "stage.complete": {
+      "comment": "Crafted house stage: the house is finished.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "House finished"
+          }
+        }
+      }
+    },
+    "stage.frame70": {
+      "comment": "Crafted house stage: most of the framing is up.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frame going up"
+          }
+        }
+      }
+    },
+    "stage.framing": {
+      "comment": "Crafted house stage: framing complete, no roof yet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frame finished"
+          }
+        }
+      }
+    },
+    "stage.half": {
+      "comment": "Crafted house stage: roof on, siding about half done.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Roof on, siding going up"
+          }
+        }
+      }
+    },
+    "stage.started": {
+      "comment": "Crafted house stage: the first studs are up.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Framing started"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

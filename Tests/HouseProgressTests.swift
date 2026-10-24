@@ -72,19 +72,25 @@ final class HouseProgressTests: XCTestCase {
 
     // MARK: Stages
 
-    func testStageBoundaries() {
-        XCTAssertEqual(p(0).stage, .emptyLot)
-        XCTAssertEqual(p(0.99).stage, .emptyLot)
-        XCTAssertEqual(p(1).stage, .groundwork)
-        XCTAssertEqual(p(99.99).stage, .groundwork)
-        XCTAssertEqual(p(100).stage, .slab)
-        XCTAssertEqual(p(140).stage, .framing)
-        XCTAssertEqual(p(499.99).stage, .framing)
-        XCTAssertEqual(p(500).stage, .roofed)
-        XCTAssertEqual(p(550).stage, .siding)
-        XCTAssertEqual(p(750).stage, .siding)
-        XCTAssertEqual(p(750.01).stage, .finished)
+    /// v2: the stage forwards to `CraftStage.stage(hours:goal:)`, a share of the goal (standard §H.3).
+    func testStageForwardsToTheCraftStage() {
+        XCTAssertEqual(p(0).stage, .started)
+        XCTAssertEqual(p(149.99).stage, .started)        // < 0.20 of 750
+        XCTAssertEqual(p(150).stage, .frame70)
+        XCTAssertEqual(p(352.4).stage, .frame70)         // < 0.47
+        XCTAssertEqual(p(352.5).stage, .framing)
+        XCTAssertEqual(p(449.99).stage, .framing)        // < 0.60
+        XCTAssertEqual(p(450).stage, .half)
+        XCTAssertEqual(p(749.99).stage, .half)
+        XCTAssertEqual(p(750).stage, .complete)
         XCTAssertEqual(p(750.01).stage.spokenName, "House finished")
+        XCTAssertEqual(p(60, .mp100).stage, .half, "The goal sets the scale: 60 of 100 has the roof on")
+        XCTAssertEqual(p(100, .mp100).stage, .complete)
+        for goal in HouseGoal.allCases {
+            for h in [0, 12.5, 99.99, 100, 300, 499.99, 500, 750, 750.01, 2000] {
+                XCTAssertEqual(p(h, goal).stage, CraftStage.stage(hours: h, goal: goal.targetHours), "\(goal) \(h)")
+            }
+        }
     }
 
     // MARK: Next milestone
@@ -199,7 +205,7 @@ final class HouseProgressTests: XCTestCase {
         XCTAssertTrue(done.contains("based on your records"), done)
 
         XCTAssertTrue(p(499.6).accessibilityLabel.contains("1 hour to go"))
-        XCTAssertTrue(p(0).accessibilityLabel.contains("An empty lot"))
+        XCTAssertTrue(p(0).accessibilityLabel.contains("Framing started"))
     }
 
     func testWholeHoursRoundDown() {

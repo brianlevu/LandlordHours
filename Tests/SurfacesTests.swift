@@ -398,7 +398,7 @@ final class ToastQueueTests: XCTestCase {
 
     func testDurations() {
         XCTAssertEqual(LHToastSpec(kind: .success, message: "x").duration, 4)
-        XCTAssertEqual(LHToastSpec(kind: .neutral, message: "x", actionTitle: "Undo").duration, 5)
+        XCTAssertEqual(LHToastSpec(kind: .neutral, message: "x", actionTitle: "Undo").duration, 8, "§1.19: 8 s with an action")
         XCTAssertEqual(LHToastSpec(kind: .problem, message: "x").duration, 8)
     }
 

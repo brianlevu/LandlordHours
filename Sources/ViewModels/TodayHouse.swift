@@ -83,6 +83,62 @@ struct TodayPace: Equatable {
     }
 }
 
+// MARK: - v2: the crafted hero's figures (standard §H.1 H10, §H.6; plan package 0a)
+
+/// What the crafted hero shows for one rental, or for "All rentals": hours, the goal they are
+/// measured against, and the stage from the one stage function.
+struct CraftHeroTotals: Equatable, Sendable {
+    let hours: Double
+    let goal: Double
+
+    var stage: CraftStage { CraftStage.stage(hours: hours, goal: goal) }
+
+    /// One rental: its confirmed hours against its goal.
+    init(hours: Double, goal: Double) {
+        self.hours = hours.isFinite ? max(0, hours) : 0
+        self.goal = goal.isFinite ? max(0, goal) : 0
+    }
+
+    /// "All rentals" (H10): the sum of confirmed hours across rentals against the largest goal any
+    /// rental uses (the 750 when one uses it), through the same stage function. No rentals: zero
+    /// hours against no goal (the first stage).
+    static func allRentals(_ rentals: [CraftHeroTotals]) -> CraftHeroTotals {
+        CraftHeroTotals(hours: rentals.reduce(0) { $0 + $1.hours },
+                        goal: rentals.map(\.goal).max() ?? 0)
+    }
+}
+
+/// The timber drop plays at most once per stage per rental (§H.6). Remembers, per profile and tax
+/// year, which rentals already played it, so a relaunch, a delete and re-log or another device's
+/// sync never replays it. "All rentals" is keyed as its own focus.
+struct CraftDropLedger {
+    static let baseKey = "LandlordHours.house.craftDropPlayed"
+    /// The key used for the aggregate "All rentals" focus.
+    static let allRentalsKey = "all"
+
+    var defaults: UserDefaults = .standard
+    /// The profile; nil = the active one.
+    var userId: String? = UserScope.userId
+
+    private var key: String { UserScope.key(Self.baseKey, userId: userId) }
+
+    static func token(focus: String, stage: CraftStage, year: Int) -> String { "\(year)_\(focus)_\(stage.rawValue)" }
+
+    static func focus(rentalID: UUID?) -> String { rentalID?.uuidString ?? allRentalsKey }
+
+    func hasPlayed(rentalID: UUID?, stage: CraftStage = .framing, year: Int) -> Bool {
+        (defaults.stringArray(forKey: key) ?? []).contains(Self.token(focus: Self.focus(rentalID: rentalID), stage: stage, year: year))
+    }
+
+    func markPlayed(rentalID: UUID?, stage: CraftStage = .framing, year: Int) {
+        var list = defaults.stringArray(forKey: key) ?? []
+        let token = Self.token(focus: Self.focus(rentalID: rentalID), stage: stage, year: year)
+        guard !list.contains(token) else { return }
+        list.append(token)
+        defaults.set(list, forKey: key)
+    }
+}
+
 // MARK: - Celebrate-once ledger
 
 /// Remembers which house celebrations a profile has seen, per tax year and milestone, so a

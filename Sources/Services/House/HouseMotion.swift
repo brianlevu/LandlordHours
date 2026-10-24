@@ -138,3 +138,127 @@ enum HouseMotion {
     /// #1E3FA6, the concept's ~4.3:1) and the ghost fill to ~0.19.
     static let lineworkAlphaGain: Double = 2.4
 }
+
+// MARK: - v2: the crafted house's motion (standard §H.6, §B.2, §B.3; plan package 0a)
+//
+// Two moves, in this order, then stillness: the 39-piece timber drop, then the windows coming on.
+// `CraftHouseView` (package A) plays what `CraftMotion.plan` returns; the stage-motion choice lives
+// in the one switch below, so no view keeps its own copy of the rule.
+
+/// How a stage change is shown.
+enum CraftStageMotion: Equatable, Sendable {
+    /// No stage change.
+    case none
+    /// The pre-rendered framing clip: fade in over the still, play, crossfade to `craft_framing`.
+    case timberDrop
+    /// A 0.25 s crossfade with a 0.97 → 1 scale settle (a 0.15 s crossfade under Reduce Motion).
+    case stageFade
+}
+
+/// What one log or confirm does to the hero.
+struct CraftMotionPlan: Equatable, Sendable {
+    var from: CraftStage
+    var to: CraftStage
+    var stageMotion: CraftStageMotion
+    /// The windows fade on (the first log of the day for the shown rental).
+    var windowsOn: Bool
+    /// Seconds from the start of the plan until the windows start to fade on.
+    var windowsDelay: Double
+    /// The windows' fade length (linear under Reduce Motion).
+    var windowsDuration: Double
+    /// The build clip is dimmed to the unlit still's mean luma while the windows are held dark.
+    var holdsWindowsDarkThroughDrop: Bool
+    /// The one wood-knock haptic as the last timber lands (kept under Reduce Motion).
+    var knock: Bool
+
+    /// Total seconds until the hero is still again.
+    var totalDuration: Double {
+        let stageEnd: Double
+        switch stageMotion {
+        case .none: stageEnd = 0
+        case .timberDrop: stageEnd = CraftMotion.dropFadeIn + CraftMotion.dropClip + CraftMotion.dropCrossfade
+        case .stageFade: stageEnd = CraftMotion.stageFadeDuration
+        }
+        return max(stageEnd, windowsOn ? windowsDelay + windowsDuration : 0)
+    }
+
+    var isEmpty: Bool { stageMotion == .none && !windowsOn }
+}
+
+enum CraftMotion {
+    // Timings (seconds). Spec: §H.6 and the §B.2 tokens.
+    /// The clip fades in over the still.
+    static let dropFadeIn: Double = 0.20
+    /// The clip: 60 frames at 30 fps.
+    static let dropClip: Double = 2.0
+    /// The clip crossfades to `craft_framing`.
+    static let dropCrossfade: Double = 0.30
+    /// `stageFade`: crossfade with a 0.97 → 1 scale settle.
+    static let stageFadeDuration: Double = 0.25
+    static let stageFadeStartScale: Double = 0.97
+    /// Reduce Motion: no clip, no scale; the still crossfades.
+    static let reducedStageCrossfade: Double = 0.15
+    /// `windowsOn`: the lit still fades over the unlit one (and the spill pool with it).
+    static let windowsFade: Double = 0.40
+    /// Without a drop the windows start this long after the still settles.
+    static let windowsAfterSettle: Double = 0.30
+    /// `rentalSlide`: 0.30 spring, bounce 0; a 0.20 fade under Reduce Motion.
+    static let rentalSlide: Double = 0.30
+    static let reducedRentalFade: Double = 0.20
+    /// The lit clip held dark through a first-of-day drop, multiplied to the unlit still's mean luma.
+    static let clipDimNight: Double = 0.66
+    static let clipDimDusk: Double = 0.76
+
+    /// The one switch: which motion carries a stage change from `old` to `new` (§H.6, "one log, two
+    /// or more stages"). The house never plays the stages in between: any change that ends at
+    /// `framing` from an earlier stage plays the drop (its fade-in covers the jump); every other
+    /// change is one `stageFade`. Lower hours (a delete) never play the drop.
+    static func stageMotion(from old: CraftStage, to new: CraftStage) -> CraftStageMotion {
+        switch (old, new) {
+        case _ where old == new: return .none
+        case (.started, .framing), (.frame70, .framing): return .timberDrop
+        default: return .stageFade
+        }
+    }
+
+    /// The plan for a save that moves the shown rental from `oldHours` to `newHours` against `goal`.
+    /// - Parameters:
+    ///   - wasLit: the windows were lit before the save (hours already logged today).
+    ///   - isLit: the windows are lit after it (`TodayWindowState.loggedToday`).
+    ///   - dropAlreadyPlayed: this rental already played its drop for this stage (once per stage per
+    ///     rental); the change is then a `stageFade`.
+    static func plan(oldHours: Double, newHours: Double, goal: Double,
+                     wasLit: Bool, isLit: Bool,
+                     reduceMotion: Bool, dropAlreadyPlayed: Bool = false) -> CraftMotionPlan {
+        let from = CraftStage.stage(hours: oldHours, goal: goal)
+        let to = CraftStage.stage(hours: newHours, goal: goal)
+        var motion = stageMotion(from: from, to: to)
+        if motion == .timberDrop && (dropAlreadyPlayed || reduceMotion) { motion = .stageFade }
+        let windowsOn = isLit && !wasLit
+        let settle: Double
+        switch motion {
+        case .none: settle = 0
+        case .timberDrop: settle = dropFadeIn + dropClip + dropCrossfade
+        case .stageFade: settle = reduceMotion ? reducedStageCrossfade : stageFadeDuration
+        }
+        // After a drop the windows fade on straight after the crossfade; otherwise 0.30 s after the
+        // still settles.
+        let delay = motion == .timberDrop ? settle : settle + windowsAfterSettle
+        let isDrop = motion == .timberDrop
+        // Reduce Motion keeps the knock when the drop would have played (the still crossfades).
+        let wouldDrop = stageMotion(from: from, to: to) == .timberDrop && !dropAlreadyPlayed
+        return CraftMotionPlan(
+            from: from, to: to, stageMotion: motion,
+            windowsOn: windowsOn,
+            windowsDelay: windowsOn ? delay : 0,
+            windowsDuration: windowsOn ? windowsFade : 0,
+            holdsWindowsDarkThroughDrop: isDrop && windowsOn,
+            knock: wouldDrop
+        )
+    }
+
+    /// The build clip's brightness multiplier: 1 when the windows are lit, else the unlit still's mean luma.
+    static func clipDim(windowsLit: Bool, dark: Bool) -> Double {
+        windowsLit ? 1 : (dark ? clipDimNight : clipDimDusk)
+    }
+}

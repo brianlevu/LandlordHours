@@ -3,6 +3,10 @@ import CoreGraphics
 
 // MARK: - House progress (pure logic)
 //
+// v2 (plan package 0a): `stage` forwards to `CraftStage.stage(hours:goal:)`, a share of the goal
+// (standard §H.3). The keyframes, milestones and next-step words below are v1 and stay until their
+// callers move to the crafted house; the milestones (100 / 500 / 750) still drive the celebrations.
+//
 // The Blueprint house is "a chart with a roof": height is confirmed, countable hours and nothing
 // else (docs/design/2.0-concepts-blueprint.md §1). This file maps those hours to one of the 19
 // rendered keyframes in Assets.xcassets/Blueprint/House (manifest:
@@ -160,24 +164,10 @@ enum HouseCelebration: Hashable, Identifiable, Sendable {
     }
 }
 
-/// The construction stage, for words and accessibility. Derived from the keyframe.
-enum HouseStage: Int, CaseIterable, Comparable, Sendable {
-    case emptyLot, groundwork, slab, framing, roofed, siding, finished
-
-    var spokenName: String {
-        switch self {
-        case .emptyLot: return "An empty lot"
-        case .groundwork: return "Breaking ground"
-        case .slab: return "Foundation poured"
-        case .framing: return "Frame going up"
-        case .roofed: return "Roof on"
-        case .siding: return "Siding going up"
-        case .finished: return "House finished"
-        }
-    }
-
-    static func < (lhs: HouseStage, rhs: HouseStage) -> Bool { lhs.rawValue < rhs.rawValue }
-}
+/// The construction stage, for words and accessibility. v2 (standard §H.3, plan package 0a): the
+/// stage is the crafted house's stage, so there is one answer to "what stage is this rental". This
+/// forwarder keeps the v1 name compiling for its callers and is deleted when the last one moves.
+typealias HouseStage = CraftStage
 
 /// One rendered keyframe pair (built pass + linework), in draw order. Raw values are the manifest
 /// keys; asset names follow `bp_house_<key>_built` / `bp_house_<key>_lines`.
@@ -292,17 +282,9 @@ struct HouseProgress: Equatable, Sendable {
 
     // MARK: Stage
 
-    var stage: HouseStage {
-        if hours < 1 { return .emptyLot }
-        switch keyframe.manifestStage {
-        case 0: return .groundwork
-        case 1: return .slab
-        case 2: return .framing
-        case 3: return .roofed
-        case 4: return .siding
-        default: return .finished
-        }
-    }
+    /// The crafted house's stage for these hours against this goal: `CraftStage.stage(hours:goal:)`,
+    /// the one stage function (standard §H.3). The keyframe above is the v1 art and retires with it.
+    var stage: HouseStage { CraftStage.stage(hours: hours, goal: goal.targetHours) }
 
     // MARK: Milestones and the goal's keys
     //
