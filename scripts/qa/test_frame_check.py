@@ -300,5 +300,163 @@ class ScaleAware(unittest.TestCase):
         self.assertTrue(any("--scale" in why for _, why in rep["skipped"]))
 
 
+FIX = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "craft")
+LIGHT = os.path.join(FIX, "today-light-L-windows-lit.png")   # real CRAFT frames, 402x874 (1px = 1pt)
+DARK = os.path.join(FIX, "today-dark-L-windows-lit.png")
+FULL = os.path.expanduser("~/AgentScratch/landlordhours/2026-10-24/dir-craft-final3/frames")
+
+
+def run_legacy(frames, scale="1"):
+    import json
+    import shutil
+    import subprocess
+    d, outd = tempfile.mkdtemp(prefix="fc-hero-"), tempfile.mkdtemp()
+    for f in frames:
+        shutil.copy(f, d)
+    subprocess.run([sys.executable, "-W", "ignore", os.path.join(os.path.dirname(fc.__file__), "frame_check.py"), d,
+                    "--scale", scale, "--out", outd], capture_output=True, text=True)
+    return json.load(open(os.path.join(outd, "frame_check.json")))["results"]
+
+
+class HeroFrames(unittest.TestCase):
+    """Dusk / night page, gradient, 3D house art (standard v2 section H). Real frames from dir-craft-final3."""
+
+    def dens(self, path, **kw):
+        return fc.analyse(path, "default", 1.0, 0.88, None, "custom", None, kw.get("hero_rect"))
+
+    def test_density_reads_rows_on_the_dusk_and_night_pages(self):
+        for p in (LIGHT, DARK):
+            r = self.dens(p)
+            self.assertNotEqual(r["verdict"], "NO_DATA", p)
+            rows = r["summary"]["row_heights_pt"]
+            self.assertEqual(len(rows), 2, rows)               # two full "To confirm" rows
+            for h in rows:
+                self.assertTrue(62.9 <= h <= 65.1, rows)       # 63.7-64.3pt at 3x; 1px = 1pt here
+            self.assertEqual(r["verdict"], "PASS", r["checks"])
+
+    def test_hero_art_is_found_and_is_not_a_card(self):
+        r = self.dens(LIGHT)
+        h = r["hero"]
+        self.assertIsNotNone(h["art_bbox_pt"])
+        self.assertFalse(h["card_edge_around_art"])
+        self.assertTrue(110 <= h["art_bbox_pt"][1] <= 135)     # art top ~120pt
+        self.assertTrue(h["art_bbox_pt"][2] - h["art_bbox_pt"][0] > 0.6 * 402)
+        self.assertEqual([c for c in r["cards"] if c["hero"]], [])
+
+    def test_hero_rect_overrides_detection(self):
+        r = self.dens(LIGHT, hero_rect=(10, 100, 392, 430))
+        self.assertEqual(r["hero"]["art_bbox_pt"], [10.0, 100.0, 392.0, 430.0])
+
+    def test_card_with_page_edge_is_a_card_not_a_field(self):
+        r = self.dens(LIGHT)
+        self.assertEqual(r["ignored"]["fields"], [])
+        self.assertTrue(any(c["list_container"] for c in r["cards"]))
+
+    def test_foot_row_of_a_card_is_not_the_pinned_bar(self):
+        self.assertIsNone(self.dens(DARK)["ignored"]["pinned_bar"])
+
+    def test_token_check_ignores_page_gradient_and_art(self):
+        for res in run_legacy([LIGHT, DARK]):
+            self.assertEqual(res["flags"], [], res["flags"])
+            self.assertIn("hero", res)
+            self.assertFalse(res["tokens"]["canvas"]["flag"])
+
+    def test_gradient_is_matched_as_a_path(self):
+        self.assertLess(fc.page_dE((0xDE, 0xD5, 0xC7), "light"), fc.HERO_DE)   # was dE 15.7 from the flat canvas token
+        self.assertGreater(fc.page_dE((0xEE, 0xF2, 0xFA), "light"), fc.HERO_DE)  # the plain list canvas is not the page
+
+    def _defect(self, text=True, ring=False):
+        im = Image.open(LIGHT).convert("RGB")
+        a = np.asarray(im).copy()
+        if text:  # textTertiary-like ink on the dusk page: < 4.5:1, not an allowed page ink
+            from PIL import ImageFont
+            d = ImageDraw.Draw(im)
+            try:
+                font = ImageFont.load_default(size=22)
+            except TypeError:
+                self.skipTest("Pillow too old for sized default font")
+            d.rectangle([30, 540, 372, 575], fill=tuple(int(v) for v in a[560, 6]))
+            d.text((110, 545), "Gutter due Friday", fill=(150, 140, 122), font=font)
+        if ring:  # remove the 1pt pageCardEdge ring from the card
+            b = np.asarray(im).copy()
+            reg = b[600:790]
+            m = np.linalg.norm(reg.astype(int) - np.array([163, 150, 111]), axis=2) < 40
+            reg[m] = (244, 239, 230)
+            im = Image.fromarray(b)
+        p = os.path.join(tempfile.mkdtemp(prefix="fc-defect-"), "today-light-defect.png")
+        im.save(p)
+        return p
+
+    def test_low_contrast_ink_on_the_dusk_page_is_caught(self):
+        flags = run_legacy([self._defect()])[0]["flags"]
+        self.assertTrue(any(f.startswith("text ") for f in flags), flags)
+        self.assertTrue(any("ink not allowed on page" in f for f in flags), flags)
+
+    def test_card_without_page_edge_is_caught(self):
+        flags = run_legacy([self._defect(text=False, ring=True)])[0]["flags"]
+        self.assertTrue(any("card floats on page" in f for f in flags), flags)
+
+    def test_hero_in_a_card_fails_density(self):
+        a = np.asarray(Image.open(LIGHT).convert("RGB")).copy()
+        reg = a[96:446, 14:388].astype(int)
+        page = a[96:446, 6:7].astype(int)
+        m = np.linalg.norm(reg - page, axis=2) < 40
+        a[96:446, 14:388][m] = (255, 255, 255)
+        a[96:98, 14:388] = (163, 150, 111); a[444:446, 14:388] = (163, 150, 111)
+        a[96:446, 14:16] = (163, 150, 111); a[96:446, 386:388] = (163, 150, 111)
+        p = os.path.join(tempfile.mkdtemp(prefix="fc-hic-"), "today-light-card.png")
+        Image.fromarray(a).save(p)
+        r = self.dens(p)
+        self.assertEqual(r["verdict"], "FAIL")
+        self.assertTrue(any(c["rule"].startswith("H hero not in a card") and not c["pass_"] for c in r["checks"]), r["checks"])
+
+    @unittest.skipUnless(os.path.isdir(FULL), "full-size frames not on this machine")
+    def test_full_size_frames(self):
+        for n in ("today-light-L-windows-lit", "today-dark-L-windows-lit"):
+            r = fc.analyse(os.path.join(FULL, n + ".png"), "default", 3.0, 0.88, None, "iphone")
+            rows = r["summary"]["row_heights_pt"]
+            self.assertEqual(len(rows), 2)
+            self.assertTrue(all(63.7 <= h <= 64.4 for h in rows), rows)
+            self.assertEqual(r["verdict"], "PASS")
+
+
+class HeroMode(unittest.TestCase):
+    def test_state_comes_from_the_last_token(self):
+        self.assertEqual(fc.frame_state("today-dark-L-windows-lit.png"), "lit")
+        self.assertEqual(fc.frame_state("today-dark-L-windows-dark.png"), "unlit")
+        self.assertEqual(fc.frame_state("just-started-light-L-workLamp-off.png"), "unlit")
+        self.assertIsNone(fc.frame_state("today-dark-L.png"))
+
+    def test_p99_contrast_and_report(self):
+        rep, _ = fc.hero_frame_report(LIGHT, "default", 1.0)
+        self.assertGreater(rep["p99_contrast"], 3.0)
+        self.assertEqual([c["verdict"] for c in rep["checks"] if c["rule"] == "p99_contrast"], ["PASS"])
+        self.assertIn("saturation_share", rep)
+
+    def test_blocked_without_art(self):
+        p = os.path.join(tempfile.mkdtemp(), "plain.png")
+        Image.fromarray(np.full((874, 402, 3), (238, 242, 250), np.uint8)).save(p)
+        rep, _ = fc.hero_frame_report(p, "default", 1.0)
+        self.assertEqual(rep["checks"][0]["verdict"], "BLOCKED")
+
+    def test_window_delta(self):
+        d = tempfile.mkdtemp()
+        lit, unlit = os.path.join(d, "half-light-L-windows-lit.png"), os.path.join(d, "half-light-L-windows-dark.png")
+        a = np.full((100, 100, 3), 60, np.uint8)
+        Image.fromarray(a).save(unlit)
+        b = a.copy(); b[20:40, 20:40] = 200
+        Image.fromarray(b).save(lit)
+        boxes = [[0.2, 0.2, 0.4, 0.4]]
+        self.assertEqual(fc.window_delta(lit, unlit, boxes)["verdict"], "PASS")
+        self.assertEqual(fc.window_delta(lit, unlit, None)["verdict"], "BLOCKED")
+        same = os.path.join(d, "copy.png")
+        Image.fromarray(b).save(same)
+        self.assertEqual(fc.window_delta(lit, same, boxes)["verdict"], "FAIL")   # identical bytes: state not captured
+        dim = os.path.join(d, "dim.png")
+        c = a.copy(); c[20:40, 20:40] = 62
+        Image.fromarray(c).save(dim)
+        self.assertEqual(fc.window_delta(dim, unlit, boxes)["verdict"], "FAIL")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

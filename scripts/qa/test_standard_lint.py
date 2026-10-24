@@ -45,5 +45,77 @@ class DynamicTypeClamp(unittest.TestCase):
         self.assertNotIn("dynamic-type-clamp", rules(f))
 
 
+def fscan(files):
+    """files: {relative path: text}"""
+    root = tempfile.mkdtemp(prefix="lint-test-")
+    for name, text in files.items():
+        path = os.path.join(root, name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        open(path, "w", encoding="utf-8").write(text)
+    return sl.scan(root)
+
+
+CLAMP = "X().dynamicTypeSize(...DynamicTypeSize.xxxLarge)\n"
+
+
+class V2Rules(unittest.TestCase):
+    def test_clamp_quota_three_sites_in_allowed_files(self):
+        f = fscan({"Sources/Views/House/CraftHouseView.swift": CLAMP * 2, "Sources/Views/DashboardView.swift": CLAMP})
+        self.assertNotIn("dynamic-type-clamp", rules(f))
+
+    def test_fourth_site_and_other_files_are_new(self):
+        f = fscan({"Sources/Views/House/CraftHouseView.swift": CLAMP * 3, "Sources/Views/DashboardView.swift": CLAMP})
+        self.assertEqual(rules(f).count("dynamic-type-clamp"), 1)
+        f = fscan({"Sources/Views/Other.swift": CLAMP})
+        self.assertEqual(rules(f).count("dynamic-type-clamp"), 1)
+
+    def test_drag_gesture_only_in_craft_house_view(self):
+        self.assertNotIn("custom-swipe", rules(fscan({"Sources/Views/House/CraftHouseView.swift": "x.gesture(DragGesture())\n"})))
+        self.assertIn("custom-swipe", rules(fscan({"Sources/Views/Row.swift": "x.gesture(DragGesture())\n"})))
+        self.assertIn("custom-swipe", rules(fscan({"Sources/Views/House/CraftHouseView.swift": "TodaySwipeRow(x)\n"})))
+
+    def test_craft_image(self):
+        self.assertIn("craft_image".replace("_", "-"), rules(fscan({"Sources/Views/A.swift": 'Image("craft_half")\n'})))
+        self.assertIn("craft-image", rules(fscan({"Sources/Views/A.swift": "Image(stage.rawValue)\n"})))
+        self.assertNotIn("craft-image", rules(fscan({"Sources/Views/House/CraftHouseView.swift": 'Image("craft_half")\n'})))
+        self.assertNotIn("craft-image", rules(fscan({"Sources/Views/Components/LHThumb.swift": "Image(stage.rawValue)\n"})))
+
+    def test_hero_card(self):
+        t = "CraftHouseView().background(.white, in: RoundedRectangle(cornerRadius: 20))\n"
+        self.assertIn("hero-card", rules(fscan({"Sources/Views/House/Wrap.swift": t})))
+        self.assertIn("hero-card", rules(fscan({"Sources/Views/DashboardView.swift": "LHCard { CraftHouseView() }\n"})))
+        self.assertNotIn("hero-card", rules(fscan({"Sources/Views/Settings.swift": t})))
+
+    def test_blueprint_retired(self):
+        for w in ("BlueprintGrid()", "InboxBlueprintPaper()", "TapeMeasure()", "StampView()", "AppColors.kraft", "Color.vellum", "HouseHeroView()"):
+            self.assertIn("blueprint-retired", rules(fscan({"Sources/Views/A.swift": w + "\n"})), w)
+        self.assertNotIn("blueprint-retired", rules(fscan({"Sources/Views/A.swift": "// BlueprintGrid retired\n"})))
+
+    def test_tab_shell(self):
+        good = "TabView {\n" + "".join(f'Tab("t{i}", systemImage: "x") {{ }}\n' for i in range(4)) + 'Tab("s", systemImage: "plus", role: .search) { }\n}\n'
+        self.assertNotIn("tab-shell", rules(fscan({"Sources/Views/ContentView.swift": good})))
+        bad = good.replace('Tab("t0", systemImage: "x") { }\n', "")
+        self.assertIn("tab-shell", rules(fscan({"Sources/Views/ContentView.swift": bad})))
+        self.assertIn("tab-shell", rules(fscan({"Sources/Views/ContentView.swift": good + ".tint(Color(hex: 0x123456))\n"})))
+        glass = good + 'Button { } label: { Image(systemName: "plus") }\n.buttonStyle(.glass)\n'
+        self.assertIn("tab-shell", rules(fscan({"Sources/Views/ContentView.swift": glass})))
+        self.assertNotIn("tab-shell", rules(fscan({"Sources/Views/Other.swift": "Text(x)\n"})))
+
+    def test_page_ink(self):
+        self.assertIn("page-ink", rules(fscan({"Sources/Views/House/CraftHouseView.swift": ".foregroundStyle(colors.textTertiary)\n"})))
+        self.assertNotIn("page-ink", rules(fscan({"Sources/Views/House/CraftHouseView.swift": ".foregroundStyle(colors.textPrimary)\n"})))
+        self.assertNotIn("page-ink", rules(fscan({"Sources/Views/Other.swift": ".foregroundStyle(colors.textTertiary)\n"})))
+
+    def test_timeline_view(self):
+        self.assertIn("timeline-view", rules(fscan({"Sources/Views/House/A.swift": "TimelineView(.animation) { _ in }\n"})))
+        self.assertNotIn("timeline-view", rules(fscan({"Sources/Views/A.swift": "TimelineView(.animation) { _ in }\n"})))
+
+    def test_section_header_mono(self):
+        self.assertIn("section-header-mono", rules(fscan({"Sources/Views/Components/LHSectionHeader.swift": "Text(x).font(.caption.monospaced())\n"})))
+        self.assertIn("section-header-mono", rules(fscan({"Sources/Views/A.swift": ".font(.system(.caption, design: .monospaced))\n"})))
+        self.assertNotIn("section-header-mono", rules(fscan({"Sources/Views/ReportsView.swift": ".font(.system(.caption, design: .monospaced))\n"})))
+        self.assertNotIn("section-header-mono", rules(fscan({"Sources/PDF/Doc.swift": ".font(.system(.caption, design: .monospaced))\n"})))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

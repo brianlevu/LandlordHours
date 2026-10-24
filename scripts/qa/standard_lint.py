@@ -50,6 +50,21 @@ NON_COPY_LINE = re.compile(r'accessibilityIdentifier|Logger|\.track\(|print\(|NS
                            r'identifier:|key:\s*"|Analytics')
 
 
+# v2 (standard H, NOTES-standard-v2.md item 6)
+CRAFT_FILE = "CraftHouseView.swift"
+CRAFT_FILES = {CRAFT_FILE, "LHThumb.swift"}
+TODAY_ROOT = {"DashboardView.swift", "TodayView.swift", "TodayRootView.swift"}  # the Today root (rental chip clamp lives here)
+CLAMP_MAX = 3  # numeral + frame in CraftHouseView, the rental chip in the Today root
+PAGE_FILES = {CRAFT_FILE, "DashboardView.swift", "TodayView.swift", "TodayRootView.swift", "RentalDetailView.swift",
+              "RentalPageView.swift", "WelcomeView.swift", "InboxEmptyStateView.swift", "InboxEmptyView.swift",
+              "MilestoneView.swift"}  # files that render on the dusk/night page
+PAGE_INK_OK = ("textPrimary", "textSecondary", "action", "behind", "positiveOnPage", "ink")
+
+
+def base(path):
+    return os.path.basename(path)
+
+
 def is_view(path):
     return not path.startswith(NOT_VIEWS)
 
@@ -92,6 +107,8 @@ def r_button_style(path, line):
 
 
 def r_swipe(path, line):
+    if base(path) == CRAFT_FILE and "DragGesture(" in line:  # the one allowed DragGesture: the hero swipe (rows stay banned)
+        return bool(re.search(r"TodaySwipeRow|TodaySwipeHint|swipePreviewOffset", line))
     return bool(re.search(r"\bDragGesture\(|TodaySwipeRow|TodaySwipeHint|swipePreviewOffset", line))
 
 
@@ -139,6 +156,50 @@ def r_hand_card(path, line):
     return bool(re.search(r"\.propertyCard\(|lhSurfaceCard", line))
 
 
+def r_craft_image(path, line):
+    if base(path) in CRAFT_FILES or line.lstrip().startswith("//"):
+        return False
+    return bool(re.search(r'Image\(\s*"craft_|Image\(\s*stage\.rawValue', line))
+
+
+def r_hero_card(path, line):
+    if not ("/House/" in path or base(path) in TODAY_ROOT) or line.lstrip().startswith("//"):
+        return False
+    return bool(re.search(r"\.background\([^)\n]*in:\s*RoundedRectangle|\.clipShape\(\s*RoundedRectangle|\bLHCard\b", line))
+
+
+BLUEPRINT_RETIRED = re.compile(r"\b(BlueprintGrid|InboxBlueprintPaper|TapeMeasure|StampView|HouseHeroView)\b|\b(kraft|vellum)\b", re.I)
+
+
+def r_blueprint_retired(path, line):
+    return not line.lstrip().startswith("//") and bool(BLUEPRINT_RETIRED.search(line))
+
+
+def r_timeline_view(path, line):
+    return "/House/" in path and "TimelineView(" in line and not line.lstrip().startswith("//")
+
+
+def r_page_ink(path, line):
+    """Advisory: on page files every foregroundStyle( token not in the allowed list is a finding for the gate to
+    confirm against the frame (it may sit inside a card builder, which a grep cannot see)."""
+    if base(path) not in PAGE_FILES or line.lstrip().startswith("//"):
+        return False
+    m = re.search(r"\.foregroundStyle\(([^\n]*)", line)
+    if not m:
+        return False
+    return not any(re.search(rf"\b{t}\b", m.group(1)) for t in PAGE_INK_OK)
+
+
+def r_mono(path, line):
+    if line.lstrip().startswith("//"):
+        return False
+    if base(path).startswith("LHSectionHeader"):
+        return ".monospaced" in line
+    if "design: .monospaced" in line or ".monospaced" in line and "design" in line:
+        return not ("/PDF/" in path or base(path) == "ReportsView.swift")
+    return False
+
+
 RULES = [
     ("system-size", "no .system(size:) outside token files (1.2)", r_system_size),
     ("color-hex", "no Color(hex:) outside token files (1.2)", r_color_hex),
@@ -148,20 +209,47 @@ RULES = [
     ("button-style", "only LHButton styles (1.13)", r_button_style),
     ("custom-swipe", "no DragGesture swipe / TodaySwipeRow, system .swipeActions only (1.3a)", r_swipe),
     ("bp-tool-image", "no Image(\"bp_tool_\") outside CategoryToolTile (1.17)", r_bp_tool),
-    ("dynamic-type-clamp", ".dynamicTypeSize( only on hero number and house art, max 2 sites (2); a clamp marked // standard:§1.27-sidebar-clamp (same or previous line) is the sidebar exception and is not counted", r_dyn_type),
+    ("dynamic-type-clamp", ".dynamicTypeSize( max 3 sites, all in CraftHouseView (numeral, frame) or the Today root (rental chip); any other site is NEW; a clamp marked // standard:§1.27-sidebar-clamp (same or previous line) is the sidebar exception and is not counted", r_dyn_type),
     ("spring-response", "springs are .spring(duration:bounce:), not response:/dampingFraction: (B.1)", r_spring_response),
     ("repeat-forever", "repeatForever only in scanningLine (B.1)", r_repeat_forever),
     ("onappear-animation", ".onAppear { withAnimation only in emptyStateEntrance / milestone (B.1)", r_onappear_anim),
     ("radius", "corner radii in {6, 12, 16, 20, capsule} (D10)", r_radius),
     ("alert", ".alert( only for irreversible destructive acts (1.21)", r_alert),
     ("fixed-size", "fixedSize at AX only; review each (2)", r_fixed_size),
+    ("craft-image", "Image(\"craft_ / Image(stage.rawValue only in CraftHouseView and LHThumb (H.3)", r_craft_image),
+    ("hero-card", "no RoundedRectangle background/clip or LHCard in House/ or the Today root (H.1)", r_hero_card),
+    ("blueprint-retired", "BlueprintGrid, InboxBlueprintPaper, TapeMeasure, StampView, kraft, vellum, HouseHeroView retired (H.8; baselined until the Today package merges)", r_blueprint_retired),
+    ("timeline-view", "no TimelineView( in House/ (B)", r_timeline_view),
+    ("page-ink", "page files: foregroundStyle only textPrimary/textSecondary/action/behind/positiveOnPage/ink; others are findings for the gate (H.4)", r_page_ink),
+    ("section-header-mono", "LHSectionHeader takes no .monospaced; design: .monospaced only in PDF/ and ReportsView (C)", r_mono),
+    ("tab-shell", "root TabView: exactly five Tab( one role: .search, no .glass plus button, no .tint(Color(hex:) (H.7, file rule)", lambda p, l: False),
     ("hand-card", "no hand-built card around rows: .propertyCard / lhSurfaceCard (1.3a)", r_hand_card),
 ]
+
+
+def tab_shell(rel, lines):
+    """Spec 6: in a file that declares the root TabView: exactly five Tab( with one role: .search, no .buttonStyle(.glass)
+    plus button, no .tint(Color(hex:). Returns [line numbers]."""
+    txt = "\n".join(lines)
+    if "TabView" not in txt:
+        return []
+    out = []
+    tv = next(i for i, l in enumerate(lines, 1) if "TabView" in l)
+    tabs = [i for i, l in enumerate(lines, 1) if re.search(r"\bTab\(", l) and not l.lstrip().startswith("//")]
+    if len(tabs) != 5 or sum("role: .search" in l for l in lines) != 1:
+        out.append(tv)
+    for i, l in enumerate(lines, 1):
+        if ".buttonStyle(.glass)" in l and any('"plus"' in x for x in lines[max(0, i - 8):i]):
+            out.append(i)
+        if re.search(r"\.tint\(\s*Color\(\s*hex:", l):
+            out.append(i)
+    return sorted(set(out))
 
 
 def scan(root=None):
     root = root or ROOT
     out = []
+    clamp_sites = 0
     for dirpath, _, files in os.walk(os.path.join(root, SRC)):
         for fn in sorted(files):
             if not fn.endswith(".swift"):
@@ -172,10 +260,18 @@ def scan(root=None):
                 lines = open(full, encoding="utf-8").read().splitlines()
             except UnicodeDecodeError:
                 continue
+            for i in tab_shell(rel, lines):
+                out.append(dict(rule="tab-shell", file=rel, line=i, text=re.sub(r"\s+", " ", lines[i - 1].strip())[:160]))
             for i, line in enumerate(lines, 1):
                 for rule, _, fn_ in RULES:
+                    if rule == "tab-shell":
+                        continue
                     if rule == "dynamic-type-clamp" and (CLAMP_MARKER in line or (i > 1 and CLAMP_MARKER in lines[i - 2])):
                         continue
+                    if rule == "dynamic-type-clamp" and fn_(rel, line) and (base(rel) == CRAFT_FILE or base(rel) in TODAY_ROOT):
+                        clamp_sites += 1
+                        if clamp_sites <= CLAMP_MAX:
+                            continue  # an allowed site within the quota of three
                     if fn_(rel, line):
                         out.append(dict(rule=rule, file=rel, line=i, text=re.sub(r"\s+", " ", line.strip())[:160]))
     out.sort(key=lambda v: (v["rule"], v["file"], v["line"]))
