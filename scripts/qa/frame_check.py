@@ -1007,6 +1007,150 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
         checks=checks, verdict=verdict)
 
 
+
+# ---- `hero` mode: art readability and state (spec 3, standard H.2 "Readability on the page", "Windows show state") ----
+P99_LIT, P99_UNLIT = 3.0, 2.4
+SAT_SHARE_MAX = {"light": 0.40, "dark": 0.28}
+MEAN_S_MAX = 0.52
+GROUND_LINE = (0.91, 0.93)
+WINDOW_GAIN = 0.20
+
+
+def frame_state(name):
+    """'lit' or 'unlit' from the last dash-separated token of the file stem (…-windows-lit, …-workLamp-off,
+    …-unlit, …-dark). The appearance token earlier in the name (today-dark-L-…) is deliberately not a state."""
+    last = os.path.splitext(os.path.basename(name))[0].lower().split("-")[-1]
+    if last == "lit":
+        return "lit"
+    if last in ("unlit", "dark", "off"):
+        return "unlit"
+    return None
+
+
+def art_pixels(a, bbox, scale):
+    """Pixels inside the art bbox that are not the page (dE > 12 from the page colour of their row)."""
+    x0, y0, x1, y1 = bbox
+    lab_r = rgb_to_lab(a[y0:y1, x0:x1])
+    lab_p = rgb_to_lab(a[y0:y1, 2:3])
+    m = np.linalg.norm(lab_r - lab_p, axis=2) > 12
+    return a[y0:y1, x0:x1][m], m
+
+
+def hero_frame_report(path, dt, scale, hero_rect=None, frame_top=None, frame_side=390.0):
+    im = Image.open(path).convert("RGB")
+    a = np.asarray(im)
+    use_scale(scale)
+    theme = page_theme(im)
+    art = find_hero_art(a, scale, dt, hero_rect)
+    rep = dict(frame=os.path.basename(path), theme=theme, state=frame_state(path), checks=[])
+
+    def chk(rule, verdict, detail):
+        rep["checks"].append(dict(rule=rule, verdict=verdict, detail=detail))
+    if not art:
+        chk("art", "BLOCKED", "no house art found (pass --hero-rect)")
+        return rep, None
+    x0, y0, x1, y1 = art["bbox_px"]
+    px, m = art_pixels(a, art["bbox_px"], scale)
+    if len(px) < 500:
+        chk("art", "BLOCKED", f"only {len(px)} art pixels")
+        return rep, None
+    page = tuple(int(v) for v in a[min(y1, a.shape[0]) - 1, 6])
+    pl = lum(page)
+    f = px.astype(np.float64) / 255.0
+    lin_ = np.where(f <= 0.04045, f / 12.92, ((f + 0.055) / 1.055) ** 2.4)
+    L = 0.2126 * lin_[:, 0] + 0.7152 * lin_[:, 1] + 0.0722 * lin_[:, 2]
+    hi, lo = np.maximum(L, pl), np.minimum(L, pl)
+    p99 = float(np.percentile((hi + 0.05) / (lo + 0.05), 99))
+    rep["p99_contrast"] = round(p99, 2)
+    st = rep["state"]
+    need = P99_LIT if st == "lit" else P99_UNLIT
+    chk("p99_contrast", "PASS" if p99 >= need else "BLOCKED", f"{p99:.2f}:1 vs page {rgb2hex(page)} (need >= {need} for {st or 'unlabelled (unlit bar)'} frames)")
+    hsv = np.array([colorsys.rgb_to_hsv(*(p / 255.0)) for p in px[:: max(1, len(px) // 20000)]])
+    sat_share = float((hsv[:, 1] >= 0.25).mean())
+    mean_s = float(hsv[:, 1].mean())
+    rep["saturation_share"], rep["mean_S"] = round(sat_share, 3), round(mean_s, 3)
+    # REVIEW, not FAIL, unless --strict: a screenshot has no alpha, so the art mask includes shadow and ground, and the
+    # real CRAFT frames (wood, grass) measure 43-75% here against the spec's 28/40%. The number is printed for the gate.
+    chk("saturation_share", "PASS" if sat_share <= SAT_SHARE_MAX[theme] else "REVIEW",
+        f"{sat_share:.1%} of art pixels have S >= 0.25 (max {SAT_SHARE_MAX[theme]:.0%} {theme}; screenshot mask, see --strict)")
+    chk("mean_S", "PASS" if mean_s <= MEAN_S_MAX else "REVIEW", f"{mean_s:.2f} (max {MEAN_S_MAX})")
+    bins = np.bincount(np.minimum((hsv[:, 0] * 12).astype(int), 11), minlength=12) / len(hsv)
+    rep["hue_bins_ge_3pct"] = {f"{i * 30}-{i * 30 + 30}": round(float(b), 3) for i, b in enumerate(bins) if b >= 0.03}
+    rep["ground_line_pt"] = round(y1 / scale, 1)
+    if frame_top is not None:
+        g = (y1 / scale - frame_top) / frame_side
+        rep["ground_line_frac"] = round(g, 3)
+        chk("ground_line", "PASS" if GROUND_LINE[0] <= g <= GROUND_LINE[1] else "FAIL", f"{g:.3f} of the frame (want {GROUND_LINE[0]}-{GROUND_LINE[1]})")
+    else:
+        chk("ground_line", "INFO", f"art bottom at {y1 / scale:.0f}pt; pass --frame-top-pt to get the fraction of the frame")
+    return rep, a
+
+
+def window_delta(path_lit, path_unlit, boxes):
+    """Mean luma in the window boxes (frame fractions) must be >= 20% higher in the lit frame; hashes must differ."""
+    out = dict(pair=[os.path.basename(path_lit), os.path.basename(path_unlit)])
+    h1 = hashlib.sha256(open(path_lit, "rb").read()).hexdigest()
+    h2 = hashlib.sha256(open(path_unlit, "rb").read()).hexdigest()
+    if h1 == h2:
+        return dict(out, verdict="FAIL", detail="state not captured (identical sha256)")
+    if not boxes:
+        return dict(out, verdict="BLOCKED", detail="no window boxes for this stage (craft_windows.json)")
+    ims = [np.asarray(Image.open(p).convert("L")).astype(np.float64) for p in (path_lit, path_unlit)]
+    means = []
+    for im_ in ims:
+        H, W = im_.shape
+        v = [im_[int(b[1] * H):int(b[3] * H), int(b[0] * W):int(b[2] * W)].mean() for b in boxes]
+        means.append(float(np.mean(v)))
+    gain = means[0] / max(means[1], 1e-6) - 1
+    return dict(out, lit_luma=round(means[0], 1), unlit_luma=round(means[1], 1), gain=round(gain, 3),
+                verdict="PASS" if gain >= WINDOW_GAIN else "FAIL",
+                detail=f"lit window luma is {gain:+.0%} vs unlit (need >= +{WINDOW_GAIN:.0%})")
+
+
+def cmd_hero(args) -> int:
+    windows = {}
+    wpath = args.windows or os.path.join(os.path.dirname(os.path.abspath(__file__)), "craft_windows.json")
+    if os.path.exists(wpath):
+        windows = json.load(open(wpath))
+    reports = []
+    for f in args.frames:
+        with Image.open(f) as im0:
+            sc, _ = infer_scale(*im0.size)
+        sc = args.scale or sc
+        dt = args.dt if args.dt != "auto" else detect_dt(os.path.basename(f))
+        hr = [float(v) for v in args.hero_rect.split(",")] if args.hero_rect else None
+        rep, _ = hero_frame_report(f, dt, sc, hr, args.frame_top_pt, args.frame_side_pt)
+        reports.append(rep)
+    pairs = []
+    if args.pairs:
+        lhs, _, rhs = args.pairs.partition("=")
+        names = {os.path.basename(f): f for f in args.frames}
+        for n, f in names.items():
+            stem, ext = os.path.splitext(n)
+            if stem.endswith("-" + lhs):
+                other = stem[: -len(lhs)] + rhs + ext
+                if other in names:
+                    stage = stem.split("-")[0]
+                    pairs.append(window_delta(f, names[other], windows.get(stage) or windows.get(stem)))
+                else:
+                    pairs.append(dict(pair=[n, other], verdict="BLOCKED", detail="counterpart frame not provided"))
+    bad = 0
+    for r in reports:
+        print(f"{r['frame']} ({r['theme']}, state {r['state']})")
+        for c in r["checks"]:
+            print(f"  {c['verdict']:8} {c['rule']}: {c['detail']}")
+            bad += c["verdict"] in ("FAIL", "BLOCKED") or (args.strict and c["verdict"] == "REVIEW")
+        if r.get("hue_bins_ge_3pct"):
+            print(f"  INFO     hue_bins (>=3% of art): {r['hue_bins_ge_3pct']}  [judgment, for the gate]")
+    for p in pairs:
+        print(f"{p['verdict']:8} window_delta {p['pair'][0]} vs {p['pair'][1]}: {p['detail']}")
+        bad += p["verdict"] in ("FAIL", "BLOCKED")
+    if args.json:
+        json.dump(dict(frames=reports, pairs=pairs), open(args.json, "w"), indent=2)
+    print(f"hero: {bad} FAIL/BLOCKED", file=sys.stderr)
+    return 1 if bad else 0
+
+
 def _j(o):
     if isinstance(o, np.integer):
         return int(o)
@@ -1072,6 +1216,22 @@ def main():
         p.add_argument("--hero-rect", help="x0,y0,x1,y1 in pt: the hero art region (default: auto-detected on hero frames)")
         p.add_argument("--hero-glob", action="append", help="frame-name glob that marks a hero frame (repeatable; default today-*, rental-*, welcome*, inbox-empty*, milestone*)")
         return cmd_density(p.parse_args())
+    if len(sys.argv) > 1 and sys.argv[1] == "hero":
+        if np is None:
+            sys.exit("hero mode needs numpy")
+        p = argparse.ArgumentParser(prog="frame_check.py hero", description="art readability and state on hero frames (standard H.2)")
+        p.add_argument("mode")
+        p.add_argument("frames", nargs="+")
+        p.add_argument("--pairs", help="LIT=UNLIT: frames whose stem ends in -LIT are compared to the frame ending in -UNLIT (e.g. lit=dark)")
+        p.add_argument("--windows", help="craft_windows.json: {stage: [[x0,y0,x1,y1] frame fractions, ...]} (default scripts/qa/craft_windows.json)")
+        p.add_argument("--hero-rect", help="x0,y0,x1,y1 in pt (default: auto-detected)")
+        p.add_argument("--dt", choices=["auto", "default", "xxl", "ax"], default="auto")
+        p.add_argument("--scale", type=float)
+        p.add_argument("--frame-top-pt", type=float, help="top of the art frame in pt; enables the ground_line fraction")
+        p.add_argument("--frame-side-pt", type=float, default=390.0)
+        p.add_argument("--strict", action="store_true", help="REVIEW verdicts (saturation) count as failures")
+        p.add_argument("--json")
+        return cmd_hero(p.parse_args())
     return legacy_main()
 
 

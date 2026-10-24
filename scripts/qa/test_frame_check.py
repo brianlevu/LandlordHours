@@ -420,5 +420,43 @@ class HeroFrames(unittest.TestCase):
             self.assertEqual(r["verdict"], "PASS")
 
 
+class HeroMode(unittest.TestCase):
+    def test_state_comes_from_the_last_token(self):
+        self.assertEqual(fc.frame_state("today-dark-L-windows-lit.png"), "lit")
+        self.assertEqual(fc.frame_state("today-dark-L-windows-dark.png"), "unlit")
+        self.assertEqual(fc.frame_state("just-started-light-L-workLamp-off.png"), "unlit")
+        self.assertIsNone(fc.frame_state("today-dark-L.png"))
+
+    def test_p99_contrast_and_report(self):
+        rep, _ = fc.hero_frame_report(LIGHT, "default", 1.0)
+        self.assertGreater(rep["p99_contrast"], 3.0)
+        self.assertEqual([c["verdict"] for c in rep["checks"] if c["rule"] == "p99_contrast"], ["PASS"])
+        self.assertIn("saturation_share", rep)
+
+    def test_blocked_without_art(self):
+        p = os.path.join(tempfile.mkdtemp(), "plain.png")
+        Image.fromarray(np.full((874, 402, 3), (238, 242, 250), np.uint8)).save(p)
+        rep, _ = fc.hero_frame_report(p, "default", 1.0)
+        self.assertEqual(rep["checks"][0]["verdict"], "BLOCKED")
+
+    def test_window_delta(self):
+        d = tempfile.mkdtemp()
+        lit, unlit = os.path.join(d, "half-light-L-windows-lit.png"), os.path.join(d, "half-light-L-windows-dark.png")
+        a = np.full((100, 100, 3), 60, np.uint8)
+        Image.fromarray(a).save(unlit)
+        b = a.copy(); b[20:40, 20:40] = 200
+        Image.fromarray(b).save(lit)
+        boxes = [[0.2, 0.2, 0.4, 0.4]]
+        self.assertEqual(fc.window_delta(lit, unlit, boxes)["verdict"], "PASS")
+        self.assertEqual(fc.window_delta(lit, unlit, None)["verdict"], "BLOCKED")
+        same = os.path.join(d, "copy.png")
+        Image.fromarray(b).save(same)
+        self.assertEqual(fc.window_delta(lit, same, boxes)["verdict"], "FAIL")   # identical bytes: state not captured
+        dim = os.path.join(d, "dim.png")
+        c = a.copy(); c[20:40, 20:40] = 62
+        Image.fromarray(c).save(dim)
+        self.assertEqual(fc.window_delta(dim, unlit, boxes)["verdict"], "FAIL")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
