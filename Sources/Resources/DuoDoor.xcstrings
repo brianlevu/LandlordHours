@@ -1,0 +1,108 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Adds to Santa Ray Ave's hours for 2026.": {
+      "extractionState": "manual"
+    },
+    "All rentals": {
+      "extractionState": "manual"
+    },
+    "Calendar · %@": {
+      "extractionState": "manual"
+    },
+    "Confirm %@": {
+      "extractionState": "manual"
+    },
+    "Gutter cleaning at Delaney Ct": {
+      "extractionState": "manual"
+    },
+    "Hours": {
+      "extractionState": "manual"
+    },
+    "Inbox": {
+      "extractionState": "manual"
+    },
+    "Insurance renewal call": {
+      "extractionState": "manual"
+    },
+    "Kind": {
+      "extractionState": "manual"
+    },
+    "Less": {
+      "extractionState": "manual"
+    },
+    "Log time": {
+      "extractionState": "manual"
+    },
+    "Monthly mortgage payment": {
+      "extractionState": "manual"
+    },
+    "More": {
+      "extractionState": "manual"
+    },
+    "Not rental work": {
+      "extractionState": "manual"
+    },
+    "Nov 1": {
+      "extractionState": "manual"
+    },
+    "Oct 19 3–3:30": {
+      "extractionState": "manual"
+    },
+    "Oct 20": {
+      "extractionState": "manual"
+    },
+    "Oct 21 4–4:30": {
+      "extractionState": "manual"
+    },
+    "Oct 22 9–10:30": {
+      "extractionState": "manual"
+    },
+    "Other": {
+      "extractionState": "manual"
+    },
+    "Plumber at Santa Ray Ave": {
+      "extractionState": "manual"
+    },
+    "Records": {
+      "extractionState": "manual"
+    },
+    "Rental": {
+      "extractionState": "manual"
+    },
+    "Rentals": {
+      "extractionState": "manual"
+    },
+    "Showing at Pine Cabin": {
+      "extractionState": "manual"
+    },
+    "Smoke alarm check": {
+      "extractionState": "manual"
+    },
+    "Tenant call about the lease": {
+      "extractionState": "manual"
+    },
+    "To confirm · %lld": {
+      "extractionState": "manual"
+    },
+    "Today": {
+      "extractionState": "manual"
+    },
+    "Today 12–2": {
+      "extractionState": "manual"
+    },
+    "Today 8–10": {
+      "extractionState": "manual"
+    },
+    "Who": {
+      "extractionState": "manual"
+    },
+    "You": {
+      "extractionState": "manual"
+    },
+    "of %lldh": {
+      "extractionState": "manual"
+    }
+  },
+  "version": "1.0"
+}

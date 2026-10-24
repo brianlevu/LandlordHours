@@ -71,6 +71,9 @@ struct LandlordHoursApp: App {
             if let board = SurfaceBoardLaunch.current {
                 // Surfaces capture boards (-LHSurfaceBoard <name>); see SurfaceCaptureBoard.swift.
                 SurfaceCaptureRoot(launch: board)
+            } else if DuoDoorLaunch.isOpen {
+                // Duo concept A, the door opens (-LHDuoDoor open); see Views/Debug/DuoDoor.
+                DuoDoorRoot()
             } else if let craft = CraftLaunch.current {
                 // Direction CRAFT, Crafted house (-LHDirection CRAFT); see Views/Debug/DirCraft.
                 DirCraftRoot(launch: craft)
