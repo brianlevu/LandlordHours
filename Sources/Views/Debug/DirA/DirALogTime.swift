@@ -20,13 +20,14 @@ struct DALogTimeSheet: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(demo: String?, scrollTo: String? = nil, showsEyebrow: Bool = true, onLog: @escaping (Double, String) -> Void, onClose: @escaping () -> Void) {
-        self.demo = demo; self.scrollTo = scrollTo; self.showsEyebrow = showsEyebrow; self.onLog = onLog; self.onClose = onClose
+    init(demo: String?, scrollTo: String? = nil, showsEyebrow: Bool = true, rental: String = "Santa Ray Ave", onLog: @escaping (Double, String) -> Void, onClose: @escaping () -> Void) {
+        self.demo = demo; self.scrollTo = scrollTo; self.showsEyebrow = showsEyebrow; self.rental = rental; self.onLog = onLog; self.onClose = onClose
     }
 
     private var c: DAColors { env.c }
     private var hours: Double { Double(quarters) / 4 }
-    private let rental = "Santa Ray Ave"
+    /// The rental the time lands on (the Duo passes the house shown beside it).
+    private let rental: String
 
     var body: some View {
         ScrollViewReader { proxy in

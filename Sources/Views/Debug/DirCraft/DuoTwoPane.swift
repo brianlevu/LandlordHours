@@ -67,7 +67,7 @@ enum DuoV2Seed {
     static let three: [DuoRental] = [
         DuoRental(id: "santa", name: "Santa Ray Ave", logged: 46, goal: 100, lit: true, stage: .frame70),
         DuoRental(id: "delaney", name: "Delaney Ct", logged: 4, goal: 100, lit: false, stage: .started),
-        DuoRental(id: "pine", name: "Pine Cabin", logged: 262, goal: 500, lit: false, stage: .half),
+        DuoRental(id: "pine", name: "Pine Cabin", logged: 262, goal: 500, lit: true, stage: .half),
     ]
     static let eight: [DuoRental] = three + [
         DuoRental(id: "harbor", name: "Harbor Loft", logged: 88, goal: 100, lit: true),
@@ -115,7 +115,9 @@ struct DuoOpenView: View {
         }
         .background {
             HStack(spacing: 0) {
-                CraftPage().frame(width: DuoGeo.pane + DuoGeo.hinge / 2)
+                CraftPage()
+                    .overlay { DuoFoldWash() }
+                    .frame(width: DuoGeo.pane + DuoGeo.hinge / 2)
                 DuoInterior()
             }
             .ignoresSafeArea()
@@ -154,6 +156,15 @@ private struct DuoNoVerticalBar: ViewModifier {
     }
 }
 
+/// The house's ink on the native tab bar: unselected items in textPrimary (#121B33 / #F2F4FA) instead of stock black.
+enum DuoTabBarInk {
+    static func apply() {
+        UITabBar.appearance().unselectedItemTintColor = UIColor { $0.userInterfaceStyle == .dark
+            ? UIColor(red: 0xF2/255, green: 0xF4/255, blue: 0xFA/255, alpha: 0.85)
+            : UIColor(red: 0x12/255, green: 0x1B/255, blue: 0x33/255, alpha: 1) }
+    }
+}
+
 private struct DuoTint: ViewModifier {
     @Environment(\.colorScheme) private var scheme
     func body(content: Content) -> some View { content.tint(CraftColors(dark: scheme == .dark).action) }
@@ -178,22 +189,47 @@ struct DuoInsideLight: View {
     }
 }
 
-/// Round-1 A's warm interior (Blender, defocused): a calm backdrop. Text never sits on it; it sits on opaque cards.
-struct DuoInterior: View {
+/// The door's light leaking back across the fold onto the house pane: the same colour and strength as the inside
+/// wall at the fold line (so the two walls meet without a seam), fading within ~150pt.
+struct DuoFoldWash: View {
     @Environment(\.colorScheme) private var scheme
     var body: some View {
+        let dark = scheme == .dark
+        RadialGradient(colors: [Color(hex: dark ? "FFC877" : "FFE6C2").opacity(dark ? 0.09 : 0.55), .clear],
+                       center: UnitPoint(x: 1, y: 0.38), startRadius: 0, endRadius: 150)
+            .blendMode(dark ? .plusLighter : .screen)
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+    }
+}
+
+/// The inside wall. The same page gradient as the house pane, so the fold has no seam; round-1 A's room shows through
+/// desaturated (dusty, low-chroma) and only away from the door; the door's light pools at the fold side.
+struct DuoInterior: View {
+    /// Where the door's light comes from, in this view's unit space (the fold edge).
+    var glowCenter = UnitPoint(x: 0, y: 0.38)
+    @Environment(\.colorScheme) private var scheme
+    var body: some View {
+        let dark = scheme == .dark
         GeometryReader { g in
-            Image("duo_interior").resizable().scaledToFill()
-                .frame(width: g.size.width, height: g.size.height)
-                .clipped()
-                .overlay {
-                    // doorGlow: the light from the open front door, spilling in from the fold edge (round-1 A mid frames).
-                    RadialGradient(colors: [Color(hex: scheme == .dark ? "FFC877" : "FFD9A0").opacity(scheme == .dark ? 0.22 : 0.30), .clear],
-                                   center: UnitPoint(x: 0, y: 0.35), startRadius: 0, endRadius: g.size.width * 0.95)
-                        .blendMode(.screen)
+            ZStack {
+                CraftPage()
+                // By day the room shows through, dusty; at night it is the navy page with one warm pool (the door).
+                if !dark {
+                Image("duo_interior").resizable().scaledToFill()
+                    .frame(width: g.size.width, height: g.size.height).clipped()
+                    .saturation(dark ? 0.15 : 0.45)
+                    .blendMode(dark ? .multiply : .multiply)
+                    .opacity(dark ? 0.55 : 0.42)
+                    .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .clear, location: 0.18),
+                                                 .init(color: .black, location: 0.85)], startPoint: .leading, endPoint: .trailing))
                 }
+                // doorGlow: the light from the open door, brightest at the fold, fading outward.
+                RadialGradient(colors: [Color(hex: dark ? "FFC877" : "FFE6C2").opacity(dark ? 0.09 : 0.55), .clear],
+                               center: glowCenter, startRadius: 0, endRadius: 370)
+                    .blendMode(dark ? .plusLighter : .screen)
+            }
         }
-        .background(Color(hex: scheme == .dark ? "391602" : "582802"))
         .ignoresSafeArea()
         .accessibilityHidden(true)
     }
@@ -212,8 +248,9 @@ struct DuoWorkstation: View {
     @State private var confirmed: Set<String> = []
     @State private var hours: Double = 2
 
-    init(rentals: [DuoRental], selectedID: Binding<String>, right: Binding<DuoRight>, maxRows: Int? = nil) {
-        self.rentals = rentals; _selectedID = selectedID; _right = right; self.maxRows = maxRows
+    init(rentals: [DuoRental], selectedID: Binding<String>, right: Binding<DuoRight>, maxRows: Int? = nil,
+         glowCenter: UnitPoint = UnitPoint(x: -DuoGeo.hinge / 2 / DuoGeo.pane, y: 0.38)) {
+        self.rentals = rentals; _selectedID = selectedID; _right = right; self.maxRows = maxRows; self.glowCenter = glowCenter
     }
 
     private var c: DAColors { env.c }
@@ -226,8 +263,9 @@ struct DuoWorkstation: View {
     }
     private var hidden: Int { all.count - items.count }
 
+    var glowCenter: UnitPoint
     var body: some View {
-        ZStack { DuoInterior(); content }
+        ZStack { DuoInterior(glowCenter: glowCenter); content }
     }
 
     @ViewBuilder private var content: some View {
@@ -235,7 +273,7 @@ struct DuoWorkstation: View {
         case .list: list
         case .detail(let id): detail(all.first { $0.id == id } ?? all[0])
         case .log:
-            DALogTimeSheet(demo: nil, showsEyebrow: false, onLog: { _, _ in right = .list }, onClose: { right = .list })
+            DALogTimeSheet(demo: nil, showsEyebrow: false, rental: selected?.name ?? DuoV2Seed.three[0].name, onLog: { _, _ in right = .list }, onClose: { right = .list })
                 .background(c.sheet)
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(craft.c.cardEdge, lineWidth: 1))
@@ -302,9 +340,44 @@ struct DuoWorkstation: View {
                         .frame(maxWidth: .infinity, minHeight: 44).buttonStyle(DAPress())
                 }
             }
-            .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 16)
+            .padding(.horizontal, 16).padding(.top, 8)
+            if let s = selected, maxRows == nil { loggedToday(s).padding(.horizontal, 16).padding(.top, 12) }
+            Color.clear.frame(height: 16)
         }
         .scrollIndicators(.hidden)
+    }
+
+    /// The honest fill for a filtered list: what is already on the record today at this rental.
+    private func loggedToday(_ r: DuoRental) -> some View {
+        let entries: [(String, String, Double)] = r.lit
+            ? [(CL("Fixed the porch step"), CL("Repairs · 8–9:30"), 1.5), (CL("Picked up paint for the trim"), CL("Repairs · 11–11:30"), 0.5)]
+            : []
+        return DuoCard {
+            HStack(alignment: .firstTextBaseline) {
+                Text(CL("On the record today")).font(.headline).foregroundStyle(c.ink).accessibilityAddTraits(.isHeader)
+                Spacer()
+                Text(StdFormat.hours(entries.reduce(0) { $0 + $1.2 })).font(.headline).monospacedDigit().foregroundStyle(c.ink)
+            }
+            .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 10)
+            if entries.isEmpty {
+                DAHairline()
+                Text(CL("Nothing logged at \(r.name) yet today."))
+                    .font(.subheadline).foregroundStyle(c.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(16)
+            }
+            ForEach(Array(entries.enumerated()), id: \.offset) { _, e in
+                DAHairline().padding(.leading, 16)
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(e.0).font(.body.weight(.semibold)).foregroundStyle(c.ink).fixedSize(horizontal: false, vertical: true)
+                        Text(e.1).font(.footnote).foregroundStyle(c.textSecondary)
+                    }
+                    Spacer(minLength: 8)
+                    Text(StdFormat.hours(e.2)).font(.subheadline.weight(.semibold)).monospacedDigit().foregroundStyle(c.ink)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 10).frame(minHeight: 56)
+            }
+        }
     }
 
     private func detail(_ item: StdSuggestion) -> some View {
@@ -520,8 +593,9 @@ struct DuoShelf: View {
             .defaultScrollAnchor(.center, for: .alignment)   // centred when every rental fits
             .mask {   // soft edges once the shelf scrolls, so a clipped neighbour reads as "more", not as a cut label
                 LinearGradient(stops: items.count > 4
-                               ? [.init(color: .clear, location: 0), .init(color: .black, location: 0.07),
-                                  .init(color: .black, location: 0.93), .init(color: .clear, location: 1)]
+                               ? [.init(color: .clear, location: 0), .init(color: .clear, location: 0.05),
+                                  .init(color: .black, location: 0.16), .init(color: .black, location: 0.84),
+                                  .init(color: .clear, location: 0.95), .init(color: .clear, location: 1)]
                                : [.init(color: .black, location: 0), .init(color: .black, location: 1)],
                                startPoint: .leading, endPoint: .trailing)
             }
@@ -603,25 +677,42 @@ struct DuoFrontDoor: View {
         if art == .half {
             let open = duoEase(clock.t, 0.0, 0.42)
             let glow = duoEase(clock.t, 0.05, 0.5)
-            let warm = Color(hex: scheme == .dark ? "FFC877" : "FFD9A0")
+            let dark = scheme == .dark
+            let warm = Color(hex: dark ? "FFC877" : "F2B872")
             ZStack(alignment: .topLeading) {
-                Rectangle().fill(LinearGradient(colors: [warm, warm.opacity(0.75)], startPoint: .top, endPoint: .bottom))
+                // The hall behind the door. At night it is the brightest thing on the house; at dusk it is a dim
+                // interior with a soft lamp glow, never brighter than the daylit facade.
+                Rectangle()
+                    .fill(dark
+                          ? AnyShapeStyle(LinearGradient(colors: [warm, warm.opacity(0.78)], startPoint: .top, endPoint: .bottom))
+                          : AnyShapeStyle(LinearGradient(colors: [Color(hex: "2A1C12"), Color(hex: "4A3220")], startPoint: .top, endPoint: .bottom)))
+                    .overlay {
+                        if !dark {
+                            RadialGradient(colors: [warm.opacity(0.75), .clear], center: UnitPoint(x: 0.65, y: 0.45),
+                                           startRadius: 0, endRadius: door.height * 0.55)
+                        }
+                    }
                     .frame(width: door.width, height: door.height).offset(x: door.minX, y: door.minY)
                     .opacity(glow)
                 Ellipse()
-                    .fill(RadialGradient(colors: [warm.opacity(0.85), warm.opacity(0)], center: .center, startRadius: 0, endRadius: door.width * 1.6))
+                    .fill(RadialGradient(colors: [warm.opacity(dark ? 0.85 : 0.45), warm.opacity(0)], center: .center,
+                                         startRadius: 0, endRadius: door.width * 1.6))
                     .frame(width: door.width * 3.2, height: door.width * 1.3)
                     .offset(x: door.minX - door.width * 0.6, y: door.maxY - door.width * 0.45)
-                    .blendMode(scheme == .dark ? .plusLighter : .screen)
+                    .blendMode(dark ? .plusLighter : .screen)
                     .opacity(glow * 0.9)
+                // The leaf: the still's own door pixels, swung on its left hinge in perspective (a sheared quad that
+                // narrows and turns away), darkening as it turns out of the light.
                 Image(art.rawValue).resizable().interpolation(.high)
                     .frame(width: side, height: side)
-                    .brightness(scheme == .dark ? CraftHouseArt.nightLift(art) : 0)
+                    .brightness(dark ? CraftHouseArt.nightLift(art) : 0)
                     .mask(alignment: .topLeading) {
                         Rectangle().frame(width: door.width, height: door.height).offset(x: door.minX, y: door.minY)
                     }
-                    .brightness(-0.18 * open)
-                    .scaleEffect(x: 1 - 0.78 * open, y: 1, anchor: UnitPoint(x: door.minX / side, y: 0.5))
+                    .brightness(-0.12 * open)
+                    .rotation3DEffect(.degrees(-78 * open), axis: (x: 0, y: 1, z: 0),
+                                      anchor: UnitPoint(x: door.minX / side, y: (door.midY) / side), perspective: 2.2)
+                    .shadow(color: .black.opacity(0.35 * open), radius: 1.5, x: 1, y: 0)
             }
             .frame(width: side, height: side, alignment: .topLeading)
             .allowsHitTesting(false)
@@ -648,11 +739,12 @@ struct DuoProppedView: View {
                         .frame(height: half, alignment: .top)
                         .background { CraftPage().ignoresSafeArea() }
                     Color.clear.frame(height: DuoGeo.hinge)
-                    DuoWorkstation(rentals: DuoV2Seed.three, selectedID: $selectedID, right: $right, maxRows: 3)
+                    DuoWorkstation(rentals: DuoV2Seed.three, selectedID: $selectedID, right: $right, maxRows: 3,
+                                   glowCenter: UnitPoint(x: 0.5, y: -0.05))
                         .frame(maxHeight: .infinity)
                 }
                 .ignoresSafeArea(.container, edges: .top)
-                .background { VStack(spacing: 0) { CraftPage(); DuoInterior() }.ignoresSafeArea() }
+                .background { VStack(spacing: 0) { CraftPage(); DuoInterior(glowCenter: UnitPoint(x: 0.5, y: 0)) }.ignoresSafeArea() }
             }
             Tab(CL("Inbox"), systemImage: "tray", value: 1) { DuoInterior() }.badge(7)
             Tab(CL("Records"), systemImage: "book.closed", value: 2) { DuoInterior() }
@@ -672,12 +764,16 @@ struct DuoCard<Content: View>: View {
     @ViewBuilder var content: Content
     private var env = DAEnv()
     private var craft = CraftEnv()
+    @Environment(\.colorScheme) private var scheme
     init(@ViewBuilder content: () -> Content) { self.content = content() }
+    /// Light: pageCardEdge. Night: duoNightCardEdge #3A4778 (new, Duo only): 2.06:1 on the night room #0B1230, inside
+    /// the H.4 card-edge band (1.9-2.2); the shared dark edge #2A3560 measures 1.55 there.
+    private var edge: Color { scheme == .dark ? Color(hex: "3A4778") : craft.c.cardEdge }
     var body: some View {
         VStack(spacing: 0) { content }
             .background(env.c.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(craft.c.cardEdge, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(edge, lineWidth: 1))
             .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
     }
 }
@@ -690,6 +786,7 @@ enum DuoV2Snapshotter {
     static var windows: [UIWindow] = []
 
     static func run() async {
+        DuoTabBarInk.apply()
         try? await Task.sleep(nanoseconds: 1_500_000_000)
         guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
         let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("duo2")
