@@ -320,6 +320,12 @@ struct AdaptiveColors {
     var pageMid: Color { pick(H.duskMid, H.darkNightTop) }
     var pageBottom: Color { pick(H.duskBottom, H.darkNightBottom) }
     /// The warm pool under the lot, with its per-mode strength baked in.
+    /// Behind-pace text on the Today page (>= 4.5:1 on both pages).
+    var behind: Color { pick(H.behind, H.darkBehind) }
+    /// Positive text on the Today page.
+    var positiveOnPage: Color { pick(H.positiveOnPage, H.darkPositive) }
+    /// Edge of a grouped container on the Today page.
+    var pageCardEdge: Color { pick(H.pageCardEdge, H.darkBorder) }
     var spillPool: Color { AppColors.spill.opacity(isDark ? H.darkSpillOpacity : H.spillOpacity) }
 
     // Brand (new in 2.0)
