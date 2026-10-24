@@ -117,7 +117,7 @@ Concurrency: 0 + A alone; then B + C (+ D if a third lane is free); then D/E; th
 
 The independent review agreed with all five recommendations and added a follow-up to three of them (applied in the standard).
 
-1. **Fourth tab name: "Rentals".** The locked frames already say Rentals, so this is a confirm, not a choice. Recommend **Rentals**: it is the word every sentence uses (§C.4). The standard now writes "Rentals (Brian to confirm)" in §1.25, §1.27 and §H.7.
+1. **Fourth tab name: "Rentals".** The locked frames already say Rentals, so this is a confirm, not a choice. Recommend **Rentals**: it is the word every sentence uses (§C.4). Confirmed 2026-10-24.
 2. **Pace tiles off Today, onto the rental page and Reports.** Recommend **yes**: the locked frames have none, and D3b only fits without them.
 3. **Drafting mono labels retired from screens** (kept in the PDF and the Reports eyebrow). Recommend **retire**. The Summary card and sheet-title eyebrows are now deleted too (§1.10, §1.14), so the rule is true everywhere.
 4. **Two canvases: dusk page on hero screens, plain canvas on lists.** Recommend **keep both** for 2.1. A tab switch has no push, so the warm-to-cool jump shows in light: a light-mode tab-switch capture is now in the gate, and a warm-neutral list canvas is logged as a test against the intent inks (backlog N-1).
