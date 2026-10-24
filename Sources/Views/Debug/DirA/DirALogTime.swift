@@ -6,6 +6,8 @@ import SwiftUI
 struct DALogTimeSheet: View {
     let demo: String?
     var scrollTo: String? = nil
+    /// The Duo's in-pane Log time drops the mono date eyebrow (standard v2 retires mono eyebrows on screens).
+    var showsEyebrow = true
     let onLog: (Double, String) -> Void
     let onClose: () -> Void
 
@@ -18,8 +20,8 @@ struct DALogTimeSheet: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(demo: String?, scrollTo: String? = nil, onLog: @escaping (Double, String) -> Void, onClose: @escaping () -> Void) {
-        self.demo = demo; self.scrollTo = scrollTo; self.onLog = onLog; self.onClose = onClose
+    init(demo: String?, scrollTo: String? = nil, showsEyebrow: Bool = true, onLog: @escaping (Double, String) -> Void, onClose: @escaping () -> Void) {
+        self.demo = demo; self.scrollTo = scrollTo; self.showsEyebrow = showsEyebrow; self.onLog = onLog; self.onClose = onClose
     }
 
     private var c: DAColors { env.c }
@@ -56,7 +58,7 @@ struct DALogTimeSheet: View {
     private var header: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(DL("FRI, OCT 23")).font(DAFont.mono).tracking(DAFont.monoTracking).foregroundStyle(c.draftingInk)
+                if showsEyebrow { Text(DL("FRI, OCT 23")).font(DAFont.mono).tracking(DAFont.monoTracking).foregroundStyle(c.draftingInk) }
                 Text(DL("Log time")).font(.title2.weight(.semibold)).foregroundStyle(c.ink).accessibilityAddTraits(.isHeader)
             }
             Spacer()

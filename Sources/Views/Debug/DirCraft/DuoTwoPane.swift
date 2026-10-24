@@ -19,7 +19,7 @@ import UIKit
 //     .splitArrangementLayoutRatio(0.5) on the primary; GeometryProxy.reservedRegions(kind: .division,
 //     options: .includeInactive) gives the fold's frame, and both panes keep clear of it.
 //   onHingeChange { old, new in } (DeviceHingeContext.hinge?.status: .closed / .partiallyOpen / .fullyOpen) starts the door.
-// The mock uses an HStack with an assumed 24pt division band in the middle (DuoGeo.hinge).
+// The mock uses an HStack with an assumed 24pt division band in the middle (DuoGeo.hinge). Open = landscape 951x669.
 
 enum DuoV2Launch {
     static var mode: String? {
@@ -30,11 +30,16 @@ enum DuoV2Launch {
 }
 
 enum DuoGeo {
-    static let open = CGSize(width: 669, height: 951)
+    /// Held open, the inner display is LANDSCAPE: 951x669pt, the fold running top to bottom down the middle.
+    /// Each half (~464x669) matches the closed outer display (466x678), which is how the fold's axis was inferred:
+    /// the device profile lists the inner framebuffer as 2007x2853 (portrait) with no fold geometry.
+    static let open = CGSize(width: 951, height: 669)
+    /// Propped up (tabletop): the same display upright, so the fold runs across it.
+    static let propped = CGSize(width: 669, height: 951)
     /// Assumed division band (reserved rect plus margins). The real value comes from reservedRegions(kind: .division).
     static let hinge: CGFloat = 24
-    static var pane: CGFloat { (open.width - hinge) / 2 }      // 322.5
-    static let topInset: CGFloat = 44                           // inner display status bar + camera (assumed)
+    static var pane: CGFloat { (open.width - hinge) / 2 }      // 463.5
+    static let topInset: CGFloat = 24                           // landscape status bar (assumed)
     static let bottomInset: CGFloat = 20                        // home indicator (assumed)
 }
 
@@ -163,16 +168,18 @@ struct DuoOutsideToday: View {
     private var c: CraftColors { env.c }
     private var rentals: [DuoRental] { DuoV2Seed.rentals }
     private var focus: DuoRental { rentals.first { $0.id == focusID } ?? rentals[0] }
-    private var side: CGFloat { typeSize.isAccessibilitySize ? 220 : 300 }
+    private var side: CGFloat { typeSize.isAccessibilitySize ? 200 : 268 }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                DuoHouse(art: focus.art, lit: focus.lit, side: side, clock: clock)
-                    .id(focus.id)
-                    .frame(maxWidth: .infinity)
-                numberBlock.padding(.top, -34)
-                rentalList.padding(.top, 20)
+                HStack(alignment: .center, spacing: 0) {
+                    DuoHouse(art: focus.art, lit: focus.lit, side: side, clock: clock)
+                        .id(focus.id)
+                    numberBlock.frame(maxWidth: .infinity)
+                }
+                .padding(.leading, 4).padding(.trailing, 12)
+                rentalList.padding(.top, 4)
             }
             .padding(.bottom, 16)
         }
@@ -183,20 +190,20 @@ struct DuoOutsideToday: View {
     private var numberBlock: some View {
         let f = focus.focus
         let p = f.pace
-        return VStack(spacing: 2) {
+        return VStack(alignment: .leading, spacing: 2) {
+            Text(f.name).font(.subheadline.weight(.semibold)).foregroundStyle(c.ink)
             Text(verbatim: "\(Int(f.logged))")
                 .font(DAFont.fraunces(size: 72, opsz: 144, wght: 600)).tracking(-2)
-                .foregroundStyle(c.ink).lineLimit(1)
+                .foregroundStyle(c.ink).lineLimit(1).minimumScaleFactor(0.8)
                 .accessibilityAddTraits(.isHeader)
-            Text(CL("of \(Int(f.goal)) hours · \(f.name)")).font(.subheadline).foregroundStyle(c.textSecondary)
+            Text(CL("of \(Int(f.goal)) hours")).font(.subheadline).foregroundStyle(c.textSecondary)
             (Text(p.lead).foregroundStyle(f.isBehind ? c.behind : c.positive).fontWeight(.semibold)
              + Text(verbatim: " ") + Text(p.rest).foregroundStyle(c.textSecondary))
                 .font(.subheadline)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 6)
         }
-        .multilineTextAlignment(.center)
-        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }
 
@@ -426,7 +433,7 @@ struct DuoInsidePane: View {
         case .list: list
         case .detail(let id): detail(items.first { $0.id == id } ?? items[0])
         case .log:
-            DALogTimeSheet(demo: nil, onLog: { _, _ in right = .list }, onClose: { right = .list })
+            DALogTimeSheet(demo: nil, showsEyebrow: false, onLog: { _, _ in right = .list }, onClose: { right = .list })
                 .background(c.sheet)
                 .clipShape(UnevenRoundedRectangle(topLeadingRadius: 20, topTrailingRadius: 20, style: .continuous))
                 .padding(.top, 8)
@@ -436,7 +443,6 @@ struct DuoInsidePane: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(CL("FRI, OCT 23")).font(DAFont.mono).tracking(DAFont.monoTracking).foregroundStyle(c.draftingInk)
             HStack(alignment: .firstTextBaseline) {
                 Text(CL("To confirm")).font(DAFont.fraunces(size: 34, opsz: 72, wght: 600)).foregroundStyle(c.ink)
                     .accessibilityAddTraits(.isHeader)
@@ -570,7 +576,6 @@ struct DuoRentalDetail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(CL("LONG-TERM RENTAL")).font(DAFont.mono).tracking(DAFont.monoTracking).foregroundStyle(c.draftingInk)
                     Text(rental.name).font(DAFont.fraunces(size: 34, opsz: 72, wght: 600)).foregroundStyle(c.ink)
                         .accessibilityAddTraits(.isHeader)
                 }
@@ -630,62 +635,82 @@ struct DuoRentalDetail: View {
     }
 }
 
-// MARK: - Propped up (tabletop: the fold runs across, landscape 951x669)
+// MARK: - Propped up (tabletop): upright 669x951, the fold runs across at y 463.5-487.5
 
-struct DuoTabletopView: View {
+struct DuoProppedView: View {
     var clock: DuoDoorClock
     private var env = DAEnv()
     private var craft = CraftEnv()
-    @State private var picked = 1
     init(clock: DuoDoorClock) { self.clock = clock }
-    private var top: CGFloat { (DuoGeo.open.width - DuoGeo.hinge) / 2 }     // 322.5 per half
+    private var half: CGFloat { (DuoGeo.propped.height - DuoGeo.hinge) / 2 }     // 463.5 per half
     var body: some View {
         let c = env.c
         let r = DuoV2Seed.rentals[2]
         let f = r.focus
+        let p = f.pace
         VStack(spacing: 0) {
-            // Upper half, readable from across the room: the house and its hours.
-            HStack(spacing: 24) {
-                DuoHouse(art: r.art, lit: r.lit, side: 270, clock: clock)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(r.name).font(.title3.weight(.semibold)).foregroundStyle(craft.c.ink)
-                    Text(verbatim: "\(Int(f.logged))").font(DAFont.fraunces(size: 96, opsz: 144, wght: 600)).tracking(-3)
+            // Upper half, upright and readable from across the room: the house, its hours and pace.
+            VStack(spacing: 0) {
+                DuoHouse(art: r.art, lit: r.lit, side: 300, clock: clock)
+                VStack(spacing: 2) {
+                    Text(verbatim: "\(Int(f.logged))").font(DAFont.fraunces(size: 64, opsz: 144, wght: 600)).tracking(-2)
                         .foregroundStyle(craft.c.ink)
-                    Text(CL("of \(Int(f.goal)) hours")).font(.title3).foregroundStyle(craft.c.textSecondary)
+                    Text(CL("of \(Int(f.goal)) hours · \(r.name)")).font(.subheadline).foregroundStyle(craft.c.textSecondary)
+                    (Text(p.lead).foregroundStyle(craft.c.behind).fontWeight(.semibold) + Text(verbatim: " ")
+                     + Text(p.rest).foregroundStyle(craft.c.textSecondary)).font(.subheadline)
                 }
-                Spacer(minLength: 0)
+                .multilineTextAlignment(.center)
+                .padding(.top, -36)
             }
-            .padding(.horizontal, 48).padding(.top, 20)
-            .frame(height: top)
+            .padding(.top, 36)
+            .frame(maxWidth: .infinity)
+            .frame(height: half, alignment: .top)
             .background { CraftPage() }
             Color.clear.frame(height: DuoGeo.hinge)
-            // Lower half, within reach: log time in one tap, or confirm the next item.
-            HStack(alignment: .top, spacing: 24) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(CL("Log time at \(r.name)")).font(.headline).foregroundStyle(c.ink)
-                    HStack(spacing: 8) {
-                        ForEach(Array([CL("30m"), CL("1h"), CL("2h")].enumerated()), id: \.offset) { i, s in
-                            Text(s).font(.body.weight(.semibold)).foregroundStyle(i == picked ? c.onAction : c.ink)
-                                .frame(minWidth: 64, minHeight: 44)
-                                .background(i == picked ? c.action : c.surfaceInner, in: Capsule())
-                        }
+            // Lower half, resting on the table, within reach: log time in one tap, and the next items to confirm.
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    ForEach(Array([CL("30m"), CL("1h"), CL("2h")].enumerated()), id: \.offset) { i, s in
+                        Text(s).font(.body.weight(.semibold)).foregroundStyle(i == 1 ? c.onAction : c.ink)
+                            .frame(minWidth: 64, minHeight: 44)
+                            .background(i == 1 ? c.action : c.surfaceInner, in: Capsule())
                     }
-                    Button(CL("Log 1h")) {}.buttonStyle(DAPrimaryStyle()).frame(width: 260)
+                    Spacer(minLength: 8)
+                    Button(CL("Log 1h")) {}.buttonStyle(DAPrimaryStyle()).frame(width: 200)
                 }
+                Text(CL("To confirm · \(DuoV2Seed.suggestions.count)")).font(.headline).foregroundStyle(c.ink).padding(.top, 4)
                 DuoCard {
-                    ForEach(Array(DuoV2Seed.suggestions.prefix(2).enumerated()), id: \.element.id) { i, item in
+                    ForEach(Array(DuoV2Seed.suggestions.prefix(3).enumerated()), id: \.element.id) { i, item in
                         if i > 0 { DAHairline().padding(.leading, 50) }
                         DAActionRow(item: item, confirmed: false) {}.padding(.horizontal, 16).padding(.vertical, 10)
                     }
                 }
-                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 48).padding(.top, 24)
-            .frame(height: top, alignment: .top)
+            .padding(.horizontal, 24).padding(.top, 20)
+            .frame(height: half, alignment: .top)
+            .frame(maxWidth: .infinity)
             .background(c.canvas)
         }
-        .frame(width: DuoGeo.open.height, height: DuoGeo.open.width)
-        .background { VStack(spacing: 0) { CraftPage(); env.c.canvas } }
+        .frame(width: DuoGeo.propped.width, height: DuoGeo.propped.height)
+        .background { VStack(spacing: 0) { CraftPage(); c.canvas } }
+    }
+}
+
+/// Diagnostic: what the system TabView does at the full open width with regular traits (where its bar lands).
+@available(iOS 26.0, *)
+struct DuoSystemBarProbe: View {
+    @State private var tab = 0
+    var body: some View {
+        TabView(selection: $tab) {
+            Tab(CL("Today"), systemImage: "sun.horizon", value: 0) { CraftPage() }
+            Tab(CL("Inbox"), systemImage: "tray", value: 1) { CraftPage() }.badge(7)
+            Tab(CL("Records"), systemImage: "book.closed", value: 2) { CraftPage() }
+            Tab(CL("Rentals"), systemImage: "house", value: 3) { CraftPage() }
+            Tab(CL("Log time"), systemImage: "plus", value: 4, role: .search) { CraftPage() }
+        }
+        .overlay {
+            Rectangle().fill(Color.pink.opacity(0.28)).frame(width: DuoGeo.hinge).ignoresSafeArea().allowsHitTesting(false)
+        }
     }
 }
 
@@ -736,9 +761,12 @@ enum DuoV2Snapshotter {
                 await render(view, size: DuoGeo.open, dark: dark, typeSize: size, scene: scene,
                              to: dir.appendingPathComponent("\(name)-\(tag).png"))
             }
-            await render(AnyView(DuoTabletopView(clock: full)), size: CGSize(width: DuoGeo.open.height, height: DuoGeo.open.width),
-                         dark: dark, typeSize: .large, scene: scene, to: dir.appendingPathComponent("propped-tabletop-\(tag).png"),
-                         insets: EdgeInsets())
+            if !dark {
+                await render(AnyView(DuoProppedView(clock: full)), size: DuoGeo.propped, dark: dark, typeSize: .large, scene: scene,
+                             to: dir.appendingPathComponent("propped-\(tag).png"), insets: EdgeInsets(top: 44, leading: 0, bottom: 20, trailing: 0))
+                await render(AnyView(DuoSystemBarProbe()), size: DuoGeo.open, dark: dark, typeSize: .large, scene: scene,
+                             to: dir.appendingPathComponent("probe-system-tabbar-regular-\(tag).png"), regular: true)
+            }
             if mode == "motion" {
                 let clock = DuoDoorClock()
                 clock.t = 0
@@ -759,7 +787,8 @@ enum DuoV2Snapshotter {
     }
 
     private static func makeWindow(_ view: AnyView, size: CGSize, dark: Bool, typeSize: DynamicTypeSize, scene: UIWindowScene,
-                                   insets: EdgeInsets = EdgeInsets(top: DuoGeo.topInset, leading: 0, bottom: DuoGeo.bottomInset, trailing: 0)) -> UIWindow {
+                                   insets: EdgeInsets = EdgeInsets(top: DuoGeo.topInset, leading: 0, bottom: DuoGeo.bottomInset, trailing: 0),
+                                   regular: Bool = false) -> UIWindow {
         let root = view
             .safeAreaPadding(insets)
             .environment(\.dynamicTypeSize, typeSize)
@@ -767,7 +796,7 @@ enum DuoV2Snapshotter {
         let hc = UIHostingController(rootView: AnyView(root))
         hc.overrideUserInterfaceStyle = dark ? .dark : .light
         // Each pane is ~322pt, so the panes lay out compact; the system tab bar then sits in the left pane.
-        hc.traitOverrides.horizontalSizeClass = .compact
+        hc.traitOverrides.horizontalSizeClass = regular ? .regular : .compact
         hc.traitOverrides.verticalSizeClass = .regular
         hc.safeAreaRegions = []            // the folded screen's trailing status column must not leak in
         let w = UIWindow(windowScene: scene)
@@ -788,14 +817,11 @@ enum DuoV2Snapshotter {
     }
 
     private static func render(_ view: AnyView, size: CGSize, dark: Bool, typeSize: DynamicTypeSize, scene: UIWindowScene, to url: URL,
-                               insets: EdgeInsets = EdgeInsets(top: DuoGeo.topInset, leading: 0, bottom: DuoGeo.bottomInset, trailing: 0)) async {
-        let w = makeWindow(view, size: size, dark: dark, typeSize: typeSize, scene: scene, insets: insets)
+                               insets: EdgeInsets = EdgeInsets(top: DuoGeo.topInset, leading: 0, bottom: DuoGeo.bottomInset, trailing: 0),
+                               regular: Bool = false) async {
+        let w = makeWindow(view, size: size, dark: dark, typeSize: typeSize, scene: scene, insets: insets, regular: regular)
         try? await Task.sleep(nanoseconds: 1_400_000_000)
         write(w, size: size, to: url)
-        // A second pass with layer.render for comparison (no glass), written beside it.
-        let f = UIGraphicsImageRendererFormat(); f.scale = 3; f.opaque = true
-        let img = UIGraphicsImageRenderer(size: size, format: f).image { ctx in w.layer.render(in: ctx.cgContext) }
-        try? img.pngData()?.write(to: url.deletingPathExtension().appendingPathExtension("layer.png"))
         w.isHidden = true
     }
 }
