@@ -106,3 +106,30 @@ Say which anchor, what matches (row rhythm, type scale, spacing, motion), and wh
 ## Verdict format
 
 `PASS`, `PASS_WITH_FIXES` or `FAIL`, then one line per section above with the evidence (script output, lint count, named motions, copy numbers, anchor paragraph). Fail closed: if the density script returns `NO_DATA` for a frame that should contain cards or rows, the frame is BLOCKED, not passed.
+
+---
+
+# Gate rubric addendum: design standard v2, the crafted object (2026-10-24)
+
+Source of truth: `docs/design/DESIGN-STANDARD.md` §H and §F. Applies to every hero screen (Today, the rental page, Welcome, the Inbox empty state, the milestone) on top of the sections above. Tool changes are specified in `scripts/qa/NOTES-standard-v2.md`; until they land, the gate measures these by hand in PIL and prints the numbers.
+
+## 6. The hero (measured)
+
+- The house art bounding box is **36–46%** of the window height at default Dynamic Type, **24–32%** at AX; the frame is a square of side `min(W − 12, round(0.446 × H))` (390 on 402×874; 295 at AX). Art hidden at AX is a BLOCKER (D3c v2).
+- The art sits on the page: no closed card edge around it. A card around the hero is a BLOCKER.
+- Art p99 contrast vs the page: **≥ 3.0:1** lit (and framing with the lamp), **≥ 2.4:1** unlit at night. Below = BLOCKED.
+- Lit and unlit frames of one state differ (hashes and window-box luma); the `-unlit` frame is darker in the windows. Equal = "state not captured", BLOCKED.
+- The number block overlaps the frame bottom by 44 ± 4pt at default (0 at AX); the chip, dots and number never intersect the art otherwise.
+- The page is the gradient (`#EAE3D7 → #D8CFC0 → #E8E0D3` light; `#0B1230 → #080C1D` dark), never flat, never a grid. The spill pool and (dark) backlight are present and fade with the windows.
+- Text on the light page is one of `textPrimary`, `textSecondary`, `action`, `behind #9A3624`, `positiveOnPage #0C5A30`, measured against the gradient step behind it. Any other ink on the page is a finding with its ratio (they all measure 3.5–3.9:1 on `#D8CFC0`).
+- Cards on the page carry a 1pt `pageCardEdge` (`#A3966F` / `#2A3560`).
+- Tab bar: native `TabView`, five items, "Log time" is the `plus` item with `role: .search`; selected-label contrast ≥ 4.5:1 in both appearances (a fixed light tint in dark measured 3.21:1 and is the known defect).
+- Today at default: chip + hero + number + pace + "To confirm · N" + 2 rows + "See all" foot above the tab bar. At AX: chip + hero + number + pace above the bar; the AX chip never truncates mid-word.
+
+## 7. Motion (measured on a 30 fps capture)
+
+The log flow shows the timber drop (≥ 24 consecutive changed frames in the lot region), no hard cuts outside the two crossfade windows, then the windows fading on over 0.30–0.47 s when it was the first hour of the day. Order: drop → windows → (later) scene. Nothing moves on appear, on a timer or on scroll. A static capture of a flow that should animate is BLOCKED ("no-animation capture").
+
+## 8. Anchor question for hero screens (judgment, written)
+
+Beside Opal, (Not Boring) Weather and Tolan: "Is this a lit object someone keeps, or a toy on a background?" Name what matches (one light source, a dark side, spill on the ground, a page with a time of day) and what does not. Kitsch from the §H.2 list (blooms, planters, lanterns, pets, smoke, weather, string lights) is a finding by name.
