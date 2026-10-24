@@ -32,7 +32,7 @@ Brian's locked decisions (2026-10-24): the house is the hero (a rendered diorama
 | 22 | Brand doc | — | conflicts listed in §D for the same-revision update of `2.0-brand-system.md` | §D |
 | 23 | Future features | — | §F: per-rental house customisation and the ambient layer, designed for and not built | §F |
 | 24 | Tool changes | — | specified, not coded: `scripts/qa/NOTES-standard-v2.md` | §5 |
-| 25 | Adaptive layout (2026-10-24) | bands A/B/C, iPad sidebar, `NavigationSplitView`, `Table`, `.inspector`; Duo open one column | **one model:** compact (one column) below 784pt, two-pane at 784 and up or with the Duo held open (house left, workstation right, the same on iPad and the Duo), stacked when the Duo is propped; no sidebar; the bar at the right pane's foot; AD1–AD17 list each change | §1.27 |
+| 25 | Adaptive layout (2026-10-24) | bands A/B/C, iPad sidebar, `NavigationSplitView`, `Table`, `.inspector`; Duo open one column | **one model:** compact (one column) below 800×645pt, two-pane at 800×645 and up or with the Duo held open (house left, workstation right, the same on iPad and the Duo), stacked when the Duo is propped; no sidebar; the bar at the right pane's foot; AD1–AD17 list each change | §1.27 |
 | 26 | Duo unfold | no custom transition on fold | `duoUnfold`: the door swings and the right pane lights from the fold, ≤ 0.80 s, on a hinge event only; token `duoDoor`; new colour `duoNightCardEdge` #3C4675 | §1.27, §B.2, §B.3 |
 | 27 | "All rentals" number | the sum against the largest goal | "N hours across M rentals" and "N of M behind" in every mode, never a goal (**decided 2026-10-24**) | §H.1 H10 |
 
@@ -66,7 +66,7 @@ Each finding of the fresh-context review and what r2 did. "Plan" is `v2-revamp-p
 | R22 | Owner summary: jargon, two wrong lines, three missing risks | Rewritten in plain words, every sentence ≤ 20 words; the two lines fixed; the asset budget, night readability and untested colours added. | `v2-summary.md` |
 | R23 | Open questions 1, 4, 5 need follow-ups | Tab name written as "Rentals" everywhere; a light-mode tab-switch capture added to the gate; the hero toast replaces the chip while it shows and is announced. | §1.19, §1.25, §H.4, §H.7, Rubric §6 |
 
-Kept from v1 without change: component grammar §1.1–1.9, 1.11–1.13, 1.16, 1.17, 1.20–1.22, 1.26; density D1, D2, D4, D5, D7–D10; the voice rules §C in full; the adaptive bands §1.27 (hero rows added); the gate rubric §5 (hero measures added).
+Kept from v1 without change: component grammar §1.1–1.9, 1.11–1.13, 1.16, 1.17, 1.20–1.22, 1.26; density D1, D2, D4, D5, D7–D10; the voice rules §C in full; the adaptive layout §1.27 (rewritten 2026-10-24 as one model: compact, two-pane, stacked); the gate rubric §5 (hero measures added).
 
 Why this exists. Brian, on the Today "To confirm" card: "These card designs also waste too much space. I feel like we don't have a standard and bar for the design system and harness, which results in some amateur design like this." CLAUDE.md holds tokens, the brand doc holds the blueprint world, and nothing says how a row, a card, a button or a sentence is built, or how dense a screen must be. Each screen was composed alone, which is why the app has four tinted-capsule button styles, three primary pill styles, six hand-built close buttons and two hours steppers (§4).
 
@@ -100,7 +100,7 @@ The house is a rendered 3D diorama (one Blender rig, `design/blueprint-house/scr
 | H7 iPhone Duo | Closed, outer display (app area 382×644): side `min(370, 287)` = **287**; numerals cap at **64pt** whenever `H < 700` (compact mode). Held open (951×669): two-pane, side **290**, numeral 76. Propped (669×951): stacked, side **220** beside the number, numeral 60. The frame never straddles the fold (`reservedRegions(kind: .division)`). Supersedes "inner display one column, side 390" (2026-10-24). | measured (closed on the Duo simulator; open and propped from off-screen @3x renders, `duo-concept-v6`) |
 | H8 hysteresis | The side is recomputed only when the mode or band changes (§1.27's 8pt hysteresis) or the window height changes by ≥ 40pt; never per pixel during a resize. | grep |
 | H9 clamps | `.dynamicTypeSize(` is allowed at exactly three sites: the hero numeral (cap 54 at AX), the house art frame, the rental chip (`…accessibility2`). The §2 clamp rule moves from 2 sites to 3. | grep |
-| H10 "All rentals" | When the chip shows "All rentals", the hero is the stage of the **sum of confirmed hours across rentals against the largest goal any rental uses** (the 750 when one uses it), through the same `CraftStage.stage(hours:goal:)`; windows lit when any rental logged today (H.2); the number block reads the same sum and goal. It is the first page dot. The drop and `windowsOn` play on "All" exactly as on one rental, keyed to the aggregate stage. **Decided 2026-10-24 (consistency with the locked Duo):** the number block never shows a goal for "All rentals" in any mode: it reads "312 hours across 3 rentals" and the pace line "3 of 3 behind. Tap a house to see its pace." (or "Every rental is on pace."); the stage art keeps the rule above. | grep: no second stage function |
+| H10 "All rentals" (rewritten 2026-10-25; one rule, every mode) | **No single house, no stage and no goal for "All rentals".** The hero is the **skyline**: each rental's own house-only render (`LHThumb.house`, §H.5) at **its own** `CraftStage.stage(hours:goal:)` and its own lit state (`loggedToday`), standing in one row on one shared ground line inside the hero frame, with the page's spill pool and one shared contact shadow. Order = the shelf's order. House side = `min(0.42 × S, (0.92 × S − 0.04 × S × (n − 1)) / n)` for frame side `S`; houses are never under 44pt. **Cap: 5 houses when `S ≥ 290`, 4 when `S < 290`** (stacked 220, closed Duo 287, SE 297 → 5 only if ≥ 290). Over the cap (for example 8 rentals), the skyline shows the most-behind rentals first (largest gap to their own pace, ties by shelf order) up to the cap, and nothing in the art counts the rest (no "+3", no words in the scene, §H.2); the number line already says "across 8 rentals" and the shelf shows all 8. The number block (`HouseNumberBlock`, shared) reads "312 hours across 3 rentals · 3 of 3 behind" (or "· All on pace"), then "Tap a house to see its pace." Motion: no `timberDrop` or `houseStageAdvance` on the skyline; a mini house whose rental changes stage takes `stageFade`, and its windows take `windowsOn`. `duoUnfold` on "All rentals" plays the pane light only. It is the first page dot and the first shelf slot. | grep: no `CraftStage.stage(` on an aggregate; no `reduce` over `goal` |
 
 ### H.2 Art direction: the lighting rig, the palette, the kitsch list
 
@@ -428,19 +428,20 @@ SF Symbols and the mono mark B template only; numbers `.rounded` tabular via `LH
 
 | Mode | Who gets it | Layout |
 |---|---|---|
-| **Compact** | every iPhone, the closed Duo (382×644), iPad mini portrait, iPad Split View and Slide Over, narrow Stage Manager windows | **One column**: the house hero on top, then the work. This is the locked Today, unchanged. |
-| **Two-pane** | the Duo held open (951×669), iPad 10th gen and larger in portrait and landscape, iPad mini landscape, wide Split View and Stage Manager windows | **The house on the left, the workstation on the right, always.** Left: the hero, the hours, the pace and the rental shelf. Right: the work (To confirm, Inbox, Records, the rental page, Log time), with detail and Log time opening **inside the right pane** over the interior wall. Same panes, same order and same contents on iPad and on the Duo. |
+| **Compact** | every iPhone in portrait **and in landscape, the Pro Max included** (H < 645), the closed Duo (382×644), iPad mini portrait, narrow Split View tiles (1/3, 1/2, and 2/3 on 11"), Slide Over, Stage Manager windows under 800 wide or 645 tall | **One column**: the house hero on top, then the work. This is the locked Today, unchanged. |
+| **Two-pane** | the Duo held open (951×669), iPad 10th gen, Air and Pro 11" and 13" in portrait and landscape, iPad mini landscape, the 2/3 tile on 13", Stage Manager windows at least 800×645 | **The house on the left, the workstation on the right, always.** Left: the hero, the hours, the pace and the rental shelf. Right: the work (To confirm, Inbox, Records, the rental page, Log time), with detail and Log time opening **inside the right pane** over the interior wall. Same panes, same order and same contents on iPad and on the Duo. |
 | **Stacked** | the Duo propped up (669×951, the fold across) | Two-pane turned on its side: the house and shelf in the top half, the workstation and the bar in the bottom half. |
 
-**Choosing the mode** **[grep]**: `LayoutMode.resolve(previous:width:division:)` is the only place it is computed. Inputs are the scene's width `W` (from `onGeometryChange` on the root; never the screen, idiom, device name or orientation) and the active `.division` region, if any (`GeometryProxy.reservedRegions(kind: .division)`).
-- A **vertical** active division (the Duo held open) → two-pane, split at the division.
-- A **horizontal** active division (the Duo propped) → stacked, split at the division.
-- No division: **two-pane iff `W ≥ 2 × 380 + 24 = 784`**, else compact. Hysteresis 8pt (two-pane on at 792, off below 776). Inside compact, `W` < 600 is the phone layout (gutter 20); `W` 600–783 is one column ≤ 600 centred (gutter 24), as band B was.
-- Minimum pane width **380**: the narrowest pane must hold the 290 hero with 16 gutters and a phone-width list. iPad mini portrait (744) stays compact; iPad 10th gen portrait (820) gets two panes of 398.
+**Choosing the mode** **[grep]**: `LayoutMode.resolve(previous:size:division:live:)` is the only place it is computed. Inputs are the scene's size `W`×`H` (from `onGeometryChange` on the root; never the screen, idiom, device name or orientation), the active `.division` region, if any (`GeometryProxy.reservedRegions(kind: .division)`), and whether a resize is live.
+- A **vertical** active division (the Duo held open) → two-pane, split at the division, **only if each pane is ≥ 380 wide**; otherwise compact.
+- A **horizontal** active division (the Duo propped) → stacked, split at the division, only if each half is ≥ 380 tall; otherwise compact.
+- No division: **two-pane iff `W ≥ 800` and `H ≥ 645`**, else compact. 800 gives panes of 388 (≥ 380) and sits above the 11" 2/3 tile (≈ 780–795), so that tile is always compact. **645 is the height floor**: below it the hero cannot keep both its 290 minimum and its 0.45 × H cap (290 / 0.45 = 645), so short windows stay compact. This also keeps an iPhone in landscape compact, the Pro Max included (956×440), if `~iphone` landscape is ever turned on. Inside compact, `W` < 600 is the phone layout (gutter 20); `W` ≥ 600 is one column ≤ 600 centred (gutter 24), as band B was.
+- **Hysteresis only during a live resize, and only above the threshold:** while a resize is live, two-pane turns on at `W ≥ 808` / `H ≥ 653` and off below 800 / 645. When the size has been still for 0.3 s, and at every scene connect and launch, the mode is re-resolved **with no history** (`previous: nil`). The mode therefore never depends on the path taken: a window settled at a given size always gets the same mode. The A/B split inside compact keeps 592/608 the same way.
+- Minimum pane width **380**: the narrowest pane must hold the 290 hero with 16 gutters and a phone-width list. iPad mini portrait (744) stays compact; iPad 10th gen portrait (820) gets two panes of 398. Captures at 799/800 and 644/645, each reached from both sides and then settled, are part of every adaptive hand-off.
 
 **Platform.** Minimum OS **iOS 18.0** (decided 2026-10-23). `ArrangementView`, `reservedRegions`, `onHingeChange` and `toolbarVerticalBehavior` sit behind `#available(iOS 27.1, *)`; below it, two-pane is the same two views in an `HStack` and nothing hinge-keyed exists. Glass stays behind `#available(iOS 26, *)` with the system-material fallback (§1.25). `Info.plist` stays `~iphone` portrait-only and `~ipad` all orientations; Duo open landscape is kept pending the orientation probe (must-prove 6).
 
-**The gap.** On iPad there is no hinge, so the gap between the panes takes the hinge band's place at a design width of **24pt** (the same as the Duo's assumed fold band). It is page, not a divider: no line, no shadow, no control, no text crosses it, and the door's light wash (`DuoFoldWash`) centres on it in every two-pane window, so the two walls meet the same way on both devices. On the Duo the gap is whatever `reservedRegions(kind: .division)` returns (frame plus margins).
+**The gap.** On iPad there is no hinge, so the gap between the panes takes the hinge band's place at a design width of **24pt** (the same as the Duo's assumed fold band). It is page, not a divider: no line, no shadow, no control, no text crosses it, and the door's light wash (`FoldWash`) centres on it in every two-pane window, so the two walls meet the same way on both devices. On the Duo the gap is whatever `reservedRegions(kind: .division)` returns (frame plus margins).
 
 **Split.** The panes are equal: each is `(W − gap) / 2`. Content inside a pane is capped at 600 and centred (13" landscape: panes 676, content 600). The left pane never widens to take spare room; consistency beats filling a 13" screen.
 
@@ -448,14 +449,14 @@ SF Symbols and the mono mark B template only; numbers `.rounded` tabular via `LH
 
 **Navigation and the tab bar, every mode.** One root `TabView` (Today, Inbox, Records, Rentals, the `.search`-role "Log time", §1.25), `.tabViewStyle(.tabBarOnly)`: **no sidebar on iPad**. The bar is the same system bottom bar in every mode:
 - Compact: the foot of the screen (the closed Duo's trailing rail is the system's and stays).
-- Two-pane: the foot of the **right pane** only, as on the open Duo; the left pane has no bar. The right pane's container reports `horizontalSizeClass = .compact` so iPadOS draws the phone bar there, not its floating top bar.
+- Two-pane: the foot of the **right pane** only, as on the open Duo; the left pane has no bar. **The one allowed bridge:** the right pane's `TabView` is hosted in **one child `UIHostingController`** whose `traitOverrides.horizontalSizeClass = .compact`, so the system itself draws its compact bottom bar there. A SwiftUI `.environment(\.horizontalSizeClass, …)` override is not documented to change the bar and is not used. This must be proven on **iPadOS 18, 26 and 27** (must-prove 12; §H.7 requires all three OSes). **If it fails on any of them, that OS gets the system's own iPad tab bar over the right pane (the floating top bar), never a custom bar.** The Duo uses the same bridge.
 - Stacked: the foot of the screen (the bottom half).
 - `.toolbarVerticalBehavior(.disabled)` (iOS 27.1, behind `#available`) in two-pane and stacked, so the Duo never folds the bar into a side rail beside the fold.
 - **Decided 2026-10-24 (Brian): no sidebar on iPad**, the bar at the right pane's foot as on the open Duo. A sidebar beside house-left and workstation-right would make three competing columns, and its per-rental tabs duplicate the shelf.
 - Settings is reached as on the phone: the gear on Today's root, top trailing (in two-pane, the top trailing of the left pane); it opens in the right pane.
 - Unselected bar items take the house ink (`textPrimary` at 0.85) in every mode, through one `UITabBar.appearance().unselectedItemTintColor` line in `LandlordHoursAppEntry` (§1.25 amended: the one allowed appearance setting); selection is `colors.action`.
 
-**[grep]** zero `userInterfaceIdiom`, zero `UIDevice.orientation`, zero `*Pad*`/`*iPad*`/`*Duo*` view names outside `Views/Adaptive/` (the two-pane parts are named for their role, `HousePane`, `WorkPane`, not for a device); zero `NavigationSplitView`, `.inspector(`, `TabSection(`, `.sidebarAdaptable`, `tabViewSidebarHeader`; `horizontalSizeClass` written in one place (the right pane's container); no hard-coded 951, 669 or 24 in shipping layout code (the gap constant `LayoutMode.paneGap` is the one exception, for iPad).
+**[grep]** zero `userInterfaceIdiom`, zero `UIDevice.orientation`, zero `*Pad*`/`*iPad*`/`*Duo*` view names outside `Views/Adaptive/` (the two-pane parts are named for their role, `HousePane`, `WorkPane`, not for a device); zero `NavigationSplitView`, `.inspector(`, `TabSection(`, `.sidebarAdaptable`, `tabViewSidebarHeader`; `traitOverrides.horizontalSizeClass` set in exactly one place (the right pane's hosting controller), and no `.environment(\.horizontalSizeClass` anywhere; no hard-coded 951, 669 or 24 in shipping layout code (the gap constant `LayoutMode.paneGap` is the one exception, for iPad).
 
 #### What sits where
 
@@ -463,26 +464,37 @@ Same components (`LHRow.*`, `LHCard`, `LHTag`, `LHChip`, `LHButton`, `CraftHouse
 
 | Tab | Compact (one column) | Two-pane: left (house) | Two-pane: right (workstation) | Stacked (top / bottom) |
 |---|---|---|---|---|
-| **Today** | rental `Menu` chip, hero, number, pace, "To confirm · N" with 2 rows and "See all" (D3b) | hero, number, pace, the shelf ("All rentals" first) | To confirm (filter chip, count, rows, "N more at other rentals"), then "On the record today"; a row's detail and Log time open here with "‹ To confirm" | house + number + shelf / To confirm (≥ 3 rows) + On the record |
-| **Inbox** | the Inbox list; detail is the confirm sheet | the same house pane (the shelf filters the list) | the Inbox list; detail opens in the pane with a back link | house / list |
-| **Records** | `LHRow.Browse` list with the `LHChip` strip; record opens as a push | the same house pane | the same list; record opens in the pane | house / list |
+| **Today** | rental `Menu` chip, hero, number, pace, "To confirm · N" with 2 rows and "See all" (D3b) | hero (the skyline on "All rentals"), number, pace, the shelf ("All rentals" first) | To confirm (filter chip, count, rows, "N more at other rentals"), then "On the record today"; a row's detail and Log time open here with "‹ To confirm" | house + number + shelf / To confirm (1 row + "See all N", DU13) + On the record |
+| **Inbox** | the Inbox list; detail is the confirm sheet | the same house pane (the shelf does **not** filter the Inbox: it shows every rental in every mode, as on the phone) | the Inbox list; detail opens in the pane with a back link | house / list |
+| **Records** | `LHRow.Browse` list with the `LHChip` strip; record opens as a push | the same house pane (the shelf does not filter Records; Records keeps its own `LHChip` strip, the same as compact) | the same list; record opens in the pane | house / list |
 | **Rentals** | the rentals list; a rental page pushes (its own hero) | the selected rental's hero + shelf (the shelf **is** the rentals list) | the selected rental's page body (pace tiles, this week, its records, Log time here); "Add rental" in the pane's toolbar | house / rental body |
 | **Log time** (the fifth tab) | `LogTimeSheet`, `.large` sheet; restores the previous tab | unchanged | `LogTimeSheet`'s content **in the pane**, naming the rental shown; restores the previous tab | house / Log time |
 | **Settings** | push from the gear | unchanged | Settings in the pane | house / Settings |
 
-The house pane is the same view in every tab: switching tabs never moves or re-lays the house, only the right pane changes. Sheets that are not Log time or a detail (the paywall, onboarding, export, capture setup) stay system sheets over the whole window, `.presentationSizing(.form)` when wider than compact.
+**What the shelf selects:** the hero, the number block and Today's To confirm filter (Today only), and which rental page the Rentals tab shows. Nothing else. The compact chip selects exactly the same things. The house pane is the same view in every tab: switching tabs never moves or re-lays the house, only the right pane changes. Sheets that are not Log time or a detail (the paywall, onboarding, export, capture setup) stay system sheets over the whole window, `.presentationSizing(.form)` when wider than compact.
 
 #### Sizes by mode
 
-| | Compact phone (402×874) | Compact, closed Duo (382×644) | Compact 600–783 (iPad mini portrait 744) | Two-pane, Duo open (951×669) | Two-pane, iPad (820×1180 portrait; 1180×820 landscape; 1376×1032 13") | Stacked (669×951) |
-|---|---|---|---|---|---|---|
-| Pane width | 402 | 382 | column ≤ 600 | **463.5** (at a 24 fold) | 398 · 578 · 676 (content 600) | 669 per half |
-| Hero frame | H1: 390 | 287 | 390 | **290** | `clamp(round(0.626 × pane), 290, 390)`, ≤ 0.45 × H: **290 · 362 · 390** | **220** beside the number |
-| Numeral | 84 (54 AX) | 64 | 84 | 76 (54 AX) | 76 (54 AX) | 60 |
-| Hero at AX | 295 | 287 | 295 | 0.75 × (218) | 0.75 × | 0.75 × |
-| Rental switcher | `Menu` chip + page dots | chip | chip | **shelf**: models 104 in 108 slots, edge fade | shelf | shelf |
-| Rows | D3b: 2 + foot | 1 + foot | D3b | right pane: DU4 (≥ 3 filtered + foot + On the record; All rentals to the bar) | right pane: DU4; Inbox/Records ≥ 7 | bottom half: DU4 / DU13 |
-| Min width | 320 | — | 600 | pane ≥ 380 | pane ≥ 380 | half ≥ 380 tall |
+| Size (pt) | Device or window | Mode | Pane(s) | Hero | Numeral | Switcher | Rows |
+|---|---|---|---|---|---|---|---|
+| 402×874 · 440×956 | iPhone 17, Pro Max, portrait | compact A | 402 · 440 | H1: 390 · 426 cap 390 | 84 | chip + dots | D3b: 2 + foot |
+| 874×402 · 956×440 | iPhone landscape (if ever enabled) | compact (H < 645) | one column ≤ 600 | H1 by height | 64 (H < 700) | chip | 1 + foot |
+| 375×667 | SE class | compact A | 375 | 297 | 64 | chip | 1 + foot |
+| 382×644 | Duo closed | compact A | 382 | 287 | 64 | chip | 1 + foot |
+| 744×1133 · 768×1024 | iPad mini portrait | compact B | column 600 | 390 | 84 | chip | D3b |
+| 1133×744 | iPad mini landscape | two-pane | 554.5 | 347 | 76 | shelf | DU4 |
+| 820×1180 · 834×1210 | iPad 10th gen / Air 11" · Pro 11" portrait | two-pane | 398 · 405 | 290 | 76 | shelf | DU4; Inbox/Records ≥ 7 |
+| 1180×820 · 1210×834 | the same, landscape | two-pane | 578 · 593 (content 600) | 362 · 371 | 76 | shelf | DU4; ≥ 7 |
+| 1032×1376 | 13" portrait | two-pane | 504 | 316 | 76 | shelf | DU4; ≥ 9 |
+| 1376×1032 | 13" landscape | two-pane | 676 (content 600) | 390 | 76 | shelf | DU4; ≥ 9 |
+| ≈ 905–920 × 1032 | 13" landscape, 2/3 tile | two-pane | ≈ 440 | 290 | 76 | shelf | DU4 |
+| ≈ 780–795 × 820 | 11" landscape, 2/3 tile | **compact** (< 800, either path) | column 600 | 390 | 84 | chip | D3b |
+| ≈ 375–690 | 1/3 and 1/2 tiles, Slide Over (≈ 320–375) | compact A or B | — | H1 / 390 | 84 | chip | D3b |
+| any W × < 645 | short Stage Manager window | compact | — | H1 by height | 64 (H < 700) | chip | 1 + foot |
+| 951×669 | Duo open | two-pane | **463.5** (24 fold) | **290** | 76 | shelf: models 104 in 108 slots | DU4 |
+| 669×951 | Duo propped | stacked | 669 per half | **220** beside the number | 60 | shelf | DU13: 1 + foot + On the record |
+
+Hero: compact by §H.1 H1 (390 cap, 287 closed Duo, 297 SE); two-pane `clamp(round(0.626 × pane), 290, 390)`, never above 0.45 × H; stacked 220. At AX every two-pane and stacked hero is × 0.75 and the numeral 54. The 1/3, 1/2 and 2/3 widths are approximate and are measured on the iPad 10th gen, mini and an 11" before J2's iPad half closes (NOTES §13).
 
 #### Rules kept from 2026-10-23 (re-scoped to the two modes)
 
@@ -512,9 +524,9 @@ Density addendum: in two-pane, D3, D4 and D6 are measured per pane; D6's hero sh
 
 Sources: `~/AgentScratch/landlordhours/2026-10-24/duo-concept-v6/` (README, frames, `selfcheck/measure-v6.txt`), `duo-concept-v5/concept.md` (layout), `duo-concept-v2/concept.md` (API citations with SwiftUICore swiftinterface lines), `duo-concept-v4/README.md` (the filter), `duo-gate6/` and `duo-critic5/verdict.md` (the numbers). **The numbers are v6's; `duo-concept-v7/` (the final fix pass on the critic's five gaps) is the capture of record**, and where v7 measures differently, v7 wins and this section is updated. Prototype code: `Sources/Views/Debug/DirCraft/DuoTwoPane.swift` on `proto/duo-door-v2` (package J ports it; it is not merged). The iPad two-pane frames do not exist yet; package J captures them against these same rules.
 
-- **Container:** on the Duo, `ArrangementView { HousePane } secondary: { WorkPane }` with `.arrangementViewStyle(.split.axes(.horizontal))` (`.vertical` when stacked) and `.splitArrangementLayoutRatio(0.5)`; on iPad the same two views in an `HStack` with the 24 gap. One `TwoPaneLayout` view chooses; the panes do not know which.
+- **Container:** on the Duo, `ArrangementView { HousePane } secondary: { WorkPane }` with `.arrangementViewStyle(.split.axes(.horizontal))` (`.vertical` when stacked) and `.splitArrangementLayoutRatio(0.5)`; on iPad the same two views in an `HStack` with the 24 gap. One `TwoPaneLayout` view chooses; the panes do not know which. The house must render **leading (left) and on top**: which side `ArrangementView` gives its primary is unproven (the prototype made the workstation primary), so J1 confirms it on the 27.1 SDK and swaps primary and secondary if needed (must-prove 15).
 - **House pane:** the selected rental's lit diorama, the Fraunces number, "of 500 hours · Pine Cabin", the pace sentence, then the **timber shelf**: "All rentals" first, then one model per rental with its name and "46 of 100h". Tap a model or swipe the house to switch (`rentalSlide`). The shelf scrolls and fades at both edges when it overflows. Nothing else in this pane is operable except the Settings gear.
-- **"All rentals" is honest:** "312 hours across 3 rentals" with "3 of 3 behind. Tap a house to see its pace." (or "Every rental is on pace."); the shelf label reads "3 of 3 behind" or "All on pace". **Goals from different tests are never summed** **[grep]**: no `reduce` over `goal` in `Views/Adaptive/` or Today. (§H.1 H10 amended to match in every mode, decided 2026-10-24.)
+- **"All rentals" is honest:** the hero is the **skyline** (§H.1 H10), never one house at one stage; the number block reads "312 hours across 3 rentals · 3 of 3 behind" and the pace line "Tap a house to see its pace." (or "Every rental is on pace."); the shelf label reads "3 of 3 behind" or "All on pace". **No goal, no summed goal and no stage are computed for "All rentals"** **[grep]**: no `reduce` over `goal` and no `CraftStage.stage(` call on an aggregate in `Views/Adaptive/`, Today or the shared number block. J2 **does not port** the prototype's `stage: .complete` and `goal: reduce(+goal)` (`DuoTwoPane.swift:82–83`). Decided 2026-10-24 for every mode.
 - **Work pane:** an opaque `LHCard` over the interior wall. To confirm's header is "To confirm", the rental filter chip and the count set large. Picking a rental filters the list to that rental's items plus items with no rental yet; "4 more at other rentals" sits at the foot and, like clearing the chip, shows all rentals. "On the record today" lists that rental's logged entries and fills the pane to the bar.
 - **The interior wall:** the Today page gradient continues across the gap; by day round-1 A's room shows through, dusty and away from the gap; by night the navy page with one warm pool at the gap.
 
@@ -525,19 +537,19 @@ Sources: `~/AgentScratch/landlordhours/2026-10-24/duo-concept-v6/` (README, fram
 | DU1 | Pane width | each pane = (W − fold band) / 2; **463.5 at the assumed 24pt band**; the band is read from `reservedRegions(kind: .division)` at runtime (frame + margins), never hard-coded in shipping code; 24 is a capture fallback until a device read. **iPad:** the 24 gap, panes `(W − 24)/2` |  measured |
 | DU2 | Fold band | 0 text-edge pixels (neighbour luminance step > 40) inside the band on every open and propped frame (v6: 0 of 20 frames) | measured |
 | DU3 | Pane gutter | 16 inside each pane; card padding 16; rows per §1 (D1 56–88, target 64; v6 row pitch ≈ 65) | measured |
-| DU4 | Right pane density | **filtered:** ≥ 3 To confirm rows + the "N more" foot + "On the record today" above the bar; **All rentals:** rows run to the bar (v6: 7). Empty wall between the last card and the bar ≤ 20% of the pane (v6: 0%). The last row clears the bar glass **at rest** by 8–12pt of bottom content inset | measured |
-| DU5 | Zero logged today | "On the record today" stays and shows "Nothing logged at Pine Cabin yet today." in the card; the wall under it still ≤ 20% (v6 had no frame of this state: v7 owes it) | measured |
+| DU4 | Right pane density | **filtered:** ≥ 3 To confirm rows + the "N more" foot + "On the record today" above the bar; **All rentals:** rows run to the bar (v6: 7). Empty wall between the last card and the bar ≤ 20% of the pane (v6: 0%). The last row clears the bar glass **at rest** (v7: bottom content inset 84pt, `barClearance`; the last subtitle 7.05:1 dusk, 8.85 night) | measured |
+| DU5 | Zero logged today | "On the record today" stays: its header (no "0h"), a hairline and one line "Nothing logged yet today.", no button; the wall below ≤ 20% of the pane (v7 `open-zerologged`: the state sits at 442–515pt, ≈ 100pt of wall above the bar = 15%; line 7.01:1 dusk, 8.85 night) | measured |
 | DU6 | Left pane density | the shelf replaces the rental `Menu` chip here; hero 290, number block, pace sentence and the shelf are all above the pane foot at default size; at XXL the shelf labels wrap to 2 lines and nothing ellipsizes | measured |
-| DU7 | Shelf edge fade | clear for the first and last 5% of the shelf, full by 16% and 84%; **no label glyph clipped at either edge** at 3 and 8 rentals (v6 open: "Oak Cottag" at the trailing edge; v7 owes it) | measured |
+| DU7 | Shelf edge fade | steep and symmetric: clear 0–9pt, 80% by 13pt, full by 36pt from each edge; **no label glyph clipped at either edge** at 3 and 8 rentals (v7: every visible glyph 10.1–12.7:1 dusk, 14–17.7 night; "Oak Cottage" whole, ending at x 438). At XXL glyphs ≥ 8.0:1 from x 12; the 9pt cut sliver at the edge reads 2.4 and is exempt as the clip, not text. At AX3 the slot widens with the type so names break at words | measured |
 | DU8 | Text contrast over the interior | every text pair ≥ 4.5:1, icons ≥ 3:1, sampled against the actual pixels behind (v6 lowest: dusk "Behind by 143h" 5.15, tags 5.51; night tags 6.97) | measured |
 | DU9 | One wall across the fold | ΔE76 between the two walls at the fold: mean ≤ 5, max ≤ 10 (v6: dusk 1.5 / 3.2, night 3.4 / 6.1; the critic's ceiling was 15). Far interior wall C* ≤ 15 by day (v6 #B2A595, 10.2) | measured |
-| DU10 | Light comes from the door | the brightest wall pixel at y = 60pt sits ≤ 120pt from the fold (v6: 13 dusk, 12 night); `DuoFoldWash` mirrors the door glow ~150pt into the house pane at the same strength | measured |
-| DU11 | Night card edge | `duoNightCardEdge` **#3C4675** (dark only, on the work pane in every two-pane and stacked window; light keeps `pageCardEdge`) ≥ 1.9:1 on the night room away from the warm pool (v6: 2.02). Inside the pool it measures 1.75: **accepted MARGINAL**, not to be "fixed" by strengthening the edge (that pushes it to ≈ 2.4 lower down). The prototype's `#3A4778` is superseded by the locked value | measured |
+| DU10 | Light comes from the door | the brightest wall pixel at y = 60pt sits ≤ 120pt from the fold (v6: 13 dusk, 12 night); `FoldWash` mirrors the door glow ~150pt into the house pane at the same strength | measured |
+| DU11 | Night card edge | `duoNightCardEdge` **#3C4675** (dark only, on the work pane in every two-pane and stacked window; light keeps `pageCardEdge`) ≥ 1.9:1 on the night room away from the warm pool (v6: 2.02). Inside the pool the flat token measures 1.75: **accepted MARGINAL**. v7 reached 1.99 there with a leading-edge ramp (#444E80 fading to #3A4778 by 55% of the width; 2.30 lower down), which is not a token: J ships the flat locked token unless Brian adds a second one. The prototype's `#3A4778` is superseded | measured |
 | DU12 | Tab bar | at the right pane's foot (v6 bar top 618pt of 669), never across the fold, never a side rail; glass from the wall behind (cream by day, navy at night); unselected items `textPrimary` at 0.85, selected `action`; selected label ≥ 4.5:1 on its pill (v6 lowest 7.80) | measured |
-| DU13 | Propped fill | the bottom half follows DU4: empty wall above the bar ≤ 20% (v6: one card and ≈ 130pt of wall; v7 owes it) | measured |
-| DU14 | Step pool | the door's light on the step is a soft-edged radial, ≤ 60% opacity, never a hard ellipse (v6 dusk failed; v7 owes it) | judgment + measured edge |
+| DU13 | Stacked fill and rows | the bottom half runs the open card logic: To confirm with **1 row + "See all N"**, then "On the record today"; card-to-bar gap ≤ 20% of the half (v7 `propped`: 36pt = 7.6%). **Relaxed 2026-10-25 from "≥ 3 rows" to the measured frame:** the half is 463pt tall, under the 700pt line where compact already shows 1 row (D3b), and 3 rows would push "On the record today" off the half or shrink the hero below 220 | measured |
+| DU14 | Step pool (Duo only) | the door's light on the step is a radial with 5 stops and no hard edge, sheared and rotated by the door angle so it lies along the step and path, ≤ 60% opacity (v7 `crop-door-*`: passes by eye; edge not yet measured) | judgment + measured edge |
 
-**[grep]** `toolbarVerticalBehavior(.disabled)` appears only in `Views/Adaptive/`; no hex literal in `Views/Adaptive/` outside `DoorArt` (the art constants, like `HouseTokens`). DU1–DU14 apply to every two-pane window, iPad included; DU13 and DU14's door parts are Duo-only.
+**[grep]** `toolbarVerticalBehavior(.disabled)` appears only in `Views/Adaptive/`; no hex literal in `Views/Adaptive/` outside `DoorArt` (the art constants, like `HouseTokens`). DU1–DU13 apply to every two-pane and stacked window, iPad included; DU14 is Duo-only.
 
 **Motion.** One named motion, `duoUnfold` (§B.3), on token `duoDoor` (§B.2). Summary: on unfold, the left house's door swings open and the right pane lights from the fold outward, ≤ 0.80s, reversed in 0.50s on fold, a 0.20s crossfade under Reduce Motion; the layout is live and hit-testable from frame 0. It is keyed to `onHingeChange` (`DeviceHinge.status` `.closed` → `.partiallyOpen` or `.fullyOpen`; UIKit `UIHingeInteraction` as the fallback), **never** to a size, arrangement or scene change, so an iPad resize or a Stage Manager window never plays it. Rentals on `started`, `frame70` or `framing` (no door yet) get the light without a door swing. **This amends the Continuity row's "no custom transition on fold" for this hinge-keyed door only**; everything else on fold, unfold and resize is still the system's.
 
@@ -554,23 +566,26 @@ Sources: `~/AgentScratch/landlordhours/2026-10-24/duo-concept-v6/` (README, fram
 | Location | `Assets.xcassets/Adaptive/` (package J), not `Craft/` (A's) |
 | Budget | Two-pane assets ≤ 0.4 MB total, counted against the app's 14 MB asset limit |
 
-**Copy keys** (table `Adaptive`, `Sources/Resources/Strings/Adaptive.xcstrings`, the same keys on iPad and the Duo; counts use plural variations; canonical keys from §C.5 are reused, never copied):
+**Shared keys** (table `Shared`, `Sources/Resources/Strings/Shared.xcstrings`, used by the one shared number-block view `HouseNumberBlock` in compact Today, the rental page and the house pane alike; owner A2):
 
 | Key | Line |
 |---|---|
-| `twoPane.shelf.allRentals` | "All rentals" |
+| `allRentals.name` | "All rentals" |
+| `allRentals.hoursAcross` | "%lld hours across %lld rentals" |
+| `allRentals.behind` | "%lld of %lld behind" (the shelf label and, after " · ", the number line) |
+| `allRentals.allOnPace` | "All on pace" (shelf) · `allRentals.everyOnPace` "Every rental is on pace." (pace line) |
+| `allRentals.tapHouse` | "Tap a house to see its pace." |
+| `hero.ofGoal` | "of %lld hours · %@" (one rental) |
+
+**Two-pane keys** (table `Adaptive`, `Sources/Resources/Strings/Adaptive.xcstrings`, the same keys on iPad and the Duo; counts use plural variations; canonical keys from §C.5 are reused, never copied):
+
+| Key | Line |
+|---|---|
 | `twoPane.shelf.progress` | "%lld of %lldh" |
-| `twoPane.shelf.allOnPace` | "All on pace" |
-| `twoPane.shelf.behindCount` | "%lld of %lld behind" |
-| `twoPane.hero.ofGoal` | "of %lld hours · %@" |
-| `twoPane.hero.acrossRentals` | "hours across %lld rentals" |
-| `twoPane.hero.allBehind` | "%lld of %lld behind." |
-| `twoPane.hero.allOnPace` | "Every rental is on pace." |
-| `twoPane.hero.tapHouse` | "Tap a house to see its pace." |
 | `twoPane.list.filterA11y` | "Showing %@. Show all rentals" (the chip's accessibility label) |
 | `twoPane.list.moreElsewhere` | "%lld more at other rentals" |
 | `twoPane.record.title` | "On the record today" |
-| `twoPane.record.empty` | "Nothing logged at %@ yet today." |
+| `twoPane.record.empty` | "Nothing logged yet today." (v7) |
 | `twoPane.detail.back` | "To confirm" (the back link) |
 | reused | `row.action.confirm`, `row.action.notRentalWork`, Today's "To confirm" header and "See all %lld" keys (C), the Log time sheet's "Log %@ at %@" key (E), which takes **the rental shown** (v5 named the wrong rental) |
 
@@ -586,9 +601,11 @@ Sources: `~/AgentScratch/landlordhours/2026-10-24/duo-concept-v6/` (README, fram
 9. Reduce Motion gives the 0.20s crossfade and no leaf turn.
 10. Instruments: 0 hitches over the unfold with 8 rentals; memory flat after 10 unfold/fold cycles.
 11. The night pool edge (DU11) and the dusk step pool (DU14) on the device panel.
-12. iPad: the right pane's forced compact size class draws the phone bottom bar there on iPadOS 27 (not the floating top bar); `.tabBarOnly` shows no sidebar toggle; the mode switch at 776/792 in Stage Manager loses nothing (tab, path, drafts).
+12. **The right-pane bar on iPad, on iPadOS 18, 26 and 27:** the one child `UIHostingController` with `traitOverrides.horizontalSizeClass = .compact` makes the system draw its compact bottom bar at the right pane's foot, with five items, the Inbox badge and the Log time revert; `.tabBarOnly` shows no sidebar toggle. **J2's iPad half is blocked until this passes**; an OS where it fails ships the system's own iPad bar over the right pane, never a custom bar; the mode switch at 776/792 in Stage Manager loses nothing (tab, path, drafts).
 13. iPad: the window controls clear the house pane's top leading in a Stage Manager window.
 14. **Brian's gut check** of the first in-app door on a device or a short clip, before any polish round (the owner's-eye rule).
+15. Which side `ArrangementView` renders its primary on, in both poses: the house must be leading and on top.
+16. The mode settles the same at 799/800 and 644/645 whichever side it is reached from, after a live resize, a scene connect and a cold launch.
 
 ---
 
@@ -597,11 +614,11 @@ Sources: `~/AgentScratch/landlordhours/2026-10-24/duo-concept-v6/` (README, fram
 
 | # | 2026-10-23 rule | Now | Why |
 |---|---|---|---|
-| AD1 | Bands A < 600, B 600–899, C ≥ 900; two columns iff band C and `Wc ≥ 744` | Two modes: compact (< 784, with the old A/B split inside it) and two-pane (≥ 784, or a vertical Duo division); stacked for a horizontal division. Hysteresis 776/792 | One rule for all three device families; the Duo proved 463pt panes work (**decided 2026-10-24**) |
+| AD1 | Bands A < 600, B 600–899, C ≥ 900; two columns iff band C and `Wc ≥ 744` | Two modes: compact (W < 800 or H < 645, with the old A/B split inside it) and two-pane (W ≥ 800 and H ≥ 645, or a vertical Duo division leaving panes ≥ 380); stacked for a horizontal division. Hysteresis only during a live resize, 800–808 / 645–653; re-resolved with no history when the resize settles and at scene connect (**decided 2026-10-25**, review F2, F3) | One rule for all three device families; the Duo proved 463pt panes work; no path-dependent mode for the 11" 2/3 tile |
 | AD2 | `Wc = W − sidebar − 48`; sidebar 280 docked in landscape | Removed: no sidebar, so `W` alone decides | No three-column layout |
 | AD3 | `.tabViewStyle(.sidebarAdaptable)`; `TabSection("Your rentals")` of per-rental tabs with `.tabPlacement(.sidebarOnly)`; Settings at the sidebar foot | `.tabBarOnly`, the bottom bar at the right pane's foot; the shelf replaces the per-rental tabs; Settings from Today's gear in every mode | Same bar placement as the open Duo; the shelf already switches rentals (**decided 2026-10-24**, Brian) |
 | AD4 | `tabViewSidebarHeader` = the house-only thumbnail at 120 (§H.1 H6, §H.5) | Removed; the thumbnail stays for the rentals list and widgets | No sidebar |
-| AD5 | Bar and sidebar capped at xxxLarge | The bar keeps the cap; the sidebar part is moot | — |
+| AD5 | Bar and sidebar capped at xxxLarge (`ShellChromeLimits`, `ReaderTypeSize`, the `§1.27-sidebar-clamp` code) | **Decided 2026-10-25: removed.** The cap existed only because the sidebar broke words at AX; the system tab bar handles Dynamic Type itself (large content viewer). A2 deletes both modifiers | No sidebar, so no cap |
 | AD6 | Regular width: toolbar `.primaryAction` "+" on every root; the sidebar hides the fifth tab | The fifth "Log time" tab in every mode, plus ⌘N | One create action everywhere |
 | AD7 | Inbox and Rentals in `NavigationSplitView` (list 320) in band C | The list is the right pane; detail opens in the same pane with a back link | Detail in-pane over the interior, as on the Duo |
 | AD8 | Today, two columns: left chip + hero (390) + number + pace; right To confirm | Left: hero + number + pace + **shelf** (no chip); right: To confirm + On the record today | The locked Duo layout |
@@ -614,6 +631,10 @@ Sources: `~/AgentScratch/landlordhours/2026-10-24/duo-concept-v6/` (README, fram
 | AD15 | Regular-width tint #4774C6 in dark (white on the sidebar selection) | `colors.action` in every mode; #4774C6 retired with the sidebar | No sidebar selection (**decided 2026-10-24**) |
 | AD16 | Dynamic Type: two columns collapse to one at AX1+ | Two-pane holds at AX; each pane takes the phone's AX rules | Each pane is phone-width |
 | AD17 | §1.25: "no `UITabBar` appearance hacks" | One allowed line: `unselectedItemTintColor` = house ink, in every mode | The locked bar (v6 #4) |
+| AD18 | (new) | **"All rentals" hero = the skyline** of each rental's own house at its own stage, cap 5 (4 under a 290 frame), most-behind first over the cap; no aggregate stage, no goal (§H.1 H10) (**decided 2026-10-25**) | H10 contradicted itself; the v7 frame showed a finished house at 312h |
+| AD19 | (new) | The shelf selects the hero, the number block, Today's To confirm filter and the Rentals page only; Inbox and Records are never filtered by it, in any mode (**decided 2026-10-25**) | The same tab behaves the same in every mode |
+| AD20 | (new) | The right-pane bar uses one child `UIHostingController` with `traitOverrides.horizontalSizeClass = .compact`, proven on iPadOS 18, 26 and 27; fallback the system's own iPad bar, never custom (**decided 2026-10-25**) | A SwiftUI environment override is not documented to change the bar; v7 forced compact on the whole off-screen window |
+| AD21 | Stacked: ≥ 3 To confirm rows | 1 row + "See all N" + On the record today, gap ≤ 20% (**relaxed 2026-10-25** to the v7 frame) | The half is 463pt tall, under the 700pt one-row line |
 
 ---
 
