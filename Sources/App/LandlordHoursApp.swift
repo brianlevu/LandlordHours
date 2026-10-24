@@ -38,6 +38,13 @@ enum AppColors {
     static let terracotta = Color(hex: Hex.terracotta)
     static let plaster = Color(hex: Hex.plaster)
 
+    // MARK: - Today page (crafted house at dusk)
+    static let pageTop = Color.lhDynamic(light: Hex.duskTop, dark: Hex.darkNightTop)
+    static let pageMid = Color.lhDynamic(light: Hex.duskMid, dark: Hex.darkNightTop)
+    static let pageBottom = Color.lhDynamic(light: Hex.duskBottom, dark: Hex.darkNightBottom)
+    /// Warm light pooled under the lot. Opacity is per mode (`AdaptiveColors.spillPool`).
+    static let spill = Color(hex: Hex.spill)
+
     // MARK: - Category inks (2.0 r4: one colour map, app-wide)
     /// Each category's ink is taken from its 3D tool's material, so bars, labels and the tile wash
     /// match the icon. Light inks are text-safe on white (≥4.5:1); dark inks on the dark card.
@@ -103,6 +110,21 @@ enum AppColors {
 
     /// Tile wash opacity behind a category tool.
     static let categoryWashOpacity: Double = 0.14
+
+    /// Tag text on its 12% wash (standard 1.16). Four light inks measured under 4.5:1 on their own
+    /// wash (management 4.30, negotiation 4.27, investing 4.31, renovation 4.67 at 12%), so tags use
+    /// a darker step of those four; every pair is >= 5.0:1. Dark mode keeps the category ink.
+    static let tagWashOpacity: Double = 0.12
+    static func categoryTagInkHex(_ category: ActivityCategory) -> (light: String, dark: String) {
+        let base = categoryInkHex(category)
+        switch category {
+        case .management: return ("7E5F00", base.dark)
+        case .contractNegotiation: return ("9E4D0D", base.dark)
+        case .investing: return ("636810", base.dark)
+        case .renovations: return ("AB3F2B", base.dark)
+        default: return base
+        }
+    }
 
     // MARK: - Light surfaces
     static let background = Color(hex: Hex.canvas)
@@ -293,6 +315,19 @@ struct AdaptiveColors {
     var backgroundTertiary: Color { pick(H.tertiary, H.darkTertiary) }
     var primarySurface: Color { pick(H.actionSurface, H.darkActionSurface) }
 
+    // Today page: dusk gradient (light) / navy (dark), and the spill pool under the lot
+    var pageTop: Color { pick(H.duskTop, H.darkNightTop) }
+    var pageMid: Color { pick(H.duskMid, H.darkNightTop) }
+    var pageBottom: Color { pick(H.duskBottom, H.darkNightBottom) }
+    /// The warm pool under the lot, with its per-mode strength baked in.
+    /// Behind-pace text on the Today page (>= 4.5:1 on both pages).
+    var behind: Color { pick(H.behind, H.darkBehind) }
+    /// Positive text on the Today page.
+    var positiveOnPage: Color { pick(H.positiveOnPage, H.darkPositive) }
+    /// Edge of a grouped container on the Today page.
+    var pageCardEdge: Color { pick(H.pageCardEdge, H.darkBorder) }
+    var spillPool: Color { AppColors.spill.opacity(isDark ? H.darkSpillOpacity : H.spillOpacity) }
+
     // Brand (new in 2.0)
     var brand: Color { AppColors.brand }
     /// Decorative linework (non-text).
@@ -310,6 +345,14 @@ struct AdaptiveColors {
     }
     func categoryWash(_ category: ActivityCategory) -> Color {
         categoryInk(category).opacity(AppColors.categoryWashOpacity)
+    }
+    /// Tag text and its 12% wash (>= 5.0:1 in light, see `categoryTagInkHex`).
+    func categoryTagInk(_ category: ActivityCategory) -> Color {
+        let hex = AppColors.categoryTagInkHex(category)
+        return pick(hex.light, hex.dark)
+    }
+    func categoryTagWash(_ category: ActivityCategory) -> Color {
+        categoryTagInk(category).opacity(AppColors.tagWashOpacity)
     }
     func sealInk(_ palette: SealPalette) -> Color {
         let hex = AppColors.sealInkHex(palette)
