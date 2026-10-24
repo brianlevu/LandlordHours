@@ -25,6 +25,14 @@ usage (bpy 5.0.1 venv, headless):
   .venv/bin/python craft5.py --masks half,complete --out DIR
   .venv/bin/python craft5.py --neutral --states complete --variants light,dark --out DIR
   .venv/bin/python craft5.py --no-sculpt ...        # pass-3 forms (with the pinned camera)
+  .venv/bin/python craft5.py --simple ...           # pass 6: the simplified house (SIMPLE below), for comparison
+
+Pass 6, --simple (2026-10-24, branch art/house-simple): one calmer object. Fewer windows on the two faces the camera
+sees (front: 2 up, 1 down + door; left: 1 up, 1 down), no shutters, a porch of posts, beam and roof (no rail, no
+knee braces), 2 shrubs, a 3-blob tree without stub branches or limbs, gutters without downpipes. The framing keeps
+every rough opening, so the framing stages and the 39-piece drop are unchanged. At night the half and complete
+stages get the framing stages' cool moon rim (--moon-house), so the unlit house holds its silhouette on navy.
+Without --simple every default reproduces pass 5.
 All craft3.py rig dials (--rim-dark, --moon-frame, ...) are accepted with the same defaults.
 """
 import argparse, json, math, os, sys, time
@@ -58,6 +66,34 @@ SCULPT = dict(
     sag=0.045, sag_wing=0.03,
     lot_corner=0.28, lot_rim=0.06,
 )
+SIMPLE = dict(
+    KN=dict(
+        drop_openings={('front', 2), ('left', 0), ('left', 1)},   # porch-side window; the two back windows on the left wall
+        shutters=False, porch_braces=False, tree_branches=False,
+        shrubs=[(-2.15, -3.5, 0.5), (3.7, -3.45, 0.44)],
+        tree_crown=[(0.0, 0.0, 2.55, 0.74), (0.3, -0.2, 2.25, 0.5), (-0.25, 0.2, 2.95, 0.52)],
+    ),
+    drop=('porch_rail', 'tree_limbs'),
+    moon_house=1.0, moon_house_dir=(0.0, 1.0, 0.35), moon_house_col='#E4EEFF',
+    # straight from behind and low, so it grazes the roof and edges, not the left wall; pale, because the cyan
+    # moon pushed the night saturated share past 28%
+)
+
+def gutters_only():
+    """craft2.detail_gutters without the downpipes, shoes and wall brackets: the eave gutters stay."""
+    zg = H.E + H.RT - H.OH * H.TT - 0.027
+    gx = 2.6 + H.OH + 0.07
+    runs = [((-gx, -2.4 - H.OH - 0.05, zg), (-gx, 3.0 + H.OH + 0.05, zg)),
+            ((gx, -2.4 - H.OH - 0.05, zg), (gx, 0.6 - H.OH - 0.02, zg)),
+            ((2.6 + H.OH - 0.05, 0.6 - H.OH - 0.07, zg), (4.4 + H.OH + 0.05, 0.6 - H.OH - 0.07, zg))]
+    fns = [K.halfpipe_fn(a, b, 0.075) for a, b in runs]
+    old = K.obj('downpipe')
+    K.replace_mesh(old, [('copper', [], fns)], None)
+    for m in list(old.modifiers):
+        if m.type == 'BEVEL': old.modifiers.remove(m)
+    so = old.modifiers.new('solid', 'SOLIDIFY'); so.thickness = 0.012; so.offset = 1.0
+    for p in old.data.polygons: p.use_smooth = True
+
 FINE, MED, LARGE = 0.014, 0.03, 0.05
 RADII = [                     # (name prefix, radius, segments); first match wins
     ('frame_', FINE, 3), ('rafter_', FINE, 3), ('ridgeboard_', FINE, 3), ('sill_plates', FINE, 3),
@@ -271,6 +307,10 @@ def parser():
     ap.add_argument('--anim', action='store_true'); ap.add_argument('--fps', type=int, default=30)
     ap.add_argument('--seconds', type=float, default=2.0)
     ap.add_argument('--no-sculpt', action='store_true'); ap.add_argument('--neutral', action='store_true')
+    ap.add_argument('--simple', action='store_true')
+    ap.add_argument('--moon-house', type=float, default=None)
+    ap.add_argument('--moon-house-col', default=SIMPLE['moon_house_col'])
+    ap.add_argument('--moon-house-dir', type=float, nargs=3, default=SIMPLE['moon_house_dir'])   # night moon rim on half/complete (default: 0, or SIMPLE's with --simple)
     for k, d in (('--sun', 4.0), ('--rim-light', 0.0), ('--rim-dark', 1.5), ('--fill-light', 1.5), ('--fill-dark', 0.45),
                  ('--win-light', 6.0), ('--win-dark', 32.0), ('--spill', 60.0), ('--spread', 50.0), ('--porch', 80.0),
                  ('--porch-lawn', 1500.0), ('--interior', 500.0), ('--work', 220.0), ('--work-lawn', 900.0),
@@ -283,6 +323,10 @@ def parser():
 def build(a):
     if not a.no_sculpt:
         H.OH = SCULPT['OH']; H.KN.update(SCULPT['S'])
+    if a.simple:
+        H.KN.update(SIMPLE['KN']); K.detail_gutters = gutters_only
+    if a.moon_house is None:
+        a.moon_house = SIMPLE['moon_house'] if a.simple else 0.0
     if a.neutral:
         neutral_pbr()
     K.flower_box = lambda *x, **k: None
@@ -292,6 +336,8 @@ def build(a):
     K.craft2_materials = mats
     T.WALLS = K.build(a)
     T.declutter()
+    if a.simple:
+        for n in SIMPLE['drop']: T.drop(n)
     T.work_lamp()
     for o in H.OBJS:
         if o['kind'] == 'block':
@@ -305,6 +351,24 @@ def build(a):
         soft_chimney(); soften(); ridge_sag(); round_lot()
     name_slots()
     C.apply_state = lambda st, v: T.apply_state(st, v, True)     # the build-drop clip always plays lit
+
+_apply = T.apply_state
+
+def apply_state(st, variant, lit=True):
+    """craft3.apply_state plus the night moon rim on the walled stages (half, complete) when --moon-house > 0."""
+    _apply(st, variant, lit)
+    if variant == 'dark' and st['stage'] >= 3 and T.ARGS.moon_house > 0:
+        o = C.sun('moon_rim_house', tuple(T.ARGS.moon_house_dir), T.ARGS.moon_house, 3.0, H.lin(T.ARGS.moon_house_col)[:3])
+        T.LAMPS.append(o.name)
+        o.light_linking.receiver_collection = house_collection()     # the house only: the lawn stays night-dark
+
+def house_collection():
+    hc = bpy.data.collections.get('house_only') or bpy.data.collections.new('house_only')
+    for o in H.OBJS:
+        if o['kind'] not in ('block', 'lot', 'stake', 'worklamp') and o.name not in hc.objects: hc.objects.link(o)
+    return hc
+
+T.apply_state = apply_state
 
 def main():
     a = parser().parse_args(); T.ARGS = a

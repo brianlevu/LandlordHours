@@ -81,3 +81,18 @@ python3 sheets5.py compare --before <pass-3 stills> --after $OUT/renders/stills 
 python3 measure3.py --probes <probes.json> --light ... --dark ...;  python3 measure_night.py $OUT/renders/stills/*_dark.png
 ```
 Clips and install are the same as pass 3 (`ffmpeg ... hevc_videotoolbox`, `install_craft3.py`).
+
+## Pass 6: the simplified house (2026-10-24, branch `art/house-simple`, comparison only, not in the catalog)
+
+`craft5.py --simple` builds one calmer object on top of pass 5; without the flag every default reproduces pass 5 byte for byte.
+Knobs: `house.py` `KN` (`drop_openings`, `shutters`, `porch_braces`, `shrubs`, `tree_crown`, `tree_branches`) and `craft5.py` `SIMPLE`.
+
+- Windows: front 2 up, 1 down and the door; left wall 1 up, 1 down. No shutters. The framing keeps every rough opening, so the framing stages and the 39-piece drop are unchanged.
+- Porch: posts, beam and roof; no rail, no knee braces. Gutters stay, downpipes go. Two shrubs, a 3-blob tree without stub branches or limbs.
+- Night: half and complete get a pale cool moon rim (`--moon-house 1.0`, from straight behind, house only, `#E4EEFF`), so the unlit house holds its silhouette on navy.
+
+```
+cd design/blueprint-house/scripts; OUT=~/AgentScratch/landlordhours/<date>/dir-craft6/renders; PY=~/tmp/lh-craft/.venv/bin/python
+$PY craft5.py --simple --states half,complete --variants light,dark --lit on,off --out $OUT
+python3 craft_post.py $OUT/*.png && python3 craft3_post.py $OUT/*.png
+```

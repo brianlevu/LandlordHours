@@ -38,6 +38,14 @@ KN = dict(
     fascia=(0.05, 0.26),
     post=0.16,          # porch post section
     beam=0.18,          # porch beam height
+    # Simplification knobs (craft5.py --simple sets these). Defaults reproduce the full house.
+    drop_openings=(),   # (wall, index) openings left out of the siding and units; the framing keeps them,
+                        # so the framing stages and the 39-piece drop are unchanged
+    shutters=True,      # louvred shutters on openings that ask for them
+    porch_braces=True,  # diagonal knee braces between the porch posts and the beam
+    shrubs=None,        # list of (x, y, r) to replace the default shrub row
+    tree_crown=None,    # list of (dx, dy, z, r) crown blobs to replace the default 8-blob crown
+    tree_branches=True, # the two stub branches on the trunk
 )
 
 # ---------------------------------------------------------------- colour/materials
@@ -640,7 +648,7 @@ def build_units(walls):
                     lb = []
                     B(u0 - 0.14, u1 + 0.14, z1 + fw, z1 + fw + 0.14, 0.0, 0.13, lb)
                     extra.append(('lintel', lb, []))
-                if o.get('shutters'):
+                if o.get('shutters') and KN['shutters']:
                     for side in (-1, 1):
                         ua = u0 - fw - 0.46 if side < 0 else u1 + fw
                         ub = ua + 0.46
@@ -693,7 +701,7 @@ def build_porch():
     for (x, y) in posts:
         pb.append(M_box((x, y, (F - 0.05 + ztop) / 2), (KN['post'], KN['post'], ztop - F + 0.05)))
         pb.append(M_box((x, y, F - 0.05 + 0.06), (0.24, 0.24, 0.12)))    # plinth block
-        for sx in (-1, 1):
+        for sx in ((-1, 1) if KN['porch_braces'] else ()):
             if (x < 0 and sx < 0) or (x > 2 and sx > 0):
                 continue
             a = Vector((x, y, ztop - 0.6)); b = Vector((x + sx * 0.55, y, ztop - 0.05))
@@ -756,7 +764,7 @@ def build_lot():
     new_obj('lot_path', [('paver', pv, [])], -1, 0, '', 'lot', bevel=0.015)
     # shrubs + tree (WP-A: lumpy clay clusters, tree kept inside the lot so no shadow falls off it)
     rnd = random.Random(7)
-    shrubs = [(-3.3, -1.9, 0.36), (-3.35, -1.3, 0.28), (-3.3, 0.6, 0.33), (-3.32, 2.35, 0.36), (-3.25, 1.2, 0.26),
+    shrubs = KN['shrubs'] or [(-3.3, -1.9, 0.36), (-3.35, -1.3, 0.28), (-3.3, 0.6, 0.33), (-3.32, 2.35, 0.36), (-3.25, 1.2, 0.26),
               (-1.9, -3.4, 0.33), (-2.5, -3.62, 0.25), (3.6, -3.3, 0.35), (4.2, -2.9, 0.27), (5.1, -0.4, 0.33), (5.2, 0.4, 0.25)]
     for j, (x, y, r) in enumerate(shrubs):
         fns = [sphere_fn((x, y, r * 0.62), r * 0.82, 4, 0.9)]
@@ -775,11 +783,12 @@ def build_lot():
         bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=0.17, radius2=0.08, depth=1.8,
                               matrix=Matrix.Translation((tx, ty, 0.9)))
     trunk.append(taper)
-    for (dx, dy, dz, ang) in ((0.22, -0.1, 1.35, 0.7), (-0.18, 0.12, 1.5, -0.8)):
+    for (dx, dy, dz, ang) in (((0.22, -0.1, 1.35, 0.7), (-0.18, 0.12, 1.5, -0.8)) if KN['tree_branches'] else ()):
         M = Matrix.Translation((tx + dx * 0.5, ty + dy * 0.5, dz)) @ Matrix.Rotation(ang, 4, 'Y' if abs(dx) > abs(dy) else 'X')
         trunk.append(cyl_fn(M, 0.045, 0.55, 10))
     crown = [(0.0, 0.0, 2.55, 0.6), (0.3, -0.22, 2.25, 0.42), (-0.32, 0.18, 2.2, 0.42), (0.22, 0.3, 2.45, 0.4),
              (-0.25, -0.28, 2.5, 0.4), (0.05, -0.05, 3.0, 0.42), (0.35, 0.05, 2.7, 0.34), (-0.3, -0.02, 2.85, 0.34)]
+    crown = KN['tree_crown'] or crown
     canopy = [sphere_fn((tx + cx * 1.05, ty + cy * 1.1, cz - 0.28), r * 1.18, 4 if r > 0.5 else 3, 0.95) for (cx, cy, cz, r) in crown]
     ob = new_obj('tree', [('trunk', [], trunk), ('foliage', [], canopy)], -1, 0, '', 'lot', bevel=0, smooth=True)
     lumpy(ob, 0.06, 0.4, vgroup_mat=1)
@@ -834,6 +843,10 @@ def build_all():
     walls = build_walls()
     build_lot(); build_stake(); build_slab(walls)
     build_frame(walls); build_roof()
+    if KN['drop_openings']:
+        # after the framing: the frame keeps every rough opening, the finished house shows fewer windows
+        for w in walls:
+            w.openings = [o for k, o in enumerate(w.openings) if (w.name, k) not in KN['drop_openings']]
     rows = build_siding(walls)
     build_units(walls); build_porch()
     return walls, rows
