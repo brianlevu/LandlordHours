@@ -101,16 +101,18 @@ struct DuoOpenView: View {
     let rentals: [DuoRental]
     var annotate = false
     var clock: DuoDoorClock
+    var scrolledToFoot = false
 
     init(rentals: [DuoRental] = DuoV2Seed.three, selectedID: String = "pine", right: DuoRight = .list, annotate: Bool = false,
-         clock: DuoDoorClock = DuoDoorClock()) {
+         clock: DuoDoorClock = DuoDoorClock(), scrolledToFoot: Bool = false) {
+        self.scrolledToFoot = scrolledToFoot
         self.rentals = rentals; _selectedID = State(initialValue: selectedID); _right = State(initialValue: right)
         self.annotate = annotate; self.clock = clock
     }
 
     var body: some View {
         HStack(spacing: 0) {
-            DuoHousePane(rentals: rentals, selectedID: $selectedID, clock: clock).frame(width: DuoGeo.pane)
+            DuoHousePane(rentals: rentals, selectedID: $selectedID, clock: clock, scrolledToFoot: scrolledToFoot).frame(width: DuoGeo.pane)
             Color.clear.frame(width: DuoGeo.hinge)        // the division region: no text, no art crosses it
             workstationTabs.frame(width: DuoGeo.pane)
                 .overlay { DuoInsideLight(clock: clock).allowsHitTesting(false) }
@@ -193,13 +195,30 @@ struct DuoInsideLight: View {
 
 /// The door's light leaking back across the fold onto the house pane: the same colour and strength as the inside
 /// wall at the fold line (so the two walls meet without a seam), fading within ~150pt.
+enum DuoGlow { static let night = 0.09 }   // night warm-pool strength; the card edge token is locked, so the pool gives way
+
 struct DuoFoldWash: View {
+    var center = UnitPoint(x: 1, y: 0.38)
+    /// The axis the fold lies across: .horizontal = the fold is the trailing edge, .vertical = the bottom edge.
+    var foldAxis: Axis = .horizontal
     @Environment(\.colorScheme) private var scheme
     var body: some View {
         let dark = scheme == .dark
-        RadialGradient(colors: [Color(hex: dark ? "FFC877" : "FFE6C2").opacity(dark ? 0.09 : 0.55), .clear],
-                       center: UnitPoint(x: 1, y: 0.38), startRadius: 0, endRadius: 150)
+        RadialGradient(colors: [Color(hex: dark ? "FFC877" : "FFE6C2").opacity(dark ? DuoGlow.night : 0.55), .clear],
+                       center: center, startRadius: 0, endRadius: 150)
             .blendMode(dark ? .plusLighter : .screen)
+            // Night: mirrors DuoInterior's mask, so the two sides of the fold carry the same pool and the wall has no step.
+            .mask {
+                GeometryReader { g in
+                    let len = max(foldAxis == .horizontal ? g.size.width : g.size.height, 1)
+                    LinearGradient(stops: dark
+                                   ? [.init(color: .black.opacity(0.12), location: 0), .init(color: .black.opacity(0.12), location: 1 - 14 / len),
+                                      .init(color: .black, location: 1 - 6 / len), .init(color: .black, location: 1)]
+                                   : [.init(color: .black, location: 0), .init(color: .black, location: 1)],
+                                   startPoint: foldAxis == .horizontal ? .leading : .top,
+                                   endPoint: foldAxis == .horizontal ? .trailing : .bottom)
+                }
+            }
             .ignoresSafeArea()
             .allowsHitTesting(false)
     }
@@ -210,12 +229,15 @@ struct DuoFoldWash: View {
 struct DuoInterior: View {
     /// Where the door's light comes from, in this view's unit space (the fold edge).
     var glowCenter = UnitPoint(x: 0, y: 0.38)
+    /// false: draw no page of its own (the caller lays one continuous page under both halves, so the fold has no seam).
+    var page = true
+    var glow = true
     @Environment(\.colorScheme) private var scheme
     var body: some View {
         let dark = scheme == .dark
         GeometryReader { g in
             ZStack {
-                CraftPage()
+                if page { CraftPage() }
                 // By day the room shows through, dusty; at night it is the navy page with one warm pool (the door).
                 if !dark {
                 Image("duo_interior").resizable().scaledToFill()
@@ -227,9 +249,20 @@ struct DuoInterior: View {
                                                  .init(color: .black, location: 0.85)], startPoint: .leading, endPoint: .trailing))
                 }
                 // doorGlow: the light from the open door, brightest at the fold, fading outward.
-                RadialGradient(colors: [Color(hex: dark ? "FFC877" : "FFE6C2").opacity(dark ? 0.09 : 0.55), .clear],
+                if glow { RadialGradient(colors: [Color(hex: dark ? "FFC877" : "FFE6C2").opacity(dark ? DuoGlow.night : 0.55), .clear],
                                center: glowCenter, startRadius: 0, endRadius: 370)
                     .blendMode(dark ? .plusLighter : .screen)
+                    // Night: the pool gives way under the card edge (DU11: the card token is locked at #3C4675, so the
+                    // wall beside the edge must stay near the base navy). Full strength in the fold band, 12% from 14pt out.
+                    .mask {
+                        let horizontal = glowCenter.x < 0.25
+                        let len = max(horizontal ? g.size.width : g.size.height, 1)
+                        LinearGradient(stops: dark
+                                       ? [.init(color: .black, location: 0), .init(color: .black, location: 6 / len),
+                                          .init(color: .black.opacity(0.12), location: 14 / len), .init(color: .black.opacity(0.12), location: 1)]
+                                       : [.init(color: .black, location: 0), .init(color: .black, location: 1)],
+                                       startPoint: horizontal ? .leading : .top, endPoint: horizontal ? .trailing : .bottom)
+                    } }
             }
         }
         .ignoresSafeArea()
@@ -244,15 +277,18 @@ struct DuoWorkstation: View {
     @Binding var selectedID: String
     @Binding var right: DuoRight
     var maxRows: Int? = nil
+    /// false: the caller draws the wall (propped, one continuous wall across the fold).
+    var interior = true
 
     private var env = DAEnv()
     private var craft = CraftEnv()
     @State private var confirmed: Set<String> = []
     @State private var hours: Double = 2
 
-    init(rentals: [DuoRental], selectedID: Binding<String>, right: Binding<DuoRight>, maxRows: Int? = nil,
+    init(rentals: [DuoRental], selectedID: Binding<String>, right: Binding<DuoRight>, maxRows: Int? = nil, interior: Bool = true,
          glowCenter: UnitPoint = UnitPoint(x: -DuoGeo.hinge / 2 / DuoGeo.pane, y: 0.38)) {
         self.rentals = rentals; _selectedID = selectedID; _right = right; self.maxRows = maxRows; self.glowCenter = glowCenter
+        self.interior = interior
     }
 
     private var c: DAColors { env.c }
@@ -267,7 +303,7 @@ struct DuoWorkstation: View {
 
     var glowCenter: UnitPoint
     var body: some View {
-        ZStack { DuoInterior(glowCenter: glowCenter); content }
+        ZStack { if interior { DuoInterior(glowCenter: glowCenter) }; content }
     }
 
     @ViewBuilder private var content: some View {
@@ -366,7 +402,7 @@ struct DuoWorkstation: View {
             if entries.isEmpty {
                 // Zero logged: one honest line, no figure, no button. The card keeps its place so the page doesn't jump.
                 DAHairline().padding(.leading, 16)
-                Text(CL("Nothing logged yet today."))
+                Text(CL("Nothing logged at \(r.name) yet today."))
                     .font(.subheadline).foregroundStyle(c.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16).padding(.vertical, 14)
@@ -470,19 +506,24 @@ struct DuoHousePane: View {
     var heroSide: CGFloat = 290
     var compact = false
     var clock: DuoDoorClock
+    /// Capture aid: start scrolled to the foot, to prove the shelf is reachable at accessibility sizes.
+    var scrolledToFoot = false
+    @State private var pos = ScrollPosition(edge: .top)
     private var env = CraftEnv()
     @Environment(\.colorScheme) private var scheme
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(rentals: [DuoRental], selectedID: Binding<String>, heroSide: CGFloat = 290, compact: Bool = false, clock: DuoDoorClock) {
+    init(rentals: [DuoRental], selectedID: Binding<String>, heroSide: CGFloat = 290, compact: Bool = false, clock: DuoDoorClock,
+         scrolledToFoot: Bool = false) {
         self.rentals = rentals; _selectedID = selectedID; self.heroSide = heroSide; self.compact = compact; self.clock = clock
+        self.scrolledToFoot = scrolledToFoot
     }
 
     private var c: CraftColors { env.c }
     private var shelfItems: [DuoRental] { [DuoV2Seed.all(rentals)] + rentals }
     private var focus: DuoRental { shelfItems.first { $0.id == selectedID } ?? shelfItems[0] }
-    private var side: CGFloat { typeSize.isAccessibilitySize ? heroSide * 0.75 : heroSide }
+    private var side: CGFloat { typeSize.isAccessibilitySize ? heroSide * 0.55 : heroSide }
 
     var body: some View {
         ScrollView {
@@ -495,11 +536,14 @@ struct DuoHousePane: View {
                     numberBlock.padding(.top, -side * 0.12)
                 }
                 DuoShelf(items: shelfItems, selectedID: $selectedID).padding(.top, compact ? 8 : 14)
+                    .dynamicTypeSize(...DynamicTypeSize.accessibility1)   // shelf labels stop growing here so two houses still fit the pane
             }
             .padding(.bottom, 12)
         }
+        .scrollPosition($pos)
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize)
+        .onAppear { if scrolledToFoot { DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { pos.scrollTo(edge: .bottom) } } }
     }
 
     private var hero: some View {
@@ -574,44 +618,48 @@ struct DuoShelf: View {
     private var da = DAEnv()
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ScaledMetric(relativeTo: .footnote) private var labelHeight: CGFloat = 40
     @ScaledMetric(relativeTo: .footnote) private var slotW: CGFloat = 108   // wide enough that labels wrap at word breaks
     @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var paneW: CGFloat = DuoGeo.pane - 16   // the scroll viewport: the pane less 8pt of air each side
+    @State private var firstID: String?
     static let model: CGFloat = 104
     static let slot: CGFloat = 108
+    static let inset: CGFloat = 8
+    /// Whole items only: how many slots fit at the minimum width, and the width that makes them fill the pane exactly.
+    private var visible: Int { max(1, min(items.count, Int(paneW / (max(Self.slot, slotW) + 8)))) }
+    private var slotWidth: CGFloat { paneW / CGFloat(visible) }
 
     init(items: [DuoRental], selectedID: Binding<String>) { self.items = items; _selectedID = selectedID }
 
+    private func leadIndex(for id: String) -> Int {
+        let i = items.firstIndex { $0.id == id } ?? 0
+        return max(0, min(items.count - visible, i - visible / 2))
+    }
+
+    /// Snaps to whole items (viewAligned), so no item is ever partly visible at rest: no fade, no cut glyphs.
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal) {
-                HStack(alignment: .top, spacing: 0) {
-                    ForEach(items) { r in slot(r).id(r.id) }
-                }
-                .background(alignment: .top) {
-                    Image("duo_shelf").resizable(resizingMode: .tile)
-                        .frame(height: 12)
-                        .shadow(color: .black.opacity(scheme == .dark ? 0.5 : 0.22), radius: 3, y: 2)
-                        .offset(y: Self.model * 0.86)
-                        .accessibilityHidden(true)
-                }
-                .padding(.horizontal, 8)
+        ScrollView(.horizontal) {
+            HStack(alignment: .top, spacing: 0) {
+                ForEach(items) { r in slot(r).id(r.id) }
             }
-            .scrollIndicators(.hidden)
-            .defaultScrollAnchor(.center, for: .alignment)   // centred when every rental fits
-            .mask {   // edges once the shelf scrolls: steep, so a label is either readable (>= 4.5:1) or cut, never mid-fade
-                GeometryReader { g in
-                    let w = max(g.size.width, 1)
-                    LinearGradient(stops: (items.count > 4 || typeSize.isAccessibilitySize)
-                                   ? [.init(color: .clear, location: 0), .init(color: .clear, location: 9 / w),
-                                      .init(color: .black.opacity(0.8), location: 13 / w), .init(color: .black, location: 36 / w),
-                                      .init(color: .black, location: 1 - 36 / w), .init(color: .black.opacity(0.8), location: 1 - 13 / w),
-                                      .init(color: .clear, location: 1 - 9 / w), .init(color: .clear, location: 1)]
-                                   : [.init(color: .black, location: 0), .init(color: .black, location: 1)],
-                                   startPoint: .leading, endPoint: .trailing)
-                }
+            .scrollTargetLayout()
+            .background(alignment: .top) {
+                Image("duo_shelf").resizable(resizingMode: .tile)
+                    .frame(height: 12)
+                    .shadow(color: .black.opacity(scheme == .dark ? 0.5 : 0.22), radius: 3, y: 2)
+                    .offset(y: Self.model * 0.86)
+                    .accessibilityHidden(true)
             }
-            .onAppear { proxy.scrollTo(selectedID, anchor: .center) }
+        }
+        .scrollTargetBehavior(.viewAligned)
+        .scrollPosition(id: $firstID, anchor: .leading)
+        .scrollIndicators(.hidden)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { paneW = $0 }
+        .padding(.horizontal, Self.inset)
+        .onAppear { firstID = items[leadIndex(for: selectedID)].id }
+        .onChange(of: selectedID) { _, id in
+            guard let f = firstID.flatMap({ k in items.firstIndex { $0.id == k } }), let i = items.firstIndex(where: { $0.id == id }) else { return }
+            if i < f || i >= f + visible { withAnimation(.spring(duration: 0.3, bounce: 0)) { firstID = items[leadIndex(for: id)].id } }
         }
     }
 
@@ -632,11 +680,14 @@ struct DuoShelf: View {
                         .monospacedDigit()
                 }
                 .padding(.horizontal, 8).padding(.vertical, 4)
+                .frame(maxWidth: slotWidth - 8)      // 4pt of air each side, so a pill never touches its neighbour or the pane edge
                 .background(on ? c.chip : .clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(on ? c.chipBorder : .clear, lineWidth: 0.8))
+                // Selected pill edge: >= 3:1 against the shelf wall in both themes (dusk #7A6F58, night #5D6AA0).
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(on ? Color(hex: scheme == .dark ? "5D6AA0" : "7A6F58") : .clear, lineWidth: 1))
                 .shadow(color: .black.opacity(on ? 0.10 : 0), radius: 4, y: 1)
             }
-            .frame(width: max(Self.slot, slotW))
+            .frame(width: slotWidth)
         }
         .buttonStyle(DAPress())
         .accessibilityLabel(CL("\(r.name), \(status(r))"))
@@ -742,6 +793,21 @@ struct DuoFrontDoor: View {
     }
 }
 
+/// Capture aid: the half-built house at 640pt with the door settled open (t = 1), so the step light can be gated.
+@available(iOS 26.0, *)
+struct DuoDoorStill: View {
+    @Environment(\.colorScheme) private var scheme
+    var body: some View {
+        ZStack {
+            CraftPage()
+            ZStack {
+                CraftHouseArt(art: .half, dark: scheme == .dark, side: 640, building: false, buildTick: 0, windowsLit: true, fillStage: true) {}
+                DuoFrontDoor(art: .half, side: 640, clock: DuoDoorClock())
+            }.frame(width: 640, height: 640)
+        }
+    }
+}
+
 // MARK: - Propped up (upright 669x951, the fold across at y 463.5-487.5): house + shelf above, workstation below
 
 @available(iOS 26.0, *)
@@ -749,6 +815,7 @@ struct DuoProppedView: View {
     @State private var selectedID = "pine"
     @State private var right: DuoRight = .list
     @State private var tab = 0
+    @Environment(\.colorScheme) private var scheme
     private var half: CGFloat { (DuoGeo.propped.height - DuoGeo.hinge) / 2 }     // 463.5
     var body: some View {
         // The TabView is the root, so its bar sits at the foot of the screen: the resting bottom half.
@@ -758,14 +825,12 @@ struct DuoProppedView: View {
                     DuoHousePane(rentals: DuoV2Seed.three, selectedID: $selectedID, heroSide: 220, compact: true, clock: DuoDoorClock())
                         .padding(.top, 44)
                         .frame(height: half, alignment: .top)
-                        .background { CraftPage().ignoresSafeArea() }
                     Color.clear.frame(height: DuoGeo.hinge)
-                    DuoWorkstation(rentals: DuoV2Seed.three, selectedID: $selectedID, right: $right, maxRows: 1,
-                                   glowCenter: UnitPoint(x: 0.5, y: -0.05))
+                    DuoWorkstation(rentals: DuoV2Seed.three, selectedID: $selectedID, right: $right, maxRows: 1, interior: false)
                         .frame(maxHeight: .infinity)
                 }
                 .ignoresSafeArea(.container, edges: .top)
-                .background { VStack(spacing: 0) { CraftPage(); DuoInterior(glowCenter: UnitPoint(x: 0.5, y: 0)) }.ignoresSafeArea() }
+                .background(alignment: .top) { proppedWall.frame(width: DuoGeo.propped.width, height: DuoGeo.propped.height) }
             }
             Tab(CL("Inbox"), systemImage: "tray", value: 1) { DuoInterior() }.badge(7)
             Tab(CL("Records"), systemImage: "book.closed", value: 2) { DuoInterior() }
@@ -775,7 +840,31 @@ struct DuoProppedView: View {
         .modifier(DuoTint())
         .modifier(DuoNoVerticalBar())   // the Duo's vertical tab rail would sit across the fold here; keep the bottom bar
         .frame(width: DuoGeo.propped.width, height: DuoGeo.propped.height)
-        .background { VStack(spacing: 0) { CraftPage(); DuoInterior() } }
+    }
+
+    /// One page gradient down the whole display and one door glow centred on the fold's midline, mirrored into the
+    /// house half, so the two halves meet with no seam (DU9).
+    private var proppedWall: some View {
+        let H = DuoGeo.propped.height
+        let mid = half + DuoGeo.hinge / 2
+        let dark = scheme == .dark
+        return ZStack(alignment: .top) {
+            CraftPage()
+            DuoInterior(page: false, glow: false).frame(height: H - mid).frame(maxHeight: .infinity, alignment: .bottom)
+            // One door glow straddling the fold: one object, so both sides carry the same wall. At night it narrows to the
+            // fold band (full within 6pt, 12% beyond 14pt) so the card edge keeps its 1.9:1 against the wall.
+            RadialGradient(colors: [Color(hex: dark ? "FFC877" : "FFE6C2").opacity(dark ? DuoGlow.night : 0.55), .clear],
+                           center: UnitPoint(x: 0.5, y: mid / H), startRadius: 0, endRadius: 260)
+                .blendMode(dark ? .plusLighter : .screen)
+                .mask {
+                    LinearGradient(stops: dark
+                                   ? [.init(color: .black.opacity(0.12), location: 0), .init(color: .black.opacity(0.12), location: (mid - 14) / H),
+                                      .init(color: .black, location: (mid - 6) / H), .init(color: .black, location: (mid + 6) / H),
+                                      .init(color: .black.opacity(0.12), location: (mid + 14) / H), .init(color: .black.opacity(0.12), location: 1)]
+                                   : [.init(color: .black, location: 0), .init(color: .black, location: 1)],
+                                   startPoint: .top, endPoint: .bottom)
+                }
+        }.compositingGroup().ignoresSafeArea()
     }
 }
 
@@ -787,16 +876,8 @@ struct DuoCard<Content: View>: View {
     private var craft = CraftEnv()
     @Environment(\.colorScheme) private var scheme
     init(@ViewBuilder content: () -> Content) { self.content = content() }
-    /// Light: pageCardEdge. Night: duoNightCardEdge #3A4778 (new, Duo only): 2.06:1 on the night room #0B1230, inside
-    /// the H.4 card-edge band (1.9-2.2); the shared dark edge #2A3560 measures 1.55 there.
-    private var edge: Color { scheme == .dark ? Color(hex: "3A4778") : craft.c.cardEdge }
-    /// Night: a slightly brighter edge on the fold side only, where the card crosses the warm pool (2.0:1 there).
-    private var edgeStyle: AnyShapeStyle {
-        scheme == .dark
-            ? AnyShapeStyle(LinearGradient(stops: [.init(color: Color(hex: "424F84"), location: 0), .init(color: edge, location: 0.55)],
-                                           startPoint: .leading, endPoint: .trailing))
-            : AnyShapeStyle(edge)
-    }
+    /// Light: pageCardEdge. Night: the locked duoNightCardEdge #3C4675 (flat, Duo only). Never a ramp or a second token.
+    private var edgeStyle: AnyShapeStyle { AnyShapeStyle(scheme == .dark ? Color(hex: "3C4675") : craft.c.cardEdge) }
     var body: some View {
         VStack(spacing: 0) { content }
             .background(env.c.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -834,8 +915,13 @@ enum DuoV2Snapshotter {
             }
             shots += [
                 ("open-3rentals-AX3", AnyView(DuoOpenView()), .accessibility3),
+                ("open-3rentals-AX3-scrolled", AnyView(DuoOpenView(scrolledToFoot: true)), .accessibility3),
+                ("open-8rentals-XXL-end", AnyView(DuoOpenView(rentals: DuoV2Seed.eight, selectedID: "oak")), .xxLarge),
+                ("open-8rentals-AX3", AnyView(DuoOpenView(rentals: DuoV2Seed.eight, selectedID: "oak")), .accessibility3),
+                ("open-8rentals-AX3-scrolled", AnyView(DuoOpenView(rentals: DuoV2Seed.eight, selectedID: "oak", scrolledToFoot: true)), .accessibility3),
                 ("open-zerologged", AnyView(DuoOpenView(rentals: DuoV2Seed.eight, selectedID: "oak")), .large),
             ]
+            shots.append(("door-settled", AnyView(DuoDoorStill()), .large))
             shots.append(("open-allrentals", AnyView(DuoOpenView(selectedID: "all")), .large))
             shots.append(("open-hinge-annotated", AnyView(DuoOpenView(annotate: true)), .large))
             for (name, view, size) in shots {

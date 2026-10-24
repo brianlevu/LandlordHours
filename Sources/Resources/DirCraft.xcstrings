@@ -287,13 +287,13 @@
         }
       }
     },
-    "Nothing logged yet today.": {
+    "Nothing logged at %@ yet today.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nothing logged yet today."
+            "value": "Nothing logged at %@ yet today."
           }
         }
       }
