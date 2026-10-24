@@ -1,0 +1,7 @@
+{
+  "images" : [
+    { "filename" : "craft_framing_light.png", "idiom" : "universal", "scale" : "3x" },
+    { "appearances" : [ { "appearance" : "luminosity", "value" : "dark" } ], "filename" : "craft_framing_dark.png", "idiom" : "universal", "scale" : "3x" }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 }
+}

@@ -71,6 +71,9 @@ struct LandlordHoursApp: App {
             if let board = SurfaceBoardLaunch.current {
                 // Surfaces capture boards (-LHSurfaceBoard <name>); see SurfaceCaptureBoard.swift.
                 SurfaceCaptureRoot(launch: board)
+            } else if let craft = CraftLaunch.current {
+                // Direction CRAFT, Crafted house (-LHDirection CRAFT); see Views/Debug/DirCraft.
+                DirCraftRoot(launch: craft)
             } else if let dirA = DirALaunch.current {
                 // Direction A, Job Site (-LHDirection A); see Views/Debug/DirA.
                 DirARoot(launch: dirA)
