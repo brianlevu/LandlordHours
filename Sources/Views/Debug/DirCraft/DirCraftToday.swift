@@ -214,6 +214,7 @@ struct DirCraftRoot: View {
             .presentationBackground(env.c.sheet)
         }
         .onAppear {
+            if DuoV2Launch.mode != nil, #available(iOS 26.0, *) { Task { await DuoV2Snapshotter.run() } }   // Duo round 2 (DuoTwoPane.swift)
             if launch.demo == "log" {
                 DADemo.after(1.6) { showLog = true }
                 DADemo.after(3.6) { logged = 1.5; logSerial += 1; showLog = false }   // the sheet's 1h 30m

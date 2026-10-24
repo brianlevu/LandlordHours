@@ -583,7 +583,7 @@ struct DAActionRow: View {
 
     private var title: some View {
         Text(item.title).font(.body.weight(.semibold)).foregroundStyle(c.ink)
-            .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
+            .lineLimit(typeSize >= .xxLarge ? nil : 2)   // no ellipsis at XXL in narrow panes (Duo, 322pt)
             .fixedSize(horizontal: false, vertical: true)
     }
 

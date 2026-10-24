@@ -155,6 +155,7 @@
 		9C15068AF606A3C94684DDF4 /* LHMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9B34F9F4C44110FC713F160 /* LHMark.swift */; };
 		9C1FBAFAC4A5D35DCF7C9461 /* DirAToday.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34186DA752ED6930992ED46E /* DirAToday.swift */; };
 		9C56CFF4C0A527580463AA1D /* CaptureModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB3ABA94307D665EF31EC294 /* CaptureModelTests.swift */; };
+		9D7525DCA1EC3BE3D33FE2E4 /* DuoTwoPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62F91B728470C200552DCF09 /* DuoTwoPane.swift */; };
 		9ED242B446E98033F81CEF73 /* HousePreviewUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016D2C699C6EA42FF25E0767 /* HousePreviewUITests.swift */; };
 		9F46F3E3D0E75D5FB1709E15 /* CaptureFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = 593E2F107A195788B317254C /* CaptureFlags.swift */; };
 		A0490A4E94BD964A66023FFA /* BackfillJob.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B4C495D3F22E19737D9DDB4 /* BackfillJob.swift */; };
@@ -397,6 +398,7 @@
 		61925A55B4CDBDF1584A392E /* LandlordHours.storekit */ = {isa = PBXFileReference; path = LandlordHours.storekit; sourceTree = "<group>"; };
 		61F1A37F861D056973D6EC70 /* TimeEntryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeEntryDetailView.swift; sourceTree = "<group>"; };
 		6252BC3F79F79B6164763816 /* ProMomentsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProMomentsTests.swift; sourceTree = "<group>"; };
+		62F91B728470C200552DCF09 /* DuoTwoPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuoTwoPane.swift; sourceTree = "<group>"; };
 		64B545F329C15FB9C02AE25C /* HouseHeroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseHeroView.swift; sourceTree = "<group>"; };
 		652D1B354C44F0935B0F2E4F /* ModelAvailability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelAvailability.swift; sourceTree = "<group>"; };
 		65CD50959762385E221A6599 /* PropertyAliasUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyAliasUITests.swift; sourceTree = "<group>"; };
@@ -558,6 +560,7 @@
 			isa = PBXGroup;
 			children = (
 				C6706B3B18DD1725A5F5C3CF /* DirCraftToday.swift */,
+				62F91B728470C200552DCF09 /* DuoTwoPane.swift */,
 			);
 			path = DirCraft;
 			sourceTree = "<group>";
@@ -1356,6 +1359,7 @@
 				9C1FBAFAC4A5D35DCF7C9461 /* DirAToday.swift in Sources */,
 				A1AA1C8051D7006C7BDAC272 /* DirCraftToday.swift in Sources */,
 				B063A0A2748928D8ABC8C1AF /* DraftingLoader.swift in Sources */,
+				9D7525DCA1EC3BE3D33FE2E4 /* DuoTwoPane.swift in Sources */,
 				E737949D84FB21B01C9FE4D5 /* EndOfEventScheduler.swift in Sources */,
 				6145256E78B6FF599DFB3B9D /* EngagementIntelligenceService.swift in Sources */,
 				2B843690B8A92B72AA874888 /* EngagementLabView.swift in Sources */,
