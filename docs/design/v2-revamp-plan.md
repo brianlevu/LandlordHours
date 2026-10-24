@@ -138,12 +138,12 @@ The independent review agreed with all five recommendations and added a follow-u
 4. **Two canvases: dusk page on hero screens, plain canvas on lists.** Recommend **keep both** for 2.1. A tab switch has no push, so the warm-to-cool jump shows in light: a light-mode tab-switch capture is now in the gate, and a warm-neutral list canvas is logged as a test against the intent inks (backlog N-1).
 5. **Toast at the top on hero screens.** Recommend **yes**, with the fix: it replaces the rental chip while it shows and is announced to VoiceOver.
 
-**Adaptive layout (2026-10-24, §1.27 rewrite). Not yet independently assessed.**
+**Adaptive layout (2026-10-24, §1.27 rewrite): decided 2026-10-24.**
 
-6. **iPad sidebar.** Recommend **drop it**, with the bar at the right pane's foot as on the open Duo: a sidebar beside house-left and workstation-right makes three columns, and its per-rental tabs repeat the shelf. The alternative keeps iPadOS's floating top tab bar across the window: more iPad-native, but different from the Duo.
-7. **Light on iPad.** Recommend **nothing**: the pane is lit at rest. A light-up on first appearance has no hinge to answer to and breaks "never animate on appear".
-8. **"All rentals" number on the phone too.** Recommend **yes**: "312 hours across 3 rentals" and "3 of 3 behind" in every mode, never a goal (§H.1 H10). That changes the locked compact Today's "All rentals" line.
-9. **Records `Table` on wide iPad.** Recommend **retire it**: no pane reaches 720pt, so the list is used everywhere.
+6. **iPad sidebar: dropped** (Brian). The bar sits at the right pane's foot, as on the open Duo.
+7. **Light on iPad: none.** The pane is lit at rest.
+8. **"All rentals": "hours across N rentals" and "N of M behind" in every mode, the phone included,** never a summed goal (§H.1 H10).
+9. **Records `Table` on iPad: dropped.** The list is used everywhere.
 
 Open finding for the visual gate (not a question for Brian yet): at AX3 the 54pt numeral renders smaller than "of 100 hours", so the hierarchy inverts. Package C's first AX3 frame goes to the gate with this named; nothing is changed silently.
 

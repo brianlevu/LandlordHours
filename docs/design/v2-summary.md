@@ -54,7 +54,7 @@ Twenty-four rules changed. The big ones: the house is not in a box, and it never
 
 ## One layout for iPhone, iPad and the folding phone
 
-iPhone, iPad and the folding phone now share one layout logic. A narrow screen shows one column: the house on top, then your work. A wide screen shows two panes: the house on the left, your work on the right. The iPad uses the same two panes as the open folding phone. Opening the folding phone swings the house's door open and lights the right pane. Four new calls on this are in the plan, each with my pick.
+iPhone, iPad and the folding phone now share one layout logic. A narrow screen shows one column: the house on top, then your work. A wide screen shows two panes: the house on the left, your work on the right. The iPad uses the same two panes as the open folding phone. Opening the folding phone swings the house's door open and lights the right pane. Four calls on this are decided: no iPad sidebar, no iPad light-up, honest "All rentals", no Records table.
 
 ## What needs you
 
