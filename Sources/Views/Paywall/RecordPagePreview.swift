@@ -121,6 +121,9 @@ struct RecordPagePreview: View {
                 Text(Self.title(year: model.year))
                     .font(.headline)
                     .foregroundStyle(paper.textPrimary)
+                    // Compact (AX sizes): two lines reserved, so the title wraps instead of truncating.
+                    .lineLimit(compact ? 2 : 1, reservesSpace: compact)
+                    .minimumScaleFactor(compact ? 0.8 : 1)
                 if !compact { Spacer(minLength: 8) }
                 if model.isSample {
                     LHTag(String(localized: "Sample", table: "ConversionPath"), tone: .informational)
@@ -136,7 +139,7 @@ struct RecordPagePreview: View {
                     .font(.caption)
                     .foregroundStyle(paper.textSecondary)
             }
-            LHDivider()
+            if !compact { LHDivider() }
             ForEach(Array(model.rows.prefix(rentalLimit).enumerated()), id: \.offset) { _, row in
                 rentalRow(row.name, row.kind, value: hoursText(row.hours), isNew: false)
             }
