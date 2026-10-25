@@ -22,8 +22,8 @@ final class InboxCaptureUITests: XCTestCase {
         launch(seed: "inbox", scheme: "light")
         let showing = app.descendants(matching: .any)["inbox.row.cal:debug-showing"]
         XCTAssertTrue(showing.waitForExistence(timeout: 20))
-        let tab = app.buttons["tab.inbox"]
-        let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '8 to confirm'"), object: tab)
+        let tab = app.tabBars.firstMatch.buttons["Inbox"]
+        let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value BEGINSWITH '8'"), object: tab)
         XCTAssertEqual(XCTWaiter().wait(for: [settled], timeout: 10), .completed)
         Thread.sleep(forTimeInterval: 1.0)
         print("VIDEO_MARK_START \(Date().timeIntervalSince1970)")
@@ -94,7 +94,7 @@ final class InboxCaptureUITests: XCTestCase {
         // Rows carry Confirm / Not work now, so this one sits below the fold (and clear of the tab bar).
         XCTAssertTrue(app.descendants(matching: .any)["inbox.row.cal:debug-showing"].waitForExistence(timeout: 20))
         Thread.sleep(forTimeInterval: 2.0)
-        let tabTop = app.buttons["tab.today"].frame.minY
+        let tabTop = app.tabBars.firstMatch.frame.minY
         for _ in 0..<6 where !sam.exists || sam.frame.maxY > tabTop - 8 { app.swipeUp(velocity: .slow) }
         sam.tap()
         XCTAssertTrue(app.buttons["confirm.log"].waitForExistence(timeout: 5))
@@ -117,7 +117,7 @@ final class InboxCaptureUITests: XCTestCase {
         app.buttons["onb-primary"].tap()                       // Look at my calendar (fake allow, held scan)
         XCTAssertTrue(app.buttons["onb-secondary"].waitForExistence(timeout: 5))
         app.buttons["onb-secondary"].tap()                     // visit-end note: Not now → Today
-        app.buttons["tab.inbox"].tap()
+        app.tabBars.firstMatch.buttons["Inbox"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["inbox.backfill.header"].waitForExistence(timeout: 10))
         Thread.sleep(forTimeInterval: 1.5)
         shoot("backfill-scanning", scheme)

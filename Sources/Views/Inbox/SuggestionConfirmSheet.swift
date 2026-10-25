@@ -71,13 +71,16 @@ struct SuggestionConfirmSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 // Accessibility sizes: the header is too tall to pin, so it scrolls with the sheet.
                 if ax { header.padding(.horizontal, -LHMetrics.gutter) }
+                // At accessibility sizes a pinned footer would take the whole sheet, so the free
+                // plan's previewing line, the one unlock and both back-outs lead the scroll instead.
+                if ax && atLimit { limitExplanation; unlockButton; limitWaysOut }
                 notice
                 hoursBlock
                 valueRows
                 if model.showsSpousePicker { whoBlock }
-                LHField(confirmText(.notePlaceholder), text: $notes, multiline: true,
+                // One line: the note is a few words, and a 104pt field around one line is 50% empty (D4).
+                LHField(confirmText(.notePlaceholder), text: $notes, multiline: false,
                         accessibilityLabel: confirmText(.noteLabel), identifier: "confirm.notes")
-                if ax && atLimit { limitExplanation; limitWaysOut }
                 secondaryActions
             }
             .padding(.horizontal, LHMetrics.gutter)
@@ -88,7 +91,7 @@ struct SuggestionConfirmSheet: View {
         .scrollBounceBehavior(.basedOnSize)
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .top, spacing: 0) { if !ax { header } }
-        .safeAreaInset(edge: .bottom, spacing: 0) { footer }
+        .safeAreaInset(edge: .bottom, spacing: 0) { if !(ax && atLimit) { footer } }
         .background(colors.backgroundSecondary)
         .lhSheetPresentation(.focused)
         .confirmationDialog(confirmText(.muteTitle), isPresented: $showMuteOptions, titleVisibility: .visible) {
@@ -145,6 +148,11 @@ struct SuggestionConfirmSheet: View {
                 .font(.subheadline)
                 .foregroundStyle(colors.textSecondary)
                 .lineLimit(ax ? nil : 1)
+                // At the free plan's limit at accessibility sizes the previewing line and the
+                // unlock take the room; the date is on the Date row below.
+                .opacity(ax && atLimit ? 0 : 1)
+                .frame(maxHeight: ax && atLimit ? 0 : nil)
+                .accessibilityHidden(ax && atLimit)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         let close = Button { dismiss() } label: { Image(systemName: "xmark") }
@@ -275,7 +283,7 @@ struct SuggestionConfirmSheet: View {
     @ViewBuilder private var footer: some View {
         VStack(spacing: 4) {
             if atLimit {
-                if !ax { limitExplanation; unlockButton; limitWaysOut } else { unlockButton }
+                limitExplanation; unlockButton; limitWaysOut
             } else {
                 regularActions
             }

@@ -23,6 +23,7 @@ struct SuggestionRowView: View {
     var onNotWork: (() -> Void)? = nil
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     private var hours: Double? { badges.needsHours ? nil : suggestion.proposedHours }
@@ -32,7 +33,7 @@ struct SuggestionRowView: View {
             title: InboxFormat.rowTitle(suggestion, propertyName: propertyName),
             sourceSymbol: InboxFormat.kindSymbol(suggestion.kind),
             meta: InboxFormat.rowMeta(suggestion),
-            tag: Self.tag(suggestion, badges: badges, limit: limit, colors: colors),
+            tag: shownTag,
             hours: hours,
             control: confirmed ? .confirmed : .open,
             controlLabel: Self.controlLabel(quick: quick, hours: hours),
@@ -44,6 +45,15 @@ struct SuggestionRowView: View {
         .accessibilityHint(String(localized: "inbox.row.hint", defaultValue: "Opens the details to confirm", table: "Inbox"))
         .accessibilityAddTraits(.isButton)
         .modifier(NotWorkAction(action: onNotWork))
+    }
+
+    /// At accessibility sizes the row stacks title, time, tag and hours, and one item took a third of
+    /// the screen (D2 asks for 30%). A plain category tag is the least needed of them, so it drops
+    /// there; a status tag ("Needs hours", "Not sure", "Might be logged") stays.
+    private var shownTag: LHTag? {
+        let hasStatus = limit != .none || badges.mightAlreadyBeLogged || badges.needsHours || badges.notSure
+        if typeSize.isAccessibilitySize && !hasStatus { return nil }
+        return Self.tag(suggestion, badges: badges, limit: limit, colors: colors)
     }
 
     static func controlLabel(quick: Bool, hours: Double?) -> String {

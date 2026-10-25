@@ -80,7 +80,7 @@ final class InboxUITests: XCTestCase {
         guard element.exists, element.isHittable else { return false }
         // The native tab bar shrinks away while the list scrolls down (§1.25), taking its buttons out of
         // the tree: then the bar's top is the screen's bottom edge less the bar's height.
-        let bar = app.buttons["tab.inbox"]
+        let bar = app.tabBars.firstMatch.buttons["Inbox"]
         let barTop = bar.exists ? bar.frame.minY : app.frame.maxY - 90
         return element.frame.maxY < barTop - 8 && element.frame.minY > 90
     }
@@ -95,7 +95,7 @@ final class InboxUITests: XCTestCase {
     /// The Inbox tab's badge as a number. The native tab bar speaks it as "8 items" (the system's
     /// wording), so the tests compare the count, not the words.
     private var badgeNumber: Int? {
-        let tab = app.buttons["tab.inbox"]
+        let tab = app.tabBars.firstMatch.buttons["Inbox"]
         guard tab.exists, let text = tab.value as? String else { return nil }
         return Int(text.split(separator: " ").first ?? "")
     }
@@ -180,7 +180,7 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(undo.waitForNonExistence(timeout: 9), "Toast times out and the log is written")
         XCTAssertFalse(row("showing").exists)
         // The confirmed entry is in Records.
-        app.buttons["tab.records"].tap()
+        app.tabBars.firstMatch.buttons["Records"].tap()
         let oakEntry = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Oak Street Duplex'")).firstMatch
         XCTAssertTrue(oakEntry.waitForExistence(timeout: 5), "Only the confirmed Showing is recorded on Oak Street Duplex")
     }
@@ -371,21 +371,21 @@ final class InboxUITests: XCTestCase {
             .matching(halfway).firstMatch.waitForExistence(timeout: 10), header.label)
 
         // Leave: Today is fully usable while the scan runs.
-        app.buttons["tab.today"].tap()
+        app.tabBars.firstMatch.buttons["Today"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["today.hero"].waitForExistence(timeout: 5))
         // Package C's Today shows the scan row until items stream in, then the items themselves.
         let scanning = app.descendants(matching: .any)["today.lookingBack"]
         let streamed = app.descendants(matching: .any)["today.confirm"]
         XCTAssertTrue(scanning.waitForExistence(timeout: 5) || streamed.waitForExistence(timeout: 5),
                       "Today says the look-back is running, not \"Log your first hour\"")
-        app.buttons["tab.logTime"].tap()
+        app.tabBars.firstMatch.buttons["Log time"].tap()
         let close = app.buttons["log.close"]
         XCTAssertTrue(close.waitForExistence(timeout: 5))
         close.tap()
-        XCTAssertTrue(app.buttons["tab.logTime"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.tabBars.firstMatch.buttons["Log time"].waitForExistence(timeout: 3))
 
         // Come back: the same run, still streaming, with what it found so far.
-        app.buttons["tab.inbox"].tap()
+        app.tabBars.firstMatch.buttons["Inbox"].tap()
         XCTAssertTrue(header.waitForExistence(timeout: 5), "Progress header is still there")
         XCTAssertTrue(header.label.contains("11 of 22 events"), header.label)
         XCTAssertTrue(header.label.contains("11 found so far"), header.label)
@@ -402,7 +402,7 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(notNow.waitForExistence(timeout: 5))
         notNow.tap()                                           // Calendar → Not now: no prompt spent
         XCTAssertTrue(whatsNew.waitForNonExistence(timeout: 5))
-        app.buttons["tab.inbox"].tap()
+        app.tabBars.firstMatch.buttons["Inbox"].tap()
         XCTAssertTrue(app.buttons["inbox.empty.setup"].waitForExistence(timeout: 5), "Calendar suggestions stay off")
     }
 
@@ -416,7 +416,7 @@ final class InboxUITests: XCTestCase {
         XCTAssertEqual(look.label, "Look at my calendar")
         look.tap()
         XCTAssertTrue(whatsNew.waitForNonExistence(timeout: 5), "Denied: no visit-end note, back to Today")
-        app.buttons["tab.inbox"].tap()
+        app.tabBars.firstMatch.buttons["Inbox"].tap()
         XCTAssertTrue(app.buttons["inbox.empty.setup"].waitForExistence(timeout: 5))
     }
 
@@ -433,7 +433,6 @@ final class InboxUITests: XCTestCase {
         let look = app.buttons["onb-primary"]
         XCTAssertTrue(settle(look))
         XCTAssertEqual(look.label, "Look at my calendar")
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "What we never do")).firstMatch.exists)
         app.buttons["onb-link"].tap()                          // Not now
         XCTAssertTrue(app.buttons["who-me"].waitForExistence(timeout: 5), "On to Who does the work")
     }

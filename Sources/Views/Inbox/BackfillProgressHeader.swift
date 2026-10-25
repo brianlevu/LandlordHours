@@ -119,7 +119,7 @@ struct BackfillProgressHeader: View {
     private var blocked: some View {
         notice(
             title: String(localized: "backfill.blocked.title", defaultValue: "We can’t read your calendar", table: "Inbox"),
-            message: String(localized: "backfill.blocked.body", defaultValue: "Turn on Full Access for LandlordHours in Settings, then run it again.", table: "Inbox"),
+            message: String(localized: "backfill.blocked.body", defaultValue: "Turn on Full Access to your calendar in Settings, then run it again.", table: "Inbox"),
             buttonTitle: String(localized: "backfill.settings", defaultValue: "Settings", table: "Inbox"),
             buttonIdentifier: "inbox.backfill.settings"
         ) {

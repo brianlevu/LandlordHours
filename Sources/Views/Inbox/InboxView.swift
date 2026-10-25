@@ -34,6 +34,7 @@ struct InboxView: View {
     @State private var footVisible = true
     /// The background 90-day look-back (header + streaming rows).
     @ObservedObject private var backfill = BackfillJob.shared
+    @ObservedObject private var toasts = LHToastCenter.shared
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
@@ -81,7 +82,39 @@ struct InboxView: View {
     private var batch: [Suggestion] { model.likelyToConfirm }
     private var showsBatch: Bool { batch.count >= InboxLogic.batchMinimum }
 
+    /// The pinned bar's slot: 44 for the capsule and 12 above and below. A constant, so the list's
+    /// frame never depends on whether the bar is showing (an inset that follows the bar's own
+    /// visibility sent the first build into a 100% CPU loop).
+    private static let batchSlot: CGFloat = LHMetrics.minTap + 24
+
+    private var barShows: Bool { showsBatch && !footVisible && !typeSize.isAccessibilitySize }
+
+    /// Room under the rows for whatever pins above the tab bar: the batch bar, or the undo toast
+    /// the shell draws there. A real layout slot, so no row is ever painted under either.
+    private var bottomSlot: CGFloat {
+        let toast: CGFloat = toasts.current != nil && toasts.placement == .bottom ? (typeSize.isAccessibilitySize ? 136 : 76) : 0
+        let bar: CGFloat = showsBatch && !typeSize.isAccessibilitySize ? Self.batchSlot : 0
+        return max(toast, bar)
+    }
+
     private var list: some View {
+        VStack(spacing: 0) {
+            listBody
+            Color.clear
+                .frame(height: bottomSlot)
+                .overlay(alignment: .center) {
+                    if barShows && toasts.current == nil {
+                        InboxBatchBar(count: batch.count) { confirmLikely() }
+                            .padding(.horizontal, LHMetrics.gutter)
+                            .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
+                .animation(reduceMotion ? AppAnimation.quick : AppAnimation.reveal, value: barShows)
+                .animation(reduceMotion ? AppAnimation.quick : AppAnimation.reveal, value: bottomSlot)
+        }
+    }
+
+    private var listBody: some View {
         List {
             Section {
                 LHScreenTitle(String(localized: "inbox.title", defaultValue: "Inbox", table: "Inbox"))
@@ -96,6 +129,30 @@ struct InboxView: View {
                         .transition(.opacity)
                 }
             }
+            if model.visible.isEmpty {
+                // A stopped or blocked look-back with nothing found: the header above has the
+                // action, this says what the empty list means (no "To confirm · 0" over bare canvas).
+                Section {
+                    VStack(spacing: 4) {
+                        Text(String(localized: "inbox.empty.headline", defaultValue: "Nothing waiting.", table: "Inbox"))
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(colors.textPrimary)
+                            .accessibilityAddTraits(.isHeader)
+                        Text(String(localized: "inbox.empty.short", defaultValue: "Anything we find in your calendar will show up here. You can log time by hand any time.", table: "Inbox"))
+                            .font(.body)
+                            .foregroundStyle(colors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 32)
+                    .listRowInsets(EdgeInsets(top: 0, leading: LHMetrics.gutter, bottom: 0, trailing: LHMetrics.gutter))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("inbox.empty.short")
+                }
+            } else {
             Section {
                 ForEach(model.sections) { section in
                     dayHeader(section.day)
@@ -111,6 +168,7 @@ struct InboxView: View {
                     .padding(.top, 4)
                     .accessibilityIdentifier("inbox.section.count")
             }
+            }
         }
         .listStyle(.insetGrouped)
         .listSectionSpacing(LHMetrics.sectionGap)
@@ -123,17 +181,6 @@ struct InboxView: View {
         } action: { _, atEnd in
             footVisible = atEnd
         }
-        // An overlay, not a safe-area inset: an inset changes the scroll geometry the bar itself is
-        // decided from, and the two chase each other (100% CPU in the first build).
-        .overlay(alignment: .bottom) {
-            if showsBatch && !footVisible && !typeSize.isAccessibilitySize {
-                InboxBatchBar(count: batch.count) { confirmLikely() }
-                    .padding(.horizontal, LHMetrics.gutter)
-                    .padding(.bottom, 12)
-                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .animation(reduceMotion ? AppAnimation.quick : AppAnimation.reveal, value: showsBatch && !footVisible && !typeSize.isAccessibilitySize)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("inbox.list")
     }
@@ -470,17 +517,43 @@ private struct InboxEmptyPage: View {
     let actionIdentifier: String
     let action: () -> Void
 
-    @State private var height: CGFloat = 0
+    /// The whole window (safe areas included), the figure the hero share is measured against.
+    @State private var window: CGSize = .zero
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+    private var ax: Bool { typeSize.isAccessibilitySize }
+
+    /// The Inbox's empty state is a hero screen (§H.5): the same frame as Today's (44.6% of the
+    /// window at default, 33.7% at accessibility sizes), so the house owns the page.
+    private var side: CGFloat {
+        guard window.width > 0 else { return CraftHeroSize.minimumDioramaSide }
+        return max(CraftHeroSize.minimumDioramaSide,
+                   CraftHeroSize.hero(windowWidth: window.width, windowHeight: window.height, accessibility: ax))
+    }
+
+    private var button: some View {
+        Button(actionTitle, action: action)
+            .buttonStyle(LHButton.primary)
+            .accessibilityIdentifier(actionIdentifier)
+    }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
                 LHScreenTitle(String(localized: "inbox.title", defaultValue: "Inbox", table: "Inbox"))
                     .padding(.top, 8)
-                Spacer(minLength: 0)
-                CraftHouseView(stage: stage, windowsLit: windowsLit, side: LHEmptyState.Page.side(viewportHeight: height))
+                // The frame can be wider than the 20pt gutters allow; it is an overlay so it never
+                // widens the column the title and button size themselves from.
+                Color.clear
+                    .frame(height: side)
+                    .overlay {
+                        CraftHouseView(stage: stage, windowsLit: windowsLit, side: side, fillsStage: !ax)
+                            .frame(width: side, height: side)
+                            .clipped()
+                    }
+                    // The frame has dead margin under the lot; the headline tucks into it.
+                    .padding(.bottom, -side * 0.12)
                 Text(headline)
                     .font(.title2.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
@@ -491,21 +564,29 @@ private struct InboxEmptyPage: View {
                     .foregroundStyle(colors.textSecondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
+                // Accessibility sizes: the button is as tall as the copy, so it scrolls with it
+                // instead of pinning over it.
+                if ax { button.padding(.top, 8) }
             }
             .padding(.horizontal, LHMetrics.gutter)
+            .padding(.bottom, 16)
             .frame(maxWidth: .infinity)
-            .frame(minHeight: max(0, height - 160))
         }
         .scrollBounceBehavior(.basedOnSize)
         .safeAreaInset(edge: .bottom) {
-            Button(actionTitle, action: action)
-                .buttonStyle(LHButton.primary)
-                .padding(.horizontal, LHMetrics.gutter)
-                .padding(.bottom, 16)
-                .accessibilityIdentifier(actionIdentifier)
+            if !ax {
+                button
+                    .padding(.horizontal, LHMetrics.gutter)
+                    .padding(.bottom, 16)
+            }
         }
         .background { LHPage() }
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+        .background {
+            Color.clear.ignoresSafeArea()
+                .onGeometryChange(for: CGSize.self) { proxy in
+                    CGSize(width: proxy.size.width + proxy.safeAreaInsets.leading + proxy.safeAreaInsets.trailing,
+                           height: proxy.size.height + proxy.safeAreaInsets.top + proxy.safeAreaInsets.bottom)
+                } action: { window = $0 }
+        }
     }
 }

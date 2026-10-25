@@ -7,7 +7,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Turn on Full Access for LandlordHours in Settings, then run it again."
+            "value": "Turn on Full Access to your calendar in Settings, then run it again."
           }
         }
       }
@@ -172,7 +172,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "To find rental work, LandlordHours needs Full Access to your calendar. You can turn it on in Settings any time. Logging by hand works either way."
+            "value": "To find rental work, we need Full Access to your calendar. You can turn it on in Settings any time. Logging by hand works either way."
           }
         }
       }
@@ -315,7 +315,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Let LandlordHours notice your rental work"
+            "value": "Let us notice your rental work"
           }
         }
       }
@@ -326,7 +326,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "LandlordHours can notice your rental work"
+            "value": "We can notice your rental work"
           }
         }
       }
@@ -370,7 +370,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "One short note after the event so you can log it with a tap. At most two a day, never at night."
+            "value": "One short note after a visit. Two a day at most, never at night."
           }
         }
       }
@@ -958,6 +958,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Find rental work in my calendar"
+          }
+        }
+      }
+    },
+    "inbox.empty.short": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anything we find in your calendar will show up here. You can log time by hand any time."
           }
         }
       }

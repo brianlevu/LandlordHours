@@ -64,6 +64,7 @@ struct CaptureSetupFlow: View {
     @EnvironmentObject private var viewModel: AppViewModel
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var phase: Phase = .priming
     // Both start OFF: turning on capture is an explicit choice, never a default.
     @State private var findInCalendar = false
@@ -113,8 +114,8 @@ struct CaptureSetupFlow: View {
                 VStack(alignment: .leading, spacing: 4) {
                     LHScreenTitle(
                         mode == .whatsNew
-                            ? String(localized: "capture.title.whatsNew", defaultValue: "LandlordHours can notice your rental work", table: "Inbox")
-                            : String(localized: "capture.title.onboarding", defaultValue: "Let LandlordHours notice your rental work", table: "Inbox"),
+                            ? String(localized: "capture.title.whatsNew", defaultValue: "We can notice your rental work", table: "Inbox")
+                            : String(localized: "capture.title.onboarding", defaultValue: "Let us notice your rental work", table: "Inbox"),
                         style: .sheet
                     )
                     .accessibilityIdentifier("capture.priming.title")
@@ -184,7 +185,7 @@ struct CaptureSetupFlow: View {
             LHRow.Toggle(
                 String(localized: "capture.toggle.prompts", defaultValue: "Ask me when a visit ends", table: "Inbox"),
                 subtitle: findInCalendar
-                    ? String(localized: "capture.toggle.prompts.detail", defaultValue: "One short note after the event so you can log it with a tap. At most two a day, never at night.", table: "Inbox")
+                    ? String(localized: "capture.toggle.prompts.detail", defaultValue: "One short note after a visit. Two a day at most, never at night.", table: "Inbox")
                     : String(localized: "capture.toggle.prompts.off", defaultValue: "Needs calendar suggestions.", table: "Inbox"),
                 isOn: $askWhenVisitEnds
             )
@@ -313,32 +314,44 @@ struct CaptureSetupFlow: View {
 
     // MARK: Denied
 
+    private var deniedActions: some View {
+        VStack(spacing: 4) {
+            Button(String(localized: "capture.denied.settings", defaultValue: "Open Settings", table: "Inbox")) {
+                if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+            }
+            .buttonStyle(LHButton.primary)
+            .accessibilityIdentifier("capture.denied.settings")
+            Button(String(localized: "capture.denied.continue", defaultValue: "Continue without it", table: "Inbox")) { onFinish(false) }
+                .buttonStyle(LHButton.tertiary)
+                .accessibilityIdentifier("capture.denied.continue")
+        }
+    }
+
     private var calendarDenied: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 LHScreenTitle(String(localized: "capture.denied.title", defaultValue: "Calendar access is off", table: "Inbox"), style: .sheet)
-                Text(String(localized: "capture.denied.body", defaultValue: "To find rental work, LandlordHours needs Full Access to your calendar. You can turn it on in Settings any time. Logging by hand works either way.", table: "Inbox"))
+                Text(String(localized: "capture.denied.body", defaultValue: "To find rental work, we need Full Access to your calendar. You can turn it on in Settings any time. Logging by hand works either way.", table: "Inbox"))
                     .font(.body)
                     .foregroundStyle(colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
+                // Accessibility sizes: the two actions are taller than the copy, so they scroll
+                // with it instead of pinning over it.
+                if dynamicTypeSize.isAccessibilitySize { deniedActions.padding(.top, 8) }
             }
             .padding(.horizontal, LHMetrics.gutter)
             .padding(.top, 24)
+            .padding(.bottom, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .scrollBounceBehavior(.basedOnSize)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 4) {
-                Button(String(localized: "capture.denied.settings", defaultValue: "Open Settings", table: "Inbox")) {
-                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
-                }
-                .buttonStyle(LHButton.primary)
-                .accessibilityIdentifier("capture.denied.settings")
-                Button(String(localized: "capture.denied.continue", defaultValue: "Continue without it", table: "Inbox")) { onFinish(false) }
-                    .buttonStyle(LHButton.tertiary)
-                    .accessibilityIdentifier("capture.denied.continue")
+            if !dynamicTypeSize.isAccessibilitySize {
+                deniedActions
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(colors.background)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("capture.denied")
