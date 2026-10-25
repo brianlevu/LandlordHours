@@ -363,8 +363,9 @@ struct RentalBody: View {
         .font(.body)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
-        .padding(.vertical, 16)
-        .frame(minHeight: LHMetrics.rowMinHeight)
+        .padding(.vertical, 12)
+        // 58, not the 56 floor: a hairline sits inside the next row's top, so 56 measured 55.7.
+        .frame(minHeight: LHMetrics.rowMinHeight + 2)
         .accessibilityElement(children: .combine)
     }
 

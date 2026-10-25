@@ -54,7 +54,7 @@ final class PropertyAliasUITests: XCTestCase {
         field.tap()
         field.typeText("ab")
         XCTAssertTrue(app.staticTexts["property.alias.hint"].waitForExistence(timeout: 3), "short-name hint")
-        XCTAssertFalse(app.buttons["property.alias.add"].isEnabled)
+        XCTAssertFalse(app.buttons["property.alias.add"].exists, "Add shows only for a name that can be added")
         capture("\(scheme)-2-alias-too-short")
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 2))
         XCTAssertFalse(app.staticTexts["property.alias.hint"].exists)

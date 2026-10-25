@@ -245,11 +245,15 @@ struct PropertyEditSheet: View {
                         identifier: "property.alias.field")
                     .submitLabel(.done)
                     .onSubmit(addAlias)
-                Button(RentalsText.add, action: addAlias)
-                    .buttonStyle(LHButton.tertiary)
-                    .disabled(!canAddAlias)
-                    .frame(minHeight: LHField.height)
-                    .accessibilityIdentifier("property.alias.add")
+                // Shown only when the name can be added, so it is never a 40%-opacity disabled label
+                // (2.1:1); the hint under the field says why a short name can't be added yet.
+                if canAddAlias {
+                    Button(RentalsText.add, action: addAlias)
+                        .buttonStyle(LHButton.tertiary)
+                        .frame(minHeight: LHField.height)
+                        .transition(.opacity)
+                        .accessibilityIdentifier("property.alias.add")
+                }
             }
             if let aliasHint {
                 Text(aliasHint)

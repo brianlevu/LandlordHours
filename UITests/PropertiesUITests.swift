@@ -222,7 +222,15 @@ final class PropertiesUITests: XCTestCase {
         ] + extra
         app.launch()
         // The launch bridge fades out over the first seconds and swallows taps until it's gone.
-        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 15))
+        // A launch that opens a sheet or the delete alert hides the tab bar from accessibility
+        // (the presentation is modal), so any of the three counts as "launched".
+        let deadline = Date().addingTimeInterval(15)
+        var ready = false
+        while Date() < deadline && !ready {
+            ready = app.buttons["tab.today"].exists || app.alerts.firstMatch.exists || app.buttons["sheet.close"].exists
+            if !ready { Thread.sleep(forTimeInterval: 0.25) }
+        }
+        XCTAssertTrue(ready, "the app launched to the tab bar, a sheet or an alert")
         Thread.sleep(forTimeInterval: 3)
         // First keyboard on a fresh simulator shows a one-time typing tip.
         let tip = app.buttons["Continue"]
