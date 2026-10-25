@@ -118,4 +118,46 @@ final class ConversionPathTests: XCTestCase {
         let words = PaywallView.benefitRows.flatMap { [$0.title, $0.meta] }.joined(separator: " ").lowercased()
         XCTAssertFalse(words.contains("accountant"), "C.4: your CPA")
     }
+
+    // MARK: Fix round 2 (gate B 1.1)
+
+    func testPaywallCopyIsLocalizedAndSaysCPA() {
+        for context in PaywallContext.allCases {
+            let c = PaywallCopy.localized(context, year: 2026, propertyName: "Pine Cabin", confirmedHours: 46.7)
+            let words = [c.headline, c.planLine, c.nextStep].joined(separator: " ").lowercased()
+            XCTAssertFalse(words.contains("accountant"), "C.4: your CPA (\(context))")
+            XCTAssertFalse(words.contains("property"), "C.4: rental (\(context))")
+        }
+        XCTAssertEqual(PaywallCopy.localized(.export, year: 2026).headline, "The record your CPA gets")
+        XCTAssertEqual(PaywallCopy.localized(.export, year: 2026).nextStep, "Export 2026")
+        XCTAssertEqual(PaywallCopy.localized(.secondProperty, year: 2026, propertyName: " Pine Cabin ").nextStep, "Add Pine Cabin")
+        XCTAssertEqual(PaywallCopy.localized(.secondProperty, year: 2026, propertyName: "  ").nextStep, "Add a rental")
+        XCTAssertEqual(PaywallCopy.localized(.todayUnlock, year: 2026, confirmedHours: 46.7).planLine,
+                       "Turn 46 confirmed hours into a clean record.")
+        XCTAssertEqual(PaywallCopy.localized(.todayUnlock, year: 2026).planLine,
+                       "Turn your confirmed hours into a clean record.")
+    }
+
+    func testBuyTitleUsesTheStorePriceAndDropsItAtLargeSizes() {
+        XCTAssertEqual(PaywallCopy.buyTitle(billed: "$29.99", large: false), "Unlock for $29.99")
+        XCTAssertEqual(PaywallCopy.buyTitle(billed: "$29.99", large: true), "Unlock Pro")
+        XCTAssertEqual(PaywallCopy.buyTitle(billed: nil, large: false), "Unlock Pro")
+    }
+
+    func testOnboardingHouseFitsItsFrameAtEveryStage() {
+        for stage in CraftStage.allCases {
+            let box = OnbHouseThumb.contentBox(stage)
+            let scale = OnbHouseThumb.scale(stage)
+            XCTAssertLessThanOrEqual(box.width * scale, 0.96 + 1e-9, "\(stage) width")
+            XCTAssertLessThanOrEqual(box.height * scale, 0.96 + 1e-9, "\(stage) height")
+            XCTAssertGreaterThan(max(box.width, box.height) * scale, 0.95, "\(stage) fills the frame")
+        }
+    }
+
+    func testAccountSheetFitsItsContent() {
+        XCTAssertEqual(OnbAccountSheet.detents(contentHeight: 300), [.height(300 + OnbAccountSheet.chromeHeight), .large])
+        XCTAssertEqual(OnbAccountSheet.detents(contentHeight: 0), [.medium, .large])
+        XCTAssertEqual(OnbAccountSheet.detents(contentHeight: .infinity), [.medium, .large])
+        XCTAssertEqual(OnbAccountSheet.detents(contentHeight: 300, accessibility: true), [.large])
+    }
 }

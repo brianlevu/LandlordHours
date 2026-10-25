@@ -36,7 +36,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         assertLockSaysWhatStays(lock)
         let origin = lock.buttons["lock.unlock"]
         tap(origin)
-        assertPaywall("export", headline: "The record your accountant gets")
+        assertPaywall("export", headline: "The record your CPA gets")
         closeThenPurchase(entryPoint: "Reports > Export card", origin: origin,
                           continuation: exportReady)
     }
@@ -47,7 +47,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         tap(app.buttons["reports.export"])
         let origin = exportPageUnlock()
         tap(origin)
-        assertPaywall("export", headline: "The record your accountant gets")
+        assertPaywall("export", headline: "The record your CPA gets")
         closeThenPurchase(entryPoint: "Reports > Export page", origin: origin,
                           continuation: exportReady, continuationIsLockLifted: true)
     }
@@ -58,7 +58,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         tap(app.buttons["records.export"])
         let origin = exportPageUnlock()
         tap(origin)
-        assertPaywall("export", headline: "The record your accountant gets")
+        assertPaywall("export", headline: "The record your CPA gets")
         closeThenPurchase(entryPoint: "Records > Export", origin: origin,
                           continuation: exportReady, continuationIsLockLifted: true)
     }
@@ -71,7 +71,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         assertLockSaysWhatStays(lock)
         let origin = lock.buttons["lock.unlock"]
         tap(origin)
-        assertPaywall("export", headline: "The record your accountant gets")
+        assertPaywall("export", headline: "The record your CPA gets")
         closeThenPurchase(entryPoint: "Settings > Export row", origin: origin, continuation: exportReady)
     }
 

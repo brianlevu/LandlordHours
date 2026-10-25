@@ -80,10 +80,22 @@
     "A week or less, on average" : {
 
     },
+    "Add %@" : {
+
+    },
+    "Add %@ and every place after it. Your hours stay put." : {
+
+    },
+    "Add a rental" : {
+
+    },
     "Add address" : {
 
     },
     "Add your first rental." : {
+
+    },
+    "Add your next rental and every place after it. Your hours stay put." : {
 
     },
     "Aim for %lld hours" : {
@@ -149,6 +161,9 @@
     "Every rental hour, counted." : {
 
     },
+    "Every rental, the PDF and spreadsheet, and the record of where each hour came from." : {
+
+    },
     "Example notification. %@. %@" : {
       "localizations" : {
         "en" : {
@@ -168,6 +183,12 @@
           }
         }
       }
+    },
+    "Export %@" : {
+
+    },
+    "Export %@ as a PDF or spreadsheet, any time." : {
+
     },
     "Family Sharing" : {
 
@@ -386,6 +407,9 @@
     "Saved" : {
 
     },
+    "See your record" : {
+
+    },
     "Share it with your family" : {
 
     },
@@ -438,16 +462,31 @@
     "The 750 counts the rental hours you log here. Other real-estate work isn’t tracked yet." : {
 
     },
+    "The record your CPA gets" : {
+
+    },
     "Total" : {
 
     },
+    "Track every rental" : {
+
+    },
     "Try again" : {
+
+    },
+    "Turn %@ confirmed hours into a clean record." : {
+
+    },
+    "Turn your confirmed hours into a clean record." : {
 
     },
     "Turnover clean" : {
 
     },
     "Unlock Pro" : {
+
+    },
+    "Unlock for %@" : {
 
     },
     "Waiting for approval. Pro unlocks when it comes through." : {
@@ -518,6 +557,9 @@
 
     },
     "Your hours count together for this target." : {
+
+    },
+    "Your hours, on paper" : {
 
     },
     "Your hours, on the way to %lld." : {

@@ -340,6 +340,11 @@ struct OnbWelcomeView: View {
     /// the lot, inside the frame's empty foot (the art's ground line is at 0.92 of the frame).
     static let headlineOverlap: CGFloat = 20
 
+    /// The fade above the pinned actions: 72 at accessibility sizes (one line is ~60pt), 24 otherwise.
+    static func fadeHeight(accessibility: Bool) -> CGFloat { accessibility ? 72 : 24 }
+    /// Space under the words so the scrolled-to-end last line sits clear of that fade.
+    static func bottomClearance(accessibility: Bool) -> CGFloat { accessibility ? fadeHeight(accessibility: true) + 8 : 16 }
+
     static var headline: String { String(localized: "Every rental hour, counted.", table: "ConversionPath") }
     static var line: String {
         String(localized: "Pick a goal: 100, 500 or 750 hours. We spot rental work in your calendar. You confirm it, and the house shows how far you’ve come.", table: "ConversionPath")
@@ -369,7 +374,9 @@ struct OnbWelcomeView: View {
                     }
                     .padding(.horizontal, LHMetrics.gutter)
                     .padding(.top, ax ? 8 : -Self.headlineOverlap)
-                    .padding(.bottom, 16)
+                    // Scrolled to the end, the last line clears the fade above the pinned actions
+                    // (72 at accessibility sizes, 24 otherwise), so no line ever rests under it.
+                    .padding(.bottom, Self.bottomClearance(accessibility: ax))
                     .frame(maxWidth: LHMetrics.readingColumn, alignment: .leading)
                     .frame(maxWidth: .infinity)
                 }
@@ -417,7 +424,7 @@ struct OnbWelcomeView: View {
         // Words scrolling toward the pinned actions fade into the page's foot, never hard-cut.
         .background(alignment: .top) {
             // At accessibility sizes one line is ~60pt, so the fade grows to keep a soft edge.
-            let fade: CGFloat = typeSize.isAccessibilitySize ? 72 : 24
+            let fade = Self.fadeHeight(accessibility: typeSize.isAccessibilitySize)
             LinearGradient(stops: [.init(color: colors.pageBottom.opacity(0), location: 0),
                                    .init(color: colors.pageBottom, location: typeSize.isAccessibilitySize ? 0.3 : 0.35)],
                            startPoint: .top, endPoint: .bottom)
@@ -464,6 +471,23 @@ struct OnbAccountSheet: View {
     @State private var showRestore = false
     @State private var isRetrying = false
     @State private var signInError = false
+    /// The content's natural height: the sheet fits it rather than opening at `.medium`.
+    @State private var contentHeight: CGFloat = 0
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    /// The sheet chrome around the content: the 56 header, the content's 4 top and 16 bottom
+    /// padding, and the empty footer inset (the detent height already sits above the home
+    /// indicator's safe area). Measured on iPhone 17 Pro, iOS 27: the footnote ends 16pt above
+    /// the footer.
+    static let chromeHeight: CGFloat = 56 + 4 + 16 + 8
+
+    /// A detent fitted to the content, with `.large` to pull up to. At accessibility sizes the
+    /// header wraps past its 56, so the sheet opens `.large` and nothing sits under its edge.
+    static func detents(contentHeight: CGFloat, accessibility: Bool = false) -> Set<PresentationDetent> {
+        if accessibility { return [.large] }
+        guard contentHeight > 0, contentHeight.isFinite else { return [.medium, .large] }
+        return [.height((contentHeight + chromeHeight).rounded(.up)), .large]
+    }
 
     var body: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
@@ -496,9 +520,13 @@ struct OnbAccountSheet: View {
                     .foregroundStyle(colors.textSecondary)
             }
             .padding(.top, 4)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
         }
         .background(colors.backgroundSecondary.ignoresSafeArea())
-        .lhSheetPresentation()
+        // §1.20's sheet with a fitted detent: the content is four short lines, and `.medium`
+        // left two-thirds of the sheet empty (gate B 1.1).
+        .presentationDetents(Self.detents(contentHeight: contentHeight, accessibility: typeSize.isAccessibilitySize))
+        .presentationDragIndicator(.visible)
         .task { await research() }
         .sheet(isPresented: $showRestore) {
             ProfileRestoreSheet(
@@ -568,7 +596,7 @@ struct OnbStakedStep: View {
         OnbStepScaffold(title: title(headline), titleIdentifier: identifier(headline)) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
-                    LHThumb.large(.started, lit: true)
+                    OnbHouseThumb(stage: .started, lit: true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(flow.displayName)
                             .font(.headline)

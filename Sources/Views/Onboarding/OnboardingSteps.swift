@@ -382,7 +382,7 @@ struct OnbPropertyStep: View {
                     : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
                 layout {
                     // The house the year starts from; it lights when the rental is saved.
-                    LHThumb.large(.started, lit: flow.stakeDropped)
+                    OnbHouseThumb(stage: .started, lit: flow.stakeDropped)
                         .accessibilityIdentifier("property-thumb")
                     VStack(alignment: .leading, spacing: 8) {
                         Text(String(localized: "Rental name", table: "ConversionPath"))
@@ -431,12 +431,15 @@ struct OnbPropertyStep: View {
             .allowsHitTesting(!flow.stakeDropped)
             .contentTransition(.opacity)
             .accessibilityIdentifier("onb-primary")
-            Button(String(localized: "I’ll add it later", table: "ConversionPath")) {
-                dismissKeyboard()
-                flow.skipProperty(OnbMotion.morph(reduce))
+            // Once saved there is nothing to put off: the way out goes with the choice.
+            if !flow.stakeDropped {
+                Button(String(localized: "I’ll add it later", table: "ConversionPath")) {
+                    dismissKeyboard()
+                    flow.skipProperty(OnbMotion.morph(reduce))
+                }
+                .buttonStyle(LHButton.tertiary)
+                .accessibilityIdentifier("onb-link")
             }
-            .buttonStyle(LHButton.tertiary)
-            .accessibilityIdentifier("onb-link")
         }
         .onSubmit { if !flow.trimmedName.isEmpty { save() } }
         .sensoryFeedback(.success, trigger: savedTick)
@@ -487,6 +490,7 @@ struct OnbNotificationPreview: View {
     var title: String
     var bodyText: String
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
@@ -497,10 +501,15 @@ struct OnbNotificationPreview: View {
                 .clipShape(RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline) {
+                // At accessibility sizes the title wraps and a trailing "now" read as part of it
+                // ("Plumber visit now just ended"), so the example drops the time there; a line
+                // of its own would push the card past the AX card share.
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(colors.textPrimary)
-                    Spacer()
-                    Text(String(localized: "now", table: "ConversionPath")).font(.footnote).foregroundStyle(colors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if !typeSize.isAccessibilitySize {
+                        Text(String(localized: "now", table: "ConversionPath")).font(.footnote).foregroundStyle(colors.textSecondary)
+                    }
                 }
                 Text(bodyText).font(.subheadline).foregroundStyle(colors.textPrimary)
             }
@@ -572,7 +581,7 @@ struct OnbWhatsNewHouseStep: View {
         OnbStepScaffold(title: OnbCopy.upgradeHeadline(hours: flow.upgradeHours, goal: flow.upgradeGoal, isRecord: flow.upgradeIsRecord)) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
-                    LHThumb.large(Self.stage(hours: flow.upgradeHours, goal: flow.upgradeGoal), lit: true)
+                    OnbHouseThumb(stage: Self.stage(hours: flow.upgradeHours, goal: flow.upgradeGoal), lit: true)
                     Text(stageLine)
                         .font(.subheadline)
                         .foregroundStyle(colors.textSecondary)

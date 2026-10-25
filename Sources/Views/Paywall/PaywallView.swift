@@ -212,7 +212,7 @@ struct PaywallView: View {
     static let previewShareAccessibility: CGFloat = 0.40
 
     private var copy: PaywallCopy {
-        PaywallCopy.make(context, year: year, propertyName: propertyName, confirmedHours: confirmedHours)
+        PaywallCopy.localized(context, year: year, propertyName: propertyName, confirmedHours: confirmedHours)
     }
     private var big: Bool { dts >= .xxLarge }
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
@@ -453,7 +453,7 @@ struct PaywallView: View {
         case .buying: return String(localized: "Waiting for the App Store", table: "ConversionPath")
         case .askToBuy: return String(localized: "Done", table: "ConversionPath")
         case .success: return copy.nextStep
-        default: return model.priceDisplay?.buttonTitle(large: big) ?? String(localized: "Unlock Pro", table: "ConversionPath")
+        default: return PaywallCopy.buyTitle(billed: model.priceDisplay?.billed, large: big)
         }
     }
 
@@ -624,5 +624,54 @@ struct PaywallSuccessLabelStyle: LabelStyle {
             configuration.icon.foregroundStyle(tint).accessibilityHidden(true)
             configuration.title
         }
+    }
+}
+
+// MARK: - The paywall's words, from the package catalog
+
+extension PaywallCopy {
+    /// The headline, plan line and success step the paywall shows, localized in
+    /// `ConversionPath.xcstrings`. Standard C.4: "your CPA" (the word "accountant" is the PDF's
+    /// only). `ProGate`'s `make` is the unlocalized original this replaces on screen.
+    static func localized(_ context: PaywallContext, year: Int, propertyName: String? = nil,
+                          confirmedHours: Double? = nil) -> PaywallCopy {
+        let yearText = String(year)
+        let name = propertyName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        switch context {
+        case .export:
+            return PaywallCopy(
+                headline: String(localized: "The record your CPA gets", table: "ConversionPath"),
+                planLine: String(localized: "Export \(yearText) as a PDF or spreadsheet, any time.", table: "ConversionPath"),
+                nextStep: String(localized: "Export \(yearText)", table: "ConversionPath"))
+        case .secondProperty:
+            return PaywallCopy(
+                headline: String(localized: "Track every rental", table: "ConversionPath"),
+                planLine: name.isEmpty
+                    ? String(localized: "Add your next rental and every place after it. Your hours stay put.", table: "ConversionPath")
+                    : String(localized: "Add \(name) and every place after it. Your hours stay put.", table: "ConversionPath"),
+                nextStep: name.isEmpty
+                    ? String(localized: "Add a rental", table: "ConversionPath")
+                    : String(localized: "Add \(name)", table: "ConversionPath"))
+        case .todayUnlock:
+            return PaywallCopy(
+                headline: String(localized: "Your hours, on paper", table: "ConversionPath"),
+                planLine: confirmedHours.map { hours in
+                    let whole = ProGate.wholeHours(hours)
+                    return String(localized: "Turn \(whole) confirmed hours into a clean record.", table: "ConversionPath")
+                } ?? String(localized: "Turn your confirmed hours into a clean record.", table: "ConversionPath"),
+                nextStep: String(localized: "See your record", table: "ConversionPath"))
+        case .settings:
+            return PaywallCopy(
+                headline: String(localized: "LandlordHours Pro", table: "ConversionPath"),
+                planLine: String(localized: "Every rental, the PDF and spreadsheet, and the record of where each hour came from.", table: "ConversionPath"),
+                nextStep: String(localized: "Done", table: "ConversionPath"))
+        }
+    }
+
+    /// The buy button: "Unlock for $29.99" with the App Store's localized price; at large text
+    /// sizes, or before the price arrives, "Unlock Pro".
+    static func buyTitle(billed: String?, large: Bool) -> String {
+        guard let billed, !large else { return String(localized: "Unlock Pro", table: "ConversionPath") }
+        return String(localized: "Unlock for \(billed)", table: "ConversionPath")
     }
 }
