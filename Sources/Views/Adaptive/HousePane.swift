@@ -33,7 +33,7 @@ struct HousePane: View {
     private var isRecord: Bool { goalManager.goalChoice == .record }
 
     /// The share of the skyline's frame kept in a pane (the houses, their pool and shadow).
-    static let skylineShare: CGFloat = 0.62
+    static let skylineShare: CGFloat = 0.72
 
     private var shelf: HouseShelf { HouseShelf.live(app: viewModel, goal: goalManager.houseGoal, isRecord: isRecord) }
 

@@ -103,6 +103,13 @@ struct TodayWorkPane: View {
         })
     }
 
+    /// The pane's own wall (the tab content is opaque): the same light profile as the wall across
+    /// the gap; when propped, the fold is the top edge (DU9, DU2).
+    private var paneWall: some View {
+        InteriorWall(glowCenter: stacked ? UnitPoint(x: 0.5, y: 0) : UnitPoint(x: 0, y: 0.38),
+                     foldInset: foldInset, foldAbove: stacked)
+    }
+
     // MARK: List
 
     private var state: TodayConfirm.State {
@@ -140,7 +147,7 @@ struct TodayWorkPane: View {
             .contentMargins(.bottom, 12, for: .scrollContent)
             .scrollIndicators(.hidden)
         }
-        .background { InteriorWall(glowCenter: UnitPoint(x: 0, y: 0.38), foldInset: foldInset) }
+        .background { paneWall }
     }
 
     private func confirmCard(items: [Suggestion], hidden: Int, total: Int) -> some View {
@@ -271,7 +278,7 @@ struct TodayWorkPane: View {
         }
         .frame(maxWidth: PaneMetrics.contentCap)
         .frame(maxWidth: .infinity)
-        .background { InteriorWall(glowCenter: UnitPoint(x: 0, y: 0.38), foldInset: foldInset) }
+        .background { paneWall }
         .accessibilityIdentifier("pane.detail")
     }
 

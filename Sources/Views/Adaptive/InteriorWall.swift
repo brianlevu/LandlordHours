@@ -47,7 +47,8 @@ struct InteriorWall: View {
                     let len = max(horizontal ? g.size.width : g.size.height, 1)
                     // Distances are measured from the fold's midline (DU9: one profile both sides).
                     let at: (CGFloat) -> CGFloat = { d in min(1, max(0, (d - foldInset) / len)) }
-                    let center = horizontal ? UnitPoint(x: -foldInset / len, y: glowCenter.y) : glowCenter
+                    let center = horizontal ? UnitPoint(x: -foldInset / len, y: glowCenter.y)
+                                            : UnitPoint(x: glowCenter.x, y: -foldInset / len)
                     RadialGradient(colors: [DoorArt.glow(dark: dark), .clear], center: center, startRadius: 0, endRadius: 370)
                         .blendMode(dark ? .plusLighter : .screen)
                         .mask {

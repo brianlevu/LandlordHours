@@ -82,7 +82,7 @@ struct TwoPaneLayout<Work: View>: View {
         WorkPane {
             work().modifier(WorkPaneEnvironment(viewModel: viewModel, selection: selection, mode: split.mode,
                                                 typeSize: typeSize, colorScheme: colorScheme,
-                                                foldInset: split.mode == .twoPane ? split.gap.width / 2 : 0))
+                                                foldInset: split.mode == .twoPane ? split.gap.width / 2 : split.gap.height / 2))
         }
         .overlay { if split.isDivision { InsideLight(clock: clock) } }
         .accessibilityElement(children: .contain)
