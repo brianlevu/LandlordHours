@@ -356,7 +356,7 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["today.lookingBack"].waitForExistence(timeout: 5),
                       "Today says the look-back is running, not \"Log your first hour\"")
         app.buttons["tab.logTime"].tap()
-        let close = app.buttons["log.close"]
+        let close = app.buttons["sheet.close"]
         XCTAssertTrue(close.waitForExistence(timeout: 5))
         close.tap()
         XCTAssertTrue(app.buttons["tab.logTime"].waitForExistence(timeout: 3))

@@ -145,16 +145,8 @@ final class TodayHouseUITests: XCTestCase {
         notes.typeText("Fixed the porch steps for 2 hours")
         let logTime = app.buttons["log.save"]
         XCTAssertTrue(logTime.waitForExistence(timeout: 5))
-        if !logTime.isEnabled {
-            // More than one rental: pick the first.
-            app.buttons["log.property"].tap()
-            let first = app.buttons["picker.property.0"]
-            XCTAssertTrue(first.waitForExistence(timeout: 5))
-            first.tap()
-        }
-        let enabled = NSPredicate(format: "isEnabled == true")
-        expectation(for: enabled, evaluatedWith: logTime)
-        waitForExpectations(timeout: 5)
+        Thread.sleep(forTimeInterval: 1.5)   // the 600 ms pause, then the read
+        resolveLogGaps()   // more than one rental: the button asks, pick the first
         logTime.tap()
         XCTAssertTrue(app.descendants(matching: .any)["shell.toast"].waitForExistence(timeout: 6))
 
@@ -223,5 +215,17 @@ final class TodayHouseUITests: XCTestCase {
         XCTAssertTrue(yes.waitForExistence(timeout: 8), "The pace line opens the existing question")
         yes.tap()
         XCTAssertTrue(waitForBlock(containing: "Done for"), "Answered: the 100 is done. \(block.label)")
+    }
+
+    /// The Log button names what is missing and opens that editor; fill each gap with the first choice until it says "Log ...".
+    private func resolveLogGaps() {
+        let save = app.buttons["log.save"]
+        for _ in 0..<4 {
+            if save.label.hasPrefix("Log ") { return }
+            save.tap()
+            let rental = app.buttons["log.pick.property.0"]
+            let kind = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'log.pick.category.'")).firstMatch
+            if rental.waitForExistence(timeout: 2) { rental.tap() } else if kind.waitForExistence(timeout: 2) { kind.tap() } else { return }
+        }
     }
 }

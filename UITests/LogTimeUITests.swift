@@ -25,6 +25,9 @@ final class LogTimeUITests: XCTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch.waitForExistence(timeout: 3)
     }
 
+    /// The Log button's words (non-breaking spaces read as spaces).
+    private var saveLabel: String { app.buttons["log.save"].label }
+
     private func waitEnabled(_ element: XCUIElement, timeout: TimeInterval = 6) {
         expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: element)
         waitForExpectations(timeout: timeout)
@@ -43,14 +46,14 @@ final class LogTimeUITests: XCTestCase {
         note.typeText("Fixed the sink at Pine Cabin, 1 hour")
         let caption = element("log.fill.caption")
         XCTAssertTrue(caption.waitForExistence(timeout: 6), "the note fills the fields")
-        XCTAssertTrue(shows("Filled from your note"), caption.label)
+        XCTAssertTrue(shows("Matched from your words"), caption.label)
         // The parser runs after each 600ms pause; wait for the read of the whole note.
         let property = app.buttons["log.property"]
         expectation(for: NSPredicate(format: "label CONTAINS %@", "Pine Cabin"), evaluatedWith: property)
         waitForExpectations(timeout: 6)
         XCTAssertTrue(app.buttons["log.category"].label.contains("Repairs"), app.buttons["log.category"].label)
         let save = app.buttons["log.save"]
-        XCTAssertEqual(save.label, "Log 1h")
+        XCTAssertEqual(save.label, "Log 1h at Pine Cabin")
         XCTAssertTrue(save.isHittable, "the Log button rides above the keyboard")
         save.tap(); taps += 1
         let toast = element("shell.toast")
@@ -68,14 +71,18 @@ final class LogTimeUITests: XCTestCase {
         let note = element("log.note")
         XCTAssertTrue(note.waitForExistence(timeout: 8))
         note.tap()
-        note.typeText("Showing at Oak Street Duplex for 2 hours")
+        note.typeText("Fixed the sink at Oak St for 2 hours")
         XCTAssertTrue(element("log.fill.caption").waitForExistence(timeout: 6))
-        XCTAssertEqual(app.buttons["log.save"].label, "Log 2h")
+        expectation(for: NSPredicate(format: "label BEGINSWITH %@", "Log 2h at Oak Street Duplex"), evaluatedWith: app.buttons["log.save"])
+        waitForExpectations(timeout: 6)
         app.buttons["log.done"].tap()
         app.buttons["log.fill.undo"].tap()
-        XCTAssertTrue(app.buttons["log.property"].label.contains("Choose"), app.buttons["log.property"].label)
-        XCTAssertEqual(app.buttons["log.save"].label, "Log 1h")
-        XCTAssertFalse(app.buttons["log.save"].isEnabled, "no property again")
+        XCTAssertTrue(app.buttons["log.property"].label.contains("not chosen"), app.buttons["log.property"].label)
+        XCTAssertEqual(saveLabel, "Pick a rental", "the button names the gap and is never dead")
+        XCTAssertTrue(app.buttons["log.save"].isEnabled)
+        // Tapping it opens the rental editor instead of logging.
+        app.buttons["log.save"].tap()
+        XCTAssertTrue(app.buttons["log.pick.property.0"].waitForExistence(timeout: 4))
         XCTAssertTrue(element("log.missing").exists)
     }
 
@@ -93,14 +100,15 @@ final class LogTimeUITests: XCTestCase {
         XCTAssertTrue(app.buttons["log.property"].label.contains("Oak Street Duplex"), app.buttons["log.property"].label)
         XCTAssertTrue(app.buttons["log.category"].label.contains("Repairs"), app.buttons["log.category"].label)
         XCTAssertTrue(app.buttons["log.date"].label.contains("Yesterday"), app.buttons["log.date"].label)
-        XCTAssertEqual(app.buttons["log.save"].label, "Log 2h")
+        XCTAssertTrue(saveLabel.hasPrefix("Log 2h at Oak Street Duplex"), saveLabel)
         XCTAssertTrue(element("log.fill.caption").waitForExistence(timeout: 4))
+        XCTAssertTrue(shows("Filled from your note"))
         app.buttons["log.done"].tap()
         app.buttons["log.fill.undo"].tap()
         XCTAssertTrue(description.waitForNonExistence(timeout: 4), "Undo clears the description")
-        XCTAssertTrue(app.buttons["log.property"].label.contains("Choose"), app.buttons["log.property"].label)
+        XCTAssertTrue(app.buttons["log.property"].label.contains("not chosen"), app.buttons["log.property"].label)
         XCTAssertTrue(app.buttons["log.date"].label.contains("Today"), app.buttons["log.date"].label)
-        XCTAssertEqual(app.buttons["log.save"].label, "Log 1h")
+        XCTAssertEqual(saveLabel, "Pick a rental")
     }
 
     func testTwoRentalsLeaveThePropertyForTheUser() {
@@ -112,7 +120,8 @@ final class LogTimeUITests: XCTestCase {
         note.typeText("Fixed the sink at Pine Cabin and mowed at Maple Court, 2 hours")
         XCTAssertTrue(element("log.propertyHint").waitForExistence(timeout: 8))
         XCTAssertTrue(shows("mentions 2 rentals"))
-        XCTAssertTrue(app.buttons["log.property"].label.contains("Choose"), app.buttons["log.property"].label)
+        XCTAssertTrue(app.buttons["log.property"].label.contains("not chosen"), app.buttons["log.property"].label)
+        XCTAssertEqual(saveLabel, "Pick a rental")
     }
 
     func testWithoutAModelTheRulesStillFill() {
@@ -123,8 +132,9 @@ final class LogTimeUITests: XCTestCase {
         note.tap()
         note.typeText("fixed the sink at Oak St with Mike, about 2 hours yesterday")
         XCTAssertTrue(element("log.fill.caption").waitForExistence(timeout: 6))
+        XCTAssertTrue(shows("Matched from your words"), "the rules still read the note, and say so")
         XCTAssertTrue(app.buttons["log.property"].label.contains("Oak Street Duplex"))
-        XCTAssertEqual(app.buttons["log.save"].label, "Log 2h")
+        XCTAssertTrue(saveLabel.hasPrefix("Log 2h at Oak Street Duplex"), saveLabel)
         XCTAssertFalse(element("log.reading").exists, "no drafting line without a model")
         XCTAssertFalse(element("log.description").exists, "rules never write a description")
     }
@@ -139,10 +149,61 @@ final class LogTimeUITests: XCTestCase {
         XCTAssertTrue(element("log.reading").waitForExistence(timeout: 6), "the drafting line while Apple's model reads")
         XCTAssertTrue(app.buttons["log.property"].label.contains("Oak Street Duplex"), "the rules filled first")
         let save = app.buttons["log.save"]
-        XCTAssertEqual(save.label, "Log 2h")
+        XCTAssertTrue(saveLabel.hasPrefix("Log 2h at Oak Street Duplex"), saveLabel)
         XCTAssertTrue(save.isEnabled, "the UI never blocks on the model")
         save.tap()
+        XCTAssertTrue(element("shell.toast").waitForExistence(timeout: 5), "Log cancels the read and logs what is on screen")
+    }
+
+    /// "Read my notes with Apple's model" off: no model runs, the rules still fill and say so.
+    func testWithTheModelSwitchOffTheRulesStillFillAndSayWhere() {
+        launch(seed: "four", extra: ["-LHNoteModel", "off"])
+        app.buttons["tab.logTime"].tap()
+        let note = element("log.note")
+        XCTAssertTrue(note.waitForExistence(timeout: 8))
+        note.tap()
+        note.typeText("fixed the sink at Oak St, 2 hours")
+        XCTAssertTrue(element("log.fill.caption").waitForExistence(timeout: 6))
+        XCTAssertTrue(shows("Matched from your words"))
+        XCTAssertFalse(element("log.reading").exists)
+        XCTAssertFalse(element("log.description").exists)
+        Thread.sleep(forTimeInterval: 2)
+        XCTAssertFalse(element("log.description").exists, "no model ever answers")
+    }
+
+    /// The manual door: every field, no reading, four taps.
+    func testEnterDetailsYourselfNeedsNoNote() {
+        launch(seed: "four", extra: [])
+        app.buttons["tab.logTime"].tap()
+        let enter = app.buttons["log.enterDetails"]
+        XCTAssertTrue(enter.waitForExistence(timeout: 8))
+        enter.tap()
+        XCTAssertTrue(app.buttons["log.property"].waitForExistence(timeout: 4))
+        app.buttons["log.property"].tap()
+        app.buttons["log.pick.property.1"].tap()
+        XCTAssertFalse(saveLabel == "Pick a rental")
+        app.buttons["log.hours"].tap()
+        app.buttons["log.chip.2h"].tap()
+        XCTAssertTrue(saveLabel.hasPrefix("Log 2h at"), saveLabel)
+    }
+
+    /// Zero rentals: one field, then Log creates the rental and the entry together.
+    func testFirstLogCreatesTheRentalAndTheEntry() {
+        launch(seed: "empty", extra: [])
+        app.buttons["tab.logTime"].tap()
+        let name = element("log.rentalName")
+        XCTAssertTrue(name.waitForExistence(timeout: 8))
+        XCTAssertEqual(saveLabel, "Name your rental")
+        name.tap()
+        name.typeText("Pine Cabin")
+        let note = element("log.note")
+        note.tap()
+        note.typeText("fixed the sink, 1 hour")
+        XCTAssertTrue(element("log.fill.caption").waitForExistence(timeout: 6))
+        XCTAssertTrue(saveLabel.hasPrefix("Add Pine Cabin and log 1h"), saveLabel)
+        app.buttons["log.save"].tap()
         XCTAssertTrue(element("shell.toast").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Pine Cabin added · Logged 1h"].exists)
     }
 
     func testVoiceDeniedOffersSettingsAndDimsTheMic() {
@@ -184,7 +245,7 @@ final class LogTimeUITests: XCTestCase {
         XCTAssertTrue(element("timer.card").waitForExistence(timeout: 4))
         XCTAssertTrue(app.staticTexts["Keeps running if you close this. You\u{2019}ll see it on your Lock Screen."].exists)
         // Close: it keeps running, and Today shows it.
-        app.buttons["log.close"].tap()
+        app.buttons["sheet.close"].tap()
         let todayStop = app.buttons["today.timer.stop"]
         XCTAssertTrue(todayStop.waitForExistence(timeout: 5), "Today's timer card replaces the floating banner")
         Thread.sleep(forTimeInterval: 61)   // run past the one-minute floor
@@ -192,7 +253,7 @@ final class LogTimeUITests: XCTestCase {
         let ran = element("log.timer.ran")
         XCTAssertTrue(ran.waitForExistence(timeout: 6))
         XCTAssertTrue(shows("Timer ran 1m"), ran.label)
-        XCTAssertEqual(app.buttons["log.save"].label, "Log 5m")
+        XCTAssertEqual(saveLabel, "Log 5m at Pine Cabin")
         app.buttons["log.save"].tap()
         XCTAssertTrue(element("shell.toast").waitForExistence(timeout: 5))
         XCTAssertFalse(todayStop.exists)
@@ -243,22 +304,27 @@ final class LogTimeUITests: XCTestCase {
         XCTAssertTrue(app.buttons["log.save"].isEnabled)
     }
 
-    func testCategoryPickerGroupsTheWorkThatDoesntCount() {
-        launch(seed: "four", extra: ["-LHOpenLog", "pickerCategory"])
-        XCTAssertTrue(element("picker.category").waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Doesn\u{2019}t count toward hours"].exists)
+    func testKindOfWorkEditorGroupsTheWorkThatDoesntCount() {
+        launch(seed: "four", extra: ["-LHOpenLog", "nfModel"])
+        let row = app.buttons["log.category"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label ==[c] %@", "Doesn\u{2019}t count toward your hours")).firstMatch.waitForExistence(timeout: 4))
         for kind in ["investing", "financing", "negotiation"] {
-            XCTAssertTrue(app.buttons["picker.category.\(kind)"].exists, kind)
+            XCTAssertTrue(app.buttons["log.pick.category.\(kind)"].exists, kind)
         }
-        app.buttons["picker.category.investing"].tap()
+        app.buttons["log.pick.category.investing"].tap()
         XCTAssertTrue(element("log.notCounted").waitForExistence(timeout: 4))
     }
 
-    func testAtTheFreeLimitThePropertyPickerShowsTheLock() {
-        launch(seed: "limit", extra: ["-LHOpenLog", "pickerPropertyLimit"])
-        // Scoped to the picker: with ProGate merged, Today's "Your record" lock under the sheet has its own Unlock Pro.
-        let unlock = element("picker.property").buttons["lock.unlock"].firstMatch
-        XCTAssertTrue(unlock.waitForExistence(timeout: 10))
+    func testAtTheFreeLimitTheRentalEditorShowsTheLock() {
+        launch(seed: "limit", extra: ["-LHOpenLog", "nfModel"])
+        let row = app.buttons["log.property"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.tap()
+        // Scoped to the editor: Today's "Your record" lock under the sheet has its own Unlock Pro.
+        let unlock = element("log.editor.property").buttons["lock.unlock"].firstMatch
+        XCTAssertTrue(unlock.waitForExistence(timeout: 6))
         XCTAssertTrue(app.staticTexts["Pine Cabin keeps tracking. Nothing is lost."].exists)
         unlock.tap()
         XCTAssertTrue(element("paywall.secondProperty").waitForExistence(timeout: 8))
@@ -285,8 +351,8 @@ final class LogTimeUITests: XCTestCase {
 
     func testPlusRouteFromOtherSurfacesOpensTheSheet() {
         launch(seed: "four", extra: [], tab: "2")
-        XCTAssertTrue(app.buttons["log.close"].waitForExistence(timeout: 8), "the old Track tab index opens the sheet")
-        app.buttons["log.close"].tap()
+        XCTAssertTrue(app.buttons["sheet.close"].waitForExistence(timeout: 8), "the old Track tab index opens the sheet")
+        app.buttons["sheet.close"].tap()
         XCTAssertTrue(app.buttons["tab.today"].isHittable)
     }
 
@@ -309,9 +375,9 @@ final class LogTimeUITests: XCTestCase {
         Shot(name: "log-empty", seed: "four", extra: ["-LHOpenLog", "empty"], waitFor: "log.note"),
         Shot(name: "log-typed", seed: "four", extra: ["-LHOpenLog", "typed"], waitFor: "log.note"),
         Shot(name: "log-filled", seed: "four", extra: ["-LHOpenLog", "filled"], waitFor: "log.fill.caption"),
-        Shot(name: "log-filled-spouse", seed: "four", extra: ["-LHOpenLog", "filled", "-LHLogSpouse"], waitFor: "log.who.spouse"),
+        Shot(name: "log-filled-spouse", seed: "four", extra: ["-LHOpenLog", "filled", "-LHLogSpouse"], waitFor: "log.who"),
         Shot(name: "log-quick", seed: "limit", extra: ["-LHOpenLog", "quick"], waitFor: "log.note"),
-        Shot(name: "log-invalid", seed: "four", extra: ["-LHOpenLog", "invalid"], waitFor: "log.missing"),
+        Shot(name: "log-invalid", seed: "four", extra: ["-LHOpenLog", "invalid"], waitFor: "log.save"),
         Shot(name: "log-keyboard", seed: "four", extra: ["-LHOpenLog", "keyboard"], waitFor: "log.done", settle: 2),
         Shot(name: "log-not-counted", seed: "four", extra: ["-LHOpenLog", "notCounted"], waitFor: "log.notCounted"),
         Shot(name: "log-save-failed", seed: "four", extra: ["-LHOpenLog", "saveFailed"], waitFor: "log.saveError"),
@@ -319,9 +385,6 @@ final class LogTimeUITests: XCTestCase {
         Shot(name: "log-voice-listening", seed: "four", extra: ["-LHOpenLog", "listening"], waitFor: "log.listening"),
         Shot(name: "log-voice-filled", seed: "four", extra: ["-LHOpenLog", "voiceFilled"], waitFor: "log.fill.caption"),
         Shot(name: "log-voice-denied", seed: "four", extra: ["-LHOpenLog", "voiceDenied", "-LHVoiceDenied"], waitFor: "log.voice.denied"),
-        Shot(name: "log-picker-category", seed: "four", extra: ["-LHOpenLog", "pickerCategory"], waitFor: "picker.category", settle: 1.6),
-        Shot(name: "log-picker-property", seed: "four", extra: ["-LHOpenLog", "pickerProperty"], waitFor: "picker.property", settle: 1.6),
-        Shot(name: "log-picker-property-limit", seed: "limit", extra: ["-LHOpenLog", "pickerPropertyLimit"], waitFor: "lock.unlock", settle: 1.6),
         Shot(name: "timer-idle", seed: "four", extra: ["-LHOpenLog", "timerIdle"], waitFor: "timer.start"),
         Shot(name: "timer-running", seed: "four", extra: ["-LHOpenLog", "timerRunning"], waitFor: "timer.card"),
         Shot(name: "timer-review", seed: "four", extra: ["-LHOpenLog", "timerReview"], waitFor: "log.timer.ran"),
@@ -346,17 +409,90 @@ final class LogTimeUITests: XCTestCase {
     func testCaptureLightAX3() { captureAll(scheme: "light", size: "ax3") }
     func testCaptureDarkAX3() { captureAll(scheme: "dark", size: "ax3") }
 
+
+    // MARK: Note-first frames (2.1)
+    //
+    // The 17 states of the approved prototype, as the real sheet: light and dark, default size and AX3.
+    // Names follow the prototype's frames: `{scheme}-{def|ax3}-{NN}-{state}`.
+
+    private struct NFShot {
+        let name: String
+        let state: String
+        let waitFor: String
+        var seed = "four"
+        var extra: [String] = []
+        var settle = 1.2
+    }
+
+    private let nfShots: [NFShot] = [
+        NFShot(name: "01-initial", state: "nfInitial", waitFor: "log.note", settle: 1.8),
+        NFShot(name: "02a-typing", state: "nfTyping", waitFor: "log.note", settle: 1.8),
+        NFShot(name: "02b-rules-fill", state: "nfRules", waitFor: "log.reading"),
+        NFShot(name: "03-model-landed", state: "nfModel", waitFor: "log.fill.caption"),
+        NFShot(name: "04a-partial-no-hours", state: "nfPartialHours", waitFor: "log.fill.caption"),
+        NFShot(name: "04b-partial-kind-empty", state: "nfPartialKind", waitFor: "log.category"),
+        NFShot(name: "05-two-rentals", state: "nfTwoRentals", waitFor: "log.propertyHint"),
+        NFShot(name: "06a-zero-property", state: "nfZero", waitFor: "log.rentalName", seed: "empty"),
+        NFShot(name: "06b-zero-named", state: "nfZeroNamed", waitFor: "log.rentalName", seed: "empty"),
+        NFShot(name: "07a-inline-edit-hours", state: "nfEditHours", waitFor: "log.hours.value"),
+        NFShot(name: "07b-undone", state: "nfUndone", waitFor: "log.rows"),
+        NFShot(name: "08a-voice-listening", state: "nfListening", waitFor: "log.listening"),
+        NFShot(name: "08b-mic-intro", state: "nfMicIntro", waitFor: "log.voice.intro"),
+        NFShot(name: "09-model-swap-caution", state: "nfSwap", waitFor: "log.updated.undo"),
+        NFShot(name: "10-enter-details-yourself", state: "nfManual", waitFor: "log.autoFill.on"),
+        NFShot(name: "11-toast", state: "nfToast", waitFor: "shell.toast", settle: 1.0),
+        NFShot(name: "12-timer-review", state: "timerReview", waitFor: "log.timer.ran"),
+    ]
+
+    func testCaptureNoteFirstLightDefault() { captureNoteFirst(scheme: "light", size: nil) }
+    func testCaptureNoteFirstDarkDefault() { captureNoteFirst(scheme: "dark", size: nil) }
+    func testCaptureNoteFirstLightAX3() { captureNoteFirst(scheme: "light", size: "ax3") }
+    func testCaptureNoteFirstDarkAX3() { captureNoteFirst(scheme: "dark", size: "ax3") }
+    func testCaptureNoteFirstLightAX5() { captureNoteFirst(scheme: "light", size: "ax5", only: ["01-initial", "03-model-landed", "05-two-rentals", "07a-inline-edit-hours", "06a-zero-property"]) }
+    func testCaptureNoteFirstDarkAX5() { captureNoteFirst(scheme: "dark", size: "ax5", only: ["01-initial", "03-model-landed", "05-two-rentals", "07a-inline-edit-hours", "06a-zero-property"]) }
+
+    private func captureNoteFirst(scheme: String, size: String?, only: Set<String>? = nil) {
+        continueAfterFailure = true
+        let tag = size ?? "def"
+        for shot in nfShots where only?.contains(shot.name) ?? true {
+            app.terminate()
+            launch(seed: shot.seed, scheme: scheme, extra: ["-LHOpenLog", shot.state] + shot.extra + sizeArgs(size))
+            XCTAssertTrue(element(shot.waitFor).waitForExistence(timeout: 15), "\(shot.name): \(shot.waitFor)")
+            Thread.sleep(forTimeInterval: shot.settle)
+            // The keyboard's one-time "slide to type" card would sit over the sheet.
+            let tip = app.buttons["Continue"]
+            if tip.exists { tip.tap(); Thread.sleep(forTimeInterval: 0.6) }
+            capture("\(scheme)-\(tag)-\(shot.name)")
+        }
+    }
+
+    /// The post-log handoff, captured as a screen recording by the caller: types a note into the real
+    /// sheet, waits for the rules and the scripted model, taps Log. `-LHLogScript` drives it.
+    func testScriptedUnfoldAndLog() {
+        launch(seed: "four", scheme: "dark", extra: ["-LHNoteModel", "fake", "-LHLogScript", "full"])
+        XCTAssertTrue(element("shell.toast").waitForExistence(timeout: 40), "the script logs the entry")
+        Thread.sleep(forTimeInterval: 2)
+    }
+
+    func testScriptedModelSwapShowsTheRowsOwnUndo() {
+        launch(seed: "four", scheme: "light", extra: ["-LHNoteModel", "swap", "-LHLogScript", "swap", "-LHLogNoLog", "1"])
+        XCTAssertTrue(element("log.updated.undo").waitForExistence(timeout: 20), "a late model answer says it updated the row")
+        element("log.updated.undo").tap()
+        XCTAssertTrue(element("log.updated.undo").waitForNonExistence(timeout: 8))
+    }
+
     private func sizeArgs(_ size: String?) -> [String] {
         switch size {
         case "xxl": return ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXL"]
         case "ax3": return ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL"]
+        case "ax5": return ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         default: return []
         }
     }
 
     /// The states a fix touched, in every scheme and size.
     func testCaptureFixups() {
-        let names: Set<String> = ["log-typed", "log-filled-spouse", "log-save-failed", "log-not-counted", "log-invalid", "log-picker-property-limit"]
+        let names: Set<String> = ["log-typed", "log-filled-spouse", "log-save-failed", "log-not-counted", "log-invalid"] 
         for scheme in ["light", "dark"] {
             for size in [nil, "xxl", "ax3"] as [String?] { captureAll(scheme: scheme, size: size, names: names) }
         }
@@ -445,7 +581,7 @@ final class LogTimeUITests: XCTestCase {
             "-AppleLocale", "en_US",
         ] + extra
         app.launch()
-        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 15) || app.buttons["log.close"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 15) || app.buttons["sheet.close"].waitForExistence(timeout: 5))
         Thread.sleep(forTimeInterval: 2.5)
         let tip = app.buttons["Continue"]
         if tip.exists { tip.tap() }

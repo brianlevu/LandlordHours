@@ -76,9 +76,9 @@ final class TodayLoadingUITests: XCTestCase {
         let plus = app.buttons["tab.logTime"]
         XCTAssertTrue(plus.isHittable)
         plus.tap()
-        XCTAssertTrue(app.buttons["log.close"].waitForExistence(timeout: 5),
+        XCTAssertTrue(app.buttons["sheet.close"].waitForExistence(timeout: 5),
                       "Log time opens while the pull is pending")
-        app.buttons["log.close"].tap()
+        app.buttons["sheet.close"].tap()
 
         // Back on Today it is still loading the Blueprint way, not blocked.
         app.buttons["tab.today"].tap()
