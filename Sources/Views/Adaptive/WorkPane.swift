@@ -84,6 +84,7 @@ struct WorkPaneEnvironment: ViewModifier {
             .environment(\.layoutMode, mode)
             .environment(\.layoutBand, band)
             .environment(\.paneFoldInset, foldInset)
+            .environment(\.paneLogRental, context == .pane ? selection.selectedRentalID : nil)
             .environment(\.dynamicTypeSize, typeSize)
             .environment(\.colorScheme, colorScheme)
     }

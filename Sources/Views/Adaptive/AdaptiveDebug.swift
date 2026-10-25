@@ -256,7 +256,9 @@ enum AdaptiveSnapshotter {
             bar = [r.minX, r.minY, r.width, r.height]
         }
         let rect: (CGRect) -> [CGFloat] = { [$0.minX, $0.minY, $0.width, $0.height] }
+        let inset = w.rootViewController?.view.safeAreaInsets ?? .zero
         let json: [String: Any] = [
+            "insets": [inset.top, inset.left, inset.bottom, inset.right],
             "mode": "\(split.mode)",
             "panes": split.mode == .compact ? [rect(CGRect(origin: .zero, size: size))] : [rect(split.first), rect(split.second)],
             "gap": split.mode == .compact ? [] : rect(split.gap),

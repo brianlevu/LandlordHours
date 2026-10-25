@@ -1,0 +1,21 @@
+diff --git a/Sources/Views/LogTime/LogTimeSheet.swift b/Sources/Views/LogTime/LogTimeSheet.swift
+index 0c53871..615c312 100644
+--- a/Sources/Views/LogTime/LogTimeSheet.swift
++++ b/Sources/Views/LogTime/LogTimeSheet.swift
+@@ -38,6 +38,8 @@ struct LogTimeSheet: View {
+     @Environment(\.colorScheme) private var colorScheme
+     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+     @Environment(\.accessibilityReduceMotion) private var reduceMotion
++    /// In a two-pane work pane: the rental the house pane shows (§1.27 "naming the rental shown").
++    @Environment(\.paneLogRental) private var paneRental
+     @ObservedObject private var voice = VoiceEntryService.shared
+     @ObservedObject private var taxProfile = TaxProfileManager.shared
+ 
+@@ -161,6 +163,7 @@ struct LogTimeSheet: View {
+         switch route {
+         case .log:
+             mode = .log
++            if let rental = paneRental, properties.contains(where: { $0.id == rental }) { form.propertyId = rental }
+         case .timer:
+             mode = viewModel.isTimerRunning ? .timerRunning : .timerIdle
+         case .timerReview:

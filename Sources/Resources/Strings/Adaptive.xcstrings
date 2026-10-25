@@ -37,6 +37,18 @@
         }
       }
     },
+    "twoPane.record.earlier": {
+      "comment": "Sub-heading inside \"On the record today\" in the iPad and open-Duo work pane: the rental's most recent earlier entries, as many as fit above the tab bar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earlier"
+          }
+        }
+      }
+    },
     "twoPane.record.empty": {
       "comment": "On the record today, when nothing is logged.",
       "extractionState": "manual",
@@ -62,7 +74,7 @@
       }
     },
     "twoPane.shelf.count": {
-      "comment": "Shelf count line above the plank: how many shelf items are in view of the total (the scroll cue).",
+      "comment": "Shelf count line above the plank when some rentals are out of view: rentals in view at rest of all rentals (the honest scroll cue), e.g. 2 of 8 rentals.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -81,6 +93,30 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld of %lldh"
+          }
+        }
+      }
+    },
+    "twoPane.shelf.total": {
+      "comment": "Shelf count line above the plank when every rental is in view (or only the All rentals slot fits): the number of rentals.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld rental"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld rentals"
+                }
+              }
+            }
           }
         }
       }

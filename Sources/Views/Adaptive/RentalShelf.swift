@@ -138,18 +138,31 @@ struct RentalShelf: View {
     }
     private var width: CGFloat { viewport > 0 ? viewport : max(widthHint - 2 * Self.inset, 1) }
     private var slotWidth: CGFloat { width / CGFloat(visible) }
+    /// The rentals in view at rest: "All rentals" holds the first slot (DU15), so it is not counted.
+    private var visibleRentals: Int {
+        let allSlot = items.first?.isAll == true ? 1 : 0
+        return max(0, min(shelf.rentals.count, visible - allSlot))
+    }
+
+    /// "2 of 8 rentals" when some are out of view; "3 rentals" when every rental is in view (or only
+    /// the "All rentals" slot fits, at the largest type sizes).
+    static func countLine(visibleRentals: Int, total: Int) -> String {
+        if visibleRentals > 0, visibleRentals < total {
+            return String(localized: "twoPane.shelf.count", defaultValue: "\(visibleRentals) of \(total) rentals", table: "Adaptive")
+        }
+        return String(localized: "twoPane.shelf.total", defaultValue: "\(total) rentals", table: "Adaptive")
+    }
 
     var body: some View {
         VStack(spacing: 6) {
-            if items.count > visible {
-                // DU15: the honest scroll cue, plain SF footnote, no dots or "+5" tile.
-                Text(String(localized: "twoPane.shelf.count", defaultValue: "\(visible) of \(items.count) rentals", table: "Adaptive"))
-                    .font(.footnote)
-                    .foregroundStyle(colors.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, Self.inset + 8)
-                    .accessibilityIdentifier("shelf.count")
-            }
+            // DU15: the honest count, always above the plank (plain SF footnote, no dots or "+5"
+            // tile): the rentals in view at rest out of all of them.
+            Text(Self.countLine(visibleRentals: visibleRentals, total: shelf.rentals.count))
+                .font(.footnote)
+                .foregroundStyle(colors.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Self.inset + 8)
+                .accessibilityIdentifier("shelf.count")
             ScrollView(.horizontal) {
                 HStack(alignment: .top, spacing: 0) {
                     ForEach(items) { item in slot(item).id(item.id) }

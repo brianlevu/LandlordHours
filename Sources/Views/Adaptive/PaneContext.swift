@@ -38,6 +38,20 @@ extension EnvironmentValues {
     }
 }
 
+private struct PaneLogRentalKey: EnvironmentKey {
+    static let defaultValue: UUID? = nil
+}
+
+extension EnvironmentValues {
+    /// The rental the house pane shows, inside a two-pane or stacked work pane (nil in compact and
+    /// on "All rentals"). Log time in the pane starts on it, so it names the rental shown (§1.27).
+    /// `LogTimeSheet` reads it (package E; `scripts/adaptive/logtime-pane-rental.patch`).
+    var paneLogRental: UUID? {
+        get { self[PaneLogRentalKey.self] }
+        set { self[PaneLogRentalKey.self] = newValue }
+    }
+}
+
 // MARK: - What the right pane shows over its tab's root
 
 /// The right pane's own stack: the tab's root, or a detail / Log time opened over it in place.

@@ -44,6 +44,11 @@ enum DoorArt {
 
     /// The still's side in pixels the rect is measured in.
     static let stillSide: CGFloat = 1206
+
+    /// The door's wall recedes up and to the right: its horizontal edges rise 0.28px per px (the lit
+    /// door panes on `craft_half` light, y 578 → 568 over x 629 → 665). The opening is drawn as that
+    /// parallelogram, never an upright box (gate J 1.2: "a slab pasted on the wall").
+    static let facadeSlope: CGFloat = -0.28
 }
 
 /// `duoDoor` (§B.2): a 0.80 s door clock t 0 → 1 (`.linear(duration: 0.80)`), 0.50 s back on fold,

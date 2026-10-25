@@ -1,0 +1,29 @@
+diff --git a/Sources/Views/Components/LHThumb.swift b/Sources/Views/Components/LHThumb.swift
+index 869146e..c7d7a9b 100644
+--- a/Sources/Views/Components/LHThumb.swift
++++ b/Sources/Views/Components/LHThumb.swift
+@@ -48,13 +48,21 @@ struct LHThumb: View {
+                     .interpolation(.high)
+                     .scaledToFit()
+             } else {
+-                // Interim crop of the still: the house fills the square, the ground line at the bottom.
++                // Interim crop of the still: the house fills most of the square, the roof whole and
++                // the ground line near the foot. The still's soft shadow runs past any square crop,
++                // so the crop's edges are feathered: a hard clip through it read as a box around
++                // every house (gate J 1.2: 66-72/255 steps at the tile edges).
+                 Image(stage.assetName(lit: true))
+                     .resizable()
+                     .interpolation(.high)
+                     .scaledToFit()
+-                    .scaleEffect(1.5, anchor: UnitPoint(x: 0.5, y: CraftStage.groundLine))
+-                    .offset(y: size * (1 - CraftStage.groundLine))
++                    .scaleEffect(1.15, anchor: UnitPoint(x: 0.5, y: CraftStage.groundLine))
++                    .offset(y: size * (1 - CraftStage.groundLine) * 0.5)
++                    .mask {
++                        Rectangle()
++                            .padding(size * 0.08)
++                            .blur(radius: size * 0.06)
++                    }
+             }
+         }
+         .colorMultiply(Color(white: dim))

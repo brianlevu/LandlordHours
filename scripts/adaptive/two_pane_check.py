@@ -13,6 +13,13 @@ Measures, per frame:
   DU10 brightest wall pixel at y = 60pt in the work pane: <= 120pt from the fold
   DU12 bar inside the right pane, at its foot (top > 75% of H), never across the gap
   DU16 (dark only) the house-pane wall rises toward the fold at y = 60pt over the last 100pt
+  D4   (round 2) per card in the work pane: the longest ink-free band inside the card, as % of the
+       card's height: <= 35% (an empty card interior is not "card", it is a hole; gate J 1.2)
+  DU15 (round 2) the timber plank is found in the house pane and leaves >= 40pt of label room
+       ("All rentals") above the pane foot, at every type size
+  EDGE (round 2) no text edge in the last 2pt of the house pane (a line cut by the pane's clip) or
+       in the window's top safe inset of a stacked frame (the numeral under the status bar);
+       needs "insets" in the sidecar (renderer round 2)
 Usage: two_pane_check.py <dir-or-frames...> [--json out.json] [--scale N]
 Copies of the Duo gate scripts it started from: duo_gate6_aa.py, duo_gate6_m.py, duo_v7_measure7.py.
 """
@@ -61,6 +68,65 @@ def row_kinds(img, x0, x1, y0, y1, s, theme):
         edges = (np.abs(np.diff(g)) > 12).sum()
         kinds.append("card" if card >= 0.4 else ("content" if edges >= 2 else "wall"))
     return kinds
+
+
+def card_holes(img, x0, x1, y0, y1, s, theme):
+    """Cards in the strip [y0, y1): runs of rows that are mostly the card colour (gaps under 4pt
+    bridged). Per card: its height and its longest ink-free band (rows of card colour with no
+    edge), in pt."""
+    gray = np.asarray(Image.fromarray(img).convert("L"), int)
+    rows = []
+    for y in range(int(y0), int(y1)):
+        py = min(int(y * s + s / 2), img.shape[0] - 1)
+        strip = img[py, int(x0 * s):int(x1 * s), :3].astype(int)
+        g = gray[py, int(x0 * s):int(x1 * s)]
+        cardish = (np.abs(strip - CARD[theme]).max(axis=1) < 8).mean() if strip.size else 0
+        edges = int((np.abs(np.diff(g)) > 12).sum()) if g.size > 1 else 0
+        rows.append((cardish >= 0.4 or (cardish >= 0.1 and edges >= 2), cardish >= 0.9 and edges < 2))
+    cards, i = [], 0
+    while i < len(rows):
+        if not rows[i][0]:
+            i += 1; continue
+        j = i
+        while j < len(rows) and (rows[j][0] or (j + 4 < len(rows) and any(r[0] for r in rows[j:j + 4]))):
+            j += 1
+        hole = cur = 0
+        for k in range(i, j):
+            cur = cur + 1 if rows[k][1] else 0
+            hole = max(hole, cur)
+        if j - i >= 24:
+            cards.append({"top": int(y0) + i, "height": j - i, "hole": hole})
+        i = j
+    return cards
+
+
+def plank_rows(img, x0, x1, y0, y1, s, theme):
+    """Rows (pt) in the strip where >= 70% of the pixels are the timber plank's brown."""
+    out = []
+    for y in range(int(y0), int(y1)):
+        py = min(int(y * s + s / 2), img.shape[0] - 1)
+        strip = img[py, int(x0 * s):int(x1 * s), :3].astype(int)
+        if strip.size == 0:
+            continue
+        r, g, b = strip[:, 0], strip[:, 1], strip[:, 2]
+        if theme == "light":
+            brown = (r - g >= 20) & (r - b >= 38) & (r >= 110)
+        else:
+            brown = (r - g >= 9) & (r - b >= 14) & (r >= 45) & (r <= 140)
+        if brown.mean() >= 0.7:
+            out.append(y)
+    return out
+
+
+def text_rows(img, x0, x1, y0, y1, s):
+    """Rows (pt) in [y0, y1) with a text-like edge (neighbour luma step > 40)."""
+    gray = np.asarray(Image.fromarray(img).convert("L"), int)
+    hits = []
+    for y in range(int(y0 * s), int(y1 * s)):
+        g = gray[min(y, gray.shape[0] - 1), int(x0 * s):int(x1 * s)]
+        if g.size > 1 and (np.abs(np.diff(g)) > 40).sum() >= 2:
+            hits.append(round(y / s, 1))
+    return hits
 
 
 def longest(kinds, what="wall"):
@@ -130,6 +196,34 @@ def check(png, scale=None):
         band = longest(kinds)
         out[f"WALL_{label}_pct"] = round(100 * band / p[3], 1)
     out["WALL"] = "PASS" if max(out["WALL_house_pct"], out["WALL_work_pct"]) <= 20 else "FAIL"
+    # D4 per card in the work pane (above the bar)
+    ybot = bar[1] if bar else work[1] + work[3]
+    cards = card_holes(img, work[0] + 20, work[0] + work[2] - 20, work[1], ybot, s, theme)
+    out["D4_cards"] = [[c["top"], c["height"], c["hole"]] for c in cards]
+    worst = max([c["hole"] / c["height"] for c in cards], default=0)
+    out["D4_worst_hole_pct"] = round(100 * worst, 1)
+    out["D4"] = "PASS" if worst <= 0.35 else "FAIL"
+    # DU15: the plank in the house pane, with room for its labels above the pane foot
+    hx0, hx1 = first[0] + 12, first[0] + first[2] - 12
+    planks = plank_rows(img, hx0, hx1, first[1], first[1] + first[3], s, theme)
+    if planks:
+        foot = first[1] + first[3]
+        out["DU15_plank_pt"] = [planks[0], planks[-1]]
+        out["DU15_label_room_pt"] = round(foot - planks[-1], 1)
+        out["DU15"] = "PASS" if foot - planks[-1] >= 40 else "FAIL"
+    else:
+        out["DU15_plank_pt"] = None
+        out["DU15"] = "FAIL"
+    # EDGE: a line cut at the house pane's foot, or ink under the top inset of a stacked frame
+    insets = meta.get("insets")
+    foot = first[1] + first[3]
+    cut = text_rows(img, hx0, hx1, foot - 2, foot - 0.4, s)
+    top_ink = []
+    if mode == "stacked" and insets:
+        top_ink = text_rows(img, first[0] + 60, first[0] + first[2] - 70, 0, max(0, insets[0] - 2), s)
+    out["EDGE_cut_rows"] = len(cut)
+    out["EDGE_top_ink_rows"] = len(top_ink)
+    out["EDGE"] = "PASS" if not cut and not top_ink else "FAIL"
     if mode == "twoPane":
         # DU9: wall either side of the fold, rows where both sides are bare wall
         dEs = []

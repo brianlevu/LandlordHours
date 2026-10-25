@@ -26,15 +26,34 @@ struct PaneCard<Content: View>: View {
 /// What is already on the record today at the selected rental (or at every rental on "All
 /// rentals"): the honest fill under To confirm. Zero logged keeps the card in place with one line
 /// and no figure or button (DU5).
+///
+/// "Fills the pane to the bar" (§1.27) with content, never with an empty card (D4, D6): when the
+/// pane has room left, the card goes on with "Earlier", the rental's own most recent entries, as many
+/// whole rows as fit above the bar. The rows that fit are measured, not estimated: every candidate
+/// row is laid out once off-screen at the card's width, and the section shows the rows whose bottoms
+/// land inside the room the column has left (`fitHeight` less where the section starts). The start
+/// does not depend on how many rows show, so the count never feeds back into itself.
 struct OnTheRecordCard: View {
     /// nil = every rental.
     let rentalID: UUID?
-    /// Stretch to the height it is given (the work pane fills to the bar).
-    var fills = false
+    /// The height the pane's content column may reach before it would scroll (the scroll view's
+    /// visible height less its bottom margin), measured in `OnTheRecordCard.space`. nil = no
+    /// "Earlier" section.
+    var fitHeight: CGFloat? = nil
+
+    /// The work pane's content column (its top is the scroll content's top).
+    static let space = "pane.content"
+    /// The most recent entries the section may show.
+    static let earlierCap = 24
 
     @EnvironmentObject private var viewModel: AppViewModel
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var typeSize
+    /// Where the "Earlier" section starts in the column.
+    @State private var earlierTop: CGFloat = 0
+    /// The bottom of the section's header (index 0) and of each candidate row (1...n), laid out
+    /// off-screen at the card's width.
+    @State private var earlierEnds: [Int: CGFloat] = [:]
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     /// Today's entries for the rental, newest first.
@@ -43,8 +62,31 @@ struct OnTheRecordCard: View {
             .sorted { $0.date > $1.date }
     }
 
+    /// The rental's entries before today, newest first (at most `earlierCap`).
+    static func earlier(_ all: [TimeEntry], rentalID: UUID?, now: Date, calendar: Calendar = .current) -> [TimeEntry] {
+        let start = calendar.startOfDay(for: now)
+        return Array(all.filter { $0.date < start && (rentalID == nil || $0.propertyId == rentalID) }
+            .sorted { $0.date > $1.date }
+            .prefix(earlierCap))
+    }
+
+    /// How many earlier rows fit (pure): the rows whose measured bottom, added to where the section
+    /// starts, stays inside the room. 0 when not even the header and one row fit.
+    static func fitCount(ends: [Int: CGFloat], candidates: Int, top: CGFloat, room: CGFloat?) -> Int {
+        guard let room, candidates > 0, ends[0] != nil else { return 0 }
+        var count = 0
+        for i in 1...candidates {
+            guard let end = ends[i], top + end <= room else { break }
+            count = i
+        }
+        return count
+    }
+
     var body: some View {
-        let today = Self.entries(viewModel.timeEntries, rentalID: rentalID, now: InboxClock.now())
+        let now = InboxClock.now()
+        let today = Self.entries(viewModel.timeEntries, rentalID: rentalID, now: now)
+        let earlier = fitHeight == nil ? [] : Self.earlier(viewModel.timeEntries, rentalID: rentalID, now: now)
+        let shown = Self.fitCount(ends: earlierEnds, candidates: earlier.count, top: earlierTop, room: fitHeight)
         PaneCard {
             HStack(alignment: .firstTextBaseline) {
                 Text(String(localized: "twoPane.record.title", defaultValue: "On the record today", table: "Adaptive"))
@@ -74,19 +116,64 @@ struct OnTheRecordCard: View {
             }
             ForEach(today) { entry in
                 LHDivider(leadingInset: LHMetrics.cardPadding)
-                row(entry)
+                row(entry, dated: false)
             }
-            if fills { Spacer(minLength: 0) }
+            // Where "Earlier" starts: the same with or without the section, so the fit is stable.
+            Color.clear
+                .frame(height: 0)
+                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.space)).minY } action: { earlierTop = $0 }
+                .accessibilityHidden(true)
+            if shown > 0 {
+                earlierSection(Array(earlier.prefix(shown)))
+            }
         }
+        .background(alignment: .topLeading) {
+            // The off-screen measure: every candidate laid out once at the card's width.
+            if !earlier.isEmpty {
+                earlierSection(earlier, measuring: true)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .coordinateSpace(.named("record.measure"))
+                    .hidden()
+                    .accessibilityHidden(true)
+            }
+        }
+        .onChange(of: earlier.map(\.id)) { _, _ in earlierEnds = [:] }
+        .onChange(of: typeSize) { _, _ in earlierEnds = [:] }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pane.record")
     }
 
-    private func row(_ entry: TimeEntry) -> some View {
+    /// "Earlier" and its rows, each with its day. `measuring` reports each part's bottom.
+    @ViewBuilder private func earlierSection(_ entries: [TimeEntry], measuring: Bool = false) -> some View {
+        VStack(spacing: 0) {
+            LHDivider(leadingInset: LHMetrics.cardPadding)
+            Text(String(localized: "twoPane.record.earlier", defaultValue: "Earlier", table: "Adaptive"))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(colors.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, LHMetrics.cardPadding)
+                .padding(.top, 14)
+                .padding(.bottom, 6)
+                .accessibilityAddTraits(.isHeader)
+                .modifier(MeasureEnd(index: 0, measuring: measuring) { earlierEnds[$0] = $1 })
+            ForEach(Array(entries.enumerated()), id: \.element.id) { i, entry in
+                VStack(spacing: 0) {
+                    LHDivider(leadingInset: LHMetrics.cardPadding)
+                    row(entry, dated: true)
+                }
+                .modifier(MeasureEnd(index: i + 1, measuring: measuring) { earlierEnds[$0] = $1 })
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(measuring ? "" : "pane.record.earlier")
+    }
+
+    private func row(_ entry: TimeEntry, dated: Bool) -> some View {
         let note = entry.notes.split(separator: "\n").first.map(String.init)?.trimmingCharacters(in: .whitespaces) ?? ""
         let title = note.isEmpty ? entry.category.inboxLabel : note
         let rental = rentalID == nil ? viewModel.properties.first { $0.id == entry.propertyId }?.name : nil
-        let meta = [rental, note.isEmpty ? nil : entry.category.inboxLabel].compactMap { $0 }.joined(separator: " · ")
+        let day = dated ? entry.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()) : nil
+        let meta = [day, rental, note.isEmpty ? nil : entry.category.inboxLabel].compactMap { $0 }.joined(separator: " · ")
         return HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
@@ -109,5 +196,20 @@ struct OnTheRecordCard: View {
         .padding(.vertical, 10)
         .frame(minHeight: LHMetrics.rowMinHeight)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Reports a part's bottom in the off-screen measure's space (no-op on the shown copy).
+private struct MeasureEnd: ViewModifier {
+    let index: Int
+    let measuring: Bool
+    let report: (Int, CGFloat) -> Void
+
+    func body(content: Content) -> some View {
+        if measuring {
+            content.onGeometryChange(for: CGFloat.self) { $0.frame(in: .named("record.measure")).maxY } action: { report(index, $0) }
+        } else {
+            content
+        }
     }
 }

@@ -105,6 +105,9 @@ struct TodayWorkPane: View {
 
     /// The pane's own wall (the tab content is opaque): the same light profile as the wall across
     /// the gap; when propped, the fold is the top edge (DU9, DU2).
+    /// Air between the last row and the bar glass at rest (DU4).
+    static let bottomMargin: CGFloat = 12
+
     private var paneWall: some View {
         InteriorWall(glowCenter: stacked ? UnitPoint(x: 0.5, y: 0) : UnitPoint(x: 0, y: 0.38),
                      foldInset: foldInset, foldAbove: stacked)
@@ -123,6 +126,9 @@ struct TodayWorkPane: View {
         let hidden = PaneConfirmFilter.hiddenCount(visible, rentalID: rentalID)
         return GeometryReader { g in
             ScrollView {
+                // Every card sizes to its content (rows never compress to fit, D7): "On the record
+                // today" goes on with as many "Earlier" rows as fit above the bar, so a tall pane
+                // fills with rows, not with an empty card or bare wall (§1.27, D4, D6, DU4).
                 VStack(spacing: 10) {
                     if state == .rows {
                         confirmCard(items: items, hidden: hidden, total: visible.count)
@@ -131,20 +137,17 @@ struct TodayWorkPane: View {
                                           onSeeAll: { NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex) },
                                           onTurnOn: { showCaptureSetup = true })
                     }
-                    // "On the record today" fills the pane to the bar (§1.27), so a tall iPad pane
-                    // never shows a band of bare wall under the cards (DU4).
-                    OnTheRecordCard(rentalID: rentalID, fills: true)
-                        .frame(maxHeight: .infinity, alignment: .top)
+                    OnTheRecordCard(rentalID: rentalID, fitHeight: max(0, g.size.height - Self.bottomMargin))
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
+                .coordinateSpace(.named(OnTheRecordCard.space))
                 .frame(maxWidth: PaneMetrics.contentCap)
                 .frame(maxWidth: .infinity)
-                .frame(minHeight: max(0, g.size.height - 20), alignment: .top)
             }
             // The tab content's safe area already ends above the bar; 12 more keeps the last row
             // clear of the glass at rest (DU4).
-            .contentMargins(.bottom, 12, for: .scrollContent)
+            .contentMargins(.bottom, Self.bottomMargin, for: .scrollContent)
             .scrollIndicators(.hidden)
         }
         .background { paneWall }

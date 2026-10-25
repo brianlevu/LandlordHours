@@ -26,6 +26,9 @@ struct TwoPaneLayout<Work: View>: View {
     /// True when the division came from the system (`reservedRegions`), not a DEBUG capture.
     @State private var systemDivision = false
     @State private var settle: Task<Void, Never>?
+    /// The window's top inset: the stacked halves run to the window's edges, so the top half pads
+    /// its own content below it (the numeral never sits under the status bar, AX included).
+    @State private var topInset: CGFloat = 0
 
     init(@ViewBuilder work: @escaping () -> Work) { self.work = work }
 
@@ -73,7 +76,7 @@ struct TwoPaneLayout<Work: View>: View {
     // MARK: Two-pane
 
     private var house: some View {
-        HousePane(split: split, showsDoor: split.isDivision, clock: clock)
+        HousePane(split: split, showsDoor: split.isDivision, topInset: split.mode == .stacked ? topInset : 0, clock: clock)
             .environmentObject(selection)
             .clipped()   // nothing in the house pane ever crosses the gap or fold (DU2)
     }
@@ -145,6 +148,8 @@ struct TwoPaneLayout<Work: View>: View {
         // re-resolve the split, or the layout re-renders forever.
         let measured = CGSize(width: (raw.size.width * 2).rounded() / 2, height: (raw.size.height * 2).rounded() / 2)
         let probe = GeometryProbe(size: AdaptiveDebug.capturedSize(for: measured) ?? measured, division: raw.division)
+        let inset = (raw.topInset * 2).rounded() / 2
+        if inset != topInset { topInset = inset }
         systemDivision = probe.division != nil
         let division = probe.division ?? AdaptiveDebug.capturedDivision(for: probe.size)
         if !resolvedOnce {
@@ -174,15 +179,19 @@ struct TwoPaneLayout<Work: View>: View {
 struct GeometryProbe: Equatable {
     let size: CGSize
     let division: PaneDivision?
+    /// The scene's top safe-area inset.
+    var topInset: CGFloat = 0
 
-    init(size: CGSize, division: PaneDivision?) {
+    init(size: CGSize, division: PaneDivision?, topInset: CGFloat = 0) {
         self.size = size
         self.division = division
+        self.topInset = topInset
     }
 
     init(_ proxy: GeometryProxy) {
         // The scene's size, safe areas included (the window, never the screen).
         let inset = proxy.safeAreaInsets
+        topInset = inset.top
         size = CGSize(width: proxy.size.width + inset.leading + inset.trailing,
                       height: proxy.size.height + inset.top + inset.bottom)
         if #available(iOS 27.1, *) {

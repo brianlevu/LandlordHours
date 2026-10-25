@@ -1,0 +1,16 @@
+diff --git a/Sources/Views/House/CraftHouseView.swift b/Sources/Views/House/CraftHouseView.swift
+index c1e5611..57e2a22 100644
+--- a/Sources/Views/House/CraftHouseView.swift
++++ b/Sources/Views/House/CraftHouseView.swift
+@@ -342,7 +342,10 @@ struct CraftHeroSide: Equatable, Sendable {
+         case (.hero, .a):
+             side = CraftHeroSize.hero(windowWidth: window.width, windowHeight: window.height, accessibility: accessibility)
+         case (.hero, _):
+-            side = min(CraftHeroSize.wideBandSide, max(0, window.width - 12))
++            // H6 (§H.1, rewritten 2026-10-25): `min(390, H1)` in the ≤ 600 column, never under the
++            // 220 diorama floor (a 1000 × 644 Stage Manager window → 287; iPad mini portrait → 390).
++            let h1 = CraftHeroSize.hero(windowWidth: window.width, windowHeight: window.height, accessibility: accessibility)
++            side = max(CraftHeroSize.minimumDioramaSide, min(CraftHeroSize.wideBandSide, h1))
+         case (.medium, .a):
+             side = CraftHeroSize.medium(windowWidth: window.width, windowHeight: window.height, accessibility: accessibility)
+         case (.medium, _):

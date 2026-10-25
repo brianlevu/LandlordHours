@@ -15,6 +15,9 @@ struct HousePane: View {
     let split: LayoutSplit
     /// Plays the door on the hero (the Duo only; never on iPad).
     var showsDoor = false
+    /// The window's top inset when the pane runs to the window's top edge (stacked ignores the
+    /// safe area so the halves meet at the fold); 0 when the pane already sits inside it.
+    var topInset: CGFloat = 0
     @ObservedObject var clock: DoorClock
 
     @EnvironmentObject private var viewModel: AppViewModel
@@ -49,44 +52,17 @@ struct HousePane: View {
     var body: some View {
         let shelf = self.shelf
         let shown = shelf.resolved(selection.selectedID)
-        GeometryReader { g in
-            ScrollView {
-                VStack(spacing: 0) {
-                    if stacked {
-                        HStack(alignment: .center, spacing: 0) {
-                            hero(shelf, shown)
-                            numberBlock(shelf, shown)
-                                .frame(maxWidth: .infinity)
-                        }
-                        .padding(.horizontal, PaneMetrics.gutter(paneWidth: pane.width, onDuo: split.isDivision))
-                        RentalShelf(shelf: shelf, selectedID: $selection.selectedID, model: 104,
-                                    widthHint: PaneMetrics.contentWidth(paneWidth: pane.width))
-                            .padding(.top, 8)
-                    } else {
-                        Spacer(minLength: 0)
-                        hero(shelf, shown)
-                        // The skyline's rows of sky already sit above the houses; a fourth band of air
-                        // between it and the number keeps every bare band of a tall pane under 20%.
-                        if shown?.isAll ?? false { Spacer(minLength: 8) }
-                        numberBlock(shelf, shown)
-                            .padding(.top, ax || (shown?.isAll ?? false) ? 4 : -heroSide * 0.10)   // the number sits in the diorama's shadow (H4)
-                        Spacer(minLength: ax ? 12 : 16)
-                        if !shelf.items.isEmpty {
-                            RentalShelf(shelf: shelf, selectedID: $selection.selectedID,
-                                        model: PaneMetrics.shelfModel(paneWidth: pane.width),
-                                        widthHint: PaneMetrics.contentWidth(paneWidth: pane.width))
-                        }
-                        Spacer(minLength: 12)
-                    }
-                }
-                .frame(maxWidth: PaneMetrics.contentCap)
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: g.size.height)
-            }
-            .scrollIndicators(.hidden)
-            .scrollBounceBehavior(.basedOnSize)
+        // DU15: the shelf ("All rentals" first) is visible at rest in every mode and at every type
+        // size. When the column fits, it is the resting layout (the free height spread into bands
+        // of air, DU4/DU6); when it does not (AX sizes, a short pane), the hero and the number scroll
+        // in the room above the shelf and the shelf holds the pane's foot.
+        ViewThatFits(in: .vertical) {
+            resting(shelf, shown)
+            scrolling(shelf, shown)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .topTrailing) { accountMenu.padding(.trailing, PaneMetrics.gutter(paneWidth: pane.width, onDuo: split.isDivision) - 8) }
+        .padding(.top, topInset)
         .onAppear(perform: restoreFocus)
         .onChange(of: selection.selectedID) { old, new in
             rememberedFocus = new
@@ -98,6 +74,91 @@ struct HousePane: View {
         .sensoryFeedback(.selection, trigger: selection.selectedID)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pane.house")
+    }
+
+    // MARK: Layouts
+
+    /// Everything fits: the free height becomes bands of air (above the house, around the number,
+    /// below the shelf), so no bare band of a tall pane passes 20% (DU4, DU6).
+    @ViewBuilder private func resting(_ shelf: HouseShelf, _ shown: HouseShelfItem?) -> some View {
+        VStack(spacing: 0) {
+            if stacked {
+                Spacer(minLength: 4)
+                heroRow(shelf, shown)
+                Spacer(minLength: 8)
+                shelfView(shelf)
+                Spacer(minLength: 8)
+            } else {
+                Spacer(minLength: 0)
+                hero(shelf, shown)
+                // The skyline's rows of sky already sit above the houses; a fourth band of air
+                // between it and the number keeps every bare band of a tall pane under 20%.
+                if shown?.isAll ?? false { Spacer(minLength: 8) }
+                numberBlock(shelf, shown)
+                    .padding(.top, numberLift(shown))
+                Spacer(minLength: ax ? 12 : 16)
+                shelfView(shelf)
+                Spacer(minLength: 12)
+            }
+        }
+        .frame(maxWidth: PaneMetrics.contentCap)
+        .frame(maxWidth: .infinity)
+    }
+
+    /// It does not fit: the hero and the number scroll above the shelf, which holds the foot. The
+    /// scroll's last 24pt fade, so a line cut at rest reads as more to scroll, not as a clip.
+    @ViewBuilder private func scrolling(_ shelf: HouseShelf, _ shown: HouseShelfItem?) -> some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: 0) {
+                    if stacked {
+                        heroRow(shelf, shown)
+                    } else {
+                        hero(shelf, shown)
+                        numberBlock(shelf, shown)
+                            .padding(.top, numberLift(shown))
+                    }
+                }
+                .padding(.bottom, 24)
+                .frame(maxWidth: PaneMetrics.contentCap)
+                .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+            .mask {
+                VStack(spacing: 0) {
+                    Color.black
+                    LinearGradient(colors: [.black, .black.opacity(0)], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 24)
+                }
+            }
+            shelfView(shelf)
+                .padding(.top, 4)
+                .padding(.bottom, 8)
+        }
+    }
+
+    /// Stacked: the hero beside the number block.
+    private func heroRow(_ shelf: HouseShelf, _ shown: HouseShelfItem?) -> some View {
+        HStack(alignment: .center, spacing: 0) {
+            hero(shelf, shown)
+            numberBlock(shelf, shown)
+                .frame(maxWidth: .infinity)
+        }
+        .padding(.horizontal, PaneMetrics.gutter(paneWidth: pane.width, onDuo: split.isDivision))
+    }
+
+    @ViewBuilder private func shelfView(_ shelf: HouseShelf) -> some View {
+        if !shelf.items.isEmpty {
+            RentalShelf(shelf: shelf, selectedID: $selection.selectedID,
+                        model: stacked ? 104 : PaneMetrics.shelfModel(paneWidth: pane.width),
+                        widthHint: PaneMetrics.contentWidth(paneWidth: pane.width))
+        }
+    }
+
+    /// The number sits in the diorama's shadow (H4); at AX and under the skyline it sits below.
+    private func numberLift(_ shown: HouseShelfItem?) -> CGFloat {
+        ax || (shown?.isAll ?? false) ? 4 : -heroSide * 0.10
     }
 
     // MARK: Hero

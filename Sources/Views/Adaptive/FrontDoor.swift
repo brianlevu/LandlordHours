@@ -29,8 +29,8 @@ struct FrontDoor: View {
             let dark = colorScheme == .dark
             let warm = DoorArt.warm(dark: dark)
             ZStack(alignment: .topLeading) {
-                // The hall behind the door.
-                Rectangle()
+                // The hall behind the door: the opening, in the wall's perspective.
+                DoorOpening(slope: DoorArt.facadeSlope)
                     .fill(dark
                           ? AnyShapeStyle(LinearGradient(colors: [warm, warm.opacity(0.78)], startPoint: .top, endPoint: .bottom))
                           : AnyShapeStyle(LinearGradient(colors: [DoorArt.hallDuskTop, DoorArt.hallDuskBottom], startPoint: .top, endPoint: .bottom)))
@@ -41,6 +41,7 @@ struct FrontDoor: View {
                         }
                     }
                     .frame(width: door.width, height: door.height)
+                    .clipShape(DoorOpening(slope: DoorArt.facadeSlope))
                     .offset(x: door.minX, y: door.minY)
                     .opacity(glow)
                 // The step pool: a radial with 5 stops (no hard edge), sheared and turned with the leaf.
@@ -65,7 +66,8 @@ struct FrontDoor: View {
                     .frame(width: side, height: side)
                     .brightness(dark ? CraftHouseView.nightLift(stage) : 0)
                     .mask(alignment: .topLeading) {
-                        Rectangle().frame(width: door.width, height: door.height).offset(x: door.minX, y: door.minY)
+                        DoorOpening(slope: DoorArt.facadeSlope)
+                            .frame(width: door.width, height: door.height).offset(x: door.minX, y: door.minY)
                     }
                     .brightness(-0.12 * open)
                     .rotation3DEffect(.degrees(-78 * open), axis: (x: 0, y: 1, z: 0),
@@ -76,5 +78,25 @@ struct FrontDoor: View {
             .allowsHitTesting(false)
             .accessibilityHidden(true)
         }
+    }
+}
+
+/// The door opening on the receding wall: the door's bounding box with its top and bottom edges
+/// sloped by the wall (`slope` px of y per px of x; negative rises to the right). The vertical edges
+/// stay vertical, as the still's do.
+struct DoorOpening: Shape {
+    let slope: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let rise = abs(slope) * rect.width
+        let leftDrop = slope < 0 ? rise : 0
+        let rightDrop = slope > 0 ? rise : 0
+        var p = Path()
+        p.move(to: CGPoint(x: rect.minX, y: rect.minY + leftDrop))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + rightDrop))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - leftDrop))
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - rightDrop))
+        p.closeSubpath()
+        return p
     }
 }
