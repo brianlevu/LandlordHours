@@ -24,7 +24,8 @@ from PIL import Image
 SRC = "Assets.xcassets/Craft"
 DST = "Sources/Widget/WidgetAssets.xcassets/House"
 STAGES = ["started", "frame70", "framing", "half", "complete"]
-BOX = (100, 30, 1140, 1070)   # the pinned camera square around the house, in the 1206px still
+BOX = (80, 20, 960, 900)     # the house's bounding square in the 1206px still (house only, standard H.5)
+NIGHT_UNLIT_GAIN = 3.4        # linear gain on the unlit night art so it clears 3:1 against the night page
 SIZE = 360                    # 120pt @3x
 
 
@@ -37,16 +38,19 @@ def run(*args):
     subprocess.run(args, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def cut(heic_path, tmp):
+def cut(heic_path, tmp, lift=False):
     png = os.path.join(tmp, "in.png")
     run("sips", "-s", "format", "png", heic_path, "--out", png)
     crop = Image.open(png).convert("RGBA").crop(BOX)
     w, h = crop.size
     yy, xx = np.mgrid[0:h, 0:w]
     xx, yy = xx / w, yy / h
-    d = np.sqrt(((xx - 0.50) / 0.72) ** 2 + ((yy - 0.52) / 0.72) ** 2)
-    mask = smooth((1.0 - d) / 0.30) * (1 - smooth((yy - 0.74) / 0.18))
+    d = np.sqrt(((xx - 0.50) / 0.62) ** 2 + ((yy - 0.50) / 0.58) ** 2)
+    mask = smooth((1.0 - d) / 0.26) * (1 - smooth((yy - 0.80) / 0.17))
     arr = np.array(crop)
+    if lift:
+        lin = (arr[:, :, :3] / 255.0) ** 2.2 * NIGHT_UNLIT_GAIN
+        arr[:, :, :3] = (np.clip(lin, 0, 1) ** (1 / 2.2) * 255).astype(np.uint8)
     arr[:, :, 3] = (arr[:, :, 3] * mask).astype(np.uint8)
     return Image.fromarray(arr).resize((SIZE, SIZE), Image.LANCZOS)
 
@@ -67,7 +71,7 @@ def main():
                 for appearance in ("light", "dark"):
                     src = f"{SRC}/{base}.imageset/{base}_{appearance}.heic"
                     out_png = os.path.join(tmp, "out.png")
-                    cut(src, tmp).save(out_png)
+                    cut(src, tmp, lift=(not lit and appearance == 'dark')).save(out_png)
                     fn = f"{name}{'-dark' if appearance == 'dark' else ''}@3x.heic"
                     run("sips", "-s", "format", "heic", "-s", "formatOptions", "85", out_png, "--out", os.path.join(d, fn))
                     total += os.path.getsize(os.path.join(d, fn))

@@ -431,6 +431,28 @@
         }
       }
     },
+    "widget.rect.hours": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ hours"
+          }
+        }
+      }
+    },
+    "widget.rect.rentals": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld rentals"
+          }
+        }
+      }
+    },
     "widget.rect.startCounting": {
       "extractionState": "manual",
       "localizations": {
@@ -448,7 +470,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Stop it to review"
+            "value": "Stop and review"
           }
         }
       }

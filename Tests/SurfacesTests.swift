@@ -171,6 +171,8 @@ final class WidgetSurfaceDisplayTests: XCTestCase {
         XCTAssertFalse(d.hasRing, "No ring: there is no goal for all rentals")
         XCTAssertEqual(d.progress, 0)
         XCTAssertEqual(d.inlineText(elapsed: ""), "312 hours · 3 rentals")
+        XCTAssertEqual(d.rectangularTitle, "3 rentals", "The rental count rides the title so the headline never truncates")
+        XCTAssertEqual(d.rectangularHeadline(elapsed: ""), "312 hours")
         for text in [d.caption, d.hoursLine, d.status?.text ?? "", d.rectangularLine, d.inlineText(elapsed: ""), d.accessibilityLabel] {
             XCTAssertFalse(text.contains("750"), "A summed goal in: \(text)")
         }

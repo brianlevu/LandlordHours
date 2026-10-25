@@ -471,7 +471,10 @@ struct WidgetSurfaceDisplay: Equatable {
     }
 
     var rectangularTitle: String {
-        state == .timer ? String(localized: "widget.rect.timer", defaultValue: "Timer", table: "Widgets")
+        if isAllRentals, state != .timer {
+            return String(localized: "widget.rect.rentals", defaultValue: "\(rentalCount) rentals", table: "Widgets")
+        }
+        return state == .timer ? String(localized: "widget.rect.timer", defaultValue: "Timer", table: "Widgets")
             : String(localized: "widget.rect.title", defaultValue: "Your hours", table: "Widgets")
     }
 
@@ -479,7 +482,12 @@ struct WidgetSurfaceDisplay: Equatable {
         switch state {
         case .noProperty: return String(localized: "widget.inline.add", defaultValue: "Add a rental", table: "Widgets")
         case .timer: return "\(elapsed) · \(timerPropertyName)"
-        default: return hoursLine
+        default:
+            // Two or more rentals: the title carries "3 rentals", so the headline is just the number
+            // and fits the 160pt accessory whole.
+            return isAllRentals
+                ? String(localized: "widget.rect.hours", defaultValue: "\(number) hours", table: "Widgets")
+                : hoursLine
         }
     }
 

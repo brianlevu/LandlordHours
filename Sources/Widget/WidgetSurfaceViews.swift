@@ -220,7 +220,7 @@ struct WidgetHouseSlot: View {
                 }
             }
         }
-        .frame(width: frame, height: side, alignment: .bottom)
+        .frame(width: frame, height: min(side, houseSide * 1.7), alignment: .bottom)
     }
 }
 
@@ -263,7 +263,9 @@ private struct WidgetNumberBlock: View {
     var numeral: CGFloat = 46
     var alignment: HorizontalAlignment = .leading
     var showsStatus = true
-    var statusLines = 1
+    var statusLines = 3
+    /// Short on height (medium at a large text size): the caption shrinks to one line instead of wrapping.
+    var captionShrinks = false
     @Environment(\.dynamicTypeSize) private var typeSize
 
     private var ax: Bool { typeSize.isAccessibilitySize }
@@ -280,12 +282,13 @@ private struct WidgetNumberBlock: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                     .widgetAccentable()
-                if !ax || display.state == .timer {
+                if !ax {
                     Text(display.state == .timer ? String(localized: "widget.timer.running", defaultValue: "Timer running", table: "Widgets") : display.caption)
                         .font(.subheadline)
                         .foregroundStyle(ink.secondary)
-                        .lineLimit(display.isAllRentals ? 2 : 1)
-                        .minimumScaleFactor(0.8)
+                        .lineLimit(captionShrinks ? 1 : nil)
+                        .minimumScaleFactor(captionShrinks ? 0.6 : 1)
+                        .layoutPriority(1)
                 }
                 if showsStatus, let status = display.status {
                     statusRow(status)
@@ -312,7 +315,7 @@ private struct WidgetNumberBlock: View {
     private func statusRow(_ s: WidgetSurfaceDisplay.Status) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
             Image(systemName: s.symbol).font(.caption.weight(.bold))
-            Text(s.text).lineLimit(ax ? 3 : statusLines).minimumScaleFactor(0.7)
+            Text(s.text).lineLimit(ax ? max(3, statusLines) : statusLines)
         }
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(ink.tone(s.tone))
@@ -350,7 +353,7 @@ private struct WidgetFooter: View {
     var body: some View {
         if let pill = display.pill {
             WidgetPill(pill: pill, ink: ink)
-        } else if !typeSize.isAccessibilitySize, display.state != .timer, display.state != .noProperty, let stage = display.stageLine {
+        } else if typeSize <= .large, display.state != .timer, display.state != .noProperty, let stage = display.stageLine {
             Text(stage)
                 .font(.footnote)
                 .foregroundStyle(ink.secondary)
@@ -360,19 +363,73 @@ private struct WidgetFooter: View {
     }
 }
 
+/// The pill every row control wears: one grammar for Confirm and Review (44pt tall, action ink on
+/// the action surface). `Confirm` is a Button on a WidgetConfirmIntent; `Review` is a Link.
+private struct WidgetRowPill: View {
+    let text: String
+    let ink: WidgetInk
+
+    var body: some View {
+        Text(text)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ink.action)
+            .lineLimit(1)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 44)
+            .background(Capsule().fill(ink.actionSurface))
+            .accessibilityLabel(text)
+    }
+}
+
+/// The first-run call to action on large and extra large: one full-width pill, "Add a rental".
+private struct WidgetAddRentalButton: View {
+    let display: WidgetSurfaceDisplay
+    let ink: WidgetInk
+
+    var body: some View {
+        if let pill = display.pill {
+            Link(destination: pill.url) {
+                HStack(spacing: 6) {
+                    Image(systemName: pill.symbol).font(.subheadline.weight(.bold))
+                    Text(pill.text).font(.subheadline.weight(.semibold)).lineLimit(1)
+                }
+                .foregroundStyle(ink.onAction)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(Capsule().fill(ink.actionFill))
+            }
+            .widgetAccentable()
+        }
+    }
+}
+
 /// To confirm: up to `limit` rows in one grouped container with hairline dividers, each with an
 /// interactive Confirm (§1.27 Widgets). A row that cannot be logged in one tap reads "Review".
+/// Rows are 56pt or more and grow with Dynamic Type (D1); with no rental the card is the
+/// "Add a rental" button instead.
 private struct WidgetConfirmCard: View {
     let display: WidgetSurfaceDisplay
     let ink: WidgetInk
     let limit: Int
-    var rowHeight: CGFloat = 48
+    /// The most rows at an accessibility size (the rows are tall there).
+    var axLimit = 2
+    /// The most rows above the default text size, so the card never outgrows its widget.
+    var largeTypeLimit = 3
 
+    @ScaledMetric(relativeTo: .body) private var rowMin: CGFloat = 56
     @Environment(\.dynamicTypeSize) private var typeSize
     private var ax: Bool { typeSize.isAccessibilitySize }
-    private var rows: [WidgetConfirmRow] { Array(display.confirmRows.prefix(ax ? min(limit, 2) : limit)) }
+    private var rowCap: Int { ax ? min(limit, axLimit) : (typeSize > .large ? min(limit, largeTypeLimit) : limit) }
+    private var rows: [WidgetConfirmRow] { Array(display.confirmRows.prefix(rowCap)) }
 
     var body: some View {
+        if display.state == .noProperty {
+            WidgetAddRentalButton(display: display, ink: ink)
+        } else {
+            card
+        }
+    }
+
+    private var card: some View {
         VStack(spacing: 0) {
             if rows.isEmpty {
                 caughtUp
@@ -392,7 +449,7 @@ private struct WidgetConfirmCard: View {
                             Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(ink.secondary)
                         }
                         .padding(.horizontal, 14)
-                        .frame(height: 40)
+                        .frame(minHeight: 44)
                     }
                 }
             }
@@ -408,62 +465,67 @@ private struct WidgetConfirmCard: View {
             Text(String(localized: "widget.card.caughtUp", defaultValue: "Nothing waiting to confirm.", table: "Widgets"))
                 .font(.subheadline)
                 .foregroundStyle(ink.primary)
-                .lineLimit(2)
+                .multilineTextAlignment(.leading)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 14)
-        .frame(minHeight: rowHeight + 12)
+        .padding(.vertical, 10)
+        .frame(minHeight: rowMin)
     }
 
-    private func rowView(_ row: WidgetConfirmRow) -> some View {
-        HStack(spacing: 10) {
-            Link(destination: WidgetLinks.inbox) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(row.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ink.primary)
-                        .lineLimit(ax ? 2 : 1)
-                        .minimumScaleFactor(0.8)
-                    if !ax {
-                        Text(display.detail(for: row))
-                            .font(.caption)
-                            .foregroundStyle(ink.secondary)
-                            .lineLimit(1)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+    @ViewBuilder private func rowView(_ row: WidgetConfirmRow) -> some View {
+        if ax {
+            VStack(alignment: .leading, spacing: 6) {
+                rowText(row)
+                control(row)
             }
-            if row.canConfirm {
-                Button(intent: WidgetConfirmIntent(key: row.key)) {
-                    Group {
-                        if ax {
-                            Image(systemName: "checkmark").font(.subheadline.weight(.bold))
-                        } else {
-                            Text(String(localized: "widget.card.confirm", defaultValue: "Confirm", table: "Widgets"))
-                                .font(.subheadline.weight(.semibold))
-                        }
-                    }
-                    .foregroundStyle(ink.action)
-                    .padding(.horizontal, ax ? 12 : 14)
-                    .frame(minHeight: 32)
-                    .background(Capsule().fill(ink.actionSurface))
-                    .accessibilityLabel(String(localized: "widget.card.confirm", defaultValue: "Confirm", table: "Widgets"))
-                }
-                .buttonStyle(.plain)
-                .frame(minHeight: 44)
-                .widgetAccentable()
-            } else {
-                Link(destination: WidgetLinks.inbox) {
-                    Text(String(localized: "widget.card.review", defaultValue: "Review", table: "Widgets"))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ink.secondary)
-                        .padding(.horizontal, 14)
-                        .frame(minHeight: 32)
-                }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: rowMin, alignment: .leading)
+        } else {
+            HStack(spacing: 10) {
+                rowText(row)
+                control(row)
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .frame(minHeight: rowMin)
         }
-        .padding(.horizontal, 14)
-        .frame(minHeight: rowHeight)
+    }
+
+    private func rowText(_ row: WidgetConfirmRow) -> some View {
+        Link(destination: WidgetLinks.inbox) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(row.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ink.primary)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(ax ? 3 : 1)
+                    .minimumScaleFactor(ax ? 1 : 0.8)
+                if !ax {
+                    Text(display.detail(for: row))
+                        .font(.caption)
+                        .foregroundStyle(ink.secondary)
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder private func control(_ row: WidgetConfirmRow) -> some View {
+        if row.canConfirm {
+            Button(intent: WidgetConfirmIntent(key: row.key)) {
+                WidgetRowPill(text: String(localized: "widget.card.confirm", defaultValue: "Confirm", table: "Widgets"), ink: ink)
+            }
+            .buttonStyle(.plain)
+            .widgetAccentable()
+        } else {
+            Link(destination: WidgetLinks.inbox) {
+                WidgetRowPill(text: String(localized: "widget.card.review", defaultValue: "Review", table: "Widgets"), ink: ink)
+            }
+            .widgetAccentable()
+        }
     }
 }
 
@@ -473,20 +535,23 @@ struct WidgetSmallView: View {
     let display: WidgetSurfaceDisplay
     var look: WidgetLook = .fullColor
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .largeTitle) private var numeral: CGFloat = 52
 
     var body: some View {
         let ink = WidgetInk(scheme: scheme, look: look)
         VStack(alignment: .leading, spacing: 0) {
-            LHMarkShape()
-                .fill(ink.action)
-                .frame(width: 24, height: 24)
-                .widgetAccentable()
-                .accessibilityHidden(true)
+            if typeSize <= .large {
+                LHMarkShape()
+                    .fill(ink.action)
+                    .frame(width: 24, height: 24)
+                    .widgetAccentable()
+                    .accessibilityHidden(true)
+            }
             Spacer(minLength: 6)
-            WidgetNumberBlock(display: display, ink: ink, numeral: numeral, statusLines: 2)
+            WidgetNumberBlock(display: display, ink: ink, numeral: min(numeral, typeSize > .large ? 40 : 56), statusLines: 4)
         }
-        .padding(16)
+        .padding(typeSize > .large ? 12 : 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(display.accessibilityLabel)
@@ -497,6 +562,7 @@ struct WidgetMediumView: View {
     let display: WidgetSurfaceDisplay
     var look: WidgetLook = .fullColor
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .largeTitle) private var numeral: CGFloat = 46
 
     var body: some View {
@@ -506,11 +572,12 @@ struct WidgetMediumView: View {
             let house = WidgetHouseSlot(display: display, look: look, side: slot, skylineWidth: 168)
             HStack(alignment: .center, spacing: 0) {
                 VStack(alignment: .leading, spacing: 0) {
-                    WidgetNumberBlock(display: display, ink: ink, numeral: numeral)
+                    WidgetNumberBlock(display: display, ink: ink, numeral: typeSize > .large ? min(numeral, 40) : numeral, captionShrinks: typeSize > .large && display.isAllRentals)
                     Spacer(minLength: 4)
                     WidgetFooter(display: display, ink: ink)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(.trailing, 8)
                 house
                     .frame(width: house.width, height: geo.size.height, alignment: .bottom)
             }
@@ -531,26 +598,30 @@ struct WidgetLargeView: View {
 
     var body: some View {
         let ink = WidgetInk(scheme: scheme, look: look)
-        let house = WidgetHouseSlot(display: display, look: look, side: 132, skylineWidth: 200)
         VStack(spacing: 12) {
-            HStack(alignment: .center, spacing: 0) {
-                VStack(alignment: .leading, spacing: 0) {
-                    WidgetNumberBlock(display: display, ink: ink, numeral: numeral)
-                    Spacer(minLength: 4)
-                    if !typeSize.isAccessibilitySize, display.state != .timer, display.state != .noProperty, let stage = display.stageLine {
-                        Text(stage)
-                            .font(.footnote)
-                            .foregroundStyle(ink.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.85)
+            // The house block takes whatever the rows leave, so a short list never leaves a blank tail.
+            GeometryReader { geo in
+                let side = min(geo.size.height, 176)
+                let house = WidgetHouseSlot(display: display, look: look, side: side, skylineWidth: 200)
+                HStack(alignment: .center, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        WidgetNumberBlock(display: display, ink: ink, numeral: numeral)
+                        Spacer(minLength: 4)
+                        if typeSize <= .large, display.state != .timer, display.state != .noProperty, let stage = display.stageLine {
+                            Text(stage)
+                                .font(.footnote)
+                                .foregroundStyle(ink.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
+                        }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.trailing, 8)
+                    house.frame(width: house.width, height: geo.size.height, alignment: .bottom)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                house.frame(width: house.width, height: 132, alignment: .bottom)
+                .frame(width: geo.size.width, height: geo.size.height)
             }
-            .frame(height: 132)
-            WidgetConfirmCard(display: display, ink: ink, limit: 3, rowHeight: 52)
-            Spacer(minLength: 0)
+            WidgetConfirmCard(display: display, ink: ink, limit: 3, axLimit: 1, largeTypeLimit: 2)
         }
         .padding(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 12))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -559,6 +630,7 @@ struct WidgetLargeView: View {
 }
 
 /// The iPad Home Screen: a mini Today on the left (house, number, pace), five rows on the right.
+/// With nothing to confirm the house takes the whole left half and the card sits under the number.
 struct WidgetExtraLargeView: View {
     let display: WidgetSurfaceDisplay
     var look: WidgetLook = .fullColor
@@ -567,16 +639,45 @@ struct WidgetExtraLargeView: View {
 
     var body: some View {
         let ink = WidgetInk(scheme: scheme, look: look)
-        HStack(alignment: .top, spacing: 18) {
-            WidgetTodayColumn(display: display, look: look, ink: ink, numeral: numeral, houseSide: 168)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            WidgetConfirmCard(display: display, ink: ink, limit: 5)
-                .frame(maxWidth: .infinity)
-                .frame(maxHeight: .infinity, alignment: .top)
+        Group {
+            if display.confirmRows.count < 2 || display.state == .noProperty {
+                settled(ink)
+            } else {
+                HStack(alignment: .top, spacing: 18) {
+                    WidgetTodayColumn(display: display, look: look, ink: ink, numeral: numeral, houseSide: 168)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    WidgetConfirmCard(display: display, ink: ink, limit: 5, largeTypeLimit: 3)
+                        .frame(maxWidth: .infinity)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                }
+            }
         }
         .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .accessibilityElement(children: .contain)
+    }
+
+    private func settled(_ ink: WidgetInk) -> some View {
+        GeometryReader { geo in
+            let side = min(geo.size.height, 280)
+            let house = WidgetHouseSlot(display: display, look: look, side: side, skylineWidth: min(geo.size.width * 0.46, 330))
+            HStack(alignment: .center, spacing: 18) {
+                house.frame(width: house.width, height: geo.size.height, alignment: .bottom)
+                VStack(alignment: .leading, spacing: 0) {
+                    if display.state == .noProperty { Spacer(minLength: 8) }
+                    WidgetNumberBlock(display: display, ink: ink, numeral: numeral)
+                    Spacer(minLength: display.state == .noProperty ? 16 : 8)
+                    if display.state == .timer, let pill = display.pill {
+                        WidgetPill(pill: pill, ink: ink)
+                    } else {
+                        WidgetConfirmCard(display: display, ink: ink, limit: 5)
+                    }
+                    if display.state == .noProperty { Spacer(minLength: 8) }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
     }
 }
 
@@ -590,9 +691,12 @@ struct WidgetExtraLargePortraitView: View {
     var body: some View {
         let ink = WidgetInk(scheme: scheme, look: look)
         VStack(spacing: 14) {
-            WidgetTodayColumn(display: display, look: look, ink: ink, numeral: numeral, houseSide: 190)
+            GeometryReader { geo in
+                let side = min(geo.size.height * 0.58, geo.size.width - 20, 300)
+                WidgetTodayColumn(display: display, look: look, ink: ink, numeral: numeral, houseSide: side)
+                    .frame(width: geo.size.width, height: geo.size.height)
+            }
             WidgetConfirmCard(display: display, ink: ink, limit: 3)
-            Spacer(minLength: 0)
         }
         .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -614,7 +718,7 @@ private struct WidgetTodayColumn: View {
             WidgetNumberBlock(display: display, ink: ink, numeral: numeral, alignment: .center)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
-            if let pill = display.pill, display.state == .timer || display.state == .noProperty {
+            if let pill = display.pill, display.state == .timer {
                 WidgetPill(pill: pill, ink: ink).padding(.top, 6)
             }
         }
@@ -641,8 +745,8 @@ struct WidgetCircularHoursView: View {
     var body: some View {
         ZStack {
             WidgetAccessoryBacking()
-            Circle().stroke(Color.white.opacity(0.28), lineWidth: 5).padding(6)
             if display.hasRing {
+                Circle().stroke(Color.white.opacity(0.28), lineWidth: 5).padding(6)
                 Circle()
                     .trim(from: 0, to: display.progress)
                     .stroke(Color.white, style: StrokeStyle(lineWidth: 5, lineCap: .round))

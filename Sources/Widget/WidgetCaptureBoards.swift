@@ -232,9 +232,9 @@ enum WidgetFrameExporter {
         let homeStates: [WidgetFrameFamily: [String]] = [
             .small: ["behind-lit", "on-pace", "goal-met", "empty", "no-rental", "timer", "three-rentals", "pace-not-ready"],
             .medium: ["behind-lit", "behind-unlit", "on-pace", "goal-met", "empty", "no-rental", "timer", "three-rentals", "all-on-pace", "pace-not-ready", "eight-rentals"],
-            .large: ["behind-lit", "on-pace", "three-rentals", "eight-rentals", "no-rental"],
-            .extraLarge: ["behind-lit", "three-rentals", "on-pace"],
-            .extraLargePortrait: ["behind-lit", "three-rentals"],
+            .large: ["behind-lit", "behind-unlit", "on-pace", "three-rentals", "eight-rentals", "no-rental", "empty", "goal-met", "timer", "pace-not-ready"],
+            .extraLarge: ["behind-lit", "behind-unlit", "three-rentals", "eight-rentals", "on-pace", "goal-met", "empty", "no-rental", "timer", "pace-not-ready"],
+            .extraLargePortrait: ["behind-lit", "behind-unlit", "three-rentals", "eight-rentals", "on-pace", "goal-met", "empty", "no-rental", "timer", "pace-not-ready"],
         ]
         let byName = Dictionary(uniqueKeysWithValues: WidgetSamples.all.map { ($0.name, $0.snapshot) })
         for scheme in [ColorScheme.light, .dark] {
@@ -255,6 +255,8 @@ enum WidgetFrameExporter {
             for state in ["behind-lit", "on-pace", "goal-met", "empty", "no-rental", "timer", "three-rentals"] where scheme == .light {
                 guard let snapshot = byName[state] else { continue }
                 for family in [WidgetFrameFamily.circular, .pendingCircular, .rectangular, .inline] {
+                    // The to-confirm circular ignores the timer, so its timer frame would repeat behind-lit.
+                    if family == .pendingCircular, state == "timer" { continue }
                     await write(family, state, snapshot, scheme: scheme, size: "default", category: .large)
                 }
             }
