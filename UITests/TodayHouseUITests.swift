@@ -202,7 +202,6 @@ final class TodayHouseUITests: XCTestCase {
     func test750FollowsTheSpouseWhenTheSpouseIsThePro() {
         launch(hours: "212", extra: ["-LHGoalChoice", "reps750", "-LHGoalPro", "spouse", "-LHTodaySpouseHours", "300"] + Self.pinned)
         XCTAssertTrue(number.waitForExistence(timeout: 15))
-        XCTExpectFailure("Today's number ignores the spouse-as-pro rule (shows the owner's 212)")
         XCTAssertTrue(waitForNumber("300", timeout: 3), "The spouse is the pro: their own hours, not ours. \(number.label)")
     }
 

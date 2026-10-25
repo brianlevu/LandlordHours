@@ -42,7 +42,6 @@ final class HousePreviewUITests: XCTestCase {
     func testArtLayersAreHiddenFromVoiceOver() {
         launch("212")
         XCTAssertTrue(house.waitForExistence(timeout: 10))
-        XCTExpectFailure("CraftHouseView stills are not decorative: asset names are exposed")
         XCTAssertEqual(app.images.matching(NSPredicate(format: "label BEGINSWITH 'craft_'")).count, 0,
                        "The art layers are hidden from VoiceOver: only the house is read")
     }
