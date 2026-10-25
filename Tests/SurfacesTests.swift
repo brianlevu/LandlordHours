@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 import UserNotifications
 @testable import LandlordHours
 
@@ -17,55 +18,84 @@ final class WidgetSurfaceDisplayTests: XCTestCase {
         required: Double = 600,
         pending: Int = 3,
         timer: Date? = nil,
-        timerName: String? = nil
+        timerName: String? = nil,
+        paceReady: Bool = true,
+        record: Bool = false,
+        rentals: [WidgetRentalFigure] = [],
+        rows: [WidgetConfirmRow] = []
     ) -> WidgetSurfaceSnapshot {
         WidgetSurfaceSnapshot(
             updatedAt: Date(timeIntervalSince1970: 100), taxYear: 2026, propertyCount: properties,
             hours: hours, goal: goal, goalHours: goalHours, requiredHoursToDate: required,
             pendingCount: pending, timerStart: timer, timerPropertyName: timerName,
-            houseKeyframe: "k05_frame040", stageTitle: "Frame going up", nextStepLabel: "Roof at 500h"
+            houseKeyframe: "", stageTitle: "Frame going up", nextStepLabel: "",
+            houseStage: "craft_frame70", loggedToday: true, paceReady: paceReady, isRecord: record,
+            rentals: rentals, confirmRows: rows
         )
+    }
+
+    private func rentals(_ behind: [Double]) -> [WidgetRentalFigure] {
+        behind.enumerated().map { WidgetRentalFigure(id: "r\($0.offset)", name: "Rental \($0.offset)", hours: 100, stage: "craft_started", lit: $0.offset == 0, behindBy: $0.element) }
     }
 
     func testBehindWithThreeToConfirm() {
         let d = WidgetSurfaceDisplay(snapshot: snapshot())
         XCTAssertEqual(d.state, .behind(gap: 388))
         XCTAssertEqual(d.number, "212")
-        XCTAssertEqual(d.goalText, "of 750h")
-        XCTAssertEqual(d.status?.text, "Behind by 388h")
-        XCTAssertEqual(d.status?.tone, .caution)
+        XCTAssertEqual(d.caption, "of 750 hours")
+        XCTAssertEqual(d.hoursLine, "212 of 750 hours")
+        XCTAssertEqual(d.status?.text, "Behind by 388 hours")
+        XCTAssertEqual(d.status?.tone, .behind)
         XCTAssertEqual(d.pill?.text, "3 to confirm")
         XCTAssertEqual(d.pill?.url, WidgetLinks.inbox)
-        XCTAssertEqual(d.inlineText(elapsed: ""), "212 of 750h · 3 to confirm")
-        XCTAssertEqual(d.rectangularHeadline(elapsed: ""), "212 of 750h")
+        XCTAssertEqual(d.inlineText(elapsed: ""), "212 hours · 3 to confirm")
+        XCTAssertEqual(d.rectangularHeadline(elapsed: ""), "212 of 750 hours")
         XCTAssertEqual(d.rectangularLine, "3 to confirm")
         XCTAssertEqual(d.pendingFace.text, "3")
-        XCTAssertEqual(d.mediumLabel, "Your REPS hours · 2026")
+        XCTAssertTrue(d.hasRing)
+        XCTAssertEqual(d.progress, 212.0 / 750.0, accuracy: 0.0001)
         XCTAssertEqual(d.url, WidgetLinks.inbox)
+    }
+
+    func testOneHourGapReadsOneHourNotHours() {
+        let d = WidgetSurfaceDisplay(snapshot: snapshot(hours: 599, required: 600, pending: 0))
+        XCTAssertEqual(d.status?.text, "Behind by 1 hour")
     }
 
     func testOnPaceAndCaughtUpShowsTheStage() {
         let d = WidgetSurfaceDisplay(snapshot: snapshot(hours: 640, required: 600, pending: 0))
         XCTAssertEqual(d.state, .onPace)
         XCTAssertEqual(d.status?.text, "On pace")
+        XCTAssertEqual(d.status?.tone, .positive)
         XCTAssertNil(d.pill, "Nothing waits: the stage line, not a pill")
-        XCTAssertEqual(d.stageLine.title, "Frame going up")
-        XCTAssertEqual(d.stageLine.next, "Roof at 500h")
+        XCTAssertEqual(d.stageLine, "Frame going up")
         XCTAssertEqual(d.rectangularLine, "On pace")
         XCTAssertEqual(d.pendingFace.text, "Done")
+        XCTAssertEqual(d.inlineText(elapsed: ""), "640 of 750 hours")
         XCTAssertEqual(d.url, WidgetLinks.today)
     }
 
-    func testFiveHoursOfSlackBeforeBehind() {
-        XCTAssertEqual(WidgetSurfaceDisplay(snapshot: snapshot(hours: 596, required: 600, pending: 0)).state, .onPace)
+    func testPaceIsTodaysRuleNotASlackBand() {
+        // Behind once the rounded gap is an hour or more, exactly like TodayPaceSentence.
+        XCTAssertEqual(WidgetSurfaceDisplay(snapshot: snapshot(hours: 599.6, required: 600, pending: 0)).state, .onPace)
+        XCTAssertEqual(WidgetSurfaceDisplay(snapshot: snapshot(hours: 599.4, required: 600, pending: 0)).state, .behind(gap: 1))
         XCTAssertEqual(WidgetSurfaceDisplay(snapshot: snapshot(hours: 594.5, required: 600, pending: 0)).state, .behind(gap: 6))
+    }
+
+    func testPaceWaitsForTwoWeeksOrTenHours() {
+        let d = WidgetSurfaceDisplay(snapshot: snapshot(hours: 6, required: 40, pending: 0, paceReady: false))
+        XCTAssertEqual(d.state, .paceNotReady)
+        XCTAssertEqual(d.status?.text, "Log a few weeks to see your pace")
+        XCTAssertEqual(d.status?.tone, .neutral)
+        let withPending = WidgetSurfaceDisplay(snapshot: snapshot(hours: 6, required: 40, pending: 2, paceReady: false))
+        XCTAssertEqual(withPending.status?.text, "Confirm your found hours to see your pace")
     }
 
     func testEmptyIsNeutralNeverDone() {
         let d = WidgetSurfaceDisplay(snapshot: snapshot(hours: 0, required: 300, pending: 0))
         XCTAssertEqual(d.state, .empty)
-        XCTAssertEqual(d.status?.text, "Nothing confirmed yet")
-        XCTAssertEqual(d.inlineText(elapsed: ""), "0 of 750h so far")
+        XCTAssertEqual(d.status?.text, "No hours yet")
+        XCTAssertEqual(d.inlineText(elapsed: ""), "0 of 750 hours")
         XCTAssertEqual(d.pendingFace.text, "–", "A new user never sees Done")
     }
 
@@ -73,11 +103,13 @@ final class WidgetSurfaceDisplayTests: XCTestCase {
         let d = WidgetSurfaceDisplay(snapshot: snapshot(properties: 0, hours: 0, pending: 0))
         XCTAssertEqual(d.state, .noProperty)
         XCTAssertNil(d.status)
-        XCTAssertEqual(d.pill?.text, "Add property")
-        XCTAssertEqual(d.inlineText(elapsed: ""), "Add a property")
+        XCTAssertEqual(d.pill?.text, "Add a rental")
+        XCTAssertEqual(d.caption, "Add a rental to start counting.")
+        XCTAssertEqual(d.inlineText(elapsed: ""), "Add a rental")
         XCTAssertEqual(d.rectangularLine, "to start counting")
         XCTAssertEqual(d.pendingFace.text, "Add")
         XCTAssertEqual(d.hoursFace.symbol, "plus")
+        XCTAssertFalse(d.hasRing)
         XCTAssertEqual(d.url, WidgetLinks.addProperty)
     }
 
@@ -86,8 +118,8 @@ final class WidgetSurfaceDisplayTests: XCTestCase {
                        "The law says MORE than 750")
         let d = WidgetSurfaceDisplay(snapshot: snapshot(hours: 768, required: 700, pending: 1))
         XCTAssertEqual(d.state, .met)
-        XCTAssertEqual(d.status?.text, "House finished")
-        XCTAssertEqual(d.inlineText(elapsed: ""), "750h reached")
+        XCTAssertEqual(d.status?.text, "Done for 2026")
+        XCTAssertEqual(d.inlineText(elapsed: ""), "750 hours reached")
         XCTAssertEqual(d.hoursFace.symbol, "checkmark")
         XCTAssertEqual(d.rectangularLine, "1 to confirm")
     }
@@ -95,9 +127,17 @@ final class WidgetSurfaceDisplayTests: XCTestCase {
     func testMaterialParticipationGoalWords() {
         let d = WidgetSurfaceDisplay(snapshot: snapshot(hours: 520, goal: .mp500, goalHours: 500, required: 400, pending: 0))
         XCTAssertEqual(d.state, .met)
-        XCTAssertEqual(d.status?.text, "500h reached", "The MP-500 house is not finished at 520h")
-        XCTAssertEqual(d.mediumLabel, "Your hours · 2026", "Only REPS says REPS")
-        XCTAssertEqual(d.goalText, "of 500h")
+        XCTAssertEqual(d.status?.text, "500 hours reached", "The MP-500 house is not finished at 520h")
+        XCTAssertEqual(d.caption, "of 500 hours")
+    }
+
+    func testRecordHasNoGoalAndNoPace() {
+        let d = WidgetSurfaceDisplay(snapshot: snapshot(hours: 300, required: 600, pending: 0, record: true))
+        XCTAssertEqual(d.caption, "hours logged in 2026")
+        XCTAssertEqual(d.state, .onPace, "A record is never behind")
+        XCTAssertEqual(d.status?.text, "On your 2026 record")
+        XCTAssertFalse(d.hasRing)
+        XCTAssertEqual(d.inlineText(elapsed: ""), "300 hours in 2026")
     }
 
     func testTimerWins() {
@@ -117,28 +157,119 @@ final class WidgetSurfaceDisplayTests: XCTestCase {
         XCTAssertEqual(WidgetSurfaceDisplay(snapshot: snapshot(hours: 212.9)).number, "212")
     }
 
+    // MARK: All rentals (H10): hours across them, how many are behind, never a goal or a stage
+
+    func testAllRentalsNeverShowsASummedGoal() {
+        let d = WidgetSurfaceDisplay(snapshot: snapshot(properties: 3, hours: 312, pending: 0, rentals: rentals([388, 526, 0])))
+        XCTAssertEqual(d.state, .allRentals(behind: 2))
+        XCTAssertTrue(d.isAllRentals)
+        XCTAssertEqual(d.caption, "hours across 3 rentals")
+        XCTAssertNil(d.stageLine, "No stage for all rentals")
+        XCTAssertEqual(d.hoursLine, "312 hours across 3 rentals")
+        XCTAssertEqual(d.status?.text, "2 of 3 behind")
+        XCTAssertEqual(d.status?.tone, .behind)
+        XCTAssertFalse(d.hasRing, "No ring: there is no goal for all rentals")
+        XCTAssertEqual(d.progress, 0)
+        XCTAssertEqual(d.inlineText(elapsed: ""), "312 hours · 3 rentals")
+        for text in [d.caption, d.hoursLine, d.status?.text ?? "", d.rectangularLine, d.inlineText(elapsed: ""), d.accessibilityLabel] {
+            XCTAssertFalse(text.contains("750"), "A summed goal in: \(text)")
+        }
+    }
+
+    func testAllRentalsOnPace() {
+        let d = WidgetSurfaceDisplay(snapshot: snapshot(properties: 2, hours: 1250, pending: 0, rentals: rentals([0, 0])))
+        XCTAssertEqual(d.state, .allRentals(behind: 0))
+        XCTAssertEqual(d.status?.text, "All on pace")
+        XCTAssertEqual(d.status?.tone, .positive)
+    }
+
+    func testSkylineIsTodaysRule() {
+        // 4 houses under 290, 5 at 290 or more, never under 44, never more than fit at 44.
+        XCTAssertEqual(WidgetSkyline.cap(frame: 400), 5)
+        XCTAssertEqual(WidgetSkyline.cap(frame: 220), 4)
+        XCTAssertEqual(WidgetSkyline.cap(frame: 150), 3, "Four 44pt houses do not fit in 150")
+        XCTAssertEqual(WidgetSkyline.houseSide(frame: 150, count: 3), 44, accuracy: 0.01, "Never under 44")
+        XCTAssertGreaterThanOrEqual(WidgetSkyline.houseSide(frame: 100, count: 5), 44)
+        XCTAssertEqual(WidgetSkyline.houseSide(frame: 400, count: 1), 168, accuracy: 0.01)
+        // Over the cap: the most-behind rentals show first, in the shelf's order.
+        let eight = (0..<8).map { WidgetRentalFigure(id: "r\($0)", name: "R\($0)", hours: 0, stage: "craft_started", lit: false, behindBy: Double($0 == 6 ? 900 : ($0 == 2 ? 700 : $0))) }
+        let shown = WidgetSkyline.visible(eight, frame: 150).map(\.id)
+        XCTAssertEqual(shown, ["r2", "r6", "r7"])
+    }
+
+    func testHouseArtNamesFollowTheStageAndTheLitState() {
+        XCTAssertEqual(WidgetHouseArt.assetName(stage: "craft_half", lit: true), "wg_thumb_half")
+        XCTAssertEqual(WidgetHouseArt.assetName(stage: "craft_complete", lit: false), "wg_thumb_complete-unlit")
+        XCTAssertEqual(WidgetHouseArt.assetName(stage: "k07_frame060", lit: true), "wg_thumb_started", "An unknown stage draws the first one")
+        for stage in ["started", "frame70", "framing", "half", "complete"] {
+            for lit in [true, false] {
+                XCTAssertNotNil(UIImage(named: WidgetHouseArt.assetName(stage: "craft_" + stage, lit: lit)), "\(stage) lit=\(lit)")
+            }
+        }
+    }
+
+    func testMidnightPutsTheLightsOut() {
+        let lit = snapshot(properties: 2, hours: 100, rentals: rentals([0, 0]))
+        XCTAssertTrue(lit.loggedToday)
+        XCTAssertTrue(lit.rentals[0].lit)
+        let next = lit.nextDay()
+        XCTAssertFalse(next.loggedToday)
+        XCTAssertTrue(next.rentals.allSatisfy { !$0.lit })
+        XCTAssertEqual(next.hours, lit.hours)
+    }
+
+    // MARK: To confirm rows (large)
+
+    func testConfirmRowDetailLines() {
+        let d = WidgetSurfaceDisplay(snapshot: snapshot())
+        XCTAssertEqual(d.detail(for: WidgetConfirmRow(key: "a", title: "x", rentalName: "Pine Cabin", hours: 1.5)), "Pine Cabin · 1.5h")
+        XCTAssertEqual(d.detail(for: WidgetConfirmRow(key: "a", title: "x", rentalName: "Pine Cabin", hours: 2)), "Pine Cabin · 2h")
+        XCTAssertEqual(d.detail(for: WidgetConfirmRow(key: "a", title: "x", rentalName: nil, hours: nil, canConfirm: false)), "Not sure yet")
+    }
+
+    // MARK: Storage
+
     func testStoreRoundTripsAndFallsBackToEmpty() {
         let suite = "WidgetSurfaceStoreTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         XCTAssertEqual(WidgetSurfaceStore.load(from: defaults), .empty)
-        let s = snapshot(timer: Date(timeIntervalSince1970: 5), timerName: "Oak")
+        let s = snapshot(timer: Date(timeIntervalSince1970: 5), timerName: "Oak", rentals: rentals([3]),
+                         rows: [WidgetConfirmRow(key: "k", title: "Plumber", rentalName: "Oak", hours: 2)])
         WidgetSurfaceStore.save(s, to: defaults)
         XCTAssertEqual(WidgetSurfaceStore.load(from: defaults), s)
+    }
+
+    func testASnapshotAnOlderBuildStoredStillLoads() throws {
+        // What 2.0.x wrote: no stage, lit, pace, record, rentals or rows.
+        let old = """
+        {"updatedAt": 100, "taxYear": 2026, "propertyCount": 2, "hours": 212, "goal": "reps", "goalHours": 750,
+         "requiredHoursToDate": 600, "pendingCount": 3, "houseKeyframe": "k05_frame040",
+         "stageTitle": "Frame going up", "nextStepLabel": "Roof at 500h"}
+        """
+        let s = try JSONDecoder().decode(WidgetSurfaceSnapshot.self, from: Data(old.utf8))
+        XCTAssertEqual(s.hours, 212)
+        XCTAssertEqual(s.houseStage, "craft_started")
+        XCTAssertFalse(s.loggedToday)
+        XCTAssertTrue(s.paceReady)
+        XCTAssertTrue(s.rentals.isEmpty)
+        XCTAssertTrue(s.confirmRows.isEmpty)
+        XCTAssertEqual(WidgetSurfaceDisplay(snapshot: s).houses.count, 1, "Two rentals recorded, none listed: one house, not a crash")
     }
 
     func testNoBannedWordsInAnyWidgetString() {
         let cases = [
             snapshot(), snapshot(hours: 640, pending: 0), snapshot(hours: 0, pending: 0), snapshot(properties: 0, hours: 0, pending: 0),
-            snapshot(hours: 800), snapshot(timer: Date(), timerName: "Pine"),
+            snapshot(hours: 800), snapshot(timer: Date(), timerName: "Pine"), snapshot(hours: 6, pending: 0, paceReady: false),
+            snapshot(properties: 3, hours: 312, rentals: rentals([4, 0, 9])), snapshot(hours: 300, record: true),
         ]
         for s in cases {
             let d = WidgetSurfaceDisplay(snapshot: s)
-            let strings = [d.smallLabel, d.mediumLabel, d.status?.text ?? "", d.pill?.text ?? "", d.inlineText(elapsed: "0:01"),
+            let strings = [d.caption, d.hoursLine, d.status?.text ?? "", d.pill?.text ?? "", d.inlineText(elapsed: "0:01"), d.stageLine ?? "",
                            d.rectangularTitle, d.rectangularHeadline(elapsed: "0:01"), d.rectangularLine, d.accessibilityLabel,
-                           d.pendingFace.accessibilityLabel, d.hoursFace.accessibilityLabel]
+                           d.pendingFace.accessibilityLabel, d.hoursFace.accessibilityLabel, d.toConfirmText]
             for text in strings {
-                for banned in ["evidence", "qualif", "audit", "tax-ready", "Track", "Home"] {
+                for banned in ["evidence", "qualif", "audit", "tax-ready", "Track", "Home", "property", "REPS", "Behind by 1 hours"] {
                     XCTAssertFalse(text.localizedCaseInsensitiveContains(banned), "\(banned) in \(text)")
                 }
                 XCTAssertFalse(text.contains("'"), "Curly apostrophes only: \(text)")
@@ -210,13 +341,71 @@ final class WidgetSurfaceBuilderTests: CaptureTestCase {
         XCTAssertEqual(s.pendingCount, 2)
     }
 
-    func testGoalMetAndTheHouseKeyframe() {
+    func testGoalMetAndTheHouseStage() {
         GoalManager.shared.globalGoalType = .reps
         let (vm, _) = seeded(selfHours: 760, spouseHours: 0)
         let s = vm.widgetSurfaceSnapshot(suggestions: [])
-        XCTAssertEqual(s.houseKeyframe, HouseKeyframe.k18_finished.rawValue)
+        XCTAssertEqual(s.houseStage, CraftStage.complete.rawValue)
         XCTAssertEqual(WidgetSurfaceDisplay(snapshot: s).state, .met)
-        XCTAssertEqual(s.nextStepLabel, "House finished")
+        XCTAssertEqual(s.stageTitle, CraftStage.complete.spokenName)
+        XCTAssertTrue(s.loggedToday, "Hours were logged today, so the windows are lit")
+        XCTAssertEqual(s.rentals.map(\.stage), [CraftStage.complete.rawValue])
+    }
+
+    func testWindowsAreLitOnlyWhenHoursWereLoggedToday() {
+        GoalManager.shared.globalGoalType = .reps
+        let (vm, property) = makeViewModel()
+        let now = Date()
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: now)!
+        vm.addTimeEntry(propertyId: property, participant: .selfParticipant, category: .repairs, hours: 3, date: yesterday, notes: "")
+        XCTAssertFalse(vm.widgetSurfaceSnapshot(now: now, suggestions: []).loggedToday)
+        XCTAssertFalse(vm.widgetSurfaceSnapshot(now: now, suggestions: []).rentals[0].lit)
+        vm.addTimeEntry(propertyId: property, participant: .selfParticipant, category: .repairs, hours: 1, date: now, notes: "")
+        let s = vm.widgetSurfaceSnapshot(now: now, suggestions: [])
+        XCTAssertTrue(s.loggedToday)
+        XCTAssertTrue(s.rentals[0].lit)
+    }
+
+    func testTwoRentalsAreSummedWithEachOwnHouse() {
+        GoalManager.shared.globalGoalType = .reps
+        let (vm, first) = makeViewModel()
+        vm.addProperty(name: "Maple", address: "2 Maple St", type: .ltr)
+        let second = vm.properties[1].id
+        let now = Date()
+        vm.addTimeEntry(propertyId: first, participant: .selfParticipant, category: .repairs, hours: 200, date: now, notes: "")
+        vm.addTimeEntry(propertyId: second, participant: .selfParticipant, category: .repairs, hours: 40, date: Calendar.current.date(byAdding: .day, value: -3, to: now)!, notes: "")
+        let s = vm.widgetSurfaceSnapshot(now: now, suggestions: [])
+        XCTAssertEqual(s.rentals.count, 2)
+        XCTAssertEqual(s.hours, s.rentals.reduce(0) { $0 + $1.hours }, accuracy: 0.001, "Today's All rentals number")
+        XCTAssertEqual(s.rentals.map(\.lit), [true, false], "Each rental has its own lit state")
+        XCTAssertEqual(s.rentals[0].stage, CraftStage.stage(hours: s.rentals[0].hours, goal: 750).rawValue)
+        XCTAssertTrue(WidgetSurfaceDisplay(snapshot: s).isAllRentals)
+    }
+
+    func testToConfirmRowsAreNewestFirstAndSayWhetherOneTapCanLogThem() {
+        let (vm, property) = seeded()
+        let now = Date()
+        let rows = [
+            calendarSuggestion(externalId: "old", start: now.addingTimeInterval(-86_400), title: "Older", propertyId: property),
+            calendarSuggestion(externalId: "new", start: now.addingTimeInterval(-7200), title: "Newer", propertyId: property, hours: 2),
+            calendarSuggestion(externalId: "vague", start: now.addingTimeInterval(-10_800), title: "Vague", propertyId: nil, hours: nil, category: nil),
+        ]
+        let s = vm.widgetSurfaceSnapshot(now: now, suggestions: rows)
+        XCTAssertEqual(s.confirmRows.map(\.title), ["Newer", "Vague", "Older"])
+        XCTAssertEqual(s.confirmRows.map(\.canConfirm), [true, false, true])
+        XCTAssertEqual(s.confirmRows[0].rentalName, "Oak")
+        XCTAssertEqual(s.confirmRows[0].hours, 2)
+        XCTAssertEqual(s.confirmRows.count, s.pendingCount)
+    }
+
+    func testPaceWaitsUntilTenHoursOrTwoWeeksOfData() {
+        GoalManager.shared.globalGoalType = .reps
+        let (vm, property) = makeViewModel()
+        let now = Date()
+        vm.addTimeEntry(propertyId: property, participant: .selfParticipant, category: .repairs, hours: 4, date: now, notes: "")
+        XCTAssertFalse(vm.widgetSurfaceSnapshot(now: now, suggestions: []).paceReady)
+        vm.addTimeEntry(propertyId: property, participant: .selfParticipant, category: .repairs, hours: 7, date: now, notes: "")
+        XCTAssertTrue(vm.widgetSurfaceSnapshot(now: now, suggestions: []).paceReady)
     }
 
     func testTimerCarriesThePropertyName() {

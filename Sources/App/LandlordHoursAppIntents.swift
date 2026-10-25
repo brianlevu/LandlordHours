@@ -274,76 +274,62 @@ enum LandlordHoursIntentCopy {
 
 // MARK: - Siri snippet (ShowsSnippetView)
 
-/// The Today hero in miniature, read-only: the number, the pace and "3 to confirm". Theme-fixed
-/// blueprint like the hero. Text uses Dynamic Type styles; the number scales with @ScaledMetric;
-/// the house sits back (dimmed) so no text is read over it, and fades further at accessibility sizes.
+/// The Today hero in miniature, read-only: the number, the pace and "3 to confirm", on the dusk or
+/// night page with the house (v2, package I: the snippet reuses the widget's page, inks and house
+/// slot). Text uses Dynamic Type styles; the number scales with @ScaledMetric; at accessibility
+/// sizes the house leaves so no text is squeezed.
 struct LandlordHoursSiriSnippet: View {
     let display: WidgetSurfaceDisplay
     @ScaledMetric(relativeTo: .largeTitle) private var numberSize: CGFloat = 48
-    @ScaledMetric(relativeTo: .body) private var houseSize: CGFloat = 170
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(eyebrow)
-                .font(.system(.caption2, design: .monospaced).weight(.medium))
-                .textCase(.uppercase)
-                .tracking(1.3)
-                .foregroundStyle(WidgetInk.drafting)
-                .fixedSize(horizontal: false, vertical: true)
-            if display.state == .noProperty {
-                Text("Add a rental to start counting.")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(WidgetInk.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 6)
-            } else {
-                Text(display.number)
-                    .font(.system(size: numberSize, weight: .bold, design: .rounded)).monospacedDigit()
-                    .foregroundStyle(WidgetInk.primary)
-                    .padding(.top, 2)
-                Text(display.goalText)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(WidgetInk.secondary)
-                Color.clear.frame(height: 14)
-                if let status = display.status, display.state != .timer {
-                    (Text(Image(systemName: status.symbol)) + Text(" " + status.text))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(WidgetInk.tone(status.tone))
+        let ink = WidgetInk(scheme: scheme)
+        HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                if display.state == .noProperty {
+                    Text(display.caption)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(ink.primary)
                         .fixedSize(horizontal: false, vertical: true)
-                }
-                if display.pendingCount > 0 {
-                    HStack(spacing: 5) {
-                        Image(systemName: "tray.fill").imageScale(.small)
-                        Text("\(display.pendingCount) to confirm")
+                } else {
+                    Text(display.number)
+                        .font(.system(size: numberSize, weight: .bold, design: .rounded)).monospacedDigit()
+                        .foregroundStyle(ink.primary)
+                    Text(display.caption)
+                        .font(.subheadline)
+                        .foregroundStyle(ink.secondary)
+                    if let status = display.status, display.state != .timer {
+                        (Text(Image(systemName: status.symbol)) + Text(" " + status.text))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ink.tone(status.tone))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 8)
                     }
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(WidgetInk.brand)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .frame(minHeight: 30)
-                    .background(Capsule().fill(WidgetInk.primary))
-                    .padding(.top, 8)
+                    if display.pendingCount > 0 {
+                        HStack(spacing: 5) {
+                            Image(systemName: "tray.fill").imageScale(.small)
+                            Text(display.toConfirmText)
+                        }
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(ink.onAction)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 30)
+                        .background(Capsule().fill(ink.actionFill))
+                        .padding(.top, 8)
+                    }
                 }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if !dynamicTypeSize.isAccessibilitySize {
+                WidgetHouseSlot(display: display, look: .fullColor, side: 130)
             }
         }
         .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 200, alignment: .topLeading)
-        .background(alignment: .bottomTrailing) {
-            WidgetHouse(keyframe: display.snapshot.houseKeyframe)
-                .frame(width: min(houseSize, 200), height: min(houseSize, 200))
-                .offset(x: 4, y: 8)
-                // Dimmed so the amber pace line never sits on a bright render (gate minor, 3.02:1).
-                .opacity(dynamicTypeSize.isAccessibilitySize ? 0.3 : 0.6)
-                .accessibilityHidden(true)
-        }
-        .background(WidgetBlueprintPaper())
+        .frame(maxWidth: .infinity, minHeight: 170, alignment: .topLeading)
+        .background(WidgetPage())
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .accessibilityElement(children: .combine)
-    }
-
-    /// "Your REPS hours · 2026" with no-break spaces, so the middot never ends a line (AX3 minor).
-    private var eyebrow: String {
-        display.mediumLabel.replacingOccurrences(of: " · ", with: "\u{00A0}·\u{00A0}")
     }
 }

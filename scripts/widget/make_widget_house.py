@@ -1,56 +1,84 @@
 #!/usr/bin/env python3
-"""Composite the Blueprint house keyframes for the widget extension.
+"""Cut the crafted-house thumbnails the widget extension draws (standard §H.5, plan package I).
 
-Widgets can't run the app's CoreImage linework pass, so each keyframe is flattened once:
-built pass (light / dark appearance) + linework alpha x2.4 (HouseMotion.lineworkAlphaGain),
-tinted drafting cyan #8FD3FF (the blueprint-hero linework, both modes). Output 480px (@3x of
-160pt, the medium widget's house), palette-quantised to keep the extension small.
+The widget extension cannot read the app's asset catalog, and the art lane has not rendered the
+house-only `craft_thumb_<stage>` set yet. So each widget thumbnail is cut here from the five lit
+and five unlit stills (Assets.xcassets/Craft, dusk = Any, night = Dark):
 
-Usage: python3 scripts/widget/make_widget_house.py   (from the repo root)
+  1. crop the pinned camera square around the house,
+  2. dissolve the lot's soil block and the lawn's far edges (soft mask), so the house stands on a
+     pool of lawn with a contact shadow, no plinth,
+  3. resize to 360px (@3x of the 120pt widget thumbnail), save as HEIC with alpha.
+
+The same crop is used for every stage, so the early stages read small by their own art, as in
+the app's skyline. Output: Sources/Widget/WidgetAssets.xcassets/House/wg_thumb_<stage>[-unlit].
+When the art lane ships the real `craft_thumb_*` renders, switch SRC_THUMB on and drop the mask.
+
+Usage (repo root): ~/AgentScratch/landlordhours/2026-10-22/venv/bin/python scripts/widget/make_widget_house.py
+Needs Pillow + numpy and macOS `sips` (HEIC with alpha).
 """
-import json, os, sys
+import json, os, subprocess, tempfile
+import numpy as np
 from PIL import Image
 
-SRC = "Assets.xcassets/Blueprint/House"
+SRC = "Assets.xcassets/Craft"
 DST = "Sources/Widget/WidgetAssets.xcassets/House"
-KEYS = ["k00_lot","k01_slab","k02_frame010","k03_frame020","k04_frame030","k05_frame040","k06_frame050",
-        "k07_frame060","k08_frame070","k09_frame080","k10_frame090","k11_frame100","k12_roof",
-        "k13_siding020","k14_siding040","k15_siding060","k16_siding080","k17_siding100","k18_finished"]
-DRAFT = (0x8F, 0xD3, 0xFF)
-GAIN = 2.4
-SIZE = 480
+STAGES = ["started", "frame70", "framing", "half", "complete"]
+BOX = (100, 30, 1140, 1070)   # the pinned camera square around the house, in the 1206px still
+SIZE = 360                    # 120pt @3x
 
-def lines_layer(path):
-    a = Image.open(path).convert("RGBA").getchannel("A")
-    a = a.point(lambda v: min(255, int(v * GAIN)))
-    layer = Image.new("RGBA", a.size, DRAFT + (0,))
-    layer.putalpha(a)
-    return layer
 
-def composite(built_path, lines_path):
-    built = Image.open(built_path).convert("RGBA")
-    out = built.copy()
-    out.alpha_composite(lines_layer(lines_path).resize(built.size, Image.LANCZOS))
-    out = out.resize((SIZE, SIZE), Image.LANCZOS)
-    return out.quantize(colors=256, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE)
+def smooth(x):
+    x = np.clip(x, 0, 1)
+    return x * x * (3 - 2 * x)
 
-os.makedirs(DST, exist_ok=True)
-json.dump({"info": {"author": "xcode", "version": 1}, "properties": {"provides-namespace": False}},
-          open(os.path.join(DST, "Contents.json"), "w"), indent=2)
-total = 0
-for k in KEYS:
-    name = f"wg_house_{k}"
-    d = os.path.join(DST, name + ".imageset"); os.makedirs(d, exist_ok=True)
-    lines = f"{SRC}/bp_house_{k}_lines.imageset/bp_house_{k}_lines@3x.png"
-    images = []
-    for suffix, appearance in (("", None), ("-dark", "dark")):
-        built = f"{SRC}/bp_house_{k}_built.imageset/bp_house_{k}_built{suffix}@3x.png"
-        fn = f"{name}{suffix}@3x.png"
-        composite(built, lines).save(os.path.join(d, fn), optimize=True)
-        total += os.path.getsize(os.path.join(d, fn))
-        entry = {"idiom": "universal", "filename": fn, "scale": "3x"}
-        if appearance:
-            entry["appearances"] = [{"appearance": "luminosity", "value": appearance}]
-        images.append(entry)
-    json.dump({"images": images, "info": {"author": "xcode", "version": 1}}, open(os.path.join(d, "Contents.json"), "w"), indent=2)
-print(f"{len(KEYS)} keyframes, {total/1024:.0f} KB")
+
+def run(*args):
+    subprocess.run(args, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def cut(heic_path, tmp):
+    png = os.path.join(tmp, "in.png")
+    run("sips", "-s", "format", "png", heic_path, "--out", png)
+    crop = Image.open(png).convert("RGBA").crop(BOX)
+    w, h = crop.size
+    yy, xx = np.mgrid[0:h, 0:w]
+    xx, yy = xx / w, yy / h
+    d = np.sqrt(((xx - 0.50) / 0.72) ** 2 + ((yy - 0.52) / 0.72) ** 2)
+    mask = smooth((1.0 - d) / 0.30) * (1 - smooth((yy - 0.74) / 0.18))
+    arr = np.array(crop)
+    arr[:, :, 3] = (arr[:, :, 3] * mask).astype(np.uint8)
+    return Image.fromarray(arr).resize((SIZE, SIZE), Image.LANCZOS)
+
+
+def main():
+    os.makedirs(DST, exist_ok=True)
+    json.dump({"info": {"author": "xcode", "version": 1}, "properties": {"provides-namespace": False}},
+              open(os.path.join(DST, "Contents.json"), "w"), indent=2)
+    total = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        for stage in STAGES:
+            for lit in (True, False):
+                base = f"craft_{stage}" + ("" if lit else "-unlit")
+                name = f"wg_thumb_{stage}" + ("" if lit else "-unlit")
+                d = os.path.join(DST, name + ".imageset")
+                os.makedirs(d, exist_ok=True)
+                images = []
+                for appearance in ("light", "dark"):
+                    src = f"{SRC}/{base}.imageset/{base}_{appearance}.heic"
+                    out_png = os.path.join(tmp, "out.png")
+                    cut(src, tmp).save(out_png)
+                    fn = f"{name}{'-dark' if appearance == 'dark' else ''}@3x.heic"
+                    run("sips", "-s", "format", "heic", "-s", "formatOptions", "85", out_png, "--out", os.path.join(d, fn))
+                    total += os.path.getsize(os.path.join(d, fn))
+                    entry = {"idiom": "universal", "filename": fn, "scale": "3x"}
+                    if appearance == "dark":
+                        entry["appearances"] = [{"appearance": "luminosity", "value": "dark"}]
+                    images.append(entry)
+                json.dump({"images": images, "info": {"author": "xcode", "version": 1}},
+                          open(os.path.join(d, "Contents.json"), "w"), indent=2)
+    print(f"{len(STAGES) * 4} thumbnails, {total / 1024:.0f} KB")
+
+
+if __name__ == "__main__":
+    main()

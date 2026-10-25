@@ -1,0 +1,513 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "widget.a11y.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LandlordHours. Add a rental to start counting."
+          }
+        }
+      }
+    },
+    "widget.a11y.met": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ of your %lld hours. Goal reached."
+          }
+        }
+      }
+    },
+    "widget.a11y.nothing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing to confirm"
+          }
+        }
+      }
+    },
+    "widget.a11y.nothingYet": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing to confirm yet"
+          }
+        }
+      }
+    },
+    "widget.a11y.timer": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Timer running at %@"
+          }
+        }
+      }
+    },
+    "widget.all.behind": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld of %lld behind"
+          }
+        }
+      }
+    },
+    "widget.all.onPace": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All on pace"
+          }
+        }
+      }
+    },
+    "widget.caption.across": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hours across %lld rentals"
+          }
+        }
+      }
+    },
+    "widget.caption.ofGoal": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "of %lld hours"
+          }
+        }
+      }
+    },
+    "widget.caption.record": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hours logged in %@"
+          }
+        }
+      }
+    },
+    "widget.caption.start": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a rental to start counting."
+          }
+        }
+      }
+    },
+    "widget.card.caughtUp": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing waiting to confirm."
+          }
+        }
+      }
+    },
+    "widget.card.confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm"
+          }
+        }
+      }
+    },
+    "widget.card.more": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See all %lld"
+          }
+        }
+      }
+    },
+    "widget.card.review": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review"
+          }
+        }
+      }
+    },
+    "widget.config.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your house, your hours, and what is waiting to confirm."
+          }
+        }
+      }
+    },
+    "widget.config.name": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your hours"
+          }
+        }
+      }
+    },
+    "widget.face.add": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add"
+          }
+        }
+      }
+    },
+    "widget.face.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        }
+      }
+    },
+    "widget.inline.across": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ hours · %lld rentals"
+          }
+        }
+      }
+    },
+    "widget.inline.add": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a rental"
+          }
+        }
+      }
+    },
+    "widget.inline.hours": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ hours in %@"
+          }
+        }
+      }
+    },
+    "widget.inline.hoursConfirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ hours · %lld to confirm"
+          }
+        }
+      }
+    },
+    "widget.inline.ofGoal": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ of %lld hours"
+          }
+        }
+      }
+    },
+    "widget.inline.reached": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld hours reached"
+          }
+        }
+      }
+    },
+    "widget.inline.timer": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Timer %@ · %@"
+          }
+        }
+      }
+    },
+    "widget.pace.behind": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Behind by %lld hour"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Behind by %lld hours"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "widget.pace.confirmFirst": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm your found hours to see your pace"
+          }
+        }
+      }
+    },
+    "widget.pace.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done for %@"
+          }
+        }
+      }
+    },
+    "widget.pace.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hours yet"
+          }
+        }
+      }
+    },
+    "widget.pace.notReady": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log a few weeks to see your pace"
+          }
+        }
+      }
+    },
+    "widget.pace.onPace": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On pace"
+          }
+        }
+      }
+    },
+    "widget.pace.reached": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld hours reached"
+          }
+        }
+      }
+    },
+    "widget.pace.record": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On your %@ record"
+          }
+        }
+      }
+    },
+    "widget.pending.description": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How many visits are waiting for you to confirm."
+          }
+        }
+      }
+    },
+    "widget.pending.name": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To confirm"
+          }
+        }
+      }
+    },
+    "widget.pill.addRental": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a rental"
+          }
+        }
+      }
+    },
+    "widget.pill.stop": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop and review"
+          }
+        }
+      }
+    },
+    "widget.rect.startCounting": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "to start counting"
+          }
+        }
+      }
+    },
+    "widget.rect.stopIt": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop it to review"
+          }
+        }
+      }
+    },
+    "widget.rect.timer": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Timer"
+          }
+        }
+      }
+    },
+    "widget.rect.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your hours"
+          }
+        }
+      }
+    },
+    "widget.row.notSure": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sure yet"
+          }
+        }
+      }
+    },
+    "widget.timer.running": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Timer running"
+          }
+        }
+      }
+    },
+    "widget.toConfirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld to confirm"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

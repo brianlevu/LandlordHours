@@ -1,13 +1,22 @@
 import SwiftUI
+import UIKit
 import WidgetKit
+import AppIntents
 
-// MARK: - 2.0 widget views (blueprint style)
+// MARK: - 2.2 widget views (the crafted house, dusk and night)
 //
-// Approved design: sandbox-surfaces 92e1bc8 (DesignSandbox/Surfaces/SFWidgets.swift), frames
-// ~/AgentScratch/landlordhours/2026-10-19/surfaces-frames-r2. The Home Screen widgets are the Today
-// hero in miniature: theme-fixed blueprint paper, the house at its real stage, the SF Rounded
-// number and an SF Mono label. Lock Screen accessories are vibrant (the system tints them), so
-// they draw in one colour. Every colour comes from BrandHex (Sources/Shared/BrandPalette.swift).
+// Standard §H.5 and §1.26, plan package I. Medium, large and extra large draw the crafted house at
+// 120 (a house-only thumbnail cut from the stills, `scripts/widget/make_widget_house.py`), lit when
+// hours were logged today, on the dusk page in light and the night page in dark. One rental draws
+// its own house and "212 of 750 hours"; two or more draw the skyline and "312 hours across 3
+// rentals", never a summed goal (§H.1 H10). Small and the Lock Screen accessories carry the mono
+// mark B: a 3D bitmap cannot tint, the mark can. Tinted and clear Home Screens draw the mark in the
+// house's slot and white inks (the system supplies the tint).
+//
+// Words come from `WidgetSurfaceDisplay` (Sources/Shared/WidgetSurface.swift) and the `Widgets`
+// string catalog. Colours are `BrandHex` tokens only. Numbers are SF Rounded, tabular (Fraunces is
+// not in the extension bundle). Text uses Dynamic Type styles; at accessibility sizes the
+// secondary lines drop so the number and the pace still fit.
 //
 // These views are compiled into the widget extension and, for DEBUG capture boards only, into the
 // app (WidgetCaptureBoard). They take a `WidgetSurfaceDisplay` and nothing else.
@@ -20,53 +29,198 @@ enum WidgetLook: Equatable {
     case accented
 }
 
-/// On-blueprint colours (theme-fixed: the widget is blueprint paper in light and dark).
-enum WidgetInk {
-    static let brand = Color(brandHex: BrandHex.brand)
-    static let brandDeep = Color(brandHex: BrandHex.blueprintDeep)
-    static let primary = Color.white
-    static let secondary = Color(brandHex: BrandHex.onHeroSecondary)
-    static let drafting = Color(brandHex: BrandHex.drafting)
-    static let positive = Color(brandHex: BrandHex.positiveOnHero)
-    static let caution = Color(brandHex: BrandHex.cautionOnHero)
+enum WidgetFont {
+    /// The SF Rounded bold numeral at `size` (already scaled by the caller's `@ScaledMetric`).
+    static func numeral(_ size: CGFloat) -> Font {
+        let base = UIFont.systemFont(ofSize: size, weight: .bold)
+        let descriptor = base.fontDescriptor.withDesign(.rounded) ?? base.fontDescriptor
+        return Font(UIFont(descriptor: descriptor, size: size))
+    }
+}
 
-    static func tone(_ tone: WidgetSurfaceDisplay.Tone) -> Color {
+extension View {
+    /// A widget is a fixed-size surface: its text grows with Dynamic Type up to the first
+    /// accessibility size, where the secondary lines drop out so the number and the pace still fit.
+    func widgetTypeCap() -> some View { dynamicTypeSize(...DynamicTypeSize.accessibility1) }
+}
+
+/// The page inks for one appearance (§H.4: only these inks are text on the dusk page).
+struct WidgetInk {
+    let scheme: ColorScheme
+    var look: WidgetLook = .fullColor
+
+    private var dark: Bool { scheme == .dark }
+    private var tinted: Bool { look == .accented }
+
+    var primary: Color { tinted ? .white : Color(brandHex: dark ? BrandHex.darkTextPrimary : BrandHex.textPrimary) }
+    var secondary: Color { tinted ? Color.white.opacity(0.75) : Color(brandHex: dark ? BrandHex.darkTextSecondary : BrandHex.textSecondary) }
+    var action: Color { tinted ? .white : Color(brandHex: dark ? BrandHex.darkAction : BrandHex.brand) }
+    var onAction: Color { tinted ? .white : Color(brandHex: dark ? BrandHex.darkOnAction : BrandHex.card) }
+    var actionFill: Color { tinted ? Color.white.opacity(0.2) : Color(brandHex: dark ? BrandHex.darkAction : BrandHex.brand) }
+    var actionSurface: Color { tinted ? Color.white.opacity(0.16) : Color(brandHex: dark ? BrandHex.darkActionSurface : BrandHex.actionSurface) }
+    var behind: Color { tinted ? .white : Color(brandHex: dark ? BrandHex.darkBehind : BrandHex.behind) }
+    var positive: Color { tinted ? .white : Color(brandHex: dark ? BrandHex.darkPositive : BrandHex.positiveOnPage) }
+    var cardFill: Color { tinted ? Color.white.opacity(0.1) : Color(brandHex: dark ? BrandHex.darkCard : BrandHex.card) }
+    var cardEdge: Color { tinted ? Color.white.opacity(0.28) : Color(brandHex: dark ? BrandHex.darkPageCardEdge : BrandHex.pageCardEdge) }
+    var divider: Color { tinted ? Color.white.opacity(0.2) : Color(brandHex: dark ? BrandHex.darkBorder : BrandHex.border) }
+    var spill: Color { Color(brandHex: BrandHex.spill).opacity(dark ? BrandHex.darkSpillOpacity : BrandHex.spillOpacity) }
+
+    func tone(_ tone: WidgetSurfaceDisplay.Tone) -> Color {
         switch tone {
-        case .caution: return caution
+        case .behind: return behind
         case .positive: return positive
         case .neutral: return secondary
-        case .drafting: return drafting
+        case .action: return action
         }
     }
 }
 
-/// Blueprint paper with the faint drafting grid (the hero's surface).
-struct WidgetBlueprintPaper: View {
+/// The page under a house: dusk in light, night in dark (§H.4, vertical gradient). Small, with no
+/// house, keeps the plain canvas (lists and forms are paper; only screens with the house get the page).
+struct WidgetPage: View {
+    var withHouse = true
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
-        ZStack {
-            LinearGradient(colors: [WidgetInk.brand, WidgetInk.brandDeep], startPoint: .top, endPoint: .bottom)
-            Canvas { context, size in
-                let step: CGFloat = 22
-                var path = Path()
-                var x: CGFloat = 0
-                while x <= size.width { path.move(to: CGPoint(x: x, y: 0)); path.addLine(to: CGPoint(x: x, y: size.height)); x += step }
-                var y: CGFloat = 0
-                while y <= size.height { path.move(to: CGPoint(x: 0, y: y)); path.addLine(to: CGPoint(x: size.width, y: y)); y += step }
-                context.stroke(path, with: .color(WidgetInk.drafting.opacity(0.07)), lineWidth: 0.5)
+        let dark = scheme == .dark
+        Group {
+            if withHouse {
+                LinearGradient(stops: [
+                    .init(color: Color(brandHex: dark ? BrandHex.darkNightTop : BrandHex.duskTop), location: 0),
+                    .init(color: Color(brandHex: dark ? BrandHex.darkNightTop : BrandHex.duskMid), location: 0.32),
+                    .init(color: Color(brandHex: dark ? BrandHex.darkNightBottom : BrandHex.duskBottom), location: 1),
+                ], startPoint: .top, endPoint: .bottom)
+            } else {
+                Color(brandHex: dark ? BrandHex.darkCanvas : BrandHex.canvas)
             }
         }
         .accessibilityHidden(true)
     }
 }
 
-/// The house at the snapshot's keyframe (pre-composited in WidgetAssets.xcassets).
-struct WidgetHouse: View {
-    let keyframe: String
+/// One house thumbnail: lit or unlit art, at a side, standing on a warm pool of light when lit.
+struct WidgetHouseThumb: View {
+    let asset: String
+    let side: CGFloat
+    var lit = true
+    var scale: CGFloat = 1
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
-        Image(decorative: "wg_house_\(keyframe)")
+        Image(decorative: asset)
             .resizable()
             .interpolation(.high)
             .scaledToFit()
+            .frame(width: side, height: side)
+            .scaleEffect(scale, anchor: UnitPoint(x: 0.5, y: 0.72))
+            .accessibilityHidden(true)
+    }
+}
+
+/// The warm pool the windows throw on the page (×0.2 when no window is lit).
+private struct WidgetSpill: View {
+    let width: CGFloat
+    let lit: Bool
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        let ink = WidgetInk(scheme: scheme)
+        Circle()
+            .fill(RadialGradient(colors: [ink.spill, ink.spill.opacity(0)], center: .center, startRadius: 0, endRadius: width * 0.5))
+            .frame(width: width, height: width)
+            .scaleEffect(y: 0.34)
+            .frame(width: width, height: width * 0.34)
+            .opacity(lit ? 1 : 0.2)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Night only: a cool light behind the lot (0.50 to 0 inside 0.88 of the slot) and a rim ellipse
+/// (0.34 to 0), so the silhouette reads on the night page (standard §H.4, as `CraftHouseView`).
+private struct WidgetBacklight: View {
+    let side: CGFloat
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        if scheme == .dark {
+            let glow = Color(brandHex: BrandHex.darkBacklight)
+            ZStack {
+                Circle()
+                    .fill(RadialGradient(colors: [glow.opacity(0.50), glow.opacity(0.20), glow.opacity(0)],
+                                         center: .center, startRadius: 0, endRadius: side * 0.44))
+                    .frame(width: side * 0.88, height: side * 0.88)
+                    .offset(y: side * 0.03)
+                Circle()
+                    .fill(RadialGradient(colors: [glow.opacity(0.34), glow.opacity(0)],
+                                         center: .center, startRadius: 0, endRadius: side * 0.46))
+                    .frame(width: side * 0.92, height: side * 0.92)
+                    .scaleEffect(y: 0.34)
+                    .offset(y: side * 0.31)
+            }
+            .frame(width: side, height: side)
+            .accessibilityHidden(true)
+        }
+    }
+}
+
+/// The house slot: one rental's house, or the skyline of every rental, or the mark B when tinted.
+struct WidgetHouseSlot: View {
+    let display: WidgetSurfaceDisplay
+    let look: WidgetLook
+    /// The slot's square side.
+    let side: CGFloat
+    /// The skyline's width when it may be wider than the single house's square (the frame side `S` of §H.1 H10).
+    var skylineWidth: CGFloat? = nil
+
+    /// The width the slot takes in its row.
+    var width: CGFloat { look != .accented && display.isAllRentals && display.houses.count > 1 ? (skylineWidth ?? side) : side }
+
+    var body: some View {
+        if look == .accented {
+            LHMarkShape()
+                .fill(Color.white.opacity(0.92))
+                .frame(width: side * 0.6, height: side * 0.6)
+                .frame(width: side, height: side)
+                .widgetAccentable()
+                .accessibilityHidden(true)
+        } else if display.isAllRentals, display.houses.count > 1 {
+            skyline
+        } else {
+            single
+        }
+    }
+
+    private var anyLit: Bool { display.snapshot.loggedToday || display.houses.contains { $0.lit } }
+
+    private var single: some View {
+        let houseSide = side * 0.96
+        let lit = display.state == .noProperty ? false : display.snapshot.loggedToday
+        let asset = display.state == .noProperty
+            ? WidgetHouseArt.assetName(stage: "craft_started", lit: false)
+            : display.singleHouseAsset
+        return ZStack(alignment: .bottom) {
+            WidgetSpill(width: side * 0.9, lit: lit).offset(y: -side * 0.1)
+            WidgetBacklight(side: side)
+            WidgetHouseThumb(asset: asset, side: houseSide, lit: lit,
+                             scale: WidgetHouseArt.stageScale(stage: display.snapshot.houseStage))
+        }
+        .frame(width: side, height: side, alignment: .bottom)
+    }
+
+    private var skyline: some View {
+        let frame = skylineWidth ?? side
+        let shown = WidgetSkyline.visible(display.houses, frame: frame)
+        let houseSide = WidgetSkyline.houseSide(frame: frame, count: shown.count)
+        return ZStack(alignment: .bottom) {
+            WidgetSpill(width: frame * 0.96, lit: anyLit).offset(y: -houseSide * 0.12)
+            WidgetBacklight(side: max(frame * 0.8, houseSide * 2)).frame(height: houseSide)
+            HStack(alignment: .bottom, spacing: WidgetSkyline.gapFraction * frame) {
+                ForEach(shown) { rental in
+                    WidgetHouseThumb(asset: WidgetHouseArt.assetName(stage: rental.stage, lit: rental.lit), side: houseSide, lit: rental.lit)
+                }
+            }
+        }
+        .frame(width: frame, height: side, alignment: .bottom)
     }
 }
 
@@ -100,19 +254,216 @@ struct WidgetElapsedText: View {
     }
 }
 
-private extension Text {
-    /// SF Mono drafting label: caps, +12% tracking.
-    func draftingLabel(_ color: Color, size: CGFloat = 10) -> some View {
-        self.font(.system(size: size, weight: .medium, design: .monospaced))
-            .tracking(size * 0.12)
-            .textCase(.uppercase)
-            .foregroundStyle(color)
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
+// MARK: - Shared pieces
+
+/// The number and what it counts: "212" / "of 750 hours", or the timer.
+private struct WidgetNumberBlock: View {
+    let display: WidgetSurfaceDisplay
+    let ink: WidgetInk
+    var numeral: CGFloat = 46
+    var alignment: HorizontalAlignment = .leading
+    var showsStatus = true
+    var statusLines = 1
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    private var ax: Bool { typeSize.isAccessibilitySize }
+
+    var body: some View {
+        VStack(alignment: alignment, spacing: 1) {
+            if display.state == .noProperty {
+                Text(display.caption)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ink.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                numberText
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .widgetAccentable()
+                if !ax || display.state == .timer {
+                    Text(display.state == .timer ? String(localized: "widget.timer.running", defaultValue: "Timer running", table: "Widgets") : display.caption)
+                        .font(.subheadline)
+                        .foregroundStyle(ink.secondary)
+                        .lineLimit(display.isAllRentals ? 2 : 1)
+                        .minimumScaleFactor(0.8)
+                }
+                if showsStatus, let status = display.status {
+                    statusRow(status)
+                        .padding(.top, 3)
+                }
+            }
+        }
     }
 
-    func heroNumber(_ size: CGFloat) -> Text {
-        self.font(.system(size: size, weight: .bold, design: .rounded)).monospacedDigit()
+    @ViewBuilder private var numberText: some View {
+        if display.state == .timer, let start = display.snapshot.timerStart {
+            WidgetElapsedText(start: start)
+                .font(WidgetFont.numeral(numeral * 0.82))
+                .monospacedDigit()
+                .foregroundStyle(ink.primary)
+        } else {
+            Text(display.number)
+                .font(WidgetFont.numeral(numeral))
+                .monospacedDigit()
+                .foregroundStyle(ink.primary)
+        }
+    }
+
+    private func statusRow(_ s: WidgetSurfaceDisplay.Status) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Image(systemName: s.symbol).font(.caption.weight(.bold))
+            Text(s.text).lineLimit(ax ? 3 : statusLines).minimumScaleFactor(0.7)
+        }
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(ink.tone(s.tone))
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// "3 to confirm": the one tappable thing on medium (a Link, so it opens its own place).
+private struct WidgetPill: View {
+    let pill: WidgetSurfaceDisplay.Pill
+    let ink: WidgetInk
+
+    var body: some View {
+        Link(destination: pill.url) {
+            HStack(spacing: 5) {
+                Image(systemName: pill.symbol).font(.caption.weight(.bold))
+                Text(pill.text).lineLimit(1).minimumScaleFactor(0.6)
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ink.onAction)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 32)
+            .background(Capsule().fill(ink.actionFill))
+        }
+        .widgetAccentable()
+    }
+}
+
+/// The footer of the left column: the pill when something waits, else the stage in words.
+private struct WidgetFooter: View {
+    let display: WidgetSurfaceDisplay
+    let ink: WidgetInk
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        if let pill = display.pill {
+            WidgetPill(pill: pill, ink: ink)
+        } else if !typeSize.isAccessibilitySize, display.state != .timer, display.state != .noProperty, let stage = display.stageLine {
+            Text(stage)
+                .font(.footnote)
+                .foregroundStyle(ink.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+        }
+    }
+}
+
+/// To confirm: up to `limit` rows in one grouped container with hairline dividers, each with an
+/// interactive Confirm (§1.27 Widgets). A row that cannot be logged in one tap reads "Review".
+private struct WidgetConfirmCard: View {
+    let display: WidgetSurfaceDisplay
+    let ink: WidgetInk
+    let limit: Int
+    var rowHeight: CGFloat = 48
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+    private var ax: Bool { typeSize.isAccessibilitySize }
+    private var rows: [WidgetConfirmRow] { Array(display.confirmRows.prefix(ax ? min(limit, 2) : limit)) }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if rows.isEmpty {
+                caughtUp
+            } else {
+                ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                    if index > 0 { Rectangle().fill(ink.divider).frame(height: 0.5).padding(.leading, 14) }
+                    rowView(row)
+                }
+                if display.pendingCount > rows.count {
+                    Rectangle().fill(ink.divider).frame(height: 0.5).padding(.leading, 14)
+                    Link(destination: WidgetLinks.inbox) {
+                        HStack {
+                            Text(String(localized: "widget.card.more", defaultValue: "See all \(display.pendingCount)", table: "Widgets"))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ink.action)
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(ink.secondary)
+                        }
+                        .padding(.horizontal, 14)
+                        .frame(height: 40)
+                    }
+                }
+            }
+        }
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(ink.cardFill))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(ink.cardEdge, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    private var caughtUp: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.circle.fill").font(.title3).foregroundStyle(ink.positive).widgetAccentable()
+            Text(String(localized: "widget.card.caughtUp", defaultValue: "Nothing waiting to confirm.", table: "Widgets"))
+                .font(.subheadline)
+                .foregroundStyle(ink.primary)
+                .lineLimit(2)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: rowHeight + 12)
+    }
+
+    private func rowView(_ row: WidgetConfirmRow) -> some View {
+        HStack(spacing: 10) {
+            Link(destination: WidgetLinks.inbox) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(row.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink.primary)
+                        .lineLimit(ax ? 2 : 1)
+                        .minimumScaleFactor(0.8)
+                    if !ax {
+                        Text(display.detail(for: row))
+                            .font(.caption)
+                            .foregroundStyle(ink.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if row.canConfirm {
+                Button(intent: WidgetConfirmIntent(key: row.key)) {
+                    Group {
+                        if ax {
+                            Image(systemName: "checkmark").font(.subheadline.weight(.bold))
+                        } else {
+                            Text(String(localized: "widget.card.confirm", defaultValue: "Confirm", table: "Widgets"))
+                                .font(.subheadline.weight(.semibold))
+                        }
+                    }
+                    .foregroundStyle(ink.action)
+                    .padding(.horizontal, ax ? 12 : 14)
+                    .frame(minHeight: 32)
+                    .background(Capsule().fill(ink.actionSurface))
+                    .accessibilityLabel(String(localized: "widget.card.confirm", defaultValue: "Confirm", table: "Widgets"))
+                }
+                .buttonStyle(.plain)
+                .frame(minHeight: 44)
+                .widgetAccentable()
+            } else {
+                Link(destination: WidgetLinks.inbox) {
+                    Text(String(localized: "widget.card.review", defaultValue: "Review", table: "Widgets"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink.secondary)
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 32)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: rowHeight)
     }
 }
 
@@ -121,199 +472,153 @@ private extension Text {
 struct WidgetSmallView: View {
     let display: WidgetSurfaceDisplay
     var look: WidgetLook = .fullColor
-
-    private var isNoProperty: Bool { display.state == .noProperty }
+    @Environment(\.colorScheme) private var scheme
+    @ScaledMetric(relativeTo: .largeTitle) private var numeral: CGFloat = 52
 
     var body: some View {
-        GeometryReader { geo in
-            let side = min(geo.size.width, geo.size.height)
-            let house = side * (isNoProperty ? 0.52 : 0.57)
-            ZStack(alignment: .topLeading) {
-                houseArt
-                    .frame(width: house, height: house)
-                    .position(x: geo.size.width - house / 2 - 2,
-                              y: isNoProperty ? 12 + house / 2 : side * 0.25 + house / 2)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(display.smallLabel).draftingLabel(labelColor)
-                    content
-                }
-                .padding(14)
-                .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
-            }
+        let ink = WidgetInk(scheme: scheme, look: look)
+        VStack(alignment: .leading, spacing: 0) {
+            LHMarkShape()
+                .fill(ink.action)
+                .frame(width: 24, height: 24)
+                .widgetAccentable()
+                .accessibilityHidden(true)
+            Spacer(minLength: 6)
+            WidgetNumberBlock(display: display, ink: ink, numeral: numeral, statusLines: 2)
         }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(display.accessibilityLabel)
     }
-
-    @ViewBuilder private var content: some View {
-        switch display.state {
-        case .noProperty:
-            Spacer(minLength: 0)
-            Text("Add a rental to start counting.")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(WidgetInk.primary)
-                .lineLimit(3)
-                .frame(maxWidth: 120, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-        case .timer:
-            if let start = display.snapshot.timerStart {
-                WidgetElapsedText(start: start)
-                    .font(.system(size: 34, weight: .bold, design: .rounded)).monospacedDigit()
-                    .foregroundStyle(WidgetInk.primary)
-                    .lineLimit(1).minimumScaleFactor(0.6)
-                    .padding(.top, 4)
-            }
-            Spacer(minLength: 0)
-            if let s = display.status { statusLine(s) }
-        default:
-            Text(display.number)
-                .heroNumber(36)
-                .foregroundStyle(WidgetInk.primary)
-                .lineLimit(1).minimumScaleFactor(0.7)
-                .padding(.top, 4)
-                .widgetAccentable()
-            Text(display.goalText)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(secondary)
-            Spacer(minLength: 0)
-            if let s = display.status { statusLine(s) }
-        }
-    }
-
-    private func statusLine(_ s: WidgetSurfaceDisplay.Status) -> some View {
-        // Two lines allowed: "Nothing confirmed yet" doesn't fit one line of a small widget.
-        HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Image(systemName: s.symbol).font(.system(size: 11, weight: .bold))
-            Text(s.text).lineLimit(2).minimumScaleFactor(0.9).fixedSize(horizontal: false, vertical: true)
-        }
-        .font(.system(size: 13, weight: .semibold))
-        .foregroundStyle(look == .accented ? WidgetInk.primary : WidgetInk.tone(s.tone))
-    }
-
-    @ViewBuilder private var houseArt: some View {
-        if look == .accented {
-            LHMarkShape().fill(WidgetInk.primary.opacity(0.9)).padding(18).offset(y: 6).widgetAccentable()
-        } else {
-            WidgetHouse(keyframe: display.snapshot.houseKeyframe).opacity(display.state == .timer ? 0.55 : 1)
-        }
-    }
-
-    private var secondary: Color { look == .accented ? WidgetInk.primary.opacity(0.7) : WidgetInk.secondary }
-    private var labelColor: Color { look == .accented ? WidgetInk.primary.opacity(0.7) : WidgetInk.drafting }
 }
 
 struct WidgetMediumView: View {
     let display: WidgetSurfaceDisplay
     var look: WidgetLook = .fullColor
+    @Environment(\.colorScheme) private var scheme
+    @ScaledMetric(relativeTo: .largeTitle) private var numeral: CGFloat = 46
 
     var body: some View {
+        let ink = WidgetInk(scheme: scheme, look: look)
         GeometryReader { geo in
-            let house = geo.size.height * 0.975
-            ZStack(alignment: .topLeading) {
-                houseArt
-                    .frame(width: house, height: house)
-                    .position(x: geo.size.width - house / 2 - 2, y: geo.size.height / 2 + 6)
+            let slot = min(geo.size.height - 22, 150)
+            let house = WidgetHouseSlot(display: display, look: look, side: slot, skylineWidth: 168)
+            HStack(alignment: .center, spacing: 0) {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(display.mediumLabel).draftingLabel(labelColor)
-                    content
+                    WidgetNumberBlock(display: display, ink: ink, numeral: numeral)
+                    Spacer(minLength: 4)
+                    WidgetFooter(display: display, ink: ink)
                 }
-                .padding(16)
-                .frame(width: geo.size.width * 0.56, height: geo.size.height, alignment: .topLeading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                house
+                    .frame(width: house.width, height: geo.size.height, alignment: .bottom)
             }
+            .padding(EdgeInsets(top: 16, leading: 16, bottom: 14, trailing: 10))
+            .frame(width: geo.size.width, height: geo.size.height)
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(display.accessibilityLabel)
     }
+}
 
-    @ViewBuilder private var content: some View {
-        if display.state == .noProperty {
-            Text("Add a rental to start counting.")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(WidgetInk.primary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 8)
+struct WidgetLargeView: View {
+    let display: WidgetSurfaceDisplay
+    var look: WidgetLook = .fullColor
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .largeTitle) private var numeral: CGFloat = 46
+
+    var body: some View {
+        let ink = WidgetInk(scheme: scheme, look: look)
+        let house = WidgetHouseSlot(display: display, look: look, side: 132, skylineWidth: 200)
+        VStack(spacing: 12) {
+            HStack(alignment: .center, spacing: 0) {
+                VStack(alignment: .leading, spacing: 0) {
+                    WidgetNumberBlock(display: display, ink: ink, numeral: numeral)
+                    Spacer(minLength: 4)
+                    if !typeSize.isAccessibilitySize, display.state != .timer, display.state != .noProperty, let stage = display.stageLine {
+                        Text(stage)
+                            .font(.footnote)
+                            .foregroundStyle(ink.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                house.frame(width: house.width, height: 132, alignment: .bottom)
+            }
+            .frame(height: 132)
+            WidgetConfirmCard(display: display, ink: ink, limit: 3, rowHeight: 52)
             Spacer(minLength: 0)
-            if let pill = display.pill { pillView(pill) }
-        } else {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                if display.state == .timer, let start = display.snapshot.timerStart {
-                    WidgetElapsedText(start: start)
-                        .font(.system(size: 40, weight: .bold, design: .rounded)).monospacedDigit()
-                        .foregroundStyle(WidgetInk.primary)
-                        .lineLimit(1).minimumScaleFactor(0.6)
-                    Text(display.timerPropertyName)
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(secondary)
-                        .lineLimit(1)
-                } else {
-                    Text(display.number).heroNumber(40).foregroundStyle(WidgetInk.primary)
-                        .lineLimit(1).minimumScaleFactor(0.6)
-                        .widgetAccentable()
-                    Text(display.goalText)
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(secondary)
-                        .lineLimit(1)
-                }
-            }
-            .padding(.top, 2)
-            if let s = statusForMedium {
-                HStack(spacing: 4) {
-                    Image(systemName: s.symbol).font(.system(size: 11, weight: .bold))
-                    Text(s.text).lineLimit(1).minimumScaleFactor(0.8)
-                }
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(look == .accented ? WidgetInk.primary : WidgetInk.tone(s.tone))
-                .padding(.top, 2)
-            }
+        }
+        .padding(EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 12))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// The iPad Home Screen: a mini Today on the left (house, number, pace), five rows on the right.
+struct WidgetExtraLargeView: View {
+    let display: WidgetSurfaceDisplay
+    var look: WidgetLook = .fullColor
+    @Environment(\.colorScheme) private var scheme
+    @ScaledMetric(relativeTo: .largeTitle) private var numeral: CGFloat = 54
+
+    var body: some View {
+        let ink = WidgetInk(scheme: scheme, look: look)
+        HStack(alignment: .top, spacing: 18) {
+            WidgetTodayColumn(display: display, look: look, ink: ink, numeral: numeral, houseSide: 168)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            WidgetConfirmCard(display: display, ink: ink, limit: 5)
+                .frame(maxWidth: .infinity)
+                .frame(maxHeight: .infinity, alignment: .top)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// The iPad Lock Screen in landscape: the mini Today stacked above three rows.
+struct WidgetExtraLargePortraitView: View {
+    let display: WidgetSurfaceDisplay
+    var look: WidgetLook = .fullColor
+    @Environment(\.colorScheme) private var scheme
+    @ScaledMetric(relativeTo: .largeTitle) private var numeral: CGFloat = 54
+
+    var body: some View {
+        let ink = WidgetInk(scheme: scheme, look: look)
+        VStack(spacing: 14) {
+            WidgetTodayColumn(display: display, look: look, ink: ink, numeral: numeral, houseSide: 190)
+            WidgetConfirmCard(display: display, ink: ink, limit: 3)
             Spacer(minLength: 0)
-            if let pill = display.pill {
-                pillView(pill)
-            } else {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(display.stageLine.title)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(WidgetInk.primary)
-                    Text(display.stageLine.next)
-                        .font(.system(size: 12))
-                        .foregroundStyle(secondary)
-                }
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// The mini Today: the house (or skyline) centred, the number under it, then the pace.
+private struct WidgetTodayColumn: View {
+    let display: WidgetSurfaceDisplay
+    let look: WidgetLook
+    let ink: WidgetInk
+    let numeral: CGFloat
+    let houseSide: CGFloat
+
+    var body: some View {
+        VStack(spacing: 4) {
+            WidgetHouseSlot(display: display, look: look, side: houseSide, skylineWidth: min(houseSide * 1.6, 300))
+            WidgetNumberBlock(display: display, ink: ink, numeral: numeral, alignment: .center)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+            if let pill = display.pill, display.state == .timer || display.state == .noProperty {
+                WidgetPill(pill: pill, ink: ink).padding(.top, 6)
             }
         }
     }
-
-    /// The timer's status line says "Timer running" (the property is beside the number).
-    private var statusForMedium: WidgetSurfaceDisplay.Status? {
-        if display.state == .timer { return .init(symbol: "timer", text: "Timer running", tone: .drafting) }
-        return display.status
-    }
-
-    /// The one tappable thing: a white pill on blueprint (a Link, so it opens its own place).
-    private func pillView(_ pill: WidgetSurfaceDisplay.Pill) -> some View {
-        Link(destination: pill.url) {
-            HStack(spacing: 5) {
-                Image(systemName: pill.symbol).font(.system(size: 11, weight: .bold))
-                Text(pill.text).lineLimit(1)
-            }
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(look == .accented ? WidgetInk.primary : WidgetInk.brand)
-            .padding(.horizontal, 12)
-            .frame(minHeight: 30)
-            .background(Capsule().fill(look == .accented ? WidgetInk.primary.opacity(0.18) : WidgetInk.primary))
-        }
-        .widgetAccentable()
-    }
-
-    @ViewBuilder private var houseArt: some View {
-        if look == .accented {
-            LHMarkShape().fill(WidgetInk.primary.opacity(0.9)).padding(30).widgetAccentable()
-        } else {
-            WidgetHouse(keyframe: display.snapshot.houseKeyframe).opacity(display.state == .timer ? 0.55 : 1)
-        }
-    }
-
-    private var secondary: Color { look == .accented ? WidgetInk.primary.opacity(0.7) : WidgetInk.secondary }
-    private var labelColor: Color { look == .accented ? WidgetInk.primary.opacity(0.7) : WidgetInk.drafting }
 }
 
 // MARK: - Lock Screen (vibrant: one colour, the system tints it)
@@ -337,12 +642,14 @@ struct WidgetCircularHoursView: View {
         ZStack {
             WidgetAccessoryBacking()
             Circle().stroke(Color.white.opacity(0.28), lineWidth: 5).padding(6)
-            Circle()
-                .trim(from: 0, to: display.state == .noProperty ? 0 : display.progress)
-                .stroke(Color.white, style: StrokeStyle(lineWidth: 5, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .padding(6)
-                .widgetAccentable()
+            if display.hasRing {
+                Circle()
+                    .trim(from: 0, to: display.progress)
+                    .stroke(Color.white, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .padding(6)
+                    .widgetAccentable()
+            }
             VStack(spacing: 0) {
                 face
                 LHMarkShape().fill(Color.white).frame(width: 15, height: 15)
@@ -403,11 +710,11 @@ struct WidgetRectangularView: View {
             .widgetAccentable()
             headline
                 .font(.system(size: 17, weight: .bold, design: .rounded)).monospacedDigit()
-                .lineLimit(1).minimumScaleFactor(0.8)
+                .lineLimit(1).minimumScaleFactor(0.7)
             Text(display.rectangularLine)
                 .font(.system(size: 13))
                 .opacity(0.9)
-                .lineLimit(1).minimumScaleFactor(0.85)
+                .lineLimit(1).minimumScaleFactor(0.8)
         }
         .foregroundStyle(Color.white)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)

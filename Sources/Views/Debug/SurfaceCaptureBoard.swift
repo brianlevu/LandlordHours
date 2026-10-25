@@ -46,14 +46,14 @@ enum SurfaceSamples {
         properties: Int = 2, hours: Double, goal: WidgetSurfaceSnapshot.Goal = .reps750, required: Double = 600,
         pending: Int, timer: Bool = false
     ) -> WidgetSurfaceSnapshot {
-        let progress = HouseProgress(hours: properties == 0 ? 0 : hours, goal: .reps750)
         return WidgetSurfaceSnapshot(
             updatedAt: now, taxYear: 2026, propertyCount: properties, hours: hours, goal: goal,
             goalHours: goal == .reps750 ? 750 : (goal == .mp500 ? 500 : 100), requiredHoursToDate: required,
             pendingCount: pending, timerStart: timer ? now.addingTimeInterval(-42 * 60) : nil,
             timerPropertyName: timer ? "Pine Cabin" : nil,
-            houseKeyframe: progress.keyframe.rawValue, stageTitle: progress.stage.spokenName,
-            nextStepLabel: progress.nextMilestoneLabel
+            houseKeyframe: "", stageTitle: "", nextStepLabel: "",
+            houseStage: WidgetSamples.stage(hours, goal == .reps750 ? 750 : (goal == .mp500 ? 500 : 100)),
+            loggedToday: pending > 0, paceReady: true
         )
     }
 
@@ -77,10 +77,9 @@ struct SurfaceCaptureRoot: View {
 
     @ViewBuilder private var board: some View {
         switch launch.name {
-        case "widgets-home-a": WallpaperBoard(scheme: launch.scheme) { HomeWidgetsA() }
-        case "widgets-home-b": WallpaperBoard(scheme: launch.scheme) { HomeWidgetsB() }
-        case "widgets-home-c": WallpaperBoard(scheme: launch.scheme) { HomeWidgetsC() }
-        case "widgets-tinted": WallpaperBoard(scheme: launch.scheme, dim: true) { HomeWidgetsA(look: .accented) }
+        // Home Screen widget frames (all families, states, appearances and type sizes): package I,
+        // Sources/Widget/WidgetCaptureBoards.swift.
+        case "widget-export": WidgetExportBoard()
         case "widgets-lock": WallpaperBoard(scheme: launch.scheme) { LockStatesBoard() }
         case "launch-storyboard": LaunchStoryboardView().ignoresSafeArea().preferredColorScheme(launch.scheme)
             .onAppear { LaunchStatusBarWindow.show() }
@@ -146,81 +145,6 @@ private struct MockTag: View {
             .padding(.horizontal, 10).padding(.vertical, 5)
             .background(Capsule().fill(.black.opacity(0.55)))
             .overlay(Capsule().strokeBorder(.white.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
-    }
-}
-
-// MARK: Home Screen widgets
-
-/// A Home Screen widget at its real size: blueprint paper (or the tinted material), clipped.
-private struct HomeTile<Content: View>: View {
-    let size: CGSize
-    var look: WidgetLook = .fullColor
-    let caption: String
-    @ViewBuilder var content: () -> Content
-
-    var body: some View {
-        VStack(spacing: 5) {
-            ZStack {
-                if look == .accented {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous).fill(.ultraThinMaterial)
-                        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Color(brandHex: "10202E").opacity(0.35)))
-                } else {
-                    WidgetBlueprintPaper()
-                }
-                content()
-            }
-            .frame(width: size.width, height: size.height)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            Text(caption).font(.system(size: 12, weight: .medium)).foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.35), radius: 2, y: 1).lineLimit(1)
-        }
-    }
-}
-
-private let small = CGSize(width: 162, height: 162)
-private let medium = CGSize(width: 344, height: 162)
-
-private struct HomeWidgetsA: View {
-    var look: WidgetLook = .fullColor
-    var body: some View {
-        VStack(spacing: 14) {
-            HomeTile(size: medium, look: look, caption: "Medium · behind, 3 to confirm") {
-                WidgetMediumView(display: .init(snapshot: SurfaceSamples.behind), look: look)
-            }
-            HStack(spacing: 20) {
-                HomeTile(size: small, look: look, caption: "Small · behind") { WidgetSmallView(display: .init(snapshot: SurfaceSamples.behind), look: look) }
-                HomeTile(size: small, look: look, caption: "Small · timer") { WidgetSmallView(display: .init(snapshot: SurfaceSamples.timer), look: look) }
-            }
-            HomeTile(size: medium, look: look, caption: "Medium · on pace, caught up") {
-                WidgetMediumView(display: .init(snapshot: SurfaceSamples.onPace), look: look)
-            }
-        }
-    }
-}
-
-private struct HomeWidgetsB: View {
-    var body: some View {
-        VStack(spacing: 14) {
-            HomeTile(size: medium, caption: "Medium · on pace, caught up") { WidgetMediumView(display: .init(snapshot: SurfaceSamples.onPace)) }
-            HStack(spacing: 20) {
-                HomeTile(size: small, caption: "Small · nothing yet") { WidgetSmallView(display: .init(snapshot: SurfaceSamples.empty)) }
-                HomeTile(size: small, caption: "Small · no property") { WidgetSmallView(display: .init(snapshot: SurfaceSamples.noProperty)) }
-            }
-            HomeTile(size: medium, caption: "Medium · goal met") { WidgetMediumView(display: .init(snapshot: SurfaceSamples.met)) }
-        }
-    }
-}
-
-private struct HomeWidgetsC: View {
-    var body: some View {
-        VStack(spacing: 14) {
-            HomeTile(size: medium, caption: "Medium · timer") { WidgetMediumView(display: .init(snapshot: SurfaceSamples.timer)) }
-            HomeTile(size: medium, caption: "Medium · no property") { WidgetMediumView(display: .init(snapshot: SurfaceSamples.noProperty)) }
-            HStack(spacing: 20) {
-                HomeTile(size: small, caption: "Small · on pace") { WidgetSmallView(display: .init(snapshot: SurfaceSamples.onPace)) }
-                HomeTile(size: small, caption: "Small · goal met") { WidgetSmallView(display: .init(snapshot: SurfaceSamples.met)) }
-            }
-        }
     }
 }
 
