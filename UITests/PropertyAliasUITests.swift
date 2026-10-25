@@ -43,7 +43,7 @@ final class PropertyAliasUITests: XCTestCase {
 
         let field = app.textFields["property.alias.field"]
         let toggle = app.switches["property.ownerOccupied"]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 15), "Edit property should open")
+        XCTAssertTrue(toggle.waitForExistence(timeout: 15), "Edit rental should open")
         bringIntoView(field)
         XCTAssertTrue(toggle.isHittable, "toggle and alias card share the frame")
         XCTAssertEqual(toggle.value as? String, "0", "I live here starts off")
@@ -108,7 +108,7 @@ final class PropertyAliasUITests: XCTestCase {
         launch(scheme: scheme, extra: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL"])
         let field = app.textFields["property.alias.field"]
         let toggle = app.switches["property.ownerOccupied"]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 15), "Edit property should open")
+        XCTAssertTrue(toggle.waitForExistence(timeout: 15), "Edit rental should open")
         bringIntoView(toggle)
         capture("\(scheme)-7-ax3-livehere-off")
         let names = ["Lake House", "Sunny Loft listing", "Ridgeline Plumbing"]
@@ -139,7 +139,7 @@ final class PropertyAliasUITests: XCTestCase {
     private func dismissKeyboard() {
         if app.keyboards.count > 0 {
             let done = app.keyboards.buttons["done"]
-            if done.exists { done.tap() } else { app.staticTexts["Edit property"].tap() }
+            if done.exists { done.tap() } else { app.staticTexts["Edit rental"].tap() }
         }
     }
 

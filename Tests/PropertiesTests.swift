@@ -125,9 +125,24 @@ final class PropertyCountableHoursTests: CaptureTestCase {
         add(vm, oak, 1, .contractNegotiation)
         let hours = vm.propertyCountableHours(oak, goal: .reps750)
         XCTAssertEqual(hours, 99, accuracy: 0.001, "102h logged, 99h count")
-        XCTAssertEqual(PropertyHouseStage.keyframe(for: hours), .k00_lot, "the 3 investor hours never pour the slab")
+        XCTAssertEqual(CraftStage.stage(hours: hours, goal: 750), .started, "the 3 investor hours never move the house")
         let kinds = vm.propertyFigures(for: vm.properties.first { $0.id == oak }!, goal: .reps750).kinds
         XCTAssertEqual(kinds.map(\.category), [.repairs])
+    }
+
+    func testRentalRowsLightOnlyTheRentalLoggedTodayAndMatchItsHours() {
+        let (vm, oak, pine) = twoProperties()
+        GoalManager.shared.globalGoalType = .reps
+        let cal = Calendar.current
+        add(vm, oak, 3, .repairs, date: Date())
+        add(vm, pine, 5, .repairs, date: cal.date(byAdding: .day, value: -2, to: Date())!)
+        let rows = vm.rentalRows(now: Date())
+        let oakRow = rows.first { $0.id == oak }!, pineRow = rows.first { $0.id == pine }!
+        XCTAssertTrue(oakRow.lit, "hours logged at Oak today")
+        XCTAssertFalse(pineRow.lit, "Pine's hours were two days ago")
+        XCTAssertEqual(oakRow.hours, vm.propertyCountableHours(oak), accuracy: 0.001)
+        XCTAssertEqual(pineRow.stage, CraftStage.stage(hours: vm.propertyCountableHours(pine), goal: 750))
+        XCTAssertEqual(rows.map(\.id), vm.properties.map(\.id), "the list keeps the rentals' order")
     }
 
     func testFiguresKindsTopFourRecentAndCounts() {
@@ -153,37 +168,118 @@ final class PropertyCountableHoursTests: CaptureTestCase {
     }
 }
 
-// MARK: - The mini-house stage (same mapping as Today)
+// MARK: - The rental's house: the one stage function, the same goal as its Today page (v2)
 
-final class PropertyHouseStageTests: XCTestCase {
-    func testBoundariesOnThe500hLadder() {
-        XCTAssertEqual(PropertyHouseStage.keyframe(for: 0), .k00_lot)
-        XCTAssertEqual(PropertyHouseStage.keyframe(for: 99), .k00_lot)
-        XCTAssertEqual(PropertyHouseStage.keyframe(for: 100), .k01_slab, "slab at 100")
-        XCTAssertEqual(PropertyHouseStage.keyframe(for: 499), .k10_frame090)
-        XCTAssertEqual(PropertyHouseStage.keyframe(for: 500), .k12_roof, "complete with the roof on at 500")
-        XCTAssertEqual(PropertyHouseStage.keyframe(for: 501), .k12_roof, "never past the roof")
-        XCTAssertEqual(PropertyHouseStage.keyframe(for: 900), .k12_roof)
-
-        // v2 (plan 0a): the stage forwards to CraftStage (share of the 750 the mini-house uses,
-        // capped at 500h); the words follow the crafted house until package F redesigns the rental.
-        XCTAssertEqual(PropertyHouseStage.stage(for: 0), .started)
-        XCTAssertEqual(PropertyHouseStage.stage(for: 149), .started)
-        XCTAssertEqual(PropertyHouseStage.stage(for: 150), .frame70)
-        XCTAssertEqual(PropertyHouseStage.stage(for: 352.5), .framing)
-        XCTAssertEqual(PropertyHouseStage.stage(for: 499), .half)
-        XCTAssertEqual(PropertyHouseStage.stage(for: 500), .half)
-        XCTAssertEqual(PropertyHouseStage.stage(for: 900), .half, "never past the 500h cap")
-    }
-
-    func testBelow500ItMatchesTodaysKeyframes() {
-        for h in stride(from: 0.0, through: 500, by: 0.5) {
-            XCTAssertEqual(PropertyHouseStage.keyframe(for: h), HouseProgress.keyframe(for: h), "\(h)h")
+final class RentalStageTests: XCTestCase {
+    func testRowStageIsTheOneStageFunctionAgainstTheRentalsGoal() {
+        let id = UUID()
+        for goal in [100.0, 500, 750] {
+            for h in stride(from: 0.0, through: goal * 1.3, by: goal / 40) {
+                let row = RentalRowModel(id: id, name: "Pine Cabin", hours: h, goal: goal, lit: false, kind: .str)
+                XCTAssertEqual(row.stage, CraftStage.stage(hours: h, goal: goal), "\(h)h of \(goal)")
+                // The same rental's Today page: TodayFocus for one rental measures against the same goal.
+                let today = TodayFocus(rentalID: id, name: "Pine Cabin", hours: h, goal: goal)
+                XCTAssertEqual(row.stage, today.stage, "the thumbnail and Today agree at \(h)h of \(goal)")
+            }
         }
-        XCTAssertEqual(PropertyHouseStage.keyframe(for: -5), .k00_lot)
-        XCTAssertEqual(PropertyHouseStage.keyframe(for: .nan), .k00_lot)
+        // No 500h cap any more: a rental reaches the finished house at its goal.
+        XCTAssertEqual(RentalRowModel(id: id, name: "A", hours: 750, goal: 750, lit: true, kind: .ltr).stage, .complete)
+        XCTAssertEqual(RentalRowModel(id: id, name: "A", hours: 500, goal: 750, lit: true, kind: .ltr).stage, .half)
     }
 
+    func testRowWordsAndHours() {
+        let row = RentalRowModel(id: UUID(), name: "Pine Cabin", hours: 212.9, goal: 750, lit: true, kind: .str)
+        XCTAssertEqual(row.value, "212h", "whole hours, never rounded up")
+        XCTAssertEqual(row.meta, "Frame going up", "the stage in words")
+        XCTAssertEqual(RentalRowModel(id: UUID(), name: "Oak", hours: 0, goal: 750, lit: false, kind: .ltr).meta, "Framing started")
+        XCTAssertTrue(row.spoken.hasSuffix("A few nights"), "VoiceOver still hears the kind of stay")
+        XCTAssertTrue(row.spoken.hasPrefix("Pine Cabin, 212 hours"))
+        // Bad input never reaches the house.
+        let bad = RentalRowModel(id: UUID(), name: "X", hours: .nan, goal: 750, lit: false, kind: .ltr)
+        XCTAssertEqual(bad.hours, 0)
+        XCTAssertEqual(bad.stage, .started)
+    }
+
+    func testListSubtitleIsHoursOnlyNeverAGoal() {
+        let line = RentalsText.subtitle(count: 3, wholeHours: 312)
+        XCTAssertEqual(line, "3 rentals · 312h this year")
+        XCTAssertFalse(line.contains("of"), "All rentals never shows a goal, summed or otherwise (H10)")
+    }
+
+    func testHouseLookIsReservedNotBuilt() {
+        XCTAssertFalse(RentalHouseLook.isBuilt, "§F.1 is designed for, not built: the House row renders nothing")
+        XCTAssertEqual(RentalHouseLook.slots, ["roof", "siding", "trim", "door"], "four slots, no more (§F.1)")
+        for stage in ["half", "complete"] {
+            XCTAssertNil(UIImage(named: "craft_slots_craft_\(stage)"), "no mask pack in the bundle before §F.1")
+            XCTAssertNil(UIImage(named: "craft_slots_\(stage)"))
+        }
+    }
+}
+
+// MARK: - The rental page's figures
+
+final class RentalPageFiguresTests: XCTestCase {
+    private let cal: Calendar = {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        c.firstWeekday = 2
+        return c
+    }()
+
+    private func date(_ y: Int, _ m: Int, _ d: Int) -> Date { cal.date(from: DateComponents(year: y, month: m, day: d, hour: 12))! }
+
+    private func input(hours: Double, goal: Double = 100, isRecord: Bool = false, days: Int = 60,
+                       thisWeek: Double = 0, lastWeek: Double = 0, now: Date? = nil) -> RentalPageFigures.Input {
+        RentalPageFigures.Input(hours: hours, goal: goal, isRecord: isRecord, thisWeek: thisWeek, lastWeek: lastWeek,
+                                year: 2026, now: now ?? date(2026, 10, 22), calendar: cal, daysOfData: days)
+    }
+
+    func testStageAndPaceAreTodaysForOneRental() {
+        let f = RentalPageFigures.make(input(hours: 46, goal: 100))
+        XCTAssertEqual(f.stage, .frame70)
+        let today = TodayPaceSentence.make(.init(hours: 46, goal: 100, year: 2026, now: date(2026, 10, 22), calendar: cal,
+                                                 paceReady: true))
+        XCTAssertEqual(f.pace, today, "the rental page says what its Today page says")
+        XCTAssertEqual(f.pace.tone, .behind)
+    }
+
+    func testFinishTile() {
+        XCTAssertEqual(RentalPageFigures.make(input(hours: 120, goal: 100)).finishTile, .init(value: "Reached", label: "100 hours"))
+        XCTAssertEqual(RentalPageFigures.make(input(hours: 0)).finishTile.value, "Not yet", "no hours, no weekly number")
+        XCTAssertEqual(RentalPageFigures.make(input(hours: 2, days: 3)).finishTile.value, "Not yet", "pace waits for data")
+        let weekly = RentalPageFigures.make(input(hours: 46, goal: 100)).finishTile
+        XCTAssertEqual(weekly.label, "To finish by Dec 31")
+        let weeks = TodayPaceCards.weeksLeft(now: date(2026, 10, 22), calendar: cal)
+        XCTAssertEqual(weekly.value, "\(Int((54 / weeks).rounded(.up)))h a week")
+        let record = RentalPageFigures.make(input(hours: 46, isRecord: true)).finishTile
+        XCTAssertEqual(record, .init(value: "70", label: "Days left in 2026"))
+    }
+
+    func testWeekTileTrend() {
+        XCTAssertEqual(RentalPageFigures.weekTile(thisWeek: 0, lastWeek: 0), .init(value: "0m", label: "This week", trend: nil))
+        XCTAssertEqual(RentalPageFigures.weekTile(thisWeek: 6, lastWeek: 2).trend, .up)
+        XCTAssertEqual(RentalPageFigures.weekTile(thisWeek: 1.5, lastWeek: 4).trend, .down)
+        XCTAssertEqual(RentalPageFigures.weekTile(thisWeek: 3, lastWeek: 3.1).trend, .flat)
+        XCTAssertEqual(RentalPageFigures.weekTile(thisWeek: 1.5, lastWeek: 0).value, "1h 30m")
+    }
+
+    func testWeekHoursSplitAtTheCalendarWeek() {
+        let now = date(2026, 10, 22) // Thursday; the week starts Monday the 19th.
+        func entry(_ d: Date, _ h: Double) -> TimeEntry {
+            TimeEntry(propertyId: UUID(), participant: .selfParticipant, category: .repairs, hours: h, date: d)
+        }
+        let entries = [entry(date(2026, 10, 19), 2), entry(date(2026, 10, 22), 1.5),
+                       entry(date(2026, 10, 18), 4), entry(date(2026, 10, 12), 1),
+                       entry(date(2026, 10, 11), 9), entry(date(2026, 10, 20), .nan)]
+        let w = RentalWeek.hours(entries: entries, now: now, calendar: cal)
+        XCTAssertEqual(w.thisWeek, 3.5, accuracy: 0.001)
+        XCTAssertEqual(w.lastWeek, 5, accuracy: 0.001)
+        XCTAssertEqual(RentalWeek.daysOfData(entries: entries, year: 2026, now: now, calendar: cal), 11)
+        XCTAssertEqual(RentalWeek.daysOfData(entries: [], year: 2026, now: now, calendar: cal), 0)
+    }
+}
+
+final class PropertyMetaTests: XCTestCase {
     func testWordingPerGoalAndGrouping() {
         // Material participation, no grouping election: the 500h test runs per rental.
         // The target is the goal's own number (100 or 500).
@@ -274,14 +370,17 @@ final class PropertySealTests: XCTestCase {
 final class PropertyDeletionTests: CaptureTestCase {
     func testAlertCopyMatchesWhatDeleteDoes() {
         let p = RentalProperty(name: "Pine Cabin", address: "", propertyType: .str)
-        let d41 = PropertyDeletion(property: p, entryCount: 41)
-        XCTAssertEqual(d41.title, "Delete Pine Cabin and its 41 entries?")
-        XCTAssertEqual(d41.message, "Its 41 entries and their photos are deleted too, on this iPhone and in iCloud. This can’t be undone.")
-        let d1 = PropertyDeletion(property: p, entryCount: 1)
-        XCTAssertEqual(d1.title, "Delete Pine Cabin and its 1 entry?")
+        // §1.21: a title of at most six words, at most two sentences, whatever the rental's name.
+        let long = RentalProperty(name: "The Arroyo Seco Schoolhouse Lofts, Unit 4B", address: "", propertyType: .ltr)
+        for property in [p, long] {
+            let d = PropertyDeletion(property: property, entryCount: 41, loggedHours: 34.5)
+            XCTAssertEqual(d.title, "Delete this rental?")
+            XCTAssertLessThanOrEqual(d.title.split(separator: " ").count, 6)
+            XCTAssertEqual(d.message, "\(property.name), its 34h 30m of logged time and any photos go from this iPhone and iCloud. This can’t be undone.")
+        }
         let d0 = PropertyDeletion(property: p, entryCount: 0)
-        XCTAssertEqual(d0.title, "Delete Pine Cabin?")
-        XCTAssertEqual(d0.message, "It’s removed from this iPhone and iCloud. This can’t be undone.")
+        XCTAssertEqual(d0.title, "Delete this rental?")
+        XCTAssertEqual(d0.message, "Pine Cabin goes from this iPhone and iCloud. This can’t be undone.")
     }
 
     func testDeleteGoesThroughTheViewModelAndTombstonesPropertyAndEntries() {
@@ -296,6 +395,7 @@ final class PropertyDeletionTests: CaptureTestCase {
 
         let deletion = PropertyDeletion.make(for: property, in: vm)
         XCTAssertEqual(deletion.entryCount, 2)
+        XCTAssertEqual(deletion.loggedHours, 3, accuracy: 0.001)
         deletion.perform(in: vm)
 
         XCTAssertFalse(vm.properties.contains { $0.id == oak })
