@@ -333,7 +333,7 @@ One `ButtonStyle` enum, four cases. Retire `PropertyTintedButtonStyle`, `ProTint
 | `.tertiary` | 44 text, `.subheadline.semibold` | clear / `action` (or `destructive`) | "See all", "Confirm 3 likely", "Restore purchase", "Undo". |
 | `.icon` | 44 circle, symbol `.body.semibold` | `backgroundTertiary` / `textSecondary`; on blueprint `white.opacity(0.14)` / white | Close, mic, stepper. |
 
-Press = motion `press`. Disabled = 40% opacity. The symbol weight inside `.icon` is the one place a symbol weight is set explicitly (§1.17).
+Press = motion `press`. Disabled = no opacity dim on a button: `textSecondary` ink (≥ 4.5:1) on a `backgroundTertiary` fill with a hairline `border` (primary, secondary), `textSecondary` ink alone on tertiary, `textTertiary` on the icon circle. A whole-row `press` target still dims to 40%. The symbol weight inside `.icon` is the one place a symbol weight is set explicitly (§1.17).
 
 ### 1.14 Screen titles `LHScreenTitle`
 

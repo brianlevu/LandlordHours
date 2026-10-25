@@ -21,7 +21,7 @@ extension AppViewModel {
         let mine = timeEntries.filter { $0.propertyId == propertyId }
         switch goal ?? houseGoal {
         case .reps750:
-            return TaxQualificationEngine.qualifyingRealEstateHours(entries: mine, participant: .selfParticipant, year: year)
+            return TaxQualificationEngine.qualifyingRealEstateHours(entries: mine, participant: GoalManager.shared.repsParticipant, year: year)
         case .mp500, .mp100:
             let spouse = includeSpouse ?? tracksSpouseJointly
             return TaxQualificationEngine.materialParticipationStatus(
