@@ -415,6 +415,8 @@ struct LogTimeSheet: View {
                 ZStack {
                     // Only the words change: the old label leaves up, the new one arrives from below.
                     Text(label)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.75)
                         .id(label)
                         .transition(reduceMotion ? .opacity : .asymmetric(insertion: .opacity.combined(with: .offset(y: 8)),
                                                                            removal: .opacity.combined(with: .offset(y: -8))))

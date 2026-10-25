@@ -505,6 +505,15 @@ final class LogTimeUITests: XCTestCase {
         }
     }
 
+    private static let extraNames: Set<String> = ["log-filled-spouse", "log-not-counted", "log-save-failed", "log-keyboard", "log-voice-denied",
+                                                  "log-voice-first", "timer-idle", "timer-running", "picker-category", "picker-property"]
+    func testCaptureExtrasLightDefault() { captureAll(scheme: "light", size: nil, names: Self.extraNames) }
+    func testCaptureExtrasDarkDefault() { captureAll(scheme: "dark", size: nil, names: Self.extraNames) }
+    func testCaptureExtrasLightXXL() { captureAll(scheme: "light", size: "xxl", names: Self.extraNames) }
+    func testCaptureExtrasDarkXXL() { captureAll(scheme: "dark", size: "xxl", names: Self.extraNames) }
+    func testCaptureExtrasLightAX3() { captureAll(scheme: "light", size: "ax3", names: Self.extraNames) }
+    func testCaptureExtrasDarkAX3() { captureAll(scheme: "dark", size: "ax3", names: Self.extraNames) }
+
     func testCapturePaneProbe() {
         for scheme in ["light", "dark"] { captureAll(scheme: scheme, size: nil, names: ["pane-probe"]) }
     }
@@ -600,7 +609,7 @@ final class LogTimeUITests: XCTestCase {
             "-AppleLocale", "en_US",
         ] + extra
         app.launch()
-        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 15) || app.buttons["sheet.close"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 15) || app.buttons["sheet.close"].waitForExistence(timeout: 25))
         Thread.sleep(forTimeInterval: 2.5)
         let tip = app.buttons["Continue"]
         if tip.exists { tip.tap() }

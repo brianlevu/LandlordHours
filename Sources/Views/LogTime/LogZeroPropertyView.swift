@@ -8,7 +8,7 @@ extension LogTimeSheet {
             Text(lt("Which rental is this for?"))
                 .font(.headline)
                 .foregroundStyle(colors.textPrimary)
-            LogTextField(placeholder: lt("Name or address, like \u{201C}Pine Cabin\u{201D}"), text: $firstRunName,
+            LogTextField(placeholder: isAX ? lt("Rental name") : lt("Name or address, like \u{201C}Pine Cabin\u{201D}"), text: $firstRunName,
                          focus: $nameFocused, label: lt("Rental name"), identifier: "log.rentalName",
                          submitLabel: .next, onSubmit: { noteFocused = true })
             LHFootnote(lt("You can add the address and type later."))

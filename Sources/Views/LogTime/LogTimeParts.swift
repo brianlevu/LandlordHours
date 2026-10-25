@@ -42,7 +42,7 @@ struct LiveTimerCard: View {
                     .lhHeroNumberFont()
                     .foregroundStyle(colors.textPrimary)
                     .contentTransition(.numericText(countsDown: false))
-                    .animation(AppAnimation.standard, value: Int(elapsed))
+                    .animation(LogSheetDebug.state == nil ? AppAnimation.standard : nil, value: Int(elapsed))
                     .accessibilityLabel(lt("Running for \(LHFormat.spokenHours(elapsed / 3600))"))
                     .accessibilityIdentifier("timer.clock")
                 Text(lt("\(category.inboxLabel) \u{00B7}\u{00A0}started \(LogTimeFormat.clockTime(start))"))
