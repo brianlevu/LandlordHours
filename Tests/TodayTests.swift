@@ -34,13 +34,16 @@ final class TodayConfirmLogicTests: CaptureTestCase {
                        .caughtUp(captureOn: false))
     }
 
-    func testCountIsEveryVisibleItemAndRowsAreTheTopThreeMostLikely() {
+    func testCountIsEveryVisibleItemAndRowsAreTheTopTwoMostLikely() {
         let items = [s("low", confidence: 0.4), s("top", confidence: 0.97), s("flag", confidence: 0.9, flagged: true),
                      s("mid", confidence: 0.9), s("ok", confidence: 0.8)]
         XCTAssertEqual(TodayConfirm.count(visible: items), 5)
-        XCTAssertEqual(TodayConfirm.rows(visible: items).map(\.title), ["top", "mid", "flag"])
+        XCTAssertEqual(TodayConfirm.rows(visible: items).map(\.title), ["top", "mid"])
+        XCTAssertEqual(TodayConfirm.rows(visible: items, limit: 1).map(\.title), ["top"])
         XCTAssertTrue(TodayConfirm.showsReviewAll(count: 5))
-        XCTAssertFalse(TodayConfirm.showsReviewAll(count: 3))
+        XCTAssertTrue(TodayConfirm.showsReviewAll(count: 3))
+        XCTAssertFalse(TodayConfirm.showsReviewAll(count: 2))
+        XCTAssertTrue(TodayConfirm.showsReviewAll(count: 2, limit: 1))
         XCTAssertEqual(TodayConfirm.rows(visible: []).count, 0)
     }
 }
@@ -132,15 +135,15 @@ final class TodayInboxConsistencyTests: CaptureTestCase {
     }
 
     func testConfirmFromTheInboxShowsOnTodayToo() {
-        _ = seed(4)
+        _ = seed(3)
         let today = model()
         let inboxTab = model()
         XCTAssertTrue(TodayConfirm.showsReviewAll(count: today.badgeCount))
         let any = inboxTab.visible[0]
         XCTAssertEqual(inboxTab.swipeLog(any), .logged)
         today.reload()
-        XCTAssertEqual(today.badgeCount, 3)
-        XCTAssertFalse(TodayConfirm.showsReviewAll(count: today.badgeCount), "Three fit in the card: no Review all")
+        XCTAssertEqual(today.badgeCount, 2)
+        XCTAssertFalse(TodayConfirm.showsReviewAll(count: today.badgeCount), "Two fit on Today: no See all")
         assertOneCount(today, inboxTab: inboxTab)
     }
 
@@ -330,5 +333,129 @@ final class TodayPaceAndRecordTests: XCTestCase {
         XCTAssertTrue(TodayRecordSlot.isShown(isPro: false, confirmedHours: 10))
         XCTAssertFalse(TodayRecordSlot.isShown(isPro: true, confirmedHours: 500))
         XCTAssertFalse(TodayRecordSlot.isShown(isPro: false, confirmedHours: .nan))
+    }
+}
+
+// MARK: - v2: the crafted hero's pages and pace sentence (§H.1 H10, §H.8)
+
+final class TodayCraftHeroTests: XCTestCase {
+    private var calendar: Calendar {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        return c
+    }
+    private func day(_ y: Int, _ m: Int, _ d: Int) -> Date {
+        calendar.date(from: DateComponents(year: y, month: m, day: d, hour: 12))!
+    }
+
+    func testOneRentalHasNoAllRentalsPage() {
+        let id = UUID()
+        let pages = TodayFocusList.make(rentals: [.init(id: id, name: "Pine Cabin", hours: 46)], goal: 100, allRentalsName: "All rentals")
+        XCTAssertEqual(pages.map(\.name), ["Pine Cabin"])
+        XCTAssertEqual(pages[0].stage, .frame70)
+        XCTAssertEqual(pages[0].id, id.uuidString)
+    }
+
+    func testAllRentalsLeadsAndSumsAgainstTheGoal() {
+        let pages = TodayFocusList.make(rentals: [.init(id: UUID(), name: "Santa Ray Ave", hours: 46),
+                                                  .init(id: UUID(), name: "Delaney Ct", hours: 4),
+                                                  .init(id: UUID(), name: "Pine Cabin", hours: 62)],
+                                        goal: 100, allRentalsName: "All rentals")
+        XCTAssertEqual(pages.map(\.name), ["All rentals", "Santa Ray Ave", "Delaney Ct", "Pine Cabin"])
+        XCTAssertTrue(pages[0].isAllRentals)
+        XCTAssertEqual(pages[0].hours, 112)
+        XCTAssertEqual(pages[0].stage, .complete)
+        XCTAssertNil(pages[0].rentalIDs)
+        XCTAssertEqual(pages.map(\.stage), [.complete, .frame70, .started, .half])
+    }
+
+    func testNoRentalsNoPages() {
+        XCTAssertTrue(TodayFocusList.make(rentals: [], goal: 100, allRentalsName: "All rentals").isEmpty)
+    }
+
+    func testInitialFocusPrefersTheRememberedPageThenTheCountedRental() {
+        let a = UUID(), b = UUID()
+        let pages = TodayFocusList.make(rentals: [.init(id: a, name: "A", hours: 1), .init(id: b, name: "B", hours: 2)],
+                                        goal: 100, allRentalsName: "All")
+        XCTAssertEqual(TodayFocusList.initialFocusID(pages, remembered: b.uuidString, countedRental: a), b.uuidString)
+        XCTAssertEqual(TodayFocusList.initialFocusID(pages, remembered: "gone", countedRental: a), a.uuidString)
+        XCTAssertEqual(TodayFocusList.initialFocusID(pages, remembered: nil, countedRental: nil), "all")
+    }
+
+    func testStepWraps() {
+        let pages = TodayFocusList.make(rentals: [.init(id: UUID(), name: "A", hours: 1), .init(id: UUID(), name: "B", hours: 2)],
+                                        goal: 100, allRentalsName: "All")
+        XCTAssertEqual(TodayFocusList.step(pages, from: pages[2].id, by: 1), pages[0].id)
+        XCTAssertEqual(TodayFocusList.step(pages, from: pages[0].id, by: -1), pages[2].id)
+        XCTAssertNil(TodayFocusList.step([], from: nil, by: 1))
+    }
+
+    func testPaceBehindMatchesTheLockedFrame() {
+        // Oct 23 2026 (day 296): 46 of 100 expected 81 → behind by 35; 54 left over 10 weeks → 6h a week.
+        let pace = TodayPaceSentence.make(.init(hours: 46, goal: 100, year: 2026, now: day(2026, 10, 23), calendar: calendar))
+        XCTAssertEqual(pace.lead, "Behind by 35h.")
+        XCTAssertEqual(pace.rest, "6h a week gets you to 100.")
+        XCTAssertEqual(pace.tone, .behind)
+    }
+
+    func testPaceOnPaceDoneAndCaveat() {
+        let onPace = TodayPaceSentence.make(.init(hours: 90, goal: 100, year: 2026, now: day(2026, 10, 23), calendar: calendar))
+        XCTAssertEqual(onPace.lead, "On pace.")
+        XCTAssertEqual(onPace.tone, .positive)
+        let done = TodayPaceSentence.make(.init(hours: 750, goal: 750, year: 2026, now: day(2026, 10, 23), calendar: calendar))
+        XCTAssertEqual(done.lead, "Done for 2026.")
+        XCTAssertEqual(done.rest, "750 hours on the record.")
+        let caveat = TodayPaceSentence.make(.init(hours: 751, goal: 750, year: 2026, now: day(2026, 10, 23), calendar: calendar,
+                                                  reachedCaveat: "750 reached. The half rule isn’t met yet."))
+        XCTAssertEqual(caveat.tone, .positive, "the hours are reached: the lead is positiveOnPage (§H.4)")
+        XCTAssertEqual(caveat.lead, "750 reached.")
+        let open = TodayPaceSentence.make(.init(hours: 101, goal: 100, year: 2026, now: day(2026, 10, 23), calendar: calendar,
+                                                reachedCaveat: "Confirm no one did more"))
+        XCTAssertEqual(open.rest, "Confirm no one did more.", "every pace line ends with a full stop")
+    }
+
+    func testReachedCaveatInTodaysWords() {
+        func copy(hours: Double, goal: HouseGoal, half: TaxQualificationEngine.MoreThanHalfStatus = .notEntered, noOneMore: Bool? = nil) -> TodayHeroCopy {
+            TodayHeroCopy.make(.init(goal: goal, hours: hours, year: 2026, now: day(2026, 10, 23), calendar: calendar,
+                                     halfTest: half, noOneParticipatedMore: noOneMore))
+        }
+        let ask = DashboardView.reachedCaveat(copy(hours: 120, goal: .mp100), hours: 120, goal: 100)
+        XCTAssertEqual(ask, "Did anyone do more? Tap to answer.")
+        let atLine = DashboardView.reachedCaveat(copy(hours: 750, goal: .reps750), hours: 750, goal: 750)
+        XCTAssertEqual(atLine, "The test needs more than 750 hours.")
+        let half = DashboardView.reachedCaveat(copy(hours: 760, goal: .reps750), hours: 760, goal: 750)
+        XCTAssertEqual(half, "Add your other work hours to check the half rule.", "the lead says \"750 reached.\" once")
+    }
+
+    func testRowTimeRangeNeverBreaks() {
+        XCTAssertEqual(TodayConfirmBlock.unbreakable("9–10:30"), "9\u{2060}–\u{2060}10:30")
+        XCTAssertFalse(TodayConfirmBlock.unbreakable("12–2").contains(" "))
+    }
+
+    func testChipNameDropsWholeWords() {
+        XCTAssertEqual(TodayChipName.candidates("Pine Cabin"), ["Pine Cabin", "Pine…"])
+        XCTAssertEqual(TodayChipName.candidates("Maple"), ["Maple"])
+        let long = TodayChipName.candidates("The Arroyo Seco Schoolhouse Lofts")
+        XCTAssertEqual(long.first, "The Arroyo Seco Schoolhouse Lofts")
+        XCTAssertEqual(long[1], "The Arroyo Seco Schoolhouse…")
+        XCTAssertTrue(long.dropFirst().allSatisfy { $0.hasSuffix("…") })
+        XCTAssertEqual(TodayChipName.candidates("Oak St, Unit 2"), ["Oak St, Unit 2", "Oak St, Unit…", "Oak St…", "Oak…"])
+    }
+
+    func testPaceWaitsAndNeverQualifies() {
+        let none = TodayPaceSentence.make(.init(hours: 0, goal: 100, year: 2026, now: day(2026, 3, 1), calendar: calendar))
+        XCTAssertNil(none.lead)
+        let early = TodayPaceSentence.make(.init(hours: 3, goal: 100, year: 2026, now: day(2026, 3, 1), calendar: calendar, paceReady: false))
+        XCTAssertEqual(early.rest, "Log a few weeks to see your pace.")
+        let record = TodayPaceSentence.make(.init(hours: 30, goal: 100, year: 2026, now: day(2026, 3, 1), calendar: calendar, isRecord: true))
+        XCTAssertNil(record.lead)
+        for p in [none, early, record] { XCTAssertFalse(p.spoken.lowercased().contains("qualif")) }
+    }
+
+    func testRowLimitFollowsHeightAndTextSize() {
+        XCTAssertEqual(TodayConfirm.rowLimit(windowHeight: 874, typeSize: .large), 2)
+        XCTAssertEqual(TodayConfirm.rowLimit(windowHeight: 667, typeSize: .large), 1)
+        XCTAssertEqual(TodayConfirm.rowLimit(windowHeight: 874, typeSize: .xxLarge), 1)
+        XCTAssertEqual(TodayConfirm.rowLimit(windowHeight: 874, typeSize: .accessibility3), 2)
     }
 }
