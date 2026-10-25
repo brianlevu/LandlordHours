@@ -33,7 +33,7 @@ struct HousePane: View {
     private var isRecord: Bool { goalManager.goalChoice == .record }
 
     /// The share of the skyline's frame kept in a pane (the houses, their pool and shadow).
-    static let skylineShare: CGFloat = 0.72
+    static let skylineShare: CGFloat = 0.6
 
     private var shelf: HouseShelf { HouseShelf.live(app: viewModel, goal: goalManager.houseGoal, isRecord: isRecord) }
 
@@ -65,6 +65,9 @@ struct HousePane: View {
                     } else {
                         Spacer(minLength: 0)
                         hero(shelf, shown)
+                        // The skyline's rows of sky already sit above the houses; a fourth band of air
+                        // between it and the number keeps every bare band of a tall pane under 20%.
+                        if shown?.isAll ?? false { Spacer(minLength: 8) }
                         numberBlock(shelf, shown)
                             .padding(.top, ax || (shown?.isAll ?? false) ? 4 : -heroSide * 0.10)   // the number sits in the diorama's shadow (H4)
                         Spacer(minLength: ax ? 12 : 16)
