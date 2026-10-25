@@ -170,7 +170,13 @@ enum AdaptiveSnapshotter {
                 if shot.duo { duoSizes.insert("\(Int(shot.size.width.rounded()))x\(Int(shot.size.height.rounded()))") }
                 AdaptiveSnapshotSelection.args = shot.args
                 let w = makeWindow(size: shot.size, dark: dark, category: shot.category, insets: shot.insets, scene: scene)
-                try? await Task.sleep(for: .seconds(shot.args["route"] == nil ? 2.8 : 4.0))
+                // The scene's own insets can move once the window lays out (a status bar or home bar
+                // arrives late); settle the compensation, then wait for the content.
+                for _ in 0..<3 {
+                    try? await Task.sleep(for: .seconds(0.4))
+                    settleInsets(w, target: shot.insets)
+                }
+                try? await Task.sleep(for: .seconds(shot.args["route"] == nil ? 2.0 : 3.2))
                 snap(w, size: shot.size, scale: scale, to: dir.appendingPathComponent("\(shot.name)-\(tag).png"))
                 writePanes(w, size: shot.size, to: dir.appendingPathComponent("\(shot.name)-\(tag).panes.json"))
                 w.isHidden = true
@@ -205,6 +211,13 @@ enum AdaptiveSnapshotter {
         hc.additionalSafeAreaInsets = insets - sys
         windows.append(w)
         return w
+    }
+
+    private static func settleInsets(_ w: UIWindow, target: UIEdgeInsets) {
+        guard let hc = w.rootViewController else { return }
+        let sys = hc.view.safeAreaInsets - hc.additionalSafeAreaInsets
+        let want = target - sys
+        if want != hc.additionalSafeAreaInsets { hc.additionalSafeAreaInsets = want }
     }
 
     private static func snap(_ w: UIWindow, size: CGSize, scale: CGFloat, to url: URL) {
