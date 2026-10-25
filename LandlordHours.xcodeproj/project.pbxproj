@@ -120,6 +120,7 @@
 		708EDA426351E4E5ECB2A0BC /* CloudKitSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E942608EE77393A2E7F17F89 /* CloudKitSyncService.swift */; };
 		70D541578CDEBFFF0DE8591C /* TodayHouse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 612AD15E9D33825E7BD9C05B /* TodayHouse.swift */; };
 		74917696E05B000CA0E13CC7 /* TodayHouseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 301638903EBA477566BCEDF5 /* TodayHouseTests.swift */; };
+		74D209D746B1A829CC37BB07 /* ConversionPath.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = FBB2664D1A41FBACDD44EC57 /* ConversionPath.xcstrings */; };
 		7A5C510D68D0C7652FC67178 /* LogTimeLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C3403D84E20A7CB20F711A0 /* LogTimeLogic.swift */; };
 		7ABC0EB90D3C20FC948B6FB9 /* PCCReceiptReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B764E672F43604FFA6F8C8A /* PCCReceiptReader.swift */; };
 		7BE636161E5D4B92208041FC /* LandlordHoursTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E078FA57ABF4C028DDE04C86 /* LandlordHoursTimerAttributes.swift */; };
@@ -219,6 +220,7 @@
 		C50E2BB001C29C77DD0C6DB1 /* BackfillRevealView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D29A46A927BF0EF43FB8068C /* BackfillRevealView.swift */; };
 		C5622A011D1DC145A3B3227C /* LogSheetDebug.swift in Sources */ = {isa = PBXBuildFile; fileRef = 538E0A81125A7A7A51653936 /* LogSheetDebug.swift */; };
 		C589D5477C7EA1EE733D29F8 /* LearnLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D257BE0EA8064F9A7B1A5FD /* LearnLibrary.swift */; };
+		C6598E290016E3290583AB66 /* ConversionPathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4609759F57DA939BB7A72130 /* ConversionPathTests.swift */; };
 		C6B50842EA064CEACA38BA96 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFBF76FD610DF2D0CDA40C0A /* AppViewModel.swift */; };
 		C7D105E61DF44191ADC49443 /* LHSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2783FC6AC767BA3CECF909A3 /* LHSheet.swift */; };
 		CB01259AC7A91CF603A4AFA8 /* TodayLoadingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 895DED5292E6EFA986E744B1 /* TodayLoadingUITests.swift */; };
@@ -386,6 +388,7 @@
 		435624AEE2D53F77DFB56482 /* TodayConfirmUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayConfirmUITests.swift; sourceTree = "<group>"; };
 		43BE42F90C9B573FED3094F9 /* StdProtoSeeAll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StdProtoSeeAll.swift; sourceTree = "<group>"; };
 		45315D80200D5FEE893898D7 /* HouseTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseTokens.swift; sourceTree = "<group>"; };
+		4609759F57DA939BB7A72130 /* ConversionPathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversionPathTests.swift; sourceTree = "<group>"; };
 		467C049646FCF74E15311141 /* RecordPagePreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordPagePreview.swift; sourceTree = "<group>"; };
 		46C2C28508D1F64A007B6BF9 /* AuditReportPDFRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditReportPDFRenderer.swift; sourceTree = "<group>"; };
 		46D2C2173FB64791CCAAB8FD /* EngagementNotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementNotificationScheduler.swift; sourceTree = "<group>"; };
@@ -575,6 +578,7 @@
 		F8184EBDA079A1EDCB5D9208 /* CaptureNotificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureNotificationTests.swift; sourceTree = "<group>"; };
 		F84A3F04EEF266FD5B4AB3E8 /* AccountDeleteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeleteTests.swift; sourceTree = "<group>"; };
 		FB2D8BC7BF72372AC3FCB6CB /* Shared.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Shared.xcstrings; sourceTree = "<group>"; };
+		FBB2664D1A41FBACDD44EC57 /* ConversionPath.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = ConversionPath.xcstrings; sourceTree = "<group>"; };
 		FF70C30146DF1981684327FB /* ProGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProGateTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -705,6 +709,7 @@
 		4DC647DE0F4B05FA8422DFCD /* Strings */ = {
 			isa = PBXGroup;
 			children = (
+				FBB2664D1A41FBACDD44EC57 /* ConversionPath.xcstrings */,
 				06883004BB1E57213877840B /* Foundations.xcstrings */,
 				FB2D8BC7BF72372AC3FCB6CB /* Shared.xcstrings */,
 			);
@@ -884,6 +889,7 @@
 				CD4B4980260EB2F39906C0E9 /* ClassifierTests.swift */,
 				0A098406B491E959C7B4D8B8 /* ClassifierV2Tests.swift */,
 				A1240689FADA6EC9A0D1883B /* ColorContrastTests.swift */,
+				4609759F57DA939BB7A72130 /* ConversionPathTests.swift */,
 				C8F3116D1D01C5BD4F4D3389 /* CraftStageTests.swift */,
 				87EEBA1DDCBACA2908D1569A /* FoundationsTests.swift */,
 				581F7881E36776AC87431D40 /* HouseProgressTests.swift */,
@@ -1313,6 +1319,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D0FB50644A3E4250418CF25F /* Assets.xcassets in Resources */,
+				74D209D746B1A829CC37BB07 /* ConversionPath.xcstrings in Resources */,
 				F4E72926A5539980DC4F2827 /* DirCraft.xcstrings in Resources */,
 				403575A80417CEE2F57E6CC7 /* Foundations.xcstrings in Resources */,
 				C19E20B4BBD0B73D9CFB97DB /* Fraunces-OFL.txt in Resources */,
@@ -1566,6 +1573,7 @@
 				14BA0EDED0F47074CB5C1684 /* ClassifierTests.swift in Sources */,
 				D007EBD21D3BF0C7744F91FC /* ClassifierV2Tests.swift in Sources */,
 				BC8F6E92451777ADF3C1AE40 /* ColorContrastTests.swift in Sources */,
+				C6598E290016E3290583AB66 /* ConversionPathTests.swift in Sources */,
 				98540C81DD08DAB1332599BA /* CraftStageTests.swift in Sources */,
 				E012C380A33D1F00DC5273F9 /* FoundationsTests.swift in Sources */,
 				A5A4A54EDF6C065AFC4FD776 /* HouseProgressTests.swift in Sources */,

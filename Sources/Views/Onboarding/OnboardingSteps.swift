@@ -1,195 +1,104 @@
 import SwiftUI
 
-// MARK: - Shared scaffold: question (SF Pro title semibold), scrolling body, pinned actions
+// MARK: - Shared scaffold (standard §1.24): step title, scrolling body, one pinned primary
+//
+// The plain canvas, gutter 20. Title SF `.title1.semibold` (`.title.weight(.semibold)`), an
+// optional `.body` subtitle, the content, an optional note at the end of the scroll. The actions
+// are pinned in a `safeAreaInset`: one `LHButton.primary`, at most one `.tertiary` (the step's
+// skip). Words scrolling under the actions fade into the canvas. No Dynamic Type clamps.
 
 struct OnbStepScaffold<Content: View, Actions: View>: View {
     var title: String
     var subtitle: String? = nil
-    /// A short note that belongs beside the ask (trust lines, the CPA note). Pinned above the
-    /// actions; at accessibility text sizes it moves to the end of the scrolling content, so the
-    /// pinned area never crowds out the question.
+    var titleIdentifier: String? = nil
+    /// A short note under the content (the CPA line, trust lines, the spouse rule).
     var note: AnyView? = nil
-    /// Scrolls this id into view whenever it changes (the property step keeps "Add address"
-    /// above the keyboard).
+    /// Scrolls this id into view whenever it changes (the property step keeps its field above
+    /// the keyboard).
     var scrollTarget: String? = nil
-    /// False for the question steps (a tap answers): no pinned bar, so nothing fades over the last card.
+    /// False for the question steps (a tap answers): nothing is pinned.
     var showsActions = true
     @ViewBuilder var content: Content
     @ViewBuilder var actions: Actions
-    @Environment(\.onbBottomInset) private var bottomInset
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var typeSize
-    @Environment(\.onbDisplayTitles) private var displayTitles
 
     var body: some View {
-        let pinNote = !typeSize.isAccessibilitySize
+        let colors = AdaptiveColors(colorScheme: colorScheme)
         ScrollViewReader { proxy in
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                titleText
-                    .foregroundStyle(OnbColor.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityAddTraits(.isHeader)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.body)
-                        .foregroundStyle(OnbColor.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 8)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(title)
+                        .font(.title.weight(.semibold))
+                        .foregroundStyle(colors.textPrimary)
+                        .accessibilityAddTraits(.isHeader)
+                        .modifier(OptionalIdentifier(identifier: titleIdentifier))
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.body)
+                            .foregroundStyle(colors.textSecondary)
+                            .padding(.top, 8)
+                    }
+                    content.padding(.top, LHMetrics.sectionGap)
+                    if let note { note.padding(.top, 16) }
                 }
-                content.padding(.top, 20)
-                if !pinNote, let note { note.padding(.top, 16) }
+                .padding(.horizontal, LHMetrics.gutter)
+                .padding(.top, 8)
+                .padding(.bottom, LHMetrics.sectionGap)
+                .frame(maxWidth: LHMetrics.readingColumn, alignment: .leading)
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 22)
-            // Room for the last line to scroll clear of the fade above the pinned actions.
-            .padding(.bottom, typeSize.isAccessibilitySize ? 80 : 36)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .onChange(of: scrollTarget) { _, target in
-            guard let target else { return }
-            // After the keyboard has moved the sheet.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.interactively)
+            .defaultScrollAnchor(OnbDebugLaunch.scrollToBottom ? .bottom : .top)
+            .onChange(of: scrollTarget) { _, target in
+                guard let target else { return }
                 withAnimation(AppAnimation.standard) { proxy.scrollTo(target, anchor: .bottom) }
             }
-        }
-        .scrollBounceBehavior(.basedOnSize)
-        // Scrolled-up words fade at the sheet's top edge instead of being cut mid-line.
-        .overlay(alignment: .top) {
-            LinearGradient(colors: [OnbColor.card, OnbColor.card.opacity(0)], startPoint: .top, endPoint: .bottom)
-                .frame(height: 22)
-                .allowsHitTesting(false)
-        }
-        .scrollIndicatorsFlash(onAppear: true)
-        .defaultScrollAnchor(OnbDebugLaunch.scrollToBottom ? .bottom : .top)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !showsActions {
-                Color.clear.frame(height: bottomInset)
-            } else {
-            VStack(spacing: 6) {
-                if pinNote, let note { note.padding(.bottom, 6) }
-                actions
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if showsActions {
+                    VStack(spacing: 4) { actions }
+                        .padding(.horizontal, LHMetrics.gutter)
+                        .padding(.top, 12)
+                        .padding(.bottom, 8)
+                        .frame(maxWidth: LHMetrics.readingColumn)
+                        .frame(maxWidth: .infinity)
+                        .background(alignment: .top) {
+                            LinearGradient(stops: [.init(color: colors.background.opacity(0), location: 0),
+                                                   .init(color: colors.background, location: typeSize.isAccessibilitySize ? 0.2 : 0.3)],
+                                           startPoint: .top, endPoint: .bottom)
+                                .padding(.top, -24)
+                                .ignoresSafeArea(edges: .bottom)
+                                .allowsHitTesting(false)
+                        }
+                }
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 10)
-            .padding(.bottom, bottomInset)
-            .background(OnbColor.card)
-            // A short fade above the pinned area: content slides under it, never hard-cut.
-            .background(alignment: .top) {
-                // Clear for the first part, so a control resting just above the pinned area keeps
-                // full contrast; only words actually sliding under it fade.
-                // At accessibility sizes one line is ~40pt, so a 28pt fade would still hard-cut it:
-                // the fade grows and starts at once, so the next line visibly runs on under it.
-                let fade: CGFloat = typeSize.isAccessibilitySize ? 72 : 28
-                LinearGradient(stops: [.init(color: OnbColor.card.opacity(0), location: 0),
-                                       .init(color: OnbColor.card.opacity(0), location: typeSize.isAccessibilitySize ? 0.1 : 0.45),
-                                       .init(color: OnbColor.card, location: 1)],
-                               startPoint: .top, endPoint: .bottom)
-                    .frame(height: fade)
-                    .offset(y: -fade)
-                    .allowsHitTesting(false)
-            }
-            }
-        }
         }
     }
 }
 
-extension OnbStepScaffold {
-    /// What's new (upgraders) titles are Fraunces display, like the app's own titles;
-    /// onboarding questions stay SF Pro (approved design).
-    @ViewBuilder fileprivate var titleText: some View {
-        if displayTitles {
-            Text(title).lhDisplayFont(.title)
-        } else {
-            Text(title).font(.system(.title, weight: .semibold))
-        }
-    }
-}
-
-/// The one card style: hairline border, 16pt radius, blueprint ring when selected.
-struct OnbOptionCard<Extra: View>: View {
+/// A `.footnote` note in `textSecondary`, optionally with a leading SF glyph.
+struct OnbNote: View {
+    var text: String
     var symbol: String? = nil
-    var title: String
-    var detail: String
-    var badge: String? = nil
-    var hint: String? = nil
-    var selected: Bool
-    var action: () -> Void
-    @ViewBuilder var extra: Extra
-    @Environment(\.dynamicTypeSize) private var typeSize
+    var identifier: String? = nil
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top, spacing: 12) {
-                    if let symbol {
-                        Image(systemName: symbol)
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(OnbColor.action)
-                            .frame(width: 36, height: 36)
-                            .background(OnbColor.actionSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            .accessibilityHidden(true)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        // At accessibility sizes the badge sits on its own line so the title keeps its width.
-                        let stack = typeSize.isAccessibilitySize
-                            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
-                            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
-                        stack {
-                            if typeSize.isAccessibilitySize, let badge { badgeView(badge) }
-                            Text(title)
-                                .font(.headline)
-                                .foregroundStyle(OnbColor.textPrimary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            if !typeSize.isAccessibilitySize, let badge { badgeView(badge) }
-                        }
-                        Text(detail)
-                            .font(.subheadline)
-                            .foregroundStyle(OnbColor.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if let hint {
-                            Text(hint)
-                                .font(.footnote)
-                                .foregroundStyle(OnbColor.textTertiary)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .padding(.top, 2)
-                        }
-                    }
-                    Spacer(minLength: 4)
-                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 22))
-                        .foregroundStyle(selected ? OnbColor.action : OnbColor.textTertiary)   // 3:1 or better; the hairline border is decorative
-                        .accessibilityHidden(true)
-                }
-                extra
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            if let symbol {
+                Image(systemName: symbol)
+                    .foregroundStyle(colors.informational)
+                    .accessibilityHidden(true)
             }
-            .multilineTextAlignment(.leading)
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(OnbColor.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(selected ? OnbColor.action : OnbColor.border, lineWidth: selected ? 2 : 1)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            Text(text)
+                .foregroundStyle(colors.textSecondary)
         }
-        .buttonStyle(OnbPressable())
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
-    private func badgeView(_ badge: String) -> some View {
-        Text(badge)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(OnbColor.action)
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(OnbColor.actionSurface, in: Capsule())
-            .fixedSize()
-    }
-}
-
-extension OnbOptionCard where Extra == EmptyView {
-    init(symbol: String? = nil, title: String, detail: String, badge: String? = nil, hint: String? = nil, selected: Bool, action: @escaping () -> Void) {
-        self.init(symbol: symbol, title: title, detail: detail, badge: badge, hint: hint, selected: selected, action: action, extra: { EmptyView() })
+        .font(.footnote)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .modifier(OptionalIdentifier(identifier: identifier))
     }
 }
 
@@ -204,31 +113,31 @@ struct OnbGoalStep: View {
             switch flow.goalPhase {
             case .rental: rentalQuestion
             case .pro: proQuestion
-            case .target: targetCards
+            case .target: targetRows
             }
         }
-        .transition(reduce ? .opacity : .asymmetric(
-            insertion: .offset(x: flow.forward ? 36 : -36).combined(with: .opacity),
-            removal: .offset(x: flow.forward ? -36 : 36).combined(with: .opacity)))
+        .transition(OnbMotion.stepTransition(forward: flow.forward, reduce: reduce))
         .id(flow.goalPhase)
     }
 
     // MARK: Q1 · What do you rent out?
 
     private var rentalQuestion: some View {
-        OnbStepScaffold(title: String(localized: "What do you rent out?"), showsActions: false) {
-            VStack(alignment: .leading, spacing: 12) {
-                OnbOptionCard(symbol: "calendar", title: String(localized: "Short stays"),
-                              detail: String(localized: "Guests stay 7 days or less, on average."),
-                              selected: flow.rental == .shortStays) { flow.answerRental(.shortStays, OnbMotion.morph(reduce)) }
+        OnbStepScaffold(title: String(localized: "What do you rent out?", table: "ConversionPath"), showsActions: false) {
+            OnbOptionGroup(hasSelection: flow.rental != nil) {
+                OnbOptionRow(symbol: "calendar", title: String(localized: "Short stays", table: "ConversionPath"),
+                             meta: String(localized: "A week or less, on average", table: "ConversionPath"),
+                             selected: flow.rental == .shortStays) { flow.answerRental(.shortStays, OnbMotion.morph(reduce)) }
                     .accessibilityIdentifier("rental-short")
-                OnbOptionCard(symbol: "key.fill", title: String(localized: "Long-term"),
-                              detail: String(localized: "Leases of a month or more."),
-                              selected: flow.rental == .longTerm) { flow.answerRental(.longTerm, OnbMotion.morph(reduce)) }
+                LHDivider(leadingInset: LHRow.browseDividerInset)
+                OnbOptionRow(symbol: "key", title: String(localized: "Long-term", table: "ConversionPath"),
+                             meta: String(localized: "Leases of a month or more", table: "ConversionPath"),
+                             selected: flow.rental == .longTerm) { flow.answerRental(.longTerm, OnbMotion.morph(reduce)) }
                     .accessibilityIdentifier("rental-long")
-                OnbOptionCard(symbol: "square.stack.fill", title: String(localized: "Both"),
-                              detail: String(localized: "Some of each."),
-                              selected: flow.rental == .both) { flow.answerRental(.both, OnbMotion.morph(reduce)) }
+                LHDivider(leadingInset: LHRow.browseDividerInset)
+                OnbOptionRow(symbol: "square.stack", title: String(localized: "Both", table: "ConversionPath"),
+                             meta: String(localized: "Some of each", table: "ConversionPath"),
+                             selected: flow.rental == .both) { flow.answerRental(.both, OnbMotion.morph(reduce)) }
                     .accessibilityIdentifier("rental-both")
             }
         } actions: {
@@ -239,18 +148,23 @@ struct OnbGoalStep: View {
     // MARK: Q2 · Do you or your spouse do real estate as a main job?
 
     private var proQuestion: some View {
-        OnbStepScaffold(title: String(localized: "Do you or your spouse do real estate as a main job?"),
-                        subtitle: String(localized: "Main job means most of your working hours, all year, running your own business or as a contractor."),
+        OnbStepScaffold(title: String(localized: "Is real estate your main job, or your spouse’s?", table: "ConversionPath"),
+                        subtitle: String(localized: "Main job means most of your working hours, all year.", table: "ConversionPath"),
                         showsActions: false) {
-            VStack(alignment: .leading, spacing: 12) {
-                OnbOptionCard(symbol: "person.fill", title: String(localized: "Me"), detail: String(localized: "Real estate is my main job."),
-                              selected: flow.pro == .me) { flow.answerPro(.me, OnbMotion.morph(reduce)) }
+            OnbOptionGroup(hasSelection: flow.pro != nil) {
+                OnbOptionRow(symbol: "person", title: String(localized: "Me", table: "ConversionPath"),
+                             meta: String(localized: "It’s my main job", table: "ConversionPath"),
+                             selected: flow.pro == .me) { flow.answerPro(.me, OnbMotion.morph(reduce)) }
                     .accessibilityIdentifier("pro-me")
-                OnbOptionCard(symbol: "person.2.fill", title: String(localized: "My spouse"), detail: String(localized: "Real estate is my spouse’s main job."),
-                              selected: flow.pro == .spouse) { flow.answerPro(.spouse, OnbMotion.morph(reduce)) }
+                LHDivider(leadingInset: LHRow.browseDividerInset)
+                OnbOptionRow(symbol: "person.2", title: String(localized: "My spouse", table: "ConversionPath"),
+                             meta: String(localized: "It’s my spouse’s main job", table: "ConversionPath"),
+                             selected: flow.pro == .spouse) { flow.answerPro(.spouse, OnbMotion.morph(reduce)) }
                     .accessibilityIdentifier("pro-spouse")
-                OnbOptionCard(symbol: "minus.circle", title: String(localized: "No"), detail: String(localized: "Neither of us."),
-                              selected: flow.pro == .nobody) { flow.answerPro(.nobody, OnbMotion.morph(reduce)) }
+                LHDivider(leadingInset: LHRow.browseDividerInset)
+                OnbOptionRow(symbol: "minus.circle", title: String(localized: "No", table: "ConversionPath"),
+                             meta: String(localized: "Neither of us", table: "ConversionPath"),
+                             selected: flow.pro == .nobody) { flow.answerPro(.nobody, OnbMotion.morph(reduce)) }
                     .accessibilityIdentifier("pro-none")
             }
         } actions: {
@@ -260,37 +174,44 @@ struct OnbGoalStep: View {
 
     // MARK: The suggested target (first, already selected), the others, then the record
 
-    private var targetCards: some View {
-        OnbStepScaffold(title: String(localized: "Based on your answers, start here"), note: AnyView(
-            Text("Change this any time. Reaching a number is based on your records; your CPA decides what it means.")
-                .font(.footnote)
-                .foregroundStyle(OnbColor.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading))) {
-            VStack(alignment: .leading, spacing: 10) {
+    private var targetRows: some View {
+        OnbStepScaffold(title: String(localized: "Based on your answers, start here", table: "ConversionPath"), note: AnyView(note)) {
+            OnbOptionGroup(hasSelection: flow.goal != nil) {
                 if let suggestion = flow.suggestion {
                     ForEach(Array(suggestion.ordered.enumerated()), id: \.element) { index, goal in
-                        card(goal, isSuggested: index == 0)
-                            .padding(.top, index == 1 ? 6 : 0)
+                        if index > 0 { LHDivider(leadingInset: LHRow.browseDividerInset) }
+                        OnbOptionRow(symbol: OnbGoalCopy.symbol(goal),
+                                     title: OnbGoalCopy.rowTitle(goal),
+                                     meta: index == 0 ? String(localized: "Suggested for you", table: "ConversionPath")
+                                                      : OnbGoalCopy.rowMeta(goal, pro: flow.pro),
+                                     selected: flow.goal == goal) {
+                            withAnimation(OnbMotion.flow(reduce)) { flow.goal = goal }
+                        }
+                        .accessibilityIdentifier(Self.identifier(goal))
                     }
                 }
             }
         } actions: {
             Button((flow.goal ?? .reps750).callToAction) { flow.confirmGoal(OnbMotion.morph(reduce)) }
-                .buttonStyle(OnbPrimaryPill())
+                .buttonStyle(LHButton.primary)
                 .disabled(flow.goal == nil)
                 .contentTransition(.opacity)
                 .accessibilityIdentifier("onb-primary")
         }
     }
 
-    private func card(_ goal: OnbGoal, isSuggested: Bool) -> some View {
-        OnbOptionCard(title: OnbGoalCopy.title(goal, pro: flow.pro),
-                      detail: OnbGoalCopy.detail(goal, pro: flow.pro, isSuggested: isSuggested, rental: flow.rental),
-                      selected: flow.goal == goal) {
-            withAnimation(OnbMotion.flow(reduce)) { flow.goal = goal }
+    /// What the selected goal counts, then "You can change this later." and the CPA line.
+    private var note: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let goal = flow.goal {
+                OnbNote(text: OnbGoalCopy.detail(goal, pro: flow.pro, isSuggested: goal == flow.suggestion?.suggested, rental: flow.rental),
+                        identifier: "goal-detail")
+                    .contentTransition(.opacity)
+                    .animation(AppAnimation.quick, value: goal)
+            }
+            OnbNote(text: String(localized: "You can change this later.", table: "ConversionPath"))
+            LHFootnote.cpa
         }
-        .accessibilityIdentifier(Self.identifier(goal))
     }
 
     static func identifier(_ goal: OnbGoal) -> String {
@@ -309,18 +230,15 @@ struct OnbGoalStep: View {
 /// values; the step's layout does not change.
 struct OnbSource {
     struct SampleRow {
-        var hours: String
+        var hours: Double
         var category: ActivityCategory
         var when: String
         var title: String
-        /// SF Symbol for where the row came from (calendar, envelope, receipt).
-        var sourceGlyph: String
     }
 
     struct TrustLine {
         var symbol: String
-        var lead: String
-        var rest: String
+        var text: String
     }
 
     var id: String
@@ -335,93 +253,20 @@ struct OnbSource {
     /// (`ClassifierKeywords`: plumber → Repairs, showing → Leasing, inspect → Management).
     static let calendar = OnbSource(
         id: "calendar",
-        title: String(localized: "Your calendar already has some of your hours."),
-        subtitle: String(localized: "We look back 90 days for things like a plumber visit, a showing or a turnover, then ask you. Every one you confirm is a dated entry."),
+        title: String(localized: "Your calendar already has some of your hours.", table: "ConversionPath"),
+        subtitle: String(localized: "We look back 90 days for things like a plumber visit or a showing. Then we ask you.", table: "ConversionPath"),
         rows: [
-            SampleRow(hours: "2h", category: .repairs, when: "Calendar · Wed 9–11", title: "Plumber", sourceGlyph: "calendar"),
-            SampleRow(hours: "1h", category: .leasing, when: "Calendar · Sat 10–11", title: "Showing", sourceGlyph: "calendar"),
-            SampleRow(hours: "3h", category: .management, when: "Calendar · Sun 11–2", title: "Turnover clean", sourceGlyph: "calendar"),
+            SampleRow(hours: 2, category: .repairs, when: String(localized: "Calendar · Wed 9–11", table: "ConversionPath"), title: String(localized: "Plumber", table: "ConversionPath")),
+            SampleRow(hours: 1, category: .leasing, when: String(localized: "Calendar · Sat 10–11", table: "ConversionPath"), title: String(localized: "Showing", table: "ConversionPath")),
+            SampleRow(hours: 3, category: .management, when: String(localized: "Calendar · Sun 11–2", table: "ConversionPath"), title: String(localized: "Turnover clean", table: "ConversionPath")),
         ],
         trust: [
-            TrustLine(symbol: "eye", lead: String(localized: "What we read:"), rest: String(localized: "event titles and times.")),
-            TrustLine(symbol: "hand.raised.fill", lead: String(localized: "What we never do:"), rest: String(localized: "send them anywhere, or log anything without you.")),
+            TrustLine(symbol: "eye", text: String(localized: "We read event titles and times.", table: "ConversionPath")),
+            TrustLine(symbol: "hand.raised", text: String(localized: "We never send them anywhere or log anything without you.", table: "ConversionPath")),
         ],
-        primary: String(localized: "Look at my calendar"),
-        secondary: String(localized: "Not now")
+        primary: String(localized: "Look at my calendar", table: "ConversionPath"),
+        secondary: String(localized: "Not now", table: "ConversionPath")
     )
-}
-
-struct OnbSampleRow: View {
-    let row: OnbSource.SampleRow
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dynamicTypeSize) private var typeSize
-
-    var body: some View {
-        Group {
-            if typeSize.isAccessibilitySize {
-                // Large text: hours and tool on a line of their own above the words; nothing truncates.
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 12) { hours; tool; Spacer(minLength: 4); hollow }
-                    words
-                }
-            } else {
-                HStack(spacing: 12) {
-                    hours.frame(width: 70, alignment: .leading)
-                    tool
-                    words
-                    Spacer(minLength: 4)
-                    hollow
-                }
-            }
-        }
-        .padding(.vertical, 8)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Example: \(row.title), \(row.hours), \(row.category.inboxLabel)")
-        .accessibilityHint("Suggestion, not saved")
-    }
-
-    private var hours: some View {
-        Text(row.hours)
-            .font(.system(.title3, design: .rounded, weight: .bold))
-            .monospacedDigit()
-            .foregroundStyle(OnbColor.textPrimary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.7)
-    }
-
-    private var tool: some View {
-        Image("bp_tool_\(row.category.blueprintToolName)_36")
-            .resizable()
-            .scaledToFit()
-            .frame(width: 36, height: 36)
-            .accessibilityHidden(true)
-    }
-
-    private var words: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Label(row.when, systemImage: row.sourceGlyph)
-                .font(.footnote)
-                .foregroundStyle(OnbColor.textSecondary)
-                .labelStyle(OnbTightLabel())
-                .lineLimit(typeSize >= .xxLarge ? 3 : 1)
-                .minimumScaleFactor(typeSize >= .xxLarge ? 1 : 0.8)
-                .fixedSize(horizontal: false, vertical: typeSize >= .xxLarge)
-            Text(row.title)
-                .font(.headline)
-                .foregroundStyle(OnbColor.textPrimary)
-            Text(row.category.inboxLabel)
-                .font(.subheadline)
-                .foregroundStyle(row.category.inboxInk(AdaptiveColors(colorScheme: colorScheme)))
-        }
-    }
-
-    /// Hollow: a suggestion, not a record, until the owner confirms it.
-    private var hollow: some View {
-        Circle()
-            .strokeBorder(OnbColor.draftingInk, style: StrokeStyle(lineWidth: 1.5, dash: [3, 2.5]))
-            .frame(width: 20, height: 20)
-            .accessibilityHidden(true)
-    }
 }
 
 struct OnbSourceStep: View {
@@ -430,58 +275,50 @@ struct OnbSourceStep: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
-        OnbStepScaffold(title: source.title, subtitle: source.subtitle, note: AnyView(
-            // Trust at the ask: what we read, what we never do.
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(Array(source.trust.enumerated()), id: \.offset) { _, line in trustLine(line) }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading))) {
-            VStack(spacing: 0) {
+        OnbStepScaffold(title: source.title, subtitle: source.subtitle, note: AnyView(trust)) {
+            LHRowGroup {
                 ForEach(Array(source.rows.enumerated()), id: \.offset) { i, row in
-                    if i > 0 { Divider().overlay(OnbColor.border).padding(.leading, 82) }
-                    OnbSampleRow(row: row)
-                        .opacity(flow.calendarRows > i ? 1 : 0)
-                        .offset(y: flow.calendarRows > i || reduce ? 0 : 6)
+                    if i > 0 { LHDivider(leadingInset: LHRow.browseDividerInset) }
+                    LHRow.Browse(title: row.title, meta: row.when, value: LHFormat.hours(row.hours), showsChevron: false) {
+                        CategoryToolTile(category: row.category, size: 36)
+                    }
+                    .opacity(flow.calendarRows > i ? 1 : 0)
+                    .offset(y: flow.calendarRows > i || reduce ? 0 : 6)
+                    .accessibilityLabel(String(localized: "Example: \(row.title), \(LHFormat.spokenHours(row.hours)), \(row.category.inboxLabel)", table: "ConversionPath"))
+                    .accessibilityHint(String(localized: "Suggestion, not saved", table: "ConversionPath"))
                 }
             }
-            .padding(.horizontal, 14)
-            .background(OnbColor.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(OnbColor.border, lineWidth: 1))
         } actions: {
             Button(source.primary) { Task { await flow.askCalendar(OnbMotion.morph(reduce)) } }
-                .buttonStyle(OnbPrimaryPill())
+                .buttonStyle(LHButton.primary)
                 .disabled(flow.isAsking)
                 .accessibilityIdentifier("onb-primary")
             Button(source.secondary) { flow.calendarNotNow(OnbMotion.morph(reduce)) }
-                .buttonStyle(OnbOutlinePill())
+                .buttonStyle(LHButton.tertiary)
                 .disabled(flow.isAsking)
                 .accessibilityIdentifier("onb-link")
         }
         .task {
-            // Rows (and hatched storeys) appear one by one.
+            // The sample rows appear one by one (each bound to `calendarRows`).
             let total = source.rows.count
             guard flow.calendarRows < total else { return }
-            if !reduce { try? await Task.sleep(nanoseconds: 300_000_000) }
+            if !reduce { try? await Task.sleep(for: .milliseconds(300)) }
             for i in (flow.calendarRows + 1)...total {
-                withAnimation(reduce ? .easeOut(duration: 0.2) : .easeOut(duration: 0.28)) { flow.calendarRows = i }
-                if !reduce { try? await Task.sleep(nanoseconds: 380_000_000) }
+                withAnimation(reduce ? AppAnimation.quick : AppAnimation.reveal) { flow.calendarRows = i }
+                if !reduce { try? await Task.sleep(for: .milliseconds(320)) }
             }
         }
     }
 
-    private func trustLine(_ line: OnbSource.TrustLine) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: line.symbol)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(OnbColor.informational)
-                .frame(width: 18)
-                .accessibilityHidden(true)
-            (Text(line.lead).fontWeight(.semibold).foregroundColor(OnbColor.textPrimary)
-             + Text(" \(line.rest)").foregroundColor(OnbColor.textSecondary))
-                .font(.footnote)
-                .fixedSize(horizontal: false, vertical: true)
+    /// Trust at the ask: what we read, what we never do, and that nothing counts unconfirmed.
+    private var trust: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(source.trust.enumerated()), id: \.offset) { _, line in
+                OnbNote(text: line.text, symbol: line.symbol)
+            }
+            OnbNote(text: String(localized: "common.nothingCountsUntilConfirm", defaultValue: "Nothing counts until you confirm it."),
+                    symbol: "checkmark.circle")
         }
-        .accessibilityElement(children: .combine)
     }
 }
 
@@ -492,34 +329,23 @@ struct OnbWhoStep: View {
     @Environment(\.accessibilityReduceMotion) private var reduce
 
     var body: some View {
-        OnbStepScaffold(title: String(localized: "Who puts in the hours?")) {
-            VStack(alignment: .leading, spacing: 12) {
-                OnbOptionCard(symbol: "person.fill", title: String(localized: "Just me"), detail: String(localized: "I handle the rentals."),
-                              selected: flow.who == .me) { pick(.me) }
+        OnbStepScaffold(title: String(localized: "Who puts in the hours?", table: "ConversionPath"),
+                        note: flow.who == .both ? AnyView(OnbNote(text: OnbGoal.spouseNote(for: flow.goal), symbol: "person.2", identifier: "who-note")
+                            .transition(.opacity)) : nil) {
+            OnbOptionGroup(hasSelection: true) {
+                OnbOptionRow(symbol: "person", title: String(localized: "Just me", table: "ConversionPath"),
+                             meta: String(localized: "I handle the rentals", table: "ConversionPath"),
+                             selected: flow.who == .me) { pick(.me) }
                     .accessibilityIdentifier("who-me")
-                OnbOptionCard(symbol: "person.2.fill", title: String(localized: "My spouse and me"), detail: String(localized: "We both do."),
-                              selected: flow.who == .both) { pick(.both) }
+                LHDivider(leadingInset: LHRow.browseDividerInset)
+                OnbOptionRow(symbol: "person.2", title: String(localized: "My spouse and me", table: "ConversionPath"),
+                             meta: String(localized: "We both do", table: "ConversionPath"),
+                             selected: flow.who == .both) { pick(.both) }
                     .accessibilityIdentifier("who-both")
-                if flow.who == .both {
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        Image(systemName: "person.2")
-                            .foregroundStyle(OnbColor.rose)
-                            .accessibilityHidden(true)
-                        Text(OnbGoal.spouseNote(for: flow.goal))
-                            .font(.subheadline)
-                            .foregroundStyle(OnbColor.textPrimary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(OnbColor.roseSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .transition(reduce ? .opacity : .opacity.combined(with: .offset(y: -8)))
-                    .accessibilityIdentifier("who-note")
-                }
             }
         } actions: {
-            Button(String(localized: "Continue")) { flow.confirmWho(OnbMotion.morph(reduce)) }
-                .buttonStyle(OnbPrimaryPill())
+            Button(String(localized: "Continue", table: "ConversionPath")) { flow.confirmWho(OnbMotion.morph(reduce)) }
+                .buttonStyle(LHButton.primary)
                 .accessibilityIdentifier("onb-primary")
         }
     }
@@ -527,138 +353,128 @@ struct OnbWhoStep: View {
     private func pick(_ w: OnbWho) { withAnimation(OnbMotion.flow(reduce)) { flow.who = w } }
 }
 
-// MARK: - 4 · First property (the one typed field)
+// MARK: - 4 · First rental (the one typed field) with the 120pt house thumbnail (§H.5)
 
 struct OnbPropertyStep: View {
     @Bindable var flow: OnbFlow
     @Environment(\.accessibilityReduceMotion) private var reduce
-    @FocusState private var focused: Bool
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var savedTick = 0
 
     var body: some View {
-        OnbStepScaffold(title: String(localized: "Which rental first?"), scrollTarget: focused ? "property-add-address-row" : nil) {
-            VStack(alignment: .leading, spacing: 12) {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        OnbStepScaffold(title: String(localized: "Add your first rental.", table: "ConversionPath"),
+                        subtitle: String(localized: "Every hour you log starts with a place.", table: "ConversionPath"),
+                        note: AnyView(OnbNote(text: String(localized: "A nickname is fine. The rest comes later.", table: "ConversionPath"))),
+                        scrollTarget: flow.addressOpen ? "property-address-row" : nil) {
+            VStack(alignment: .leading, spacing: 16) {
                 if let hint = flow.propertyHint {
                     Label(hint, systemImage: "tray.and.arrow.down")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(OnbColor.draftingInk)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(colors.textSecondary)
                         .contentTransition(.numericText(value: Double(flow.found.count)))
                         .transition(.opacity)
                         .accessibilityIdentifier("property-hint")
                 }
-                Text("Rental name")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(OnbColor.textPrimary)
-                    .accessibilityHidden(true)
-                TextField("", text: $flow.name, prompt: Text(flow.firstPropertyType == .str ? String(localized: "Tahoe cabin") : String(localized: "Oak Street duplex")).foregroundColor(OnbColor.textTertiary))
-                    .font(.body)
-                    .foregroundStyle(OnbColor.textPrimary)
-                    .focused($focused)
-                    .submitLabel(.done)
-                    .textInputAutocapitalization(.words)
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 52)
-                    .background(OnbColor.tertiary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(focused ? OnbColor.action : OnbColor.border, lineWidth: focused ? 2 : 1))
-                    .accessibilityLabel("Rental name")
-                    .accessibilityIdentifier("property-name")
+                let layout = typeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
+                    : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
+                layout {
+                    // The house the year starts from; it lights when the rental is saved.
+                    LHThumb.large(.started, lit: flow.stakeDropped)
+                        .accessibilityIdentifier("property-thumb")
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(String(localized: "Rental name", table: "ConversionPath"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(colors.textPrimary)
+                            .accessibilityHidden(true)
+                        LHField(flow.firstPropertyType == .str ? String(localized: "Tahoe cabin", table: "ConversionPath")
+                                                               : String(localized: "Oak Street duplex", table: "ConversionPath"),
+                                text: $flow.name,
+                                accessibilityLabel: String(localized: "Rental name", table: "ConversionPath"),
+                                identifier: "property-name")
+                            .textInputAutocapitalization(.words)
+                            .submitLabel(.done)
+                    }
+                }
                 if flow.addressOpen {
-                    TextField("", text: $flow.address, prompt: Text("Street address (optional)").foregroundColor(OnbColor.textTertiary))
-                        .font(.body)
-                        .foregroundStyle(OnbColor.textPrimary)
+                    LHField(String(localized: "Street address (optional)", table: "ConversionPath"), text: $flow.address,
+                            accessibilityLabel: String(localized: "Street address, optional", table: "ConversionPath"),
+                            identifier: "property-address")
                         .textContentType(.fullStreetAddress)
-                        .padding(.horizontal, 16)
-                        .frame(minHeight: 52)
-                        .background(OnbColor.tertiary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(OnbColor.border, lineWidth: 1))
-                        .accessibilityLabel("Street address, optional")
-                        .accessibilityIdentifier("property-address")
                         .transition(.opacity)
+                        .id("property-address-row")
                 } else {
                     Button {
                         withAnimation(OnbMotion.flow(reduce)) { flow.addressOpen = true }
                     } label: {
-                        Label("Add address", systemImage: "plus")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(OnbColor.action)
-                            .frame(minHeight: 32)
-                            .contentShape(Rectangle())
+                        Label(String(localized: "Add address", table: "ConversionPath"), systemImage: "plus")
                     }
-                    .buttonStyle(OnbPressable())
+                    .buttonStyle(LHButton.tertiary)
                     .accessibilityIdentifier("property-add-address")
-                    .id("property-add-address-row")
                 }
-                if flow.rental == .both { kindPicker }
-                Text("A nickname is fine. Address, units and more rentals come later.")
-                    .font(.footnote)
-                    .foregroundStyle(OnbColor.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if flow.rental == .both { kindPicker(colors) }
             }
         } actions: {
-            // One tap: the stake drops, the flag shows the name, and the flow moves on by itself.
             Button {
-                stake()
+                save()
             } label: {
-                if flow.stakeDropped { Label("Saved", systemImage: "checkmark") } else { Text("Save it") }
+                if flow.stakeDropped {
+                    Label(String(localized: "Saved", table: "ConversionPath"), systemImage: "checkmark")
+                } else {
+                    Text(String(localized: "Save it", table: "ConversionPath"))
+                }
             }
-            .buttonStyle(OnbPrimaryPill())
+            .buttonStyle(LHButton.primary)
             .disabled(flow.trimmedName.isEmpty)
             .allowsHitTesting(!flow.stakeDropped)
+            .contentTransition(.opacity)
             .accessibilityIdentifier("onb-primary")
-            Button("I’ll add it later") {
-                focused = false
+            Button(String(localized: "I’ll add it later", table: "ConversionPath")) {
+                dismissKeyboard()
                 flow.skipProperty(OnbMotion.morph(reduce))
             }
-            .buttonStyle(OnbLink(color: OnbColor.textSecondary))
+            .buttonStyle(LHButton.tertiary)
             .accessibilityIdentifier("onb-link")
         }
-        .onSubmit { if !flow.trimmedName.isEmpty { stake() } }
-        .onAppear { if OnbDebugLaunch.focusName { focused = true } }
+        .onSubmit { if !flow.trimmedName.isEmpty { save() } }
+        .sensoryFeedback(.success, trigger: savedTick)
     }
 
-    /// Owners with both kinds say which kind this first rental is (the 100 and 500 hour tests count each rental on its own).
-    private var kindPicker: some View {
+    /// Owners with both kinds say which kind this first rental is (the 100 and 500 hour tests count
+    /// each rental on its own).
+    private func kindPicker(_ colors: AdaptiveColors) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Which kind is this one?")
+            Text(String(localized: "Which kind is this one?", table: "ConversionPath"))
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(OnbColor.textPrimary)
-            HStack(spacing: 8) {
-                kindChip(String(localized: "Short stays"), short: true, id: "property-kind-short")
-                kindChip(String(localized: "Long-term"), short: false, id: "property-kind-long")
-            }
+                .foregroundStyle(colors.textPrimary)
+            LHSegmented([.init(true, String(localized: "Short stays", table: "ConversionPath")),
+                         .init(false, String(localized: "Long-term", table: "ConversionPath"))],
+                        selection: $flow.firstPropertyIsShortStay,
+                        accessibilityLabel: String(localized: "Which kind is this one?", table: "ConversionPath"))
+                .accessibilityIdentifier("property-kind")
         }
     }
 
-    private func kindChip(_ label: String, short: Bool, id: String) -> some View {
-        let on = flow.firstPropertyIsShortStay == short
-        return Button { withAnimation(OnbMotion.flow(reduce)) { flow.firstPropertyIsShortStay = short } } label: {
-            Text(label)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(on ? OnbColor.onAction : OnbColor.action)
-                .padding(.horizontal, 16)
-                .frame(minHeight: 40)
-                .background(on ? OnbColor.action : OnbColor.actionSurface, in: Capsule())
-                .contentShape(Capsule())
-        }
-        .buttonStyle(OnbPressable())
-        .accessibilityAddTraits(on ? .isSelected : [])
-        .accessibilityIdentifier(id)
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
-    private func stake() {
-        focused = false
+    /// One tap: the rental is saved, its house lights (`windows`), the button says Saved, and the
+    /// flow moves on by itself.
+    private func save() {
+        dismissKeyboard()
         guard flow.saveProperty() else { return }
+        savedTick += 1
+        withAnimation(reduce ? AppAnimation.windowsReduced : AppAnimation.windows) {
+            flow.stakeDropped = true
+            flow.flagOpen = true
+        }
+        UIAccessibility.post(notification: .announcement,
+                             argument: String(localized: "\(flow.displayName) saved.", table: "ConversionPath"))
         Task { @MainActor in
-            // The stake drops (220 ms), the flag unfurls with the name, hold, then the morph.
-            if reduce {
-                withAnimation(.easeInOut(duration: 0.2)) { flow.stakeDropped = true; flow.flagOpen = true }
-            } else {
-                withAnimation(.easeIn(duration: 0.22)) { flow.stakeDropped = true }
-                try? await Task.sleep(nanoseconds: 220_000_000)
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { flow.flagOpen = true }
-            }
-            UIAccessibility.post(notification: .announcement, argument: "\(flow.displayName) saved.")
-            try? await Task.sleep(nanoseconds: reduce ? 500_000_000 : 720_000_000)
+            try? await Task.sleep(for: .milliseconds(reduce ? 500 : 700))
             if OnbDebugLaunch.holdAfterStake { return }
             flow.next(OnbMotion.morph(reduce))
         }
@@ -670,68 +486,71 @@ struct OnbPropertyStep: View {
 struct OnbNotificationPreview: View {
     var title: String
     var bodyText: String
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
         HStack(alignment: .top, spacing: 10) {
             Image("onb-appicon")
                 .resizable()
-                .frame(width: 38, height: 38)
-                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .frame(width: 40, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                HStack {
-                    Text(title).font(.subheadline.weight(.semibold))
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(colors.textPrimary)
                     Spacer()
-                    Text("now").font(.footnote).foregroundStyle(.secondary)
+                    Text(String(localized: "now", table: "ConversionPath")).font(.footnote).foregroundStyle(colors.textSecondary)
                 }
-                Text(bodyText).font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(bodyText).font(.subheadline).foregroundStyle(colors.textPrimary)
             }
-            .foregroundStyle(.primary)
         }
-        .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(.primary.opacity(0.08), lineWidth: 1))
-        .shadow(color: Color.black.opacity(0.10), radius: 12, y: 4)
+        .padding(LHMetrics.cardPadding)
+        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous).strokeBorder(colors.border, lineWidth: LHMetrics.hairline))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Example notification. \(title). \(bodyText)")
+        .accessibilityLabel(String(localized: "Example notification. \(title). \(bodyText)", table: "ConversionPath"))
     }
 }
 
 struct OnbNotifyStep: View {
     @Bindable var flow: OnbFlow
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.colorScheme) private var colorScheme
     private var place: String {
         if !flow.trimmedName.isEmpty { return flow.trimmedName }
-        return flow.firstPropertyType == .str ? String(localized: "Tahoe cabin") : String(localized: "Oak Street")
+        return flow.firstPropertyType == .str ? String(localized: "Tahoe cabin", table: "ConversionPath") : String(localized: "Oak Street", table: "ConversionPath")
     }
 
     var body: some View {
-        OnbStepScaffold(title: String(localized: "Want a nudge to log it while it’s fresh?")) {
-            VStack(alignment: .leading, spacing: 14) {
-                OnbNotificationPreview(title: String(localized: "Plumber visit just ended"), bodyText: String(localized: "Log 2h at \(place)?"))
-                Text("One short note after a calendar event, so your entry is dated the day it happened. At most two a day, never at night.")
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        OnbStepScaffold(title: String(localized: "Want a nudge to log it while it’s fresh?", table: "ConversionPath")) {
+            VStack(alignment: .leading, spacing: 16) {
+                OnbNotificationPreview(title: String(localized: "Plumber visit just ended", table: "ConversionPath"),
+                                       bodyText: String(localized: "Log 2 hours at \(place)?", table: "ConversionPath"))
+                Text(String(localized: "A short note after a calendar event, so you log it the same day. At most 2 a day, never at night.", table: "ConversionPath"))
                     .font(.body)
-                    .foregroundStyle(OnbColor.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(colors.textSecondary)
             }
         } actions: {
-            Button("Yes, after visits") { Task { await flow.askNotify(OnbMotion.morph(reduce)) } }
-                .buttonStyle(OnbPrimaryPill())
+            Button(String(localized: "Yes, after visits", table: "ConversionPath")) { Task { await flow.askNotify(OnbMotion.morph(reduce)) } }
+                .buttonStyle(LHButton.primary)
                 .disabled(flow.isAsking)
                 .accessibilityIdentifier("onb-primary")
-            Button("Not now") { flow.notifyNotNow(OnbMotion.morph(reduce)) }
-                .buttonStyle(OnbOutlinePill())
+            Button(String(localized: "Not now", table: "ConversionPath")) { flow.notifyNotNow(OnbMotion.morph(reduce)) }
+                .buttonStyle(LHButton.tertiary)
                 .disabled(flow.isAsking)
                 .accessibilityIdentifier("onb-secondary")
         }
     }
 }
 
-// MARK: - What's new for upgraders · 1 "Your hours now build a house."
+// MARK: - What's new for upgraders · 1: their hours and their house
 
 struct OnbWhatsNewHouseStep: View {
     @Bindable var flow: OnbFlow
     @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.colorScheme) private var colorScheme
 
     private var stageLine: String { Self.stageLine(hours: flow.upgradeHours, goal: flow.upgradeGoal) }
 
@@ -743,26 +562,34 @@ struct OnbWhatsNewHouseStep: View {
         return parts.joined(separator: " · ")
     }
 
+    /// The upgrader's house: the craft stage of their countable hours against their goal.
+    static func stage(hours: Double, goal: HouseGoal) -> CraftStage {
+        CraftStage.stage(hours: max(0, hours), goal: goal.targetHours)
+    }
+
     var body: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
         OnbStepScaffold(title: OnbCopy.upgradeHeadline(hours: flow.upgradeHours, goal: flow.upgradeGoal, isRecord: flow.upgradeIsRecord)) {
             VStack(alignment: .leading, spacing: 12) {
-                Text(stageLine)
-                    .onbDrafting(OnbColor.draftingInk)
+                HStack(spacing: 12) {
+                    LHThumb.large(Self.stage(hours: flow.upgradeHours, goal: flow.upgradeGoal), lit: true)
+                    Text(stageLine)
+                        .font(.subheadline)
+                        .foregroundStyle(colors.textSecondary)
+                }
                 Text(OnbCopy.upgradeBody(isRecord: flow.upgradeIsRecord))
                     .font(.body)
-                    .foregroundStyle(OnbColor.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(colors.textSecondary)
                 if flow.upgradeGoal == .reps750, !flow.upgradeIsRecord {
                     Text(OnbCopy.upgradeRepsNote)
                         .font(.body)
-                        .foregroundStyle(OnbColor.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(colors.textSecondary)
                         .accessibilityIdentifier("whatsnew-reps-note")
                 }
             }
         } actions: {
-            Button("Continue") { flow.next(OnbMotion.morph(reduce)) }
-                .buttonStyle(OnbPrimaryPill())
+            Button(String(localized: "Continue", table: "ConversionPath")) { flow.next(OnbMotion.morph(reduce)) }
+                .buttonStyle(LHButton.primary)
                 .accessibilityIdentifier("onb-primary")
         }
     }

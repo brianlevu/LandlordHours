@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- 2.0 launch: blueprint #1E3FA6 (LaunchBlueprint, same in light and dark) and mark B
-     (LaunchMark, 112pt vector PDF), centred on the full screen 12pt above centre. No text.
-     The app's first SwiftUI frame repeats this exactly (LaunchHandoffView). -->
+<!-- v2 launch (standard H.5): LaunchBackground = pageTop (#EAE3D7 light, #0B1230 dark) and
+     mono mark B in textPrimary per appearance (LaunchMark, 112pt vector PDF: #121B33 / #F2F4FA),
+     centred on the full screen 12pt above centre. No text. The blueprint LaunchBlueprint colour is
+     retired. The app's first SwiftUI frame repeats this exactly (LaunchHandoffView). -->
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23504" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" colorMatched="YES" initialViewController="LaunchViewController">
     <device id="retina6_12" orientation="portrait" appearance="light"/>
     <dependencies>
@@ -26,7 +27,7 @@
                                 </constraints>
                             </imageView>
                         </subviews>
-                        <color key="backgroundColor" name="LaunchBlueprint"/>
+                        <color key="backgroundColor" name="LaunchBackground"/>
                         <constraints>
                             <constraint firstItem="LaunchMarkView" firstAttribute="centerX" secondItem="LaunchRoot" secondAttribute="centerX" id="MarkCenterX"/>
                             <constraint firstItem="LaunchMarkView" firstAttribute="centerY" secondItem="LaunchRoot" secondAttribute="centerY" constant="-12" id="MarkCenterY"/>
@@ -39,8 +40,8 @@
     </scenes>
     <resources>
         <image name="LaunchMark" width="112" height="112"/>
-        <namedColor name="LaunchBlueprint">
-            <color red="0.11764705882352941" green="0.24705882352941178" blue="0.65098039215686276" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+        <namedColor name="LaunchBackground">
+            <color red="0.91764705882352937" green="0.8901960784313725" blue="0.84313725490196079" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </namedColor>
     </resources>
 </document>

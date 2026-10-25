@@ -73,16 +73,17 @@ final class PaywallCaptureUITests: XCTestCase {
         }
     }
 
-    /// The status band follows the scroll: blueprint over the hero, canvas below it.
-    func testStatusBandFollowsScroll() {
+    /// v2 (standard §1.23): no blueprint band. The header (title + close) stays pinned on the plain
+    /// canvas while the page scrolls, and "What you get" is reachable.
+    func testHeaderStaysPinnedWithoutABand() {
         launch(scenario: "occasional", scheme: "light", size: "UICTContentSizeCategoryXXL", extra: ["-LHPaywallPreview", "export"])
         XCTAssertTrue(app.staticTexts["paywall.title"].waitForExistence(timeout: 12))
-        XCTAssertTrue(app.descendants(matching: .any)["paywall.band.hero"].waitForExistence(timeout: 3), "Blue band over the hero")
+        XCTAssertFalse(app.descendants(matching: .any)["paywall.band.hero"].exists, "The blueprint band is retired")
         app.swipeUp(velocity: .fast); app.swipeUp(velocity: .fast)
         Thread.sleep(forTimeInterval: 1.5)
-        XCTAssertTrue(app.descendants(matching: .any)["paywall.band.canvas"].waitForExistence(timeout: 3), "Canvas band once scrolled past the hero")
-        app.swipeDown(velocity: .fast); app.swipeDown(velocity: .fast); app.swipeDown(velocity: .fast)
-        XCTAssertTrue(app.descendants(matching: .any)["paywall.band.hero"].waitForExistence(timeout: 3), "Blue again at the top")
+        XCTAssertTrue(app.staticTexts["paywall.title"].isHittable, "The header stays pinned")
+        XCTAssertTrue(app.buttons["paywall.close"].isHittable, "Close stays reachable")
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.benefits"].exists, "What you get")
     }
 
     /// Properties at the free limit: the shared `.row` lock (entry properties_limit).

@@ -1,10 +1,10 @@
 import SwiftUI
 
-// MARK: - Page 1 of the record, drawn plain (the paywall hero and Today's lock)
+// MARK: - Page 1 of the record, drawn plain (the paywall preview and Today's lock)
 //
 // Built from the same `AuditReport` the PDF renderer uses, so with at least one entry the page
 // shows the user's own rentals, hours and entries. With none it shows sample data under a
-// "SAMPLE" stamp. It is drawn in SwiftUI (portrait, like the approved sandbox) rather than as a
+// "Sample" tag. It is drawn in SwiftUI (portrait, like the approved sandbox) rather than as a
 // bitmap of the landscape PDF, so the context highlight (the new row, the total) can be drawn.
 
 struct RecordPageModel: Equatable {
@@ -23,7 +23,7 @@ struct RecordPageModel: Equatable {
 
     static func from(report: AuditReport, owner: String, properties: [RentalProperty]) -> RecordPageModel {
         let kindFor: (UUID) -> String = { id in
-            (properties.first { $0.id == id }?.propertyType == .str) ? "A few nights" : "Long stays"
+            (properties.first { $0.id == id }?.propertyType == .str) ? String(localized: "A few nights", table: "ConversionPath") : String(localized: "Long stays", table: "ConversionPath")
         }
         let rows = report.propertyTotals.map { Row(name: $0.name, kind: kindFor($0.propertyId), hours: $0.repsCountableHours) }
         let total = report.summary.repsCountableHours
@@ -40,14 +40,14 @@ struct RecordPageModel: Equatable {
         let last = report.summary.lastEntryDate ?? Date()
         let range = "\(df.string(from: first)) – \(df.string(from: last)), \(String(report.taxYear))"
         let name = owner.trimmingCharacters(in: .whitespacesAndNewlines)
-        return RecordPageModel(year: report.taxYear, owner: name.isEmpty || name == "User" ? "Your name" : name,
+        return RecordPageModel(year: report.taxYear, owner: name.isEmpty || name == "User" ? String(localized: "Your name", table: "ConversionPath") : name,
                                range: range, rows: rows, total: total, kinds: Array(kinds), lines: Array(lines), isSample: false)
     }
 
     static func sample(year: Int) -> RecordPageModel {
         RecordPageModel(
-            year: year, owner: "Sample owner", range: "Jan 1 – Oct 19, \(String(year))",
-            rows: [Row(name: "Sample Cabin", kind: "Long stays", hours: 140.5)], total: 140.5,
+            year: year, owner: String(localized: "Sample owner", table: "ConversionPath"), range: String(localized: "Jan 1 – Oct 19, \(String(year))", table: "ConversionPath"),
+            rows: [Row(name: String(localized: "Sample Cabin", table: "ConversionPath"), kind: String(localized: "Long stays", table: "ConversionPath"), hours: 140.5)], total: 140.5,
             kinds: [Kind(label: "Repairs", fraction: 1), Kind(label: "Management", fraction: 0.64),
                     Kind(label: "Leasing", fraction: 0.43), Kind(label: "Bookkeeping", fraction: 0.31)],
             lines: [Line(date: "Oct 18", title: "Plumber", hours: 2), Line(date: "Oct 16", title: "Showing", hours: 1),
@@ -88,104 +88,121 @@ enum RecordPageHighlight: Equatable {
     }
 }
 
-/// The page itself: always white paper with dark ink, in both themes.
+/// Page 1 of the record, at readable sizes (v2: the 5.5–13pt miniature is retired). Paper is
+/// always the light tokens, in both appearances. The title is the PDF's own title (`pdf.title`,
+/// "Rental hours record 2026"); the frame that holds it crops the page's foot.
 struct RecordPagePreview: View {
     let model: RecordPageModel
     var highlight: RecordPageHighlight = .none
+    /// Entry lines under the total (the paywall shows as many as fit).
+    var entryLimit = 4
+    /// Rental rows (up to 3).
+    var rentalLimit = 3
+    /// Fill the height it is given (Today's lock frames it); the paywall hugs the content.
+    var fillsHeight = true
+    /// The smallest form (accessibility sizes): the title wraps, the tag sits under it, the owner
+    /// line goes, so nothing truncates mid-word.
+    var compact = false
 
-    // The page is paper: always the light tokens, in both themes.
-    private let ink = Color(hex: AppColors.Hex.textPrimary)
-    private let grey = Color(hex: AppColors.Hex.textSecondary)
-    private let rule = Color(hex: AppColors.Hex.border)
-    private let draftingInk = Color(hex: AppColors.Hex.draftingInk)
+    /// The paper's ink set: the light tokens in both appearances.
+    private let paper = AdaptiveColors(colorScheme: .light)
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack {
-                Text("LANDLORDHOURS").font(.system(size: 6.5, weight: .semibold, design: .monospaced)).tracking(0.8).foregroundStyle(AppColors.brand)
-                Spacer()
-                if model.isSample {
-                    // The stamp sits in the header's own slot, so it never covers the title.
-                    Text("SAMPLE")
-                        .font(.system(size: 8, weight: .bold, design: .monospaced)).tracking(1.2)
-                        .foregroundStyle(draftingInk)
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(draftingInk, lineWidth: 1.2))
-                        .rotationEffect(.degrees(-4))
-                        .accessibilityIdentifier("paywall.sampleStamp")
-                } else {
-                    Text("Page 1").font(.system(size: 6)).foregroundStyle(grey)
-                }
-            }
-            Text("\(String(model.year)) hours record").font(.system(size: 13, weight: .semibold, design: .serif)).foregroundStyle(ink)
-            Text("\(model.owner) · \(model.range)").font(.system(size: 6.5)).foregroundStyle(grey).lineLimit(1)
-            Rectangle().fill(rule).frame(height: 0.5)
-            HStack { Text("PROPERTY"); Spacer(); Text("HOURS") }
-                .font(.system(size: 5.5, weight: .semibold)).foregroundStyle(grey)
-            ForEach(Array(model.rows.prefix(3).enumerated()), id: \.offset) { _, row in
-                propertyRow(row.name, row.kind, value: hoursText(row.hours), isNew: false)
-            }
-            if case .newRow(let name) = highlight {
-                propertyRow(name, "New rental", value: "—", isNew: true)
-            }
-            Rectangle().fill(rule).frame(height: 0.5)
-            HStack {
-                Text("Total").font(.system(size: 7.5, weight: .semibold))
-                Spacer()
-                Text("\(hoursText(model.total))h").font(.system(size: 9, weight: .bold)).monospacedDigit()
-            }
-            .foregroundStyle(ink)
-            .padding(.horizontal, highlight == .total ? 4 : 0).padding(.vertical, highlight == .total ? 3 : 0)
-            .background { if highlight == .total { RoundedRectangle(cornerRadius: 3).fill(HouseTokens.drafting.opacity(0.28)) } }
-            if !model.kinds.isEmpty {
-                Text("BY KIND OF WORK").font(.system(size: 5.5, weight: .semibold)).foregroundStyle(grey).padding(.top, 4)
-                ForEach(model.kinds, id: \.label) { kind in
-                    HStack(spacing: 4) {
-                        Text(kind.label).font(.system(size: 6)).lineLimit(1).frame(width: 52, alignment: .leading)
-                        GeometryReader { g in
-                            Capsule().fill(draftingInk.opacity(0.7)).frame(width: max(3, g.size.width * kind.fraction))
-                        }
-                        .frame(height: 3.5)
-                    }
-                    .foregroundStyle(ink)
-                }
-            }
-            if !model.lines.isEmpty {
-                Text("ENTRIES").font(.system(size: 5.5, weight: .semibold)).foregroundStyle(grey).padding(.top, 4)
-                ForEach(Array(model.lines.enumerated()), id: \.offset) { _, line in
-                    HStack {
-                        Text(line.date).frame(width: 28, alignment: .leading)
-                        Text(line.title).lineLimit(1)
-                        Spacer()
-                        Text(hoursText(line.hours)).monospacedDigit()
-                    }
-                    .font(.system(size: 6)).foregroundStyle(ink)
-                    Rectangle().fill(rule.opacity(0.6)).frame(height: 0.3)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(14)
-        .padding(.top, 18)
-        .frame(maxHeight: .infinity, alignment: .top)
-        .background(Color.white)
-        .environment(\.colorScheme, .light)
-        .dynamicTypeSize(.large)
+    /// `pdf.title`: one key for the PDF, the CSV file name and this preview (standard §C.5).
+    static func title(year: Int) -> String {
+        String(format: String(localized: "pdf.title", defaultValue: "Rental hours record %lld"), year)
     }
 
-    private func propertyRow(_ name: String, _ kind: String, value: String, isNew: Bool) -> some View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            let header = compact
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+            header {
+                Text(Self.title(year: model.year))
+                    .font(.headline)
+                    .foregroundStyle(paper.textPrimary)
+                if !compact { Spacer(minLength: 8) }
+                if model.isSample {
+                    LHTag(String(localized: "Sample", table: "ConversionPath"), tone: .informational)
+                        .accessibilityIdentifier("paywall.sampleStamp")
+                } else {
+                    Text(String(localized: "Page 1", table: "ConversionPath"))
+                        .font(.caption)
+                        .foregroundStyle(paper.textSecondary)
+                }
+            }
+            if !compact {
+                Text(verbatim: "\(model.owner) · \(model.range)")
+                    .font(.caption)
+                    .foregroundStyle(paper.textSecondary)
+            }
+            LHDivider()
+            ForEach(Array(model.rows.prefix(rentalLimit).enumerated()), id: \.offset) { _, row in
+                rentalRow(row.name, row.kind, value: hoursText(row.hours), isNew: false)
+            }
+            if case .newRow(let name) = highlight {
+                rentalRow(name, String(localized: "New rental", table: "ConversionPath"), value: "—", isNew: true)
+            }
+            LHDivider()
+            HStack {
+                Text(String(localized: "Total", table: "ConversionPath")).font(.subheadline.weight(.semibold))
+                Spacer()
+                Text(verbatim: "\(hoursText(model.total))h")
+                    .font(.subheadline.weight(.semibold))
+                    .fontDesign(.rounded)
+                    .monospacedDigit()
+            }
+            .foregroundStyle(paper.textPrimary)
+            .padding(.horizontal, highlight == .total ? 8 : 0)
+            .padding(.vertical, highlight == .total ? 6 : 0)
+            .background {
+                if highlight == .total {
+                    RoundedRectangle(cornerRadius: LHTag.radius, style: .continuous).fill(paper.actionSurface)
+                }
+            }
+            if !model.lines.isEmpty && entryLimit > 0 {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(model.lines.prefix(entryLimit).enumerated()), id: \.offset) { _, line in
+                        HStack(spacing: 8) {
+                            Text(line.date).frame(minWidth: 48, alignment: .leading)
+                                .foregroundStyle(paper.textSecondary)
+                            Text(line.title).lineLimit(1)
+                            Spacer()
+                            Text(hoursText(line.hours)).fontDesign(.rounded).monospacedDigit()
+                        }
+                        .font(.footnote)
+                        .foregroundStyle(paper.textPrimary)
+                    }
+                }
+                .padding(.top, 4)
+            }
+            if fillsHeight { Spacer(minLength: 0) }
+        }
+        .padding(LHMetrics.cardPadding)
+        .frame(maxWidth: .infinity, maxHeight: fillsHeight ? .infinity : nil, alignment: .top)
+        .background(paper.backgroundSecondary)
+        .environment(\.colorScheme, .light)
+    }
+
+    private func rentalRow(_ name: String, _ kind: String, value: String, isNew: Bool) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 1) {
-                Text(name).font(.system(size: 7.5, weight: .semibold)).lineLimit(1)
-                Text(kind).font(.system(size: 5.5)).foregroundStyle(grey)
+                Text(name).font(.subheadline.weight(.semibold)).lineLimit(2)
+                Text(kind).font(.caption).foregroundStyle(paper.textSecondary)
             }
             Spacer()
-            Text(value).font(.system(size: 7.5, weight: .semibold)).monospacedDigit()
+            Text(value).font(.subheadline.weight(.semibold)).fontDesign(.rounded).monospacedDigit()
         }
-        .foregroundStyle(ink)
-        .padding(.horizontal, isNew ? 4 : 0).padding(.vertical, isNew ? 3 : 0)
-        .background { if isNew { RoundedRectangle(cornerRadius: 3).fill(HouseTokens.drafting.opacity(0.28)) } }
-        .overlay { if isNew { RoundedRectangle(cornerRadius: 3).strokeBorder(draftingInk, style: StrokeStyle(lineWidth: 0.8, dash: [2, 2])) } }
+        .foregroundStyle(paper.textPrimary)
+        .padding(.horizontal, isNew ? 8 : 0)
+        .padding(.vertical, isNew ? 6 : 0)
+        .background { if isNew { RoundedRectangle(cornerRadius: LHTag.radius, style: .continuous).fill(paper.actionSurface) } }
+        .overlay {
+            if isNew {
+                RoundedRectangle(cornerRadius: LHTag.radius, style: .continuous)
+                    .strokeBorder(paper.action, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+            }
+        }
     }
 
     private func hoursText(_ h: Double) -> String { String(format: "%.1f", max(0, h)) }

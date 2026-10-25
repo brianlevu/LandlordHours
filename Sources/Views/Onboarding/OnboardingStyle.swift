@@ -1,169 +1,110 @@
 import SwiftUI
 
-// MARK: - Onboarding tokens and the one component set
+// MARK: - Onboarding on the standard components (standard §1.24; plan package B)
 //
-// One pill, one outline pill, one card, one link on every step (consistency audit). Colours are
-// the 2.0 intent tokens from `AppColors.Hex`, resolved per trait so a subtree that overrides the
-// colour scheme (the blueprint band) resolves them correctly.
+// v2: onboarding uses the app's own components and tokens. `OnbColor` and the `Onb*` button
+// styles are deleted; buttons are `LHButton`, option rows are `LHRow.Browse` in one `LHRowGroup`,
+// fields are `LHField`, the kind picker is `LHSegmented`. This file holds the three onboarding
+// pieces that are not app components: the motion choices, the progress track and the option row
+// (an `LHRow.Browse` with the trailing `checkmark` the standard specifies for selection).
 
-enum OnbColor {
-    private typealias H = AppColors.Hex
-    static let canvas = Color.lhDynamic(light: H.canvas, dark: H.darkCanvas)
-    static let card = Color.lhDynamic(light: H.card, dark: H.darkCard)
-    static let tertiary = Color.lhDynamic(light: H.tertiary, dark: H.darkTertiary)
-    static let action = AppColors.action
-    static let onAction = AppColors.onAction
-    static let actionSurface = Color.lhDynamic(light: H.actionSurface, dark: H.darkActionSurface)
-    static let draftingInk = AppColors.draftingInk
-    static let timberInk = AppColors.timberInk
-    static let textPrimary = Color.lhDynamic(light: H.textPrimary, dark: H.darkTextPrimary)
-    static let textSecondary = Color.lhDynamic(light: H.textSecondary, dark: H.darkTextSecondary)
-    static let textTertiary = Color.lhDynamic(light: H.textTertiary, dark: H.darkTextTertiary)
-    static let border = Color.lhDynamic(light: H.border, dark: H.darkBorder)
-    static let positive = Color.lhDynamic(light: H.positive, dark: H.darkPositive)
-    /// People / spouse only.
-    static let rose = Color.lhDynamic(light: H.rose, dark: H.darkRose)
-    static let roseSurface = Color.lhDynamic(light: H.roseSurface, dark: H.darkRoseSurface)
-    static let informational = Color.lhDynamic(light: H.informational, dark: H.darkInformational)
-    static let brand = AppColors.brand
+/// The package's String Catalog (`Sources/Resources/Strings/ConversionPath.xcstrings`).
+enum OnbStrings {
+    static let table = "ConversionPath"
 }
 
 enum OnbMotion {
-    /// Header morph between steps (spring 0.5 / 0.85). Reduce Motion: a short cross-fade.
-    static func morph(_ reduce: Bool) -> Animation { reduce ? .easeInOut(duration: 0.2) : .spring(response: 0.5, dampingFraction: 0.85) }
-    /// Progress dimension line (0.35 / 0.9).
-    static func progress(_ reduce: Bool) -> Animation { reduce ? .easeInOut(duration: 0.15) : .spring(response: 0.35, dampingFraction: 0.9) }
-    /// In-flow reveal (notes, chips): the shipped `flow` spring.
-    static func flow(_ reduce: Bool) -> Animation { reduce ? .easeInOut(duration: 0.2) : AppAnimation.flow }
-}
-
-extension View {
-    /// SF Mono drafting label: 11pt medium caps, +12% tracking.
-    func onbDrafting(_ color: Color) -> some View {
-        self.font(AppTypography.drafting)
-            .textCase(.uppercase)
-            .tracking(1.3)
-            .foregroundStyle(color)
+    /// Step to step: `flow` (0.30 spring, bounce 0). Reduce Motion: a `quick` crossfade.
+    static func morph(_ reduce: Bool) -> Animation { reduce ? AppAnimation.quick : AppAnimation.flow }
+    /// The progress fill: `smooth`. Reduce Motion: `quick`.
+    static func progress(_ reduce: Bool) -> Animation { reduce ? AppAnimation.quick : AppAnimation.smooth }
+    /// In-step reveals (a note, the address field): `flow`, or `quick` under Reduce Motion.
+    static func flow(_ reduce: Bool) -> Animation { reduce ? AppAnimation.quick : AppAnimation.flow }
+    /// The step content's transition: a short slide with opacity; opacity only under Reduce Motion.
+    static func stepTransition(forward: Bool, reduce: Bool) -> AnyTransition {
+        reduce ? .opacity : .asymmetric(
+            insertion: .offset(x: forward ? 24 : -24).combined(with: .opacity),
+            removal: .offset(x: forward ? -24 : 24).combined(with: .opacity))
     }
 }
 
-/// Press feedback: scale 0.97, 120 ms ease-out.
-struct OnbPressable: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(AppAnimation.feedback, value: configuration.isPressed)
-    }
-}
-
-/// Blueprint pill on white (dark: cyan on navy). Full width, 52pt.
-struct OnbPrimaryPill: ButtonStyle {
-    @Environment(\.isEnabled) private var enabled
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.body.weight(.semibold))
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .padding(.horizontal, 16)
-            .foregroundStyle(enabled ? OnbColor.onAction : OnbColor.textTertiary)
-            .background(enabled ? OnbColor.action : OnbColor.tertiary, in: Capsule())
-            .overlay { if !enabled { Capsule().strokeBorder(OnbColor.border, lineWidth: 1) } }
-            .contentShape(Capsule())
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(AppAnimation.feedback, value: configuration.isPressed)
-    }
-}
-
-/// Outlined pill of equal weight (the real "Not now").
-struct OnbOutlinePill: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.body.weight(.semibold))
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .padding(.horizontal, 16)
-            .foregroundStyle(OnbColor.action)
-            .overlay(Capsule().strokeBorder(OnbColor.action, lineWidth: 1.5))
-            .contentShape(Capsule())
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(AppAnimation.feedback, value: configuration.isPressed)
-    }
-}
-
-/// White pill on blueprint (both modes).
-struct OnbHeroPill: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.body.weight(.semibold))
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .padding(.horizontal, 16)
-            .foregroundStyle(OnbColor.brand)
-            .background(HouseTokens.onHeroPrimary, in: Capsule())
-            .contentShape(Capsule())
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(AppAnimation.feedback, value: configuration.isPressed)
-    }
-}
-
-/// The one text link.
-struct OnbLink: ButtonStyle {
-    var color: Color = OnbColor.action
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.body.weight(.semibold))
-            .foregroundStyle(color)
-            .multilineTextAlignment(.center)
-            .frame(minHeight: 44)
-            .padding(.horizontal, 12)
-            .contentShape(Rectangle())
-            .opacity(configuration.isPressed ? 0.6 : 1)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-    }
-}
-
-struct OnbTightLabel: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 5) {
-            configuration.icon
-            configuration.title
-        }
-    }
-}
-
-struct OnbTriangle: Shape {
-    func path(in r: CGRect) -> Path {
-        var p = Path()
-        p.move(to: CGPoint(x: r.minX, y: r.minY))
-        p.addLine(to: CGPoint(x: r.maxX, y: r.minY))
-        p.addLine(to: CGPoint(x: r.midX, y: r.maxY))
-        p.closeSubpath()
-        return p
-    }
-}
-
-/// Cyan drafting dimension line: end stops, one tick per step, the drawn part grows with `trim`.
-struct OnbDimensionLine: View {
+/// Progress (§1.24): a 3pt track in `border`, the fill in `action`.
+struct OnbProgressTrack: View {
     var total: Int
     var value: Int
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduce
+
     var body: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        let fraction = CGFloat(value) / CGFloat(max(total, 1))
         GeometryReader { g in
-            let w = g.size.width, mid = g.size.height / 2
-            ZStack(alignment: .topLeading) {
-                Path { p in p.move(to: CGPoint(x: 0, y: mid)); p.addLine(to: CGPoint(x: w, y: mid)) }
-                    .stroke(HouseTokens.drafting.opacity(0.28), lineWidth: 1.5)
-                Path { p in p.move(to: CGPoint(x: 0, y: mid)); p.addLine(to: CGPoint(x: w, y: mid)) }
-                    .trim(from: 0, to: CGFloat(value) / CGFloat(max(total, 1)))
-                    .stroke(HouseTokens.drafting, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                ForEach(0...max(total, 1), id: \.self) { i in
-                    Rectangle()
-                        .fill(HouseTokens.drafting.opacity(i <= value ? 1 : 0.35))
-                        .frame(width: 1.5, height: i == 0 || i == total ? 12 : 7)
-                        .position(x: w * CGFloat(i) / CGFloat(max(total, 1)), y: mid)
-                }
+            ZStack(alignment: .leading) {
+                Capsule().fill(colors.border)
+                Capsule().fill(colors.action)
+                    .frame(width: max(3, g.size.width * min(max(fraction, 0), 1)))
             }
         }
+        .frame(height: 3)
+        .animation(OnbMotion.progress(reduce), value: value)
         .accessibilityElement()
-        .accessibilityLabel("Step \(value) of \(total)")
+        .accessibilityLabel(String(localized: "Step \(value) of \(total)", table: "ConversionPath"))
+        .accessibilityIdentifier("onb-progress")
+    }
+}
+
+/// One option in an onboarding question: an `LHRow.Browse` (the option's SF glyph in the leading
+/// slot, title, one meta line) with a trailing `checkmark` in `action` (`.body.semibold`, 44 frame)
+/// on the selected row. The whole row is the target. The 22pt leading circle is the confirm
+/// control's (§1.3) and never appears here.
+struct OnbOptionRow: View {
+    var symbol: String
+    var title: String
+    var meta: String? = nil
+    var selected: Bool
+    var action: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        Button(action: action) {
+            HStack(spacing: 0) {
+                LHRow.Browse(title: title, meta: meta, showsChevron: false) {
+                    LHRowGlyph(systemImage: symbol, tint: selected ? .action : .neutral)
+                }
+                Image(systemName: "checkmark")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(colors.action)
+                    .frame(width: 44, height: 44)
+                    .opacity(selected ? 1 : 0)
+                    .padding(.trailing, 4)
+                    .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(LHButton.press)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+/// The options of one question in one grouped container (§1.24): hairline dividers between rows,
+/// and the container's edge turns `action` while a row in it is selected.
+struct OnbOptionGroup<Content: View>: View {
+    var hasSelection: Bool
+    @ViewBuilder var content: Content
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        LHRowGroup { content }
+            .overlay {
+                if hasSelection {
+                    RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
+                        .strokeBorder(colors.action, lineWidth: 1)
+                }
+            }
+            .animation(AppAnimation.quick, value: hasSelection)
     }
 }
