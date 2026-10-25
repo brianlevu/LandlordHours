@@ -54,7 +54,7 @@ final class FreeUserPaywallUITests: XCTestCase {
 
     func testRecordsExportPageLock() {
         launchFree()
-        tap(app.buttons["Records"].firstMatch)
+        tapTab("Records")
         tap(app.buttons["records.export"])
         let origin = exportPageUnlock()
         tap(origin)
@@ -89,7 +89,7 @@ final class FreeUserPaywallUITests: XCTestCase {
 
     func testPropertiesSecondRental() {
         launchFree()
-        tap(app.buttons["Properties"].firstMatch)
+        tapTab("Rentals")
         let lock = lockContainer("properties_limit")
         scrollTo(lock)
         assertLockSaysWhatStays(lock)
@@ -196,7 +196,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         app.launchArguments = baseArguments(scenario: "occasional", tab: 0, scheme: scheme)
         app.launch()
         taps = 0
-        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 12), "Home tab bar should load")
+        XCTAssertTrue(todayTab.waitForExistence(timeout: 12), "Home tab bar should load")
     }
 
     private func launchInboxLimit() {
@@ -205,19 +205,22 @@ final class FreeUserPaywallUITests: XCTestCase {
             + ["-LHSeedSuggestions", "limit"]
         app.launch()
         taps = 0
-        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 12))
-        tap(app.buttons["Inbox"].firstMatch)
+        XCTAssertTrue(todayTab.waitForExistence(timeout: 12))
+        tapTab("Inbox")
     }
 
-    /// Reports and Settings are reached from Today's header buttons; each is one tap.
+    private var todayTab: XCUIElement { app.tabBars.firstMatch.buttons["Today"] }
+
+    /// The native tab bar: Today, Inbox, Records, Rentals, Log time. Reports and Settings are not
+    /// tabs: they open in the Today tab from the account menu (`today.account`), two taps.
     private func tapTab(_ title: String) {
-        let label: String
         switch title {
-        case "Reports": label = "Open reports"
-        case "Settings": label = "Open profile and settings"
-        default: label = title
+        case "Reports", "Settings":
+            tap(app.buttons["today.account"])
+            tap(app.buttons[title].firstMatch)
+        default:
+            tap(app.tabBars.firstMatch.buttons[title])
         }
-        tap(app.buttons[label].firstMatch)
     }
 
     /// The unlocked Export page: create (or, when it already ran, share) the report.
@@ -352,7 +355,7 @@ final class FreeUserPaywallUITests: XCTestCase {
     /// The floating tab bar is an overlay the accessibility tree still calls hittable through, so a tap
     /// on a lock sitting under it lands on a tab (Today's "Your record" sits last, right above it).
     private func isUnderTabBar(_ element: XCUIElement) -> Bool {
-        let tabBar = app.buttons["tab.today"]
+        let tabBar = app.tabBars.firstMatch
         guard element.exists, tabBar.exists, tabBar.isHittable else { return false }
         return element.frame.maxY > tabBar.frame.minY - 8
     }
@@ -370,9 +373,9 @@ final class FreeUserPaywallUITests: XCTestCase {
         XCTAssertTrue(app.buttons["onb-link"].waitForExistence(timeout: 6))
         settleAndCapture("onboarding-last-step", scheme: scheme, waitFor: app.buttons["onb-link"])
         tap(app.buttons["onb-link"])                           // I’ll add it later
-        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 10), "Onboarding lands on the app, not a paywall")
+        XCTAssertTrue(todayTab.waitForExistence(timeout: 10), "Onboarding lands on the app, not a paywall")
         XCTAssertFalse(app.descendants(matching: .any)["paywall.title"].exists)
-        settleAndCapture("onboarding-finished-home", scheme: scheme, waitFor: app.buttons["tab.today"])
+        settleAndCapture("onboarding-finished-home", scheme: scheme, waitFor: todayTab)
     }
 
     private func capturePaywall(_ name: String, scheme: String) {

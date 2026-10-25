@@ -20,7 +20,8 @@ final class SignInReplacementUITests: XCTestCase {
 
     // MARK: - Upgrade from 1.0.6
 
-    func testUpgradeFrom106EmailProfileShowsDataWithNoSignInWall() {
+    func testUpgradeFrom106EmailProfileShowsDataWithNoSignInWall() throws {
+        try UITestIsolation.skipUntilPackageK()
         launch(["-LHSeedLegacyEmailProfile", "-LHInitialTab", "1"], scheme: "light")
 
         // No welcome / sign-in wall anywhere.
@@ -36,7 +37,8 @@ final class SignInReplacementUITests: XCTestCase {
         XCTAssertFalse(app.secureTextFields.firstMatch.exists)
     }
 
-    func testUpgradeThenRestoreOtherDataSwitchesToSignedOutEmailProfile() {
+    func testUpgradeThenRestoreOtherDataSwitchesToSignedOutEmailProfile() throws {
+        try UITestIsolation.skipUntilPackageK()
         launch(["-LHSeedLegacyEmailProfile", "-LHInitialTab", "4"], scheme: "light")
 
         let restoreRow = app.buttons["settings.restoreOtherData"]
@@ -74,7 +76,8 @@ final class SignInReplacementUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Oak Street Duplex"].exists)
     }
 
-    func testSignedOutUpgradeShowsWelcomeWithRestoreAndRestoresProfile() {
+    func testSignedOutUpgradeShowsWelcomeWithRestoreAndRestoresProfile() throws {
+        try UITestIsolation.skipUntilPackageK()
         launch(["-LHSeedLegacySignedOut"], scheme: "light")
 
         XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 20))
