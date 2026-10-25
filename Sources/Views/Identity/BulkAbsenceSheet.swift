@@ -41,6 +41,7 @@ struct BulkAbsenceSheet: View {
             }
             .buttonStyle(LHButton.primary)
             .accessibilityIdentifier("identity.bulk.keep")
+            .identitySheetFooter(colors)
         }
         .background(colors.backgroundSecondary.ignoresSafeArea())
         .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.fraction(0.6), .large])

@@ -37,7 +37,7 @@ struct MergeQuestionSheet: View {
             .padding(.top, 4)
             .animation(reduceMotion ? nil : AppAnimation.quick, value: step)
         } footer: {
-            primaryAction
+            primaryAction.identitySheetFooter(colors)
         }
         .background(colors.backgroundSecondary.ignoresSafeArea())
         .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.fraction(0.75), .large])

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - Package K's words (P1–P31), all from Identity.xcstrings
 //
@@ -59,5 +60,20 @@ enum IdentityCopy {
 
     static var footer: String {
         String(localized: "Your records live on this iPhone and in your own iCloud. We never see them. Photos stay on this iPhone.", table: "Identity")
+    }
+}
+
+extension View {
+    /// The pinned primary of an identity sheet sits on the sheet's own fill, so words scrolling
+    /// beneath it at accessibility sizes never show through (LHSheet's footer has no fill; noted
+    /// for package 0).
+    func identitySheetFooter(_ colors: AdaptiveColors) -> some View {
+        frame(maxWidth: .infinity)
+            .background(alignment: .top) {
+                colors.backgroundSecondary
+                    .padding(.horizontal, -16)
+                    .padding(.top, -8)
+                    .padding(.bottom, -40)
+            }
     }
 }

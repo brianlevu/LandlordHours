@@ -40,6 +40,7 @@ struct AccountChangedSheet: View {
                 .buttonStyle(LHButton.primary)
                 .disabled(working)
                 .accessibilityIdentifier("identity.account.keep")
+            .identitySheetFooter(colors)
         }
         .background(colors.backgroundSecondary.ignoresSafeArea())
         .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.fraction(0.62), .large])
@@ -104,6 +105,7 @@ struct ZoneGoneSheet: View {
             .buttonStyle(LHButton.primary)
             .disabled(working)
             .accessibilityIdentifier("identity.zoneGone.keep")
+            .identitySheetFooter(colors)
         }
         .background(colors.backgroundSecondary.ignoresSafeArea())
         .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.fraction(0.62), .large])
