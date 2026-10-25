@@ -1,0 +1,612 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ found. %lld counted." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ found. %2$lld counted."
+          }
+        }
+      }
+    },
+    "%@ hours" : {
+
+    },
+    "%@ saved." : {
+
+    },
+    "%@ so far · still looking" : {
+
+    },
+    "%@ waiting" : {
+
+    },
+    "%lld hours" : {
+
+    },
+    "%lld minutes" : {
+
+    },
+    "%lld suggestions" : {
+
+    },
+    "0 hours in the book" : {
+
+    },
+    "0 of %lld hours" : {
+
+    },
+    "1 hour" : {
+
+    },
+    "1 minute" : {
+
+    },
+    "1 suggestion" : {
+
+    },
+    "100 hours" : {
+
+    },
+    "100 hours, and more than anyone else" : {
+
+    },
+    "500 hours" : {
+
+    },
+    "750 hours" : {
+
+    },
+    "750 hours, on your own count" : {
+
+    },
+    "750 hours, your spouse’s own count" : {
+
+    },
+    "A few nights" : {
+
+    },
+    "A nickname is fine. The rest comes later." : {
+
+    },
+    "A sample page of the PDF record" : {
+
+    },
+    "A short note after a calendar event, so you log it the same day. At most 2 a day, never at night." : {
+
+    },
+    "A week or less, on average" : {
+
+    },
+    "Add %@" : {
+
+    },
+    "Add %@ and every place after it. Your hours stay put." : {
+
+    },
+    "Add a rental" : {
+
+    },
+    "Add address" : {
+
+    },
+    "Add your first rental." : {
+
+    },
+    "Add your next rental and every place after it. Your hours stay put." : {
+
+    },
+    "Aim for %lld hours" : {
+
+    },
+    "Back" : {
+
+    },
+    "Based on your answers, start here" : {
+
+    },
+    "Both" : {
+
+    },
+    "Calendar · Sat 10–11" : {
+
+    },
+    "Calendar · Sun 11–2" : {
+
+    },
+    "Calendar · Wed 9–11" : {
+
+    },
+    "Checking…" : {
+
+    },
+    "Close" : {
+
+    },
+    "Continue" : {
+
+    },
+    "Couldn’t finish the purchase. Nothing was charged. Try again in a moment." : {
+
+    },
+    "Couldn’t reach the App Store." : {
+
+    },
+    "Counts the hours you put in yourself. No comparison with anyone else." : {
+
+    },
+    "Counts the rental hours you log here. Other real-estate work isn’t tracked yet." : {
+
+    },
+    "Counts the rental hours you log here. Other real-estate work isn’t tracked yet. Only your spouse’s own hours count." : {
+
+    },
+    "Done" : {
+
+    },
+    "Every hour you log from here counts toward it, dated the day it happened." : {
+
+    },
+    "Every hour you log from here goes in your record, dated the day it happened." : {
+
+    },
+    "Every hour you log starts with a place." : {
+
+    },
+    "Every rental" : {
+
+    },
+    "Every rental hour, counted." : {
+
+    },
+    "Every rental, the PDF and spreadsheet, and the record of where each hour came from." : {
+
+    },
+    "Example notification. %@. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Example notification. %1$@. %2$@"
+          }
+        }
+      }
+    },
+    "Example: %@, %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Example: %1$@, %2$@, %3$@"
+          }
+        }
+      }
+    },
+    "Export %@" : {
+
+    },
+    "Export %@ as a PDF or spreadsheet, any time." : {
+
+    },
+    "Family Sharing" : {
+
+    },
+    "Free covers one" : {
+
+    },
+    "From %lld calendar events in the last 90 days. Confirm the ones that were rental work and they count toward your %lld hours." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "From %1$lld calendar events in the last 90 days. Confirm the ones that were rental work and they count toward your %2$lld hours."
+          }
+        }
+      }
+    },
+    "From %lld calendar events in the last 90 days. Confirm the ones that were rental work and they go in your record." : {
+
+    },
+    "From 1 calendar event in the last 90 days. If it was rental work, confirm it and it counts toward your %lld hours." : {
+
+    },
+    "From 1 calendar event in the last 90 days. If it was rental work, confirm it and it goes in your record." : {
+
+    },
+    "Get started" : {
+
+    },
+    "Getting the price" : {
+
+    },
+    "Go to Today" : {
+
+    },
+    "Have an account?" : {
+
+    },
+    "I handle the rentals" : {
+
+    },
+    "Is real estate your main job, or your spouse’s?" : {
+
+    },
+    "It’s my main job" : {
+
+    },
+    "It’s my spouse’s main job" : {
+
+    },
+    "I’ll add it later" : {
+
+    },
+    "Jan 1 – Oct 19, %@" : {
+
+    },
+    "Just keep a record" : {
+
+    },
+    "Just me" : {
+
+    },
+    "Keep a record" : {
+
+    },
+    "LandlordHours Pro" : {
+
+    },
+    "Leases of a month or more" : {
+
+    },
+    "Log 2 hours at %@?" : {
+
+    },
+    "Long stays" : {
+
+    },
+    "Long-term" : {
+
+    },
+    "Look at my calendar" : {
+
+    },
+    "Looking back 90 days." : {
+
+    },
+    "Looking back 90 days. %@ so far." : {
+
+    },
+    "Main job means most of your working hours, all year." : {
+
+    },
+    "Me" : {
+
+    },
+    "More than anyone else" : {
+
+    },
+    "My spouse" : {
+
+    },
+    "My spouse and me" : {
+
+    },
+    "Neither of us" : {
+
+    },
+    "New rental" : {
+
+    },
+    "No" : {
+
+    },
+    "No purchase found on this Apple Account." : {
+
+    },
+    "No subscription" : {
+
+    },
+    "No target" : {
+
+    },
+    "No target. Dated hours for your CPA." : {
+
+    },
+    "Not now" : {
+
+    },
+    "Nothing in the last 90 days looked like rental work." : {
+
+    },
+    "Oak Street" : {
+
+    },
+    "Oak Street duplex" : {
+
+    },
+    "On every device" : {
+
+    },
+    "On every line" : {
+
+    },
+    "One person’s own count" : {
+
+    },
+    "PDF and spreadsheet" : {
+
+    },
+    "Page 1" : {
+
+    },
+    "Page 1 of your PDF record" : {
+
+    },
+    "Pay once" : {
+
+    },
+    "Pay once, keep it" : {
+
+    },
+    "Pick a goal: 100, 500 or 750 hours. We spot rental work in your calendar. You confirm it, and the house shows how far you’ve come." : {
+
+    },
+    "Plumber" : {
+
+    },
+    "Plumber visit just ended" : {
+
+    },
+    "Privacy Policy" : {
+
+    },
+    "Pro is yours" : {
+
+    },
+    "Ready for your CPA" : {
+
+    },
+    "Rental name" : {
+
+    },
+    "Restore earlier records" : {
+
+    },
+    "Restore earlier records (%lld)" : {
+
+    },
+    "Restore purchase" : {
+
+    },
+    "Restore when you switch" : {
+
+    },
+    "Review %@" : {
+
+    },
+    "Same hours, same PDF. Today now shows your count against your target, and the house shows how far along you are." : {
+
+    },
+    "Same hours, same PDF. Today now shows your hours, and the house shows how far along you are." : {
+
+    },
+    "Sample" : {
+
+    },
+    "Sample Cabin" : {
+
+    },
+    "Sample owner" : {
+
+    },
+    "Save it" : {
+
+    },
+    "Saved" : {
+
+    },
+    "See your record" : {
+
+    },
+    "Share it with your family" : {
+
+    },
+    "Short stays" : {
+
+    },
+    "Showing" : {
+
+    },
+    "Sign in to pick up where you left off." : {
+
+    },
+    "Some of each" : {
+
+    },
+    "Step %lld of %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Step %1$lld of %2$lld"
+          }
+        }
+      }
+    },
+    "Still finishing your purchase…" : {
+
+    },
+    "Street address (optional)" : {
+
+    },
+    "Street address, optional" : {
+
+    },
+    "Suggested for you" : {
+
+    },
+    "Suggestion, not saved" : {
+
+    },
+    "Tahoe cabin" : {
+
+    },
+    "Terms of Use" : {
+
+    },
+    "The 500-hour test" : {
+
+    },
+    "The 750 counts the rental hours you log here. Other real-estate work isn’t tracked yet." : {
+
+    },
+    "The record your CPA gets" : {
+
+    },
+    "Total" : {
+
+    },
+    "Track every rental" : {
+
+    },
+    "Try again" : {
+
+    },
+    "Turn %@ confirmed hours into a clean record." : {
+
+    },
+    "Turn your confirmed hours into a clean record." : {
+
+    },
+    "Turnover clean" : {
+
+    },
+    "Unlock Pro" : {
+
+    },
+    "Unlock for %@" : {
+
+    },
+    "Waiting for approval. Pro unlocks when it comes through." : {
+
+    },
+    "Waiting for the App Store" : {
+
+    },
+    "Want a nudge to log it while it’s fresh?" : {
+
+    },
+    "We both do" : {
+
+    },
+    "We found %lld things, but none count toward your hours yet." : {
+
+    },
+    "We found 1 thing, but none count toward your hours yet." : {
+
+    },
+    "We look back 90 days for things like a plumber visit or a showing. Then we ask you." : {
+
+    },
+    "We never send them anywhere or log anything without you." : {
+
+    },
+    "We read event titles and times." : {
+
+    },
+    "Welcome back" : {
+
+    },
+    "What do you rent out?" : {
+
+    },
+    "What you get" : {
+
+    },
+    "Where each hour came from" : {
+
+    },
+    "Which kind is this one?" : {
+
+    },
+    "Who puts in the hours?" : {
+
+    },
+    "Yes, after visits" : {
+
+    },
+    "You can change this later." : {
+
+    },
+    "Your %lld hours, on the way to %lld." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Your %1$lld hours, on the way to %2$lld."
+          }
+        }
+      }
+    },
+    "Your %lld hours, safe in your record." : {
+
+    },
+    "Your calendar already has some of your hours." : {
+
+    },
+    "Your hours count together for this target." : {
+
+    },
+    "Your hours, on paper" : {
+
+    },
+    "Your hours, on the way to %lld." : {
+
+    },
+    "Your name" : {
+
+    },
+    "Your own count" : {
+
+    },
+    "Your records stay on your iPhone and in your iCloud." : {
+
+    },
+    "Your records, safe where they are." : {
+
+    },
+    "Your rental" : {
+
+    },
+    "Your spouse’s count" : {
+
+    },
+    "You’ll also confirm that no one else did more, cleaners and managers included." : {
+
+    },
+    "You’ll each have your own count." : {
+
+    },
+    "You’ll each have your own count. For 750, one of you has to get there alone." : {
+
+    },
+    "You’re set up for %lld hours." : {
+
+    },
+    "You’re set up to keep a record." : {
+
+    },
+    "now" : {
+
+    },
+    "once, yours to keep" : {
+
+    },
+    "your record" : {
+
+    }
+  },
+  "version" : "1.0"
+}

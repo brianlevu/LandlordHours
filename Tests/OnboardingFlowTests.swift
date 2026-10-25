@@ -655,7 +655,7 @@ final class GoalFirstMessagingTests: XCTestCase {
     func testCardWordsSayWhatThe750CountsAndNeverClaimFrequency() {
         for pro in [RealEstatePro.me, .spouse, .nobody] {
             XCTAssertTrue(OnbGoalCopy.detail(.reps750, pro: pro, isSuggested: false, rental: .both)
-                .contains("Counts rental hours you log here. Brokerage and other real-estate work aren’t tracked yet"), "\(pro)")
+                .contains("Counts the rental hours you log here. Other real-estate work isn’t tracked yet"), "\(pro)")
         }
         XCTAssertEqual(OnbGoalCopy.title(.reps750, pro: .spouse), "750 hours, your spouse’s own count")
         XCTAssertEqual(OnbGoalCopy.title(.mp100, pro: .nobody), "100 hours, and more than anyone else")

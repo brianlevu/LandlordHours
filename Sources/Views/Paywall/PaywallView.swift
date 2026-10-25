@@ -127,14 +127,15 @@ final class PaywallModel: ObservableObject {
     }
 }
 
-/// The scheme the user actually runs, read without the paywall's own dark window override.
-enum PaywallScheme {
-    static func user() -> ColorScheme {
-        if let forced = AppearanceManager.forcedColorSchemeFromLaunchArguments { return forced }
-        if let chosen = AppearanceManager.shared.preferredColorScheme { return chosen }
-        return UIScreen.main.traitCollection.userInterfaceStyle == .dark ? .dark : .light
-    }
-}
+
+// MARK: - The paywall (standard §1.23, v2)
+//
+// The plain canvas, no blueprint band, no house. A sheet header names the thing tapped (the first
+// line), then the record preview (page 1, its title is `pdf.title`, ≤ 40% of the viewport; 35% here
+// so "What you get" stays above the fold), the plan card (radius 20: name + "Pay once" tag, the
+// price in `.largeTitle.rounded.bold`, one line, the `.primary`, the `.tertiary` Restore, the status
+// line, the legal links), then "What you get" as 56pt `LHRow.Browse` rows. Close is `.icon`. No
+// countdowns, no scarcity, no Dynamic Type clamp. The status bar follows the appearance.
 
 struct PaywallView: View {
     let context: PaywallContext
@@ -146,7 +147,7 @@ struct PaywallView: View {
     var onClose: (() -> Void)?
     /// DEBUG: scroll to "What you get" on appear (capture of the below-the-fold state).
     var startsBelowFold = false
-    /// DEBUG: hold the page in its drafting state (capture).
+    /// DEBUG: hold the page in its loading state (capture).
     var holdsPageLoading = false
     /// DEBUG: show the sample page even when the user has entries (capture).
     var forcesSample = false
@@ -158,13 +159,11 @@ struct PaywallView: View {
     @Environment(\.dynamicTypeSize) private var dts
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.openURL) private var openURL
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var page: RecordPageModel?
-    @State private var shown = false
     @State private var successTick = 0
-    @State private var overHero = true
     @State private var didFinish = false
-    @State private var userScheme = PaywallScheme.user()
 
     /// Keeps the 1.x call shape (`PaywallView(context:onUnlocked:onClose:)`) that Properties uses.
     init(context: PaywallContext,
@@ -207,232 +206,218 @@ struct PaywallView: View {
     static let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
     static let privacyURL = URL(string: "https://gist.github.com/brianlevu/5e4dbbf64a69c0be6b981aabcea1b8db#file-privacy-html")!
 
+    /// The record preview's share of the scroll viewport (≤ 0.40, standard §1.23).
+    static let previewShare: CGFloat = 0.35
+    /// At accessibility sizes the page's title wraps: the preview takes the full 40% cap.
+    static let previewShareAccessibility: CGFloat = 0.40
+
     private var copy: PaywallCopy {
-        PaywallCopy.make(context, year: year, propertyName: propertyName, confirmedHours: confirmedHours)
+        PaywallCopy.localized(context, year: year, propertyName: propertyName, confirmedHours: confirmedHours)
     }
     private var big: Bool { dts >= .xxLarge }
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: userScheme) }
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
-        // The window runs dark while the blue hero is under the status bar (light status-bar text
-        // in both themes); the page keeps the user's scheme through its environment.
-        content
-            .environment(\.colorScheme, userScheme)
-            .preferredColorScheme(overHero ? .dark : userScheme)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    preview
+                        .padding(.top, 4)
+                    planCard
+                        .padding(.top, 16)
+                    restoreArea
+                        .padding(.top, 4)
+                    benefits
+                        .id("benefits")
+                        .padding(.top, LHMetrics.sectionGap)
+                }
+                .padding(.horizontal, LHMetrics.gutter)
+                .padding(.bottom, LHMetrics.sectionGap)
+                .frame(maxWidth: LHMetrics.readingColumn)
+                .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
+            .safeAreaInset(edge: .top, spacing: 0) { header }
             .onAppear {
-                Analytics.paywallViewed(context: context)
-                Analytics.paywallShown(context: context, entry: entry)
-                RatingPromptCoordinator.shared.notePaywallShown()
-                withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.28).delay(0.06)) { shown = true }
-            }
-            .task { await model.start() }
-            .task { await loadPage() }
-            .onChange(of: subscriptionManager.isPro) { _, isPro in model.entitlementChanged(isPro: isPro) }
-            .onChange(of: model.phase) { _, phase in
-                if phase == .success {
-                    successTick += 1
-                    UIAccessibility.post(notification: .announcement, argument: "Pro is yours")
-                }
-            }
-            .sensoryFeedback(.success, trigger: successTick)
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier("paywall.\(context.rawValue)")
-    }
-
-    private var content: some View {
-        GeometryReader { g in
-            let heroH = g.size.height * (big ? 0.30 : 0.46) + g.safeAreaInsets.top
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(spacing: 0) {
-                        hero(width: g.size.width, height: heroH, top: g.safeAreaInsets.top)
-                        planCard
-                            .padding(.horizontal, 16)
-                            .padding(.top, -40)
-                        benefits
-                            .id("benefits")
-                            .padding(.horizontal, 20)
-                            .padding(.top, 32)
-                            .padding(.bottom, 48)
+                if startsBelowFold {
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(400))
+                        proxy.scrollTo("benefits", anchor: .top)
                     }
                 }
-                .scrollIndicators(.hidden)
-                .ignoresSafeArea(edges: .top)
-                .modifier(PaywallScrollObserver { y in
-                    updateOverHero(offset: y, heroH: heroH, top: g.safeAreaInsets.top)
-                })
-                .onAppear {
-                    if startsBelowFold { DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { proxy.scrollTo("benefits", anchor: .top) } }
+            }
+        }
+        .background(LHCanvas())
+        .onAppear {
+            Analytics.paywallViewed(context: context)
+            Analytics.paywallShown(context: context, entry: entry)
+            RatingPromptCoordinator.shared.notePaywallShown()
+        }
+        .task { await model.start() }
+        .task { await loadPage() }
+        .onChange(of: subscriptionManager.isPro) { _, isPro in model.entitlementChanged(isPro: isPro) }
+        .onChange(of: model.phase) { _, phase in
+            if phase == .success {
+                successTick += 1
+                UIAccessibility.post(notification: .announcement,
+                                     argument: String(localized: "Pro is yours", table: "ConversionPath"))
+            }
+        }
+        .sensoryFeedback(.success, trigger: successTick)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("paywall.\(context.rawValue)")
+    }
+
+    // MARK: Header (the LHSheet header: 56, title left in the sheet style, one `.icon` close right)
+
+    /// The first line names the thing tapped (the export, the second rental, the record).
+    private var header: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text(copy.headline)
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(colors.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("paywall.title")
+            Button { close() } label: { Image(systemName: "xmark") }
+                .buttonStyle(LHButton.icon)
+                .accessibilityLabel(String(localized: "Close", table: "ConversionPath"))
+                .accessibilityIdentifier("paywall.close")
+        }
+        .padding(.horizontal, LHMetrics.gutter)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .frame(minHeight: 56)
+        .frame(maxWidth: .infinity)
+        .background(colors.background)
+    }
+
+    // MARK: Record preview (page 1; title = pdf.title)
+
+    /// The page sized to the space: as many entry lines as fit (4, 2, none, then the rentals
+    /// alone), so the preview ends on a whole line and is never cut or faded mid-text.
+    private var preview: some View {
+        Group {
+            if let page, !holdsPageLoading {
+                let highlight = RecordPageHighlight.forContext(context, propertyName: propertyName)
+                ViewThatFits(in: .vertical) {
+                    paper(page, highlight, entries: 4)
+                    paper(page, highlight, entries: 2)
+                    paper(page, highlight, entries: 0)
+                    paper(page, highlight, entries: 0, rentals: 1)
+                    paper(page, highlight, entries: 0, rentals: 0)
+                    paper(page, highlight, entries: 0, rentals: 0, compact: true)
                 }
-            }
-            .overlay(alignment: .top) {
-                // A solid band behind the status bar: blueprint while the hero is under it, canvas
-                // once scrolled past, so the clock always reads (white on blue, dark on canvas).
-                // Once the plan card reaches the close button the band also covers the button's
-                // row, so text scrolls under a full-width bar, never beside the button mid-word.
-                (overHero ? AppColors.brand : colors.background)
-                    .frame(height: g.safeAreaInsets.top + (overHero ? 0 : Self.closeRowHeight))
-                    .overlay(alignment: .bottom) {
-                        if !overHero { Rectangle().fill(colors.border).frame(height: 0.5) }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .offset(y: -g.safeAreaInsets.top)
-                    .allowsHitTesting(false)
-                    .animation(.easeOut(duration: 0.2), value: overHero)
-                    .accessibilityElement()
-                    .accessibilityLabel("")
-                    .accessibilityIdentifier(overHero ? "paywall.band.hero" : "paywall.band.canvas")
-            }
-            .overlay(alignment: .topTrailing) {
-                PaywallCloseButton { close() }
-                    .padding(.trailing, 16)
-                    .padding(.top, 4)
+                .transition(.opacity)
+            } else {
+                DraftingLoader(sketch: .document, surface: .adaptive, subject: String(localized: "your record", table: "ConversionPath"))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .background(colors.background.ignoresSafeArea())
-    }
-
-    /// Close button row: 4 pt above, the 44 pt button, 4 pt below.
-    static let closeRowHeight: CGFloat = 52
-
-    /// The blue band (and the dark window) only while the hero is under the status bar and the
-    /// close button's row. The plan card starts 40 pt above the hero's bottom, so it reaches the
-    /// close row once `heroH - 40 - y < top + closeRowHeight`.
-    private func updateOverHero(offset y: CGFloat, heroH: CGFloat, top: CGFloat) {
-        let over = y < heroH - 40 - top - Self.closeRowHeight
-        if overHero != over { overHero = over }
-    }
-
-    // MARK: Hero
-
-    private func hero(width: CGFloat, height: CGFloat, top: CGFloat) -> some View {
-        ZStack(alignment: .top) {
-            InboxBlueprintPaper(cornerRadius: 0)
-            VStack(spacing: big ? 14 : 22) {
-                Text(copy.headline)
-                    .lhDisplayFont(.title)
-                    // Display type stops growing at XXL, as in the sandbox: AX sizes keep 2–3 lines.
-                    .dynamicTypeSize(...DynamicTypeSize.xxLarge)
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(dts.isAccessibilitySize ? 4 : 2)
-                    .minimumScaleFactor(0.7)
-                    .allowsTightening(true)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, dts.isAccessibilitySize ? 24 : 60)
-                    .padding(.trailing, dts.isAccessibilitySize ? 36 : 0)
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityIdentifier("paywall.title")
-                // Accessibility sizes keep the page (smaller, cropped) so the record, the sample
-                // stamp and the drafting state still show.
-                phone(width: width * (dts.isAccessibilitySize ? 0.5 : 0.62))
-                    .frame(height: dts.isAccessibilitySize ? width * 0.42 : nil, alignment: .top)
-                    .clipped()
-                    .opacity(shown ? 1 : 0)
-                    .offset(y: shown || reduceMotion ? 0 : 12)
-            }
-            .padding(.top, top + 20)
-            .padding(.bottom, dts.isAccessibilitySize ? 40 : 0)
+        .containerRelativeFrame(.vertical, alignment: .top) { height, _ in
+            (height * (dts.isAccessibilitySize ? Self.previewShareAccessibility : Self.previewShare)).rounded()
         }
-        .frame(height: dts.isAccessibilitySize ? nil : height, alignment: .top)
+        .frame(maxWidth: .infinity)
         .clipped()
+        .animation(AppAnimation.reveal, value: page)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(page?.isSample == true
+                            ? String(localized: "A sample page of the PDF record", table: "ConversionPath")
+                            : String(localized: "Page 1 of your PDF record", table: "ConversionPath"))
+        .accessibilityIdentifier("paywall.page")
     }
 
-    private func phone(width: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: 44, style: .continuous)
-            .strokeBorder(HouseTokens.drafting, lineWidth: 2)
-            .frame(width: width, height: width * 2.05)
-            .overlay(alignment: .top) {
-                Group {
-                    if let page, !holdsPageLoading {
-                        RecordPagePreview(model: page, highlight: RecordPageHighlight.forContext(context, propertyName: propertyName))
-                            .frame(width: width - 24)
-                            .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
-                            .padding(.top, 12)
-                            .transition(.opacity)
-                    } else {
-                        DraftingLoader(sketch: .document, surface: .blueprint, subject: "your record")
-                            .frame(width: width * 0.6)
-                            .padding(.top, 40)
-                    }
-                }
-                .animation(.easeOut(duration: 0.2), value: page)
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(page?.isSample == true ? "A sample page of the PDF record" : "Page 1 of your PDF record")
-            .accessibilityIdentifier("paywall.page")
+    private func paper(_ page: RecordPageModel, _ highlight: RecordPageHighlight, entries: Int, rentals: Int = 3,
+                       compact: Bool = false) -> some View {
+        RecordPagePreview(model: page, highlight: highlight, entryLimit: entries, rentalLimit: rentals, fillsHeight: false, compact: compact)
+            .clipShape(RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous)
+                .strokeBorder(colors.border, lineWidth: LHMetrics.hairline))
     }
 
     // MARK: Plan card
 
+    /// The plan card holds only the decision: name + tag, the price, one line, the status and the
+    /// `.primary`. Restore sits right under it as a `.tertiary` with the legal links (visible
+    /// without scrolling); "No subscription" joins the benefit rows, so the card stays compact.
     private var planCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            (dts.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6)) : AnyLayout(HStackLayout(spacing: 8))) {
-                Text("LandlordHours Pro").font(.headline).foregroundStyle(colors.textPrimary)
-                    .lineLimit(1).minimumScaleFactor(0.6).allowsTightening(true)
-                Text("PAY ONCE")
-                    .font(.system(size: 11, weight: .semibold)).tracking(0.6)
-                    .foregroundStyle(colors.action)
-                    .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(Capsule().fill(colors.actionSurface))
-                Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: 10) {
+            // Name and tag on one line when they fit; stacked otherwise (never a mid-word break).
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { planName; payOnceTag; Spacer(minLength: 0) }
+                VStack(alignment: .leading, spacing: 6) { planName; payOnceTag }
             }
             priceRow
             Text(copy.planLine)
-                .font(.subheadline).foregroundStyle(colors.textSecondary)
-                .lineLimit(big ? 5 : 2)
-                .fixedSize(horizontal: false, vertical: true)
+                .font(.subheadline)
+                .foregroundStyle(colors.textSecondary)
                 .accessibilityIdentifier("paywall.body")
             statusLine
             buyButton
-            if model.phase != .success {
-                Button {
-                    Task { if await model.restore() { } }
-                } label: {
-                    Text(model.phase == .restoring ? "Checking…" : "Restore purchase")
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.lhPressable)
-                .font(.subheadline).foregroundStyle(colors.action)
-                .disabled(!model.canRestore)
-                .overlay(alignment: .bottom) {
-                    if model.phase == .restoring { PaywallDraftingLine(color: colors.draftingInk).frame(width: 90).offset(y: -8) }
-                }
-                .accessibilityIdentifier("paywall.restore")
-            }
-            if model.phase == .restoreNone {
-                // A restore that errored or timed out says so; "no purchase" only when the App
-                // Store answered and found nothing.
-                Text(subscriptionManager.restoreFailureMessage ?? "No purchase found on this Apple Account.")
-                    .font(.footnote).foregroundStyle(colors.textSecondary).frame(maxWidth: .infinity)
-                    .multilineTextAlignment(.center)
-                    .accessibilityIdentifier("paywall.restoreNone")
-            }
-            Rectangle().fill(colors.border).frame(height: 0.5)
-            VStack(alignment: .leading, spacing: 8) {
-                Label("No subscription", systemImage: "infinity")
-                if model.familyShareable { Label("Family Sharing", systemImage: "person.2") }
-            }
-            .font(.subheadline).foregroundStyle(colors.textSecondary)
-            .labelStyle(PaywallLabelStyle())
-            legalLinks
+                .padding(.top, 2)
         }
-        .padding(20)
-        .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(colors.backgroundSecondary))
-        .shadow(color: .black.opacity(userScheme == .dark ? 0 : 0.06), radius: 16, y: 6)
+        .padding(LHMetrics.cardPadding)
+        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+        .overlay {
+            if colorScheme == .dark {
+                RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
+                    .strokeBorder(colors.border, lineWidth: LHMetrics.hairline)
+            }
+        }
+    }
+
+    @ViewBuilder private var restoreArea: some View {
+        if model.phase != .success && model.phase != .buying {
+            Button {
+                Task { await model.restore() }
+            } label: {
+                HStack(spacing: 8) {
+                    if model.phase == .restoring { ProgressView().controlSize(.small).tint(colors.action) }
+                    Text(model.phase == .restoring
+                         ? String(localized: "Checking…", table: "ConversionPath")
+                         : String(localized: "Restore purchase", table: "ConversionPath"))
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(LHButton.tertiary)
+            .disabled(!model.canRestore)
+            .accessibilityIdentifier("paywall.restore")
+        }
+        if model.phase == .restoreNone {
+            // A restore that errored or timed out says so; "no purchase" only when the App
+            // Store answered and found nothing.
+            Text(subscriptionManager.restoreFailureMessage ?? String(localized: "No purchase found on this Apple Account.", table: "ConversionPath"))
+                .font(.footnote)
+                .foregroundStyle(colors.textSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("paywall.restoreNone")
+        }
+        // Terms and Privacy stay visible without scrolling, next to the purchase (App Review).
+        legalLinks
+            .frame(maxWidth: .infinity)
+    }
+
+    private var planName: some View {
+        Text(String(localized: "LandlordHours Pro", table: "ConversionPath"))
+            .font(.headline)
+            .foregroundStyle(colors.textPrimary)
+    }
+
+    private var payOnceTag: some View {
+        LHTag(String(localized: "Pay once", table: "ConversionPath"), tone: .action)
     }
 
     @ViewBuilder private var priceRow: some View {
         switch model.phase {
         case .success:
-            HStack(spacing: 10) {
-                Image(systemName: "checkmark.seal.fill").font(.system(size: 34)).foregroundStyle(colors.positive)
-                    .accessibilityHidden(true)
-                Text("Pro is yours").font(.system(.title, design: .rounded, weight: .bold)).foregroundStyle(colors.textPrimary)
-                    .accessibilityIdentifier("paywall.success")
-            }
-            .transition(.opacity)
+            Label(String(localized: "Pro is yours", table: "ConversionPath"), systemImage: "checkmark.circle.fill")
+                .font(.title.weight(.bold))
+                .fontDesign(.rounded)
+                .foregroundStyle(colors.textPrimary)
+                .labelStyle(PaywallSuccessLabelStyle(tint: colors.positive))
+                .transition(.opacity)
+                .accessibilityIdentifier("paywall.success")
         case .priceFailed:
             EmptyView()
         case .priceLoading:
@@ -448,42 +433,27 @@ struct PaywallView: View {
     @ViewBuilder private var statusLine: some View {
         switch model.phase {
         case .priceFailed:
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.circle.fill").accessibilityHidden(true)
-                    Text("Couldn’t reach the App Store.")
-                    Spacer(minLength: 4)
-                    retryButton
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("Couldn’t reach the App Store.", systemImage: "exclamationmark.circle.fill")
-                    retryButton
-                }
-            }
-            .font(.subheadline).foregroundStyle(colors.caution)
-            .accessibilityIdentifier("paywall.priceFailed")
+            Label(String(localized: "Couldn’t reach the App Store.", table: "ConversionPath"), systemImage: "exclamationmark.circle.fill")
+                .font(.subheadline)
+                .foregroundStyle(colors.caution)
+                .accessibilityIdentifier("paywall.priceFailed")
         case .askToBuy:
-            Label("Waiting for approval. Pro unlocks when it comes through.", systemImage: "clock")
-                .font(.subheadline).foregroundStyle(colors.textSecondary).labelStyle(PaywallLabelStyle())
+            Label(String(localized: "Waiting for approval. Pro unlocks when it comes through.", table: "ConversionPath"), systemImage: "clock")
+                .font(.subheadline)
+                .foregroundStyle(colors.textSecondary)
                 .accessibilityIdentifier("paywall.askToBuy")
         default: EmptyView()
         }
     }
 
-    private var retryButton: some View {
-        Button("Try again") { Task { await model.retryPrice() } }
-            .fontWeight(.semibold).foregroundStyle(colors.action)
-            .frame(minHeight: 44)
-            .accessibilityIdentifier("paywall.retryPrice")
-    }
-
     private var buyLabel: String {
         switch model.phase {
-        case .priceLoading, .priceFailed: return "Unlock Pro"
-        case .buying: return "Waiting for the App Store"
-        case .askToBuy: return "Done"
+        case .priceLoading: return String(localized: "Getting the price", table: "ConversionPath")
+        case .priceFailed: return String(localized: "Try again", table: "ConversionPath")
+        case .buying: return String(localized: "Waiting for the App Store", table: "ConversionPath")
+        case .askToBuy: return String(localized: "Done", table: "ConversionPath")
         case .success: return copy.nextStep
-        default: return model.priceDisplay?.buttonTitle(large: big) ?? "Unlock Pro"
+        default: return PaywallCopy.buyTitle(billed: model.priceDisplay?.billed, large: big)
         }
     }
 
@@ -493,30 +463,30 @@ struct PaywallView: View {
                 switch model.phase {
                 case .askToBuy: close()
                 case .success: finish()
+                case .priceFailed: Task { await model.retryPrice() }
                 default: Task { await model.buy() }
                 }
             } label: {
-                // Buying: the drafting line sits under the label's own bounds, so a wrapped
-                // label at large sizes is never struck through.
-                VStack(spacing: 4) {
-                    Text(buyLabel).contentTransition(.opacity).lineLimit(3).multilineTextAlignment(.center)
-                        .minimumScaleFactor(0.75)
-                    if model.phase == .buying {
-                        PaywallDraftingLine(color: userScheme == .dark ? colors.onAction : HouseTokens.drafting, lineWidth: 2)
-                            .frame(width: 96)
-                    }
+                HStack(spacing: 10) {
+                    if model.phase == .buying || model.phase == .priceLoading { ProgressView().tint(colors.onAction) }
+                    Text(buyLabel)
+                        .contentTransition(.opacity)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, model.phase == .buying ? 8 : 0)
             }
-            .buttonStyle(InboxPrimaryButtonStyle())
-            .disabled(!(model.canBuy || model.phase == .askToBuy || model.phase == .success || model.phase == .buying))
-            .allowsHitTesting(model.phase != .buying)
-            .animation(.easeOut(duration: 0.2), value: model.phase)
-            .accessibilityIdentifier(model.phase == .success ? "paywall.continue" : "paywall.buy")
+            .buttonStyle(LHButton.primary)
+            // Never drawn disabled (a 40% label fails AA): while the App Store works the button
+            // shows a spinner and ignores taps; a failed price load turns it into "Try again".
+            .disabled(!(model.canBuy || [.askToBuy, .success, .buying, .priceLoading, .priceFailed].contains(model.phase)))
+            .allowsHitTesting(model.phase != .buying && model.phase != .priceLoading)
+            .animation(AppAnimation.quick, value: model.phase)
+            .accessibilityIdentifier(model.phase == .success ? "paywall.continue" : (model.phase == .priceFailed ? "paywall.retryPrice" : "paywall.buy"))
             if model.phase == .failed {
-                Text(model.isFinishingPurchase ? "Still finishing your purchase…" : "That didn’t go through. Try again in a moment.")
-                    .font(.subheadline).foregroundStyle(colors.caution).multilineTextAlignment(.center)
+                Text(model.isFinishingPurchase
+                     ? String(localized: "Still finishing your purchase…", table: "ConversionPath")
+                     : String(localized: "Couldn’t finish the purchase. Nothing was charged. Try again in a moment.", table: "ConversionPath"))
+                    .font(.subheadline)
+                    .foregroundStyle(colors.caution)
+                    .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
                     .accessibilityIdentifier("paywall.failed")
             }
@@ -526,50 +496,63 @@ struct PaywallView: View {
     private var legalLinks: some View {
         // Each link stays on one line; at large sizes they stack instead of breaking.
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 6) { termsLink; Text("·").accessibilityHidden(true); privacyLink }
-            VStack(alignment: .leading, spacing: 4) { termsLink; privacyLink }
+            HStack(spacing: 6) { termsLink; Text(verbatim: "·").accessibilityHidden(true); privacyLink }
+            VStack(alignment: .center, spacing: 0) { termsLink; privacyLink }
         }
         .font(.footnote)
         .foregroundStyle(colors.textSecondary)
-        .buttonStyle(.plain)
-        .frame(minHeight: 32)
     }
 
     private var termsLink: some View {
-        Button { openURL(Self.termsURL) } label: { Text("Terms\u{00A0}of\u{00A0}Use").lineLimit(1).fixedSize() }
-            .frame(minHeight: 32)
-            .accessibilityIdentifier("paywall.terms")
+        Button { openURL(Self.termsURL) } label: {
+            Text(String(localized: "Terms\u{00A0}of\u{00A0}Use", table: "ConversionPath")).lineLimit(1).layoutPriority(1)
+        }
+        .buttonStyle(LHButton.press)
+        .frame(minHeight: LHMetrics.minTap)
+        .accessibilityIdentifier("paywall.terms")
     }
 
     private var privacyLink: some View {
-        Button { openURL(Self.privacyURL) } label: { Text("Privacy\u{00A0}Policy").lineLimit(1).fixedSize() }
-            .frame(minHeight: 32)
-            .accessibilityIdentifier("paywall.privacy")
+        Button { openURL(Self.privacyURL) } label: {
+            Text(String(localized: "Privacy\u{00A0}Policy", table: "ConversionPath")).lineLimit(1).layoutPriority(1)
+        }
+        .buttonStyle(LHButton.press)
+        .frame(minHeight: LHMetrics.minTap)
+        .accessibilityIdentifier("paywall.privacy")
     }
 
-    // MARK: Benefits
+    // MARK: What you get
+
+    /// The four rows, one meta line each (short enough to stay on one line at XXL).
+    static var benefitRows: [(symbol: String, title: String, meta: String)] {
+        [("house", String(localized: "Every rental", table: "ConversionPath"), String(localized: "Free covers one", table: "ConversionPath")),
+         ("doc.richtext", String(localized: "PDF and spreadsheet", table: "ConversionPath"), String(localized: "Ready for your CPA", table: "ConversionPath")),
+         ("calendar.badge.checkmark", String(localized: "Where each hour came from", table: "ConversionPath"), String(localized: "On every line", table: "ConversionPath")),
+         ("arrow.clockwise", String(localized: "On every device", table: "ConversionPath"), String(localized: "Restore when you switch", table: "ConversionPath"))]
+    }
 
     private var benefits: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("What you get")
-                .font(.footnote.weight(.semibold)).textCase(.uppercase).tracking(0.3)
-                .foregroundStyle(colors.textSecondary)
-                .padding(.horizontal, 4)
+        VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+            LHSectionHeader(String(localized: "What you get", table: "ConversionPath"))
                 .accessibilityAddTraits(.isHeader)
-            ForEach(PaywallCopy.benefits, id: \.title) { item in
-                HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: item.symbol).font(.system(size: 20)).foregroundStyle(colors.action)
-                        .frame(width: 28, height: 28).accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(item.title).font(.headline).foregroundStyle(colors.textPrimary)
-                        Text(item.line).font(.subheadline).foregroundStyle(colors.textSecondary)
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
+            LHRowGroup {
+                ForEach(Array(Self.benefitRows.enumerated()), id: \.offset) { i, item in
+                    if i > 0 { LHDivider(leadingInset: LHRow.browseDividerInset) }
+                    LHRow.Browse(title: item.title, meta: item.meta, systemImage: item.symbol, showsChevron: false)
                 }
-                .accessibilityElement(children: .combine)
+                LHDivider(leadingInset: LHRow.browseDividerInset)
+                LHRow.Browse(title: String(localized: "No subscription", table: "ConversionPath"),
+                             meta: String(localized: "Pay once, keep it", table: "ConversionPath"),
+                             systemImage: "infinity", showsChevron: false)
+                if model.familyShareable {
+                    LHDivider(leadingInset: LHRow.browseDividerInset)
+                    LHRow.Browse(title: String(localized: "Family Sharing", table: "ConversionPath"),
+                                 meta: String(localized: "Share it with your family", table: "ConversionPath"),
+                                 systemImage: "person.2", showsChevron: false)
+                }
             }
         }
+        .accessibilityIdentifier("paywall.benefits")
     }
 
     // MARK: Actions
@@ -588,7 +571,10 @@ struct PaywallView: View {
         close()
         if let continuation {
             // Let the paywall finish dismissing before the next screen is presented.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { continuation() }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(450))
+                continuation()
+            }
         }
     }
 
@@ -597,27 +583,11 @@ struct PaywallView: View {
     }
 }
 
-/// iOS 18+: the scroll view reports its own offset. iOS 17 keeps the blueprint band throughout
-/// (still legible: white status text on blue).
-private struct PaywallScrollObserver: ViewModifier {
-    var onChange: (CGFloat) -> Void
-    func body(content: Content) -> some View {
-        if #available(iOS 18.0, *) {
-            content.onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, y in
-                onChange(y)
-            }
-        } else {
-            content
-        }
-    }
-}
-
-
-/// "$29.99 once, yours to keep" on one baseline; stacked when it doesn't fit.
+/// "$29.99 once, yours to keep" on one baseline; stacked when it doesn't fit. The billed amount is
+/// `.largeTitle.rounded.bold`, the largest price text on the page (App Review, `PriceDisplay`).
 struct PaywallPriceRow: View {
     let display: PriceDisplay
     let colors: AdaptiveColors
-    @ScaledMetric(relativeTo: .largeTitle) private var billedSize: CGFloat = PriceDisplay.billedSize
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
@@ -631,66 +601,77 @@ struct PaywallPriceRow: View {
 
     private var billed: some View {
         Text(display.billed)
-            .font(.system(size: billedSize, weight: .bold, design: .rounded))
+            .font(.largeTitle.weight(.bold))
+            .fontDesign(.rounded)
             .monospacedDigit()
             .foregroundStyle(colors.textPrimary)
             .lineLimit(1)
-            .minimumScaleFactor(0.6)
+            .minimumScaleFactor(0.8)
     }
 
     private var caption: some View {
-        Text(PriceDisplay.caption).font(.subheadline).foregroundStyle(colors.textSecondary)
+        Text(String(localized: "once, yours to keep", table: "ConversionPath"))
+            .font(.subheadline)
+            .foregroundStyle(colors.textSecondary)
     }
 }
 
-/// 44pt close on a solid blueprint disc with a white glyph: 9.1:1 whatever scrolls under it
-/// (r4 gate: the glass close was 1.79:1 over the white plan card at light XXL).
-struct PaywallCloseButton: View {
-    var action: () -> Void
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "xmark")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Color.white)
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(AppColors.brand))
-                .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
-                .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
-                .contentShape(Circle())
-        }
-        .buttonStyle(.lhPressable)
-        .accessibilityLabel("Close")
-        .accessibilityIdentifier("paywall.close")
-    }
-}
-
-struct PaywallLabelStyle: LabelStyle {
-    @ScaledMetric(relativeTo: .subheadline) private var iconWidth: CGFloat = 22
+/// The success label: the check in `positive`, the words in the label's ink.
+struct PaywallSuccessLabelStyle: LabelStyle {
+    let tint: Color
     func makeBody(configuration: Configuration) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            configuration.icon.frame(minWidth: iconWidth).accessibilityHidden(true)
+        HStack(spacing: 10) {
+            configuration.icon.foregroundStyle(tint).accessibilityHidden(true)
             configuration.title
         }
     }
 }
 
-/// A short drafting line that draws itself left to right, then restarts (Reduce Motion: still).
-struct PaywallDraftingLine: View {
-    var color: Color
-    var lineWidth: CGFloat = 1
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    var body: some View {
-        TimelineView(.animation(paused: reduce)) { ctx in
-            let t = ctx.date.timeIntervalSinceReferenceDate
-            let p = reduce ? 1 : CGFloat((t.truncatingRemainder(dividingBy: 1.6)) / 1.6)
-            GeometryReader { g in
-                Path { $0.move(to: .init(x: 0, y: g.size.height / 2)); $0.addLine(to: .init(x: g.size.width, y: g.size.height / 2)) }
-                    .trim(from: reduce ? 0 : max(0, p - 0.55), to: p)
-                    .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-            }
+// MARK: - The paywall's words, from the package catalog
+
+extension PaywallCopy {
+    /// The headline, plan line and success step the paywall shows, localized in
+    /// `ConversionPath.xcstrings`. Standard C.4: "your CPA" (the word "accountant" is the PDF's
+    /// only). `ProGate`'s `make` is the unlocalized original this replaces on screen.
+    static func localized(_ context: PaywallContext, year: Int, propertyName: String? = nil,
+                          confirmedHours: Double? = nil) -> PaywallCopy {
+        let yearText = String(year)
+        let name = propertyName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        switch context {
+        case .export:
+            return PaywallCopy(
+                headline: String(localized: "The record your CPA gets", table: "ConversionPath"),
+                planLine: String(localized: "Export \(yearText) as a PDF or spreadsheet, any time.", table: "ConversionPath"),
+                nextStep: String(localized: "Export \(yearText)", table: "ConversionPath"))
+        case .secondProperty:
+            return PaywallCopy(
+                headline: String(localized: "Track every rental", table: "ConversionPath"),
+                planLine: name.isEmpty
+                    ? String(localized: "Add your next rental and every place after it. Your hours stay put.", table: "ConversionPath")
+                    : String(localized: "Add \(name) and every place after it. Your hours stay put.", table: "ConversionPath"),
+                nextStep: name.isEmpty
+                    ? String(localized: "Add a rental", table: "ConversionPath")
+                    : String(localized: "Add \(name)", table: "ConversionPath"))
+        case .todayUnlock:
+            return PaywallCopy(
+                headline: String(localized: "Your hours, on paper", table: "ConversionPath"),
+                planLine: confirmedHours.map { hours in
+                    let whole = ProGate.wholeHours(hours)
+                    return String(localized: "Turn \(whole) confirmed hours into a clean record.", table: "ConversionPath")
+                } ?? String(localized: "Turn your confirmed hours into a clean record.", table: "ConversionPath"),
+                nextStep: String(localized: "See your record", table: "ConversionPath"))
+        case .settings:
+            return PaywallCopy(
+                headline: String(localized: "LandlordHours Pro", table: "ConversionPath"),
+                planLine: String(localized: "Every rental, the PDF and spreadsheet, and the record of where each hour came from.", table: "ConversionPath"),
+                nextStep: String(localized: "Done", table: "ConversionPath"))
         }
-        .frame(height: max(2, lineWidth))
-        .opacity(reduce ? 0.6 : 1)
-        .accessibilityHidden(true)
+    }
+
+    /// The buy button: "Unlock for $29.99" with the App Store's localized price; at large text
+    /// sizes, or before the price arrives, "Unlock Pro".
+    static func buyTitle(billed: String?, large: Bool) -> String {
+        guard let billed, !large else { return String(localized: "Unlock Pro", table: "ConversionPath") }
+        return String(localized: "Unlock for \(billed)", table: "ConversionPath")
     }
 }

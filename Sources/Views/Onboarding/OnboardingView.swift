@@ -24,7 +24,9 @@ struct OnboardingView: View {
                 Color.clear
             }
         }
-        .background(OnbColor.card.ignoresSafeArea())
+        // Welcome draws its own dusk/night page; the steps draw the plain canvas. Until the flow
+        // exists the page shows, so the launch hand-off fades into `pageTop`, never a flash.
+        .background(LHPage())
         .onAppear {
             guard flow == nil else { return }
             viewModel.suppressCelebrations = true
@@ -48,7 +50,6 @@ struct OnboardingView: View {
         }
         .onDisappear {
             viewModel.suppressCelebrations = false
-            OnbStatusBar.set(.default)
             // Left without finishing (sign-out, profile restore): never hold Today's reveal.
             if OnbBackfill.flowActive { OnbBackfill.flowEnded(foundShown: false) }
         }
@@ -63,12 +64,11 @@ struct OnboardingView: View {
         CaptureSetupHandoff.openInboxAfterOnboarding = completion.openInbox
         Analytics.onboardingCompleted(skippedProperty: completion.skippedProperty, calendar: completion.calendar.analyticsKey)
         viewModel.suppressCelebrations = false
-        OnbStatusBar.set(.default)
-        withAnimation(.easeInOut(duration: 0.35)) { showOnboarding = false }
+        withAnimation(AppAnimation.standard) { showOnboarding = false }
     }
 }
 
-/// Upgraders from 1.x: "Your hours now build a house", then the calendar and visit-end note.
+/// Upgraders from 1.x: their hours and the house, then the calendar and visit-end note.
 struct OnbWhatsNewSheet: View {
     var onFinish: (_ openInbox: Bool) -> Void
     @EnvironmentObject private var viewModel: AppViewModel
@@ -76,9 +76,9 @@ struct OnbWhatsNewSheet: View {
 
     var body: some View {
         Group {
-            if let flow { OnbRoot(flow: flow, embedded: true).environment(\.onbDisplayTitles, true) } else { Color.clear }
+            if let flow { OnbRoot(flow: flow, embedded: true) } else { Color.clear }
         }
-        .background(OnbColor.card.ignoresSafeArea())
+        .background(LHCanvas())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("onb.whatsNew")
         .onAppear {
@@ -214,9 +214,9 @@ enum OnbBackfill {
     }
 }
 
+
 // MARK: - Root
 
-private struct BottomInsetKey: EnvironmentKey { static let defaultValue: CGFloat = 34 }
 enum OnbWelcomeAccount {
     case shown, hidden
 
@@ -229,13 +229,8 @@ enum OnbWelcomeAccount {
 }
 private struct LeaveWelcomeKey: EnvironmentKey { static let defaultValue: () -> Void = {} }
 private struct WelcomeAccountKey: EnvironmentKey { static let defaultValue: OnbWelcomeAccount = .shown }
-private struct DisplayTitlesKey: EnvironmentKey { static let defaultValue = false }
 extension EnvironmentValues {
-    var onbBottomInset: CGFloat {
-        get { self[BottomInsetKey.self] }
-        set { self[BottomInsetKey.self] = newValue }
-    }
-    /// Welcome's "Have an account?" row (hidden once a profile exists).
+    /// Welcome's "Have an account?" (hidden once a finished profile exists).
     var onbWelcomeAccount: OnbWelcomeAccount {
         get { self[WelcomeAccountKey.self] }
         set { self[WelcomeAccountKey.self] = newValue }
@@ -246,163 +241,68 @@ extension EnvironmentValues {
         get { self[LeaveWelcomeKey.self] }
         set { self[LeaveWelcomeKey.self] = newValue }
     }
-    /// Step titles in Fraunces display (What's new).
-    var onbDisplayTitles: Bool {
-        get { self[DisplayTitlesKey.self] }
-        set { self[DisplayTitlesKey.self] = newValue }
-    }
 }
 
-/// Onboarding shell. Welcome and Staked are full-bleed blueprint; steps 1–5 share one layout: a
-/// blueprint band holding the lot scene, a sheet below with one question. The band and the
-/// scene are ONE view whose frame morphs between steps.
+/// Onboarding shell (standard §1.24). Welcome is the crafted house on the dusk/night page. Every
+/// other step is a question on the plain canvas: a top bar (back `.icon`, the 3pt progress track),
+/// the step title, the options, and one pinned `.primary`.
 struct OnbRoot: View {
     @Bindable var flow: OnbFlow
-    var embedded = false               // inside the What's new sheet: no full-bleed, no status bar
+    /// Inside the What's new sheet: no Welcome, the sheet's own chrome.
+    var embedded = false
     @Environment(\.accessibilityReduceMotion) private var reduce
-    @Environment(\.colorScheme) private var scheme
-    @Environment(\.dynamicTypeSize) private var typeSize
-    @State private var keyboardUp = false
-
-    private var bandFraction: CGFloat {
-        if typeSize.isAccessibilitySize { return 0.22 }
-        if typeSize >= .xxLarge { return 0.30 }
-        if flow.step == .calendar { return embedded ? 0.22 : 0.33 }
-        if flow.step == .goal { return 0.23 }
-        return 0.38
-    }
 
     var body: some View {
-        GeometryReader { g in
-            let top = embedded ? 0 : g.safeAreaInsets.top
-            let bottom = embedded ? 0 : g.safeAreaInsets.bottom
-            // Side insets (iPhone Duo folded: an 84 pt vertical status bar on the trailing edge).
-            // Content stays inside them; the blueprint paper runs under them.
-            let lead = embedded ? 0 : g.safeAreaInsets.leading
-            let trail = embedded ? 0 : g.safeAreaInsets.trailing
-            let H = g.size.height + top + bottom
-            let W = g.size.width
-            let hideHouse = flow.step == .welcome && !embedded && typeSize.isAccessibilitySize
-            let full = flow.step.isFullBleed && !embedded
-            let bandH = full ? H : (keyboardUp ? top + 50 + 96 : H * (embedded ? bandFraction + 0.02 : bandFraction))
-            let scene = sceneFrame(W: W, H: H, top: top, bandH: bandH)
-
-            ZStack(alignment: .top) {
-                OnbScene(flow: flow, step: flow.step)
-                    .dynamicTypeSize(.large)                  // decorative drawing; the sheet carries the readable copy
-                    .frame(width: scene.width, height: scene.width)
-                    .position(x: scene.midX, y: scene.midY)
-                    // Accessibility sizes give the room to the words; the house returns on the steps.
-                    .opacity(hideHouse ? 0 : 1)
-                    .accessibilityHidden(hideHouse)
-
-                if !full { chrome(top: top) }
-
-                if !full {
-                    sheet(bandH: bandH, H: H)
-                        .transition(.opacity)
-                }
-
-                if flow.step == .welcome && !embedded {
-                    OnbWelcomeContent(flow: flow, leadInset: lead, trailInset: trail, houseBottom: typeSize.isAccessibilitySize ? top + 12 : scene.maxY - scene.width * 0.08)
-                        .frame(width: W, height: H)
-                        .transition(.opacity)
-                }
-                if flow.step == .staked && !embedded {
-                    OnbStakedContent(flow: flow, sceneBottom: scene.maxY)
-                        .frame(width: W, height: H)
-                        .transition(.opacity)
-                }
+        ZStack {
+            if flow.step == .welcome && !embedded {
+                OnbWelcomeView(flow: flow)
+                    .transition(.opacity)
+            } else {
+                steps
+                    .transition(.opacity)
             }
-            .frame(width: W, height: H)
-            // Paper and card are backgrounds so the wider paper never changes the layout width.
-            .background(alignment: .top) {
-                HouseBlueprintPaper()
-                    .frame(width: W + lead + trail, height: bandH)
-                    .clipped()
-                    .offset(x: (trail - lead) / 2)
+        }
+        .animation(OnbMotion.morph(reduce), value: flow.step == .welcome)
+    }
+
+    private var steps: some View {
+        VStack(spacing: 0) {
+            topBar
+            ZStack {
+                stepContent
+                    .id(flow.step)
+                    .transition(OnbMotion.stepTransition(forward: flow.forward, reduce: reduce))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+        .background(LHCanvas())
+    }
+
+    // MARK: Top bar: back `.icon` + the progress track (never a skip; skips are per step)
+
+    private var canGoBack: Bool {
+        if flow.cohort == .new { return flow.index > 0 }
+        return flow.index > 0
+    }
+
+    private var topBar: some View {
+        HStack(spacing: 12) {
+            if canGoBack {
+                Button { flow.back(OnbMotion.morph(reduce)) } label: { Image(systemName: "chevron.left") }
+                    .buttonStyle(LHButton.icon)
+                    .accessibilityLabel(String(localized: "Back", table: "ConversionPath"))
+                    .accessibilityIdentifier("onb-back")
+            } else {
+                Color.clear.frame(width: LHMetrics.minTap, height: LHMetrics.minTap)
                     .accessibilityHidden(true)
             }
-            .background(OnbColor.card)
-            .environment(\.onbBottomInset, max(bottom, 16))
-            .offset(y: -top)
+            OnbProgressTrack(total: flow.progressTotal, value: flow.progressValue)
+            Color.clear.frame(width: LHMetrics.minTap, height: LHMetrics.minTap)
+                .accessibilityHidden(true)
         }
-        .sensoryFeedback(.impact(flexibility: .rigid), trigger: flow.stakeDropped)
-        .onAppear { if !embedded { OnbStatusBar.set(.lightContent) } }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-            withAnimation(reduce ? .easeInOut(duration: 0.2) : .spring(response: 0.35, dampingFraction: 0.9)) { keyboardUp = true }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-            withAnimation(reduce ? .easeInOut(duration: 0.2) : .spring(response: 0.35, dampingFraction: 0.9)) { keyboardUp = false }
-        }
-    }
-
-    // MARK: Layout
-
-    private func sceneFrame(W: CGFloat, H: CGFloat, top: CGFloat, bandH: CGFloat) -> CGRect {
-        switch flow.step {
-        case .welcome where !embedded:
-            let s = min(W * 0.92, H * (typeSize >= .xLarge ? 0.30 : (H < 760 ? 0.28 : 0.42)))
-            return CGRect(x: (W - s) / 2, y: top + 4, width: s, height: s)
-        case .staked where !embedded:
-            let s = min(W * 0.96, H * 0.45)
-            return CGRect(x: (W - s) / 2, y: top + 18, width: s, height: s)
-        default:
-            let chromeH: CGFloat = embedded ? 34 : 50
-            let avail = bandH - 26 - (top + chromeH)
-            let s = max(0, min(W * 1.0, avail / 0.84))
-            // The render's content sits between y 0.10 (ridge) and 0.93 (lot corner).
-            return CGRect(x: (W - s) / 2, y: top + chromeH - 0.09 * s, width: s, height: s)
-        }
-    }
-
-    // MARK: Progress dimension line + back chevron (in the band, never a skip)
-
-    private func chrome(top: CGFloat) -> some View {
-        VStack(spacing: 2) {
-            OnbDimensionLine(total: flow.progressTotal, value: flow.progressValue)
-                .frame(height: 14)
-                .padding(.horizontal, 24)
-                .padding(.top, top + (embedded ? 14 : 6))
-                .animation(OnbMotion.progress(reduce), value: flow.progressValue)
-            HStack {
-                if flow.index > 0 {
-                    Button { flow.back(OnbMotion.morph(reduce)) } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(HouseTokens.onHeroPrimary)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(OnbPressable())
-                    .accessibilityLabel("Back")
-                    .accessibilityIdentifier("onb-back")
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 8)
-            .frame(height: 30)
-        }
-        .frame(maxHeight: .infinity, alignment: .top)
-    }
-
-    // MARK: The sheet (one question, one primary, one link)
-
-    private func sheet(bandH: CGFloat, H: CGFloat) -> some View {
-        let overlap: CGFloat = 22
-        return ZStack {
-            stepContent
-                .id(flow.step)
-                .transition(reduce ? .opacity : .asymmetric(
-                    insertion: .offset(x: flow.forward ? 36 : -36).combined(with: .opacity),
-                    removal: .offset(x: flow.forward ? -36 : 36).combined(with: .opacity)))
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(OnbColor.card, in: UnevenRoundedRectangle(topLeadingRadius: 26, topTrailingRadius: 26))
-        .frame(height: max(0, H - bandH + overlap))
-        // Clipped to the sheet's own shape: scrolled content never shows over the blueprint band.
-        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 26, topTrailingRadius: 26))
-        .frame(maxHeight: .infinity, alignment: .bottom)
+        .padding(.horizontal, 12)
+        .padding(.top, embedded ? 12 : 4)
+        .frame(minHeight: 52)
     }
 
     @ViewBuilder private var stepContent: some View {
@@ -413,152 +313,125 @@ struct OnbRoot: View {
         case .property: OnbPropertyStep(flow: flow)
         case .notify: OnbNotifyStep(flow: flow)
         case .wnHouse: OnbWhatsNewHouseStep(flow: flow)
-        case .welcome, .staked: EmptyView()
+        case .staked: OnbStakedStep(flow: flow)
+        case .welcome: EmptyView()
         }
     }
 }
 
-// MARK: - 0 · Welcome (full-bleed blueprint)
+// MARK: - 0 · Welcome: the crafted house on the dusk/night page (§H.5, §1.24)
 
-struct OnbWelcomeContent: View {
+/// The finished house, lit, at the Today hero size (H1; H3 at accessibility sizes, never hidden),
+/// the Fraunces 34 headline, one line, one pinned `.primary` and "Have an account?" as a
+/// `.tertiary` that opens Sign in with Apple and Restore. The words scroll under the pinned
+/// actions at large sizes; nothing is clamped.
+struct OnbWelcomeView: View {
     let flow: OnbFlow
-    /// Side safe-area insets the scrims run under, so the paper has no seam beside the content.
-    var leadInset: CGFloat = 0
-    var trailInset: CGFloat = 0
-    var houseBottom: CGFloat
     @EnvironmentObject private var viewModel: AppViewModel
-    @Environment(\.onbBottomInset) private var bottomInset
     @Environment(\.onbWelcomeAccount) private var account
     @Environment(\.accessibilityReduceMotion) private var reduce
-    @Environment(\.onbLeaveWelcome) private var leaveWelcome
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.colorScheme) private var colorScheme
     @State private var restorable: [DiscoveredProfile] = []
     @State private var cloudProblem = false
-    @State private var isRetrying = false
-    @State private var showRestore = false
-    @State private var signInError = false
+    @State private var showAccount = OnbDebugLaunch.accountSheet
+
+    /// The number block on Today overlaps the frame by 44 (H4); here the headline sits just under
+    /// the lot, inside the frame's empty foot (the art's ground line is at 0.92 of the frame).
+    static let headlineOverlap: CGFloat = 20
+
+    /// The fade above the pinned actions: 72 at accessibility sizes (one line is ~60pt), 24 otherwise.
+    static func fadeHeight(accessibility: Bool) -> CGFloat { accessibility ? 72 : 24 }
+    /// Space under the words so the scrolled-to-end last line sits clear of that fade.
+    static func bottomClearance(accessibility: Bool) -> CGFloat { accessibility ? fadeHeight(accessibility: true) + 8 : 16 }
+
+    static var headline: String { String(localized: "Every rental hour, counted.", table: "ConversionPath") }
+    static var line: String {
+        String(localized: "Pick a goal: 100, 500 or 750 hours. We spot rental work in your calendar. You confirm it, and the house shows how far you’ve come.", table: "ConversionPath")
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Color.clear.frame(height: max(0, houseBottom))
-            ScrollView(showsIndicators: false) {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        GeometryReader { g in
+            let windowW = g.size.width + g.safeAreaInsets.leading + g.safeAreaInsets.trailing
+            let windowH = g.size.height + g.safeAreaInsets.top + g.safeAreaInsets.bottom
+            let ax = typeSize.isAccessibilitySize
+            let side = Self.heroSide(windowWidth: windowW, windowHeight: windowH, accessibility: ax)
+            ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("Know where you stand on your hours.")
-                        .lhDisplayFont(.display)
-                        .foregroundStyle(HouseTokens.onHeroPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityAddTraits(.isHeader)
-                    Text("Pick the hour target you’re aiming for: 100, 500 or 750. We find the hours you already spend on your rentals. You confirm them, and the house shows how close you are.")
-                        .font(.body)
-                        .foregroundStyle(HouseTokens.onHeroSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 10)
-                    // One row when it fits; otherwise a two-column grid; never clipped.
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 8) { chips }
-                        Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 8) {
-                            GridRow { chip("100h", "Foundation"); chip("500h", "Roof") }
-                            GridRow { chip("750h", "Keys") }
-                        }
-                        VStack(alignment: .leading, spacing: 8) { chips }
+                    CraftHouseView(stage: .complete, windowsLit: true, side: side)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 4)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(Self.headline)
+                            .lhDisplayFont(.display)
+                            .foregroundStyle(colors.textPrimary)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityIdentifier("welcome.headline")
+                        Text(Self.line)
+                            .font(.body)
+                            .foregroundStyle(colors.textSecondary)
                     }
-                    .padding(.top, 18)
-                    .padding(.bottom, 52)          // clears both scrims (44 pt fade + 40 pt button scrim) so the last chip stays readable
-                    // Accessibility sizes: only "Get started" stays pinned; the returning-user rows
-                    // scroll with the words, so the headline gets the room and nothing is cut off.
-                    if typeSize.isAccessibilitySize {
-                        VStack(spacing: 10) { secondaryRows }
-                            .frame(maxWidth: .infinity)
-                            .padding(.bottom, 28)
-                    }
+                    .padding(.horizontal, LHMetrics.gutter)
+                    .padding(.top, ax ? 8 : -Self.headlineOverlap)
+                    // Scrolled to the end, the last line clears the fade above the pinned actions
+                    // (72 at accessibility sizes, 24 otherwise), so no line ever rests under it.
+                    .padding(.bottom, Self.bottomClearance(accessibility: ax))
+                    .frame(maxWidth: LHMetrics.readingColumn, alignment: .leading)
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal, 24)
             }
             .scrollBounceBehavior(.basedOnSize)
-            // Words that scroll toward the pinned button fade out before they reach it.
-            .overlay(alignment: .bottom) {
-                LinearGradient(colors: [HouseTokens.blueprintDeep.opacity(0), HouseTokens.blueprintDeep], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 44)
-                    .padding(.horizontal, -24)
-                    .padding(.leading, -leadInset)
-                    .padding(.trailing, -trailInset)
-                    .allowsHitTesting(false)
-            }
-            VStack(spacing: 10) {
-                Button("Get started") { flow.start(OnbMotion.morph(reduce)) }
-                    .buttonStyle(OnbHeroPill())
-                    .accessibilityIdentifier("onb-start")
-                if !typeSize.isAccessibilitySize { secondaryRows }
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 12)
-            .padding(.bottom, bottomInset + 8)
-            .background(alignment: .top) {
-                LinearGradient(colors: [HouseTokens.blueprintDeep.opacity(0), HouseTokens.blueprintDeep.opacity(0.85)], startPoint: .top, endPoint: .init(x: 0.5, y: 0.25))
-                    .padding(.top, -40)
-                    .padding(.horizontal, -24)
-                    .padding(.leading, -leadInset)
-                    .padding(.trailing, -trailInset)
-                    .allowsHitTesting(false)
-            }
+            .scrollIndicators(.hidden)
+            .defaultScrollAnchor(OnbDebugLaunch.scrollToBottom ? .bottom : .top)
+            .safeAreaInset(edge: .bottom, spacing: 0) { actions(colors) }
         }
-        .task {
+        .background(LHPage())
+        // Keyed by `account`: the active profile can resolve after Welcome first appears, and a
+        // search skipped while it was hidden must run once it shows.
+        .task(id: account) {
             guard account == .shown else { return }
             await search(announce: true)
         }
-        .sheet(isPresented: $showRestore) {
-            ProfileRestoreSheet(
-                profiles: restorable, context: .welcome,
-                cloudProblem: cloudProblem, isRetrying: isRetrying,
-                onRetry: {
-                    Task {
-                        isRetrying = true
-                        await search(announce: false)
-                        isRetrying = false
-                    }
-                }
-            ) { profile in
-                showRestore = false
-                viewModel.switchToProfile(profile)
-                // Sign-out and sign-in land in one pass, so the shell never sees the change. When
-                // Welcome was held open by an unfinished profile, close it ourselves.
-                if viewModel.activeProfileCompletedOnboarding { leaveWelcome() }
-            }
-            .environmentObject(viewModel)
-        }
-        .alert("Sign In Failed", isPresented: $signInError) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(AppleSignInFlow.failureMessage)
+        .sheet(isPresented: $showAccount) {
+            OnbAccountSheet(flow: flow, initialProfiles: restorable, initialCloudProblem: cloudProblem)
+                .environmentObject(viewModel)
         }
     }
 
-    /// Returning-user rows under "Get started": Sign in with Apple, restore, and the privacy line.
-    @ViewBuilder private var secondaryRows: some View {
-                if account == .shown {
-                    // Apple's own button (App Review): white on the blueprint, small, under the pill.
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 10) { accountLead; appleButton }
-                        VStack(spacing: 8) { accountLead; appleButton }
-                    }
-                    .padding(.top, 4)
-                    if !restorable.isEmpty || cloudProblem {
-                        Button { showRestore = true } label: {
-                            if restorable.count <= 1 { Text("Restore earlier records") } else { Text("Restore earlier records (\(restorable.count))") }
-                        }
-                            .buttonStyle(OnbLink(color: HouseTokens.onHeroPrimary))
-                            .font(.footnote.weight(.semibold))
-                            // Wraps to a second line at large sizes; never truncates, never overlaps.
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("welcome.restoreEarlierData")
-                    }
-                }
-                Text("Your records stay on your iPhone and in your iCloud.")
-                    .font(.footnote)
-                    .foregroundStyle(HouseTokens.onHeroSecondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 2)
+    /// H1 at default to XXL, H3 at accessibility sizes; bands B and C a fixed 390 frame (H6).
+    static func heroSide(windowWidth: CGFloat, windowHeight: CGFloat, accessibility: Bool) -> CGFloat {
+        if windowWidth >= 600 { return min(CraftHeroSize.wideBandSide, CraftHeroSize.hero(windowWidth: windowWidth, windowHeight: windowHeight, accessibility: accessibility)) }
+        return CraftHeroSize.hero(windowWidth: windowWidth, windowHeight: windowHeight, accessibility: accessibility)
+    }
+
+    private func actions(_ colors: AdaptiveColors) -> some View {
+        VStack(spacing: 4) {
+            Button(String(localized: "Get started", table: "ConversionPath")) { flow.start(OnbMotion.morph(reduce)) }
+                .buttonStyle(LHButton.primary)
+                .accessibilityIdentifier("onb-start")
+            if account == .shown {
+                Button(String(localized: "Have an account?", table: "ConversionPath")) { showAccount = true }
+                    .buttonStyle(LHButton.tertiary)
+                    .accessibilityIdentifier("welcome.haveAccount")
+            }
+        }
+        .padding(.horizontal, LHMetrics.gutter)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .frame(maxWidth: LHMetrics.readingColumn)
+        .frame(maxWidth: .infinity)
+        // Words scrolling toward the pinned actions fade into the page's foot, never hard-cut.
+        .background(alignment: .top) {
+            // At accessibility sizes one line is ~60pt, so the fade grows to keep a soft edge.
+            let fade = Self.fadeHeight(accessibility: typeSize.isAccessibilitySize)
+            LinearGradient(stops: [.init(color: colors.pageBottom.opacity(0), location: 0),
+                                   .init(color: colors.pageBottom, location: typeSize.isAccessibilitySize ? 0.3 : 0.35)],
+                           startPoint: .top, endPoint: .bottom)
+                .padding(.top, -fade)
+                .ignoresSafeArea(edges: .bottom)
+                .allowsHitTesting(false)
+        }
     }
 
     private func search(announce: Bool) async {
@@ -574,11 +447,114 @@ struct OnbWelcomeContent: View {
             cloudProblem: found.cloudProblem
         )
     }
+}
 
-    private var accountLead: some View {
-        Text("Been here before?")
-            .font(.footnote)
-            .foregroundStyle(HouseTokens.onHeroSecondary)
+/// "Have an account?": Sign in with Apple (Apple's own button, App Review), "Restore earlier
+/// records" when this iPhone or iCloud holds some, and where the records live.
+struct OnbAccountSheet: View {
+    let flow: OnbFlow
+    /// What Welcome's own search found (shown at once); the sheet searches again when it opens,
+    /// so a profile that arrived after Welcome appeared is never missed.
+    @State private var restorable: [DiscoveredProfile]
+    @State private var cloudProblem: Bool
+
+    init(flow: OnbFlow, initialProfiles: [DiscoveredProfile], initialCloudProblem: Bool) {
+        self.flow = flow
+        _restorable = State(initialValue: initialProfiles)
+        _cloudProblem = State(initialValue: initialCloudProblem)
+    }
+    @EnvironmentObject private var viewModel: AppViewModel
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.onbLeaveWelcome) private var leaveWelcome
+    @Environment(\.accessibilityReduceMotion) private var reduce
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var showRestore = false
+    @State private var isRetrying = false
+    @State private var signInError = false
+    /// The content's natural height: the sheet fits it rather than opening at `.medium`.
+    @State private var contentHeight: CGFloat = 0
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    /// The sheet chrome around the content: the 56 header, the content's 4 top and 16 bottom
+    /// padding, and the empty footer inset (the detent height already sits above the home
+    /// indicator's safe area). Measured on iPhone 17 Pro, iOS 27: the footnote ends 16pt above
+    /// the footer.
+    static let chromeHeight: CGFloat = 56 + 4 + 16 + 8
+
+    /// A detent fitted to the content, with `.large` to pull up to. At accessibility sizes the
+    /// header wraps past its 56, so the sheet opens `.large` and nothing sits under its edge.
+    static func detents(contentHeight: CGFloat, accessibility: Bool = false) -> Set<PresentationDetent> {
+        if accessibility { return [.large] }
+        guard contentHeight > 0, contentHeight.isFinite else { return [.medium, .large] }
+        return [.height((contentHeight + chromeHeight).rounded(.up)), .large]
+    }
+
+    var body: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        LHSheet(String(localized: "Welcome back", table: "ConversionPath"), onClose: { dismiss() }) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(String(localized: "Sign in to pick up where you left off.", table: "ConversionPath"))
+                    .font(.body)
+                    .foregroundStyle(colors.textSecondary)
+                appleButton
+                if signInError {
+                    // What happened, then what to do (§C.2 Error); never an alert (§1.21).
+                    Label(AppleSignInFlow.failureMessage, systemImage: "exclamationmark.circle")
+                        .font(.subheadline)
+                        .foregroundStyle(colors.caution)
+                        .accessibilityIdentifier("welcome.signInFailed")
+                }
+                if !restorable.isEmpty || cloudProblem {
+                    Button {
+                        showRestore = true
+                    } label: {
+                        Text(restorable.count <= 1
+                             ? String(localized: "Restore earlier records", table: "ConversionPath")
+                             : String(localized: "Restore earlier records (\(restorable.count))", table: "ConversionPath"))
+                    }
+                    .buttonStyle(LHButton.tertiary)
+                    .accessibilityIdentifier("welcome.restoreEarlierData")
+                }
+                Text(String(localized: "Your records stay on your iPhone and in your iCloud.", table: "ConversionPath"))
+                    .font(.footnote)
+                    .foregroundStyle(colors.textSecondary)
+            }
+            .padding(.top, 4)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+        }
+        .background(colors.backgroundSecondary.ignoresSafeArea())
+        // §1.20's sheet with a fitted detent: the content is four short lines, and `.medium`
+        // left two-thirds of the sheet empty (gate B 1.1).
+        .presentationDetents(Self.detents(contentHeight: contentHeight, accessibility: typeSize.isAccessibilitySize))
+        .presentationDragIndicator(.visible)
+        .task { await research() }
+        .sheet(isPresented: $showRestore) {
+            ProfileRestoreSheet(
+                profiles: restorable, context: .welcome,
+                cloudProblem: cloudProblem, isRetrying: isRetrying,
+                onRetry: {
+                    Task {
+                        isRetrying = true
+                        await research()
+                        isRetrying = false
+                    }
+                }
+            ) { profile in
+                showRestore = false
+                dismiss()
+                viewModel.switchToProfile(profile)
+                // Sign-out and sign-in land in one pass, so the shell never sees the change. When
+                // Welcome was held open by an unfinished profile, close it ourselves.
+                if viewModel.activeProfileCompletedOnboarding { leaveWelcome() }
+            }
+            .environmentObject(viewModel)
+        }
+    }
+
+    private func research() async {
+        let found = await viewModel.discoverRestorable()
+        restorable = found.profiles
+        cloudProblem = found.cloudProblem
     }
 
     private var appleButton: some View {
@@ -587,6 +563,7 @@ struct OnbWelcomeContent: View {
         } onCompletion: { result in
             switch AppleSignInFlow.complete(result) {
             case .signedIn(let isNewUser):
+                dismiss()
                 if isNewUser {
                     flow.signUpWithApple(OnbMotion.morph(reduce))
                 } else {
@@ -594,132 +571,94 @@ struct OnbWelcomeContent: View {
                     viewModel.adoptReturningAppleSignIn()
                     leaveWelcome()
                 }
-            case .cancelled: break
-            case .failed: signInError = true
+            case .cancelled: signInError = false
+            case .failed: withAnimation(AppAnimation.quick) { signInError = true }
             }
         }
-        .signInWithAppleButtonStyle(.white)
-        .frame(width: 168, height: 36)
+        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+        .frame(height: LHButton.Metrics.primaryHeight)
         .clipShape(Capsule())
         .accessibilityIdentifier("welcome.signInWithApple")
     }
-
-    @ViewBuilder private var chips: some View {
-        chip("100h", "Foundation")
-        chip("500h", "Roof")
-        chip("750h", "Keys")
-    }
-
-    private func chip(_ h: String, _ label: String) -> some View {
-        HStack(spacing: 5) {
-            Text(h).font(.subheadline.weight(.bold)).monospacedDigit().foregroundStyle(HouseTokens.onHeroPrimary)
-            Text(label).font(.subheadline).foregroundStyle(HouseTokens.onHeroSecondary)
-        }
-        // Accessibility sizes: a chip wraps inside the screen instead of running past it (a chip
-        // wider than the screen widened the whole page and pushed the headline off the edge).
-        .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
-        .fixedSize(horizontal: !typeSize.isAccessibilitySize, vertical: true)
-        .padding(.horizontal, 10)
-        .frame(minHeight: 32)
-        .overlay(Capsule().strokeBorder(HouseTokens.drafting.opacity(0.45), lineWidth: 1))
-        .accessibilityElement(children: .combine)
-    }
 }
 
-// MARK: - 6 · Staked (full-bleed blueprint)
+// MARK: - 6 · Staked: the last step, on the plain canvas
 
-struct OnbStakedContent: View {
-    let flow: OnbFlow
-    var sceneBottom: CGFloat
-    @Environment(\.onbBottomInset) private var bottomInset
+/// What onboarding found (or that the user is set up), with the 120pt house thumbnail of the
+/// first rental, then one `.primary`: "Review N suggestions" (to the Inbox) or "Go to Today".
+struct OnbStakedStep: View {
+    @Bindable var flow: OnbFlow
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
         let headline = flow.stakedHeadline
-        VStack(alignment: .leading, spacing: 0) {
-            Color.clear.frame(height: max(0, sceneBottom - 6))
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    switch headline {
-                    case .found(let found):
-                        // The aha leads: what we found, then that it is theirs to confirm.
-                        Text(String(localized: "\(flow.displayName) is staked")).onbDrafting(HouseTokens.drafting)
-                        Text(OnbCopy.foundHeadline(found))
-                            .lhDisplayFont(.display)
-                            .foregroundStyle(HouseTokens.onHeroPrimary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 6)
-                            .accessibilityAddTraits(.isHeader)
-                            .accessibilityIdentifier("staked-found")
-                            .onAppear { flow.foundShown = true }
-                        Text(OnbCopy.foundBody(count: found.count, goal: flow.goal))
-                            .font(.body)
-                            .foregroundStyle(HouseTokens.onHeroSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 8)
-                    default:
-                        Text(OnbCopy.countLine(goal: flow.goal)).onbDrafting(HouseTokens.drafting)
-                        Text(OnbCopy.setUpHeadline(goal: flow.goal))
-                            .lhDisplayFont(.display)
-                            .foregroundStyle(HouseTokens.onHeroPrimary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 8)
-                            .accessibilityAddTraits(.isHeader)
-                            .accessibilityIdentifier("staked-setup")
-                        if case .nothingCountable(let count) = headline {
-                            // Right under the headline, so it's seen at every text size.
-                            // A sentence, so body text (mono caps are for short eyebrows only).
-                            Text(OnbStakedHeadline.nothingCountableLine(count))
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(HouseTokens.onHeroPrimary)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .padding(.top, 10)
-                                .accessibilityIdentifier("staked-nothing-countable")
-                        }
-                        Text(OnbCopy.setUpBody(goal: flow.goal))
-                            .font(.body)
-                            .foregroundStyle(HouseTokens.onHeroSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 10)
-                        if case .lookingBack(let found) = headline {
-                            Text(found.hours > 0 ? String(localized: "Looking back 90 days · \(found.hoursText) so far") : String(localized: "Looking back 90 days"))
-                                .onbDrafting(HouseTokens.drafting)
-                                .padding(.top, 16)
-                                .accessibilityIdentifier("staked-looking")
-                        } else if headline == .nothingFound {
-                            Text("Nothing in the last 90 days looked like rental work")
-                                .onbDrafting(HouseTokens.drafting)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .padding(.top, 16)
-                                .accessibilityIdentifier("staked-nothing")
-                        }
+        OnbStepScaffold(title: title(headline), titleIdentifier: identifier(headline)) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    OnbHouseThumb(stage: .started, lit: true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(flow.displayName)
+                            .font(.headline)
+                            .foregroundStyle(colors.textPrimary)
+                        Text(OnbCopy.countLine(goal: flow.goal))
+                            .font(.subheadline)
+                            .fontDesign(.rounded)
+                            .monospacedDigit()
+                            .foregroundStyle(colors.textSecondary)
                     }
                 }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 28)          // clears the scrim above the pinned button
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+                switch headline {
+                case .found(let found):
+                    Text(OnbCopy.foundBody(count: found.count, goal: flow.goal))
+                        .font(.body)
+                        .foregroundStyle(colors.textSecondary)
+                        .onAppear { flow.foundShown = true }
+                default:
+                    if case .nothingCountable(let count) = headline {
+                        Text(OnbStakedHeadline.nothingCountableLine(count))
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(colors.textPrimary)
+                            .accessibilityIdentifier("staked-nothing-countable")
+                    }
+                    Text(OnbCopy.setUpBody(goal: flow.goal))
+                        .font(.body)
+                        .foregroundStyle(colors.textSecondary)
+                    if case .lookingBack(let found) = headline {
+                        Label(found.hours > 0
+                              ? String(localized: "Looking back 90 days. \(found.hoursText) so far.", table: "ConversionPath")
+                              : String(localized: "Looking back 90 days.", table: "ConversionPath"),
+                              systemImage: "calendar")
+                            .font(.subheadline)
+                            .foregroundStyle(colors.textSecondary)
+                            .accessibilityIdentifier("staked-looking")
+                    } else if headline == .nothingFound {
+                        Text(String(localized: "Nothing in the last 90 days looked like rental work.", table: "ConversionPath"))
+                            .font(.subheadline)
+                            .foregroundStyle(colors.textSecondary)
+                            .accessibilityIdentifier("staked-nothing")
+                    }
+                }
             }
-            .scrollBounceBehavior(.basedOnSize)
-            // Words that scroll toward the pinned button fade out before they reach it.
-            .overlay(alignment: .bottom) {
-                LinearGradient(colors: [HouseTokens.blueprintDeep.opacity(0), HouseTokens.blueprintDeep], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 44)
-                    .allowsHitTesting(false)
-            }
-            Button(headline.reviewCount.map { String(localized: "Review \(OnbFormat.suggestions($0))") } ?? String(localized: "Go to Today")) {
+            .animation(AppAnimation.standard, value: headline)
+        } actions: {
+            Button(headline.reviewCount.map { String(localized: "Review \(OnbFormat.suggestions($0))", table: "ConversionPath") }
+                   ?? String(localized: "Go to Today", table: "ConversionPath")) {
                 flow.leaveStaked()
             }
-            .buttonStyle(OnbHeroPill())
+            .buttonStyle(LHButton.primary)
             .accessibilityIdentifier("onb-today")
-            .padding(.horizontal, 24)
-            .padding(.top, 12)
-            .padding(.bottom, bottomInset + 8)
-            .background(alignment: .top) {
-                // Words scrolling under the pinned button fade out instead of running under it.
-                LinearGradient(colors: [HouseTokens.blueprintDeep.opacity(0), HouseTokens.blueprintDeep.opacity(0.85)], startPoint: .top, endPoint: .init(x: 0.5, y: 0.25))
-                    .padding(.top, -40)
-                    .allowsHitTesting(false)
-            }
         }
-        .animation(AppAnimation.standard, value: headline)
+    }
+
+    private func title(_ headline: OnbStakedHeadline) -> String {
+        if case .found(let found) = headline { return OnbCopy.foundHeadline(found) }
+        return OnbCopy.setUpHeadline(goal: flow.goal)
+    }
+
+    private func identifier(_ headline: OnbStakedHeadline) -> String {
+        if case .found = headline { return "staked-found" }
+        return "staked-setup"
     }
 }

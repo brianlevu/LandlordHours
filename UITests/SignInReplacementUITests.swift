@@ -78,6 +78,9 @@ final class SignInReplacementUITests: XCTestCase {
         launch(["-LHSeedLegacySignedOut"], scheme: "light")
 
         XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 20))
+        // v2: Restore lives behind "Have an account?" (standard §1.24).
+        XCTAssertTrue(app.buttons["welcome.haveAccount"].waitForExistence(timeout: 20))
+        app.buttons["welcome.haveAccount"].tap()
         let restore = app.buttons["welcome.restoreEarlierData"]
         XCTAssertTrue(restore.waitForExistence(timeout: 20))
         XCTAssertFalse(app.buttons["Log in"].exists)
@@ -111,6 +114,8 @@ final class SignInReplacementUITests: XCTestCase {
 
         // 2. Welcome — signed-out 1.0.6 user with earlier data → Restore row.
         launch(["-LHSeedLegacySignedOut"], scheme: scheme)
+        XCTAssertTrue(app.buttons["welcome.haveAccount"].waitForExistence(timeout: 20))
+        app.buttons["welcome.haveAccount"].tap()
         XCTAssertTrue(app.buttons["welcome.restoreEarlierData"].waitForExistence(timeout: 20))
         settle()
         attach("02-welcome-restore-\(scheme)")

@@ -4,8 +4,8 @@ import Observation
 // MARK: - 2.0 onboarding: state, routing and the rules every screen counts from
 //
 // Approved design: AgentScratch/landlordhours/2026-10-19/onboarding/design.md, sandbox branch
-// `sandbox-onboarding` (607007d). Welcome and Staked are full-bleed blueprint; steps 1–5 share
-// one layout (blueprint band holding the lot, a sheet with one question). Upgraders from 1.x get
+// `sandbox-onboarding` (607007d); v2 (standard §1.24, §H.5): Welcome is the crafted house on the
+// dusk/night page; every other step is one question on the plain canvas. Upgraders from 1.x get
 // a short What's new (house, calendar, visit-end note) instead.
 //
 // Everything with a rule lives here as pure code so it is unit-tested: step routing (the note is
@@ -17,7 +17,8 @@ enum OnbStep: String, CaseIterable {
     /// Upgraders: "Your hours now build a house."
     case wnHouse
 
-    var isFullBleed: Bool { self == .welcome || self == .staked }
+    /// v2: only Welcome sits on the dusk/night page (standard §H.5); every other step is on the canvas.
+    var isOnPage: Bool { self == .welcome }
 
     /// Analytics `step` value.
     var analyticsKey: String { self == .wnHouse ? "whats_new_house" : rawValue }
@@ -68,16 +69,16 @@ enum OnbGoal: String, CaseIterable {
 
     /// The primary button names the choice (design: "Commitment is a button").
     var callToAction: String {
-        guard let hours = targetHours else { return String(localized: "Keep a record") }
-        return String(localized: "Aim for \(hours) hours")
+        guard let hours = targetHours else { return String(localized: "Keep a record", table: "ConversionPath") }
+        return String(localized: "Aim for \(hours) hours", table: "ConversionPath")
     }
 
     /// The spouse note on "Who puts in the hours?" (REPS: one spouse must reach 750 alone).
     static func spouseNote(for goal: OnbGoal?) -> String {
         switch goal {
-        case .mp500, .mp100: return String(localized: "Your hours count together for this target.")
-        case .record: return String(localized: "You’ll each have your own count.")
-        case .reps750, nil: return String(localized: "You’ll each have your own count. For 750, one of you has to get there alone.")
+        case .mp500, .mp100: return String(localized: "Your hours count together for this target.", table: "ConversionPath")
+        case .record: return String(localized: "You’ll each have your own count.", table: "ConversionPath")
+        case .reps750, nil: return String(localized: "You’ll each have your own count. For 750, one of you has to get there alone.", table: "ConversionPath")
         }
     }
 }
@@ -119,31 +120,63 @@ enum OnbGoalCopy {
         switch goal {
         case .reps750:
             switch pro {
-            case .me?: return String(localized: "750 hours, on your own count")
-            case .spouse?: return String(localized: "750 hours, your spouse’s own count")
-            default: return String(localized: "750 hours")
+            case .me?: return String(localized: "750 hours, on your own count", table: "ConversionPath")
+            case .spouse?: return String(localized: "750 hours, your spouse’s own count", table: "ConversionPath")
+            default: return String(localized: "750 hours", table: "ConversionPath")
             }
-        case .mp500: return String(localized: "500 hours")
-        case .mp100: return String(localized: "100 hours, and more than anyone else")
-        case .record: return String(localized: "Just keep a record")
+        case .mp500: return String(localized: "500 hours", table: "ConversionPath")
+        case .mp100: return String(localized: "100 hours, and more than anyone else", table: "ConversionPath")
+        case .record: return String(localized: "Just keep a record", table: "ConversionPath")
         }
     }
 
+    /// The note under the target rows, for the selected goal (standard §C.5 line 5: the spouse rule
+    /// lives on "Who puts in the hours?", not here).
     static func detail(_ goal: OnbGoal, pro: RealEstatePro?, isSuggested: Bool, rental: RentalMix?) -> String {
         switch goal {
         case .reps750:
             switch pro {
-            case .me?: return String(localized: "Counts rental hours you log here. Brokerage and other real-estate work aren’t tracked yet.")
-            case .spouse?: return String(localized: "Counts rental hours you log here. Brokerage and other real-estate work aren’t tracked yet. Only your spouse’s own hours count.")
-            default: return String(localized: "Counts rental hours you log here. Brokerage and other real-estate work aren’t tracked yet.")
+            case .spouse?: return String(localized: "Counts the rental hours you log here. Other real-estate work isn’t tracked yet. Only your spouse’s own hours count.", table: "ConversionPath")
+            default: return String(localized: "Counts the rental hours you log here. Other real-estate work isn’t tracked yet.", table: "ConversionPath")
             }
-        case .mp500:
-            if isSuggested { return String(localized: "Counts the hours you put in yourself. Ask your CPA what it means for long-term rentals.") }
-            return String(localized: "No comparison with anyone else needed.")
-        case .mp100:
-            if isSuggested { return String(localized: "You’ll also confirm that no one else did more, cleaners and managers included.") }
-            return String(localized: "You’ll also confirm that no one else did more, cleaners and managers included.")
-        case .record: return String(localized: "No target. Dated entries for your CPA.")
+        case .mp500: return String(localized: "Counts the hours you put in yourself. No comparison with anyone else.", table: "ConversionPath")
+        case .mp100: return String(localized: "You’ll also confirm that no one else did more, cleaners and managers included.", table: "ConversionPath")
+        case .record: return String(localized: "No target. Dated hours for your CPA.", table: "ConversionPath")
+        }
+    }
+
+    /// The option row's title: the target alone, so it never truncates (standard §1.24, D7).
+    static func rowTitle(_ goal: OnbGoal) -> String {
+        switch goal {
+        case .reps750: return String(localized: "750 hours", table: "ConversionPath")
+        case .mp500: return String(localized: "500 hours", table: "ConversionPath")
+        case .mp100: return String(localized: "100 hours", table: "ConversionPath")
+        case .record: return String(localized: "Just keep a record", table: "ConversionPath")
+        }
+    }
+
+    /// The option row's one meta line (≤ 22 characters, so it fits one line at XXL on a 402pt window).
+    static func rowMeta(_ goal: OnbGoal, pro: RealEstatePro?) -> String {
+        switch goal {
+        case .reps750:
+            switch pro {
+            case .me?: return String(localized: "Your own count", table: "ConversionPath")
+            case .spouse?: return String(localized: "Your spouse’s count", table: "ConversionPath")
+            default: return String(localized: "One person’s own count", table: "ConversionPath")
+            }
+        case .mp500: return String(localized: "The 500-hour test", table: "ConversionPath")
+        case .mp100: return String(localized: "More than anyone else", table: "ConversionPath")
+        case .record: return String(localized: "No target", table: "ConversionPath")
+        }
+    }
+
+    /// The option row's SF glyph.
+    static func symbol(_ goal: OnbGoal) -> String {
+        switch goal {
+        case .reps750: return "briefcase"
+        case .mp500: return "house"
+        case .mp100: return "calendar"
+        case .record: return "doc.text"
         }
     }
 }
@@ -206,7 +239,7 @@ enum OnbFormat {
     static func isDisplayable(_ h: Double) -> Bool { (h * 60).rounded(.down) >= 1 }
 
     static func suggestions(_ n: Int) -> String {
-        n == 1 ? String(localized: "1 suggestion") : String(localized: "\(n) suggestions")
+        n == 1 ? String(localized: "1 suggestion", table: "ConversionPath") : String(localized: "\(n) suggestions", table: "ConversionPath")
     }
 
     /// "23 hours", "23.5 hours", "1 hour"; under an hour in whole minutes ("45 minutes"). Never
@@ -214,14 +247,14 @@ enum OnbFormat {
     static func hoursInWords(_ h: Double) -> String {
         if h < 1 {
             let minutes = Int((h * 60).rounded(.down))
-            return minutes == 1 ? String(localized: "1 minute") : String(localized: "\(minutes) minutes")
+            return minutes == 1 ? String(localized: "1 minute", table: "ConversionPath") : String(localized: "\(minutes) minutes", table: "ConversionPath")
         }
         let tenths = (h * 10).rounded(.down) / 10
         if tenths == tenths.rounded() {
             let whole = Int(tenths)
-            return whole == 1 ? String(localized: "1 hour") : String(localized: "\(whole) hours")
+            return whole == 1 ? String(localized: "1 hour", table: "ConversionPath") : String(localized: "\(whole) hours", table: "ConversionPath")
         }
-        return String(localized: "\(String(format: "%.1f", tenths)) hours")
+        return String(localized: "\(String(format: "%.1f", tenths)) hours", table: "ConversionPath")
     }
 }
 
@@ -302,8 +335,8 @@ enum OnbStakedHeadline: Equatable {
     /// The drafting line under "Your house is staked." when nothing found counts.
     static func nothingCountableLine(_ count: Int) -> String {
         count == 1
-            ? String(localized: "We found 1 thing, but none count toward your hours yet.")
-            : String(localized: "We found \(count) things, but none count toward your hours yet.")
+            ? String(localized: "We found 1 thing, but none count toward your hours yet.", table: "ConversionPath")
+            : String(localized: "We found \(count) things, but none count toward your hours yet.", table: "ConversionPath")
     }
 }
 
@@ -312,65 +345,65 @@ enum OnbCopy {
     static func propertyHint(calendar: OnbCalendar, scan: OnbScanState, found: OnbFound) -> String? {
         guard calendar == .allowed, found.count > 0 else { return nil }
         switch scan {
-        case .finished: return String(localized: "\(OnbFormat.suggestions(found.count)) waiting")
-        case .running, .idle: return String(localized: "\(OnbFormat.suggestions(found.count)) so far · still looking")
+        case .finished: return String(localized: "\(OnbFormat.suggestions(found.count)) waiting", table: "ConversionPath")
+        case .running, .idle: return String(localized: "\(OnbFormat.suggestions(found.count)) so far · still looking", table: "ConversionPath")
         case .blocked: return nil
         }
     }
 
-    /// The drafting line on Staked ("0 of 750 hours", "0 hours in the book").
+    /// The count line beside the house on Staked ("0 of 750 hours", "0 hours in the book").
     static func countLine(goal: OnbGoal?) -> String {
-        if let h = goal?.targetHours { return String(localized: "0 of \(h) hours") }
-        return String(localized: "0 hours in the book")
+        if let h = goal?.targetHours { return String(localized: "0 of \(h) hours", table: "ConversionPath") }
+        return String(localized: "0 hours in the book", table: "ConversionPath")
     }
 
     /// Staked, when the look-back found countable hours: "23 hours found. 0 counted." Found hours
     /// are never counted until the owner confirms them, so the second number is what is
     /// confirmed so far (nothing, in a new profile).
     static func foundHeadline(_ found: OnbFound, counted: Double = 0) -> String {
-        String(localized: "\(OnbFormat.hoursInWords(found.hours)) found. \(Int(counted.rounded(.down))) counted.")
+        String(localized: "\(OnbFormat.hoursInWords(found.hours)) found. \(Int(counted.rounded(.down))) counted.", table: "ConversionPath")
     }
 
     /// The line under the found headline: where the hours came from and what confirming does.
     static func foundBody(count: Int, goal: OnbGoal?) -> String {
         switch (count == 1, goal?.targetHours) {
-        case (true, let h?): return String(localized: "From 1 calendar event in the last 90 days. If it was rental work, confirm it and it counts toward your \(h) hours.")
-        case (false, let h?): return String(localized: "From \(count) calendar events in the last 90 days. Confirm the ones that were rental work and they count toward your \(h) hours.")
-        case (true, nil): return String(localized: "From 1 calendar event in the last 90 days. If it was rental work, confirm it and it goes in your record.")
-        case (false, nil): return String(localized: "From \(count) calendar events in the last 90 days. Confirm the ones that were rental work and they go in your record.")
+        case (true, let h?): return String(localized: "From 1 calendar event in the last 90 days. If it was rental work, confirm it and it counts toward your \(h) hours.", table: "ConversionPath")
+        case (false, let h?): return String(localized: "From \(count) calendar events in the last 90 days. Confirm the ones that were rental work and they count toward your \(h) hours.", table: "ConversionPath")
+        case (true, nil): return String(localized: "From 1 calendar event in the last 90 days. If it was rental work, confirm it and it goes in your record.", table: "ConversionPath")
+        case (false, nil): return String(localized: "From \(count) calendar events in the last 90 days. Confirm the ones that were rental work and they go in your record.", table: "ConversionPath")
         }
     }
 
     /// Staked, with no found hours: "You’re set up for 100 hours."
     static func setUpHeadline(goal: OnbGoal?) -> String {
-        if let h = goal?.targetHours { return String(localized: "You’re set up for \(h) hours.") }
-        return String(localized: "You’re set up to keep a record.")
+        if let h = goal?.targetHours { return String(localized: "You’re set up for \(h) hours.", table: "ConversionPath") }
+        return String(localized: "You’re set up to keep a record.", table: "ConversionPath")
     }
 
     static func setUpBody(goal: OnbGoal?) -> String {
         goal?.targetHours == nil
-            ? String(localized: "Every hour you log from here goes in your record, dated the day it happened.")
-            : String(localized: "Every hour you log from here counts toward it, dated the day it happened.")
+            ? String(localized: "Every hour you log from here goes in your record, dated the day it happened.", table: "ConversionPath")
+            : String(localized: "Every hour you log from here counts toward it, dated the day it happened.", table: "ConversionPath")
     }
 
     /// Upgraders, first screen: "Your 312 hours, on the way to 750."
     static func upgradeHeadline(hours: Double, goal: HouseGoal, isRecord: Bool) -> String {
         let whole = Int(hours.rounded(.down))
         if isRecord {
-            return whole >= 1 ? String(localized: "Your \(whole) hours, safe in your record.") : String(localized: "Your records, safe where they are.")
+            return whole >= 1 ? String(localized: "Your \(whole) hours, safe in your record.", table: "ConversionPath") : String(localized: "Your records, safe where they are.", table: "ConversionPath")
         }
         let target = Int(goal.targetHours)
-        return whole >= 1 ? String(localized: "Your \(whole) hours, on the way to \(target).") : String(localized: "Your hours, on the way to \(target).")
+        return whole >= 1 ? String(localized: "Your \(whole) hours, on the way to \(target).", table: "ConversionPath") : String(localized: "Your hours, on the way to \(target).", table: "ConversionPath")
     }
 
     static func upgradeBody(isRecord: Bool) -> String {
         isRecord
-            ? String(localized: "Same hours, same PDF. Today now shows your hours, and the house shows how far along you are.")
-            : String(localized: "Same hours, same PDF. Today now shows your count against your target, and the house shows how far along you are.")
+            ? String(localized: "Same hours, same PDF. Today now shows your hours, and the house shows how far along you are.", table: "ConversionPath")
+            : String(localized: "Same hours, same PDF. Today now shows your count against your target, and the house shows how far along you are.", table: "ConversionPath")
     }
 
     /// Only the 750 target: what it counts.
-    static let upgradeRepsNote = String(localized: "The 750 counts rental hours you log here. Brokerage and other real-estate work aren’t tracked yet.")
+    static let upgradeRepsNote = String(localized: "The 750 counts the rental hours you log here. Other real-estate work isn’t tracked yet.", table: "ConversionPath")
 }
 
 // MARK: - Side effects (live wiring in OnboardingServices+Live; fakes in tests)
@@ -516,7 +549,7 @@ final class OnbFlow {
     var stakedHeadline: OnbStakedHeadline { .make(calendar: calendar, scan: scan, found: found) }
     var propertyHint: String? { OnbCopy.propertyHint(calendar: calendar, scan: scan, found: found) }
     var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
-    var displayName: String { trimmedName.isEmpty ? String(localized: "Your rental") : trimmedName }
+    var displayName: String { trimmedName.isEmpty ? String(localized: "Your rental", table: "ConversionPath") : trimmedName }
 
     /// Fires the first step's view event (the init sets `index` without `didSet`).
     func appeared() { services.track(.stepViewed(step, cohort)) }

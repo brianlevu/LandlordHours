@@ -1,34 +1,4 @@
 import SwiftUI
-import UIKit
-import ObjectiveC
-
-// MARK: - Status bar over the blueprint band
-
-/// Light status-bar content over the blueprint band WITHOUT forcing the window dark (a dark
-/// window would also give a light-mode user a dark keyboard). SwiftUI has no status-bar-style
-/// API, so this overrides `preferredStatusBarStyle` on the root hosting controller's class.
-/// `.default` hands control back to the system everywhere else.
-@MainActor
-enum OnbStatusBar {
-    private static var style: UIStatusBarStyle = .default
-    private static var installedOn: AnyClass?
-
-    static func set(_ newStyle: UIStatusBarStyle) {
-        style = newStyle
-        let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows)
-        guard let root = (windows.first(where: \.isKeyWindow) ?? windows.first)?.rootViewController else { return }
-        let cls: AnyClass = type(of: root)
-        if installedOn !== cls {
-            let sel = #selector(getter: UIViewController.preferredStatusBarStyle)
-            let block: @convention(block) (AnyObject) -> Int = { _ in
-                MainActor.assumeIsolated { OnbStatusBar.style.rawValue }
-            }
-            class_replaceMethod(cls, sel, imp_implementationWithBlock(block), "q@:")
-            installedOn = cls
-        }
-        root.setNeedsStatusBarAppearanceUpdate()
-    }
-}
 
 // MARK: - Capture / UI-test launch hooks (DEBUG only; Release reads nothing)
 //
@@ -40,6 +10,7 @@ enum OnbStatusBar {
 //   -LHOnbRental short|long|both · -LHOnbPro me|spouse|none · -LHOnbGoalPhase rental|pro|target
 //   -LHOnbScrollBottom 1  scroll step content to the end (AX3 frames)
 //   -LHOnbUpgradeHours <h> What's new house at h hours
+//   -LHOnbAccountSheet 1  Welcome with the "Have an account?" sheet open (captures)
 enum OnbDebugLaunch {
     #if DEBUG
     private static func value(_ flag: String) -> String? {
@@ -53,6 +24,7 @@ enum OnbDebugLaunch {
     static var scrollToBottom: Bool { flag("-LHOnbScrollBottom") }
     static var focusName: Bool { flag("-LHOnbFocus") }
     static var holdAfterStake: Bool { flag("-LHOnbHoldStake") }
+    static var accountSheet: Bool { flag("-LHOnbAccountSheet") }
 
     @MainActor static func apply(to flow: OnbFlow) {
         if let raw = value("-LHOnbGoal") {
@@ -93,6 +65,7 @@ enum OnbDebugLaunch {
     static var scrollToBottom: Bool { false }
     static var focusName: Bool { false }
     static var holdAfterStake: Bool { false }
+    static var accountSheet: Bool { false }
     @MainActor static func apply(to flow: OnbFlow) {}
     #endif
 }

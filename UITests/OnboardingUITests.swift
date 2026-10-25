@@ -50,6 +50,9 @@ final class OnboardingUITests: XCTestCase {
     func testUnfinishedProfileStillSeesSignInAndRestore() {
         launchFresh(["-LHSeedWelcomeState", "deadEnd", "-LHFakeCloudProfiles", "brian"])
         XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 20), "Welcome")
+        // v2: Sign in and Restore live behind "Have an account?" (standard §1.24).
+        XCTAssertTrue(app.buttons["welcome.haveAccount"].waitForExistence(timeout: 10), "Have an account?")
+        app.buttons["welcome.haveAccount"].tap()
         XCTAssertTrue(app.buttons["welcome.signInWithApple"].waitForExistence(timeout: 10), "Sign in with Apple")
         let restore = app.buttons["welcome.restoreEarlierData"]
         XCTAssertTrue(restore.waitForExistence(timeout: 10), "Restore earlier data")
@@ -67,6 +70,7 @@ final class OnboardingUITests: XCTestCase {
         launchFresh(["-LHSeedWelcomeState", "completed", "-LHForceWelcome", "-LHFakeCloudProfiles", "brian"])
         XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 20), "Welcome")
         Thread.sleep(forTimeInterval: 2)
+        XCTAssertFalse(app.buttons["welcome.haveAccount"].exists)
         XCTAssertFalse(app.buttons["welcome.signInWithApple"].exists)
         XCTAssertFalse(app.buttons["welcome.restoreEarlierData"].exists)
     }
@@ -74,6 +78,8 @@ final class OnboardingUITests: XCTestCase {
     func testFreshInstallSeesSignInAndRestoreOnlyWhenThereIsSomethingToRestore() {
         launchFresh(["-LHFakeCloudProfiles", "empty"])
         XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["welcome.haveAccount"].waitForExistence(timeout: 10))
+        app.buttons["welcome.haveAccount"].tap()
         XCTAssertTrue(app.buttons["welcome.signInWithApple"].waitForExistence(timeout: 10))
         Thread.sleep(forTimeInterval: 2)
         XCTAssertFalse(app.buttons["welcome.restoreEarlierData"].exists)
@@ -82,6 +88,8 @@ final class OnboardingUITests: XCTestCase {
     /// iCloud can't be searched: Restore stays visible, says so plainly, and Try again works.
     func testRestoreShowsPlainErrorAndTryAgainFindsTheRecords() {
         launchFresh(["-LHSeedWelcomeState", "deadEnd", "-LHFakeCloudProfiles", "errorOnce"])
+        XCTAssertTrue(app.buttons["welcome.haveAccount"].waitForExistence(timeout: 20))
+        app.buttons["welcome.haveAccount"].tap()
         let restore = app.buttons["welcome.restoreEarlierData"]
         XCTAssertTrue(restore.waitForExistence(timeout: 20), "Restore stays visible when iCloud can't be searched")
         restore.tap()
@@ -254,7 +262,7 @@ final class OnboardingUITests: XCTestCase {
         tap(app.buttons["onb-back"])
         XCTAssertTrue(app.staticTexts["Based on your answers, start here"].waitForExistence(timeout: 5))
         tap(app.buttons["onb-back"])                               // back through the questions
-        XCTAssertTrue(app.staticTexts["Do you or your spouse do real estate as a main job?"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Is real estate your main job, or your spouse’s?"].waitForExistence(timeout: 5))
         tap(app.buttons["onb-back"])
         XCTAssertTrue(app.staticTexts["What do you rent out?"].waitForExistence(timeout: 5))
     }
@@ -423,6 +431,7 @@ final class SignInSafetyCaptureUITests: XCTestCase {
         launch(["-LHSeedWelcomeState", "completed", "-LHForceWelcome", "-LHFakeCloudProfiles", "brian"], scheme: scheme, size: size)
         XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 20))
         Thread.sleep(forTimeInterval: 2)
+        XCTAssertFalse(app.buttons["welcome.haveAccount"].exists)
         XCTAssertFalse(app.buttons["welcome.signInWithApple"].exists)
         shoot("welcome-completed-\(suffix)")
     }
