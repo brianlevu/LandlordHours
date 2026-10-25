@@ -136,10 +136,12 @@ enum AdaptiveSnapshotter {
             shots.append(Shot(name: "duo-open-detail", size: duoOpen, category: L, args: ["select": "3", "route": "detail"], duo: true))
             shots.append(Shot(name: "duo-open-logtime", size: duoOpen, category: L, args: ["select": "3", "route": "log"], duo: true))
             shots.append(Shot(name: "duo-open-zerologged", size: duoOpen, category: L, args: ["select": "2"], duo: true))
-            shots.append(Shot(name: "duo-propped", size: duoPropped, category: L, args: ["select": "3"],
-                              insets: UIEdgeInsets(top: 24, left: 0, bottom: 20, right: 0), duo: true))
-            shots.append(Shot(name: "duo-propped-allrentals", size: duoPropped, category: L, args: ["select": "0"], duo: true))
-            shots.append(Shot(name: "duo-propped-AX3", size: duoPropped, category: AX3, args: ["select": "3"], duo: true))
+            // Propped: the bottom inset is the capture sim's own (34; the Duo's propped insets are
+            // must-prove 4), so no negative compensation fights the stacked layout.
+            let propped = UIEdgeInsets(top: 24, left: 0, bottom: 34, right: 0)
+            shots.append(Shot(name: "duo-propped", size: duoPropped, category: L, args: ["select": "3"], insets: propped, duo: true))
+            shots.append(Shot(name: "duo-propped-allrentals", size: duoPropped, category: L, args: ["select": "0"], insets: propped, duo: true))
+            shots.append(Shot(name: "duo-propped-AX3", size: duoPropped, category: AX3, args: ["select": "3"], insets: propped, duo: true))
         } else {
             let sizes: [(String, CGSize)] = [
                 ("sm-799x1000", CGSize(width: 799, height: 1000)), ("sm-800x1000", CGSize(width: 800, height: 1000)),
