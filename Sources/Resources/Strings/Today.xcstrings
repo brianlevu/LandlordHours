@@ -139,7 +139,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Test 3 needs more than 100 hours. You’re at the line."
+            "value": "The 100‑hour test needs more than 100. You’re at the line."
           }
         }
       }
@@ -150,7 +150,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Past the 100-hour line for test 3."
+            "value": "Past 100 hours. That’s the line for the 100‑hour test."
           }
         }
       }
@@ -161,7 +161,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Test 1 needs more than 500 hours. You’re at the line."
+            "value": "The 500‑hour test needs more than 500. You’re at the line."
           }
         }
       }
@@ -172,7 +172,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Past the 500-hour line for test 1."
+            "value": "Past 500 hours. That’s the line for the 500‑hour test."
           }
         }
       }
@@ -205,7 +205,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Past 100 hours. Test 3 also asks that no one else did more."
+            "value": "Past 100 hours. The 100‑hour test also asks that no one else did more."
           }
         }
       }
@@ -216,7 +216,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Past the 500-hour line for test 1."
+            "value": "Past 500 hours. That’s the line for the 500‑hour test."
           }
         }
       }
@@ -496,6 +496,17 @@
         }
       }
     },
+    "today.pace.askNoOneMore": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Did anyone do more? Tap to answer."
+          }
+        }
+      }
+    },
     "today.pace.behind": {
       "extractionState": "manual",
       "localizations": {
@@ -547,6 +558,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bringing in your latest hours from iCloud."
+          }
+        }
+      }
+    },
+    "today.pace.moreThan": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The test needs more than %lld hours."
           }
         }
       }
@@ -646,6 +668,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Your %@ record"
+          }
+        }
+      }
+    },
+    "today.record.keeps": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logging stays free."
+          }
+        }
+      }
+    },
+    "today.record.lockLine": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export your %lld hours with Pro."
           }
         }
       }

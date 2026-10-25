@@ -53,51 +53,59 @@ struct MilestoneCelebrationView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                LHToastChipSlot {
-                    Color.clear.frame(height: 36)
-                }
-                .padding(.top, 4)
-                ZStack(alignment: .top) {
-                    CraftHouseView(stage: advanced ? afterStage : beforeStage, windowsLit: advanced ? windowsLit : false,
-                                   side: side, fillsStage: !ax, dropAllowed: true,
-                                   onStageSettled: { _ in scheduleBeat(after: windowsLit ? CraftMotion.windowsFade : 0) })
-                    HouseConfettiBeat(trigger: beatTick, width: side, fall: side * 0.62)
-                }
-                .frame(width: side, height: side)
-                .frame(maxWidth: .infinity)
-                .clipped()
-                .contentShape(Rectangle())
-                .onTapGesture { finish(animated: true) }
-                .accessibilityIdentifier("milestone.house")
+        // The actions end the content, never a pinned inset over it: at AX3 a pinned Continue
+        // covered the detail line (gate C-1.2). The column is at least the viewport tall, so at
+        // default the buttons still sit at the bottom.
+        GeometryReader { viewport in
+            ScrollView {
+                VStack(spacing: 0) {
+                    LHToastChipSlot {
+                        Color.clear.frame(height: 36)
+                    }
+                    .padding(.top, 4)
+                    ZStack(alignment: .top) {
+                        CraftHouseView(stage: advanced ? afterStage : beforeStage, windowsLit: advanced ? windowsLit : false,
+                                       side: side, fillsStage: !ax, dropAllowed: true,
+                                       onStageSettled: { _ in scheduleBeat(after: windowsLit ? CraftMotion.windowsFade : 0) })
+                        HouseConfettiBeat(trigger: beatTick, width: side, fall: side * 0.62)
+                    }
+                    .frame(width: side, height: side)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                    .contentShape(Rectangle())
+                    .onTapGesture { finish(animated: true) }
+                    .accessibilityIdentifier("milestone.house")
 
-                VStack(spacing: 6) {
-                    Text(Self.title(for: celebration))
-                        .font(LHFont.screenTitle(size: 34))
-                        .foregroundStyle(colors.textPrimary)
-                        .multilineTextAlignment(.center)
-                        .accessibilityAddTraits(.isHeader)
-                        .opacity(lineShown ? 1 : 0)
-                    Text(Self.hoursLine(for: celebration, hours: hours, year: year))
-                        .font(.body)
-                        .foregroundStyle(colors.textSecondary)
-                    Text(Self.detail(for: celebration, hours: hours))
-                        .font(.subheadline)
-                        .foregroundStyle(colors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    VStack(spacing: 6) {
+                        Text(Self.title(for: celebration))
+                            .font(LHFont.screenTitle(size: 34))
+                            .foregroundStyle(colors.textPrimary)
+                            .multilineTextAlignment(.center)
+                            .accessibilityAddTraits(.isHeader)
+                            .opacity(lineShown ? 1 : 0)
+                        Text(Self.hoursLine(for: celebration, hours: hours, year: year))
+                            .font(.body)
+                            .foregroundStyle(colors.textSecondary)
+                        Text(Self.detail(for: celebration, hours: hours))
+                            .font(.subheadline)
+                            .foregroundStyle(colors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, LHMetrics.gutter + 4)
+                    .padding(.top, ax ? 8 : -28)
+                    .accessibilityElement(children: .combine)
+
+                    Spacer(minLength: LHMetrics.sectionGap)
+                    actions
                 }
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, LHMetrics.gutter + 4)
-                .padding(.top, ax ? 8 : -28)
-                .accessibilityElement(children: .combine)
+                .frame(maxWidth: band == .a ? .infinity : LHMetrics.readingColumn)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: viewport.size.height)
             }
-            .frame(maxWidth: band == .a ? .infinity : LHMetrics.readingColumn)
-            .frame(maxWidth: .infinity)
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .scrollIndicators(.hidden)
-        .scrollBounceBehavior(.basedOnSize)
-        .safeAreaInset(edge: .bottom) { actions }
         .background { LHPage() }
         .background {
             Color.clear
@@ -204,20 +212,20 @@ struct MilestoneCelebrationView: View {
         switch celebration {
         case .stage(.foundation100):
             return hours > 100
-                ? String(localized: "milestone.detail.100past", defaultValue: "Past the 100-hour line for test 3.", table: "Today")
-                : String(localized: "milestone.detail.100at", defaultValue: "Test 3 needs more than 100 hours. You’re at the line.", table: "Today")
+                ? String(localized: "milestone.detail.100past", defaultValue: "Past 100 hours. That’s the line for the 100\u{2011}hour test.", table: "Today")
+                : String(localized: "milestone.detail.100at", defaultValue: "The 100\u{2011}hour test needs more than 100. You’re at the line.", table: "Today")
         case .stage(.roof500):
             return hours > 500
-                ? String(localized: "milestone.detail.500past", defaultValue: "Past the 500-hour line for test 1.", table: "Today")
-                : String(localized: "milestone.detail.500at", defaultValue: "Test 1 needs more than 500 hours. You’re at the line.", table: "Today")
+                ? String(localized: "milestone.detail.500past", defaultValue: "Past 500 hours. That’s the line for the 500\u{2011}hour test.", table: "Today")
+                : String(localized: "milestone.detail.500at", defaultValue: "The 500\u{2011}hour test needs more than 500. You’re at the line.", table: "Today")
         case .stage(.keys750):
             return String(localized: "milestone.detail.750", defaultValue: "More than 750 hours on your record.", table: "Today")
         case .goalMet(.reps750):
             return String(localized: "milestone.detail.goal750", defaultValue: "Your 750 hours are on your record.", table: "Today")
         case .goalMet(.mp500):
-            return String(localized: "milestone.detail.mp500", defaultValue: "Past the 500-hour line for test 1.", table: "Today")
+            return String(localized: "milestone.detail.mp500", defaultValue: "Past 500 hours. That’s the line for the 500\u{2011}hour test.", table: "Today")
         case .goalMet(.mp100):
-            return String(localized: "milestone.detail.mp100", defaultValue: "Past 100 hours. Test 3 also asks that no one else did more.", table: "Today")
+            return String(localized: "milestone.detail.mp100", defaultValue: "Past 100 hours. The 100\u{2011}hour test also asks that no one else did more.", table: "Today")
         }
     }
 }

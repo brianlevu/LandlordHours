@@ -449,6 +449,13 @@ struct TodayPaceSentence: Equatable {
         var reachedCaveat: String? = nil
     }
 
+    /// Every pace line ends with a full stop, like "Behind by 14h. 9h a week gets you to 100."
+    static func sentence(_ s: String) -> String {
+        let t = s.trimmingCharacters(in: .whitespaces)
+        guard let last = t.last, !".!?".contains(last) else { return t }
+        return t + "."
+    }
+
     static func make(_ i: Input) -> TodayPaceSentence {
         let goal = Int(i.goal.rounded())
         if i.isRecord || i.goal <= 0 {
@@ -456,8 +463,9 @@ struct TodayPaceSentence: Equatable {
         }
         if i.hours >= i.goal {
             if let caveat = i.reachedCaveat {
+                // The hours are reached, so the lead is `positiveOnPage` (§H.4); the caveat says what is open.
                 return TodayPaceSentence(lead: String(localized: "today.pace.reached", defaultValue: "\(goal) reached.", table: "Today"),
-                                         rest: caveat, tone: .neutral)
+                                         rest: sentence(caveat), tone: .positive)
             }
             return TodayPaceSentence(lead: String(localized: "today.pace.done", defaultValue: "Done for \(String(i.year)).", table: "Today"),
                                      rest: String(localized: "today.pace.doneRest", defaultValue: "\(goal) hours on the record.", table: "Today"),
@@ -484,5 +492,25 @@ struct TodayPaceSentence: Equatable {
                                      rest: rest, tone: .behind)
         }
         return TodayPaceSentence(lead: String(localized: "today.pace.onPace", defaultValue: "On pace.", table: "Today"), rest: rest, tone: .positive)
+    }
+}
+
+
+/// The rental chip's name when it does not fit: whole words only, then "…" (§2 no mid-word break).
+enum TodayChipName {
+    /// The full name first, then the name with one word fewer each time ("The Arroyo Seco…"), so
+    /// `ViewThatFits` picks the longest that fits. The last candidate is the first word, which the
+    /// chip may still shorten when even it is too wide.
+    static func candidates(_ name: String) -> [String] {
+        let words = name.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        guard words.count > 1 else { return [name] }
+        var out = [name]
+        for n in stride(from: words.count - 1, through: 1, by: -1) {
+            var head = words.prefix(n).joined(separator: " ")
+            while let last = head.last, ",;:-·".contains(last) { head.removeLast() }
+            let candidate = head + "…"
+            if !out.contains(candidate) { out.append(candidate) }
+        }
+        return out
     }
 }

@@ -88,8 +88,11 @@ struct DashboardView: View {
     @State private var frozen: HeroSnapshot?
     /// Bumped to remount the hero without motion (return to Today, a DEBUG seed).
     @State private var heroMount = 0
-    /// The number waits for the last timber to land (`heroCountUp` after `timberDrop`).
-    @State private var numberHold: (focus: String, hours: Double)?
+    /// The hours the number last landed on, per page. While a timber drop is pending from these
+    /// hours to the live ones, the number shows these, then rolls as the last timber lands
+    /// (`heroCountUp`). Derived in `shownHours`, so the number never flashes the new value first
+    /// (r2 showed 46 → 48 → 46 for eight frames when the hold was set in `onChange`).
+    @State private var settledHours: (focus: String, hours: Double)?
     @State private var calendarSuggestionsOn = CaptureOptIn.calendarSuggestionsEnabled()
     @State private var showParticipationSheet = false
     @State private var showRecordExport = false
@@ -141,8 +144,23 @@ struct DashboardView: View {
 
     /// The number shown: held at the pre-save value through a drop.
     private var shownHours: Double {
-        if let hold = numberHold, hold.focus == heroState.focus { return hold.hours }
-        return heroState.hours
+        let live = heroState.hours
+        if let settled = settledHours, settled.focus == heroState.focus, dropPending(from: settled.hours, to: live) {
+            return settled.hours
+        }
+        return live
+    }
+
+    /// A save on the shown page that will play the timber drop (the same test `CraftHouseView` makes).
+    private func dropPending(from old: Double, to new: Double) -> Bool {
+        guard isVisible, frozen == nil, new > old, let focus, dropAllowed, !reduceMotion,
+              CraftHouseView.buildClipURL(dark: colorScheme == .dark) != nil else { return false }
+        return CraftMotion.stageMotion(from: CraftStage.stage(hours: old, goal: focus.goal),
+                                       to: CraftStage.stage(hours: new, goal: focus.goal)) == .timberDrop
+    }
+
+    private func settleNumber() {
+        settledHours = focus.map { ($0.id, $0.hours) }
     }
 
     private var side: CGFloat {
@@ -181,11 +199,27 @@ struct DashboardView: View {
             return TodayPaceSentence(lead: nil, rest: TodayHeroCopy.emptyLotLine(target: isRecord ? nil : Int(houseGoal.targetHours)), tone: .neutral)
         }
         let copy = heroCopy(focus)
-        let caveat = (focus.hours >= focus.goal && !copy.claimsReached) ? copy.status : nil
+        let caveat = (focus.hours >= focus.goal && !copy.claimsReached) ? Self.reachedCaveat(copy, hours: focus.hours, goal: focus.goal) : nil
         return TodayPaceSentence.make(.init(
             hours: shownHours, goal: focus.goal, year: currentYear, now: InboxClock.now(), isRecord: isRecord,
             paceReady: TodayHeroCopy.paceIsReady(hours: focus.hours, daysOfData: daysOfData),
             hasPendingToConfirm: inbox.badgeCount > 0, reachedCaveat: caveat))
+    }
+
+    /// What is still open once the hours reach the goal, in Today's words: the 100-hour question
+    /// (the pace line opens it), the "more than" line at exactly the goal, else the hero copy's status.
+    static func reachedCaveat(_ copy: TodayHeroCopy, hours: Double, goal: Double) -> String? {
+        if copy.needsConfirmation {
+            return String(localized: "today.pace.askNoOneMore", defaultValue: "Did anyone do more? Tap to answer.", table: "Today")
+        }
+        if hours <= goal {
+            return String(localized: "today.pace.moreThan", defaultValue: "The test needs more than \(Int(goal.rounded())) hours.", table: "Today")
+        }
+        // The hero copy may already start with "750 reached." (the half rule); the lead says it once.
+        guard var status = copy.status else { return nil }
+        let lead = "\(Int(goal.rounded())) reached."
+        if status.hasPrefix(lead) { status = String(status.dropFirst(lead.count)).trimmingCharacters(in: .whitespaces) }
+        return status.isEmpty ? nil : status
     }
 
     private var paceTap: (() -> Void)? {
@@ -230,6 +264,9 @@ struct DashboardView: View {
                     resolveFocus()
                     if let i = TodayDebugSeed.focusIndex, focuses.indices.contains(i) { focusID = focuses[i].id }
                     heroMount += 1   // the seed replaced the data: remount, no motion
+                    settleNumber()
+                    if let focus { TodayDebugSeed.scheduleLog(app: viewModel, rentalID: focus.rentalID, rentalName: focus.name) }
+                    TodayDebugSeed.runTabTour()
                     guard TodayDebugSeed.scrollsToEnd else { return }
                     try? await Task.sleep(for: .seconds(1.2))
                     withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo("today.end", anchor: .bottom) }
@@ -268,7 +305,7 @@ struct DashboardView: View {
             }
             .onChange(of: houseEvents.celebrationTick) { _, _ in
                 guard isVisible else { return }
-                scheduleCelebration(after: numberHold != nil ? Self.afterDrop : Self.afterSettle)
+                scheduleCelebration(after: shownHours != heroState.hours ? Self.afterDrop : Self.afterSettle)
             }
             .onChange(of: houseEvents.pendingBackfill) { _, reveal in
                 guard reveal != nil, isVisible else { return }
@@ -407,10 +444,14 @@ struct DashboardView: View {
                     ForEach(pages) { page in Text(page.name).tag(page.id) }
                 }
             } label: {
-                // The whole name when it fits beside the account button; only long names shorten
-                // ("Santa Ray…" at AX3 was a FAIL, §H.8).
-                LHHeroChip(focus.name, showsChevron: pages.count > 1)
-                    .frame(maxWidth: max(160, min(window.width > 0 ? window.width : 402, 402) - 2 * (LHMetrics.gutter + LHMetrics.minTap)))
+                // The whole name when it fits beside the account button; a long name drops whole
+                // words, never breaks inside one ("Santa Ray…" at AX3 and "Schoolhous…" were FAILs, §H.8).
+                ViewThatFits(in: .horizontal) {
+                    ForEach(TodayChipName.candidates(focus.name), id: \.self) { name in
+                        LHHeroChip(name, showsChevron: pages.count > 1)
+                    }
+                }
+                .frame(maxWidth: max(160, min(window.width > 0 ? window.width : 402, 402) - 2 * (LHMetrics.gutter + LHMetrics.minTap)))
                 .contentTransition(.opacity)
             }
             .disabled(pages.count < 2)
@@ -484,7 +525,7 @@ struct DashboardView: View {
         let pages = focuses
         let to = pages.firstIndex { $0.id == id } ?? 0
         slideEdge = to > focusIndex ? .trailing : .leading
-        numberHold = nil
+        if let page = pages.first(where: { $0.id == id }) { settledHours = (page.id, page.hours) }
         withAnimation(CraftHouseView.rentalSlideAnimation(reduceMotion: reduceMotion)) { focusID = id }
         rememberedFocus = id
     }
@@ -511,23 +552,19 @@ struct DashboardView: View {
         heroSide = CraftHeroSide.resolve(previous: heroSide, kind: .hero, window: window, band: band, accessibility: ax)
     }
 
-    /// Hours on the shown page changed while Today is on screen. If the stage change will be the
-    /// timber drop, the number waits for the last timber (`heroCountUp`).
+    /// Hours on the shown page changed. Unless the change plays the timber drop (the number then
+    /// waits in `shownHours` for the last timber), the number lands on the new hours now.
     private func hoursChanged(from old: Double?, to new: Double?) {
-        guard isVisible, frozen == nil, let old, let new, new > old, let focus else { return }
-        let motion = CraftMotion.stageMotion(from: CraftStage.stage(hours: old, goal: focus.goal),
-                                             to: CraftStage.stage(hours: new, goal: focus.goal))
-        let clip = CraftHouseView.buildClipURL(dark: colorScheme == .dark) != nil
-        if motion == .timberDrop && dropAllowed && !reduceMotion && clip {
-            numberHold = (focus.id, old)
-        }
+        guard let focus, let new else { return }
+        if settledHours?.focus == focus.id, let settled = settledHours?.hours, dropPending(from: settled, to: new) { return }
+        settledHours = (focus.id, new)
     }
 
     private func stageSettled(_ motion: CraftStageMotion) {
         if motion == .timberDrop, let focus {
             CraftDropLedger().markPlayed(rentalID: focus.rentalID, stage: .framing, year: currentYear)
         }
-        numberHold = nil
+        settleNumber()
     }
 
     private func rowLogged(_ suggestion: Suggestion) {
@@ -549,7 +586,7 @@ struct DashboardView: View {
             heroMount += 1
         }
         frozen = nil
-        numberHold = nil
+        settleNumber()
         houseEvents.takeConfirm()
         scheduleCelebration(after: Self.afterAppear)
     }

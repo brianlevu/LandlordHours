@@ -74,7 +74,7 @@ final class HouseMotionTests: XCTestCase {
 
     func testCelebrationCopyNeverOverclaims() {
         XCTAssertTrue(MilestoneCelebrationView.detail(for: .stage(.roof500), hours: 500).contains("needs more than 500"))
-        XCTAssertTrue(MilestoneCelebrationView.detail(for: .stage(.roof500), hours: 502).contains("Past the 500-hour line"))
+        XCTAssertTrue(MilestoneCelebrationView.detail(for: .stage(.roof500), hours: 502).contains("Past 500 hours"))
         XCTAssertTrue(MilestoneCelebrationView.detail(for: .stage(.foundation100), hours: 100).contains("needs more than 100"))
         XCTAssertEqual(MilestoneCelebrationView.title(for: .goalMet(.mp100)), "100 hours.")
         XCTAssertEqual(MilestoneCelebrationView.title(for: .stage(.roof500)), "500 hours.")

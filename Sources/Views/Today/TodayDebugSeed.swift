@@ -16,6 +16,12 @@ import SwiftUI
 //                            dark: nothing logged today anywhere
 //   -LHCraftFirstHour        same as dark (the next log is the first of the day: `windowsOn`)
 //   -LHCraftScroll           scroll to the end of Today after launch (AX row captures)
+//   -LHCraftLogAfter <s>     s seconds after Today appears, log -LHCraftLogHours (default 2) today on
+//                            the opened rental through `addTimeEntry` (the real save path) and show
+//                            the toast: with `craft` focus 1 and -LHCraftWindows dark, 46h -> 48h is
+//                            frame70 -> framing, so the timber drop plays, then the lamp comes on.
+//                            The drop ledger is cleared first so the drop can play.
+//   -LHCraftTabTour          light-mode seam capture: Inbox at 2.5 s, back to Today at 5.5 s
 // Run with `-LHMockScenario emptyMainTabs`; `-LHSeedSuggestions inbox` adds the To confirm rows.
 //
 // Older hooks kept for the UI tests:
@@ -24,6 +30,8 @@ import SwiftUI
 @MainActor
 enum TodayDebugSeed {
     private static var didApply = false
+    private static var didScheduleLog = false
+    private static var didTour = false
 
     static func value(_ flag: String) -> String? { InboxDebugSeed.value(after: flag) }
     private static var args: [String] { ProcessInfo.processInfo.arguments }
@@ -33,6 +41,36 @@ enum TodayDebugSeed {
     private static var windowsLit: Bool {
         if args.contains("-LHCraftFirstHour") { return false }
         return value("-LHCraftWindows")?.lowercased() != "dark"
+    }
+
+    static var logAfter: Double? { value("-LHCraftLogAfter").flatMap(Double.init) }
+    static var logHours: Double { value("-LHCraftLogHours").flatMap(Double.init) ?? 2 }
+    static var tabTour: Bool { args.contains("-LHCraftTabTour") }
+
+    /// `-LHCraftLogAfter`: log on the shown rental once Today is on screen (the drop capture).
+    static func scheduleLog(app: AppViewModel, rentalID: UUID?, rentalName: String) {
+        guard let delay = logAfter, let rentalID, !didScheduleLog else { return }
+        didScheduleLog = true
+        UserDefaults.standard.removeObject(forKey: UserScope.key(CraftDropLedger.baseKey, userId: UserScope.userId))
+        let hours = logHours
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(delay))
+            app.addTimeEntry(propertyId: rentalID, participant: .selfParticipant, category: .repairs,
+                             hours: hours, date: Date(), notes: "")
+            AppToastCenter.shared.show(TodayText.logged(InboxFormat.hours(hours), at: rentalName), kind: .success)
+        }
+    }
+
+    /// `-LHCraftTabTour`: Today → Inbox → Today through the shell's own tab route.
+    static func runTabTour() {
+        guard tabTour, !didTour else { return }
+        didTour = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2.5))
+            NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex)
+            try? await Task.sleep(for: .seconds(3.0))
+            NotificationCenter.default.post(name: .switchToTab, object: ShellTab.todayIndex)
+        }
     }
 
     static func applyIfNeeded(app: AppViewModel) {

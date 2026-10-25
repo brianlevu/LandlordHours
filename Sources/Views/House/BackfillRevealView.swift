@@ -34,52 +34,56 @@ struct BackfillRevealView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                HStack {
-                    Spacer()
-                    Button(String(localized: "backfill.skip", defaultValue: "Skip", table: "Today"), action: onSkip)
-                        .buttonStyle(LHButton.tertiary)
-                        .accessibilityIdentifier("backfill-skip")
+        // The primary ends the content, never a pinned inset over it (the milestone's AX3 defect).
+        GeometryReader { viewport in
+            ScrollView {
+                VStack(spacing: 0) {
+                    HStack {
+                        Spacer()
+                        Button(String(localized: "backfill.skip", defaultValue: "Skip", table: "Today"), action: onSkip)
+                            .buttonStyle(LHButton.tertiary)
+                            .accessibilityIdentifier("backfill-skip")
+                    }
+                    .padding(.horizontal, LHMetrics.gutter)
+                    CraftHouseView(stage: stage, windowsLit: false, side: side, fillsStage: !ax)
+                        .frame(maxWidth: .infinity)
+                    VStack(spacing: 2) {
+                        Text(verbatim: "\(Int(shownHours.rounded(.down)))")
+                            .font(LHFont.heroNumeral(size: ax ? 54 : 84))
+                            .tracking(-2)
+                            .foregroundStyle(colors.textPrimary)
+                            .contentTransition(.numericText(value: shownHours))
+                            .accessibilityLabel(String(localized: "backfill.foundLabel",
+                                                       defaultValue: "\(Int(foundHours.rounded(.down))) hours found in your calendar", table: "Today"))
+                        Text(String(localized: "backfill.found", defaultValue: "hours found in your calendar", table: "Today"))
+                            .font(.body)
+                            .foregroundStyle(colors.textSecondary)
+                            .accessibilityHidden(true)
+                        Text(String(localized: "backfill.note", defaultValue: "Nothing counts until you confirm it.", table: "Today"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(colors.textPrimary)
+                            .padding(.top, 8)
+                    }
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, LHMetrics.gutter + 4)
+                    .padding(.top, ax ? 0 : -44)
+
+                    Spacer(minLength: LHMetrics.sectionGap)
+                    Button(suggestionCount == 1
+                           ? String(localized: "backfill.reviewOne", defaultValue: "Review 1 suggestion", table: "Today")
+                           : String(localized: "backfill.review", defaultValue: "Review \(suggestionCount) suggestions", table: "Today"),
+                           action: onReview)
+                        .buttonStyle(LHButton.primary)
+                        .padding(.horizontal, LHMetrics.gutter)
+                        .padding(.bottom, 8)
+                        .accessibilityIdentifier("backfill-review")
                 }
-                .padding(.horizontal, LHMetrics.gutter)
-                CraftHouseView(stage: stage, windowsLit: false, side: side, fillsStage: !ax)
-                    .frame(maxWidth: .infinity)
-                VStack(spacing: 2) {
-                    Text(verbatim: "\(Int(shownHours.rounded(.down)))")
-                        .font(LHFont.heroNumeral(size: ax ? 54 : 84))
-                        .tracking(-2)
-                        .foregroundStyle(colors.textPrimary)
-                        .contentTransition(.numericText(value: shownHours))
-                        .accessibilityLabel(String(localized: "backfill.foundLabel",
-                                                   defaultValue: "\(Int(foundHours.rounded(.down))) hours found in your calendar", table: "Today"))
-                    Text(String(localized: "backfill.found", defaultValue: "hours found in your calendar", table: "Today"))
-                        .font(.body)
-                        .foregroundStyle(colors.textSecondary)
-                        .accessibilityHidden(true)
-                    Text(String(localized: "backfill.note", defaultValue: "Nothing counts until you confirm it.", table: "Today"))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(colors.textPrimary)
-                        .padding(.top, 8)
-                }
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, LHMetrics.gutter + 4)
-                .padding(.top, ax ? 0 : -44)
+                .frame(maxWidth: band == .a ? .infinity : LHMetrics.readingColumn)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: viewport.size.height)
             }
-            .frame(maxWidth: band == .a ? .infinity : LHMetrics.readingColumn)
-            .frame(maxWidth: .infinity)
-        }
-        .scrollIndicators(.hidden)
-        .scrollBounceBehavior(.basedOnSize)
-        .safeAreaInset(edge: .bottom) {
-            Button(suggestionCount == 1
-                   ? String(localized: "backfill.reviewOne", defaultValue: "Review 1 suggestion", table: "Today")
-                   : String(localized: "backfill.review", defaultValue: "Review \(suggestionCount) suggestions", table: "Today"),
-                   action: onReview)
-                .buttonStyle(LHButton.primary)
-                .padding(.horizontal, LHMetrics.gutter)
-                .padding(.bottom, 8)
-                .accessibilityIdentifier("backfill-review")
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
         }
         .background { LHPage() }
         .background {

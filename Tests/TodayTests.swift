@@ -407,8 +407,39 @@ final class TodayCraftHeroTests: XCTestCase {
         XCTAssertEqual(done.rest, "750 hours on the record.")
         let caveat = TodayPaceSentence.make(.init(hours: 751, goal: 750, year: 2026, now: day(2026, 10, 23), calendar: calendar,
                                                   reachedCaveat: "750 reached. The half rule isn’t met yet."))
-        XCTAssertEqual(caveat.tone, .neutral)
+        XCTAssertEqual(caveat.tone, .positive, "the hours are reached: the lead is positiveOnPage (§H.4)")
         XCTAssertEqual(caveat.lead, "750 reached.")
+        let open = TodayPaceSentence.make(.init(hours: 101, goal: 100, year: 2026, now: day(2026, 10, 23), calendar: calendar,
+                                                reachedCaveat: "Confirm no one did more"))
+        XCTAssertEqual(open.rest, "Confirm no one did more.", "every pace line ends with a full stop")
+    }
+
+    func testReachedCaveatInTodaysWords() {
+        func copy(hours: Double, goal: HouseGoal, half: TaxQualificationEngine.MoreThanHalfStatus = .notEntered, noOneMore: Bool? = nil) -> TodayHeroCopy {
+            TodayHeroCopy.make(.init(goal: goal, hours: hours, year: 2026, now: day(2026, 10, 23), calendar: calendar,
+                                     halfTest: half, noOneParticipatedMore: noOneMore))
+        }
+        let ask = DashboardView.reachedCaveat(copy(hours: 120, goal: .mp100), hours: 120, goal: 100)
+        XCTAssertEqual(ask, "Did anyone do more? Tap to answer.")
+        let atLine = DashboardView.reachedCaveat(copy(hours: 750, goal: .reps750), hours: 750, goal: 750)
+        XCTAssertEqual(atLine, "The test needs more than 750 hours.")
+        let half = DashboardView.reachedCaveat(copy(hours: 760, goal: .reps750), hours: 760, goal: 750)
+        XCTAssertEqual(half, "Add your other work hours to check the half rule.", "the lead says \"750 reached.\" once")
+    }
+
+    func testRowTimeRangeNeverBreaks() {
+        XCTAssertEqual(TodayConfirmBlock.unbreakable("9–10:30"), "9\u{2060}–\u{2060}10:30")
+        XCTAssertFalse(TodayConfirmBlock.unbreakable("12–2").contains(" "))
+    }
+
+    func testChipNameDropsWholeWords() {
+        XCTAssertEqual(TodayChipName.candidates("Pine Cabin"), ["Pine Cabin", "Pine…"])
+        XCTAssertEqual(TodayChipName.candidates("Maple"), ["Maple"])
+        let long = TodayChipName.candidates("The Arroyo Seco Schoolhouse Lofts")
+        XCTAssertEqual(long.first, "The Arroyo Seco Schoolhouse Lofts")
+        XCTAssertEqual(long[1], "The Arroyo Seco Schoolhouse…")
+        XCTAssertTrue(long.dropFirst().allSatisfy { $0.hasSuffix("…") })
+        XCTAssertEqual(TodayChipName.candidates("Oak St, Unit 2"), ["Oak St, Unit 2", "Oak St, Unit…", "Oak St…", "Oak…"])
     }
 
     func testPaceWaitsAndNeverQualifies() {

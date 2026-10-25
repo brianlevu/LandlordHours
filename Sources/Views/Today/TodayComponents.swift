@@ -224,11 +224,18 @@ struct TodayConfirmBlock: View {
         return String(localized: "today.row.title", defaultValue: "\(suggestion.title) at \(propertyName)", table: "Today")
     }
 
-    /// "Calendar · 12–2" (no date: Today's rows are this week's work; the Inbox has the day headers).
+    /// The time range, "12–2" (§1.3: the source is the row's glyph, so the word "Calendar" is not
+    /// repeated; no date: Today's rows are this week's work). Word joiners keep "9–10:30" on one
+    /// line at AX, and the shorter meta keeps the range visible beside a wide tag at default.
+    /// A receipt has no time, so it says "Receipt".
     static func meta(_ suggestion: Suggestion) -> String {
-        let kind = InboxFormat.kindLabel(suggestion.kind)
-        if suggestion.kind == .receipt { return kind }
-        return "\(kind) · \(InboxFormat.timeRange(start: suggestion.start, end: suggestion.end))"
+        if suggestion.kind == .receipt { return InboxFormat.kindLabel(suggestion.kind) }
+        return unbreakable(InboxFormat.timeRange(start: suggestion.start, end: suggestion.end))
+    }
+
+    /// "9–10:30" with U+2060 word joiners around the dash, so the range never breaks.
+    static func unbreakable(_ range: String) -> String {
+        range.replacingOccurrences(of: "–", with: "\u{2060}–\u{2060}")
     }
 
     /// One tag: a status tag replaces the category.
@@ -356,9 +363,11 @@ struct TodayRecordSlot: View {
     }
 }
 
-/// Today's "Your record" card for a free user: a page thumbnail with its top third sharp, the rest
-/// under the lock. "Unlock Pro" opens the paywall about the user's own hours; afterwards it opens
-/// the export.
+/// Today's "Your record" lock for a free user: one ghost row of the record (blurred), the lock line,
+/// what stays free, and the one "Unlock Pro" action, in one grouped container on the page. It was a
+/// 300pt page preview (43% of the viewport at XXL, 81% at AX3: gate C-1.1 D6/D2), so it is now the
+/// standard's row lock (`LockedPreview(.row)`); the paywall it opens shows the record page itself.
+/// At accessibility sizes the ghost row is left out so the lock stays one item's share (§2 D2).
 struct TodayRecordLockCard: View {
     let year: Int
     let confirmedHours: Double
@@ -366,76 +375,53 @@ struct TodayRecordLockCard: View {
     var onUnlocked: () -> Void
     @EnvironmentObject private var viewModel: AppViewModel
     @Environment(\.colorScheme) private var colorScheme
-    @State private var page: RecordPageModel?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
-    private static let pageHeight: CGFloat = 300
-    private static let sharpPage: CGFloat = 104
-
     var body: some View {
-        LockedPreview(
-            size: .card,
-            entry: .todayRecord,
-            line: ProGate.lockLine(.todayRecord, confirmedHours: confirmedHours),
-            keeps: ProGate.keepsLine(.todayRecord),
-            surface: colors.backgroundSecondary,
-            onUnlock: {
-                ProPaywallPresenter.shared.present(entry: .todayRecord, confirmedHours: confirmedHours, onUnlocked: onUnlocked)
-            }
-        ) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 12) {
-                    Image(systemName: "doc.richtext").font(.title3).foregroundStyle(colors.action)
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(String(localized: "today.record.cardTitle", defaultValue: "Your \(String(year)) record", table: "Today"))
-                            .font(.headline).foregroundStyle(colors.textPrimary)
-                        Text(String(localized: "today.record.cardMeta", defaultValue: "PDF and spreadsheet · \(entryCount) entries", table: "Today"))
-                            .font(.subheadline).foregroundStyle(colors.textSecondary)
-                    }
+        LHRowGroup(onPage: true) {
+            LockedPreview(
+                size: .row,
+                entry: .todayRecord,
+                // Today's own short lines (the row lock must stay one item's share at AX3, §2 D2).
+                line: String(localized: "today.record.lockLine",
+                             defaultValue: "Export your \(Int(max(0, confirmedHours).rounded(.down))) hours with Pro.", table: "Today"),
+                // At AX3 the "stays free" line made the lock 37% of the viewport; the paywall it
+                // opens says the same, so the lock keeps one line and the one action there.
+                keeps: dynamicTypeSize.isAccessibilitySize
+                    ? "" : String(localized: "today.record.keeps", defaultValue: "Logging stays free.", table: "Today"),
+                surface: colors.backgroundSecondary,
+                onUnlock: {
+                    ProPaywallPresenter.shared.present(entry: .todayRecord, confirmedHours: confirmedHours, onUnlocked: onUnlocked)
                 }
-                pageView
-                    .frame(height: Self.sharpPage, alignment: .top)
-                    .clipShape(UnevenRoundedRectangle(topLeadingRadius: LHMetrics.innerRadius, topTrailingRadius: LHMetrics.innerRadius, style: .continuous))
+            ) {
+                if !dynamicTypeSize.isAccessibilitySize { ghost }
             }
-            .padding([.horizontal, .top], LHMetrics.cardPadding)
-        } locked: {
-            pageView
-                .offset(y: -Self.sharpPage)
-                .frame(height: Self.pageHeight - Self.sharpPage, alignment: .top)
-                .clipped()
-                .padding(.horizontal, LHMetrics.cardPadding)
-                .padding(.bottom, LHMetrics.cardPadding)
+            .padding(.top, dynamicTypeSize.isAccessibilitySize ? 12 : 0)
         }
-        .background(RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous).fill(colors.backgroundSecondary))
-        .overlay(RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous).strokeBorder(colors.pageCardEdge, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("today.yourRecord")
-        .task { await load() }
+    }
+
+    /// The record as a row: what Pro exports, blurred under the lock.
+    private var ghost: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "doc.richtext").font(.title3).foregroundStyle(colors.action)
+                .frame(width: 36, height: 36)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(String(localized: "today.record.cardTitle", defaultValue: "Your \(String(year)) record", table: "Today"))
+                    .font(.body.weight(.semibold)).foregroundStyle(colors.textPrimary)
+                Text(String(localized: "today.record.cardMeta", defaultValue: "PDF and spreadsheet · \(entryCount) entries", table: "Today"))
+                    .font(.subheadline).foregroundStyle(colors.textSecondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, LHMetrics.cardPadding)
+        .frame(minHeight: LHMetrics.rowMinHeight)
     }
 
     private var entryCount: Int {
         viewModel.timeEntries.filter { Calendar.current.component(.year, from: $0.date) == year }.count
-    }
-
-    @ViewBuilder private var pageView: some View {
-        Group {
-            if let page {
-                RecordPagePreview(model: page)
-            } else {
-                DraftingLoader(sketch: .document, surface: .adaptive, subject: "your record")
-                    .padding(40)
-                    .frame(maxWidth: .infinity)
-            }
-        }
-        .frame(height: Self.pageHeight, alignment: .top)
-        .overlay(RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous).strokeBorder(colors.border, lineWidth: 0.5))
-    }
-
-    private func load() async {
-        guard page == nil else { return }
-        page = await RecordPageModel.load(entries: viewModel.timeEntries, properties: viewModel.properties,
-                                          owner: viewModel.userName, year: year)
     }
 }
