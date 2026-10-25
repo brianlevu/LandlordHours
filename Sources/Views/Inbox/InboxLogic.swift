@@ -11,26 +11,12 @@ enum InboxClock {
 // Everything that decides WHAT the inbox shows lives here, so grouping, ranking, badges and the
 // swipe-to-log rule are tested without views.
 
-enum InboxGroup: String, CaseIterable, Identifiable {
-    case today
-    case thisWeek
-    case earlier
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .today: return "Today"
-        case .thisWeek: return "This week"
-        case .earlier: return "Earlier"
-        }
-    }
-}
-
+/// One day of the Inbox list: a day header (standard §1.15a) over that day's rows.
 struct InboxSection: Identifiable, Equatable {
-    var group: InboxGroup
+    /// The start of the day the work happened.
+    var day: Date
     var items: [Suggestion]
-    var id: String { group.id }
+    var id: Date { day }
 }
 
 enum InboxLogic {
@@ -40,28 +26,23 @@ enum InboxLogic {
         suggestions.filter { $0.isPending && $0.detectedAt <= now }
     }
 
-    /// Today / This week (the 6 days before today) / Earlier, by when the work happened.
-    /// Newest first inside each group; empty groups are left out.
+    /// One section per day, newest day first; inside a day, by start time (§1.15a). Days with
+    /// nothing in them are left out.
     static func sections(_ suggestions: [Suggestion], now: Date, calendar: Calendar = .current) -> [InboxSection] {
-        let startOfToday = calendar.startOfDay(for: now)
-        let startOfWeek = calendar.date(byAdding: .day, value: -6, to: startOfToday) ?? startOfToday
-        var buckets: [InboxGroup: [Suggestion]] = [:]
-        for suggestion in visible(suggestions, now: now) {
-            let group: InboxGroup
-            if suggestion.start >= startOfToday {
-                group = .today
-            } else if suggestion.start >= startOfWeek {
-                group = .thisWeek
-            } else {
-                group = .earlier
-            }
-            buckets[group, default: []].append(suggestion)
-        }
-        return InboxGroup.allCases.compactMap { group in
-            guard let items = buckets[group], !items.isEmpty else { return nil }
-            return InboxSection(group: group, items: items.sorted { $0.start > $1.start })
+        let byDay = Dictionary(grouping: visible(suggestions, now: now)) { calendar.startOfDay(for: $0.start) }
+        return byDay.keys.sorted(by: >).map { day in
+            InboxSection(day: day, items: (byDay[day] ?? []).sorted { $0.start < $1.start })
         }
     }
+
+    /// The rows "Confirm N likely" logs: nothing needs a decision (`canQuickLog`) and the
+    /// classifier is sure (not "Not sure"). §1.3 Batch.
+    static func likely(_ suggestions: [Suggestion], propertyIds: Set<UUID>) -> [Suggestion] {
+        suggestions.filter { canQuickLog($0, propertyIds: propertyIds) && !badges(for: $0).notSure }
+    }
+
+    /// The foot / bar shows from two rows up (§1.3 Batch).
+    static let batchMinimum = 2
 
     /// Backfill order: most confident first; at equal confidence, items that are NOT flagged
     /// "might already be logged" first, then newest.
@@ -120,6 +101,22 @@ struct SuggestionBadges: Equatable {
 // MARK: - Formatting
 
 enum InboxFormat {
+    /// One `DateFormatter` per (pattern, calendar, locale): the list formats a date per row per layout
+    /// pass, and building a formatter each time dominated a scroll.
+    private static let formatters = NSCache<NSString, DateFormatter>()
+
+    private static func formatter(_ pattern: String, calendar: Calendar, locale: Locale) -> DateFormatter {
+        let key = "\(pattern)|\(calendar.identifier)|\(calendar.timeZone.identifier)|\(locale.identifier)" as NSString
+        if let cached = formatters.object(forKey: key) { return cached }
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = locale
+        formatter.dateFormat = pattern
+        formatters.setObject(formatter, forKey: key)
+        return formatter
+    }
+
     /// "2h", "1h 30m", "45m".
     static func hours(_ value: Double) -> String {
         let totalMinutes = Int((value * 60).rounded())
@@ -130,6 +127,48 @@ enum InboxFormat {
         case (_, 0): return "\(h)h"
         default: return "\(h)h \(m)m"
         }
+    }
+
+    /// The day header over a day's rows (§1.15a), the one source: "Today", "Yesterday", weekday and
+    /// date for the days before that in the last week ("Mon Oct 19"), then "Oct 12", and
+    /// "Oct 12, 2025" in another year. The patterns are localizable.
+    static func dayHeader(_ date: Date, now: Date, calendar: Calendar = .current) -> String {
+        let startOfDate = calendar.startOfDay(for: date)
+        let startOfNow = calendar.startOfDay(for: now)
+        let days = calendar.dateComponents([.day], from: startOfDate, to: startOfNow).day ?? 99
+        if days == 0 { return String(localized: "inbox.day.today", defaultValue: "Today", table: "Inbox") }
+        if days == 1 { return String(localized: "inbox.day.yesterday", defaultValue: "Yesterday", table: "Inbox") }
+        let pattern: String
+        if (2...6).contains(days) {
+            pattern = String(localized: "inbox.day.weekPattern", defaultValue: "EEE MMM d", table: "Inbox",
+                             comment: "Date pattern for a day in the last week, e.g. Mon Oct 19")
+        } else if calendar.component(.year, from: date) == calendar.component(.year, from: now) {
+            pattern = String(localized: "inbox.day.datePattern", defaultValue: "MMM d", table: "Inbox",
+                             comment: "Date pattern for an older day this year, e.g. Oct 12")
+        } else {
+            pattern = String(localized: "inbox.day.yearPattern", defaultValue: "MMM d, yyyy", table: "Inbox",
+                             comment: "Date pattern for a day in another year, e.g. Oct 12, 2025")
+        }
+        // A calendar without a real locale (the root locale) formats months as "M10": use the user's.
+        let calendarLocale = calendar.locale
+        let locale = (calendarLocale?.identifier.isEmpty ?? true) ? Locale.current : (calendarLocale ?? .current)
+        return formatter(pattern, calendar: calendar, locale: locale).string(from: date)
+    }
+
+    /// "Plumber at Pine Cabin" (§1.3): the one function for a decision row's title and the confirm
+    /// sheet's.
+    static func rowTitle(_ suggestion: Suggestion, propertyName: String?) -> String {
+        guard let propertyName, !propertyName.isEmpty else { return suggestion.title }
+        return String(localized: "inbox.row.title", defaultValue: "\(suggestion.title) at \(propertyName)", table: "Inbox",
+                      comment: "A suggestion's title at a rental, e.g. Plumber at Pine Cabin")
+    }
+
+    /// The meta line's time range, "12–2" (§1.3: the glyph names the source and the day header the
+    /// date). A receipt has no time, so it says "Receipt". Word joiners keep "9–10:30" on one line.
+    static func rowMeta(_ suggestion: Suggestion, calendar: Calendar = .current) -> String {
+        if suggestion.kind == .receipt { return kindLabel(suggestion.kind) }
+        return timeRange(start: suggestion.start, end: suggestion.end, calendar: calendar)
+            .replacingOccurrences(of: "–", with: "\u{2060}–\u{2060}")
     }
 
     /// "2 hours", "1 hour 30 minutes" for VoiceOver.
@@ -145,10 +184,10 @@ enum InboxFormat {
 
     static func kindLabel(_ kind: Suggestion.Kind) -> String {
         switch kind {
-        case .calendar: return "Calendar"
-        case .receipt: return "Receipt"
-        case .location: return "Location"
-        case .gmail: return "Email"
+        case .calendar: return String(localized: "inbox.kind.calendar", defaultValue: "Calendar", table: "Inbox")
+        case .receipt: return String(localized: "inbox.kind.receipt", defaultValue: "Receipt", table: "Inbox")
+        case .location: return String(localized: "inbox.kind.location", defaultValue: "Location", table: "Inbox")
+        case .gmail: return String(localized: "inbox.kind.email", defaultValue: "Email", table: "Inbox")
         }
     }
 
@@ -168,12 +207,7 @@ enum InboxFormat {
             return "Yesterday"
         }
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: now)).day ?? 99
-        let formatter = DateFormatter()
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
-        formatter.locale = Locale(identifier: "en_US")
-        formatter.dateFormat = (0..<7).contains(days) ? "EEE" : "MMM d"
-        return formatter.string(from: date)
+        return formatter((0..<7).contains(days) ? "EEE" : "MMM d", calendar: calendar, locale: Locale(identifier: "en_US")).string(from: date)
     }
 
     /// "9–11", "5:30–6:30", "11:30–1".
@@ -196,20 +230,10 @@ enum InboxFormat {
 
     /// "TUE, OCT 14" for the sheet eyebrow.
     static func longDay(_ date: Date, calendar: Calendar = .current) -> String {
-        let formatter = DateFormatter()
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
-        formatter.locale = Locale(identifier: "en_US")
-        formatter.dateFormat = "EEE, MMM d"
-        return formatter.string(from: date)
+        return formatter("EEE, MMM d", calendar: calendar, locale: Locale(identifier: "en_US")).string(from: date)
     }
 
     static func clockTime(_ date: Date, calendar: Calendar = .current) -> String {
-        let formatter = DateFormatter()
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
-        formatter.locale = Locale(identifier: "en_US")
-        formatter.dateFormat = "h:mm"
-        return formatter.string(from: date)
+        return formatter("h:mm", calendar: calendar, locale: Locale(identifier: "en_US")).string(from: date)
     }
 }

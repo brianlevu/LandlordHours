@@ -7,8 +7,17 @@ import Foundation
 // properties and a known set of suggestions into the profile's inbox:
 // - inbox:    items in Today / This week / Earlier, incl. "Not sure", "Might already be logged",
 //             a receipt with no hours, and a no-property item;
-// - empty:    an empty inbox with calendar suggestions on;
+// - inbox-long: `inbox` plus more days and long titles, so the list scrolls (the pinned bar);
+// - inbox-one: a single likely item (no "Confirm N likely");
+// - empty:    an empty inbox with calendar suggestions on (`empty-lit`: and hours logged today);
 // - backfill: an empty inbox; the backfill scan (fake) finds 22 items with progress.
+// Frame hooks: `-LHInboxOpenSheet <key>` opens the confirm sheet for the item whose source key ends
+// with <key> (`plumber`, `homedepot`, `call-sam`, `hardware`, `limit-showing`);
+// `-LHInboxOpenSetup` opens the capture setup sheet (with `-LHCaptureSetupOn` both switches start
+// on, with `-LHCaptureSetupPhase denied` it opens on the denied screen);
+// `-LHInboxRunBackfill` starts the look-back (with `-LHHoldBackfillScan` it holds halfway,
+// `-LHInboxCancelBackfill` stops it after 2 s, `-LHFakeScanBlocked` blocks it);
+// `-LHInboxConfirmLikely` taps "Confirm N likely" 1.5 s after launch (the "Logged 3" toast).
 // `-LHFakeCalendar granted|denied` and `-LHFakeNotifications granted|denied` replace the system
 // permission prompts in the capture setup flow. Compiled out of Release.
 @MainActor
@@ -23,6 +32,8 @@ enum InboxDebugSeed {
         guard let index = args.firstIndex(of: flag), args.indices.contains(index + 1) else { return nil }
         return args[index + 1]
     }
+
+    static func has(_ flag: String) -> Bool { ProcessInfo.processInfo.arguments.contains(flag) }
 
     /// `-LHFixedNow 2026-10-16T15:00` pins the inbox clock (local time) for repeatable frames.
     static func pinClockIfRequested() {
@@ -60,6 +71,16 @@ enum InboxDebugSeed {
             CaptureOptIn.markBackfillCompleted(userId: userId)
             let items = inboxItems(app: app, now: InboxClock.now())
             store.ingest(items, existingEntries: app.timeEntries)
+        case "inbox-long":
+            CaptureOptIn.recordChoice(calendar: true, eventPrompts: false, userId: userId)
+            CaptureOptIn.markBackfillCompleted(userId: userId)
+            let now = InboxClock.now()
+            store.ingest(inboxItems(app: app, now: now) + longItems(app: app, now: now), existingEntries: app.timeEntries)
+        case "inbox-one":
+            CaptureOptIn.recordChoice(calendar: true, eventPrompts: false, userId: userId)
+            CaptureOptIn.markBackfillCompleted(userId: userId)
+            let items = inboxItems(app: app, now: InboxClock.now()).filter { ["plumber", "homedepot", "call-sam"].contains($0.sourceKey.replacingOccurrences(of: "cal:debug-", with: "").replacingOccurrences(of: "rcpt:", with: "")) }
+            store.ingest(items, existingEntries: app.timeEntries)
         case "limit", "limit-waiting":
             CaptureOptIn.recordChoice(calendar: true, eventPrompts: false, userId: userId)
             CaptureOptIn.markBackfillCompleted(userId: userId)
@@ -67,9 +88,16 @@ enum InboxDebugSeed {
             store.ingest(items, existingEntries: app.timeEntries)
             if scenario == "limit-waiting" { ProWaitList.shared.add(items[0].sourceKey) }
             else { ProWaitList.shared.remove(items[0].sourceKey) }
-        case "empty":
+        case "empty", "empty-lit":
             CaptureOptIn.recordChoice(calendar: true, eventPrompts: false, userId: userId)
             CaptureOptIn.markBackfillCompleted(userId: userId)
+            // `empty-lit`: hours logged today at the first rental, so the diorama's windows are lit.
+            if scenario == "empty-lit", let pine = app.properties.first?.id,
+               !app.timeEntries.contains(where: { $0.notes == "Lit today" }) {
+                app.timeEntries.append(TimeEntry(propertyId: pine, participant: .selfParticipant, category: .repairs,
+                                                 hours: 2, date: InboxClock.now(), notes: "Lit today"))
+                app.saveData()
+            }
         default:
             break
         }
@@ -153,6 +181,32 @@ enum InboxDebugSeed {
                  property: oak, category: .legal, confidence: 0.91, backfill: true),
             item("hoa", title: "HOA meeting", start: day(20, 18), hours: 2,
                  property: oak, category: .management, confidence: 0.66, backfill: true),
+        ]
+    }
+
+    /// More days and long titles, so the card runs past the first screen.
+    static func longItems(app: AppViewModel, now: Date) -> [Suggestion] {
+        let pine = app.properties.first { $0.name == "Pine Cabin" }?.id ?? app.properties.first?.id
+        let oak = app.properties.first { $0.name == "Oak Street Duplex" }?.id ?? app.properties.last?.id
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        func day(_ offset: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+            let base = calendar.date(byAdding: .day, value: -offset, to: today) ?? today
+            return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: base) ?? base
+        }
+        return [
+            item("lease-call", title: "Tenant call about the lease renewal", start: day(1, 9), hours: 1,
+                 property: oak, category: .management, confidence: 0.88),
+            item("gutters", title: "Gutter cleaning", start: day(1, 14), hours: 2,
+                 property: pine, category: .repairs, confidence: 0.92),
+            item("rent-review", title: "Rent review", start: day(4, 11), hours: 1.5,
+                 property: oak, category: .bookkeeping, confidence: 0.87),
+            item("smoke", title: "Smoke alarm check", start: day(6, 10), hours: 0.5,
+                 property: pine, category: .repairs, confidence: 0.9),
+            item("permit", title: "City permit office", start: day(8, 13), hours: 1,
+                 property: oak, category: .legal, confidence: 0.84),
+            item("paint", title: "Paint touch-up", start: day(9, 9), hours: 3,
+                 property: pine, category: .renovations, confidence: 0.9),
         ]
     }
 

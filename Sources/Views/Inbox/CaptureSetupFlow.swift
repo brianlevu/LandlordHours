@@ -47,6 +47,9 @@ struct CaptureSetupEnvironment {
 /// `.onboarding` is the same choice as a new user's onboarding step. Nothing turns on without a
 /// tap here: calendar suggestions and end-of-event prompts default to off.
 /// Ends by starting the day-1 backfill in the background when calendar access was granted.
+///
+/// Standard components only (plan package D): `LHScreenTitle` (sheet), `LHRowGroup` +
+/// `LHRow.Toggle`, a sample `LHRow.Action`, `LHButton`. No eyebrow, no blueprint switch style.
 struct CaptureSetupFlow: View {
     enum Mode { case onboarding, whatsNew }
     enum Phase: Equatable { case priming, calendarDenied, backfill }
@@ -89,7 +92,14 @@ struct CaptureSetupFlow: View {
                 }
             }
         }
-        .onAppear { if startAtBackfill { phase = .backfill } }
+        .onAppear {
+            if startAtBackfill { phase = .backfill }
+            #if DEBUG
+            if InboxDebugSeed.has("-LHCaptureSetupOn") { findInCalendar = true; askWhenVisitEnds = true }
+            if InboxDebugSeed.value(after: "-LHCaptureSetupPhase") == "denied" { phase = .calendarDenied }
+            #endif
+        }
+        .presentationDragIndicator(.visible)
         .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
         .animation(reduceMotion ? .easeInOut(duration: 0.2) : AppAnimation.smooth, value: phase)
         .background(colors.background.ignoresSafeArea())
@@ -98,153 +108,111 @@ struct CaptureSetupFlow: View {
     // MARK: Priming
 
     private var priming: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    if mode == .whatsNew {
-                        Text("New in 2.0")
-                            .font(AppTypography.drafting)
-                            .tracking(1.3)
-                            .textCase(.uppercase)
-                            .foregroundStyle(colors.draftingInk)
-                            .padding(.bottom, 10)
-                    }
-                    Text(mode == .whatsNew ? "LandlordHours can notice your rental work" : "Let LandlordHours notice your rental work")
-                        .font(.title.weight(.bold))
-                        .foregroundStyle(colors.textPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityAddTraits(.isHeader)
-                        .accessibilityIdentifier("capture.priming.title")
-                    Text("We look for things like a plumber visit or a showing in your calendar, then ask you. Nothing counts until you confirm it.")
+        ScrollView {
+            VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
+                VStack(alignment: .leading, spacing: 4) {
+                    LHScreenTitle(
+                        mode == .whatsNew
+                            ? String(localized: "capture.title.whatsNew", defaultValue: "LandlordHours can notice your rental work", table: "Inbox")
+                            : String(localized: "capture.title.onboarding", defaultValue: "Let LandlordHours notice your rental work", table: "Inbox"),
+                        style: .sheet
+                    )
+                    .accessibilityIdentifier("capture.priming.title")
+                    Text(String(localized: "capture.body", defaultValue: "We look for things like a plumber visit or a showing in your calendar, then ask you. Nothing counts until you confirm it.", table: "Inbox"))
                         .font(.body)
                         .foregroundStyle(colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 10)
-
-                    switches
-                        .padding(.top, 24)
-
-                    preview
-                        .padding(.top, 28)
-
-                    CapturePrivacyFooter()
-                        .padding(.top, 20)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, mode == .whatsNew ? 32 : 16)
-                .padding(.bottom, 16)
-            }
-            .scrollBounceBehavior(.basedOnSize)
 
-            VStack(spacing: 10) {
-                Button {
-                    Task { await continueTapped() }
-                } label: {
-                    if isWorking {
-                        ProgressView().tint(colors.onAction)
-                    } else {
-                        Text("Turn on")
-                    }
-                }
-                .buttonStyle(InboxPrimaryButtonStyle())
-                .disabled(isWorking || !findInCalendar)
-                .accessibilityIdentifier("capture.priming.continue")
-                Button("Not now") { notNow() }
-                    .font(.body)
-                    .foregroundStyle(colors.action)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .disabled(isWorking)
-                    .accessibilityIdentifier("capture.priming.notNow")
+                switches
+
+                preview
+
+                CapturePrivacyFooter()
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
+            .padding(.horizontal, LHMetrics.gutter)
+            .padding(.top, mode == .whatsNew ? 24 : 12)
             .padding(.bottom, 16)
-            .background(
-                colors.background
-                    .overlay(alignment: .top) { Rectangle().fill(colors.border).frame(height: 0.5) }
-                    .ignoresSafeArea(edges: .bottom)
-            )
         }
+        .scrollBounceBehavior(.basedOnSize)
+        .safeAreaInset(edge: .bottom, spacing: 0) { primingFooter }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(mode == .whatsNew ? "capture.whatsNew" : "capture.onboarding")
     }
 
-    private var switches: some View {
-        VStack(spacing: 0) {
-            Toggle(isOn: $findInCalendar.animation(reduceMotion ? nil : AppAnimation.quick)) {
-                switchLabel(
-                    symbol: "calendar",
-                    title: "Find rental work in my calendar",
-                    detail: "Looks back 90 days, then watches new events."
-                )
+    private var primingFooter: some View {
+        VStack(spacing: 4) {
+            Button {
+                Task { await continueTapped() }
+            } label: {
+                if isWorking {
+                    ProgressView().tint(colors.onAction)
+                } else {
+                    Text(String(localized: "capture.turnOn", defaultValue: "Turn on", table: "Inbox"))
+                }
             }
-            .toggleStyle(InboxSwitchStyle())
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .buttonStyle(LHButton.primary)
+            .disabled(isWorking || !findInCalendar)
+            .accessibilityIdentifier("capture.priming.continue")
+            Button(String(localized: "capture.notNow", defaultValue: "Not now", table: "Inbox")) { notNow() }
+                .buttonStyle(LHButton.tertiary)
+                .disabled(isWorking)
+                .accessibilityIdentifier("capture.priming.notNow")
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 8)
+        .background(
+            colors.background
+                .overlay(alignment: .top) { Rectangle().fill(colors.border).frame(height: LHMetrics.hairline) }
+                .ignoresSafeArea(edges: .bottom)
+        )
+    }
+
+    private var switches: some View {
+        LHRowGroup {
+            LHRow.Toggle(
+                String(localized: "capture.toggle.calendar", defaultValue: "Find rental work in my calendar", table: "Inbox"),
+                subtitle: String(localized: "capture.toggle.calendar.detail", defaultValue: "Looks back 90 days, then watches new events.", table: "Inbox"),
+                isOn: $findInCalendar.animation(reduceMotion ? nil : AppAnimation.quick)
+            )
+            .padding(LHRow.insets)
             .accessibilityIdentifier("capture.toggle.calendar")
 
-            Rectangle().fill(colors.border.opacity(0.7)).frame(height: 0.5).padding(.leading, 56)
+            LHDivider(leadingInset: 16)
 
-            Toggle(isOn: $askWhenVisitEnds) {
-                switchLabel(
-                    symbol: "bell.badge",
-                    title: "Ask me when a visit ends",
-                    detail: findInCalendar
-                        ? "One short note after the event so you can log it with a tap. At most two a day, never at night."
-                        : "Needs calendar suggestions."
-                )
-            }
-            .toggleStyle(InboxSwitchStyle())
+            LHRow.Toggle(
+                String(localized: "capture.toggle.prompts", defaultValue: "Ask me when a visit ends", table: "Inbox"),
+                subtitle: findInCalendar
+                    ? String(localized: "capture.toggle.prompts.detail", defaultValue: "One short note after the event so you can log it with a tap. At most two a day, never at night.", table: "Inbox")
+                    : String(localized: "capture.toggle.prompts.off", defaultValue: "Needs calendar suggestions.", table: "Inbox"),
+                isOn: $askWhenVisitEnds
+            )
             .disabled(!findInCalendar)
-            .opacity(findInCalendar ? 1 : 0.55)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(LHRow.insets)
             .accessibilityIdentifier("capture.toggle.eventPrompts")
         }
-        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onChange(of: findInCalendar) { _, on in
             if !on { askWhenVisitEnds = false }
         }
     }
 
-    private func switchLabel(symbol: String, title: String, detail: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: symbol)
-                .font(.system(size: 20))
-                .foregroundStyle(colors.action)
-                .frame(width: 28)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(colors.textPrimary)
-                Text(detail)
-                    .font(.subheadline)
-                    .foregroundStyle(colors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
     /// One suggestion row and one notification, so people see what they are agreeing to.
     private var preview: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("What you’ll see")
-                .font(.footnote.weight(.semibold))
-                .textCase(.uppercase)
-                .tracking(0.3)
-                .foregroundStyle(colors.textSecondary)
-            SuggestionRowView(
-                suggestion: Self.sampleSuggestion,
-                propertyName: "Pine Cabin",
-                badges: SuggestionBadges(notSure: false, mightAlreadyBeLogged: false, needsHours: false),
-                now: Self.sampleNow
-            )
-            .padding(.horizontal, 12)
-            .fixedSize(horizontal: false, vertical: true)
-            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+            LHSectionHeader(String(localized: "capture.preview.title", defaultValue: "What you’ll see", table: "Inbox"))
+            LHRowGroup {
+                SuggestionRowView(
+                    suggestion: Self.sampleSuggestion,
+                    propertyName: Self.samplePropertyName,
+                    badges: SuggestionBadges(notSure: false, mightAlreadyBeLogged: false, needsHours: false),
+                    quick: true,
+                    now: Self.sampleNow
+                )
+                .allowsHitTesting(false)
+            }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Example suggestion: 2 hours, Plumber at Pine Cabin, from your calendar")
+            .accessibilityLabel(String(localized: "capture.preview.a11y", defaultValue: "Example suggestion: 2 hours, Plumber at Pine Cabin, from your calendar", table: "Inbox"))
 
             if askWhenVisitEnds {
                 notificationPreview
@@ -254,32 +222,34 @@ struct CaptureSetupFlow: View {
     }
 
     private var notificationPreview: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 12) {
             LHCompactLogo(size: 22)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Plumber visit just ended")
+                Text(String(localized: "capture.notification.title", defaultValue: "Plumber visit just ended", table: "Inbox"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
-                Text("Log 2h at Pine Cabin?")
+                Text(String(localized: "capture.notification.body", defaultValue: "Log 2h at Pine Cabin?", table: "Inbox"))
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
             }
             Spacer(minLength: 0)
-            Text("now")
+            Text(String(localized: "capture.notification.now", defaultValue: "now", table: "Inbox"))
                 .font(.footnote)
                 .foregroundStyle(colors.textSecondary)
         }
-        .padding(14)
+        .padding(LHMetrics.cardPadding)
         .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
                 .fill(colors.backgroundSecondary)
                 .shadow(color: .black.opacity(colorScheme == .dark ? 0.35 : 0.08), radius: 12, y: 4)
         )
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Example notification: Plumber visit just ended. Log 2 hours at Pine Cabin?")
+        .accessibilityLabel(String(localized: "capture.notification.a11y", defaultValue: "Example notification: Plumber visit just ended. Log 2 hours at Pine Cabin?", table: "Inbox"))
         .accessibilityIdentifier("capture.notificationPreview")
     }
+
+    static let samplePropertyName = "Pine Cabin"
 
     static let sampleNow: Date = {
         var c = DateComponents()
@@ -344,28 +314,32 @@ struct CaptureSetupFlow: View {
     // MARK: Denied
 
     private var calendarDenied: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Calendar access is off")
-                .font(.title.weight(.bold))
-                .foregroundStyle(colors.textPrimary)
-            Text("To find rental work, LandlordHours needs Full Access to your calendar. You can turn it on in Settings any time. Logging by hand works either way.")
-                .font(.body)
-                .foregroundStyle(colors.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer()
-            Button("Open Settings") {
-                if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                LHScreenTitle(String(localized: "capture.denied.title", defaultValue: "Calendar access is off", table: "Inbox"), style: .sheet)
+                Text(String(localized: "capture.denied.body", defaultValue: "To find rental work, LandlordHours needs Full Access to your calendar. You can turn it on in Settings any time. Logging by hand works either way.", table: "Inbox"))
+                    .font(.body)
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .buttonStyle(InboxPrimaryButtonStyle())
-            Button("Continue without it") { onFinish(false) }
-                .font(.body)
-                .foregroundStyle(colors.action)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .accessibilityIdentifier("capture.denied.continue")
+            .padding(.horizontal, LHMetrics.gutter)
+            .padding(.top, 24)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 32)
-        .padding(.bottom, 8)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 4) {
+                Button(String(localized: "capture.denied.settings", defaultValue: "Open Settings", table: "Inbox")) {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                }
+                .buttonStyle(LHButton.primary)
+                .accessibilityIdentifier("capture.denied.settings")
+                Button(String(localized: "capture.denied.continue", defaultValue: "Continue without it", table: "Inbox")) { onFinish(false) }
+                    .buttonStyle(LHButton.tertiary)
+                    .accessibilityIdentifier("capture.denied.continue")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("capture.denied")
     }

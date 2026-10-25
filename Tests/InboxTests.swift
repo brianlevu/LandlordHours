@@ -21,31 +21,68 @@ final class InboxLogicTests: CaptureTestCase {
                    confidence: confidence, isBackfill: backfill, mightAlreadyBeLogged: flagged)
     }
 
-    func testGroupsTodayThisWeekEarlierNewestFirst() {
+    func testOneSectionPerDayNewestDayFirstAndStartTimeWithinADay() {
         let items = [
             s("old", start: date(2026, 9, 1, 9)),
+            s("today-pm", start: date(2026, 10, 16, 12)),
             s("today-am", start: date(2026, 10, 16, 9)),
-            s("today-noon", start: date(2026, 10, 16, 12)),
             s("tue", start: date(2026, 10, 14, 9)),
-            s("edge-week", start: date(2026, 10, 10, 9)),   // 6 days before today: this week
-            s("edge-earlier", start: date(2026, 10, 9, 23)), // 7 days: earlier
+            s("edge-week", start: date(2026, 10, 10, 9)),
+            s("edge-earlier", start: date(2026, 10, 9, 23)),
         ]
         let sections = InboxLogic.sections(items, now: now, calendar: calendar)
-        XCTAssertEqual(sections.map(\.group), [.today, .thisWeek, .earlier])
-        XCTAssertEqual(sections[0].items.map(\.title), ["today-noon", "today-am"])
-        XCTAssertEqual(sections[1].items.map(\.title), ["tue", "edge-week"])
-        XCTAssertEqual(sections[2].items.map(\.title), ["edge-earlier", "old"])
+        XCTAssertEqual(sections.map(\.day), [date(2026, 10, 16), date(2026, 10, 14), date(2026, 10, 10), date(2026, 10, 9), date(2026, 9, 1)]
+            .map { calendar.startOfDay(for: $0) })
+        XCTAssertEqual(sections[0].items.map(\.title), ["today-am", "today-pm"], "By start time inside a day")
+        XCTAssertEqual(sections.flatMap(\.items).count, 6)
     }
 
-    func testEmptyGroupsDroppedAndUpcomingAndResolvedHidden() {
+    func testEmptyDaysDroppedAndUpcomingAndResolvedHidden() {
         var confirmed = s("done", start: date(2026, 10, 15, 9))
         confirmed.state = .confirmed(entryId: UUID())
         var dismissed = s("no", start: date(2026, 10, 15, 9))
         dismissed.state = .dismissed(reason: .notLandlordWork)
         let upcoming = s("later", start: date(2026, 10, 16, 18), detectedAt: date(2026, 10, 16, 19))
         let sections = InboxLogic.sections([confirmed, dismissed, upcoming, s("x", start: date(2026, 10, 15, 9))], now: now, calendar: calendar)
-        XCTAssertEqual(sections.map(\.group), [.thisWeek])
+        XCTAssertEqual(sections.count, 1)
         XCTAssertEqual(sections[0].items.map(\.title), ["x"])
+    }
+
+    func testDayHeadersFollowTheStandard() {
+        func header(_ day: Date) -> String { InboxFormat.dayHeader(day, now: now, calendar: calendar) }
+        XCTAssertEqual(header(date(2026, 10, 16, 9)), "Today")
+        XCTAssertEqual(header(date(2026, 10, 15, 23)), "Yesterday")
+        XCTAssertEqual(header(date(2026, 10, 14, 9)), "Wed Oct 14")
+        XCTAssertEqual(header(date(2026, 10, 10, 9)), "Sat Oct 10", "Six days back is still weekday and date")
+        XCTAssertEqual(header(date(2026, 10, 9, 9)), "Oct 9", "Seven days back drops the weekday")
+        XCTAssertEqual(header(date(2026, 9, 1, 9)), "Sep 1")
+        XCTAssertEqual(header(date(2025, 10, 12, 9)), "Oct 12, 2025", "Another year says the year")
+    }
+
+    func testRowTitleNamesTheRental() {
+        let plumber = s("Plumber", start: now)
+        XCTAssertEqual(InboxFormat.rowTitle(plumber, propertyName: "Pine Cabin"), "Plumber at Pine Cabin")
+        XCTAssertEqual(InboxFormat.rowTitle(plumber, propertyName: nil), "Plumber")
+        XCTAssertEqual(InboxFormat.rowTitle(plumber, propertyName: ""), "Plumber")
+    }
+
+    func testRowMetaIsTheTimeRangeWithoutADate() {
+        let call = s("call", start: date(2026, 10, 14, 9), hours: 1.5)
+        XCTAssertEqual(InboxFormat.rowMeta(call, calendar: calendar), "9\u{2060}–\u{2060}10:30")
+        let receipt = Suggestion(sourceKey: "rcpt:1", kind: .receipt, detectedAt: now, start: now, title: "Depot", hoursBasis: .none)
+        XCTAssertEqual(InboxFormat.rowMeta(receipt, calendar: calendar), "Receipt")
+    }
+
+    func testLikelyIsSureAndCompleteAndNotFlagged() {
+        let property = UUID()
+        let ids: Set<UUID> = [property]
+        let sure = s("sure", start: now, property: property)
+        let notSure = s("unsure", start: now, confidence: 0.35, property: property)
+        let flagged = s("flagged", start: now, flagged: true, property: property)
+        let noHours = s("none", start: now, hours: nil, basis: .none, property: property)
+        let noProperty = s("noprop", start: now, property: nil)
+        XCTAssertEqual(InboxLogic.likely([sure, notSure, flagged, noHours, noProperty], propertyIds: ids).map(\.title), ["sure"],
+                       "Not sure needs the user's call, so the batch skips it")
     }
 
     func testRankingByConfidenceThenNotFlaggedThenNewest() {
@@ -300,6 +337,27 @@ final class InboxViewModelTests: CaptureTestCase {
         model.mute(a, rule: rule)
         XCTAssertEqual(store.pending.map(\.sourceKey), [other.sourceKey])
         XCTAssertTrue(store.isDismissed(a.sourceKey))
+    }
+
+    func testConfirmLikelyLogsTheSureOnesWithOneToastAndOneUndo() {
+        seed([item("a", daysAgo: 1), item("b", daysAgo: 2), item("c", daysAgo: 3, hours: nil)])
+        let model = model()
+        XCTAssertEqual(model.likelyToConfirm.count, 2, "The one without hours needs the sheet")
+        let before = app.timeEntries.count
+        XCTAssertEqual(model.confirmLikely(), 2)
+        XCTAssertEqual(app.timeEntries.count, before + 2)
+        XCTAssertEqual(model.toast?.message, "Logged 2")
+        XCTAssertEqual(model.visible.count, 1, "The row that needs a decision stays")
+        model.undo()
+        XCTAssertEqual(app.timeEntries.count, before, "One Undo reverses the whole batch")
+        XCTAssertEqual(model.visible.count, 3)
+    }
+
+    func testConfirmLikelyWithNothingLikelySavesNothing() {
+        seed([item("a", daysAgo: 1, hours: nil)])
+        let model = model()
+        XCTAssertEqual(model.confirmLikely(), 0)
+        XCTAssertNil(model.toast)
     }
 
     func testSpousePickerOnlyWhenSpouseIsTracked() {

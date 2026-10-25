@@ -43,6 +43,13 @@ final class InboxUITests: XCTestCase {
 
     private var undo: XCUIElement { app.buttons["inbox.undo"] }
 
+    /// The hours stepper is one adjustable element (`LHStepper`): its minus and plus sit at its ends.
+    private func tapStepper(plus: Bool) {
+        let stepper = app.descendants(matching: .any)["confirm.hours.value"]
+        XCTAssertTrue(stepper.waitForExistence(timeout: 5))
+        stepper.coordinate(withNormalizedOffset: CGVector(dx: plus ? 0.93 : 0.07, dy: 0.5)).tap()
+    }
+
     /// Waits for an element, then for the launch bridge and seed reload to settle, so the next
     /// tap or swipe is not swallowed by a transition.
     @discardableResult
@@ -71,7 +78,10 @@ final class InboxUITests: XCTestCase {
     /// On screen and not under the floating tab bar (XCUI calls covered rows "hittable").
     private func isClearOfTabBar(_ element: XCUIElement) -> Bool {
         guard element.exists, element.isHittable else { return false }
-        let barTop = app.buttons["tab.inbox"].frame.minY
+        // The native tab bar shrinks away while the list scrolls down (§1.25), taking its buttons out of
+        // the tree: then the bar's top is the screen's bottom edge less the bar's height.
+        let bar = app.buttons["tab.inbox"]
+        let barTop = bar.exists ? bar.frame.minY : app.frame.maxY - 90
         return element.frame.maxY < barTop - 8 && element.frame.minY > 90
     }
 
@@ -82,14 +92,22 @@ final class InboxUITests: XCTestCase {
         from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .fast, thenHoldForDuration: 0)
     }
 
-    private func waitForBadge(_ value: String, timeout: TimeInterval = 6) -> Bool {
+    /// The Inbox tab's badge as a number. The native tab bar speaks it as "8 items" (the system's
+    /// wording), so the tests compare the count, not the words.
+    private var badgeNumber: Int? {
         let tab = app.buttons["tab.inbox"]
+        guard tab.exists, let text = tab.value as? String else { return nil }
+        return Int(text.split(separator: " ").first ?? "")
+    }
+
+    private func waitForBadge(_ value: String, timeout: TimeInterval = 6) -> Bool {
+        let wanted = Int(value.split(separator: " ").first ?? "")
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if (tab.value as? String) == value { return true }
+            if badgeNumber == wanted { return true }
             Thread.sleep(forTimeInterval: 0.25)
         }
-        return (tab.value as? String) == value
+        return badgeNumber == wanted
     }
 
     /// Both opt-in switches start off; turning calendar on is the explicit choice.
@@ -128,18 +146,21 @@ final class InboxUITests: XCTestCase {
     func testInboxGroupsBadgesAndTabCount() {
         launch("inbox")
         XCTAssertTrue(settle(row("showing")))
-        XCTAssertTrue(app.staticTexts["Today"].exists || app.staticTexts["TODAY"].exists)
-        XCTAssertTrue(app.staticTexts["This week"].exists || app.staticTexts["THIS WEEK"].exists)
+        XCTAssertTrue(waitForBadge("8 to confirm", timeout: 12))
+        // One header per day (standard §1.15a), newest first.
+        XCTAssertTrue(app.staticTexts["Today"].exists)
+        XCTAssertTrue(app.staticTexts["Wed Oct 14"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["inbox.backfillBanner"].exists)
         // Rows carry Confirm / Not work, so they are taller: scroll to each one.
         XCTAssertTrue(scrollTo(row("call-sam")))
         XCTAssertTrue(row("call-sam").label.contains("Not sure"), row("call-sam").label)
-        XCTAssertEqual(app.buttons["tab.inbox"].value as? String, "8 to confirm")
         XCTAssertTrue(scrollTo(row("hardware")))
         XCTAssertTrue(row("hardware").label.contains("Might already be logged"), row("hardware").label)
         XCTAssertTrue(scrollTo(row("inspection")))
-        XCTAssertTrue(app.staticTexts["Earlier"].waitForExistence(timeout: 3) || app.staticTexts["EARLIER"].exists)
-        XCTAssertEqual(app.buttons["tab.inbox"].value as? String, "8 to confirm")
+        XCTAssertTrue(app.staticTexts["Oct 4"].waitForExistence(timeout: 3), "Older days drop the weekday")
+        // Scrolling down tucks the native tab bar away (§1.25); back at the top it returns.
+        for _ in 0..<5 { app.swipeDown() }
+        XCTAssertTrue(waitForBadge("8 to confirm"))
     }
 
     func testSwipeLogThenUndoThenCommit() {
@@ -192,7 +213,7 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(app.buttons["confirm.log"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["confirm.who"].exists, "Spouse is tracked in this seed")
         app.descendants(matching: .any)["confirm.who"].buttons["Spouse"].tap()
-        app.buttons["confirm.hours.plus"].tap()
+        tapStepper(plus: true)
         XCTAssertTrue(app.buttons["confirm.log"].label.hasPrefix("Log"))
         app.buttons["confirm.log"].tap()
         XCTAssertTrue(undo.waitForExistence(timeout: 5))
@@ -208,8 +229,8 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(log.waitForExistence(timeout: 5))
         XCTAssertFalse(log.isEnabled, "Hours are required when there are none to propose")
         XCTAssertTrue(app.staticTexts["confirm.missing"].exists)
-        app.buttons["confirm.hours.plus"].tap()
-        app.buttons["confirm.hours.plus"].tap()
+        tapStepper(plus: true)
+        tapStepper(plus: true)
         XCTAssertTrue(log.isEnabled)
         XCTAssertEqual(log.label, "Log 30m")
     }
@@ -353,7 +374,10 @@ final class InboxUITests: XCTestCase {
         // Leave: Today is fully usable while the scan runs.
         app.buttons["tab.today"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["today.hero"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.descendants(matching: .any)["today.lookingBack"].waitForExistence(timeout: 5),
+        // Package C's Today shows the scan row until items stream in, then the items themselves.
+        let scanning = app.descendants(matching: .any)["today.lookingBack"]
+        let streamed = app.descendants(matching: .any)["today.confirm"]
+        XCTAssertTrue(scanning.waitForExistence(timeout: 5) || streamed.waitForExistence(timeout: 5),
                       "Today says the look-back is running, not \"Log your first hour\"")
         app.buttons["tab.logTime"].tap()
         let close = app.buttons["log.close"]

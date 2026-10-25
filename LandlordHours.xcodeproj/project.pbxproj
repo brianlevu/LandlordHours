@@ -22,6 +22,7 @@
 		0D41B7310365067EB90C2D1D /* AppDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71D542D8D3135A25F2D304F8 /* AppDestination.swift */; };
 		0F352493E9D7EEA53D9D38FC /* RecordsLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 401D542F4CD2262A89C17B07 /* RecordsLogic.swift */; };
 		0FCAFAA435C8D031405C2C69 /* CaptureNotificationRefresher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56416E7776DD2506FD147689 /* CaptureNotificationRefresher.swift */; };
+		0FCBF8F9F40CBB00DE9FF60A /* Inbox.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 62177BDC1EB74EBC85C64513 /* Inbox.xcstrings */; };
 		100B88263DFBFE6A54119AA0 /* HouseNumberBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC89C6AA748F34B691BABDE4 /* HouseNumberBlock.swift */; };
 		1271C43405BD7788AF2A11A9 /* LockedPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2487D044B1E2C51F52E4363B /* LockedPreview.swift */; };
 		12BA2B1FF6DA34B9708EABF4 /* ExportPDFView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37718C6C352F5146B1B19AAA /* ExportPDFView.swift */; };
@@ -398,6 +399,7 @@
 		612AD15E9D33825E7BD9C05B /* TodayHouse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayHouse.swift; sourceTree = "<group>"; };
 		61925A55B4CDBDF1584A392E /* LandlordHours.storekit */ = {isa = PBXFileReference; path = LandlordHours.storekit; sourceTree = "<group>"; };
 		61F1A37F861D056973D6EC70 /* TimeEntryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeEntryDetailView.swift; sourceTree = "<group>"; };
+		62177BDC1EB74EBC85C64513 /* Inbox.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Inbox.xcstrings; sourceTree = "<group>"; };
 		6252BC3F79F79B6164763816 /* ProMomentsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProMomentsTests.swift; sourceTree = "<group>"; };
 		652D1B354C44F0935B0F2E4F /* ModelAvailability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelAvailability.swift; sourceTree = "<group>"; };
 		65CD50959762385E221A6599 /* PropertyAliasUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyAliasUITests.swift; sourceTree = "<group>"; };
@@ -640,6 +642,7 @@
 			children = (
 				FBB2664D1A41FBACDD44EC57 /* ConversionPath.xcstrings */,
 				06883004BB1E57213877840B /* Foundations.xcstrings */,
+				62177BDC1EB74EBC85C64513 /* Inbox.xcstrings */,
 				FB2D8BC7BF72372AC3FCB6CB /* Shared.xcstrings */,
 				4DD8A9101BBFD3FB3025E7D0 /* Today.xcstrings */,
 			);
@@ -1234,6 +1237,7 @@
 				403575A80417CEE2F57E6CC7 /* Foundations.xcstrings in Resources */,
 				C19E20B4BBD0B73D9CFB97DB /* Fraunces-OFL.txt in Resources */,
 				511575339D5FAE17292F68C7 /* Fraunces.ttf in Resources */,
+				0FCBF8F9F40CBB00DE9FF60A /* Inbox.xcstrings in Resources */,
 				38B5E98FF26323E43143DBF3 /* LaunchScreen.storyboard in Resources */,
 				3C9A055713D8A40AAFFB526A /* Learn.xcstrings in Resources */,
 				874E4639B3AFACC6422540B5 /* LearnArticles.json in Resources */,
