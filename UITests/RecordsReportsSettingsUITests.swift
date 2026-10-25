@@ -166,18 +166,17 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         }
     }
 
-    /// Follow-up frames: Settings with Dark chosen ("Saved: dark mode") and Reports' branded switcher.
+    /// Follow-up frames: Settings with Dark chosen and Reports' branded switcher.
     func testCaptureFollowUpFrames() {
         for scheme in ["light", "dark"] {
             launch(tab: 4, scheme: scheme)
-            let dark = app.buttons["Dark appearance"]
-            XCTAssertTrue(scrollTo(dark), "Dark appearance pill")
+            let dark = app.buttons["Dark"]
+            XCTAssertTrue(scrollTo(dark), "Dark appearance segment")
             dark.tap()
-            let saved = app.staticTexts["Saved: dark mode"]
-            XCTAssertTrue(saved.waitForExistence(timeout: 5))
+            XCTAssertTrue(dark.isSelected)
             settleAndCapture("settings-appearance-dark-selected-\(scheme)")
             // Restore so the choice does not leak into later runs.
-            let auto = app.buttons["Auto appearance"]
+            let auto = app.buttons["Auto"]
             if auto.exists { auto.tap() }
 
             launch(tab: 4, scheme: scheme)
@@ -270,7 +269,7 @@ final class RecordsReportsSettingsUITests: XCTestCase {
 
         launch(tab: 4, scheme: scheme)
         tapWhenReady(element("settings.taxProfile"))
-        XCTAssertTrue(app.staticTexts["Tax profile"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Filing and goal"].waitForExistence(timeout: 5))
         settleAndCapture("settings-tax-profile-\(scheme)")
         app.swipeUp()
         settleAndCapture("settings-tax-profile-\(scheme)-scrolled")
@@ -297,7 +296,7 @@ final class RecordsReportsSettingsUITests: XCTestCase {
 
         launch(tab: 4, scheme: scheme)
         tapWhenReady(element("settings.profile"))
-        XCTAssertTrue(app.navigationBars["Profile"].waitForExistence(timeout: 5))
+        XCTAssertTrue(element("profile.save").waitForExistence(timeout: 5))
         settleAndCapture("settings-profile-edit-\(scheme)")
 
         // Profiles / restore (needs an earlier profile on the device).

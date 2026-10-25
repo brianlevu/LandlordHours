@@ -1,5 +1,4 @@
 import SwiftUI
-import LucideIcons
 import LinkPresentation
 import UniformTypeIdentifiers
 
@@ -28,7 +27,7 @@ final class ExportJob: ObservableObject {
     /// The ready banner was closed or used.
     @Published private(set) var bannerDismissed = false
 
-    static let failureMessage = "Could not create the report. Please try again."
+    static var failureMessage: String { HS.t("export.failure", "Couldn’t create the record. Try again.") }
 
     private let writer: Writer
     private var runID = UUID()
@@ -180,11 +179,12 @@ final class ExportJob: ObservableObject {
     }
 }
 
-/// "Your report is ready · Share". Floats above the tab bar; tap to open the share sheet. The
-/// failed variant says the report couldn't be made and to try again from Export.
+/// "Your record is ready · Share". Floats above the tab bar; tap to open the share sheet. The
+/// failed variant says the record couldn't be made and to try again from Export. Standard v2: SF
+/// symbols, `LHButton.icon` for the close, strings from the package catalog.
 struct ExportReadyBanner: View {
     /// The one subtitle for a ready report, on screen and for VoiceOver.
-    static let readySubtitle = "PDF and spreadsheet"
+    static var readySubtitle: String { HS.t("export.banner.subtitle", "PDF and spreadsheet") }
     var kind: ExportJob.Banner = .ready
     var onOpen: () -> Void
     var onDismiss: () -> Void
@@ -195,6 +195,10 @@ struct ExportReadyBanner: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var collapsed = false
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    private var readyLine: String { HS.t("export.banner.ready", "Your record is ready") }
+    private var failedLine: String { HS.t("export.banner.failed", "Couldn’t create your record") }
+    private var shareLine: String { HS.t("export.banner.share", "Share") }
 
     var body: some View {
         Group {
@@ -207,55 +211,54 @@ struct ExportReadyBanner: View {
             }
         }
         .onAppear {
-            UIAccessibility.post(notification: .announcement,
-                                 argument: kind == .ready ? "Your report is ready" : "Couldn’t create your report")
+            UIAccessibility.post(notification: .announcement, argument: kind == .ready ? readyLine : failedLine)
             guard kind == .ready else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + collapseAfter) {
-                if reduceMotion { collapsed = true } else { withAnimation(.easeOut(duration: 0.24)) { collapsed = true } }
+                if reduceMotion { collapsed = true } else { withAnimation(AppAnimation.smooth) { collapsed = true } }
             }
         }
     }
 
-    /// "Report ready · Share", a compact centred pill.
+    private var closeButton: some View {
+        Button(action: onDismiss) { Image(systemName: "xmark") }
+            .buttonStyle(LHButton.icon)
+            .accessibilityLabel(HS.t("common.close", "Close"))
+            .accessibilityIdentifier("export.readyBanner.close")
+    }
+
+    /// "Record ready · Share", a compact centred pill.
     private var pill: some View {
         HStack(spacing: 4) {
             Button(action: onOpen) {
                 HStack(spacing: 8) {
-                    LucideIcon(image: Lucide.fileCheck, size: 15)
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.subheadline)
                         .foregroundStyle(colors.positive)
-                    Text("Report ready")
+                    Text(HS.t("export.banner.pill", "Record ready"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(colors.textPrimary)
-                    Text("Share")
+                    Text(shareLine)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(colors.action)
                 }
                 .padding(.leading, 14)
-                .frame(minHeight: 44)
+                .frame(minHeight: LHMetrics.minTap)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.lhPressable)
+            .buttonStyle(LHButton.press)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Your report is ready. \(Self.readySubtitle). Share")
+            .accessibilityLabel(HS.f("export.banner.a11y", "%@. %@. %@", readyLine, Self.readySubtitle, shareLine))
             .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier("export.readyBanner")
 
-            Button(action: onDismiss) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(colors.textSecondary)
-                    .frame(width: 40, height: 44)
-            }
-            .buttonStyle(.lhPressable)
-            .accessibilityLabel("Close")
-            .accessibilityIdentifier("export.readyBanner.close")
+            closeButton
         }
         .background(
             Capsule()
                 .fill(colors.backgroundSecondary)
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.10), radius: 10, y: 3)
+                .shadow(color: .black.opacity(LHToastMetrics.shadowOpacity(colorScheme)), radius: 10, y: 3)
         )
-        .overlay(Capsule().strokeBorder(colors.border.opacity(0.6), lineWidth: 1))
+        .overlay(Capsule().strokeBorder(colors.border, lineWidth: LHMetrics.hairline))
         .frame(maxWidth: .infinity)
     }
 
@@ -264,12 +267,9 @@ struct ExportReadyBanner: View {
             if kind == .ready {
                 Button(action: onOpen) {
                     HStack(spacing: 12) {
-                        LucideIcon(image: Lucide.fileCheck, size: 18)
-                            .foregroundStyle(colors.positive)
-                            .frame(width: 36, height: 36)
-                            .background(Circle().fill(colors.positiveSurface))
+                        LHRowGlyph(systemImage: "doc.badge.checkmark", tint: .positive)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text("Your report is ready")
+                            Text(readyLine)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(colors.textPrimary)
                             Text(Self.readySubtitle)
@@ -277,29 +277,25 @@ struct ExportReadyBanner: View {
                                 .foregroundStyle(colors.textSecondary)
                         }
                         Spacer(minLength: 8)
-                        Text("Share")
+                        Text(shareLine)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(colors.action)
                     }
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.lhPressable)
+                .buttonStyle(LHButton.press)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Your report is ready. \(Self.readySubtitle). Share")
+                .accessibilityLabel(HS.f("export.banner.a11y", "%@. %@. %@", readyLine, Self.readySubtitle, shareLine))
                 .accessibilityAddTraits(.isButton)
                 .accessibilityIdentifier("export.readyBanner")
             } else {
                 HStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(colors.caution)
-                        .frame(width: 36, height: 36)
-                        .background(Circle().fill(colors.cautionSurface))
+                    LHRowGlyph(systemImage: "exclamationmark.triangle.fill", tint: .caution)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Couldn’t create your report")
+                        Text(failedLine)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(colors.textPrimary)
-                        Text("Try again from Export.")
+                        Text(HS.t("export.banner.retry", "Try again from Export."))
                             .font(.footnote)
                             .foregroundStyle(colors.textSecondary)
                     }
@@ -309,25 +305,18 @@ struct ExportReadyBanner: View {
                 .accessibilityIdentifier("export.failedBanner")
             }
 
-            Button(action: onDismiss) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(colors.textSecondary)
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(.lhPressable)
-            .accessibilityLabel("Close")
-            .accessibilityIdentifier("export.readyBanner.close")
+            closeButton
         }
         .padding(.leading, 12)
-        .padding(.trailing, 2)
+        .padding(.trailing, 4)
         .frame(minHeight: 60)
         .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: LHToastMetrics.radius, style: .continuous)
                 .fill(colors.backgroundSecondary)
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.4 : 0.12), radius: 16, y: 4)
+                .shadow(color: .black.opacity(LHToastMetrics.shadowOpacity(colorScheme)), radius: 16, y: 4)
         )
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(colors.border.opacity(0.6), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: LHToastMetrics.radius, style: .continuous)
+            .strokeBorder(colors.border, lineWidth: LHMetrics.hairline))
     }
 }
 

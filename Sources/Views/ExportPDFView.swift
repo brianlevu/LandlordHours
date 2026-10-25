@@ -1,13 +1,16 @@
 import SwiftUI
 import PDFKit
 
-/// Export: the real first page of the PDF on top (Crouton), the year, what's inside, then one
-/// action. docs/design/2.0-hifi-reference-spec.md §h.
+/// Export: the real first page of the record on top, the year, what's inside, then one pinned
+/// action. Standard v2 (package H): an `LHSheet` (title, `.icon` close, `.primary` pinned), year
+/// choice on `LHChip`, the summary in one grouped container, and for a free user the one shared
+/// `LockedPreview` whose unlock opens the paywall about the export.
 struct ExportPDFView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var year: Int
@@ -24,6 +27,7 @@ struct ExportPDFView: View {
     private var reportIsStale: Bool { job.isStale(year: year, fingerprint: fingerprint) }
     private var exportError: String? { job.failureMessage(for: year) }
     private var isGenerating: Bool { job.isGenerating }
+    private var isLocked: Bool { ProGate.isExportLocked(isPro: subscriptionManager.isPro) }
     private var gate: ExportGate {
         ExportGate.resolve(
             hasEntries: canExport,
@@ -48,64 +52,56 @@ struct ExportPDFView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                LockedPreview(
-                    size: .page,
-                    entry: .exportPage,
-                    line: ProGate.lockLine(.exportPage),
-                    keeps: ProGate.keepsLine(.exportPage),
-                    unlocked: !ProGate.isExportLocked(isPro: subscriptionManager.isPro),
-                    stamp: "PREVIEW",
-                    onUnlock: openPaywall
-                ) {
-                    VStack(alignment: .leading, spacing: 24) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Export report")
-                                .lhDisplayFont(.largeTitle)
-                                .foregroundStyle(colors.textPrimary)
-                                .accessibilityAddTraits(.isHeader)
-                            Text("A PDF for your accountant and a CSV spreadsheet of every entry.")
-                                .font(.subheadline)
-                                .foregroundStyle(colors.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+        LHSheet(
+            HS.t("export.title", "Export the record"),
+            subtitle: HS.t("export.subtitle", "A PDF for your CPA and a CSV of every record."),
+            onClose: { dismiss() }
+        ) {
+            LockedPreview(
+                size: .page,
+                entry: .exportPage,
+                line: ProGate.lockLine(.exportPage),
+                keeps: ProGate.keepsLine(.exportPage),
+                unlocked: !isLocked,
+                stamp: HS.t("export.stamp", "PREVIEW"),
+                onUnlock: openPaywall
+            ) {
+                VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
+                    yearChips
 
-                        yearChips
+                    // Free: the summary stays sharp; the page itself is what Pro unlocks,
+                    // so it sits under the lock (sandbox lock-export).
+                    if isLocked { summary }
+                }
+                .padding(.bottom, LHMetrics.sectionGap)
+            } locked: {
+                VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
+                    pagePreview
 
-                        // Free: the summary stays sharp; the page itself is what Pro unlocks,
-                        // so it sits under the lock (sandbox lock-export).
-                        if ProGate.isExportLocked(isPro: subscriptionManager.isPro) { summary }
-                    }
-                    .padding(.bottom, 24)
-                } locked: {
-                    VStack(alignment: .leading, spacing: 24) {
-                        pagePreview
+                    if !isLocked { summary }
 
-                        if !ProGate.isExportLocked(isPro: subscriptionManager.isPro) { summary }
+                    status
 
-                        actions
+                    // At accessibility sizes the buttons are too tall to pin: they end the content.
+                    if !isLocked && typeSize.isAccessibilitySize {
+                        VStack(spacing: 8) { actions }
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 32)
             }
-            .scrollIndicators(.hidden)
-            // Content scrolling up never shows through under the Close chip.
-            .modifier(HardTopScrollEdge())
-            .toolbarBackground(colors.background, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .background(colors.background.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                        .foregroundStyle(colors.action)
-                        .accessibilityIdentifier("export.close")
-                }
+            .padding(.top, 8)
+        }
+        // Pinned `.primary` on its own surface so scrolled content never reads through it (§1.20).
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !isLocked && !typeSize.isAccessibilitySize {
+                VStack(spacing: 4) { actions }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 16)
+                    .frame(maxWidth: .infinity)
+                    .background(colors.backgroundSecondary)
             }
         }
+        .lhSheetPresentation(.focused)
         .hidesAppTabBar()
         .proPaywall($paywall)
         .task(id: year) { await renderPreview() }
@@ -124,33 +120,28 @@ struct ExportPDFView: View {
     // MARK: Year
 
     private var yearChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(yearChoices, id: \.self) { choice in
-                    Button {
-                        year = choice
-                    } label: {
-                        BPFilterChip(title: yearLabel(choice), isActive: choice == year, showsChevron: false)
-                    }
-                    .buttonStyle(.lhPressable)
-                    .accessibilityAddTraits(choice == year ? .isSelected : [])
+        // The strip carries its own page gutter; the sheet already insets, so pull it back out.
+        LHChipStrip {
+            ForEach(yearChoices, id: \.self) { choice in
+                LHChip(yearLabel(choice), isSelected: choice == year) { year = choice }
                     .accessibilityIdentifier("export.year.\(choice)")
-                }
             }
         }
+        .padding(.horizontal, -LHMetrics.gutter)
     }
 
     private func yearLabel(_ value: Int) -> String {
-        if value == currentYear { return "This year" }
-        if value == currentYear - 1 { return "Last year" }
+        if value == currentYear { return HS.t("export.year.this", "This year") }
+        if value == currentYear - 1 { return HS.t("export.year.last", "Last year") }
         return String(value)
     }
 
     // MARK: Preview
 
     private var pagePreview: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
+        let page = RoundedRectangle(cornerRadius: LHMetrics.tagRadius, style: .continuous)
+        return ZStack {
+            page
                 .fill(Color.white)
                 .shadow(color: .black.opacity(colorScheme == .dark ? 0.5 : 0.08), radius: 16, y: 4)
             if let preview, previewYear == year {
@@ -158,7 +149,7 @@ struct ExportPDFView: View {
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
-                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                    .clipShape(page)
                     .transition(.opacity)
             } else {
                 // isLoading hook: the page renders off the main thread; only the page shows a
@@ -181,145 +172,80 @@ struct ExportPDFView: View {
         .frame(maxWidth: .infinity)
         .animation(reduceMotion ? nil : AppAnimation.reveal, value: previewYear)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Preview of the first page of the \(String(year)) report")
+        .accessibilityLabel(HS.f("export.preview.label", "Preview of the first page of the %@ record", String(year)))
         .accessibilityIdentifier("export.preview")
     }
 
     // MARK: Summary
 
     private var summary: some View {
-        VStack(spacing: 0) {
-            summaryRow("Entries", value: "\(yearEntries.count)")
-            Divider().padding(.leading, 16)
-            summaryRow("Properties", value: "\(activePropertyCount)")
-            Divider().padding(.leading, 16)
-            summaryRow("All logged hours", value: BPHours.short(totalHours))
-            Divider().padding(.leading, 16)
-            summaryRow("Real estate hours", value: BPHours.short(repsQualifiedHours))
+        LHRowGroup {
+            summaryRow(HS.t("export.summary.records", "Records"), value: "\(yearEntries.count)")
+            LHDivider(leadingInset: LHRow.insets.leading)
+            summaryRow(HS.t("export.summary.rentals", "Rentals"), value: "\(activePropertyCount)")
+            LHDivider(leadingInset: LHRow.insets.leading)
+            summaryRow(HS.t("export.summary.all", "All hours logged"), value: LHFormat.hours(totalHours))
+            LHDivider(leadingInset: LHRow.insets.leading)
+            summaryRow(HS.t("export.summary.counted", "Hours that count toward 750"), value: LHFormat.hours(repsQualifiedHours))
         }
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("export.summary")
     }
 
     private func summaryRow(_ label: String, value: String) -> some View {
-        HStack {
-            Text(label)
-                .font(.body)
-                .foregroundStyle(colors.textPrimary)
-            Spacer(minLength: 8)
-            Text(value)
-                .font(.system(.body, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(colors.textSecondary)
-        }
-        .padding(.horizontal, 16)
-        .frame(minHeight: 48)
-        .accessibilityElement(children: .combine)
+        LongTailValueRow(label: label, value: value, accessory: .none)
     }
 
-    // MARK: Actions
+    // MARK: Status (inside the content; the buttons are pinned in the sheet footer)
 
     @ViewBuilder
-    private var actions: some View {
-        VStack(spacing: 12) {
-            if let shareItem {
-                Label("Report ready", systemImage: "checkmark.circle.fill")
+    private var status: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if shareItem != nil {
+                Label(HS.t("export.ready", "Report ready"), systemImage: "checkmark.circle.fill")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(colors.positive)
-                    .frame(maxWidth: .infinity)
 
-                Button {
-                    sharing = ShareRequest(url: shareItem.pdfURL, format: .pdf)
-                } label: {
-                    Label("Share PDF", systemImage: "square.and.arrow.up")
-                }
-                .buttonStyle(InboxPrimaryButtonStyle())
-                .accessibilityIdentifier("export.sharePDF")
-
-                Button {
-                    sharing = ShareRequest(url: shareItem.csvURL, format: .csv)
-                } label: {
-                    Label("Share CSV spreadsheet", systemImage: "tablecells")
-                        .font(AppTypography.buttonLarge)
-                        .foregroundStyle(colors.action)
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 52)
-                        .background(Capsule().fill(colors.actionSurface))
-                }
-                .buttonStyle(.lhPressable)
-                .accessibilityIdentifier("export.shareCSV")
-
-                Button("Create again") { generateExports() }
-                    .font(AppTypography.button)
-                    .foregroundStyle(colors.action)
-                    .frame(minHeight: 44)
-                    .disabled(!gate.allowsCreate)
-                    .accessibilityHint("Makes a new report from your current records")
-                    .accessibilityIdentifier("export.createAgain")
-                if gate == .stillSyncing {
-                    createWithLocalButton
+                if let shareItem {
+                    Button {
+                        sharing = ShareRequest(url: shareItem.csvURL, format: .csv)
+                    } label: {
+                        Label(HS.t("export.shareCSV", "Share CSV spreadsheet"), systemImage: "tablecells")
+                    }
+                    .buttonStyle(LHButton.secondary)
+                    .accessibilityIdentifier("export.shareCSV")
                 }
             } else {
                 if reportIsStale && !isGenerating {
-                    Text("Your records changed since your last report. Create it again to include them.")
+                    Text(HS.t("export.stale", "Your records changed since your last report. Create it again to include them."))
                         .font(.footnote)
                         .foregroundStyle(colors.caution)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
                         .accessibilityIdentifier("export.stale")
                 }
                 if isGenerating {
-                    // Busy: the drafting line runs inside a muted, non-tappable button.
+                    // Busy: the drafting line runs while the button above is muted.
                     HStack(spacing: 10) {
                         DraftingLoader(sketch: .chart, surface: .adaptive, lineWidth: 1.6)
                             .frame(width: 34, height: 14)
                             .accessibilityHidden(true)
-                        Text(generateButtonTitle)
-                    }
-                    .font(AppTypography.buttonLarge)
-                    .foregroundStyle(colors.action)
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 52)
-                    .background(Capsule().fill(colors.actionSurface))
-                    .accessibilityElement(children: .combine)
-                    .accessibilityIdentifier("export.generatePDF")
-
-                    Text("You can close this. We’ll let you know when it’s ready.")
-                        .font(.footnote)
-                        .foregroundStyle(colors.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
-                        .accessibilityIdentifier("export.backgroundHint")
-                } else {
-                    Button {
-                        generateExports()
-                    } label: {
-                        Text(generateButtonTitle)
-                    }
-                    .buttonStyle(InboxPrimaryButtonStyle())
-                    .disabled(!gate.allowsCreate)
-                    .accessibilityIdentifier("export.generatePDF")
-
-                    if gate == .stillSyncing && canExport {
-                        createWithLocalButton
-                    }
-
-                    if !canExport && gate == .noEntries {
-                        Text("Log time in \(String(year)), then export it here.")
+                        Text(HS.t("export.generating.hint", "You can close this. We’ll let you know when it’s ready."))
                             .font(.footnote)
                             .foregroundStyle(colors.textSecondary)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("export.backgroundHint")
+                } else if !canExport && gate == .noEntries {
+                    Text(HS.f("export.empty", "Log hours in %@, then export them here.", String(year)))
+                        .font(.footnote)
+                        .foregroundStyle(colors.textSecondary)
                 }
             }
 
             if viewModel.initialPullFailed && gate.allowsCreate {
-                Label("Couldn’t reach iCloud. This report may be missing hours from your other devices.",
+                Label(HS.t("export.pullFailed", "Couldn’t reach iCloud. This report may be missing hours from your other devices."),
                       systemImage: "icloud.slash")
                     .font(.footnote)
                     .foregroundStyle(colors.textSecondary)
-                    .frame(maxWidth: .infinity)
-                    .multilineTextAlignment(.center)
                     .accessibilityIdentifier("export.pullFailedNote")
             }
 
@@ -327,18 +253,50 @@ struct ExportPDFView: View {
                 Label(exportError, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote)
                     .foregroundStyle(colors.destructive)
-                    .multilineTextAlignment(.center)
             }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: Actions (pinned: one primary, at most one tertiary above it)
+
+    @ViewBuilder
+    private var actions: some View {
+        if let shareItem {
+            if gate == .stillSyncing {
+                createWithLocalButton
+            } else {
+                Button(HS.t("export.createAgain", "Create again")) { generateExports() }
+                    .buttonStyle(LHButton.tertiary)
+                    .disabled(!gate.allowsCreate)
+                    .accessibilityHint(HS.t("export.createAgain.hint", "Makes a new report from your current records"))
+                    .accessibilityIdentifier("export.createAgain")
+            }
+            Button {
+                sharing = ShareRequest(url: shareItem.pdfURL, format: .pdf)
+            } label: {
+                Label(HS.t("export.sharePDF", "Share PDF"), systemImage: "square.and.arrow.up")
+            }
+            .buttonStyle(LHButton.primary)
+            .accessibilityIdentifier("export.sharePDF")
+        } else {
+            if gate == .stillSyncing && canExport { createWithLocalButton }
+            Button {
+                generateExports()
+            } label: {
+                Text(generateButtonTitle)
+            }
+            .buttonStyle(LHButton.primary)
+            .disabled(!gate.allowsCreate)
+            .accessibilityIdentifier("export.generatePDF")
         }
     }
 
     /// The pull is slow, not failed: the report may miss hours from other devices. The user
     /// chooses to go ahead anyway (the only way to create while syncing).
     private var createWithLocalButton: some View {
-        Button("Create with what’s on this device") { generateExports(force: true) }
-            .font(AppTypography.button)
-            .foregroundStyle(colors.action)
-            .frame(maxWidth: .infinity, minHeight: 44)
+        Button(HS.t("export.createLocal", "Create with what’s on this device")) { generateExports(force: true) }
+            .buttonStyle(LHButton.tertiary)
             .accessibilityIdentifier("export.createLocal")
     }
 
@@ -421,8 +379,10 @@ enum AuditExportFiles {
             let folder = directory ?? FileManager.default.temporaryDirectory
                 .appendingPathComponent("LandlordHoursExport-\(UUID().uuidString)", isDirectory: true)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let pdfURL = folder.appendingPathComponent("LandlordHours_\(year)_Activity_Log.pdf")
-            let csvURL = folder.appendingPathComponent("LandlordHours_\(year)_Activity_Log.csv")
+            // `pdf.title` names both files ("Rental hours record 2026"), the same line as the PDF's title.
+            let name = HS.recordTitle(year: year)
+            let pdfURL = folder.appendingPathComponent("\(name).pdf")
+            let csvURL = folder.appendingPathComponent("\(name).csv")
             try AuditReportPDFRenderer().render(report).write(to: pdfURL, options: .atomic)
             try Data(AuditReportCSV.make(report).utf8).write(to: csvURL, options: .atomic)
             return .success(ExportShareItem(pdfURL: pdfURL, csvURL: csvURL))
@@ -490,11 +450,11 @@ enum ExportGate: Equatable {
 
     func title(isStale: Bool) -> String {
         switch self {
-        case .generating: return "Creating report…"
-        case .waitingForHours: return "Getting your latest hours…"
-        case .stillSyncing: return "Still syncing from iCloud"
-        case .noEntries: return "No entries to export"
-        case .ready: return isStale ? "Create again" : "Create PDF and CSV"
+        case .generating: return HS.t("export.gate.generating", "Creating report…")
+        case .waitingForHours: return HS.t("export.gate.waiting", "Getting your latest hours…")
+        case .stillSyncing: return HS.t("export.gate.syncing", "Still syncing from iCloud")
+        case .noEntries: return HS.t("export.gate.empty", "No hours to export")
+        case .ready: return isStale ? HS.t("export.createAgain", "Create again") : HS.t("export.gate.ready", "Create PDF and CSV")
         }
     }
 }

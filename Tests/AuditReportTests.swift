@@ -357,7 +357,7 @@ final class AuditReportBuilderTests: XCTestCase {
         let pdf = AuditReportPDFRenderer().render(report)
         let document = PDFDocument(data: pdf)
         XCTAssertEqual(document?.pageCount, 1)
-        XCTAssertTrue(document?.string?.contains("No time entries were logged for 2026") == true)
+        XCTAssertTrue(document?.string?.contains("No hours were logged for 2026") == true)
     }
 }
 
@@ -653,8 +653,8 @@ final class AuditReportPDFTests: XCTestCase {
         let pdf = AuditReportPDFRenderer(attachmentData: { images[$0.id] }).render(report)
         let text = try XCTUnwrap(PDFDocument(data: pdf)?.string)
         XCTAssertTrue(text.contains("financing"), "\"fi\" ligature must extract as text")
-        XCTAssertTrue(text.contains("Tax Profile"))
-        XCTAssertFalse(text.contains("Tax Pro le"))
+        XCTAssertTrue(text.contains("Filing and goal"))
+        XCTAssertFalse(text.contains("Fil ng"))
     }
 
     func testMaterialParticipationNoteStaysWithItsTable() throws {
@@ -671,7 +671,7 @@ final class AuditReportPDFTests: XCTestCase {
         let document = try XCTUnwrap(PDFDocument(data: AuditReportPDFRenderer(attachmentData: { images[$0.id] }).render(report)))
         let all = document.string ?? ""
         for expected in ["Detected", "Confirmed", "Calendar suggestion", "Calendar import", "Receipt", "Other",
-                         "Appendix: where entries came from", AuditReportFormat.suggestionExplanation, "days later"] {
+                         "Appendix: where records came from", AuditReportFormat.suggestionExplanation, "days later"] {
             XCTAssertTrue(all.contains(expected), "missing \(expected)")
         }
         for banned in ["audit-proof", "audit proof", "score", "%"] {
@@ -693,8 +693,8 @@ final class AuditReportPDFTests: XCTestCase {
             XCTAssertTrue(text.contains("not tax advice"), "page \(index + 1) disclaimer")
         }
         let all = document.string ?? ""
-        for expected in ["REPS hours by participant", "Hours by property", "Hours by category", "Hours by participant",
-                         "Time entries (chronological)", "Appendix: photos and receipts", "Oak Street Duplex", "Pine Cabin",
+        for expected in ["Hours toward 750, by person", "Hours by rental", "Hours by category", "Hours by person",
+                         "Records, by date", "Appendix: photos and receipts", "Oak Street Duplex", "Pine Cabin",
                          "water-heater-receipt.jpg", "Calendar", "Timer", "Voice", "E46"] {
             XCTAssertTrue(all.contains(expected), "missing \(expected)")
         }

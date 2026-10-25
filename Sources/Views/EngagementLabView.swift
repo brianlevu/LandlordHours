@@ -1,5 +1,4 @@
 import SwiftUI
-import LucideIcons
 
 #if DEBUG
 struct EngagementLabView: View {
@@ -44,7 +43,7 @@ struct EngagementLabView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
-                LucideIcon(image: Lucide.bell, size: 22)
+                Image(systemName: "bell")
                     .foregroundStyle(colors.action)
                     .frame(width: 44, height: 44)
                     .background(colors.actionSurface)
@@ -52,10 +51,10 @@ struct EngagementLabView: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Engagement Intelligence")
-                        .font(.system(size: 28, weight: .black, design: .rounded))
+                        .font(.title.weight(.black)).fontDesign(.rounded)
                         .foregroundStyle(colors.textPrimary)
                     Text("Preview when the app should speak, and when silence is better.")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .font(.subheadline.weight(.medium)).fontDesign(.rounded)
                         .foregroundStyle(colors.textSecondary)
                 }
             }
@@ -65,7 +64,7 @@ struct EngagementLabView: View {
     private var scenarioPicker: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Scenario")
-                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .font(.body.weight(.bold)).fontDesign(.rounded)
                 .foregroundStyle(colors.textPrimary)
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
@@ -89,7 +88,7 @@ struct EngagementLabView: View {
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                LucideIcon(image: scenario.icon, size: 18)
+                Image(systemName: scenario.icon)
                     .foregroundStyle(scenario.tint)
                     .frame(width: 32, height: 32)
                     .background(scenario.wash(colors))
@@ -98,7 +97,7 @@ struct EngagementLabView: View {
                 Spacer(minLength: 0)
 
                 if isSelected {
-                    LucideIcon(image: Lucide.check, size: 15)
+                    Image(systemName: "checkmark")
                         .foregroundStyle(AppColors.onAction)
                         .frame(width: 26, height: 26)
                         .background(scenario.tint)
@@ -109,13 +108,13 @@ struct EngagementLabView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(scenario.title)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(.footnote.weight(.bold)).fontDesign(.rounded)
                     .foregroundStyle(colors.textPrimary)
                     .lineLimit(2)
                     .minimumScaleFactor(0.82)
 
                 Text(scenario.shortLabel)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(.caption2.weight(.medium)).fontDesign(.rounded)
                     .foregroundStyle(colors.textTertiary)
                     .lineLimit(2)
             }
@@ -133,7 +132,7 @@ struct EngagementLabView: View {
     private var recommendationSummary: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
-                LucideIcon(image: recommendationIcon, size: 22)
+                Image(systemName: recommendationIcon)
                     .foregroundStyle(recommendationTint)
                     .frame(width: 42, height: 42)
                     .background(recommendationWash)
@@ -141,11 +140,11 @@ struct EngagementLabView: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(recommendationTitle)
-                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .font(.title3.weight(.black)).fontDesign(.rounded)
                         .foregroundStyle(colors.textPrimary)
 
                     Text(recommendationMessage)
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .font(.footnote.weight(.medium)).fontDesign(.rounded)
                         .foregroundStyle(colors.textSecondary)
                         .lineSpacing(2)
                 }
@@ -202,34 +201,34 @@ struct EngagementLabView: View {
                     WaveHouseIcon(size: 28)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("LandlordHours")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(.footnote.weight(.bold)).fontDesign(.rounded)
                             .foregroundStyle(colors.textPrimary)
                         Text("now")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .font(.caption2.weight(.medium)).fontDesign(.rounded)
                             .foregroundStyle(colors.textTertiary)
                     }
                     Spacer()
                 }
 
                 Text(notificationTitle)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(.callout.weight(.bold)).fontDesign(.rounded)
                     .foregroundStyle(colors.textPrimary)
 
                 Text(notificationMessage)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(.footnote.weight(.medium)).fontDesign(.rounded)
                     .foregroundStyle(colors.textSecondary)
                     .lineSpacing(2)
 
                 if recommendation.surface != .none {
                     Text(actionLabel)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(.footnote.weight(.bold)).fontDesign(.rounded)
                         .foregroundStyle(colors.action)
                         .padding(.top, 2)
                 }
             }
             .padding(14)
             .background(colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.28 : 0.08), radius: 8, y: 4)
         }
         .previewCard(colors: colors)
@@ -245,18 +244,18 @@ struct EngagementLabView: View {
                     HStack(spacing: 7) {
                         LHCompactLogo(size: 24)
                         Text("LandlordHours")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(.footnote.weight(.bold)).fontDesign(.rounded)
                             .foregroundStyle(colors.textPrimary)
                     }
 
                     Text(widgetHeadline)
-                        .font(.system(size: 26, weight: .black, design: .rounded))
+                        .font(.title.weight(.black)).fontDesign(.rounded)
                         .foregroundStyle(colors.textPrimary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
 
                     Text(widgetDetail)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(.caption.weight(.medium)).fontDesign(.rounded)
                         .foregroundStyle(colors.textSecondary)
                         .lineSpacing(2)
                         .lineLimit(2)
@@ -286,8 +285,8 @@ struct EngagementLabView: View {
                     endPoint: .bottomTrailing
                 )
             )
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .liquidGlassPanel(cornerRadius: 22, colors: colors, colorScheme: colorScheme)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .liquidGlassPanel(cornerRadius: 20, colors: colors, colorScheme: colorScheme)
         }
         .previewCard(colors: colors)
         .accessibilityIdentifier("engagement.preview.widget")
@@ -301,7 +300,7 @@ struct EngagementLabView: View {
                 dynamicIslandPreview
 
                 HStack(spacing: 11) {
-                    LucideIcon(image: Lucide.clock, size: 18)
+                    Image(systemName: "clock")
                         .foregroundStyle(colors.action)
                         .frame(width: 34, height: 34)
                         .background(colors.actionSurface)
@@ -309,10 +308,10 @@ struct EngagementLabView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(liveActivityTitle)
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .font(.subheadline.weight(.bold)).fontDesign(.rounded)
                             .foregroundStyle(colors.textPrimary)
                         Text(liveActivityMessage)
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .font(.caption.weight(.medium)).fontDesign(.rounded)
                             .foregroundStyle(colors.textSecondary)
                             .lineLimit(2)
                     }
@@ -320,20 +319,20 @@ struct EngagementLabView: View {
                     Spacer()
 
                     Text(liveActivityTime)
-                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .font(.title3.weight(.black)).fontDesign(.rounded)
                         .foregroundStyle(colors.textPrimary)
                 }
 
                 HStack(spacing: 8) {
                     Text(recommendation.reason == .timerSafety ? "Review in app" : "Open timer")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(.footnote.weight(.bold)).fontDesign(.rounded)
                         .foregroundStyle(AppColors.onAction)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
                         .liquidGlassCapsule(tint: colors.action, colorScheme: colorScheme, foreground: true)
 
                     Text(recommendation.reason == .timerSafety ? "Timer active" : "No live surface")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(.footnote.weight(.bold)).fontDesign(.rounded)
                         .foregroundStyle(colors.textSecondary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
@@ -341,7 +340,7 @@ struct EngagementLabView: View {
                 }
             }
             .padding(14)
-            .liquidGlassPanel(cornerRadius: 24, colors: colors, colorScheme: colorScheme)
+            .liquidGlassPanel(cornerRadius: 20, colors: colors, colorScheme: colorScheme)
         }
         .previewCard(colors: colors)
         .accessibilityIdentifier("engagement.preview.liveActivity")
@@ -351,13 +350,13 @@ struct EngagementLabView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Text("Dynamic Island")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(.caption.weight(.bold)).fontDesign(.rounded)
                     .foregroundStyle(colors.textSecondary)
 
                 Spacer()
 
                 Text(recommendation.reason == .timerSafety ? "Active" : "Quiet")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(.caption2.weight(.bold)).fontDesign(.rounded)
                     .foregroundStyle(recommendation.reason == .timerSafety ? colors.positive : colors.textTertiary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -367,10 +366,10 @@ struct EngagementLabView: View {
 
             HStack(spacing: 10) {
                 HStack(spacing: 6) {
-                    LucideIcon(image: Lucide.house, size: 12)
+                    Image(systemName: "house")
                         .foregroundStyle(AppColors.primaryLight)
                     Text(liveActivityTime)
-                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .font(.footnote.weight(.black)).fontDesign(.rounded)
                         .monospacedDigit()
                         .foregroundStyle(.white)
                 }
@@ -382,24 +381,24 @@ struct EngagementLabView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Oak Street")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(.caption2.weight(.bold)).fontDesign(.rounded)
                             .foregroundStyle(.white)
                         Text(recommendation.reason == .timerSafety ? "Review timer" : "Only while timing")
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .font(.caption2.weight(.semibold)).fontDesign(.rounded)
                             .foregroundStyle(.white.opacity(0.68))
                     }
 
                     Spacer(minLength: 6)
 
                     Text(recommendation.reason == .timerSafety ? "Review" : "Idle")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(.caption2.weight(.bold)).fontDesign(.rounded)
                         .foregroundStyle(recommendation.reason == .timerSafety ? AppColors.primaryLight : .white.opacity(0.58))
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
                 .frame(maxWidth: .infinity)
                 .background(Color.black)
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             }
         }
         .padding(12)
@@ -415,16 +414,16 @@ struct EngagementLabView: View {
                 HStack {
                     Spacer()
                     Text(siriUserPrompt)
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .font(.subheadline.weight(.semibold)).fontDesign(.rounded)
                         .foregroundStyle(AppColors.onAction)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
                         .background(colors.action)
-                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
 
                 HStack(alignment: .top, spacing: 10) {
-                    LucideIcon(image: Lucide.sparkles, size: 16)
+                    Image(systemName: "sparkles")
                         .foregroundStyle(colors.action)
                         .frame(width: 30, height: 30)
                         .background(colors.actionSurface)
@@ -432,17 +431,17 @@ struct EngagementLabView: View {
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text(siriResponse)
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .font(.subheadline.weight(.medium)).fontDesign(.rounded)
                             .foregroundStyle(colors.textPrimary)
                             .lineSpacing(2)
 
                         Text(actionLabel)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(.footnote.weight(.bold)).fontDesign(.rounded)
                             .foregroundStyle(colors.action)
                     }
                     .padding(12)
                     .background(colors.backgroundTertiary)
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                     Spacer(minLength: 0)
                 }
@@ -455,7 +454,7 @@ struct EngagementLabView: View {
     private var scenarioFacts: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Context")
-                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .font(.body.weight(.bold)).fontDesign(.rounded)
                 .foregroundStyle(colors.textPrimary)
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 138), spacing: 10)], spacing: 10) {
@@ -472,7 +471,7 @@ struct EngagementLabView: View {
     private var qualityChecks: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Quality Checks")
-                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .font(.body.weight(.bold)).fontDesign(.rounded)
                 .foregroundStyle(colors.textPrimary)
 
             VStack(spacing: 10) {
@@ -504,10 +503,10 @@ struct EngagementLabView: View {
     private func previewHeader(_ title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .font(.body.weight(.bold)).fontDesign(.rounded)
                 .foregroundStyle(colors.textPrimary)
             Text(subtitle)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .font(.caption.weight(.medium)).fontDesign(.rounded)
                 .foregroundStyle(colors.textSecondary)
         }
     }
@@ -515,10 +514,10 @@ struct EngagementLabView: View {
     private func metricCard(_ title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(.caption2.weight(.bold)).fontDesign(.rounded)
                 .foregroundStyle(colors.textTertiary)
             Text(value)
-                .font(.system(size: 17, weight: .black, design: .rounded))
+                .font(.body.weight(.black)).fontDesign(.rounded)
                 .foregroundStyle(colors.textPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.76)
@@ -531,25 +530,25 @@ struct EngagementLabView: View {
 
     private func qualityRow(title: String, value: String, isPassing: Bool) -> some View {
         HStack(spacing: 10) {
-            LucideIcon(image: isPassing ? Lucide.badgeCheck : Lucide.circleAlert, size: 17)
+            Image(systemName: isPassing ? "checkmark.seal" : "exclamationmark.circle")
                 .foregroundStyle(isPassing ? colors.positive : colors.caution)
                 .frame(width: 28, height: 28)
                 .background(isPassing ? colors.positiveSurface : colors.cautionSurface)
                 .clipShape(Circle())
 
             Text(title)
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .font(.subheadline.weight(.bold)).fontDesign(.rounded)
                 .foregroundStyle(colors.textPrimary)
             Spacer()
             Text(value)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .font(.footnote.weight(.semibold)).fontDesign(.rounded)
                 .foregroundStyle(colors.textSecondary)
         }
     }
 
     private func engagementPill(label: String, color: Color, wash: Color) -> some View {
         Text(label)
-            .font(.system(size: 11, weight: .bold, design: .rounded))
+            .font(.caption2.weight(.bold)).fontDesign(.rounded)
             .foregroundStyle(color)
             .lineLimit(1)
             .minimumScaleFactor(0.78)
@@ -569,26 +568,26 @@ struct EngagementLabView: View {
 
             VStack(spacing: 0) {
                 Text("\(Int((snapshot.yearHours / context.targetHours) * 100))%")
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(.title3.weight(.black)).fontDesign(.rounded)
                     .foregroundStyle(colors.textPrimary)
                 Text("\(Int(context.targetHours))h")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(.caption2.weight(.bold)).fontDesign(.rounded)
                     .foregroundStyle(colors.textTertiary)
             }
         }
         .frame(width: 68, height: 68)
     }
 
-    private var recommendationIcon: UIImage {
+    private var recommendationIcon: String {
         switch recommendation.reason {
-        case .noActionNeeded: return Lucide.circleCheck
-        case .setupProperty: return Lucide.building2
-        case .inactiveLogging: return Lucide.clock
-        case .timerSafety: return Lucide.timer
-        case .calendarDraftsReady: return Lucide.calendarCheck
-        case .behindPace: return Lucide.chartNoAxesCombined
-        case .yearEndExport: return Lucide.fileText
-        case .portfolioSummary: return Lucide.layoutGrid
+        case .noActionNeeded: return "checkmark.circle"
+        case .setupProperty: return "building.2"
+        case .inactiveLogging: return "clock"
+        case .timerSafety: return "timer"
+        case .calendarDraftsReady: return "calendar.badge.checkmark"
+        case .behindPace: return "chart.bar"
+        case .yearEndExport: return "doc.text"
+        case .portfolioSummary: return "square.grid.2x2"
         }
     }
 
@@ -792,16 +791,16 @@ private enum EngagementLabScenario: String, CaseIterable, Identifiable {
         }
     }
 
-    var icon: UIImage {
+    var icon: String {
         switch self {
-        case .setup: return Lucide.userPlus
-        case .recentlyActive: return Lucide.circleCheck
-        case .inactive: return Lucide.clock
-        case .dismissed: return Lucide.circleSlash
-        case .calendarDrafts: return Lucide.calendarCheck
-        case .timerSafety: return Lucide.timer
-        case .behindPace: return Lucide.chartNoAxesCombined
-        case .yearEnd: return Lucide.fileText
+        case .setup: return "person.badge.plus"
+        case .recentlyActive: return "checkmark.circle"
+        case .inactive: return "clock"
+        case .dismissed: return "nosign"
+        case .calendarDrafts: return "calendar.badge.checkmark"
+        case .timerSafety: return "timer"
+        case .behindPace: return "chart.bar"
+        case .yearEnd: return "doc.text"
         }
     }
 
