@@ -19,6 +19,8 @@ struct InteriorWall: View {
     /// How far outside the leading edge the fold's midline lies (half the gap when the wall is
     /// drawn inside the pane, 0 when it starts at the midline), so both walls share one profile.
     var foldInset: CGFloat = 0
+    /// The fold runs across the top edge (stacked): the room fades in from the top, not the leading edge.
+    var foldAbove = false
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -38,7 +40,7 @@ struct InteriorWall: View {
                         .opacity(0.42)
                         .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .clear, location: 0.18),
                                                      .init(color: .black, location: 0.85)],
-                                             startPoint: .leading, endPoint: .trailing))
+                                             startPoint: foldAbove ? .top : .leading, endPoint: foldAbove ? .bottom : .trailing))
                 }
                 if glow {
                     let horizontal = glowCenter.x < 0.25

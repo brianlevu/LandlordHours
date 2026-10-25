@@ -154,6 +154,11 @@ def check(png, scale=None):
         g8 = row.mean(axis=1)
         step = np.abs(np.diff(g8, prepend=g8[0])) + np.abs(np.diff(g8, append=g8[-1]))
         wall = (np.abs(row - CARD[theme]).max(axis=1) >= 8) & (step < 6)
+        # The card and its edge hairline are not wall: keep only pixels outside the card's span.
+        on_card = np.where(np.abs(row - CARD[theme]).max(axis=1) < 8)[0]
+        if on_card.size:
+            pad = int(4 * s)
+            wall[max(0, on_card.min() - pad):on_card.max() + pad + 1] = False
         L = np.where(wall, L, -1)
         xb = int(np.argmax(L)) / s
         out["DU10_brightest_from_fold_pt"] = round(xb, 1)

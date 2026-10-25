@@ -30,13 +30,15 @@ struct TwoPaneLayout<Work: View>: View {
     init(@ViewBuilder work: @escaping () -> Work) { self.work = work }
 
     var body: some View {
-        content
-            .background {
-                Color.clear
-                    .onGeometryChange(for: GeometryProbe.self) { proxy in GeometryProbe(proxy) } action: { probe in
-                        update(probe)
-                    }
-            }
+        ZStack {
+            // The probe is the content's sibling, so a pane that ignores a safe area (stacked) can
+            // never feed its own size back into the mode.
+            Color.clear
+                .onGeometryChange(for: GeometryProbe.self) { proxy in GeometryProbe(proxy) } action: { probe in
+                    update(probe)
+                }
+            content
+        }
             .environment(\.layoutMode, split.mode)
             .duoUnfold(clock, isEnabled: split.isDivision)
             .simultaneousGesture(TapGesture().onEnded { clock.finish() }, including: clock.t < 1 ? .all : .none)
@@ -128,15 +130,21 @@ struct TwoPaneLayout<Work: View>: View {
         VStack(spacing: 0) {
             house.frame(height: first.height)
             Color.clear.frame(height: split.gap.height).accessibilityHidden(true)
-            workPane.frame(height: second.height).ignoresSafeArea(.container, edges: .bottom)
+            workPane.frame(height: second.height)
         }
-        .ignoresSafeArea(.container, edges: .top)
+        // The halves are measured from the window's edges (the fold sits at its division), so the
+        // stack spans the whole window; each half keeps its own insets inside.
+        .ignoresSafeArea(.container, edges: .vertical)
         .background { StackedWall(fold: split.gap) }
     }
 
     // MARK: Mode
 
-    private func update(_ probe: GeometryProbe) {
+    private func update(_ raw: GeometryProbe) {
+        // Whole half-points: a size that differs only in float noise (978.9999 / 979.0001) must not
+        // re-resolve the split, or the layout re-renders forever.
+        let measured = CGSize(width: (raw.size.width * 2).rounded() / 2, height: (raw.size.height * 2).rounded() / 2)
+        let probe = GeometryProbe(size: AdaptiveDebug.capturedSize(for: measured) ?? measured, division: raw.division)
         systemDivision = probe.division != nil
         let division = probe.division ?? AdaptiveDebug.capturedDivision(for: probe.size)
         if !resolvedOnce {
@@ -206,7 +214,7 @@ private struct StackedWall: View {
             let dark = colorScheme == .dark
             ZStack(alignment: .top) {
                 LHPage()
-                InteriorWall(page: false, glow: false)
+                InteriorWall(page: false, glow: false, foldAbove: true)
                     .frame(height: max(0, h - mid))
                     .frame(maxHeight: .infinity, alignment: .bottom)
                 RadialGradient(colors: [DoorArt.glow(dark: dark), .clear], center: UnitPoint(x: 0.5, y: mid / h),

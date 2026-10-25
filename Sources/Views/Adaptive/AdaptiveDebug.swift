@@ -23,6 +23,17 @@ enum AdaptiveDebug {
         #endif
     }
 
+    /// The capture shot's size while an off-screen Duo frame renders (the measured size carries the
+    /// capture's inset compensation); nil otherwise and in Release.
+    static func capturedSize(for size: CGSize) -> CGSize? {
+        #if DEBUG
+        guard AdaptiveSnapshotter.division(for: size) != nil else { return nil }
+        return MainActor.assumeIsolated { AdaptiveSnapshotter.duoShot }
+        #else
+        return nil
+        #endif
+    }
+
     #if DEBUG
     static var args: [String] { ProcessInfo.processInfo.arguments }
     static func value(_ flag: String) -> String? {
