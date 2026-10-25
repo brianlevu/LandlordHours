@@ -309,7 +309,7 @@ As v2 §8 plus v3/v4 additions: `records_unified` once (counts only, now includi
 
 ## 8. Decisions for Brian (asked one at a time, tap to select)
 
-1. **Remove Sign in with Apple, iCloud is the identity** (recommended) — or keep Sign in with Apple as an optional sign-in beside the iCloud model. *Recommended because* it cannot move records between iCloud accounts (there is no server), it never held a token, and it is one of the three ids that broke 2.0; keeping it keeps the join problem. *Trade-off:* a returning 2.0 Apple-sign-in user looks for a Sign in button once; the merge has already brought their records, and P22 says so.
+1. **DECIDED 2026-10-25 by Brian: remove Sign in with Apple; iCloud is the identity.** (Was: recommended) — or keep Sign in with Apple as an optional sign-in beside the iCloud model. *Recommended because* it cannot move records between iCloud accounts (there is no server), it never held a token, and it is one of the three ids that broke 2.0; keeping it keeps the join problem. *Trade-off:* a returning 2.0 Apple-sign-in user looks for a Sign in button once; the merge has already brought their records, and P22 says so.
 2. **The container rescue and the CloudKit Console sitting (§3.5)**: this week (recommended; the rescue is only possible while the dev build is still on BLV-Phone, and the console sitting decides his recovery branch, deploys `displayName`, and unlocks the verifier's zone reads) — or after K1 lands, accepting that an App Store update on his phone in the meantime closes the rescue window.
 
 Already decided in this plan, reversible: name in the synced `TaxProfile.displayName`; photo dropped; inferred removals kept until the user acts, user deletes 30 days; K is a release gate for 2.2.
