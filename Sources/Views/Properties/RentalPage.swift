@@ -62,6 +62,7 @@ struct PropertyDetailView: View {
         }
         .onChange(of: dynamicTypeSize) { _, _ in resolveSide() }
         .onChange(of: band) { _, _ in resolveSide() }
+        .navigationTitle(ax ? (property?.name ?? "") : "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -107,13 +108,16 @@ struct PropertyDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     LHToastChipSlot {
-                        LHScreenTitle(property.name, style: .detail)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .accessibilityIdentifier("property.title")
+                        // At AX the name moves to the inline bar (it is also in the number line),
+                        // so the number and the pace sentence stay above the tab bar (§H.1 H3).
+                        if !ax {
+                            LHScreenTitle(property.name, style: .detail)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .accessibilityIdentifier("property.title")
+                        }
                     }
                     .padding(.horizontal, LHMetrics.gutter)
                     RentalHero(property: property, side: side, windowHeight: window.height)
-                        .padding(.top, ax ? 8 : 0)
                     RentalBody(property: property)
                         .padding(.horizontal, LHMetrics.gutter)
                         .padding(.top, LHMetrics.sectionGap)
@@ -123,6 +127,9 @@ struct PropertyDetailView: View {
                 .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.hidden)
+            // Rows that scroll up meet a hard edge under the bar, never the Back and Edit glass
+            // with a figure half-read beneath it.
+            .modifier(HardTopScrollEdge())
 #if DEBUG
             .onAppear {
                 if ProcessInfo.processInfo.arguments.contains("-LHOpenFirstPropertyDetailLower") {
@@ -193,7 +200,19 @@ struct RentalHero: View {
     }
 
     /// The number block sits in the diorama's shadow: 44pt at the 390 hero, scaled to this frame (H4).
-    private var overlap: CGFloat { ax ? 0 : (44 * side / CraftStage.referenceSide).rounded() }
+    /// At AX the art is drawn unscaled, so the number tucks into the empty band under the lot instead
+    /// (it never meets the art's bounding box).
+    private var overlap: CGFloat {
+        ax ? (side * RentalHeroAXCrop.bottomBand).rounded() : (44 * side / CraftStage.referenceSide).rounded()
+    }
+
+    /// At AX the frame drops the empty sky above the art (the art itself keeps its size, §H.3), using
+    /// the taller of the stage on screen and the stage the hours have reached, so a drop is never cut.
+    private func topCrop(_ target: CraftStage) -> CGFloat {
+        guard ax else { return 0 }
+        let shown = CraftStage.stage(hours: shownHours, goal: goal)
+        return (side * min(RentalHeroAXCrop.topBand(target), RentalHeroAXCrop.topBand(shown))).rounded()
+    }
 
     var body: some View {
         let f = figures
@@ -202,8 +221,9 @@ struct RentalHero: View {
                            dropAllowed: dropAllowed, onStageSettled: stageSettled)
                 .id(property.id)
                 .frame(width: side, height: side)
-                .frame(maxWidth: .infinity)
+                .frame(width: side, height: side - topCrop(f.stage), alignment: .bottom)
                 .clipped()
+                .frame(maxWidth: .infinity)
                 .accessibilityIdentifier("property.hero")
             HouseNumberBlock(content: .rental(hours: shownHours, goal: goal, name: property.name, pace: pace(f)),
                              numeralSize: numeralSize, isPending: viewModel.isAwaitingInitialPull)
@@ -234,6 +254,22 @@ struct RentalHero: View {
             CraftDropLedger().markPlayed(rentalID: property.id, stage: .framing, year: year)
         }
         settledHours = liveHours
+    }
+}
+
+/// The empty bands of the unscaled stills (alpha > 24 of 255, measured on the 1206 stills): the art
+/// spans x 0.105–0.923 and ends at y 0.91 in every stage; it starts at y 0.337 (started), 0.213
+/// (frame70), 0.115 (framing) and 0.05 (half, complete). Each band keeps a 0.02 margin.
+enum RentalHeroAXCrop {
+    static let bottomBand: CGFloat = 0.07
+
+    static func topBand(_ stage: CraftStage) -> CGFloat {
+        switch stage {
+        case .started: return 0.317
+        case .frame70: return 0.193
+        case .framing: return 0.095
+        case .half, .complete: return 0.03
+        }
     }
 }
 

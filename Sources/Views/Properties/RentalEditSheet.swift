@@ -38,6 +38,8 @@ struct PropertyEditSheet: View {
     @State private var pickedAddress: String?
     @State private var nameError: String?
     @State private var loaded = false
+    /// How far the form has scrolled up under the sheet's title (content points).
+    @State private var scrolledUnderHeader: CGFloat = 0
 
     private var ax: Bool { dynamicTypeSize.isAccessibilitySize }
 
@@ -70,12 +72,18 @@ struct PropertyEditSheet: View {
                     Color.clear.frame(height: 1).id("propertySheet.bottom")
                 }
                 .padding(.top, 8)
+                .mask(alignment: .top) { underHeaderMask }
             } footer: {
                 Button(editing != nil ? RentalsText.save : RentalsText.addRental, action: save)
                     .buttonStyle(LHButton.primary)
                     .disabled(!canSave)
                     .accessibilityIdentifier("property.save")
                     .background(alignment: .top) { footerSurface }
+            }
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top
+            } action: { _, scrolled in
+                scrolledUnderHeader = max(0, scrolled)
             }
 #if DEBUG
             .onAppear {
@@ -87,6 +95,20 @@ struct PropertyEditSheet: View {
         }
         .onAppear(perform: load)
         .onChange(of: name) { _, _ in nameError = nil }
+    }
+
+    /// `LHSheet`'s header inset has no surface either (reported to package A), so the form scrolled
+    /// up through the title. The form is cut where it passes under the header: the rows above that
+    /// line are not drawn, and the title sits on the sheet's own surface.
+    private var underHeaderMask: some View {
+        VStack(spacing: 0) {
+            Color.clear.frame(height: scrolledUnderHeader)
+            // A short fade once rows pass under, so a cut line never splits a glyph.
+            LinearGradient(colors: [.black.opacity(0), .black], startPoint: .top, endPoint: .bottom)
+                .frame(height: min(16, scrolledUnderHeader))
+            Color.black
+        }
+        .accessibilityHidden(true)
     }
 
     /// `LHSheet`'s footer inset has no surface, so the form showed through around the pinned button
