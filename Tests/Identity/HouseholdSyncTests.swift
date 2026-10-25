@@ -463,7 +463,9 @@ final class HouseholdSyncTests: XCTestCase {
         let outcome18 = await h.engine.runCloudPhase()
         XCTAssertEqual(outcome18, .done, "the migration was done; the question pauses sync")
         let ok = await h.engine.answerZoneGone(.keepAndRestore)
-        XCTAssertFalse(ok, "the fake zone stays gone; the source decides whether it can be recreated")
+        XCTAssertTrue(ok, "Keep: this iPhone's copy goes back to iCloud, only because the person chose it")
+        XCTAssertEqual(h.zone.records.values.filter { $0.recordType == "TimeEntry" }.count, 10)
+        XCTAssertFalse(sandbox.defaults.bool(forKey: IdentityKeys.zoneGone))
     }
 
     // MARK: U38 · iCloud full, restricted
@@ -520,6 +522,23 @@ final class HouseholdSyncTests: XCTestCase {
         try await h.zone.deleteZone()
         XCTAssertTrue(h.zone.zoneDeleted)
         XCTAssertTrue(h.zone.records.isEmpty)
+    }
+
+    // MARK: Settings-only owners are listed (diagnosis §7.2)
+
+    func testAnOwnerWithOnlySettingsRecordsIsListedNotAsked() async throws {
+        let settingsOnly = "001234.only-settings.0303"
+        let zone = FakeZoneSource(records: [
+            GoalSettingsValues.defaults.record(name: IdentityZone.goalSettingsName(settingsOnly), owner: settingsOnly),
+            TaxProfileValues(filingStatus: FilingStatus.single.rawValue, spouseTracking: false, taxYear: 2025, groupingElection: false,
+                             nonREWorkHours: 0, displayName: nil).record(name: IdentityZone.taxProfileName(settingsOnly), owner: settingsOnly)
+        ])
+        let h = EngineHarness(sandbox, zone: zone)
+        try h.device()
+        let outcome = await h.cloud()
+        XCTAssertEqual(outcome, .done)
+        XCTAssertEqual(h.groups?.group(settingsOnly)?.settingsOnly, true, "the cloud knew them: found, no hours")
+        XCTAssertTrue(h.earlier.pendingGroups.isEmpty, "never asked about")
     }
 
     // MARK: Per-type push (diagnosis §7.3)

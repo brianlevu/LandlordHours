@@ -63,7 +63,10 @@ final class CloudKitSyncService: ObservableObject {
     // MARK: Private
     private let container: CKContainer?
     private var database: CKDatabase? { container?.privateCloudDatabase }
-    private let zoneID = IdentityZone.zoneID
+    /// DEBUG device tests run against a throwaway zone in the Development container, never the
+    /// person's `LandlordHoursZone` (DevelopmentContainerSyncTests).
+    var zoneIDOverride: CKRecordZone.ID?
+    private var zoneID: CKRecordZone.ID { zoneIDOverride ?? IdentityZone.zoneID }
     /// The scope the push gate and the baselines are keyed by (`UserScope.userId`).
     private var appUserId: String? { UserScope.userId }
     /// The owner tag every pushed record carries: the unified id (§4.6).
@@ -141,6 +144,8 @@ final class CloudKitSyncService: ObservableObject {
                     return self.accountAvailable
                 }
                 guard self.container != nil else { return false }
+                // A DEBUG mock scope (captures, mock scenarios) never meets the real zone.
+                guard !IdentityScope.isDebugScope() else { return false }
                 await self.checkAccountStatus()
                 return self.accountAvailable
             },
@@ -188,6 +193,7 @@ final class CloudKitSyncService: ObservableObject {
             defer {
                 self.isRunningInitialSync = false
                 self.initialSyncTask = nil
+                self.onIdentityChange?()   // "Syncing…" ends: the status row says what happened
             }
             repeat {
                 self.rerunRequested = false
@@ -207,6 +213,7 @@ final class CloudKitSyncService: ObservableObject {
         let ops = operationsOverride ?? liveOperations
         guard await ops.accountAvailable() else {
             accountAvailable = false
+            onIdentityChange?()   // the status row and Today's P10 learn that iCloud is off
             return
         }
         accountAvailable = true
@@ -1073,25 +1080,38 @@ extension CloudKitSyncService: IdentityZoneSource {
         }
     }
 
-    /// S8: the household pair with `.ifServerRecordUnchanged`. A conflict means another device
-    /// wrote it first: adopt its `appUserId` (the loser never pushes under its own id).
+    /// S8: the household pair. Measured on the Development container (iPad mini 5, 2026-10-25):
+    /// `.ifServerRecordUnchanged` on a freshly built record does not refuse to overwrite one that
+    /// exists, so the first writer is found by reading. Read: a pair exists → adopt its
+    /// `appUserId`. Else save, then read back: another device that saved in the same moment wins
+    /// if its copy is the one on the server, and this one adopts it (the loser never pushes
+    /// under its own id; both converge on the server's copy).
     func saveHousehold(goal: ZoneRecord, tax: ZoneRecord) async throws -> HouseholdSaveResult {
         guard let database else { throw ZoneSourceError.unavailable("no CloudKit") }
+        let goalID = CKRecord.ID(recordName: goal.recordName, zoneID: zoneID)
+        if let existing = try await fetchOptional(goalID, database: database), let owner = existing["appUserId"] as? String {
+            return owner == goal.appUserId ? .saved : .adopted(owner)
+        }
         let records = [goal.ckRecord(zoneID: zoneID), tax.ckRecord(zoneID: zoneID)]
         do {
             try await modify(database: database, save: records, policy: .ifServerRecordUnchanged, atomic: false)
-            return .saved
         } catch let error as CKError {
-            let serverOwner = Self.serverRecords(in: error).compactMap { $0["appUserId"] as? String }.first
-            if error.code == .serverRecordChanged || serverOwner != nil {
-                return .adopted(serverOwner ?? goal.appUserId ?? IdentityZone.household)
-            }
-            if Self.isZoneGone(error) {
-                try await createZone()
-                try await modify(database: database, save: records, policy: .ifServerRecordUnchanged, atomic: false)
-                return .saved
-            }
-            throw error
+            if let owner = Self.serverRecords(in: error).compactMap({ $0["appUserId"] as? String }).first { return .adopted(owner) }
+            guard Self.isZoneGone(error) else { throw error }
+            try await createZone()
+            try await modify(database: database, save: records, policy: .ifServerRecordUnchanged, atomic: false)
+        }
+        if let after = try await fetchOptional(goalID, database: database), let owner = after["appUserId"] as? String, owner != goal.appUserId {
+            return .adopted(owner)
+        }
+        return .saved
+    }
+
+    private func fetchOptional(_ id: CKRecord.ID, database: CKDatabase) async throws -> CKRecord? {
+        do {
+            return try await database.record(for: id)
+        } catch let error as CKError where error.code == .unknownItem || Self.isZoneGone(error) {
+            return nil
         }
     }
 

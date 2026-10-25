@@ -58,6 +58,9 @@ final class AccountDeleteTests: CaptureTestCase {
     func testICloudOffAsksBeforeDeletingFromThisIPhoneOnly() async throws {
         let (viewModel, _) = makeViewModel()
         let service = viewModel.syncService
+        // No iCloud account (the same on a simulator and on a signed-in iPad).
+        let off = IdentityFixtures.fakeZone("off")
+        service.zoneSourceOverride = off
         service.accountAvailable = false
         var zoneDeletes = 0
         service.zoneDeleteOverride = { zoneDeletes += 1 }
@@ -70,6 +73,7 @@ final class AccountDeleteTests: CaptureTestCase {
         try await viewModel.deleteAllData(allowLocalOnly: true)
         XCTAssertEqual(zoneDeletes, 0, "iCloud is not touched")
         XCTAssertTrue(viewModel.properties.isEmpty)
+        withExtendedLifetime(off) {}
     }
 
     func testTheUnreachableMessageIsPlain() {

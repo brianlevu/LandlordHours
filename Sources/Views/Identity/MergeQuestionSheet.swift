@@ -8,6 +8,7 @@ import SwiftUI
 // threshold. Spouse and aside are reversible, so they get a second step, not an alert (§1.21).
 
 struct MergeQuestionSheet: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
     let group: ArchivedGroup
     var index = 1
     var total = 1
@@ -36,8 +37,9 @@ struct MergeQuestionSheet: View {
             footer
         }
         .background(colors.backgroundSecondary.ignoresSafeArea())
-        .presentationDetents([.large])
+        .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.fraction(0.8), .large])
         .presentationDragIndicator(.visible)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("identity.mergeQuestion")
     }
 

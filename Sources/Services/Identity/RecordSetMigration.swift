@@ -223,10 +223,24 @@ final class RecordSetMigration {
         adoptIds(storage: storage, unified: primary.flatMap { $0.id == LegacyInventory.unscopedGroupId ? nil : $0.id } ?? IdentityZone.household,
                  defaults: defaults)
 
-        // The invariant, device side.
-        let before = Set(inventory.groups.flatMap { g in g.entries.map(\.ledgerVersion) + g.properties.map(\.ledgerVersion) + g.categories.map(\.ledgerVersion) })
+        // The invariant, device side. Each inventory version is hashed once; a live entry reuses
+        // its source's hash unless its id had more than one version or the spouse answer changed it.
+        var versionsById: [UUID: [RecordVersion]] = [:]
+        var before = Set<RecordVersion>()
+        for g in inventory.groups {
+            for e in g.entries {
+                let v = e.ledgerVersion
+                before.insert(v)
+                if versionsById[e.id]?.contains(v) != true { versionsById[e.id, default: []].append(v) }
+            }
+            before.formUnion(g.properties.map(\.ledgerVersion) + g.categories.map(\.ledgerVersion))
+        }
+        let spouseIds = Set(live.filter { groupsFile.group($0.id)?.status == .spouse }.flatMap { $0.entries.map(\.id) })
         var places = RecordLedger.Places()
-        places.live = RecordLedger.versions(entries: entries, properties: properties, categories: categories)
+        places.live = Set(entries.map { e -> RecordVersion in
+            if !spouseIds.contains(e.id), let known = versionsById[e.id], known.count == 1 { return known[0] }
+            return e.ledgerVersion
+        }).union(RecordLedger.versions(entries: [], properties: properties, categories: categories))
         places.archived = earlier.archivedVersions
         places.removed = earlier.removedVersions
         places.backup = Set(losers)
@@ -354,8 +368,10 @@ final class RecordSetMigration {
     }
 
     var step: MigrationStep { IdentityScope.step(defaults) }
-    var storageId: String { defaults.string(forKey: IdentityKeys.storageId) ?? IdentityZone.household }
-    var unifiedId: String { defaults.string(forKey: IdentityKeys.unifiedId) ?? storageId }
+    /// The same scope the rest of the app runs on (a DEBUG scope wins, so a mock never meets the
+    /// real record set's baselines).
+    var storageId: String { IdentityScope.resolve(defaults).scopeId ?? defaults.string(forKey: IdentityKeys.storageId) ?? IdentityZone.household }
+    var unifiedId: String { IdentityScope.unifiedId(defaults) ?? storageId }
     var syncRoot: URL { root.appendingPathComponent("Sync", isDirectory: true) }
     var tracker: SyncChangeTracker { SyncChangeTracker(userId: storageId, baseDirectory: syncRoot) }
 

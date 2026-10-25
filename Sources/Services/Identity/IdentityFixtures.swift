@@ -33,6 +33,8 @@ final class FakeZoneSource: IdentityZoneSource {
     var pendingDeleted: [String: String] = [:]
     /// Another device already wrote the household pair (S8 race): its `appUserId`.
     var raceHouseholdOwner: String?
+    /// Where "has this device synced before" lives (the live source reads the same key).
+    var defaults: UserDefaults = .standard
     private(set) var pushes: [[ZoneRecord]] = []
     var pushesForTests: [[ZoneRecord]] { pushes }
     private(set) var deletes: [String] = []
@@ -93,7 +95,12 @@ final class FakeZoneSource: IdentityZoneSource {
 
     func push(_ batch: [ZoneRecord], deletes names: [String]) async -> ZonePushReport {
         var report = ZonePushReport()
-        guard zoneExists else { report.zoneGone = true; return report }
+        if !zoneExists {
+            // Like the live source: a device that synced before never recreates a deleted zone; a
+            // first sync on an account creates it.
+            if defaults.bool(forKey: IdentityKeys.hasSynced) { report.zoneGone = true; return report }
+            zoneExists = true
+        }
         if quotaExceeded {
             report.quotaExceeded = true
             for type in Set(batch.map(\.recordType)) { report.failedTypes[type] = 25 }

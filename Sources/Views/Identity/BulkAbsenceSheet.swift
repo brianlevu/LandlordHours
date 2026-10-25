@@ -7,6 +7,7 @@ import SwiftUI
 // picks. Swipe down = decide later (row P30 under Earlier records).
 
 struct BulkAbsenceSheet: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
     @EnvironmentObject private var viewModel: AppViewModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -42,8 +43,9 @@ struct BulkAbsenceSheet: View {
             .accessibilityIdentifier("identity.bulk.keep")
         }
         .background(colors.backgroundSecondary.ignoresSafeArea())
-        .presentationDetents([.large])
+        .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.fraction(0.6), .large])
         .presentationDragIndicator(.visible)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("identity.bulk")
     }
 }

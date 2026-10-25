@@ -8,6 +8,7 @@ import SwiftUI
 // to Earlier records (nothing deleted); "Decide later" keeps sync paused with a Today card.
 
 struct AccountChangedSheet: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
     @EnvironmentObject private var viewModel: AppViewModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -39,8 +40,9 @@ struct AccountChangedSheet: View {
                 .accessibilityIdentifier("identity.account.keep")
         }
         .background(colors.backgroundSecondary.ignoresSafeArea())
-        .presentationDetents([.large])
+        .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.fraction(0.62), .large])
         .interactiveDismissDisabled(working)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("identity.accountChanged")
     }
 
@@ -65,6 +67,7 @@ struct AccountChangedSheet: View {
 // zone on its own, so "Delete all data" on one device isn't undone by another (review fix 1).
 
 struct ZoneGoneSheet: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
     @EnvironmentObject private var viewModel: AppViewModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -101,7 +104,7 @@ struct ZoneGoneSheet: View {
             .accessibilityIdentifier("identity.zoneGone.keep")
         }
         .background(colors.backgroundSecondary.ignoresSafeArea())
-        .presentationDetents([.large])
+        .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.fraction(0.62), .large])
         .interactiveDismissDisabled(true)
         .alert(String(localized: "Delete from this iPhone?", table: "Identity"), isPresented: $confirmDelete) {
             Button(String(localized: "Delete", table: "Identity"), role: .destructive) {
@@ -114,6 +117,7 @@ struct ZoneGoneSheet: View {
         } message: {
             Text(String(localized: "Every record on this iPhone goes. This can’t be undone.", table: "Identity"))
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("identity.zoneGone")
     }
 }

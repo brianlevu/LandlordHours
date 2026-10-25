@@ -57,11 +57,24 @@ class IdentityJourneyUITests: XCTestCase {
         element.tap()
     }
 
+    /// Settings is a lazy List: rows below the fold exist only once scrolled to.
+    @discardableResult
+    func reveal(_ id: String, maxSwipes: Int = 12) -> XCUIElement {
+        let e = element(id)
+        var swipes = 0
+        while !(e.exists && e.isHittable) && swipes < maxSwipes {
+            app.swipeUp()
+            swipes += 1
+        }
+        return e
+    }
+
     var todayShown: Bool { element("today.chip").waitForExistence(timeout: 25) || element("today.addRental").waitForExistence(timeout: 2) }
 
     /// Settings opens from Today's account menu (2.2 shell).
     func openSettings() {
-        if !element("today.account").exists { tap(app.buttons["tab.today"]) }
+        // A top toast replaces Today's chip row for a few seconds; the account button comes back.
+        if !element("today.account").waitForExistence(timeout: 12) { tap(app.tabBars.buttons["Today"]) }
         tap(element("today.account"))
         tap(app.buttons["Settings"])
         XCTAssertTrue(element("settings.screen").waitForExistence(timeout: 10), "Settings")
@@ -112,7 +125,7 @@ class IdentityJourneyUITests: XCTestCase {
         tap(app.buttons["identity.merge.confirmSpouse"])
         XCTAssertTrue(element("identity.mergeQuestion").waitForNonExistence(timeout: 8))
         openSettings()
-        tap(element("settings.earlierRecords"))
+        tap(reveal("settings.earlierRecords"))
         tap(element("earlier.group.spouse"))
         tap(app.buttons["Undo"])
         XCTAssertTrue(element("earlier.group.pending").waitForExistence(timeout: 8), "back to waiting for an answer")
@@ -123,7 +136,7 @@ class IdentityJourneyUITests: XCTestCase {
         tap(app.buttons["identity.merge.aside"], timeout: 25)
         tap(app.buttons["identity.merge.confirmAside"])
         openSettings()
-        tap(element("settings.earlierRecords"))
+        tap(reveal("settings.earlierRecords"))
         tap(element("earlier.group.aside"))
         tap(app.buttons["Add to my records"])
         XCTAssertTrue(element("identity.mergeQuestion").waitForExistence(timeout: 8), "Add to my records asks again")
@@ -135,7 +148,7 @@ class IdentityJourneyUITests: XCTestCase {
         XCTAssertTrue(element("identity.mergeQuestion").waitForExistence(timeout: 25))
         tap(element("sheet.close"))
         openSettings()
-        XCTAssertTrue(element("settings.earlierRecords").waitForExistence(timeout: 10))
+        XCTAssertTrue(reveal("settings.earlierRecords").waitForExistence(timeout: 10))
         XCTAssertTrue(element("settings.earlierRecords").label.contains("1 waiting for your answer"), element("settings.earlierRecords").label)
     }
 
@@ -157,7 +170,7 @@ class IdentityJourneyUITests: XCTestCase {
         XCTAssertTrue(element("identity.bulk").waitForExistence(timeout: 25), "P28")
         tap(app.buttons["identity.bulk.remove"])
         openSettings()
-        tap(element("settings.earlierRecords"))
+        tap(reveal("settings.earlierRecords"))
         tap(element("earlier.recentlyRemoved"))
         XCTAssertTrue(element("removed.list").waitForExistence(timeout: 8))
         tap(app.buttons["removed.putBackAll"])
@@ -186,7 +199,7 @@ class IdentityJourneyUITests: XCTestCase {
             launch(fixture: "D2-106-signed-in", zone: zone)
             XCTAssertTrue(todayShown)
             openSettings()
-            let row = element("settings.icloud.status")
+            let row = reveal("settings.icloud.status")
             XCTAssertTrue(row.waitForExistence(timeout: 15))
             let deadline = Date().addingTimeInterval(15)
             while !row.label.contains(value) && Date() < deadline { Thread.sleep(forTimeInterval: 0.5) }
@@ -200,10 +213,7 @@ class IdentityJourneyUITests: XCTestCase {
         launch(fixture: "D2-106-signed-in", zone: "empty")
         XCTAssertTrue(todayShown)
         openSettings()
-        let row = element("settings.deleteData")
-        var swipes = 0
-        while !(row.exists && row.isHittable) && swipes < 12 { app.swipeUp(); swipes += 1 }
-        tap(row)
+        tap(reveal("settings.deleteData"))
         let hold = app.buttons["delete.hold"].firstMatch.exists ? app.buttons["delete.hold"].firstMatch : element("delete.hold")
         XCTAssertTrue(hold.waitForExistence(timeout: 10))
         hold.press(forDuration: 2.2)

@@ -105,6 +105,7 @@ struct EarlierRecordsView: View {
         .sheet(isPresented: $showBulk) { BulkAbsenceSheet().environmentObject(viewModel) }
         .navigationDestination(isPresented: $showRemoved) { RecentlyRemovedView() }
         .onAppear { viewModel.identity.refresh() }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("earlier.list")
     }
 
@@ -134,7 +135,7 @@ struct EarlierRecordsView: View {
             glyph = "tray"
         }
         return LHRow.Browse(title: summary, meta: meta, systemImage: glyph, tint: group.status == .pending ? .caution : .neutral) {
-            if group.status == .pending { answering = group } else { acting = group }
+            if group.status == .pending { viewModel.identity.questionDeferred = true; answering = group } else { acting = group }
         }
         .accessibilityIdentifier("earlier.group.\(group.status.rawValue)")
     }
@@ -149,8 +150,13 @@ struct EarlierRecordsView: View {
             Button(String(localized: "Undo", table: "Identity")) { viewModel.undoSpouse(group: group.id) }
         default:
             Button(String(localized: "Add to my records", table: "Identity")) {
+                // This page asks; the app-level host stays quiet so one sheet shows, after the
+                // dialog has finished closing.
+                viewModel.identity.questionDeferred = true
                 viewModel.identity.reconsider(group: group.id)
-                answering = viewModel.identity.earlier.group(group.id)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                    answering = viewModel.identity.earlier.group(group.id)
+                }
             }
             Button(String(localized: "Delete", table: "Identity"), role: .destructive) { deleting = group }
         }
@@ -197,6 +203,7 @@ struct RecentlyRemovedView: View {
             Button(String(localized: "Put back", table: "Identity")) { viewModel.putBack([item.name]) }
             Button(String(localized: "Cancel", table: "Identity"), role: .cancel) {}
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("removed.list")
     }
 

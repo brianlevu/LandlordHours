@@ -74,7 +74,8 @@ final class IdentityCoordinator: ObservableObject {
     private(set) var engine: RecordSetMigration?
     private(set) var source: IdentityZoneSource?
 
-    @Published private(set) var status: ICloudRecordsStatus = .off
+    /// `.syncing` until the first account check: never flash "only on this iPhone" before it.
+    @Published private(set) var status: ICloudRecordsStatus = .syncing
     @Published private(set) var pendingQuestion: ArchivedGroup?
     @Published private(set) var pendingIndex = 1
     @Published private(set) var pendingTotal = 1
@@ -164,7 +165,9 @@ final class IdentityCoordinator: ObservableObject {
     }
 
     /// Set by the view model when the live set has at least one entry.
-    var hasSavedEntry = false
+    var hasSavedEntry = false {
+        didSet { if oldValue != hasSavedEntry { todayNotice = computeNotice() } }
+    }
 
     private var iCloudOffSnoozed: Bool {
         guard let at = defaults.object(forKey: IdentityKeys.noticeICloudOffDismissedAt) as? Date else { return false }
@@ -193,8 +196,11 @@ final class IdentityCoordinator: ObservableObject {
         welcome = .checking
         let task = Task { await sync.start() }
         let deadline = Date().addingTimeInterval(8)
+        // Until the cloud step finishes (or can't run), never on the sync flag alone: the
+        // initial sync may not have started yet when Welcome appears.
         while Date() < deadline {
-            if liveHours() > 0 || !sync.isRunningInitialSync { break }
+            if liveHours() > 0 || IdentityScope.step(defaults) == .done { break }
+            if sync.accountStatusCheckCount > 0 && !sync.accountAvailable && !sync.isRunningInitialSync { break }
             try? await Task.sleep(for: .milliseconds(250))
         }
         _ = task
@@ -203,6 +209,11 @@ final class IdentityCoordinator: ObservableObject {
     }
 
     func setWelcome(_ state: WelcomeRecordsState) { welcome = state }
+
+    /// Records that land after the ≤ 8 s check still turn Welcome's footer into P2.
+    func noteLiveHours(_ hours: Double) {
+        if hours > 0, welcome != .found(hours: hours), welcome != .checking { welcome = .found(hours: hours) }
+    }
 
     // MARK: Answers (forwarded to the engine)
 

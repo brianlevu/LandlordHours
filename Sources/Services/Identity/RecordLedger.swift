@@ -54,7 +54,20 @@ struct RecordLedger {
         if let v = entry.recordDescription { fields.append((CloudKitSyncService.CaptureEntryField.recordDescription, "s:" + v)) }
         fields.sort { $0.0 < $1.0 }
         let joined = (["type=TimeEntry"] + fields.map { "\($0.0)=\($0.1)" }).joined(separator: "\u{1F}")
-        return SHA256.hash(data: Data(joined.utf8)).map { String(format: "%02x", $0) }.joined()
+        return hex(SHA256.hash(data: Data(joined.utf8)))
+    }
+
+    private static let hexDigits = Array("0123456789abcdef".utf8)
+
+    /// Lowercase hex without `String(format:)` per byte (the slow part on an A12 in S4).
+    static func hex<D: Sequence>(_ digest: D) -> String where D.Element == UInt8 {
+        var out = [UInt8]()
+        out.reserveCapacity(64)
+        for byte in digest {
+            out.append(hexDigits[Int(byte >> 4)])
+            out.append(hexDigits[Int(byte & 0x0f)])
+        }
+        return String(decoding: out, as: UTF8.self)
     }
 
     static func version(_ property: RentalProperty) -> RecordVersion {

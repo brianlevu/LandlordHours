@@ -31,6 +31,7 @@ struct ICloudRecordsSection: View {
                 ICloudStatusRow(showsChevron: false) {}
             }
             .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 16))
+            .accessibilityIdentifier("settings.icloud.status")
             if identity.status == .off || identity.status == .restricted {
                 LHRow.Browse(title: String(localized: "Turn on iCloud for LandlordHours", table: "Identity"),
                              meta: String(localized: "Opens iPhone Settings", table: "Identity"), systemImage: "gearshape", tint: .neutral) {
@@ -218,6 +219,7 @@ struct ICloudRecordsView: View {
         .navigationTitle(String(localized: "iCloud", table: "Identity"))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { identity.refresh(sync: viewModel.syncService) }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("icloud.detail")
     }
 

@@ -125,6 +125,7 @@ final class EngineHarness {
     init(_ sandbox: IdentitySandbox, zone: FakeZoneSource? = nil) {
         self.sandbox = sandbox
         let zone = zone ?? FakeZoneSource()
+        zone.defaults = sandbox.defaults
         self.zone = zone
         live = DefaultsLiveRecordSet(defaults: sandbox.defaults)
         earlier = EarlierRecordsStore(root: sandbox.root)

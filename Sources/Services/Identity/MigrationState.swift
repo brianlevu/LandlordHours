@@ -110,6 +110,15 @@ enum IdentityScope {
         return Resolved(scopeId: nil, prefix: "")
     }
 
+    /// A DEBUG mock or fixture scope is active: it must never sync with the person's real zone.
+    static func isDebugScope(_ defaults: UserDefaults = .standard) -> Bool {
+        #if DEBUG
+        return (debugOverride?.isEmpty == false) || (defaults.string(forKey: debugScopeKey)?.isEmpty == false)
+        #else
+        return false
+        #endif
+    }
+
     static func step(_ defaults: UserDefaults = .standard) -> MigrationStep {
         defaults.string(forKey: IdentityKeys.state).flatMap(MigrationStep.init(rawValue:)) ?? .notStarted
     }

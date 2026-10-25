@@ -109,8 +109,8 @@ class AppViewModel: ObservableObject {
 #endif
         // 2.2: every 1.x / 2.0 state becomes one record set under `v2.` (S1–S4, before the
         // first frame). Nothing is deleted; `u.*` stays as it is.
-        Self.runDeviceMerge()
-        reloadManagersForRecordSet()
+        // The managers re-read their keys only when this launch moved the record set.
+        if Self.runDeviceMerge() { reloadManagersForRecordSet() }
         checkSignInState()
 #if DEBUG
         applyLaunchMockScenarioIfNeeded()
@@ -174,8 +174,9 @@ class AppViewModel: ObservableObject {
     static var debugFakeZone: FakeZoneSource?
 #endif
 
-    /// S1–S4 over the standard defaults and Application Support.
-    static func runDeviceMerge() {
+    /// S1–S4 over the standard defaults and Application Support. True when this launch merged.
+    @discardableResult
+    static func runDeviceMerge() -> Bool {
         var options = RecordSetMigration.DeviceOptions()
 #if DEBUG
         options.crashAt = IdentityFixtures.crashAt
@@ -184,9 +185,10 @@ class AppViewModel: ObservableObject {
         }
 #endif
         do {
-            _ = try RecordSetMigration.runDevicePhase(defaults: .standard, root: MigrationFiles.defaultRoot, options: options)
+            return try RecordSetMigration.runDevicePhase(defaults: .standard, root: MigrationFiles.defaultRoot, options: options) != .alreadyMerged
         } catch {
             Self.persistenceLogger.error("Device merge stopped: \(String(describing: error), privacy: .public)")
+            return true
         }
     }
 
@@ -202,6 +204,7 @@ class AppViewModel: ObservableObject {
     /// Pulls, answers and archive moves change the live set: reload what Today shows.
     func reloadAfterIdentityChange() {
         identity.hasSavedEntry = !timeEntries.isEmpty
+        if rootState == .welcome { identity.noteLiveHours(timeEntries.reduce(0) { $0 + $1.hours }) }
         identity.refresh(sync: syncService)
         objectWillChange.send()
     }

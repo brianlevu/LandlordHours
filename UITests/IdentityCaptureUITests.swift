@@ -44,6 +44,8 @@ final class IdentityCaptureUITests: IdentityJourneyUITests {
             app.swipeUp()
             swipes += 1
         }
+        // Rest the row in the middle of the screen, not under the tab bar.
+        if element.exists, element.frame.maxY > app.frame.height * 0.8 { app.swipeUp() }
     }
 
     private func captureAll(scheme: String, size: String?) {
@@ -96,14 +98,14 @@ final class IdentityCaptureUITests: IdentityJourneyUITests {
         openSettings()
         scrollTo(element("settings.icloud.status"))
         shoot("settings-icloud-on-\(s)")
-        tap(element("settings.earlierRecords"))
+        tap(reveal("settings.earlierRecords"))
         XCTAssertTrue(element("earlier.list").waitForExistence(timeout: 10))
         shoot("earlier-records-\(s)")
         launch(fixture: "D2-106-signed-in", zone: "fail", scheme: scheme, size: size)
         openSettings()
         scrollTo(element("settings.icloud.status"))
         shoot("settings-icloud-problem-\(s)")
-        tap(element("settings.icloud.status"))
+        tap(reveal("settings.icloud.status"))
         XCTAssertTrue(element("icloud.detail").waitForExistence(timeout: 10))
         shoot("icloud-detail-problem-\(s)")
 
@@ -112,14 +114,14 @@ final class IdentityCaptureUITests: IdentityJourneyUITests {
         tap(app.buttons["identity.bulk.remove"], timeout: 25)
         openSettings()
         scrollTo(element("settings.earlierRecords"))
-        tap(element("settings.earlierRecords"))
+        tap(reveal("settings.earlierRecords"))
         tap(element("earlier.recentlyRemoved"))
         XCTAssertTrue(element("removed.list").waitForExistence(timeout: 10))
         shoot("recently-removed-\(s)")
         launch(fixture: "D2-106-signed-in", zone: "empty", scheme: scheme, size: size)
         openSettings()
         scrollTo(element("settings.yourName"))
-        tap(element("settings.yourName"))
+        tap(reveal("settings.yourName"))
         XCTAssertTrue(element("yourName.field").waitForExistence(timeout: 10))
         shoot("your-name-\(s)")
     }
