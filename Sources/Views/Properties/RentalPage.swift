@@ -108,10 +108,10 @@ struct PropertyDetailView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     LHToastChipSlot {
                         LHScreenTitle(property.name, style: .detail)
-                            .padding(.horizontal, LHMetrics.gutter)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .accessibilityIdentifier("property.title")
                     }
+                    .padding(.horizontal, LHMetrics.gutter)
                     RentalHero(property: property, side: side, windowHeight: window.height)
                         .padding(.top, ax ? 8 : 0)
                     RentalBody(property: property)

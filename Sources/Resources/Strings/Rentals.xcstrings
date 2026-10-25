@@ -261,7 +261,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Every hour you log starts with a place."
+            "value": "Your hours start here."
           }
         }
       }
@@ -328,6 +328,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lldh this year"
+          }
+        }
+      }
+    },
+    "rentals.hoursWhole": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lldh"
           }
         }
       }

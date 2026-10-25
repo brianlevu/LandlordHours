@@ -190,6 +190,7 @@ final class RentalStageTests: XCTestCase {
     func testRowWordsAndHours() {
         let row = RentalRowModel(id: UUID(), name: "Pine Cabin", hours: 212.9, goal: 750, lit: true, kind: .str)
         XCTAssertEqual(row.value, "212h", "whole hours, never rounded up")
+        XCTAssertEqual(RentalRowModel(id: UUID(), name: "M", hours: 0, goal: 750, lit: false, kind: .ltr).value, "0h", "never 0m")
         XCTAssertEqual(row.meta, "Frame going up", "the stage in words")
         XCTAssertEqual(RentalRowModel(id: UUID(), name: "Oak", hours: 0, goal: 750, lit: false, kind: .ltr).meta, "Framing started")
         XCTAssertTrue(row.spoken.hasSuffix("A few nights"), "VoiceOver still hears the kind of stay")
@@ -256,7 +257,7 @@ final class RentalPageFiguresTests: XCTestCase {
     }
 
     func testWeekTileTrend() {
-        XCTAssertEqual(RentalPageFigures.weekTile(thisWeek: 0, lastWeek: 0), .init(value: "0m", label: "This week", trend: nil))
+        XCTAssertEqual(RentalPageFigures.weekTile(thisWeek: 0, lastWeek: 0), .init(value: "0h", label: "This week", trend: nil))
         XCTAssertEqual(RentalPageFigures.weekTile(thisWeek: 6, lastWeek: 2).trend, .up)
         XCTAssertEqual(RentalPageFigures.weekTile(thisWeek: 1.5, lastWeek: 4).trend, .down)
         XCTAssertEqual(RentalPageFigures.weekTile(thisWeek: 3, lastWeek: 3.1).trend, .flat)

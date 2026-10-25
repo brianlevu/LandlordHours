@@ -37,8 +37,8 @@ struct RentalRowModel: Identifiable, Equatable {
     /// Whole hours, rounded down so a row never runs ahead of the records.
     var wholeHours: Int { Int(hours.rounded(.down)) }
 
-    /// The trailing value: "212h".
-    var value: String { LHFormat.hours(Double(wholeHours)) }
+    /// The trailing value: "212h" (whole hours; "0h", never "0m", for a rental with none yet).
+    var value: String { RentalsText.wholeHours(wholeHours) }
 
     /// The meta line says the stage in words (identity is the thumbnail, §H.5): "Frame going up". One
     /// short phrase, so it never truncates at default ("Roof on, siding going up" is the longest);
@@ -112,7 +112,7 @@ struct RentalPageFigures: Equatable {
         } else {
             trend = this > last ? .up : .down
         }
-        return Tile(value: LHFormat.hours(this), label: RentalsText.thisWeek, trend: trend)
+        return Tile(value: this == 0 ? RentalsText.wholeHours(0) : LHFormat.hours(this), label: RentalsText.thisWeek, trend: trend)
     }
 
     /// "9h a week · To finish by Dec 31"; "Reached" once the goal is met; "Not yet" while the pace
@@ -196,6 +196,10 @@ enum RentalsText {
     static func count(_ n: Int) -> String {
         String(localized: "rentals.count", defaultValue: "\(n) rentals", table: "Rentals")
     }
+    /// "212h".
+    static func wholeHours(_ whole: Int) -> String {
+        String(localized: "rentals.hoursWhole", defaultValue: "\(whole)h", table: "Rentals")
+    }
     /// "212h this year".
     static func hoursThisYear(_ whole: Int) -> String {
         String(localized: "rentals.hoursThisYear", defaultValue: "\(whole)h this year", table: "Rentals")
@@ -224,7 +228,7 @@ enum RentalsText {
     static var loading: String { String(localized: "rentals.loading", defaultValue: "Loading your rentals", table: "Rentals") }
     static var emptyHeadline: String { String(localized: "rentals.empty.headline", defaultValue: "Add your first rental", table: "Rentals") }
     static var emptyMessage: String {
-        String(localized: "rentals.empty.message", defaultValue: "Every hour you log starts with a place.", table: "Rentals")
+        String(localized: "rentals.empty.message", defaultValue: "Your hours start here.", table: "Rentals")
     }
     static var nextRental: String { String(localized: "rentals.lock.next", defaultValue: "Your next rental", table: "Rentals") }
     static var open: String { String(localized: "rentals.menu.open", defaultValue: "Open", table: "Rentals") }

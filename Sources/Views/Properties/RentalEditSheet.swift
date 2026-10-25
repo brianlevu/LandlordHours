@@ -75,6 +75,7 @@ struct PropertyEditSheet: View {
                     .buttonStyle(LHButton.primary)
                     .disabled(!canSave)
                     .accessibilityIdentifier("property.save")
+                    .background(alignment: .top) { footerSurface }
             }
 #if DEBUG
             .onAppear {
@@ -86,6 +87,23 @@ struct PropertyEditSheet: View {
         }
         .onAppear(perform: load)
         .onChange(of: name) { _, _ in nameError = nil }
+    }
+
+    /// `LHSheet`'s footer inset has no surface, so the form showed through around the pinned button
+    /// (reported to package A). The button carries the sheet's surface behind it, out to the sheet's
+    /// edges and the home indicator, with a 24pt fade above so rows scroll out softly.
+    private var footerSurface: some View {
+        VStack(spacing: 0) {
+            LinearGradient(colors: [colors.backgroundSecondary.opacity(0), colors.backgroundSecondary],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(height: 24)
+            colors.backgroundSecondary
+        }
+        .padding(.top, -32)
+        .padding(.horizontal, -40)
+        .padding(.bottom, -80)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     // MARK: Name and address
@@ -153,14 +171,15 @@ struct PropertyEditSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             LHSectionHeader(RentalsText.stayQuestion)
             if ax {
-                Menu {
-                    Picker(RentalsText.stayQuestion, selection: $propertyType) {
-                        Text(RentalsText.kind(.ltr)).tag(PropertyType.ltr)
-                        Text(RentalsText.kind(.str)).tag(PropertyType.str)
-                    }
-                } label: {
-                    LHRow.Value(RentalsText.howGuestsStay, value: RentalsText.kind(propertyType), accessory: .menu).content
+                // At AX sizes two segments cannot hold "Long stays" and "A few nights" whole, so the
+                // choice becomes two option rows with the trailing checkmark (§1.24's option rows).
+                VStack(spacing: 0) {
+                    stayOption(.ltr)
+                    LHDivider(leadingInset: 16)
+                    stayOption(.str)
                 }
+                .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("property.stay")
             } else {
                 LHSegmented([.init(PropertyType.ltr, RentalsText.kind(.ltr)), .init(PropertyType.str, RentalsText.kind(.str))],
@@ -171,6 +190,33 @@ struct PropertyEditSheet: View {
                 .font(.footnote)
                 .foregroundStyle(colors.textSecondary)
         }
+    }
+
+    private func stayOption(_ type: PropertyType) -> some View {
+        let selected = propertyType == type
+        return Button {
+            if reduceMotion { propertyType = type } else { withAnimation(AppAnimation.quick) { propertyType = type } }
+        } label: {
+            HStack(spacing: 12) {
+                Text(RentalsText.kind(type))
+                    .font(.body)
+                    .foregroundStyle(colors.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(colors.action)
+                        .frame(minWidth: LHMetrics.minTap, minHeight: LHMetrics.minTap)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .frame(minHeight: LHMetrics.rowMinHeight)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(LHButton.press)
+        .sensoryFeedback(.selection, trigger: selected)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     // MARK: Other names
