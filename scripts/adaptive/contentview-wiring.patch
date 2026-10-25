@@ -1,0 +1,38 @@
+diff --git a/Sources/Views/ContentView.swift b/Sources/Views/ContentView.swift
+index 7b52e48..5d5bc57 100644
+--- a/Sources/Views/ContentView.swift
++++ b/Sources/Views/ContentView.swift
+@@ -168,7 +168,8 @@ struct ContentView: View {
+                             .padding(.bottom, 12)
+                     }
+             } else {
+-                mainContent
++                // §1.27: compact, two-pane or stacked (package J's root; A owns this line).
++                TwoPaneLayout { mainContent }
+             }
+         }
+         .frame(maxWidth: .infinity, maxHeight: .infinity)
+@@ -374,12 +375,10 @@ struct ContentView: View {
+             .onReceive(NotificationCenter.default.publisher(for: .openLogSheet)) { note in
+                 openLog((note.object as? LogSheetRoute) ?? .log)
+             }
+-            .sheet(item: $logRoute) { route in
++            // Log time: a `.large` sheet in compact, in the right pane in two-pane and stacked (§1.27).
++            .paneAwareLogTime(route: $logRoute, background: colors.background) { route in
+                 LogTimeSheet(route: route) { logRoute = nil }
+                     .environmentObject(viewModel)
+-                    .presentationDetents([.large])
+-                    .presentationDragIndicator(.hidden)
+-                    .presentationBackground(colors.background)
+             }
+             .onChange(of: scenePhase) { _, phase in
+                 if phase == .active { inboxModel.reload() }
+@@ -466,7 +465,7 @@ struct ContentView: View {
+     @ViewBuilder
+     private var todayContent: some View {
+         switch todayRoute {
+-        case .dashboard: DashboardView(inbox: inboxModel)
++        case .dashboard: AdaptiveToday(inbox: inboxModel)   // DashboardView in compact, the work pane otherwise
+         case .reports: ReportsView()
+         case .settings: SettingsView()
+         }

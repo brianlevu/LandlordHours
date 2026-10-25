@@ -1,0 +1,90 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "twoPane.detail.back": {
+      "comment": "Back link from a detail opened in the work pane.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To confirm"
+          }
+        }
+      }
+    },
+    "twoPane.list.filterA11y": {
+      "comment": "Accessibility label of the rental filter chip in the work pane.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Showing %@. Show all rentals"
+          }
+        }
+      }
+    },
+    "twoPane.list.moreElsewhere": {
+      "comment": "Foot of the filtered To confirm list; tapping shows every rental.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld more at other rentals"
+          }
+        }
+      }
+    },
+    "twoPane.record.empty": {
+      "comment": "On the record today, when nothing is logged.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing logged yet today."
+          }
+        }
+      }
+    },
+    "twoPane.record.title": {
+      "comment": "Card title: entries logged today at the selected rental.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On the record today"
+          }
+        }
+      }
+    },
+    "twoPane.shelf.count": {
+      "comment": "Shelf count line above the plank: how many shelf items are in view of the total (the scroll cue).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld of %lld rentals"
+          }
+        }
+      }
+    },
+    "twoPane.shelf.progress": {
+      "comment": "Shelf: one rental's hours of its goal, e.g. 46 of 100h.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld of %lldh"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
