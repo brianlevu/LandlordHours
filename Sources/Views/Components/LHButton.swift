@@ -14,7 +14,8 @@ import SwiftUI
 //   .icon       44 circle, symbol .body.semibold, backgroundTertiary / textSecondary.
 //
 // Press = motion `press` (scale 0.97, `feedback` down / `quick` up; opacity 0.8 under Reduce
-// Motion). Disabled = 40% opacity. `onBlueprint` keeps the 1.x blueprint-band variants (white on
+// Motion). Disabled = no opacity dim: a muted fill (`backgroundTertiary`, hairline `border`) with
+// `textSecondary` ink on primary and secondary (≥ 4.5:1), `textSecondary` ink alone on tertiary and icon. `onBlueprint` keeps the 1.x blueprint-band variants (white on
 // brand) for the screens that still draw that band until their package removes it.
 //
 // Usage: `Button("Log") { … }.buttonStyle(LHButton.primary)`;
@@ -53,8 +54,7 @@ struct LHButton: ButtonStyle {
         static let secondaryPadding: CGFloat = 18
         static let primaryPadding: CGFloat = 20
         static let pressedScale: CGFloat = 0.97
-        static let disabledOpacity: Double = 0.4
-    }
+            }
 
     func makeBody(configuration: Configuration) -> some View {
         LHButtonBody(style: self, configuration: configuration)
@@ -76,9 +76,15 @@ private struct LHButtonBody: View {
 
     var body: some View {
         styled
-            .opacity(isEnabled ? (reduceMotion && pressed ? 0.8 : 1) : LHButton.Metrics.disabledOpacity)
+            .opacity(reduceMotion && pressed ? 0.8 : 1)
             .scaleEffect(pressed && !reduceMotion ? LHButton.Metrics.pressedScale : 1)
             .animation(pressed ? AppAnimation.feedback : AppAnimation.quick, value: pressed)
+    }
+
+    /// Disabled ink and fill (§1.13): full-contrast secondary text on a muted fill, never a dimmed label.
+    private var disabledInk: Color { colors.textSecondary }
+    private func disabledFill(_ shape: some InsettableShape) -> some View {
+        shape.fill(colors.backgroundTertiary).overlay(shape.strokeBorder(colors.border, lineWidth: 1))
     }
 
     @ViewBuilder private var styled: some View {
@@ -103,7 +109,11 @@ private struct LHButtonBody: View {
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, minHeight: LHButton.Metrics.primaryHeight)
             .contentShape(Capsule())
-        if style.glass, #available(iOS 26.0, *) {
+        if !isEnabled {
+            label
+                .foregroundStyle(disabledInk)
+                .background(disabledFill(Capsule()))
+        } else if style.glass, #available(iOS 26.0, *) {
             label
                 .foregroundStyle(primaryInk)
                 .glassEffect(.regular.tint(primaryFill).interactive(), in: .capsule)
@@ -117,19 +127,22 @@ private struct LHButtonBody: View {
     private var secondary: some View {
         configuration.label
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(style.onBlueprint ? Color.white : colors.action)
+            .foregroundStyle(isEnabled ? (style.onBlueprint ? Color.white : colors.action) : disabledInk)
             .multilineTextAlignment(.center)
             .padding(.horizontal, LHButton.Metrics.secondaryPadding)
             .padding(.vertical, 10)
             .frame(minHeight: LHButton.Metrics.controlHeight)
-            .background(style.onBlueprint ? Color.white.opacity(0.14) : colors.actionSurface, in: Capsule())
+            .background {
+                if isEnabled { Capsule().fill(style.onBlueprint ? Color.white.opacity(0.14) : colors.actionSurface) }
+                else { disabledFill(Capsule()) }
+            }
             .contentShape(Capsule())
     }
 
     private var tertiary: some View {
         configuration.label
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(style.destructive ? colors.destructive : (style.onBlueprint ? Color.white : colors.action))
+            .foregroundStyle(isEnabled ? (style.destructive ? colors.destructive : (style.onBlueprint ? Color.white : colors.action)) : disabledInk)
             .multilineTextAlignment(.center)
             .frame(minHeight: LHButton.Metrics.controlHeight)
             .contentShape(Rectangle())
@@ -140,7 +153,7 @@ private struct LHButtonBody: View {
             // §1.17: the one place a symbol weight is set explicitly.
             .font(.body.weight(.semibold))
             .imageScale(.medium)
-            .foregroundStyle(style.onBlueprint ? Color.white : colors.textSecondary)
+            .foregroundStyle(style.onBlueprint ? Color.white : (isEnabled ? colors.textSecondary : colors.textTertiary))
             .frame(width: max(iconSide, LHButton.Metrics.controlHeight), height: max(iconSide, LHButton.Metrics.controlHeight))
             .background(style.onBlueprint ? Color.white.opacity(0.14) : colors.backgroundTertiary, in: Circle())
             .contentShape(Circle())
@@ -172,7 +185,7 @@ private struct LHPressBody: View {
         configuration.label
             .contentShape(Rectangle())
             .scaleEffect(pressed && !reduceMotion ? LHButton.Metrics.pressedScale : 1)
-            .opacity(isEnabled ? (pressed && reduceMotion ? 0.8 : 1) : LHButton.Metrics.disabledOpacity)
+            .opacity(isEnabled ? (pressed && reduceMotion ? 0.8 : 1) : 0.4)
             .animation(pressed ? AppAnimation.feedback : AppAnimation.quick, value: pressed)
     }
 }
