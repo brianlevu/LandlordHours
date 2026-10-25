@@ -75,7 +75,7 @@ struct TimeEntryDetailView: View {
                 if isEditing {
                     Button(RR.t("record.save", "Save")) { saveChanges() }
                         .fontWeight(.semibold)
-                        .foregroundStyle(hasChanges ? colors.action : colors.textTertiary)
+                        .foregroundStyle(hasChanges ? colors.action : colors.textSecondary)
                         .disabled(!hasChanges)
                         .accessibilityIdentifier("entry.save")
                 } else {
@@ -121,14 +121,25 @@ struct TimeEntryDetailView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 14) {
-            CategoryToolTile(category: category, size: 56)
-            LHScreenTitle(
-                isEditing ? category.inboxLabel : RecordsLogic.title(for: entry, propertyName: propertyName),
-                subtitle: headerSubtitle,
-                style: .detail
-            )
-            .padding(.bottom, -LHMetrics.headerToContent)
+        let title = LHScreenTitle(
+            isEditing ? category.inboxLabel : RecordsLogic.title(for: entry, propertyName: propertyName),
+            subtitle: headerSubtitle,
+            style: .detail
+        )
+        .padding(.bottom, -LHMetrics.headerToContent)
+        return Group {
+            if ax {
+                // Tile above the title so the title keeps the full width (no mid-word breaks).
+                VStack(alignment: .leading, spacing: 12) {
+                    CategoryToolTile(category: category, size: 56)
+                    title
+                }
+            } else {
+                HStack(alignment: .center, spacing: 14) {
+                    CategoryToolTile(category: category, size: 56)
+                    title
+                }
+            }
         }
         .accessibilityElement(children: .combine)
     }
@@ -143,11 +154,17 @@ struct TimeEntryDetailView: View {
                     .frame(maxWidth: .infinity)
             }
         }
-        .padding(.horizontal, LHMetrics.cardPadding)
-        .padding(.vertical, 18)
-        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+        .padding(.horizontal, isEditing ? 0 : LHMetrics.cardPadding)
+        .padding(.vertical, isEditing ? 0 : 14)
+        .background {
+            // The stepper sits bare on the page: a card around a single 44pt control reads as empty.
+            if !isEditing {
+                RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
+                    .fill(colors.backgroundSecondary)
+            }
+        }
         .overlay {
-            if colorScheme == .dark {
+            if colorScheme == .dark && !isEditing {
                 RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
                     .strokeBorder(colors.border, lineWidth: LHMetrics.hairline)
             }
@@ -257,7 +274,7 @@ struct TimeEntryDetailView: View {
                     }
                 }
             } label: {
-                LHRow.Value(RR.t("record.fact.rental", "Rental"), value: propertyName, accessory: .menu).content
+                EditMenuFace(label: RR.t("record.fact.rental", "Rental"), value: propertyName, colors: colors)
             }
             .accessibilityIdentifier("entry.edit.rental")
 
@@ -268,7 +285,7 @@ struct TimeEntryDetailView: View {
                     }
                 }
             } label: {
-                LHRow.Value(RR.t("record.fact.kind", "Kind of work"), value: category.inboxLabel, accessory: .menu).content
+                EditMenuFace(label: RR.t("record.fact.kind", "Kind of work"), value: category.inboxLabel, colors: colors)
             }
             .accessibilityIdentifier("entry.edit.kind")
 
@@ -378,6 +395,44 @@ private struct FactRow: View {
         }
         .padding(LHRow.insets)
         .frame(maxWidth: .infinity, minHeight: LHMetrics.rowMinHeight, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// A menu row's face for the edit form. Takes the parent's resolved colours: a `Menu` label is
+/// rendered outside the parent's environment, so reading `colorScheme` here put the light
+/// tertiary fill on a dark canvas.
+private struct EditMenuFace: View {
+    let label: String
+    let value: String
+    let colors: AdaptiveColors
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+                                                  : AnyLayout(HStackLayout(spacing: 12))
+        layout {
+            Text(label)
+                .font(.body)
+                .foregroundStyle(colors.textPrimary)
+                .frame(maxWidth: typeSize.isAccessibilitySize ? .infinity : nil, alignment: .leading)
+            if !typeSize.isAccessibilitySize { Spacer(minLength: 8) }
+            HStack(spacing: 6) {
+                Text(value)
+                    .font(.body)
+                    .foregroundStyle(colors.textSecondary)
+                    .multilineTextAlignment(.trailing)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.footnote)
+                    .foregroundStyle(colors.textTertiary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: LHMetrics.rowMinHeight, alignment: .leading)
+        .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }

@@ -304,13 +304,12 @@ private struct RecordsScreen: View {
                 EmptyView()
             }
             .opacity(0)
-            LHRow.Browse(
+            RecordRowContent(
                 title: RecordsLogic.title(for: entry, propertyName: propertyName),
                 meta: RecordsLogic.meta(for: entry, propertyName: propertyName),
-                value: LHFormat.hours(entry.hours)
-            ) {
-                CategoryToolTile(category: entry.category, size: 36)
-            }
+                value: LHFormat.hours(entry.hours),
+                category: entry.category
+            )
         }
         .listRowBackground(colors.backgroundSecondary)
         .listRowInsets(EdgeInsets())
@@ -341,4 +340,43 @@ private struct RecordsScreen: View {
 #Preview {
     HistoryView()
         .environmentObject(AppViewModel())
+}
+
+
+/// One Records row. Same look as `LHRow.Browse` at regular sizes. At accessibility sizes the tile and
+/// chevron go and the hours move onto the meta line, so the title gets the full width (no mid-word
+/// breaks) and a row stays at D7: title <= 2 lines, meta 1 line.
+private struct RecordRowContent: View {
+    let title: String
+    let meta: String
+    let value: String
+    let category: ActivityCategory
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var typeSize
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        if typeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.body)
+                    .foregroundStyle(colors.textPrimary)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(RR.t("records.row.metaWithHours", "\(value) \u{00B7} \(meta)"))
+                    .font(.subheadline)
+                    .foregroundStyle(colors.textSecondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(LHRow.insets)
+            .frame(minHeight: LHMetrics.rowMinHeight)
+            .contentShape(Rectangle())
+        } else {
+            LHRow.Browse(title: title, meta: meta, value: value) {
+                CategoryToolTile(category: category, size: 36)
+            }
+        }
+    }
 }

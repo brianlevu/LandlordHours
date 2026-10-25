@@ -535,15 +535,22 @@ private struct RingStandingCard: View {
         RR.t("reports.standing.eyebrow", "\(String(year)) \u{00B7} \(standing.name)")
     }
 
+    /// The ring is the screen's hero but sits in a card, so the card stays <= 40% of the window
+    /// (D6 under the hero allowance): 200 at regular sizes, smaller as the words grow.
+    private var ringDiameter: CGFloat {
+        if typeSize.isAccessibilitySize { return 200 }
+        return typeSize >= .xxLarge ? 176 : 200
+    }
+
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 10) {
             Text(eyebrow)
                 .font(AppTypography.drafting)
                 .textCase(.uppercase)
                 .tracking(1.3)
                 .foregroundStyle(colors.draftingInk)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            LHRing(progress: standing.progress, tone: standing.tone == .positive ? .positive : (standing.tone == .caution ? .caution : .action), accessibilityValue: standing.spokenValue) {
+            LHRing(progress: standing.progress, tone: standing.tone == .positive ? .positive : (standing.tone == .caution ? .caution : .action), diameter: ringDiameter, lineWidth: 14, accessibilityValue: standing.spokenValue) {
                 VStack(spacing: 2) {
                     Text(String(Int(standing.hours.rounded(.down))))
                         .font(.largeTitle.weight(.bold))
@@ -559,7 +566,7 @@ private struct RingStandingCard: View {
                         .foregroundStyle(colors.textSecondary)
                         .multilineTextAlignment(.center)
                 }
-                .padding(.horizontal, 36)
+                .padding(.horizontal, 24)
             }
             VStack(spacing: 6) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -580,7 +587,8 @@ private struct RingStandingCard: View {
                 }
             }
         }
-        .padding(LHMetrics.cardPadding)
+        .padding(.horizontal, LHMetrics.cardPadding)
+        .padding(.vertical, 14)
         .frame(maxWidth: .infinity)
         .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
         .overlay {
@@ -615,9 +623,13 @@ private struct CompactStandingCard: View {
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
             : AnyLayout(HStackLayout(alignment: .center, spacing: 16))
         layout {
-            LHRing(progress: standing.progress, tone: standing.tone == .positive ? .positive : (standing.tone == .caution ? .caution : .action), diameter: 72, lineWidth: 9,
-                   accessibilityValue: standing.spokenValue) {
-                EmptyView()
+            // At accessibility sizes the words carry the count ("21h of 750h"); the ring would
+            // only add a stacked 72pt band above six lines of text.
+            if !typeSize.isAccessibilitySize {
+                LHRing(progress: standing.progress, tone: standing.tone == .positive ? .positive : (standing.tone == .caution ? .caution : .action), diameter: 72, lineWidth: 9,
+                       accessibilityValue: standing.spokenValue) {
+                    EmptyView()
+                }
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(eyebrow)

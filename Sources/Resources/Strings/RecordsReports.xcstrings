@@ -793,6 +793,17 @@
         }
       }
     },
+    "records.row.metaWithHours": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · %@"
+          }
+        }
+      }
+    },
     "records.search.label": {
       "extractionState": "manual",
       "localizations": {
