@@ -13,41 +13,43 @@ struct TodayIdentityCard: View {
     @EnvironmentObject private var viewModel: AppViewModel
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.openURL) private var openURL
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var showEarlier = false
     @State private var showBulk = false
 
     var body: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
         LHRowGroup(onPage: true) {
-            HStack(alignment: .top, spacing: 12) {
+            // One row: glyph, the words, then the text actions stacked at the trailing edge, so
+            // the card has no empty band under the words (D4).
+            let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                                                      : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
+            layout {
                 LHRowGlyph(systemImage: glyph, tint: tint)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(text)
-                        .font(.subheadline)
-                        .foregroundStyle(colors.textPrimary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    if actionTitle != nil || dismissible {
-                        // Text actions under the words, leading: no empty band (D4).
-                        HStack(spacing: 20) {
-                            if let actionTitle {
-                                Button(actionTitle, action: act)
-                                    .buttonStyle(LHButton.tertiary)
-                                    .accessibilityIdentifier("today.identity.action")
-                            }
-                            if dismissible {
-                                Button(String(localized: "Not now", table: "Identity")) {
-                                    withAnimation(AppAnimation.quick) { viewModel.identity.dismissNotice(notice) }
-                                }
+                Text(text)
+                    .font(.subheadline)
+                    .foregroundStyle(colors.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if actionTitle != nil || dismissible {
+                    VStack(alignment: typeSize.isAccessibilitySize ? .leading : .trailing, spacing: 0) {
+                        if let actionTitle {
+                            Button(actionTitle, action: act)
                                 .buttonStyle(LHButton.tertiary)
-                                .accessibilityIdentifier("today.identity.dismiss")
+                                .accessibilityIdentifier("today.identity.action")
+                        }
+                        if dismissible {
+                            Button(String(localized: "Not now", table: "Identity")) {
+                                withAnimation(AppAnimation.quick) { viewModel.identity.dismissNotice(notice) }
                             }
+                            .buttonStyle(LHButton.tertiary)
+                            .accessibilityIdentifier("today.identity.dismiss")
                         }
                     }
+                    .layoutPriority(1)
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 14)
-            .padding(.bottom, actionTitle != nil || dismissible ? 2 : 14)
+            .padding(.vertical, 8)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("today.identity.\(notice.id)")

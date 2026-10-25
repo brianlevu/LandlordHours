@@ -59,7 +59,7 @@ class IdentityJourneyUITests: XCTestCase {
 
     /// Settings is a lazy List: rows below the fold exist only once scrolled to.
     @discardableResult
-    func reveal(_ id: String, maxSwipes: Int = 12) -> XCUIElement {
+    func reveal(_ id: String, maxSwipes: Int = 30) -> XCUIElement {
         let e = element(id)
         var swipes = 0
         while !(e.exists && e.isHittable) && swipes < maxSwipes {

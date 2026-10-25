@@ -30,7 +30,9 @@ struct YourNameSheet: View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
         LHSheet(String(localized: "Your name", table: "Identity"), onClose: { dismiss() }) {
             VStack(alignment: .leading, spacing: 8) {
-                TextField(String(localized: "Optional", table: "Identity"), text: $name)
+                // The placeholder in textSecondary: the system grey fails AA (harness rule, 2026-10-19).
+                TextField("", text: $name, prompt: Text(String(localized: "Optional", table: "Identity")).foregroundStyle(colors.textSecondary))
+                    .foregroundStyle(colors.textPrimary)
                     .font(.body)
                     .textContentType(.name)
                     .submitLabel(.done)

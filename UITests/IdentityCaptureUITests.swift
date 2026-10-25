@@ -109,6 +109,33 @@ final class IdentityCaptureUITests: IdentityJourneyUITests {
         XCTAssertTrue(element("icloud.detail").waitForExistence(timeout: 10))
         shoot("icloud-detail-problem-\(s)")
 
+        captureTail(s, scheme: scheme, size: size)
+    }
+
+    // Recently removed and Your name only (round re-runs after a fix to those two surfaces).
+    func testTailLightDefault() { captureTail("light-default", scheme: "light", size: nil) }
+    func testTailDarkDefault() { captureTail("dark-default", scheme: "dark", size: nil) }
+    func testTailLightXXL() { captureTail("light-xxl", scheme: "light", size: "xxl") }
+    func testTailDarkXXL() { captureTail("dark-xxl", scheme: "dark", size: "xxl") }
+    func testTailLightAX3() { captureTail("light-ax3", scheme: "light", size: "ax3") }
+    func testTailDarkAX3() { captureTail("dark-ax3", scheme: "dark", size: "ax3") }
+
+    // Today's notice card only (round re-runs after a fix to the card).
+    func testNoticeLightDefault() { captureNotices("light-default", scheme: "light", size: nil) }
+    func testNoticeDarkDefault() { captureNotices("dark-default", scheme: "dark", size: nil) }
+    func testNoticeLightXXL() { captureNotices("light-xxl", scheme: "light", size: "xxl") }
+    func testNoticeDarkXXL() { captureNotices("dark-xxl", scheme: "dark", size: "xxl") }
+    func testNoticeLightAX3() { captureNotices("light-ax3", scheme: "light", size: "ax3") }
+    func testNoticeDarkAX3() { captureNotices("dark-ax3", scheme: "dark", size: "ax3") }
+
+    private func captureNotices(_ s: String, scheme: String, size: String?) {
+        launch(fixture: "D2-106-signed-in", zone: "empty", scheme: scheme, size: size)
+        if element("today.identity.p12").waitForExistence(timeout: 25) { scrollTo(element("today.identity.p12"), maxSwipes: 3); shoot("today-p12-\(s)") }
+        launch(fixture: "D2-106-signed-in", zone: "off", scheme: scheme, size: size)
+        if element("today.identity.p10").waitForExistence(timeout: 25) { scrollTo(element("today.identity.p10"), maxSwipes: 3); shoot("today-p10-\(s)") }
+    }
+
+    private func captureTail(_ s: String, scheme: String, size: String?) {
         // Recently removed (after "Remove them" on the bulk question), Your name.
         launch(fixture: "D5-201-local", zone: "bulk", scheme: scheme, size: size)
         tap(app.buttons["identity.bulk.remove"], timeout: 25)
