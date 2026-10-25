@@ -72,7 +72,7 @@ class CaptureTestCase: XCTestCase {
         authSnapshot = AuthStateSnapshot.capture()
         AuthStateSnapshot.clearAll()
         profileId = "local-capture-\(UUID().uuidString.prefix(8))"
-        UserDefaults.standard.set(profileId, forKey: ProfileKeys.localProfileId)
+        IdentityScope.debugOverride = profileId
         baseDir = FileManager.default.temporaryDirectory.appendingPathComponent("capture-\(UUID().uuidString)")
         calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
     }

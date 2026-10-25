@@ -30,8 +30,9 @@ final class SyncChangeTracker {
         var pendingDeletes: [String]?
     }
 
-    /// Fields rewritten on every build of the record (single-record settings stamp
-    /// `modifiedAt = Date()`), so they can't tell a change apart.
+    /// Fields rewritten on every build of the record (1.x/2.0 settings stamped
+    /// `modifiedAt = Date()`), so they can't tell a change apart. 2.2 settings records carry no
+    /// `modifiedAt`; the exclusion stays so 2.0.x records compare equal.
     nonisolated static let volatileKeysByType: [String: Set<String>] = [
         "GoalSettings": ["modifiedAt"],
         "TaxProfile": ["modifiedAt"]
@@ -67,8 +68,8 @@ final class SyncChangeTracker {
     // MARK: Fingerprints
 
     /// Stable fingerprint of a record's fields (record type and every non-volatile key).
-    nonisolated static func fingerprint(_ record: CKRecord) -> String {
-        let volatile = volatileKeysByType[record.recordType] ?? []
+    nonisolated static func fingerprint(_ record: CKRecord, excluding extra: Set<String> = []) -> String {
+        let volatile = (volatileKeysByType[record.recordType] ?? []).union(extra)
         var parts = ["type=\(record.recordType)"]
         for key in record.allKeys().sorted() where !volatile.contains(key) {
             parts.append("\(key)=\(encode(record[key]))")

@@ -1,12 +1,12 @@
 import SwiftUI
 import Combine
-import AuthenticationServices
 
 // MARK: - Entry points
 //
 // New users: `OnboardingView` replaces the 1.x sign-in wall and onboarding. Welcome leads with
-// "Start building" (a profile on this iPhone); Sign in with Apple and "Restore earlier data" sit
-// small under it for returning people, until the active profile has finished onboarding. Upgraders: `OnbWhatsNewSheet` over Today.
+// "Get started"; there is no sign-in (2.2, package K: iCloud is the identity). Under the button,
+// K's `WelcomeRecordsFooter` says where records live, that it is checking iCloud, or what it found
+// (then the button reads Continue). Upgraders: `OnbWhatsNewSheet` over Today.
 
 struct OnboardingView: View {
     @Binding var showOnboarding: Bool
@@ -40,11 +40,8 @@ struct OnboardingView: View {
             let made = OnbFlow(cohort: .new, services: services, startAt: start)
             OnbDebugLaunch.apply(to: made)
             OnbBackfill.flowStarted()
-            // A capture launch past Welcome needs a profile to write to.
-            if (start ?? .welcome) != .welcome, !viewModel.isSignedIn {
-                showOnboarding = true
-                viewModel.continueWithoutAccount()
-            }
+            // A capture launch past Welcome: the record set always exists (package K).
+            if (start ?? .welcome) != .welcome { showOnboarding = true }
             flow = made
             made.appeared()
         }
@@ -115,8 +112,9 @@ extension OnbServices {
     /// visit-end consent, analytics.
     static func live(app: AppViewModel, environment: CaptureSetupEnvironment, complete: @escaping (OnbCompletion) -> Void) -> OnbServices {
         var s = OnbServices()
-        s.ensureProfile = { if !app.isSignedIn { app.continueWithoutAccount() } }
-        s.signUpWithApple = { app.signUp() }
+        // Package K: no profile to make and no sign-in; the record set exists from the first launch.
+        s.ensureProfile = {}
+        s.signUpWithApple = {}
         s.saveGoal = { goal in GoalManager.shared.setGoalChoice(goal.goalChoice) }
         s.saveWho = { who in TaxProfileManager.shared.spouseTracking = (who == .both) }
         s.saveGoalAnswers = { rental, pro in GoalManager.shared.setGoalSetup(rental: rental, pro: pro) }
@@ -322,19 +320,16 @@ struct OnbRoot: View {
 // MARK: - 0 · Welcome: the crafted house on the dusk/night page (§H.5, §1.24)
 
 /// The finished house, lit, at the Today hero size (H1; H3 at accessibility sizes, never hidden),
-/// the Fraunces 34 headline, one line, one pinned `.primary` and "Have an account?" as a
-/// `.tertiary` that opens Sign in with Apple and Restore. The words scroll under the pinned
+/// the Fraunces 34 headline, one line, one pinned `.primary` and package K's records footer under
+/// it (P1 / P3 / P2; no sign-in in 2.2). The words scroll under the pinned
 /// actions at large sizes; nothing is clamped.
 struct OnbWelcomeView: View {
     let flow: OnbFlow
     @EnvironmentObject private var viewModel: AppViewModel
-    @Environment(\.onbWelcomeAccount) private var account
     @Environment(\.accessibilityReduceMotion) private var reduce
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorScheme) private var colorScheme
-    @State private var restorable: [DiscoveredProfile] = []
-    @State private var cloudProblem = false
-    @State private var showAccount = OnbDebugLaunch.accountSheet
+    @Environment(\.onbLeaveWelcome) private var leaveWelcome
 
     /// The number block on Today overlaps the frame by 44 (H4); here the headline sits just under
     /// the lot, inside the frame's empty foot (the art's ground line is at 0.92 of the frame).
@@ -387,15 +382,10 @@ struct OnbWelcomeView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) { actions(colors) }
         }
         .background(LHPage())
-        // Keyed by `account`: the active profile can resolve after Welcome first appears, and a
-        // search skipped while it was hidden must run once it shows.
-        .task(id: account) {
-            guard account == .shown else { return }
-            await search(announce: true)
-        }
-        .sheet(isPresented: $showAccount) {
-            OnbAccountSheet(flow: flow, initialProfiles: restorable, initialCloudProblem: cloudProblem)
-                .environmentObject(viewModel)
+        // Package K: P3 while iCloud is checked (≤ 8 s), then P2 or P1.
+        .task {
+            await viewModel.identity.runWelcomeCheck(liveHours: { viewModel.timeEntries.reduce(0) { $0 + $1.hours } },
+                                                     sync: viewModel.syncService)
         }
     }
 
@@ -407,14 +397,18 @@ struct OnbWelcomeView: View {
 
     private func actions(_ colors: AdaptiveColors) -> some View {
         VStack(spacing: 4) {
-            Button(String(localized: "Get started", table: "ConversionPath")) { flow.start(OnbMotion.morph(reduce)) }
+            Button(viewModel.welcomePrimaryTitle) {
+                if case .found = viewModel.identity.welcome {
+                    // Earlier records are already here: straight to Today.
+                    viewModel.completeOnboardingWithEarlierRecords()
+                    leaveWelcome()
+                } else {
+                    flow.start(OnbMotion.morph(reduce))
+                }
+            }
                 .buttonStyle(LHButton.primary)
                 .accessibilityIdentifier("onb-start")
-            if account == .shown {
-                Button(String(localized: "Have an account?", table: "ConversionPath")) { showAccount = true }
-                    .buttonStyle(LHButton.tertiary)
-                    .accessibilityIdentifier("welcome.haveAccount")
-            }
+            WelcomeRecordsFooter(state: viewModel.identity.welcome)
         }
         .padding(.horizontal, LHMetrics.gutter)
         .padding(.top, 12)
@@ -434,152 +428,6 @@ struct OnbWelcomeView: View {
         }
     }
 
-    private func search(announce: Bool) async {
-        let found = await viewModel.discoverRestorable()
-        restorable = found.profiles
-        cloudProblem = found.cloudProblem
-        guard announce, !found.profiles.isEmpty || found.cloudProblem else { return }
-        let kinds = found.profiles.map(\.analyticsKind)
-        Analytics.restoreOffered(
-            emailCount: kinds.filter { $0 == "email" }.count,
-            localCount: kinds.filter { $0 == "local" }.count,
-            appleCount: kinds.filter { $0 == "apple" }.count,
-            cloudProblem: found.cloudProblem
-        )
-    }
-}
-
-/// "Have an account?": Sign in with Apple (Apple's own button, App Review), "Restore earlier
-/// records" when this iPhone or iCloud holds some, and where the records live.
-struct OnbAccountSheet: View {
-    let flow: OnbFlow
-    /// What Welcome's own search found (shown at once); the sheet searches again when it opens,
-    /// so a profile that arrived after Welcome appeared is never missed.
-    @State private var restorable: [DiscoveredProfile]
-    @State private var cloudProblem: Bool
-
-    init(flow: OnbFlow, initialProfiles: [DiscoveredProfile], initialCloudProblem: Bool) {
-        self.flow = flow
-        _restorable = State(initialValue: initialProfiles)
-        _cloudProblem = State(initialValue: initialCloudProblem)
-    }
-    @EnvironmentObject private var viewModel: AppViewModel
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.onbLeaveWelcome) private var leaveWelcome
-    @Environment(\.accessibilityReduceMotion) private var reduce
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var showRestore = false
-    @State private var isRetrying = false
-    @State private var signInError = false
-    /// The content's natural height: the sheet fits it rather than opening at `.medium`.
-    @State private var contentHeight: CGFloat = 0
-    @Environment(\.dynamicTypeSize) private var typeSize
-
-    /// The sheet chrome around the content: the 56 header, the content's 4 top and 16 bottom
-    /// padding, and the empty footer inset (the detent height already sits above the home
-    /// indicator's safe area). Measured on iPhone 17 Pro, iOS 27: the footnote ends 16pt above
-    /// the footer.
-    static let chromeHeight: CGFloat = 56 + 4 + 16 + 8
-
-    /// A detent fitted to the content, with `.large` to pull up to. At accessibility sizes the
-    /// header wraps past its 56, so the sheet opens `.large` and nothing sits under its edge.
-    static func detents(contentHeight: CGFloat, accessibility: Bool = false) -> Set<PresentationDetent> {
-        if accessibility { return [.large] }
-        guard contentHeight > 0, contentHeight.isFinite else { return [.medium, .large] }
-        return [.height((contentHeight + chromeHeight).rounded(.up)), .large]
-    }
-
-    var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        LHSheet(String(localized: "Welcome back", table: "ConversionPath"), onClose: { dismiss() }) {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(String(localized: "Sign in to pick up where you left off.", table: "ConversionPath"))
-                    .font(.body)
-                    .foregroundStyle(colors.textSecondary)
-                appleButton
-                if signInError {
-                    // What happened, then what to do (§C.2 Error); never an alert (§1.21).
-                    Label(AppleSignInFlow.failureMessage, systemImage: "exclamationmark.circle")
-                        .font(.subheadline)
-                        .foregroundStyle(colors.caution)
-                        .accessibilityIdentifier("welcome.signInFailed")
-                }
-                if !restorable.isEmpty || cloudProblem {
-                    Button {
-                        showRestore = true
-                    } label: {
-                        Text(restorable.count <= 1
-                             ? String(localized: "Restore earlier records", table: "ConversionPath")
-                             : String(localized: "Restore earlier records (\(restorable.count))", table: "ConversionPath"))
-                    }
-                    .buttonStyle(LHButton.tertiary)
-                    .accessibilityIdentifier("welcome.restoreEarlierData")
-                }
-                Text(String(localized: "Your records stay on your iPhone and in your iCloud.", table: "ConversionPath"))
-                    .font(.footnote)
-                    .foregroundStyle(colors.textSecondary)
-            }
-            .padding(.top, 4)
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
-        }
-        .background(colors.backgroundSecondary.ignoresSafeArea())
-        // §1.20's sheet with a fitted detent: the content is four short lines, and `.medium`
-        // left two-thirds of the sheet empty (gate B 1.1).
-        .presentationDetents(Self.detents(contentHeight: contentHeight, accessibility: typeSize.isAccessibilitySize))
-        .presentationDragIndicator(.visible)
-        .task { await research() }
-        .sheet(isPresented: $showRestore) {
-            ProfileRestoreSheet(
-                profiles: restorable, context: .welcome,
-                cloudProblem: cloudProblem, isRetrying: isRetrying,
-                onRetry: {
-                    Task {
-                        isRetrying = true
-                        await research()
-                        isRetrying = false
-                    }
-                }
-            ) { profile in
-                showRestore = false
-                dismiss()
-                viewModel.switchToProfile(profile)
-                // Sign-out and sign-in land in one pass, so the shell never sees the change. When
-                // Welcome was held open by an unfinished profile, close it ourselves.
-                if viewModel.activeProfileCompletedOnboarding { leaveWelcome() }
-            }
-            .environmentObject(viewModel)
-        }
-    }
-
-    private func research() async {
-        let found = await viewModel.discoverRestorable()
-        restorable = found.profiles
-        cloudProblem = found.cloudProblem
-    }
-
-    private var appleButton: some View {
-        SignInWithAppleButton(.signIn) { request in
-            AppleSignInFlow.configure(request)
-        } onCompletion: { result in
-            switch AppleSignInFlow.complete(result) {
-            case .signedIn(let isNewUser):
-                dismiss()
-                if isNewUser {
-                    flow.signUpWithApple(OnbMotion.morph(reduce))
-                } else {
-                    // Returning: their profile already finished setup, so the app opens on Today.
-                    viewModel.adoptReturningAppleSignIn()
-                    leaveWelcome()
-                }
-            case .cancelled: signInError = false
-            case .failed: withAnimation(AppAnimation.quick) { signInError = true }
-            }
-        }
-        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-        .frame(height: LHButton.Metrics.primaryHeight)
-        .clipShape(Capsule())
-        .accessibilityIdentifier("welcome.signInWithApple")
-    }
 }
 
 // MARK: - 6 · Staked: the last step, on the plain canvas

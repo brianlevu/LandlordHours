@@ -1,0 +1,126 @@
+import XCTest
+
+/// Frames of every package K surface for the visual gate (`TEST_RUNNER_LH_CAPTURE_DIR=<dir>`):
+/// light and dark, at the default size, XXL and AX3. Each state is reached with the captured
+/// fixtures and the fake zone, never by hand.
+final class IdentityCaptureUITests: IdentityJourneyUITests {
+    func testCaptureLightDefault() { captureAll(scheme: "light", size: nil) }
+    func testCaptureDarkDefault() { captureAll(scheme: "dark", size: nil) }
+    func testCaptureLightXXL() { captureAll(scheme: "light", size: "xxl") }
+    func testCaptureDarkXXL() { captureAll(scheme: "dark", size: "xxl") }
+    func testCaptureLightAX3() { captureAll(scheme: "light", size: "ax3") }
+    func testCaptureDarkAX3() { captureAll(scheme: "dark", size: "ax3") }
+
+    // The journey tests are not re-run here.
+    override func testFirstRunHasNoSignInAnywhere() {}
+    override func testReturning106UserOpensOnTodayWithTheirRecords() {}
+    override func testReturning201AppleUserOpensOnTodayWithNoSignIn() {}
+    override func testTwoSetsAskOnceCombineAddsTheHours() {}
+    override func testTwoSetsSpouseAnswerThenUndo() {}
+    override func testTwoSetsAsideIsListedAndCanBeAddedLater() {}
+    override func testDecideLaterKeepsTheSetHeldAndListed() {}
+    override func testNewPhoneChecksICloudThenContinues() {}
+    override func testBulkAbsenceAsksKeepThenRemoveGoesToRecentlyRemoved() {}
+    override func testAccountChangedAsks() {}
+    override func testZoneDeletedElsewhereAsksAndNeverRecreatesItself() {}
+    override func testSettingsStatusOnOffAndCouldntSync() {}
+    override func testDeleteAllDataGoesBackToWelcome() {}
+
+    private func shoot(_ name: String, wait: TimeInterval = 1.4) {
+        Thread.sleep(forTimeInterval: wait)
+        let screenshot = XCUIScreen.main.screenshot()
+        let shot = XCTAttachment(screenshot: screenshot)
+        shot.name = name
+        shot.lifetime = .keepAlways
+        add(shot)
+        if let dir = ProcessInfo.processInfo.environment["LH_CAPTURE_DIR"], !dir.isEmpty {
+            try? screenshot.pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).png"))
+        }
+    }
+
+    private func scrollTo(_ element: XCUIElement, maxSwipes: Int = 10) {
+        var swipes = 0
+        while !(element.exists && element.isHittable) && swipes < maxSwipes {
+            app.swipeUp()
+            swipes += 1
+        }
+    }
+
+    private func captureAll(scheme: String, size: String?) {
+        let s = scheme + (size.map { "-\($0)" } ?? "-default")
+
+        // Welcome: P1, P3, P2.
+        launch(zone: "empty", scheme: scheme, size: size)
+        XCTAssertTrue(element("welcome.records.p1").waitForExistence(timeout: 20))
+        shoot("welcome-p1-\(s)")
+        launch(zone: "slow", scheme: scheme, size: size)
+        if element("welcome.records.checking").waitForExistence(timeout: 10) { shoot("welcome-checking-\(s)", wait: 0.3) }
+        XCTAssertTrue(element("welcome.records.found").waitForExistence(timeout: 20))
+        shoot("welcome-found-\(s)")
+
+        // The two-sets question and its two second steps.
+        launch(fixture: "D8-201-two-local", zone: "empty", scheme: scheme, size: size)
+        XCTAssertTrue(element("identity.mergeQuestion").waitForExistence(timeout: 25))
+        shoot("merge-ask-\(s)")
+        tap(app.buttons["identity.merge.spouse"])
+        shoot("merge-spouse-\(s)")
+        tap(app.buttons["identity.merge.back"])
+        tap(app.buttons["identity.merge.aside"])
+        shoot("merge-aside-\(s)")
+
+        // Bulk absence (P28), account changed (P13), zone deleted elsewhere (P31).
+        launch(fixture: "D5-201-local", zone: "bulk", scheme: scheme, size: size)
+        XCTAssertTrue(element("identity.bulk").waitForExistence(timeout: 25))
+        shoot("bulk-\(s)")
+        launch(fixture: "D5-201-local", zone: "accountChanged", scheme: scheme, size: size)
+        XCTAssertTrue(element("identity.accountChanged").waitForExistence(timeout: 25))
+        shoot("account-changed-\(s)")
+        tap(app.buttons["identity.account.later"])
+        if element("today.identity.p13").waitForExistence(timeout: 10) { shoot("today-p13-\(s)") }
+        launch(fixture: "D5-201-local", zone: "zoneGone", scheme: scheme, size: size)
+        XCTAssertTrue(element("identity.zoneGone").waitForExistence(timeout: 30))
+        shoot("zone-gone-\(s)")
+
+        // Today notices: P12 (done), P10 (iCloud off after a saved entry).
+        launch(fixture: "D2-106-signed-in", zone: "empty", scheme: scheme, size: size)
+        if element("today.identity.p12").waitForExistence(timeout: 25) { scrollTo(element("today.identity.p12"), maxSwipes: 3); shoot("today-p12-\(s)") }
+        launch(fixture: "D2-106-signed-in", zone: "off", scheme: scheme, size: size)
+        if element("today.identity.p10").waitForExistence(timeout: 25) { scrollTo(element("today.identity.p10"), maxSwipes: 3); shoot("today-p10-\(s)") }
+
+        // Settings › iCloud & records: On, Off (this capture's launch is already "off"), Couldn't sync.
+        openSettings()
+        scrollTo(element("settings.icloud.status"))
+        shoot("settings-icloud-off-\(s)")
+        launch(fixture: "D3-106-signed-out-two", zone: "empty", scheme: scheme, size: size)
+        if element("identity.mergeQuestion").waitForExistence(timeout: 25) { tap(element("sheet.close")) }
+        openSettings()
+        scrollTo(element("settings.icloud.status"))
+        shoot("settings-icloud-on-\(s)")
+        tap(element("settings.earlierRecords"))
+        XCTAssertTrue(element("earlier.list").waitForExistence(timeout: 10))
+        shoot("earlier-records-\(s)")
+        launch(fixture: "D2-106-signed-in", zone: "fail", scheme: scheme, size: size)
+        openSettings()
+        scrollTo(element("settings.icloud.status"))
+        shoot("settings-icloud-problem-\(s)")
+        tap(element("settings.icloud.status"))
+        XCTAssertTrue(element("icloud.detail").waitForExistence(timeout: 10))
+        shoot("icloud-detail-problem-\(s)")
+
+        // Recently removed (after "Remove them" on the bulk question), Your name.
+        launch(fixture: "D5-201-local", zone: "bulk", scheme: scheme, size: size)
+        tap(app.buttons["identity.bulk.remove"], timeout: 25)
+        openSettings()
+        scrollTo(element("settings.earlierRecords"))
+        tap(element("settings.earlierRecords"))
+        tap(element("earlier.recentlyRemoved"))
+        XCTAssertTrue(element("removed.list").waitForExistence(timeout: 10))
+        shoot("recently-removed-\(s)")
+        launch(fixture: "D2-106-signed-in", zone: "empty", scheme: scheme, size: size)
+        openSettings()
+        scrollTo(element("settings.yourName"))
+        tap(element("settings.yourName"))
+        XCTAssertTrue(element("yourName.field").waitForExistence(timeout: 10))
+        shoot("your-name-\(s)")
+    }
+}

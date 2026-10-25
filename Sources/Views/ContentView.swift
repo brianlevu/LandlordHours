@@ -158,7 +158,8 @@ struct ContentView: View {
         Group {
             // WP-L: no launch splash or loading screen in any path. Today renders at once from
             // local data; only the hours wait on the first iCloud pull (DashboardView).
-            if !viewModel.isSignedIn || showOnboarding {
+            // Package K: the root reads `rootState` (no sign-in); onboarding still holds itself open.
+            if viewModel.rootState != .app || showOnboarding {
                 // 2.0: Welcome replaces the sign-in wall; "Start building" makes a profile on
                 // this iPhone and the same flow carries on (one branch, one view identity).
                 OnboardingView(showOnboarding: $showOnboarding)
@@ -169,6 +170,7 @@ struct ContentView: View {
                     }
             } else {
                 mainContent
+                    .identitySheets(viewModel)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

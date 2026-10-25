@@ -1,0 +1,7 @@
+{
+  "CustomCategory": {"appUserId": "STRING", "colorHex": "STRING", "countsForREPS": "INT64", "iconName": "STRING", "modifiedAt": "TIMESTAMP", "name": "STRING"},
+  "GoalSettings": {"appUserId": "STRING", "globalGoalType": "STRING", "materialParticipationTarget": "INT64", "propertyGoalsJSON": "STRING"},
+  "Property": {"address": "STRING", "aliasCount": "INT64", "aliases": "LIST<STRING>", "appUserId": "STRING", "createdAt": "TIMESTAMP", "isOwnerOccupied": "INT64", "modifiedAt": "TIMESTAMP", "name": "STRING", "propertyType": "STRING"},
+  "TaxProfile": {"appUserId": "STRING", "displayName": "STRING", "filingStatus": "STRING", "groupingElection": "INT64", "nonREWorkHours": "DOUBLE", "spouseTracking": "INT64", "taxYear": "INT64"},
+  "TimeEntry": {"appUserId": "STRING", "category": "STRING", "confirmedAt": "TIMESTAMP", "createdAt": "TIMESTAMP", "date": "TIMESTAMP", "detectedAt": "TIMESTAMP", "hours": "DOUBLE", "importCalendarId": "STRING", "importExternalId": "STRING", "importSource": "STRING", "modifiedAt": "TIMESTAMP", "notes": "STRING", "participant": "STRING", "propertyId": "STRING", "recordDescription": "STRING", "sourceDetail": "STRING", "sourceKey": "STRING"}
+}

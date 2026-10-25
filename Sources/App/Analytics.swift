@@ -117,10 +117,10 @@ enum Analytics {
         UserDefaults.standard.bool(forKey: optOutKey)
     }
 
-    /// Captures an event. No-op when analytics never configured or opted out. Kept private — call
-    /// sites use the typed helpers below so the event taxonomy stays centralized and reviewable in
-    /// one place.
-    private static func capture(_ event: String, properties: [String: Any]? = nil) {
+    /// Captures an event. No-op when analytics never configured or opted out. Call sites use the
+    /// typed helpers (below, and package K's identity events in Analytics+Identity.swift) so the
+    /// event taxonomy stays centralized and reviewable.
+    static func capture(_ event: String, properties: [String: Any]? = nil) {
         #if DEBUG
         // Unit-test seam: a spy sees exactly what would be sent, and nothing reaches PostHog.
         if let spy = testSpy {
@@ -258,32 +258,6 @@ enum Analytics {
         case .notifyResult(let result):
             capture("notify_permission_result", properties: ["result": result, "context": "onboarding"])
         }
-    }
-
-    enum ProfileKind: String {
-        case apple
-        case local
-    }
-
-    /// A new profile was created: with Sign in with Apple, or on this device only.
-    static func profileCreated(kind: ProfileKind) {
-        capture("profile_created", properties: ["kind": kind.rawValue])
-    }
-
-    /// Welcome or the Restore sheet showed earlier records the person can open. Counts and fixed
-    /// kinds only: never an id, an email or a name. `cloudProblem` = iCloud could not be searched.
-    static func restoreOffered(emailCount: Int, localCount: Int, appleCount: Int, cloudProblem: Bool) {
-        capture("restore_offered", properties: [
-            "email_profiles": emailCount,
-            "local_profiles": localCount,
-            "apple_profiles": appleCount,
-            "icloud_problem": cloudProblem
-        ])
-    }
-
-    /// An earlier profile was opened. `kind`: email, local or apple. `source`: device, icloud or both.
-    static func restoreCompleted(kind: String, source: String) {
-        capture("restore_completed", properties: ["kind": kind, "source": source])
     }
 
     /// We asked iOS to show its rating prompt. iOS decides whether it actually appears.

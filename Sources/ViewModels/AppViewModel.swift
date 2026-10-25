@@ -1,31 +1,34 @@
 import Foundation
 import SwiftUI
-import AuthenticationServices
+import Combine
 import WidgetKit
 import ActivityKit
 import UIKit
 import os.log
 
-// MARK: - Per-User Key Scoping
+// MARK: - Record-set key scoping
 
-/// Scopes UserDefaults keys to the current signed-in user.
-/// Auth keys (appleUserId, localProfileId, legacy emailUserId, etc.) remain unscoped.
+/// Scopes UserDefaults keys to the record set. 2.2 (package K): one record set per iCloud
+/// account under the fixed `v2.` prefix once the device merge has run (`IdentityScope`); the
+/// `u.<id>.` keys of 1.x / 2.0 profiles stay untouched (2.3 removes them).
 enum UserScope {
-    /// Current userId: `appleUserId ?? localProfileId ?? emailUserId` (legacy fallback).
+    /// The scope id: the frozen storage id (`v2.storageId`), used for folder names, capture ids
+    /// and notification ids. Nil only before the first 2.2 launch finished its device merge.
     static var userId: String? {
-        ProfileKeys.resolveUserId(.standard)
+        IdentityScope.resolve(.standard).scopeId
     }
 
-    /// Returns a user-scoped key. Falls back to unscoped if no user signed in.
+    /// A key in the live record set (`v2.<base>`).
     static func key(_ base: String) -> String {
-        guard let id = userId else { return base }
-        return "u.\(id).\(base)"
+        IdentityScope.resolve(.standard).prefix + base
     }
 
-    /// Returns the scoped key for a known userId. Used during account deletion
-    /// after capturing the account id but before clearing auth keys.
+    /// The key for a known scope id: the live prefix for the active scope id, otherwise the
+    /// legacy `u.<id>.` key (the inventory, DEBUG fixtures, tests).
     static func key(_ base: String, userId: String?) -> String {
         guard let userId else { return base }
+        let resolved = IdentityScope.resolve(.standard)
+        if userId == resolved.scopeId { return resolved.prefix + base }
         return "u.\(userId).\(base)"
     }
 }
@@ -93,52 +96,69 @@ class AppViewModel: ObservableObject {
     private var staleTimerRecoveryKey: String { UserScope.key("LandlordHours.staleTimerRecovery") }
     private var staleTimerRecoveriesKey: String { UserScope.key("LandlordHours.staleTimerRecoveries") }
 
+    /// Package K: the identity surfaces (iCloud status, Earlier records, the two-sets question,
+    /// the Welcome footer, the Today notice) and the record-set engine behind them.
+    let identity = IdentityCoordinator()
+    private var identityObservation: AnyCancellable?
+
     init() {
 #if DEBUG
+        // Captured upgrade fixtures and fresh-device resets are written before the merge reads them.
+        IdentityFixtures.applyLaunchArguments()
         seedLegacyEmailFixtureIfNeeded()
 #endif
-        // 1.1: turn a ≤1.0.6 email "account" into a local profile with the SAME ID.
-        // Must run before anything reads auth keys or migrates unscoped legacy data.
-        ProfileMigration.migrateEmailProfile(defaults: .standard)
+        // 2.2: every 1.x / 2.0 state becomes one record set under `v2.` (S1–S4, before the
+        // first frame). Nothing is deleted; `u.*` stays as it is.
+        Self.runDeviceMerge()
+        reloadManagersForRecordSet()
         checkSignInState()
 #if DEBUG
         applyLaunchMockScenarioIfNeeded()
 #endif
         if UserScope.userId != nil {
-            migrateUnscopedLegacyData()
             loadData()
             loadTimerState()
             refreshWidgetSnapshot()
         }
         syncService.delegate = self
-        // Any successful pull for the active profile (including retries that call start()
-        // directly) clears the export sheet's "Couldn't reach iCloud" note.
+        var zoneSource: IdentityZoneSource = syncService
+#if DEBUG
+        if let fake = IdentityFixtures.fakeZoneIfRequested() { zoneSource = fake; Self.debugFakeZone = fake }
+#endif
+        identity.attach(source: zoneSource, live: self, sync: syncService)
+        identity.hasSavedEntry = !timeEntries.isEmpty
+        // Views that read `viewModel.identity` (Welcome, Today, Settings) re-render with it.
+        identityObservation = identity.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
+        // Any successful pull clears the export sheet's "Couldn't reach iCloud" note.
         syncService.onInitialPullSucceeded = { [weak self] profileId in
             guard let self, profileId == UserScope.userId else { return }
             self.initialPullFailed = false
         }
+        syncService.onIdentityChange = { [weak self] in
+            guard let self else { return }
+            self.reloadAfterIdentityChange()
+        }
 
-        // Trigger cloud sync when tax profile or goals change
+        // Settings edits made by a person are "dirty" until pushed (v4 §3.3); edits made while the
+        // record set is empty are "dirty while empty" and never beat the household's settings.
         TaxProfileManager.shared.onDidChange = { [weak self] in
-            // Spouse hours / grouping change what the widget counts.
-            self?.refreshWidgetSnapshot()
-            self?.syncService.schedulePush()
+            guard let self else { return }
+            self.markSettingsDirty(tax: true)
+            self.refreshWidgetSnapshot()
+            self.syncService.schedulePush()
         }
         GoalManager.shared.onDidChange = { [weak self] in
-            self?.refreshWidgetSnapshot()
-            self?.syncService.schedulePush()
+            guard let self else { return }
+            self.markSettingsDirty(tax: false)
+            self.refreshWidgetSnapshot()
+            self.syncService.schedulePush()
         }
-        // WP-L: no launch splash. Today renders at once from local data; the first pull runs
-        // behind it and only the hours wait on it.
         if Self.isUnitTestHost {
-            // Unit tests build many view models; keep their sync start where it always was
-            // (after 2 s, no placeholder) so no test races a pull it didn't ask for.
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 if self.isSignedIn { Task { await self.syncService.start() } }
             }
         } else if isSignedIn {
             #if DEBUG
-            // Capture hook: a forced pull state replaces the real sync start.
             if Self.simulatedPullState == nil { startInitialSync(showsPlaceholder: !Self.isMockLaunch) }
             #else
             startInitialSync(showsPlaceholder: !Self.isMockLaunch)
@@ -147,6 +167,54 @@ class AppViewModel: ObservableObject {
 #if DEBUG
         applySimulatedPendingPullIfNeeded()
 #endif
+    }
+
+#if DEBUG
+    /// The in-memory zone a `-LHFakeZone` launch uses (UI tests drive "another device" through it).
+    static var debugFakeZone: FakeZoneSource?
+#endif
+
+    /// S1–S4 over the standard defaults and Application Support.
+    static func runDeviceMerge() {
+        var options = RecordSetMigration.DeviceOptions()
+#if DEBUG
+        options.crashAt = IdentityFixtures.crashAt
+        if ProcessInfo.processInfo.arguments.contains("-LHBackupFails") {
+            options.writeBackup = { _, _ in throw CocoaError(.fileWriteOutOfSpace) }
+        }
+#endif
+        do {
+            _ = try RecordSetMigration.runDevicePhase(defaults: .standard, root: MigrationFiles.defaultRoot, options: options)
+        } catch {
+            Self.persistenceLogger.error("Device merge stopped: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// Every manager re-reads its keys from the record set's prefix.
+    func reloadManagersForRecordSet() {
+        SubscriptionManager.shared.reload()
+        GoalManager.shared.loadGoals()
+        CategoryManager.shared.loadCategories()
+        TaxProfileManager.shared.reload()
+        MilestoneTracker.shared.reload()
+    }
+
+    /// Pulls, answers and archive moves change the live set: reload what Today shows.
+    func reloadAfterIdentityChange() {
+        identity.hasSavedEntry = !timeEntries.isEmpty
+        identity.refresh(sync: syncService)
+        objectWillChange.send()
+    }
+
+    private var isApplyingRemoteSettings = false
+
+    private func markSettingsDirty(tax: Bool) {
+        guard !isApplyingRemoteSettings else { return }
+        let defaults = UserDefaults.standard
+        defaults.set(true, forKey: tax ? IdentityKeys.taxDirty : IdentityKeys.goalDirty)
+        if properties.isEmpty && timeEntries.isEmpty {
+            defaults.set(true, forKey: tax ? IdentityKeys.taxDirtyWhileEmpty : IdentityKeys.goalDirtyWhileEmpty)
+        }
     }
 
     /// Starts the profile's initial iCloud sync. With `showsPlaceholder`, Today treats the hours
@@ -247,251 +315,58 @@ class AppViewModel: ObservableObject {
     }
 #endif
     
+    /// There is no sign-in in 2.2: the record set exists once the device merge has run. The
+    /// name kept for compatibility: true whenever there is a record set to show.
     func checkSignInState() {
-        let defaults = UserDefaults.standard
-        ProfileIdentity.hydrateActive(defaults)
-        if defaults.string(forKey: ProfileKeys.appleUserId) != nil {
-            isSignedIn = true
-            userName = defaults.string(forKey: ProfileKeys.appleUserName) ?? "User"
-        } else if defaults.string(forKey: ProfileKeys.localProfileId) != nil {
-            isSignedIn = true
-            userName = defaults.string(forKey: ProfileKeys.localProfileName) ?? "User"
-        } else if defaults.string(forKey: ProfileKeys.emailUserId) != nil {
-            isSignedIn = true
-            userName = defaults.string(forKey: ProfileKeys.emailUserName) ?? "User"
-        }
-    }
-
-    /// Name shown for the active profile, from whichever identity is active.
-    static func resolvedProfileName(_ defaults: UserDefaults = .standard) -> String {
-        let candidate: String?
-        if defaults.string(forKey: ProfileKeys.appleUserId) != nil {
-            candidate = defaults.string(forKey: ProfileKeys.appleUserName)
-        } else if defaults.string(forKey: ProfileKeys.localProfileId) != nil {
-            candidate = defaults.string(forKey: ProfileKeys.localProfileName)
-        } else {
-            candidate = defaults.string(forKey: ProfileKeys.emailUserName)
-        }
-        guard let candidate, !candidate.isEmpty else { return "User" }
-        return candidate
-    }
-
-    func signIn() {
-        isSignedIn = true
-        ProfileIdentity.hydrateActive(.standard)
-        // Clear in-memory state from any previous user before loading new user's data.
-        // This prevents stale data from leaking if a CloudKit sync fires during the transition.
-        properties = []
-        timeEntries = []
-        // Migrate legacy unscoped data to this user's scoped keys (one-time)
-        migrateUnscopedLegacyData()
-        // Load user-scoped data (UserScope.userId is now set via auth keys)
-        loadData()
-        loadTimerState()
-        // Pro belongs to this device's App Store account, not to a profile: carry the
-        // cached flag from the previous profile, then reload() re-checks StoreKit
-        // (Transaction.currentEntitlements) for the new profile.
-        ProEntitlementCarryOver.carryFromPreviousProfile(defaults: .standard)
-        // Reload all singleton managers for this user
-        SubscriptionManager.shared.reload()
-        GoalManager.shared.loadGoals()
-        CategoryManager.shared.loadCategories()
-        TaxProfileManager.shared.reload()
-        MilestoneTracker.shared.reload()
-
+        isSignedIn = UserScope.userId != nil
         userName = Self.resolvedProfileName(.standard)
-        AppleSignInManager.shared.checkExistingSignIn()
-
-        // Start CloudKit sync; a restored profile's hours settle in when the pull lands.
-        BackfillJob.shared.reset()
-        startInitialSync()
     }
 
-    /// "Continue without an account": creates a `local-<UUID>` profile.
-    ///
-    /// Deliberately does NOT call `signUp()`, which would wipe unscoped legacy data.
-    /// Unscoped legacy data is migrated into the new profile instead.
-    func continueWithoutAccount() {
-        let defaults = UserDefaults.standard
-        let id = ProfileKeys.newLocalProfileId()
-        defaults.set(id, forKey: ProfileKeys.localProfileId)
-        defaults.removeObject(forKey: ProfileKeys.localProfileName)
-        defaults.removeObject(forKey: ProfileKeys.localProfileEmail)
-        defaults.set(LoginType.local.rawValue, forKey: ProfileKeys.loginType)
-        migrateUnscopedLegacyData()
-        defaults.removeObject(forKey: UserScope.key("hasCompletedOnboarding"))
-        signIn()
-        Analytics.profileCreated(kind: .local)
-    }
-
-    /// Restores an earlier profile found on this device or in iCloud and makes it active.
-    /// The currently active profile's data stays on this device.
-    func switchToProfile(_ profile: DiscoveredProfile) {
-        if isSignedIn || UserScope.userId != nil {
-            signOut()
-        }
-        ProfileRestore.activate(profile, defaults: .standard)
-        signIn()
-        Analytics.restoreCompleted(kind: profile.analyticsKind, source: profile.analyticsSource)
-    }
-
-    /// Inactive earlier profiles found on this device and (when reachable) in iCloud.
-    func discoverRestorableProfiles(cloudSource: CloudProfileRecordSource? = nil) async -> [DiscoveredProfile] {
-        await discoverRestorable(cloudSource: cloudSource).profiles
-    }
-
-    private static let restoreLogger = Logger(subsystem: "com.openclaw.landlordhours", category: "Restore")
-
-    /// Same search, but says when iCloud could not be searched instead of quietly returning
-    /// only what is on this iPhone.
-    func discoverRestorable(cloudSource: CloudProfileRecordSource? = nil) async -> RestoreDiscovery {
-        let activeId = UserScope.userId
-        let device = ProfileDiscovery.deviceProfiles(defaults: .standard, excluding: activeId)
-        var source: CloudProfileRecordSource = cloudSource ?? syncService
+    /// "Your name" (optional), shown as "Prepared for" on reports. Device copy of
+    /// `TaxProfile.displayName`, which syncs.
+    static func resolvedProfileName(_ defaults: UserDefaults = .standard) -> String {
         #if DEBUG
-        if cloudSource == nil, let fake = DebugCloudProfiles.sourceIfRequested() { source = fake }
+        if let scope = defaults.string(forKey: IdentityScope.debugScopeKey) ?? IdentityScope.debugOverride,
+           let name = defaults.string(forKey: "u.\(scope).profile.name"), !name.isEmpty { return name }
         #endif
-        let cloud: [DiscoveredProfile]
-        var cloudProblem = false
-        do {
-            cloud = ProfileDiscovery.cloudProfiles(
-                from: try await source.fetchProfileRecordSummaries(),
-                excluding: activeId
-            )
-        } catch {
-            Self.restoreLogger.error("Restore search could not reach iCloud: \(String(describing: error), privacy: .public)")
-            cloud = []
-            cloudProblem = true
-        }
-        return RestoreDiscovery(profiles: ProfileDiscovery.merge(device: device, cloud: cloud), cloudProblem: cloudProblem)
+        if let name = defaults.string(forKey: IdentityKeys.displayName), !name.isEmpty { return name }
+        return ""
     }
 
-    /// A returning Apple user signed in on Welcome while a profile made by "Get started" was
-    /// active. `AppleSignInFlow.complete` has already written the Apple keys. Runs the same
-    /// teardown as `switchToProfile` for the outgoing profile (sync stopped, timer saved), then
-    /// signs in as the Apple user. An outgoing profile with no entries and no properties is
-    /// removed so it never clutters Restore; one with data stays restorable.
-    func adoptReturningAppleSignIn() {
+    /// Saves "Your name" (device copy + the synced TaxProfile field).
+    func setDisplayName(_ name: String) {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let defaults = UserDefaults.standard
-        let appleKeys = [ProfileKeys.appleUserId, ProfileKeys.appleUserName, ProfileKeys.appleUserEmail]
-        let saved = appleKeys.compactMap { key in defaults.string(forKey: key).map { (key, $0) } }
-        guard saved.contains(where: { $0.0 == ProfileKeys.appleUserId }) else { signIn(); return }
-        // Hide the Apple id so signOut tears down the profile that is actually active.
-        for key in appleKeys { defaults.removeObject(forKey: key) }
-        let outgoing = UserScope.userId
-        if isSignedIn || outgoing != nil { signOut() }
-        for (key, value) in saved { defaults.set(value, forKey: key) }
-        defaults.set(LoginType.apple.rawValue, forKey: ProfileKeys.loginType)
-        signIn()
-        if let outgoing, outgoing != UserScope.userId, ProfileDiscovery.isEmptyProfile(outgoing, defaults: defaults) {
-            Self.clearScopedAccountData(for: outgoing)
-            for key in ["LandlordHours.properties", "LandlordHours.entries", "hasCompletedOnboarding", ProfileRestore.profileNameKey] {
-                defaults.removeObject(forKey: UserScope.key(key, userId: outgoing))
-            }
-            if defaults.string(forKey: ProfileKeys.previousProfileId) == outgoing {
-                defaults.removeObject(forKey: ProfileKeys.previousProfileId)
-            }
-        }
+        if clean.isEmpty { defaults.removeObject(forKey: IdentityKeys.displayName) } else { defaults.set(clean, forKey: IdentityKeys.displayName) }
+        userName = clean
+        markSettingsDirty(tax: true)
+        syncService.schedulePush()
     }
 
-    /// Whether the active profile has finished onboarding. False with no profile.
+    /// Whether the record set has finished onboarding. False before the device merge.
     var activeProfileCompletedOnboarding: Bool {
-        guard isSignedIn, UserScope.userId != nil else { return false }
+        guard UserScope.userId != nil else { return false }
         return UserDefaults.standard.bool(forKey: UserScope.key("hasCompletedOnboarding"))
     }
 
-    /// Call when a new account is created (not for returning sign-in).
-    func signUp() {
-        // New user — delete any stale unscoped data so it doesn't leak
-        Self.clearUnscopedLegacyData()
-        // Clear onboarding flag so new user sees onboarding flow
-        UserDefaults.standard.removeObject(forKey: UserScope.key("hasCompletedOnboarding"))
-        signIn()
-        // signUp() is only called for a brand-new Sign in with Apple profile.
-        Analytics.profileCreated(kind: .apple)
+    /// What the root shows (ContentView): Welcome, the onboarding steps, or the app.
+    enum RootState: Equatable { case welcome, onboarding, app }
+
+    var rootState: RootState {
+        guard isSignedIn else { return .welcome }
+        return activeProfileCompletedOnboarding ? .app : .welcome
     }
 
-    /// Signs out / switches away from the active profile. Per-profile data stays on the
-    /// device under `u.<id>.*`.
-    ///
-    /// - Parameter keepProfileState: false only when the profile's data was just deleted,
-    ///   so nothing is written back into the deleted scope.
-    func signOut(keepProfileState: Bool = true) {
-        // Stop CloudKit sync
-        syncService.stop()
-        endAwaitingInitialPull()
-        // Background work belongs to the outgoing profile: stop it, never finish it into the next.
-        BackfillJob.shared.reset()
-        ExportJob.shared.reset()
-        let defaults = UserDefaults.standard
-        let outgoingId = UserScope.userId
-
-        // Timer: stop the visible timer and save its state to THIS profile while its ID
-        // is still set. (Before 1.1 this ran after the ID was cleared and wrote unscoped
-        // `LandlordHours.timer*` keys.) A running timer resumes — or is offered for
-        // recovery if stale — when the profile comes back.
-        if keepProfileState, let outgoingId {
-            // Pause a running timer at switch time: record the elapsed time as a recovery
-            // draft for this profile (offered when the profile comes back) instead of
-            // leaving the timer counting while another profile is active.
-            if isTimerRunning, let start = timerStartTime, let propertyId = timerPropertyId {
-                saveStaleTimerRecovery(StaleTimerRecovery(
-                    startTime: start,
-                    propertyId: propertyId,
-                    category: timerCategory,
-                    elapsedHours: max(Date().timeIntervalSince(start), 0) / 3600.0,
-                    reason: .pausedAtSwitch,
-                    pausedAt: Date()
-                ))
-                endTimerLiveActivity(propertyId: propertyId, category: timerCategory, startDate: start, needsReview: true)
-                isTimerRunning = false
-                timerStartTime = nil
-                timerPropertyId = nil
-            }
-            saveTimerState()
-            if defaults.string(forKey: ProfileKeys.localProfileId) == outgoingId,
-               let name = defaults.string(forKey: ProfileKeys.localProfileName), !name.isEmpty {
-                defaults.set(name, forKey: UserScope.key(ProfileRestore.profileNameKey, userId: outgoingId))
-            }
-            defaults.set(outgoingId, forKey: ProfileKeys.previousProfileId)
+    /// Welcome's primary button: "Continue" when earlier records are already here (P2).
+    var welcomePrimaryTitle: String {
+        if case .found = identity.welcome {
+            return String(localized: "Continue", table: "Identity")
         }
-        endTimerLiveActivity(propertyId: timerPropertyId, category: timerCategory, startDate: timerStartTime, needsReview: false)
-
-        // The live name/email keys are about to go; keep the profile's own copy first.
-        ProfileIdentity.stashActive(defaults)
-        // Clear auth keys (unscoped — shared on device)
-        for key in ProfileKeys.signOutKeys {
-            defaults.removeObject(forKey: key)
-        }
-        // Clear any stale unscoped legacy data to prevent leaking to next user
-        Self.clearUnscopedLegacyData()
-        // Note: per-user data stays in UserDefaults under scoped keys (u.<userId>.*)
-
-        // Reset in-memory timer state only; never persist it after the ID is gone.
-        isTimerRunning = false
-        timerStartTime = nil
-        timerPropertyId = nil
-        timerCategory = .repairs
-        staleTimerRecovery = nil
-
-        // Reset in-memory state
-        properties = []
-        timeEntries = []
-        activeCelebration = nil
-        isSignedIn = false
-        userName = ""
-        EngagementWidgetSnapshotStore.save(.empty)
-        WidgetSurfaceStore.save(.empty)
-        WidgetCenter.shared.reloadTimelines(ofKind: EngagementWidgetSnapshotStore.widgetKind)
-
-        // Reset singleton managers in memory
-        SubscriptionManager.shared.resetForSignOut()
-        GoalManager.shared.resetForSignOut()
-        CategoryManager.shared.resetForSignOut()
-        TaxProfileManager.shared.resetForSignOut()
-        MilestoneTracker.shared.reload()
-        AppleSignInManager.shared.signOut()
+        return String(localized: "Get started", table: "ConversionPath")
     }
+
+    /// The one Today card K fills (C's slot under the hero).
+    var todayNotice: TodayIdentityNotice? { identity.todayNotice }
 
     enum ProfileDeletionError: LocalizedError, Equatable {
         /// iCloud is off/unreachable, so copies saved there can't be removed now.
@@ -500,56 +375,64 @@ class AppViewModel: ObservableObject {
         var errorDescription: String? {
             switch self {
             case .iCloudUnavailable:
-                return "iCloud is off, so copies saved there can’t be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?"
+                return String(localized: "iCloud is off, so copies saved there can’t be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?", table: "Identity")
             }
         }
     }
 
-    /// Deletes the active profile's data (Apple: "Delete Account and Data"; local:
-    /// "Delete All Data"): iCloud records, scoped keys, attachment files and
-    /// notification keys, then signs out.
+    /// Delete all data (§1.4): the whole iCloud zone (one operation), then every `v2.*` and
+    /// `u.*` key, the archive, the backup, attachments, notification keys and the widget
+    /// snapshot. Afterwards the app is a new install: Welcome.
     ///
-    /// - Parameter allowLocalOnly: when iCloud is unavailable the call throws
-    ///   `ProfileDeletionError.iCloudUnavailable` BEFORE deleting anything, unless the
-    ///   user explicitly chose "Delete from this iPhone anyway".
-    func deleteAccountAndData(allowLocalOnly: Bool = false) async throws {
-        guard let userId = UserScope.userId else {
-            signOut()
-            return
-        }
-
+    /// - Parameter allowLocalOnly: with iCloud unavailable it throws `.iCloudUnavailable` BEFORE
+    ///   deleting anything, unless the person chose "Delete from this iPhone anyway".
+    func deleteAllData(allowLocalOnly: Bool = false) async throws {
         syncService.stop()
-        if !syncService.accountAvailable {
-            await syncService.checkAccountStatus()
-        }
+        if !syncService.accountAvailable { await syncService.checkAccountStatus() }
         if syncService.accountAvailable {
-            try await syncService.deleteCurrentUserRecords(
-                properties: properties,
-                entries: timeEntries,
-                categories: CategoryManager.shared.customCategories,
-                userId: userId
-            )
+            try await syncService.deleteEverythingInICloud()
         } else if !allowLocalOnly {
             throw ProfileDeletionError.iCloudUnavailable
         }
+        Analytics.deleteAllData(iCloud: syncService.accountAvailable)
+        wipeEverythingLocal()
+    }
 
-        // Photo files are not keyed by user; delete the ones this profile references.
+    /// The local half of Delete all data (also P31 "Delete here too").
+    func wipeEverythingLocal() {
+        endTimerLiveActivity(propertyId: timerPropertyId, category: timerCategory, startDate: timerStartTime, needsReview: false)
         deleteAttachmentFiles(for: timeEntries)
-        Self.clearScopedAccountData(for: userId)
+        let defaults = UserDefaults.standard
+        for key in defaults.dictionaryRepresentation().keys
+        where key.hasPrefix("u.") || key.hasPrefix(IdentityKeys.prefix) || ProfileKeys.signOutKeys.contains(key)
+            || key == ProfileKeys.previousProfileId || Self.unscopedLegacyKeys.contains(key) || key == CaptureActionQueue.key {
+            defaults.removeObject(forKey: key)
+        }
+        let root = MigrationFiles.defaultRoot
+        // Photos are not keyed by record set: the whole folder goes.
+        for folder in IdentityFolder.allCases {
+            try? FileManager.default.removeItem(at: root.appendingPathComponent(folder.rawValue, isDirectory: true))
+        }
+        identity.earlier.deleteEverything()
+        // A new install's record set.
+        RecordSetMigration.adoptIds(storage: IdentityZone.household, unified: IdentityZone.household, defaults: defaults)
+        RecordSetMigration.setStep(.deviceMerged, defaults)
 
         properties = []
         timeEntries = []
         activeCelebration = nil
-        endTimerLiveActivity(propertyId: timerPropertyId, category: timerCategory, startDate: timerStartTime, needsReview: false)
         isTimerRunning = false
         timerStartTime = nil
         timerPropertyId = nil
-
-        signOut(keepProfileState: false)
-        let defaults = UserDefaults.standard
-        if defaults.string(forKey: ProfileKeys.previousProfileId) == userId {
-            defaults.removeObject(forKey: ProfileKeys.previousProfileId)
-        }
+        timerCategory = .repairs
+        staleTimerRecovery = nil
+        EngagementWidgetSnapshotStore.save(.empty)
+        WidgetSurfaceStore.save(.empty)
+        WidgetCenter.shared.reloadTimelines(ofKind: EngagementWidgetSnapshotStore.widgetKind)
+        reloadManagersForRecordSet()
+        checkSignInState()
+        identity.refresh(sync: syncService)
+        objectWillChange.send()
     }
 
     func resetCurrentUserLocalData() {
@@ -638,9 +521,9 @@ class AppViewModel: ObservableObject {
         "propertyGoals",
         "iCloudBackupEnabled",
         "profileImageData",
-        ProfileIdentity.nameKey,
-        ProfileIdentity.emailKey,
-        ProfileIdentity.editedKey,
+        "profile.name",
+        "profile.email",
+        "profile.userEdited",
         GuidedOnboardingStore.completedKey,
         GuidedOnboardingStore.skippedKey,
         "LandlordHours.taxProfile.filingStatus",
@@ -649,29 +532,6 @@ class AppViewModel: ObservableObject {
         "LandlordHours.taxProfile.groupingElection",
         "LandlordHours.taxProfile.nonREWorkHours",
     ]
-
-    /// One-time migration: copies unscoped data into the current user's scoped keys,
-    /// then deletes the unscoped keys so they can't leak to other users.
-    private func migrateUnscopedLegacyData() {
-        let migrationKey = UserScope.key("legacyDataMigrated")
-        guard !UserDefaults.standard.bool(forKey: migrationKey) else { return }
-        guard UserScope.userId != nil else { return }
-
-        let defaults = UserDefaults.standard
-        for baseKey in Self.unscopedLegacyKeys {
-            let scopedKey = UserScope.key(baseKey)
-            // Only migrate if unscoped data exists AND scoped version doesn't
-            if defaults.object(forKey: baseKey) != nil && defaults.object(forKey: scopedKey) == nil {
-                defaults.set(defaults.object(forKey: baseKey), forKey: scopedKey)
-            }
-        }
-
-        // Mark migration as done for this user
-        defaults.set(true, forKey: migrationKey)
-
-        // Delete all unscoped legacy keys
-        Self.clearUnscopedLegacyData()
-    }
 
     /// Delete all unscoped legacy data keys. Safe to call multiple times.
     static func clearUnscopedLegacyData() {
@@ -715,7 +575,7 @@ class AppViewModel: ObservableObject {
             HouseCelebrationLedger.celebratedBaseKey,
             HouseCelebrationLedger.pendingBaseKey,
             HouseCelebrationLedger.backfillShownBaseKey,
-            ProfileRestore.profileNameKey,
+            "profile.displayName",
             CapturePromptConsent.baseKey
         ] + taxProfileFields.map { "LandlordHours.taxProfile.\($0)" } + CaptureOptIn.allBaseKeys
 
@@ -1886,13 +1746,10 @@ extension AppViewModel: CloudKitSyncDelegate {
         Self.clearScopedAccountData(for: userId)
 
         let defaults = UserDefaults.standard
-        defaults.removeObject(forKey: ProfileKeys.emailUserId)
-        defaults.removeObject(forKey: ProfileKeys.emailUserName)
-        defaults.removeObject(forKey: ProfileKeys.emailUserEmail)
-        defaults.set(userId, forKey: ProfileKeys.localProfileId)
-        defaults.set(Self.launchMockEmail(defaultValue: "brianlevu@gmail.com"), forKey: ProfileKeys.localProfileEmail)
-        defaults.set(Self.launchMockName(defaultValue: scenario.userName), forKey: ProfileKeys.localProfileName)
-        defaults.set(LoginType.local.rawValue, forKey: ProfileKeys.loginType)
+        // An isolated DEBUG scope (`u.debug-<scenario>.`), never the person's `v2.` record set.
+        defaults.set(userId, forKey: IdentityScope.debugScopeKey)
+        defaults.set(Self.launchMockName(defaultValue: scenario.userName), forKey: "u.\(userId).profile.name")
+        reloadManagersForRecordSet()
 
         isSignedIn = true
         userName = Self.launchMockName(defaultValue: scenario.userName)
@@ -2124,4 +1981,117 @@ extension AppViewModel: CloudKitSyncDelegate {
         return Calendar.current.date(byAdding: .day, value: -daysAgo, to: base) ?? Date()
     }
 #endif
+}
+
+// MARK: - The live record set (package K's engine reads and writes through here)
+
+extension AppViewModel: LiveRecordSet {
+    var liveEntries: [TimeEntry] { timeEntries }
+    var liveProperties: [RentalProperty] { properties }
+    var liveCategories: [CustomCategory] { CategoryManager.shared.customCategories }
+
+    func replaceLive(entries: [TimeEntry], properties newProperties: [RentalProperty], categories: [CustomCategory]) {
+        isApplyingRemoteChanges = true
+        defer { isApplyingRemoteChanges = false }
+        properties = newProperties
+        timeEntries = entries
+        writePersistentStore()
+        let manager = CategoryManager.shared
+        if manager.customCategories.map(\.id) != categories.map(\.id) || manager.customCategories.map(\.modifiedAt) != categories.map(\.modifiedAt) {
+            manager.customCategories = categories
+            manager.saveCategories()
+        }
+        refreshWidgetSnapshot()
+        identity.hasSavedEntry = !timeEntries.isEmpty
+    }
+
+    var goalSettings: GoalSettingsValues {
+        let gm = GoalManager.shared
+        let json = (try? JSONEncoder().encode(gm.propertyGoals)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        let mp = gm.materialParticipationTarget
+        return GoalSettingsValues(globalGoalType: gm.globalGoalType.rawValue, materialParticipationTarget: mp == 0 ? nil : mp, propertyGoalsJSON: json)
+    }
+
+    var taxProfile: TaxProfileValues {
+        let tp = TaxProfileManager.shared
+        return TaxProfileValues(filingStatus: tp.filingStatus.rawValue, spouseTracking: tp.spouseTracking, taxYear: tp.taxYear,
+                                groupingElection: tp.groupingElection, nonREWorkHours: tp.nonREWorkHours,
+                                displayName: UserDefaults.standard.string(forKey: IdentityKeys.displayName))
+    }
+
+    func applyRemoteSettings(goal: GoalSettingsValues?, tax: TaxProfileValues?) {
+        isApplyingRemoteSettings = true
+        defer { isApplyingRemoteSettings = false }
+        if let goal {
+            let gm = GoalManager.shared
+            gm.globalGoalType = HourGoalType(rawValue: goal.globalGoalType) ?? .reps
+            if let mp = goal.materialParticipationTarget { gm.applyMaterialParticipationTarget(mp) }
+            gm.propertyGoals = goal.propertyGoals
+            gm.saveGoals()
+        }
+        if let tax {
+            let tp = TaxProfileManager.shared
+            if let status = FilingStatus(rawValue: tax.filingStatus) { tp.filingStatus = status }
+            tp.spouseTracking = tax.spouseTracking
+            tp.taxYear = tax.taxYear
+            tp.groupingElection = tax.groupingElection
+            tp.nonREWorkHours = tax.nonREWorkHours
+            if let name = tax.displayName, !name.isEmpty {
+                UserDefaults.standard.set(name, forKey: IdentityKeys.displayName)
+                userName = name
+            }
+        }
+    }
+}
+
+// MARK: - The person's answers (package K); each one pushes what changed
+
+extension AppViewModel {
+    func answerTwoSets(_ answer: TwoSetsAnswer, group id: String) {
+        identity.answer(answer, group: id)
+        syncService.schedulePush()
+        reloadAfterIdentityChange()
+    }
+
+    func undoSpouse(group id: String) {
+        identity.undoSpouse(group: id)
+        syncService.schedulePush()
+        reloadAfterIdentityChange()
+    }
+
+    func putBack(_ names: Set<String>) {
+        identity.putBack(names)
+        syncService.schedulePush()
+        reloadAfterIdentityChange()
+    }
+
+    func answerBulk(_ answer: BulkAnswer) {
+        identity.answerBulk(answer)
+        syncService.schedulePush()
+        reloadAfterIdentityChange()
+    }
+
+    func answerZoneGone(_ answer: ZoneGoneAnswer) async {
+        guard let engine = identity.engine else { return }
+        _ = await engine.answerZoneGone(answer)
+        if answer == .deleteHere { wipeEverythingLocal() }
+        reloadAfterIdentityChange()
+    }
+
+    func answerAccountChanged(_ answer: AccountChangedAnswer) async {
+        guard let engine = identity.engine else { return }
+        _ = await engine.answerAccountChanged(answer)
+        identity.accountChangedDeferred = false
+        reloadAfterIdentityChange()
+        if answer != .later { await syncService.start() }
+    }
+}
+
+extension AppViewModel {
+    /// Welcome's "Continue" (P2): the records arrived from an earlier version, so setup is done.
+    func completeOnboardingWithEarlierRecords() {
+        UserDefaults.standard.set(true, forKey: UserScope.key("hasCompletedOnboarding"))
+        CaptureOptIn.markWhatsNewSeen()
+        objectWillChange.send()
+    }
 }

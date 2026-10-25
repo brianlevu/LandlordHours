@@ -297,17 +297,8 @@ final class RecordsReportsSettingsUITests: XCTestCase {
 
         launch(tab: 4, scheme: scheme)
         tapWhenReady(element("settings.profile"))
-        XCTAssertTrue(app.navigationBars["Profile"].waitForExistence(timeout: 5))
+        XCTAssertTrue(element("yourName.field").waitForExistence(timeout: 5), "package K: the header opens Your name")
         settleAndCapture("settings-profile-edit-\(scheme)")
-
-        // Profiles / restore (needs an earlier profile on the device).
-        launch(tab: 4, scheme: scheme, scenario: nil, extra: ["-LHSeedLegacyEmailProfile"])
-        let restore = element("settings.restoreOtherData")
-        if restore.waitForExistence(timeout: 10) {
-            tapWhenReady(restore)
-            XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "restore.profile.")).firstMatch.waitForExistence(timeout: 5))
-            settleAndCapture("settings-restore-\(scheme)")
-        }
     }
 
     // MARK: Helpers

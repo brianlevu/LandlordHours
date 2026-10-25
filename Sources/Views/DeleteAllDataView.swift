@@ -5,14 +5,13 @@ import SwiftUI
 // Sandbox `S2DeleteAll` (spec §5, frames delete-hold / delete-hold-mid): a pushed page that says
 // exactly what goes, then a destructive-outline capsule the person holds for 1.5s. Letting go
 // snaps back in 200ms. VoiceOver gets a custom action that asks with a standard alert. Cancel is
-// always on screen. Deletion runs through `AppViewModel.deleteAccountAndData` (App Review
+// always on screen. Deletion runs through `AppViewModel.deleteAllData` (App Review
 // 5.1.1(v)); its iCloud-off and failure alerts are kept as the error states. Afterwards the app
-// is signed out, so the root shows Welcome.
+// is a new install (package K: the whole iCloud zone goes), so the root shows Welcome.
 
 struct DeleteAllDataView: View {
     @EnvironmentObject private var viewModel: AppViewModel
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
-    @ObservedObject private var signInManager = AppleSignInManager.shared
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
@@ -26,7 +25,8 @@ struct DeleteAllDataView: View {
     @ScaledMetric(relativeTo: .body) private var iconColumn: CGFloat = 24
     @State private var deleteError: String? = Self.debugFailure
 
-    private var isAppleProfile: Bool { signInManager.loginType == .apple }
+    /// Package K: there is no account any more (Sign in with Apple is removed in 2.2).
+    private var isAppleProfile: Bool { false }
 
     private var photoCount: Int {
         viewModel.timeEntries.reduce(0) { $0 + $1.attachments.filter { $0.mimeType.hasPrefix("image") }.count }
@@ -57,6 +57,8 @@ struct DeleteAllDataView: View {
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("delete.items")
 
+                Text(String(localized: "Delete on your other devices too, or they will offer to put the records back.", table: "Identity"))
+                    .font(.subheadline).foregroundStyle(colors.textSecondary)
                 Text("This can’t be undone.")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
@@ -186,7 +188,7 @@ struct DeleteAllDataView: View {
             isDeleting = true
             defer { isDeleting = false }
             do {
-                try await viewModel.deleteAccountAndData(allowLocalOnly: allowLocalOnly)
+                try await viewModel.deleteAllData(allowLocalOnly: allowLocalOnly)
             } catch AppViewModel.ProfileDeletionError.iCloudUnavailable {
                 showICloudOffPrompt = true
             } catch {

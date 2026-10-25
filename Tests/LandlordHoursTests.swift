@@ -634,91 +634,55 @@ final class AILocalParserTests: XCTestCase {
 // MARK: - UserScope Tests
 
 final class UserScopeTests: XCTestCase {
-    /// Snapshot of every unscoped auth/profile key (incl. 1.1 localProfileId).
     private var authSnapshot: AuthStateSnapshot!
-
-    /// Saved auth state to restore after tests, since this is a hosted test.
-    private var savedAppleUserId: String?
-    private var savedEmailUserId: String?
 
     override func setUp() {
         super.setUp()
         authSnapshot = AuthStateSnapshot.capture()
         AuthStateSnapshot.clearAll()
-        // Save any existing auth state from the host app
-        savedAppleUserId = UserDefaults.standard.string(forKey: "appleUserId")
-        savedEmailUserId = UserDefaults.standard.string(forKey: "emailUserId")
-        // Clear for test isolation
-        UserDefaults.standard.removeObject(forKey: "appleUserId")
-        UserDefaults.standard.removeObject(forKey: "emailUserId")
-        UserDefaults.standard.synchronize()
     }
 
     override func tearDown() {
-        // Restore original auth state so we don't break the host app
-        if let saved = savedAppleUserId {
-            UserDefaults.standard.set(saved, forKey: "appleUserId")
-        } else {
-            UserDefaults.standard.removeObject(forKey: "appleUserId")
-        }
-        if let saved = savedEmailUserId {
-            UserDefaults.standard.set(saved, forKey: "emailUserId")
-        } else {
-            UserDefaults.standard.removeObject(forKey: "emailUserId")
-        }
-        UserDefaults.standard.synchronize()
         authSnapshot.restore()
         super.tearDown()
     }
 
-    func testUserIdReflectsCurrentAuthState() {
-        // In a hosted test, we can't guarantee nil state (app may restore keys).
-        // Instead, verify that setting a key updates userId correctly.
-        UserDefaults.standard.set("test-user-abc", forKey: "appleUserId")
-        UserDefaults.standard.synchronize()
-        XCTAssertEqual(UserScope.userId, "test-user-abc")
+    /// 2.2: once the device merge ran, every key lives under `v2.` and the scope id is the frozen storage id.
+    func testRecordSetScopeIsV2AfterTheDeviceMerge() {
+        let d = UserDefaults.standard
+        d.set(MigrationStep.deviceMerged.rawValue, forKey: IdentityKeys.state)
+        d.set("email-scope@example.com", forKey: IdentityKeys.storageId)
+        XCTAssertEqual(UserScope.userId, "email-scope@example.com")
+        XCTAssertEqual(UserScope.key("someKey"), "v2.someKey")
+        XCTAssertEqual(UserScope.key("someKey", userId: "email-scope@example.com"), "v2.someKey", "the live id maps to v2")
+        XCTAssertEqual(UserScope.key("someKey", userId: "local-other"), "u.local-other.someKey", "a legacy id keeps its own keys")
     }
 
-    func testUserIdReturnsAppleId() {
-        UserDefaults.standard.set("apple-123", forKey: "appleUserId")
-        XCTAssertEqual(UserScope.userId, "apple-123")
+    /// Legacy sign-in keys no longer choose the scope.
+    func testLegacySignInKeysDoNotChangeTheScope() {
+        let d = UserDefaults.standard
+        d.set(MigrationStep.deviceMerged.rawValue, forKey: IdentityKeys.state)
+        d.set("household", forKey: IdentityKeys.storageId)
+        d.set("apple-123", forKey: ProfileKeys.appleUserId)
+        XCTAssertEqual(UserScope.userId, "household")
+        XCTAssertEqual(UserScope.key("data"), "v2.data")
     }
 
-    func testUserIdReturnsEmailIdWhenNoApple() {
-        UserDefaults.standard.set("email-test@example.com", forKey: "emailUserId")
-        XCTAssertEqual(UserScope.userId, "email-test@example.com")
+    /// Disk full at S2: the app runs on the legacy prefix until the backup is written (§3.4).
+    func testLegacyPrefixModeWhileTheBackupCannotBeWritten() {
+        let d = UserDefaults.standard
+        d.set("email-full@example.com", forKey: IdentityKeys.legacyPrefixId)
+        defer { d.removeObject(forKey: IdentityKeys.legacyPrefixId) }
+        XCTAssertEqual(UserScope.userId, "email-full@example.com")
+        XCTAssertEqual(UserScope.key("data"), "u.email-full@example.com.data")
     }
 
-    func testAppleIdTakesPrecedenceOverEmail() {
-        UserDefaults.standard.set("apple-123", forKey: "appleUserId")
-        UserDefaults.standard.set("email-test@example.com", forKey: "emailUserId")
-        XCTAssertEqual(UserScope.userId, "apple-123")
-    }
-
-    func testKeyScopingWithUser() {
-        UserDefaults.standard.set("user-42", forKey: "appleUserId")
-        XCTAssertEqual(UserScope.key("someKey"), "u.user-42.someKey")
-    }
-
-    func testKeyScopingProducesUserPrefixedKey() {
-        // Verify that setting a user produces correctly prefixed keys
-        UserDefaults.standard.set("scope-test-user", forKey: "appleUserId")
-        UserDefaults.standard.synchronize()
-        let key = UserScope.key("someKey")
-        XCTAssertTrue(key.hasPrefix("u.scope-test-user."), "Key should have user prefix, got: \(key)")
-        XCTAssertTrue(key.hasSuffix(".someKey"), "Key should end with base key, got: \(key)")
-    }
-
-    func testDifferentUsersGetDifferentKeys() {
-        UserDefaults.standard.set("user-A", forKey: "appleUserId")
-        let keyA = UserScope.key("data")
-
-        UserDefaults.standard.set("user-B", forKey: "appleUserId")
-        let keyB = UserScope.key("data")
-
-        XCTAssertNotEqual(keyA, keyB)
-        XCTAssertEqual(keyA, "u.user-A.data")
-        XCTAssertEqual(keyB, "u.user-B.data")
+    /// DEBUG scopes (mock scenarios, unit tests) are isolated `u.<id>.` scopes.
+    func testDebugOverrideIsAnIsolatedLegacyShapedScope() {
+        TestScope.pin("debug-frequent")
+        XCTAssertEqual(UserScope.userId, "debug-frequent")
+        XCTAssertEqual(UserScope.key("data"), "u.debug-frequent.data")
+        TestScope.unpin()
     }
 }
 
@@ -738,8 +702,8 @@ final class AppViewModelLocalResetTests: XCTestCase {
         AuthStateSnapshot.clearAll()
         savedAppleUserId = UserDefaults.standard.string(forKey: "appleUserId")
         savedEmailUserId = UserDefaults.standard.string(forKey: "emailUserId")
-        UserDefaults.standard.removeObject(forKey: "appleUserId")
-        UserDefaults.standard.set("reset-test-user", forKey: "emailUserId")
+        IdentityScope.debugOverride = nil
+        IdentityScope.debugOverride = "reset-test-user"
         UserDefaults.standard.set("reset@example.com", forKey: "emailUserEmail")
         UserDefaults.standard.synchronize()
     }
@@ -747,14 +711,14 @@ final class AppViewModelLocalResetTests: XCTestCase {
     override func tearDown() {
         AppViewModel.clearScopedAccountData(for: "reset-test-user")
         if let savedAppleUserId {
-            UserDefaults.standard.set(savedAppleUserId, forKey: "appleUserId")
+            IdentityScope.debugOverride = savedAppleUserId
         } else {
-            UserDefaults.standard.removeObject(forKey: "appleUserId")
+            IdentityScope.debugOverride = nil
         }
         if let savedEmailUserId {
-            UserDefaults.standard.set(savedEmailUserId, forKey: "emailUserId")
+            IdentityScope.debugOverride = savedEmailUserId
         } else {
-            UserDefaults.standard.removeObject(forKey: "emailUserId")
+            IdentityScope.debugOverride = nil
         }
         UserDefaults.standard.synchronize()
         authSnapshot.restore()
@@ -806,8 +770,8 @@ final class AppViewModelFlowTests: XCTestCase {
         AuthStateSnapshot.clearAll()
         savedAppleUserId = UserDefaults.standard.string(forKey: "appleUserId")
         savedEmailUserId = UserDefaults.standard.string(forKey: "emailUserId")
-        UserDefaults.standard.removeObject(forKey: "appleUserId")
-        UserDefaults.standard.set(testUserId, forKey: "emailUserId")
+        IdentityScope.debugOverride = nil
+        IdentityScope.debugOverride = testUserId
         AppViewModel.clearScopedAccountData(for: testUserId)
         UserDefaults.standard.synchronize()
     }
@@ -815,14 +779,14 @@ final class AppViewModelFlowTests: XCTestCase {
     override func tearDown() {
         AppViewModel.clearScopedAccountData(for: testUserId)
         if let savedAppleUserId {
-            UserDefaults.standard.set(savedAppleUserId, forKey: "appleUserId")
+            IdentityScope.debugOverride = savedAppleUserId
         } else {
-            UserDefaults.standard.removeObject(forKey: "appleUserId")
+            IdentityScope.debugOverride = nil
         }
         if let savedEmailUserId {
-            UserDefaults.standard.set(savedEmailUserId, forKey: "emailUserId")
+            IdentityScope.debugOverride = savedEmailUserId
         } else {
-            UserDefaults.standard.removeObject(forKey: "emailUserId")
+            IdentityScope.debugOverride = nil
         }
         UserDefaults.standard.synchronize()
         authSnapshot.restore()
@@ -1668,8 +1632,8 @@ final class PersistenceHardeningTests: XCTestCase {
         AuthStateSnapshot.clearAll()
         savedAppleUserId = UserDefaults.standard.string(forKey: "appleUserId")
         savedEmailUserId = UserDefaults.standard.string(forKey: "emailUserId")
-        UserDefaults.standard.removeObject(forKey: "appleUserId")
-        UserDefaults.standard.set(testUserId, forKey: "emailUserId")
+        IdentityScope.debugOverride = nil
+        IdentityScope.debugOverride = testUserId
         AppViewModel.clearScopedAccountData(for: testUserId)
         UserDefaults.standard.synchronize()
 
@@ -1685,14 +1649,14 @@ final class PersistenceHardeningTests: XCTestCase {
         if let attachmentDir { try? FileManager.default.removeItem(at: attachmentDir) }
         AppViewModel.clearScopedAccountData(for: testUserId)
         if let savedAppleUserId {
-            UserDefaults.standard.set(savedAppleUserId, forKey: "appleUserId")
+            IdentityScope.debugOverride = savedAppleUserId
         } else {
-            UserDefaults.standard.removeObject(forKey: "appleUserId")
+            IdentityScope.debugOverride = nil
         }
         if let savedEmailUserId {
-            UserDefaults.standard.set(savedEmailUserId, forKey: "emailUserId")
+            IdentityScope.debugOverride = savedEmailUserId
         } else {
-            UserDefaults.standard.removeObject(forKey: "emailUserId")
+            IdentityScope.debugOverride = nil
         }
         UserDefaults.standard.synchronize()
         authSnapshot.restore()

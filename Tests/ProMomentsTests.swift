@@ -240,12 +240,17 @@ final class FunnelAnalyticsTests: XCTestCase {
         XCTAssertEqual(only("notify_permission_result")?["result"] as? String, "declined_in_app")
     }
 
-    func testProfileCreatedKind() {
-        Analytics.profileCreated(kind: .apple)
-        XCTAssertEqual(only("profile_created")?["kind"] as? String, "apple")
+    /// 2.2: no profiles. The identity events carry fixed values and counts only.
+    func testIdentityEventsCarryOnlyFixedValues() {
+        Analytics.mergeQuestionAnswered("spouse")
+        XCTAssertEqual(only("merge_question_answered")?["answer"] as? String, "spouse")
         events = []
-        Analytics.profileCreated(kind: .local)
-        XCTAssertEqual(only("profile_created")?["kind"] as? String, "local")
+        Analytics.syncPushFailed(recordType: "CustomCategory", code: 12)
+        XCTAssertEqual(only("sync_push_failed")?["record_type"] as? String, "CustomCategory")
+        XCTAssertEqual(only("sync_push_failed")?["ck_error"] as? Int, 12)
+        events = []
+        Analytics.icloudState(.restricted, quotaExceeded: false)
+        XCTAssertEqual(only("icloud_state")?["state"] as? String, "restricted")
     }
 
     func testRatingPromptRequestedTrigger() {
@@ -258,7 +263,6 @@ final class FunnelAnalyticsTests: XCTestCase {
         EntrySource.allCases.forEach { Analytics.entryLogged(source: $0) }
         Analytics.exportShared(format: .pdf)
         PaywallContext.allCases.forEach { Analytics.paywallViewed(context: $0) }
-        Analytics.profileCreated(kind: .local)
         Analytics.ratingPromptRequested(trigger: .entriesMilestone)
         LockEntry.allCases.forEach { Analytics.lockPreviewShown(entry: $0) }
         PaywallContext.allCases.forEach {
@@ -292,13 +296,13 @@ final class FunnelAnalyticsIntegrationTests: XCTestCase {
         super.setUp()
         events = []
         Analytics.testSpy = { [weak self] name, props in self?.events.append((name, props)) }
-        UserDefaults.standard.set(id, forKey: ProfileKeys.localProfileId)
+        IdentityScope.debugOverride = id
     }
 
     override func tearDown() {
         Analytics.testSpy = nil
         AppViewModel.clearScopedAccountData(for: id)
-        UserDefaults.standard.removeObject(forKey: ProfileKeys.localProfileId)
+        IdentityScope.debugOverride = nil
         super.tearDown()
     }
 
