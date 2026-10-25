@@ -24,9 +24,9 @@ struct ReportStanding: Identifiable, Equatable {
 
     var name: String {
         switch person {
-        case .you: return "You"
-        case .spouse: return "Spouse"
-        case .household: return "You and your spouse"
+        case .you: return RR.t("reports.person.you", "You")
+        case .spouse: return RR.t("reports.person.spouse", "Spouse")
+        case .household: return RR.t("reports.person.together", "You and your spouse")
         }
     }
 
@@ -46,11 +46,11 @@ enum ReportsLogic {
         let currentYear = calendar.component(.year, from: now)
         let met = HouseProgress(hours: hours, goal: goal).isGoalMet
         if year < currentYear {
-            if met { return ("Goal hours met", .positive) }
+            if met { return (RR.t("reports.pace.met", "Goal hours met"), .positive) }
             let short = max(1, Int((goal.targetHours - hours).rounded(.up)))
-            return ("Year ended \(short)h short", .caution)
+            return (RR.t("reports.pace.short", "Year ended \(short)h short"), .caution)
         }
-        if year > currentYear { return ("Not started", .neutral) }
+        if year > currentYear { return (RR.t("reports.pace.notStarted", "Not started"), .neutral) }
         let pace = TodayPace.resolve(hours: hours, goal: goal, date: now, calendar: calendar)
         switch pace.tone {
         case .positive: return (pace.text, .positive)
@@ -75,14 +75,14 @@ enum ReportsLogic {
             return ReportStanding(
                 person: .spouse, goal: .reps750, hours: hours, target: 750,
                 status: pace.text, tone: pace.tone == .caution ? .caution : .neutral,
-                detail: "50% rule not tracked for your spouse. REPS is met by one spouse alone, so these hours never add to yours."
+                detail: RR.t("reports.spouse.detail", "50% rule not tracked for your spouse. The 750 is met by one of you alone, so these hours never add to yours.")
             )
         }
         if rep.isQualified {
             return ReportStanding(
                 person: person, goal: .reps750, hours: hours, target: 750,
-                status: "Past both marks", tone: .positive,
-                detail: "More than 750 hours, and more than half your working time."
+                status: RR.t("reports.rule.bothMarks", "Past both marks"), tone: .positive,
+                detail: RR.t("reports.rule.bothMarks.detail", "More than 750 hours, and more than half your working time.")
             )
         }
         if let open = TaxQualificationEngine.hoursMetRuleOpenStatus(rep) {
@@ -94,9 +94,15 @@ enum ReportsLogic {
         let pace = paceStatus(hours: hours, goal: .reps750, year: year, now: now, calendar: calendar)
         let rule: String
         switch rep.moreThanHalfStatus {
-        case .met: rule = "50% rule: met, \(Int((rep.realEstateWorkPercentage * 100).rounded(.down)))% of your working time."
-        case .notMet: rule = "50% rule: not met yet, \(Int((rep.realEstateWorkPercentage * 100).rounded(.down)))% of your working time."
-        case .notEntered: rule = "50% rule: " + TaxQualificationEngine.MoreThanHalfStatus.notEnteredPrompt.lowercased() + "."
+        case .met:
+            let percent = Int((rep.realEstateWorkPercentage * 100).rounded(.down))
+            rule = RR.t("reports.rule.met", "50% rule: met, \(percent)% of your working time.")
+        case .notMet:
+            let percent = Int((rep.realEstateWorkPercentage * 100).rounded(.down))
+            rule = RR.t("reports.rule.notMet", "50% rule: not met yet, \(percent)% of your working time.")
+        case .notEntered:
+            let prompt = TaxQualificationEngine.MoreThanHalfStatus.notEnteredPrompt.lowercased()
+            rule = RR.t("reports.rule.notEntered", "50% rule: \(prompt).")
         }
         return ReportStanding(
             person: person, goal: .reps750, hours: hours, target: 750,
@@ -120,8 +126,10 @@ enum ReportsLogic {
         if met {
             return ReportStanding(
                 person: person, goal: goal, hours: hours, target: goal.targetHours,
-                status: "Goal met", tone: .positive,
-                detail: goal == .mp100 ? "More than 100 hours, and no one else did more." : "More than 500 hours on this activity."
+                status: RR.t("reports.mp.met", "Goal met"), tone: .positive,
+                detail: goal == .mp100
+                    ? RR.t("reports.mp.met.100", "More than 100 hours, and no one else did more.")
+                    : RR.t("reports.mp.met.500", "More than 500 hours on this activity.")
             )
         }
         // Over 500 hours the 500-hour test is met, so who else spent more time doesn't matter.
@@ -129,8 +137,8 @@ enum ReportsLogic {
         if goal == .mp100, result.meets500HourTest {
             return ReportStanding(
                 person: person, goal: goal, hours: hours, target: goal.targetHours,
-                status: "Over 500 hours", tone: .positive,
-                detail: "You’re past 500 hours, so who else did more doesn’t come up."
+                status: RR.t("reports.mp.over500", "Over 500 hours"), tone: .positive,
+                detail: RR.t("reports.mp.over500.detail", "You\u{2019}re past 500 hours, so who else did more doesn\u{2019}t come up.")
             )
         }
         if goal == .mp100, result.ownerAndSpouseHours > 100 {
@@ -138,14 +146,14 @@ enum ReportsLogic {
             case .none:
                 return ReportStanding(
                     person: person, goal: goal, hours: hours, target: goal.targetHours,
-                    status: "100 hours reached", tone: .positive,
-                    detail: "Confirm no one else spent more time on it."
+                    status: RR.t("reports.mp.reached100", "100 hours reached"), tone: .positive,
+                    detail: RR.t("reports.mp.reached100.detail", "Confirm no one else spent more time on it.")
                 )
             case .some(false):
                 return ReportStanding(
                     person: person, goal: goal, hours: hours, target: goal.targetHours,
-                    status: "Someone else did more", tone: .caution,
-                    detail: "Someone else did more, so the 100-hour route is out. The 500-hour route is still open."
+                    status: RR.t("reports.mp.someoneMore", "Someone else did more"), tone: .caution,
+                    detail: RR.t("reports.mp.someoneMore.detail", "Someone else did more, so the 100-hour route is out. The 500-hour route is still open.")
                 )
             case .some(true):
                 break
@@ -155,7 +163,9 @@ enum ReportsLogic {
         return ReportStanding(
             person: person, goal: goal, hours: hours, target: goal.targetHours,
             status: pace.text, tone: pace.tone,
-            detail: includesSpouse ? "Your hours and your spouse’s count together for this test." : "Your hours only. Turn on spouse hours in Tax profile to count both."
+            detail: includesSpouse
+                ? RR.t("reports.mp.together", "Your hours and your spouse\u{2019}s count together for this test.")
+                : RR.t("reports.mp.solo", "Your hours only. Turn on spouse hours in Settings to count both.")
         )
     }
 
@@ -165,7 +175,7 @@ enum ReportsLogic {
         guard sorted.count > limit else { return sorted.map { ($0.0, $0.1) } }
         let head = sorted.prefix(limit - 1).map { ($0.0, $0.1) }
         let rest = sorted.dropFirst(limit - 1).reduce(0) { $0 + $1.1 }
-        return head + [("Other", rest)]
+        return head + [(RR.t("reports.other", "Other"), rest)]
     }
 
     /// Hours per month for `year` (12 values, January first).
@@ -176,6 +186,93 @@ enum ReportsLogic {
             months[month - 1] += entry.hours
         }
         return months
+    }
+}
+
+// MARK: - Pace tiles and rental rows (moved here from Today, standard §1.11, §H.5)
+
+/// One pace tile: a value and its label (`LHTile.Stat`).
+struct ReportsTile: Equatable {
+    let value: String
+    let label: String
+}
+
+/// One rental in "By rental": its own house stage against the chosen goal, lit when hours were
+/// logged there today, and its share of the year's hours.
+struct ReportsRentalRow: Identifiable, Equatable {
+    let id: UUID
+    let name: String
+    let hours: Double
+    /// 0...1 of all rental hours in the year.
+    let share: Double
+    let stage: CraftStage
+    let loggedToday: Bool
+}
+
+extension ReportsLogic {
+    /// Hours a week still needed and the second tile (the 50% rule for the 750, days left for the
+    /// other tests). Only the current year has a pace; a closed or future year shows none.
+    static func paceTiles(
+        standing: ReportStanding,
+        rep: TaxQualificationEngine.REPSResult?,
+        year: Int,
+        paceReady: Bool,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [ReportsTile] {
+        guard calendar.component(.year, from: now) == year else { return [] }
+        let pace = TodayPace.resolve(hours: standing.hours, goal: standing.goal, date: now, calendar: calendar)
+        let finish = TodayPaceCards.finish(hours: standing.hours, goal: standing.goal, pace: pace, now: now,
+                                           calendar: calendar, paceReady: paceReady)
+        var tiles = [ReportsTile(value: finish.value, label: finish.label)]
+        if standing.goal == .reps750, let rep {
+            switch rep.moreThanHalfStatus {
+            case .notEntered:
+                tiles.append(ReportsTile(value: RR.t("reports.tile.rule.notChecked", "Not checked"),
+                                         label: RR.t("reports.tile.rule.label", "Your 50% rule")))
+            case .met, .notMet:
+                let percent = Int((rep.realEstateWorkPercentage * 100).rounded(.down))
+                tiles.append(ReportsTile(value: RR.t("reports.tile.rule.value", "\(percent)%"),
+                                         label: RR.t("reports.tile.rule.workTime", "Of your working time")))
+            }
+        } else {
+            let days = daysLeft(now: now, calendar: calendar)
+            tiles.append(ReportsTile(
+                value: days == 1 ? RR.t("reports.tile.days.one", "1 day") : RR.t("reports.tile.days.many", "\(days) days"),
+                label: RR.t("reports.tile.days.label", "Left in \(String(year))")))
+        }
+        return tiles
+    }
+
+    static func daysLeft(now: Date, calendar: Calendar = .current) -> Int {
+        let year = calendar.component(.year, from: now)
+        guard let end = calendar.date(from: DateComponents(year: year, month: 12, day: 31)) else { return 0 }
+        return max(calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: end).day ?? 0, 0)
+    }
+
+    /// "By rental": every rental with hours in the year, largest first, each with its own stage.
+    static func rentalRows(
+        rentals: [(id: UUID, name: String, hours: Double, loggedToday: Bool)],
+        goalHours: Double
+    ) -> [ReportsRentalRow] {
+        let active = rentals.filter { $0.hours > 0 }
+        let total = active.reduce(0) { $0 + $1.hours }
+        return active
+            .sorted { $0.hours == $1.hours ? $0.name < $1.name : $0.hours > $1.hours }
+            .map { rental in
+                ReportsRentalRow(
+                    id: rental.id, name: rental.name, hours: rental.hours,
+                    share: total > 0 ? rental.hours / total : 0,
+                    stage: CraftStage.stage(hours: rental.hours, goal: goalHours),
+                    loggedToday: rental.loggedToday
+                )
+            }
+    }
+
+    /// "34% of your hours" for a rental row's meta line.
+    static func shareLine(_ share: Double) -> String {
+        let percent = Int((share * 100).rounded())
+        return RR.t("reports.rental.share", "\(percent)% of your hours")
     }
 }
 

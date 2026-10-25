@@ -453,3 +453,63 @@ final class WPRReviewFixTests: XCTestCase {
         XCTAssertEqual(RecordSourceBadge(entry: unknown).title, "Other")
     }
 }
+
+// MARK: - Package G: records rows, pace tiles, rental rows
+
+final class RecordsReportsPackageGTests: XCTestCase {
+    private var calendar: Calendar = {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        return c
+    }()
+    private var oct19: Date { calendar.date(from: DateComponents(year: 2026, month: 10, day: 19, hour: 12))! }
+
+    private func entry(_ hours: Double, spouse: Bool = false, category: ActivityCategory = .repairs) -> TimeEntry {
+        TimeEntry(propertyId: UUID(), participant: spouse ? .spouse : .selfParticipant, category: category,
+                  hours: hours, date: oct19, notes: "Fixed faucet")
+    }
+
+    func testMetaPutsFlagsBeforeTheRentalSoTheNameTruncates() {
+        let meta = RecordsLogic.meta(for: entry(1, spouse: true), propertyName: "Pine Cabin")
+        XCTAssertTrue(meta.hasSuffix("Pine Cabin"), meta)
+        XCTAssertTrue(meta.contains("Spouse"), meta)
+        XCTAssertEqual(RecordsLogic.meta(for: entry(1), propertyName: "Pine Cabin").components(separatedBy: " \u{00B7} ").count, 2)
+    }
+
+    func testMonthHeaderCarriesTheMonthTotal() {
+        let header = RecordsLogic.monthHeader(oct19, hours: 30.5)
+        XCTAssertTrue(header.contains("30h 30m"), header)
+    }
+
+    func testPaceTilesOnlyInTheCurrentYear() {
+        let standing = ReportStanding(person: .you, goal: .mp500, hours: 100, target: 500, status: "x", tone: .neutral, detail: nil)
+        XCTAssertTrue(ReportsLogic.paceTiles(standing: standing, rep: nil, year: 2025, paceReady: true, now: oct19, calendar: calendar).isEmpty)
+        let tiles = ReportsLogic.paceTiles(standing: standing, rep: nil, year: 2026, paceReady: true, now: oct19, calendar: calendar)
+        XCTAssertEqual(tiles.count, 2)
+        XCTAssertEqual(tiles[0].label, "To finish by Dec 31")
+        XCTAssertEqual(tiles[1].value, "73 days")
+    }
+
+    func testRepsSecondTileIsTheFiftyPercentRule() {
+        let rep = TaxQualificationEngine.REPSResult(participant: .selfParticipant, realEstateHours: 300, nonRealEstateHours: 100,
+                                                    meets750HourTest: false, meetsMoreThanHalfPersonalServicesTest: true)
+        let standing = ReportStanding(person: .you, goal: .reps750, hours: 300, target: 750, status: "x", tone: .neutral, detail: nil)
+        let tiles = ReportsLogic.paceTiles(standing: standing, rep: rep, year: 2026, paceReady: true, now: oct19, calendar: calendar)
+        XCTAssertEqual(tiles[1].value, "75%")
+    }
+
+    func testRentalRowsRankAndPickTheStageFromTheGoal() {
+        let a = UUID(), b = UUID(), c = UUID()
+        let rows = ReportsLogic.rentalRows(
+            rentals: [(a, "A", 50, false), (b, "B", 300, true), (c, "C", 0, false)], goalHours: 500)
+        XCTAssertEqual(rows.map(\.name), ["B", "A"])
+        XCTAssertEqual(rows[0].stage, CraftStage.stage(hours: 300, goal: 500))
+        XCTAssertTrue(rows[0].loggedToday)
+        XCTAssertEqual(rows.map(\.share).reduce(0, +), 1, accuracy: 0.0001)
+    }
+
+    func testCatalogResolvesPackageStrings() {
+        XCTAssertEqual(RR.t("records.title", "zzz"), "Records")
+        XCTAssertEqual(ReportsLogic.shareLine(0.34), "34% of your hours")
+    }
+}

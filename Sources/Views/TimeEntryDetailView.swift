@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// One record, read and edited in place. Same grammar as the Inbox confirm sheet: the tool and
-/// what it was on top, the hours large, then the facts as a plain grouped list, then where it came
-/// from. Records are tax evidence, so edits are explicit (Edit → Save) and delete asks first.
+/// One record, read and edited in place. The tool and what it was on top, the hours large, then the
+/// facts as one grouped container, then where it came from. Edits are explicit (Edit, then Save)
+/// and delete asks first. Standard §1.4, §1.7, §1.8, §1.9, §1.14 (`.detail` title), §1.17 (the 56pt
+/// tool header stays), §H.5 (no house on a record).
 struct TimeEntryDetailView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @Environment(\.colorScheme) var colorScheme
@@ -25,7 +26,6 @@ struct TimeEntryDetailView: View {
     @State private var showingDeleteConfirmation = false
     @State private var showingDiscardAlert = false
     @State private var savedTick = 0
-    @FocusState private var isNotesFocused: Bool
 
     init(entry: TimeEntry) {
         self.entry = entry
@@ -38,7 +38,7 @@ struct TimeEntryDetailView: View {
     }
 
     private var propertyName: String {
-        viewModel.properties.first { $0.id == propertyId }?.name ?? "No property"
+        viewModel.properties.first { $0.id == propertyId }?.name ?? RR.t("record.noRental", "No rental")
     }
 
     private var badge: RecordSourceBadge { RecordSourceBadge(entry: entry) }
@@ -52,42 +52,34 @@ struct TimeEntryDetailView: View {
         participant != entry.participant
     }
 
-    var body: some View {
-        List {
-            Section {
-                header
-                    .listRowInsets(EdgeInsets(top: 8, leading: 4, bottom: 4, trailing: 4))
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                hoursCard
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-            }
+    private var ax: Bool { dynamicTypeSize.isAccessibilitySize }
 
-            if isEditing {
-                editSections
-            } else {
-                readSections
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
+                header
+                hoursCard
+                if isEditing { editSections } else { readSections }
             }
+            .padding(.horizontal, LHMetrics.gutter)
+            .padding(.top, 8)
+            .padding(.bottom, LHMetrics.sectionGap)
         }
-        .listStyle(.insetGrouped)
-        .listSectionSpacing(20)
-        .scrollContentBackground(.hidden)
-        .background(colors.background.ignoresSafeArea())
-        .navigationTitle(isEditing ? "Edit record" : "")
+        .scrollDismissesKeyboard(.interactively)
+        .background { LHCanvas() }
+        .navigationTitle(isEditing ? RR.t("record.editTitle", "Edit record") : "")
         .navigationBarTitleDisplayMode(.inline)
         .hidesAppTabBar()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if isEditing {
-                    Button("Save") { saveChanges() }
+                    Button(RR.t("record.save", "Save")) { saveChanges() }
                         .fontWeight(.semibold)
                         .foregroundStyle(hasChanges ? colors.action : colors.textTertiary)
                         .disabled(!hasChanges)
                         .accessibilityIdentifier("entry.save")
                 } else {
-                    Button("Edit") {
+                    Button(RR.t("record.edit", "Edit")) {
                         animate { isEditing = true }
                     }
                     .foregroundStyle(colors.action)
@@ -96,25 +88,25 @@ struct TimeEntryDetailView: View {
             }
             if isEditing {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { cancelEditing() }
+                    Button(RR.t("record.cancel", "Cancel")) { cancelEditing() }
                         .foregroundStyle(colors.action)
                 }
             }
         }
-        .alert("Delete this record?", isPresented: $showingDeleteConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
+        .alert(RR.t("record.delete.title", "Delete this record?"), isPresented: $showingDeleteConfirmation) {
+            Button(RR.t("record.delete.cancel", "Cancel"), role: .cancel) {}
+            Button(RR.t("record.delete.confirm", "Delete"), role: .destructive) {
                 viewModel.deleteTimeEntry(entry)
                 dismiss()
             }
         } message: {
-            Text("It comes off your hours and your export. This can’t be undone.")
+            Text(RR.t("record.delete.message", "It comes off your hours and your export. This can\u{2019}t be undone."))
         }
-        .alert("Discard changes?", isPresented: $showingDiscardAlert) {
-            Button("Keep editing", role: .cancel) {}
-            Button("Discard", role: .destructive) { discardChanges() }
+        .confirmationDialog(RR.t("record.discard.title", "Discard changes?"), isPresented: $showingDiscardAlert, titleVisibility: .visible) {
+            Button(RR.t("record.discard.confirm", "Discard"), role: .destructive) { discardChanges() }
+            Button(RR.t("record.discard.keep", "Keep editing"), role: .cancel) {}
         } message: {
-            Text("Your edits to this record will be lost.")
+            Text(RR.t("record.discard.message", "Your edits to this record will be lost."))
         }
         .sensoryFeedback(.success, trigger: savedTick)
         .navigationBarBackButtonHidden(isEditing)
@@ -123,250 +115,197 @@ struct TimeEntryDetailView: View {
 
     // MARK: Header
 
+    private var headerSubtitle: String {
+        let day = date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        return RR.t("record.header.subtitle", "\(badge.title) \u{00B7} \(day)")
+    }
+
     private var header: some View {
         HStack(alignment: .center, spacing: 14) {
             CategoryToolTile(category: category, size: 56)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(badge.title) · \(date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))")
-                    .font(AppTypography.drafting)
-                    .textCase(.uppercase)
-                    .tracking(1.3)
-                    .foregroundStyle(colors.draftingInk)
-                    .lineLimit(2)
-                Text(isEditing ? category.inboxLabel : RecordsLogic.title(for: entry, propertyName: propertyName))
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(colors.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityAddTraits(.isHeader)
-            }
-            Spacer(minLength: 0)
+            LHScreenTitle(
+                isEditing ? category.inboxLabel : RecordsLogic.title(for: entry, propertyName: propertyName),
+                subtitle: headerSubtitle,
+                style: .detail
+            )
+            .padding(.bottom, -LHMetrics.headerToContent)
         }
         .accessibilityElement(children: .combine)
     }
 
     private var hoursCard: some View {
-        HStack(spacing: 16) {
+        Group {
             if isEditing {
-                stepButton(symbol: "minus", label: "Fifteen minutes less", enabled: hours > 0.25) {
-                    animate(AppAnimation.quick) { hours = max(0.25, hours - 0.25) }
-                }
-            }
-            Spacer(minLength: 0)
-            HoursReadout(hours: hours)
-            Spacer(minLength: 0)
-            if isEditing {
-                stepButton(symbol: "plus", label: "Fifteen minutes more", enabled: hours < 24) {
-                    animate(AppAnimation.quick) { hours = min(24, hours + 0.25) }
-                }
+                LHStepper(hours: $hours, step: 0.25, range: 0.25...24, label: RR.t("record.hours", "Hours"))
+                    .frame(maxWidth: .infinity)
+            } else {
+                HoursReadout(hours: hours)
+                    .frame(maxWidth: .infinity)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, LHMetrics.cardPadding)
         .padding(.vertical, 18)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
-        .accessibilityElement(children: .contain)
-    }
-
-    private func stepButton(symbol: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(enabled ? colors.textPrimary : colors.textTertiary)
-                .frame(width: 48, height: 48)
-                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(colors.backgroundTertiary))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(colors.border, lineWidth: 1))
+        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+        .overlay {
+            if colorScheme == .dark {
+                RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
+                    .strokeBorder(colors.border, lineWidth: LHMetrics.hairline)
+            }
         }
-        .buttonStyle(.lhPressable)
-        .disabled(!enabled)
-        .accessibilityLabel(label)
+        .accessibilityElement(children: .contain)
     }
 
     // MARK: Read
 
     @ViewBuilder
     private var readSections: some View {
-        // Photos first: they are the evidence, and the List only builds rows on screen.
         if !entry.attachments.isEmpty {
-            Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Attachments (\(entry.attachments.count))")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(colors.textSecondary)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(entry.attachments) { attachment in
-                                if let bytes = attachment.data, let uiImage = UIImage(data: bytes) {
-                                    Image(uiImage: uiImage)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 72, height: 72)
-                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                        .accessibilityLabel("Attached photo")
-                                }
+            VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+                LHSectionHeader(RR.t("record.attachments", "Attachments"), count: entry.attachments.count)
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(entry.attachments) { attachment in
+                            if let bytes = attachment.data, let uiImage = UIImage(data: bytes) {
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 72, height: 72)
+                                    .clipShape(RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
+                                    .accessibilityLabel(RR.t("record.attachment.photo", "Attached photo"))
                             }
                         }
                     }
                 }
-                .padding(.vertical, 6)
-                .accessibilityIdentifier("entry.attachments")
+                .scrollIndicators(.hidden)
             }
-            .listRowBackground(colors.backgroundSecondary)
+            .accessibilityIdentifier("entry.attachments")
         }
 
-        Section {
-            factRow("Property", value: propertyName)
-            factRow("Who", value: participant == .spouse ? "Spouse" : "Me")
-            factRow("Category", value: category.inboxLabel)
-            factRow("Date", value: entry.formattedDate)
+        LHRowGroup {
+            FactRow(label: RR.t("record.fact.rental", "Rental"), value: propertyName)
+            LHDivider(leadingInset: LHMetrics.cardPadding)
+            FactRow(label: RR.t("record.fact.who", "Who"),
+                    value: participant == .spouse ? RR.t("record.who.spouse", "Spouse") : RR.t("record.who.me", "Me"))
+            LHDivider(leadingInset: LHMetrics.cardPadding)
+            FactRow(label: RR.t("record.fact.kind", "Kind of work"), value: category.inboxLabel)
+            LHDivider(leadingInset: LHMetrics.cardPadding)
+            FactRow(label: RR.t("record.fact.date", "Date"), value: entry.formattedDate)
             if !entry.countsForREPS {
-                factRow("Counts toward", value: "Not real estate hours", valueColor: colors.caution)
+                LHDivider(leadingInset: LHMetrics.cardPadding)
+                FactRow(label: RR.t("record.fact.counts", "Counts toward your goal"),
+                        value: RR.t("record.fact.counts.no", "No, not rental work"), valueColor: colors.caution)
             }
         }
-        .listRowBackground(colors.backgroundSecondary)
 
         if !notes.isEmpty {
-            Section {
+            VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+                LHSectionHeader(RR.t("record.notes", "Notes"))
                 Text(notes)
                     .font(.body)
                     .foregroundStyle(colors.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.vertical, 4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(LHMetrics.cardPadding)
+                    .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
                     .textSelection(.enabled)
-            } header: {
-                BPSectionHeader(title: "Notes")
             }
-            .listRowBackground(colors.backgroundSecondary)
         }
 
-        Section {
-            factRow("Source", value: badge.title)
-            if let detected = entry.detectedAt {
-                factRow("Detected", value: detected.formatted(date: .abbreviated, time: .shortened))
+        VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+            LHSectionHeader(RR.t("record.source.header", "Where it came from"))
+            LHRowGroup {
+                FactRow(label: RR.t("record.fact.source", "Source"), value: badge.title)
+                if let detected = entry.detectedAt {
+                    LHDivider(leadingInset: LHMetrics.cardPadding)
+                    FactRow(label: RR.t("record.fact.found", "Found"), value: detected.formatted(date: .abbreviated, time: .shortened))
+                }
+                if let confirmed = entry.confirmedAt {
+                    LHDivider(leadingInset: LHMetrics.cardPadding)
+                    FactRow(label: RR.t("record.fact.confirmed", "Confirmed by you"), value: confirmed.formatted(date: .abbreviated, time: .shortened))
+                }
+                LHDivider(leadingInset: LHMetrics.cardPadding)
+                FactRow(label: RR.t("record.fact.added", "Added"), value: entry.createdAt.formatted(date: .abbreviated, time: .shortened))
+                if entry.modifiedAt.timeIntervalSince(entry.createdAt) > 1 {
+                    LHDivider(leadingInset: LHMetrics.cardPadding)
+                    FactRow(label: RR.t("record.fact.changed", "Last changed"), value: entry.modifiedAt.formatted(date: .abbreviated, time: .shortened))
+                }
             }
-            if let confirmed = entry.confirmedAt {
-                factRow("Confirmed by you", value: confirmed.formatted(date: .abbreviated, time: .shortened))
-            }
-            factRow("Added", value: entry.createdAt.formatted(date: .abbreviated, time: .shortened))
-            if entry.modifiedAt.timeIntervalSince(entry.createdAt) > 1 {
-                factRow("Last changed", value: entry.modifiedAt.formatted(date: .abbreviated, time: .shortened))
-            }
-        } header: {
-            BPSectionHeader(title: "Where it came from")
-        } footer: {
-            Text("Your export shows the same source and dates for every entry.")
+            Text(RR.t("record.source.footer", "Your PDF shows the same source and dates for every record."))
                 .font(.footnote)
                 .foregroundStyle(colors.textSecondary)
+                .padding(.horizontal, 4)
         }
-        .listRowBackground(colors.backgroundSecondary)
 
-        Section {
-            Button(role: .destructive) {
-                showingDeleteConfirmation = true
-            } label: {
-                Label("Delete record", systemImage: "trash")
-                    .foregroundStyle(colors.destructive)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .accessibilityIdentifier("entry.delete")
+        Button(role: .destructive) {
+            showingDeleteConfirmation = true
+        } label: {
+            Label(RR.t("record.delete.button", "Delete record"), systemImage: "trash")
+                .frame(maxWidth: .infinity)
         }
-        .listRowBackground(colors.backgroundSecondary)
-    }
-
-    private func factRow(_ label: String, value: String, valueColor: Color? = nil) -> some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(label).font(.subheadline).foregroundStyle(colors.textSecondary)
-                    Text(value).font(.body).foregroundStyle(valueColor ?? colors.textPrimary)
-                }
-            } else {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(label)
-                        .font(.body)
-                        .foregroundStyle(colors.textSecondary)
-                    Spacer(minLength: 12)
-                    Text(value)
-                        .font(.body)
-                        .foregroundStyle(valueColor ?? colors.textPrimary)
-                        .multilineTextAlignment(.trailing)
-                }
-            }
-        }
-        .frame(minHeight: 36)
-        .accessibilityElement(children: .combine)
+        .buttonStyle(LHButton.destructiveTertiary)
+        .accessibilityIdentifier("entry.delete")
     }
 
     // MARK: Edit
 
-    /// Branded date chip: our capsule is the visual; the system date picker sits invisibly on top
-    /// so tapping still opens the native calendar (and VoiceOver still reads a date picker).
-    private var dateChip: some View {
-        Text(date.formatted(date: .abbreviated, time: .omitted))
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(colors.action)
-            .padding(.horizontal, 14)
-            .frame(minHeight: 40)
-            .background(Capsule().fill(colors.backgroundTertiary))
-            .overlay(Capsule().strokeBorder(colors.border, lineWidth: 1))
-            .overlay {
-                DatePicker("Date", selection: $date, in: ...Date.distantFuture, displayedComponents: .date)
-                    .labelsHidden()
-                    .tint(colors.action)
-                    .opacity(0.02)
-            }
-            .contentShape(Capsule())
-    }
-
     @ViewBuilder
     private var editSections: some View {
-        Section {
-            Picker("Property", selection: $propertyId) {
-                ForEach(viewModel.properties) { property in
-                    Text(property.name).tag(property.id)
+        VStack(spacing: 12) {
+            Menu {
+                Picker(RR.t("record.fact.rental", "Rental"), selection: $propertyId) {
+                    ForEach(viewModel.properties) { property in
+                        Text(property.name).tag(property.id)
+                    }
                 }
+            } label: {
+                LHRow.Value(RR.t("record.fact.rental", "Rental"), value: propertyName, accessory: .menu).content
             }
-            .tint(colors.action)
+            .accessibilityIdentifier("entry.edit.rental")
+
+            Menu {
+                Picker(RR.t("record.fact.kind", "Kind of work"), selection: $category) {
+                    ForEach(ActivityCategory.allCases, id: \.self) { cat in
+                        Text(cat.inboxLabel).tag(cat)
+                    }
+                }
+            } label: {
+                LHRow.Value(RR.t("record.fact.kind", "Kind of work"), value: category.inboxLabel, accessory: .menu).content
+            }
+            .accessibilityIdentifier("entry.edit.kind")
+
+            dateRow
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("Who")
-                    .foregroundStyle(colors.textPrimary)
-                BPSegmentedPicker(
-                    options: [Participant.selfParticipant, .spouse],
-                    selection: $participant,
-                    title: { $0 == .spouse ? "Spouse" : "Me" }
-                )
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("Who")
-            }
-
-            Picker("Category", selection: $category) {
-                ForEach(ActivityCategory.allCases, id: \.self) { cat in
-                    Text(cat.inboxLabel).tag(cat)
-                }
-            }
-            .tint(colors.action)
-
-            HStack {
-                Text("Date")
-                    .foregroundStyle(colors.textPrimary)
-                Spacer(minLength: 12)
-                dateChip
+                Text(RR.t("record.fact.who", "Who"))
+                    .font(.subheadline)
+                    .foregroundStyle(colors.textSecondary)
+                LHSegmented([
+                    .init(Participant.selfParticipant, RR.t("record.who.me", "Me")),
+                    .init(Participant.spouse, RR.t("record.who.spouse", "Spouse"))
+                ], selection: $participant, accessibilityLabel: RR.t("record.fact.who", "Who"))
             }
         }
-        .listRowBackground(colors.backgroundSecondary)
 
-        Section {
-            TextField("What did you do?", text: $notes, axis: .vertical)
-                .lineLimit(3...8)
-                .focused($isNotesFocused)
-                .foregroundStyle(colors.textPrimary)
-        } header: {
-            BPSectionHeader(title: "Notes")
-        } footer: {
-            Text("A short note makes the record stronger if anyone asks later.")
+        VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+            LHSectionHeader(RR.t("record.notes", "Notes"))
+            LHField(RR.t("record.notes.placeholder", "What did you do?"), text: $notes, multiline: true,
+                    identifier: "entry.edit.notes")
+            Text(RR.t("record.notes.footer", "A short note helps if anyone asks later."))
                 .font(.footnote)
                 .foregroundStyle(colors.textSecondary)
+                .padding(.horizontal, 4)
         }
-        .listRowBackground(colors.backgroundSecondary)
+    }
+
+    /// The date as a value row with the system date picker on top, so tapping opens the calendar.
+    private var dateRow: some View {
+        DatePicker(RR.t("record.fact.date", "Date"), selection: $date, in: ...Date.distantFuture, displayedComponents: .date)
+            .tint(colors.action)
+            .foregroundStyle(colors.textPrimary)
+            .padding(.horizontal, LHMetrics.cardPadding)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, minHeight: LHMetrics.rowMinHeight, alignment: .leading)
+            .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
+            .accessibilityIdentifier("entry.edit.date")
     }
 
     // MARK: Actions
@@ -382,7 +321,6 @@ struct TimeEntryDetailView: View {
         updated.modifiedAt = Date()
         viewModel.updateTimeEntry(updated)
         savedTick += 1
-        isNotesFocused = false
         animate { isEditing = false }
     }
 
@@ -413,32 +351,65 @@ struct TimeEntryDetailView: View {
     }
 }
 
-/// "2h 30m" with small unit letters, SF Pro Rounded tabular (the Inbox sheet's readout).
+/// One read-only fact: the label left, the value right (stacked at accessibility sizes), 56pt
+/// minimum like every row.
+private struct FactRow: View {
+    let label: String
+    let value: String
+    var valueColor: Color? = nil
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var typeSize
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 12))
+        layout {
+            Text(label)
+                .font(typeSize.isAccessibilitySize ? .subheadline : .body)
+                .foregroundStyle(colors.textSecondary)
+            if !typeSize.isAccessibilitySize { Spacer(minLength: 12) }
+            Text(value)
+                .font(.body)
+                .foregroundStyle(valueColor ?? colors.textPrimary)
+                .multilineTextAlignment(typeSize.isAccessibilitySize ? .leading : .trailing)
+        }
+        .padding(LHRow.insets)
+        .frame(maxWidth: .infinity, minHeight: LHMetrics.rowMinHeight, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// "2h 30m" with small unit letters, SF Pro Rounded tabular.
 private struct HoursReadout: View {
     let hours: Double
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
-        let total = Int((hours * 60).rounded())
+        let total = LHFormat.minutes(hours) ?? 0
         HStack(alignment: .firstTextBaseline, spacing: 2) {
             Text("\(total / 60)")
-                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .font(.largeTitle.weight(.bold))
+                .fontDesign(.rounded)
                 .contentTransition(.numericText())
-            Text("h").font(.title3).foregroundStyle(colors.textSecondary)
+            Text(RR.t("record.unit.h", "h")).font(.title3).foregroundStyle(colors.textSecondary)
             Text(String(format: "%02d", total % 60))
-                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .font(.largeTitle.weight(.bold))
+                .fontDesign(.rounded)
                 .contentTransition(.numericText())
                 .padding(.leading, 6)
-            Text("m").font(.title3).foregroundStyle(colors.textSecondary)
+            Text(RR.t("record.unit.m", "m")).font(.title3).foregroundStyle(colors.textSecondary)
         }
         .monospacedDigit()
         .foregroundStyle(colors.textPrimary)
         .lineLimit(1)
-        .minimumScaleFactor(0.6)
+        .minimumScaleFactor(0.8)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Hours")
-        .accessibilityValue(BPHours.spoken(hours))
+        .accessibilityLabel(RR.t("record.hours", "Hours"))
+        .accessibilityValue(LHFormat.spokenHours(hours))
     }
 }
 

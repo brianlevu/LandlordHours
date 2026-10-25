@@ -36,7 +36,7 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         tapRetrying(row, until: app.buttons["entry.edit"])
         XCTAssertFalse(app.buttons["tab.logTime"].isHittable, "The record hides the tab bar")
         app.buttons["entry.edit"].tap()
-        XCTAssertTrue(app.buttons["Fifteen minutes more"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Hours")).firstMatch.waitForExistence(timeout: 5), "The hours stepper shows in edit")
         XCTAssertTrue(app.buttons["entry.save"].exists)
     }
 

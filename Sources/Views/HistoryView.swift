@@ -1,11 +1,13 @@
 import SwiftUI
 
-/// Records: every confirmed hour, newest first, grouped by month (Mercury's restraint, Remote's
-/// rows). The tab root, and also pushed from Today's "See all". docs/design/2.0-hifi-reference-spec.md §g.
+/// Records: every confirmed hour, newest first, grouped by month. The tab root, and also pushed
+/// from Today's "See all". Standard §1.4 (browse row), §1.16 (chips), §H.5 (no house on Records:
+/// a record is about an activity, so the category's tool is the ornament) and §1.27 AD9 (the same
+/// list in every mode; no `Table`).
 struct HistoryView: View {
     /// True when pushed onto another NavigationStack (Today's "See all"); the tab root owns its own.
     @Environment(\.isPresented) private var isPushed
-    /// Opens narrowed to one rental (Properties' "See all in Records").
+    /// Opens narrowed to one rental (the rental page's "See all in Records").
     var initialPropertyId: UUID? = nil
 
     var body: some View {
@@ -27,16 +29,13 @@ private struct RecordsScreen: View {
     @ObservedObject private var taxProfile = TaxProfileManager.shared
     @ObservedObject private var goalManager = GoalManager.shared
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var filter = RecordsFilter(year: Calendar.current.component(.year, from: Date()))
     @State private var appliedInitialFilter = false
     @State private var entryToDelete: TimeEntry?
     @State private var showExport = false
-    @FocusState private var searchFocused: Bool
 
     private var propertyNames: [UUID: String] {
         Dictionary(viewModel.properties.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
@@ -58,41 +57,62 @@ private struct RecordsScreen: View {
         viewModel.timeEntries.contains { Calendar.current.component(.year, from: $0.date) == filter.year }
     }
 
+    private var totalLabel: String {
+        RecordsLogic.totalLabel(goal: goalManager.houseGoal, tracksSpouseJointly: taxProfile.spouseTracking)
+    }
+
     var body: some View {
         List {
             Section {
-                header
-                    .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 0, trailing: 20))
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                searchField
-                    .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 0, trailing: 16))
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
+                ScreenHeader(
+                    title: RR.t("records.title", "Records"),
+                    back: showsBackButton
+                        ? (label: RR.t("records.back", "Back"), identifier: "records.back", action: { dismiss() })
+                        : nil,
+                    trailing: (symbol: "square.and.arrow.up", label: RR.t("records.export.label", "Export records"),
+                               identifier: "records.export", action: { showExport = true })
+                )
+                .listRowInsets(EdgeInsets(top: 8, leading: LHMetrics.gutter, bottom: 0, trailing: LHMetrics.gutter))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+
+                LHField(
+                    RR.t("records.search.placeholder", "Search records"),
+                    text: $filter.searchText,
+                    accessibilityLabel: RR.t("records.search.label", "Search records"),
+                    identifier: "records.search"
+                )
+                .listRowInsets(EdgeInsets(top: 4, leading: LHMetrics.gutter, bottom: 0, trailing: LHMetrics.gutter))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+
                 chips
-                    .listRowInsets(EdgeInsets(top: 10, leading: 0, bottom: 4, trailing: 0))
+                    .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
             }
 
             if sections.isEmpty {
                 Section {
-                    BPEmptyState(
-                        symbol: yearHasEntries ? "line.3.horizontal.decrease.circle" : "list.bullet.rectangle",
-                        title: yearHasEntries ? "Nothing matches" : "No records for \(String(filter.year))",
+                    LHEmptyState(
+                        systemImage: yearHasEntries ? "line.3.horizontal.decrease.circle" : "list.bullet.rectangle",
+                        tone: .action,
+                        headline: yearHasEntries
+                            ? RR.t("records.empty.filtered.title", "Nothing matches")
+                            : RR.t("records.empty.year.title", "No records for \(String(filter.year))"),
                         message: yearHasEntries
-                            ? "Try another property, source or person."
-                            : "Hours you log or confirm show up here, by month."
+                            ? RR.t("records.empty.filtered.message", "Try another rental, source or person.")
+                            : RR.t("records.empty.year.message", "Hours you log or confirm show up here, by month.")
                     )
-                    .padding(.vertical, 40)
+                    .padding(.vertical, 24)
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     .accessibilityIdentifier("records.empty")
                 }
             } else {
                 Section {
-                    totalCard
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    summary
+                        .listRowInsets(EdgeInsets(top: 0, leading: LHMetrics.gutter, bottom: 0, trailing: LHMetrics.gutter))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 }
@@ -103,41 +123,39 @@ private struct RecordsScreen: View {
                             row(entry)
                         }
                     } header: {
-                        BPSectionHeader(
-                            title: section.month.formatted(.dateTime.month(.wide).year()),
-                            trailing: BPHours.short(section.totalHours),
-                            trailingAccessibility: "\(BPHours.spoken(section.totalHours)) logged"
-                        )
-                        .accessibilityIdentifier("records.month.\(section.month.formatted(.dateTime.year().month(.twoDigits)))")
+                        LHSectionHeader(RecordsLogic.monthHeader(section.month, hours: section.totalHours))
+                            .textCase(nil)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityLabel(RR.t("records.month.spoken", "\(section.month.formatted(.dateTime.month(.wide).year())), \(LHFormat.spokenHours(section.totalHours)) logged"))
+                            .accessibilityIdentifier("records.month.\(section.month.formatted(.dateTime.year().month(.twoDigits)))")
                     }
                 }
             }
         }
         .listStyle(.insetGrouped)
-        .listSectionSpacing(16)
+        .listSectionSpacing(LHMetrics.sectionGap)
         .scrollContentBackground(.hidden)
         .scrollDismissesKeyboard(.immediately)
-        .contentMargins(.bottom, 104, for: .scrollContent)
-        .background { LHMobileCanvas() }
+        .background { LHCanvas() }
         .onAppear {
             guard !appliedInitialFilter else { return }
             appliedInitialFilter = true
             if let initialPropertyId { filter.propertyId = initialPropertyId }
         }
-        .navigationBarHidden(!showsBackButton)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(showsBackButton ? .visible : .hidden, for: .navigationBar)
-        .alert("Delete this record?", isPresented: Binding(
+        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+        .alert(RR.t("records.delete.title", "Delete this record?"), isPresented: Binding(
             get: { entryToDelete != nil },
             set: { if !$0 { entryToDelete = nil } }
         )) {
-            Button("Cancel", role: .cancel) { entryToDelete = nil }
-            Button("Delete", role: .destructive) {
+            Button(RR.t("records.delete.cancel", "Cancel"), role: .cancel) { entryToDelete = nil }
+            Button(RR.t("records.delete.confirm", "Delete"), role: .destructive) {
                 if let entry = entryToDelete { viewModel.deleteTimeEntry(entry) }
                 entryToDelete = nil
             }
         } message: {
-            Text("It comes off your hours and your export. This can’t be undone.")
+            Text(RR.t("records.delete.message", "It comes off your hours and your export. This can\u{2019}t be undone."))
         }
         .sheet(isPresented: $showExport) {
             ExportPDFView(year: filter.year)
@@ -145,171 +163,140 @@ private struct RecordsScreen: View {
         .accessibilityIdentifier("records.screen")
     }
 
-    // MARK: Header
-
-    private var header: some View {
-        let layout = dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
-            : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
-        return layout {
-            BPScreenTitle(text: "Records")
-            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 12) }
-            Button {
-                // A free user sees the Export page as a locked preview (WP-P).
-                showExport = true
-            } label: {
-                BPCapsuleButtonLabel(title: "Export", symbol: nil)
-            }
-            .buttonStyle(.lhPressable)
-            .accessibilityLabel("Export records")
-            .accessibilityIdentifier("records.export")
-        }
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(colors.textSecondary)
-                .accessibilityHidden(true)
-            TextField("", text: $filter.searchText, prompt: Text("Search records").foregroundStyle(colors.textTertiary))
-                .font(.body)
-                .foregroundStyle(colors.textPrimary)
-                .focused($searchFocused)
-                .submitLabel(.search)
-                .accessibilityLabel("Search records")
-                .accessibilityIdentifier("records.search")
-            if !filter.searchText.isEmpty {
-                Button {
-                    filter.searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(colors.textTertiary)
-                        .frame(width: 32, height: 32)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Clear search")
-            }
-        }
-        .padding(.horizontal, 12)
-        .frame(minHeight: 40)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(colors.backgroundSecondary))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(colors.border, lineWidth: 1))
-    }
+    // MARK: Filters
 
     private var chips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                Menu {
-                    Picker("Year", selection: $filter.year) {
-                        ForEach(RecordsLogic.availableYears(viewModel.timeEntries), id: \.self) { year in
-                            Text(String(year)).tag(year)
-                        }
+        LHChipStrip {
+            Menu {
+                Picker(RR.t("records.filter.year", "Year"), selection: $filter.year) {
+                    ForEach(RecordsLogic.availableYears(viewModel.timeEntries), id: \.self) { year in
+                        Text(String(year)).tag(year)
                     }
-                } label: {
-                    BPFilterChip(title: String(filter.year), isActive: true)
                 }
-                .accessibilityLabel("Year, \(String(filter.year))")
-                .accessibilityIdentifier("records.filter.year")
-
-                Menu {
-                    Picker("Property", selection: $filter.propertyId) {
-                        Text("All properties").tag(UUID?.none)
-                        ForEach(viewModel.properties) { property in
-                            Text(property.name).tag(UUID?.some(property.id))
-                        }
-                    }
-                } label: {
-                    BPFilterChip(
-                        title: filter.propertyId.flatMap { propertyNames[$0] } ?? "Property",
-                        isActive: filter.propertyId != nil
-                    )
-                }
-                .accessibilityLabel("Property filter, \(filter.propertyId.flatMap { propertyNames[$0] } ?? "all properties")")
-                .accessibilityIdentifier("records.filter.property")
-
-                Menu {
-                    Picker("Source", selection: $filter.source) {
-                        Text("All sources").tag(RecordSourceBadge?.none)
-                        ForEach(RecordSourceBadge.filterOrder, id: \.self) { source in
-                            Label(source.title, systemImage: source.symbol).tag(RecordSourceBadge?.some(source))
-                        }
-                    }
-                } label: {
-                    BPFilterChip(title: filter.source?.title ?? "Source", isActive: filter.source != nil)
-                }
-                .accessibilityLabel("Source filter, \(filter.source?.title ?? "all sources")")
-                .accessibilityIdentifier("records.filter.source")
-
-                if showsWhoFilter {
-                    Menu {
-                        Picker("Who", selection: $filter.participant) {
-                            Text("Everyone").tag(Participant?.none)
-                            Text("Me").tag(Participant?.some(.selfParticipant))
-                            Text("Spouse").tag(Participant?.some(.spouse))
-                        }
-                    } label: {
-                        BPFilterChip(title: whoTitle, isActive: filter.participant != nil)
-                    }
-                    .accessibilityLabel("Who filter, \(filter.participant == nil ? "everyone" : whoTitle)")
-                    .accessibilityIdentifier("records.filter.who")
-                }
+            } label: {
+                LHChip(String(filter.year), systemImage: "calendar", isSelected: false) {}
+                    .allowsHitTesting(false)
             }
-            .padding(.horizontal, 16)
+            .accessibilityLabel(RR.t("records.filter.year.spoken", "Year, \(String(filter.year))"))
+            .accessibilityIdentifier("records.filter.year")
+
+            Menu {
+                Picker(RR.t("records.filter.rental", "Rental"), selection: $filter.propertyId) {
+                    Text(RR.t("records.filter.rental.all", "All rentals")).tag(UUID?.none)
+                    ForEach(viewModel.properties) { property in
+                        Text(property.name).tag(UUID?.some(property.id))
+                    }
+                }
+            } label: {
+                LHChip(rentalTitle, systemImage: "house", isSelected: filter.propertyId != nil) {}
+                    .allowsHitTesting(false)
+            }
+            .accessibilityLabel(RR.t("records.filter.rental.spoken", "Rental filter, \(rentalSpoken)"))
+            .accessibilityIdentifier("records.filter.property")
+
+            Menu {
+                Picker(RR.t("records.filter.source", "Source"), selection: $filter.source) {
+                    Text(RR.t("records.filter.source.all", "All sources")).tag(RecordSourceBadge?.none)
+                    ForEach(RecordSourceBadge.filterOrder, id: \.self) { source in
+                        Label(source.title, systemImage: source.symbol).tag(RecordSourceBadge?.some(source))
+                    }
+                }
+            } label: {
+                LHChip(filter.source?.title ?? RR.t("records.filter.source", "Source"),
+                       systemImage: "tray.and.arrow.down", isSelected: filter.source != nil) {}
+                    .allowsHitTesting(false)
+            }
+            .accessibilityLabel(RR.t("records.filter.source.spoken", "Source filter, \(sourceSpoken)"))
+            .accessibilityIdentifier("records.filter.source")
+
+            if showsWhoFilter {
+                Menu {
+                    Picker(RR.t("records.filter.who", "Who"), selection: $filter.participant) {
+                        Text(RR.t("records.filter.who.everyone", "Everyone")).tag(Participant?.none)
+                        Text(RR.t("records.filter.who.me", "Me")).tag(Participant?.some(.selfParticipant))
+                        Text(RR.t("records.filter.who.spouse", "Spouse")).tag(Participant?.some(.spouse))
+                    }
+                } label: {
+                    LHChip(whoTitle, systemImage: "person", isSelected: filter.participant != nil) {}
+                        .allowsHitTesting(false)
+                }
+                .accessibilityLabel(RR.t("records.filter.who.spoken", "Who filter, \(whoSpoken)"))
+                .accessibilityIdentifier("records.filter.who")
+            }
         }
+    }
+
+    private var rentalTitle: String {
+        filter.propertyId.flatMap { propertyNames[$0] } ?? RR.t("records.filter.rental", "Rental")
+    }
+
+    private var rentalSpoken: String {
+        filter.propertyId.flatMap { propertyNames[$0] } ?? RR.t("records.filter.rental.allSpoken", "all rentals")
+    }
+
+    private var sourceSpoken: String {
+        filter.source?.title ?? RR.t("records.filter.source.allSpoken", "all sources")
     }
 
     private var whoTitle: String {
         switch filter.participant {
-        case .none: return "Who"
-        case .some(.selfParticipant): return "Me"
-        case .some(.spouse): return "Spouse"
+        case .none: return RR.t("records.filter.who", "Who")
+        case .some(.selfParticipant): return RR.t("records.filter.who.me", "Me")
+        case .some(.spouse): return RR.t("records.filter.who.spouse", "Spouse")
         }
+    }
+
+    private var whoSpoken: String {
+        filter.participant == nil ? RR.t("records.filter.who.everyoneSpoken", "everyone") : whoTitle
     }
 
     // MARK: Total
 
-    private var totalCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            (dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
-                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))) {
-                Text(BPHours.short(totalHours))
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                    .monospacedDigit()
-                    .foregroundStyle(colors.textPrimary)
-                    .contentTransition(.numericText())
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                Text(entries.count == 1 ? "in 1 record" : "in \(entries.count) records")
-                    .font(.subheadline)
-                    .foregroundStyle(colors.textSecondary)
-                Spacer(minLength: 0)
+    /// The year's total as one line (the hours large, the record count beside it) with the one
+    /// sentence that says what it is under it, so "All logged hours" is never read as the number on
+    /// Today. A line rather than a Summary card: Records keeps its rows above the fold (D3).
+    private var summary: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) { totalValue; totalCount }
+                VStack(alignment: .leading, spacing: 2) { totalValue; totalCount }
             }
-            HStack(alignment: .top, spacing: 6) {
-                Image(systemName: "info.circle")
-                    .font(.footnote)
-                    .foregroundStyle(colors.draftingInk)
-                    .accessibilityHidden(true)
-                Text(RecordsLogic.totalLabel(goal: goalManager.houseGoal, tracksSpouseJointly: taxProfile.spouseTracking))
-                    .font(.footnote)
-                    .foregroundStyle(colors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("records.totalLabel")
-            }
+            Text(totalLabel)
+                .font(.footnote)
+                .foregroundStyle(colors.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("records.totalLabel")
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
+        .padding(.horizontal, 4)
         .lhMotion(AppAnimation.standard, value: totalHours)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(BPHours.spoken(totalHours)) in \(entries.count) records. \(RecordsLogic.totalLabel(goal: goalManager.houseGoal, tracksSpouseJointly: taxProfile.spouseTracking))")
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("records.total")
+    }
+
+    private var totalValue: some View {
+        Text(LHFormat.hours(totalHours))
+            .font(.title.weight(.bold))
+            .fontDesign(.rounded)
+            .monospacedDigit()
+            .foregroundStyle(colors.textPrimary)
+            .contentTransition(.numericText())
+            .lineLimit(1)
+            .accessibilityLabel(RR.t("records.total.spoken", "\(LHFormat.spokenHours(totalHours)) in \(entries.count) records"))
+    }
+
+    private var totalCount: some View {
+        Text(entries.count == 1
+             ? RR.t("records.total.one", "in 1 record")
+             : RR.t("records.total.many", "in \(entries.count) records"))
+            .font(.subheadline)
+            .foregroundStyle(colors.textSecondary)
+            .accessibilityHidden(true)
     }
 
     // MARK: Row
 
     private func row(_ entry: TimeEntry) -> some View {
-        let propertyName = propertyNames[entry.propertyId] ?? "No property"
+        let propertyName = propertyNames[entry.propertyId] ?? RR.t("records.noRental", "No rental")
         return ZStack {
             NavigationLink {
                 TimeEntryDetailView(entry: entry)
@@ -317,156 +304,37 @@ private struct RecordsScreen: View {
                 EmptyView()
             }
             .opacity(0)
-            RecordRowView(entry: entry, propertyName: propertyName)
+            LHRow.Browse(
+                title: RecordsLogic.title(for: entry, propertyName: propertyName),
+                meta: RecordsLogic.meta(for: entry, propertyName: propertyName),
+                value: LHFormat.hours(entry.hours)
+            ) {
+                CategoryToolTile(category: entry.category, size: 36)
+            }
         }
         .listRowBackground(colors.backgroundSecondary)
-        .listRowInsets(EdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 16))
-        .alignmentGuide(.listRowSeparatorLeading) { _ in 48 }
+        .listRowInsets(EdgeInsets())
+        .alignmentGuide(.listRowSeparatorLeading) { _ in LHRow.browseDividerInset }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive) {
                 entryToDelete = entry
             } label: {
-                Label("Delete", systemImage: "trash")
+                Label(RR.t("records.delete.confirm", "Delete"), systemImage: "trash")
             }
         }
         .contextMenu {
             Button(role: .destructive) {
                 entryToDelete = entry
             } label: {
-                Label("Delete", systemImage: "trash")
+                Label(RR.t("records.delete.confirm", "Delete"), systemImage: "trash")
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(RecordRowView.accessibilityLabel(entry: entry, propertyName: propertyName))
-        .accessibilityHint("Opens the record")
+        .accessibilityLabel(RecordsLogic.spokenRow(entry, propertyName: propertyName))
+        .accessibilityHint(RR.t("records.row.hint", "Opens the record"))
         .accessibilityAddTraits(.isButton)
-        .accessibilityAction(named: "Delete") { entryToDelete = entry }
+        .accessibilityAction(named: RR.t("records.delete.confirm", "Delete")) { entryToDelete = entry }
         .accessibilityIdentifier("records.row.\(entry.id.uuidString)")
-    }
-}
-
-/// One record: the category's tool, what was done, the property on its own line, where it came
-/// from, and the hours right-aligned in SF Pro Rounded tabular figures.
-struct RecordRowView: View {
-    let entry: TimeEntry
-    let propertyName: String
-
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-
-    private var badge: RecordSourceBadge { RecordSourceBadge(entry: entry) }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            CategoryToolTile(category: entry.category, size: 36)
-                .padding(.top, 2)
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 4) {
-                    details
-                    trailing(alignment: .leading)
-                }
-            } else {
-                details
-                Spacer(minLength: 8)
-                trailing(alignment: .trailing)
-            }
-        }
-        .padding(.vertical, 12)
-        .contentShape(Rectangle())
-    }
-
-    private var details: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(RecordsLogic.title(for: entry, propertyName: propertyName))
-                .font(.body)
-                .foregroundStyle(colors.textPrimary)
-                .lineLimit(2)
-            Text(propertyName)
-                .font(.subheadline)
-                .foregroundStyle(colors.textSecondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-            // Badges sit on one line while they fit, else stack. Fixed-size badges forced a row
-            // wider than its cell at large text (the first row's hours clipped at the corner).
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 10) { badges }
-                VStack(alignment: .leading, spacing: 4) { badges }
-            }
-            .padding(.top, 2)
-        }
-    }
-
-    @ViewBuilder private var badges: some View {
-        Label(badge.title, systemImage: badge.symbol)
-            .labelStyle(RecordBadgeLabelStyle(tint: badgeTint))
-            .fixedSize()
-        if entry.participant == .spouse {
-            Label("Spouse", systemImage: "person.2")
-                .labelStyle(RecordBadgeLabelStyle(tint: colors.rose))
-                .fixedSize()
-        }
-        if !entry.countsForREPS {
-            Label("Investor task", systemImage: "minus.circle")
-                .labelStyle(RecordBadgeLabelStyle(tint: colors.textSecondary))
-                .fixedSize()
-        }
-    }
-
-    private func trailing(alignment: HorizontalAlignment) -> some View {
-        VStack(alignment: alignment, spacing: 2) {
-            Text(BPHours.short(entry.hours))
-                .font(.system(.body, design: .rounded, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(colors.textPrimary)
-                .lineLimit(1)
-            Text(entry.date.formatted(.dateTime.month(.abbreviated).day()))
-                .font(.subheadline)
-                .monospacedDigit()
-                .foregroundStyle(colors.textSecondary)
-                .lineLimit(1)
-        }
-        .fixedSize()
-    }
-
-    private var badgeTint: Color {
-        switch badge {
-        case .calendarImport: return colors.informational
-        case .suggested: return colors.draftingInk
-        case .timer, .voice: return colors.timberInk
-        case .receipt, .location, .shortcut, .gmail: return colors.informational
-        case .manual, .other: return colors.textSecondary
-        }
-    }
-
-    static func accessibilityLabel(entry: TimeEntry, propertyName: String) -> String {
-        var parts = [
-            RecordsLogic.title(for: entry, propertyName: propertyName),
-            propertyName,
-            BPHours.spoken(entry.hours),
-            entry.date.formatted(.dateTime.month(.wide).day()),
-            RecordSourceBadge(entry: entry).title
-        ]
-        if entry.participant == .spouse { parts.append("Spouse") }
-        if !entry.countsForREPS { parts.append("Investor task, not counted") }
-        return parts.joined(separator: ", ")
-    }
-}
-
-/// Footnote badge: tinted glyph, secondary words (colour is never the only cue).
-private struct RecordBadgeLabelStyle: LabelStyle {
-    let tint: Color
-    @Environment(\.colorScheme) private var colorScheme
-
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 4) {
-            configuration.icon
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(tint)
-            configuration.title
-                .font(.footnote)
-                .foregroundStyle(AdaptiveColors(colorScheme: colorScheme).textSecondary)
-        }
     }
 }
 

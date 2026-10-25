@@ -3,13 +3,15 @@ import Charts
 
 // MARK: - Reports
 //
-// Flighty's report, on the Blueprint brand: where each person honestly stands first (the same
-// engine values as Today), then where the hours went (property, kind of work, month, who,
-// source), then the export. docs/design/2.0-hifi-reference-spec.md §h.
+// The ring's screen (standard §1.12, §H.5): where each person honestly stands first (the same
+// engine values as Today), the two pace tiles that left Today, then where the hours went (rental,
+// kind of work, month, who, source), then the PDF. Plain canvas: the house sits on Today and the
+// rental page, so two heroes never compete here. The one thing on a screen set in the drafting
+// mono is the ring card's eyebrow (§C, mono labels).
 
 /// The goal Reports measures against. Labels double as the segmented control's titles.
 enum GoalMode: String, CaseIterable, Identifiable {
-    case reps750 = "REPS 750h"
+    case reps750 = "750h"
     case mp500 = "500h"
     case mp100 = "100h"
 
@@ -37,13 +39,12 @@ enum GoalMode: String, CaseIterable, Identifiable {
 
 struct ReportsView: View {
     /// Loading hook (owner direction: loading never blocks). Reports' numbers are computed on the
-    /// main actor today, so this stays false; when totals or charts move off-thread, set it and
-    /// only the numbers and the month chart show `BPLoadingPlaceholder` (DraftingLoader later).
+    /// main actor today, so this stays false; when totals or charts move off-thread, set it and the
+    /// numbers and the month chart show as placeholders.
     var isLoading: Bool = false
 
     @EnvironmentObject var viewModel: AppViewModel
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     @ObservedObject private var goalManager = GoalManager.shared
@@ -55,6 +56,8 @@ struct ReportsView: View {
     @State private var showingExportSheet = false
     @State private var paywall: ProPaywallRequest?
     @State private var showingParticipationSheet = false
+
+    private var ax: Bool { dynamicTypeSize.isAccessibilitySize }
 
     // MARK: Data
 
@@ -71,8 +74,14 @@ struct ReportsView: View {
             && !materialParticipation.meets500HourTest
     }
 
-    private var propertyBars: [(label: String, hours: Double)] {
-        ReportsLogic.ranked(viewModel.properties.map { ($0.name, viewModel.hoursForProperty($0, year: selectedYear)) })
+    private var rentalRows: [ReportsRentalRow] {
+        let calendar = Calendar.current
+        let today = viewModel.timeEntries.filter { calendar.isDateInToday($0.date) }
+        let loggedToday = Set(today.map(\.propertyId))
+        return ReportsLogic.rentalRows(
+            rentals: viewModel.properties.map { ($0.id, $0.name, viewModel.hoursForProperty($0, year: selectedYear), loggedToday.contains($0.id)) },
+            goalHours: selectedGoal.targetHours
+        )
     }
 
     private var categoryBars: [(label: String, hours: Double)] {
@@ -85,7 +94,7 @@ struct ReportsView: View {
         let me = yearEntries.filter { $0.participant == .selfParticipant }.reduce(0) { $0 + $1.hours }
         let spouse = yearEntries.filter { $0.participant == .spouse }.reduce(0) { $0 + $1.hours }
         guard spouse > 0 || taxProfile.spouseTracking else { return [] }
-        return [("Me", me), ("Spouse", spouse)]
+        return [(RR.t("reports.who.me", "Me"), me), (RR.t("reports.who.spouse", "Spouse"), spouse)]
     }
 
     private var sourceBars: [(label: String, hours: Double)] {
@@ -96,15 +105,32 @@ struct ReportsView: View {
 
     private var monthly: [Double] { ReportsLogic.monthlyHours(yearEntries, year: selectedYear) }
 
+    /// "Through Oct 19 · 73 days left in the year", or what a closed or future year is.
     private var throughLine: String {
         let calendar = Calendar.current
         let now = Date()
         let currentYear = calendar.component(.year, from: now)
-        if selectedYear < currentYear { return "The \(String(selectedYear)) tax year is closed." }
-        if selectedYear > currentYear { return "\(String(selectedYear)) hasn’t started yet." }
-        let end = calendar.date(from: DateComponents(year: currentYear, month: 12, day: 31)) ?? now
-        let days = max(calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: end).day ?? 0, 0)
-        return "Through \(now.formatted(.dateTime.month(.abbreviated).day())) · \(days) days left in the year"
+        if selectedYear < currentYear { return RR.t("reports.through.closed", "The \(String(selectedYear)) tax year is closed.") }
+        if selectedYear > currentYear { return RR.t("reports.through.future", "\(String(selectedYear)) hasn\u{2019}t started yet.") }
+        let day = now.formatted(.dateTime.month(.abbreviated).day())
+        let days = ReportsLogic.daysLeft(now: now, calendar: calendar)
+        return RR.t("reports.through.open", "Through \(day) \u{00B7} \(days) days left in the year")
+    }
+
+    /// Days since the first record of the year, so a pace waits for enough hours (Today's rule).
+    private var daysOfData: Int {
+        let calendar = Calendar.current
+        guard let first = yearEntries.map(\.date).min() else { return 0 }
+        return max(0, calendar.dateComponents([.day], from: calendar.startOfDay(for: first), to: calendar.startOfDay(for: Date())).day ?? 0)
+    }
+
+    private var paceTiles: [ReportsTile] {
+        guard let lead = standings.first else { return [] }
+        let rep = selectedGoal == .reps750 ? viewModel.repsStatus(participant: .selfParticipant, year: selectedYear) : nil
+        return ReportsLogic.paceTiles(
+            standing: lead, rep: rep, year: selectedYear,
+            paceReady: TodayHeroCopy.paceIsReady(hours: lead.hours, daysOfData: daysOfData)
+        )
     }
 
     // MARK: Body
@@ -112,34 +138,35 @@ struct ReportsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
                     header
+                    controls
                     standingSection
                     if yearEntries.isEmpty {
-                        BPEmptyState(
-                            symbol: "chart.bar",
-                            title: "No hours in \(String(selectedYear)) yet",
-                            message: "Log or confirm work and the breakdown fills in here."
+                        LHEmptyState(
+                            systemImage: "chart.bar",
+                            tone: .action,
+                            headline: RR.t("reports.empty.title", "No hours in \(String(selectedYear)) yet"),
+                            message: RR.t("reports.empty.message", "Log or confirm work and the breakdown fills in here.")
                         )
-                        .padding(.vertical, 12)
                         .accessibilityIdentifier("reports.empty")
                     } else {
-                        breakdown(title: "By property", bars: propertyBars, footnote: "All logged hours that count as real estate work, both of you.")
-                        breakdown(title: "By kind of work", bars: categoryBars, footnote: nil)
+                        rentalSection
+                        barSection(title: RR.t("reports.section.kind", "By kind of work"), bars: categoryBars)
                         monthSection
                         if !whoBars.isEmpty {
-                            breakdown(title: "Who did it", bars: whoBars, footnote: nil)
+                            barSection(title: RR.t("reports.section.who", "Who did it"), bars: whoBars)
                         }
-                        breakdown(title: "Where the hours came from", bars: sourceBars, footnote: nil)
+                        barSection(title: RR.t("reports.section.source", "Where the hours came from"), bars: sourceBars)
                     }
                     exportCard
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, LHMetrics.gutter)
                 .padding(.top, 8)
-                .padding(.bottom, AppSpacing.tabContentBottomInset)
+                .padding(.bottom, LHMetrics.sectionGap)
             }
             .scrollIndicators(.hidden)
-            .background { LHMobileCanvas() }
+            .background { LHCanvas() }
             .navigationBarHidden(true)
             .sheet(isPresented: $showingExportSheet) {
                 ExportPDFView(year: selectedYear)
@@ -161,83 +188,84 @@ struct ReportsView: View {
         .accessibilityIdentifier("reports.screen")
     }
 
-    // MARK: Header
+    // MARK: Header and controls
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            BPBackToTodayButton()
-                .padding(.bottom, -10)
-            (dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
-                : AnyLayout(HStackLayout(alignment: .firstTextBaseline))) {
-                BPScreenTitle(text: "Reports")
-                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 12) }
-                Button(action: exportAction) {
-                    BPCapsuleButtonLabel(
-                        title: "Export",
-                        symbol: "square.and.arrow.up"
-                    )
-                }
-                .buttonStyle(.lhPressable)
-                .accessibilityLabel("Export report")
-                .accessibilityIdentifier("reports.export")
-            }
+        ScreenHeader(
+            title: RR.t("reports.title", "Reports"),
+            subtitle: throughLine,
+            back: (label: RR.t("reports.back", "Back to Today"), identifier: "shell.backToToday", action: {
+                NotificationCenter.default.post(name: .switchToTab, object: ShellTab.todayIndex)
+            }),
+            trailing: (symbol: "square.and.arrow.up", label: RR.t("reports.export.label", "Export report"),
+                       identifier: "reports.export", action: exportAction)
+        )
+    }
 
-            // Year chip and goal switcher share a row while they fit; otherwise the switcher
-            // takes its own row (and stacks its options at accessibility sizes).
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) {
-                    yearMenu
-                    goalPicker(.horizontalOnly)
-                }
-                VStack(alignment: .leading, spacing: 10) {
-                    yearMenu
-                    goalPicker(.automatic)
-                }
+    /// The year chip and the goal switcher share a row while they fit; otherwise the switcher takes
+    /// its own row.
+    private var controls: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                yearMenu
+                goalPicker
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                yearMenu
+                goalPicker
             }
         }
+        .padding(.top, -8)
     }
 
     private var yearMenu: some View {
         Menu {
-            Picker("Year", selection: $selectedYear) {
+            Picker(RR.t("reports.year", "Year"), selection: $selectedYear) {
                 ForEach(RecordsLogic.availableYears(viewModel.timeEntries), id: \.self) { year in
                     Text(String(year)).tag(year)
                 }
             }
         } label: {
-            // Outlined, not filled: the filled capsule beside it is the selected goal, and a
-            // second filled pill read as part of the switcher.
-            BPFilterChip(title: String(selectedYear), isActive: false)
+            LHChip(String(selectedYear), systemImage: "calendar", isSelected: false) {}
+                .allowsHitTesting(false)
         }
         .fixedSize()
-        .accessibilityLabel("Tax year, \(String(selectedYear))")
+        .accessibilityLabel(RR.t("reports.year.spoken", "Tax year, \(String(selectedYear))"))
         .accessibilityIdentifier("reports.year")
     }
 
-    private func goalPicker(_ layout: BPSegmentedPicker<GoalMode>.Layout) -> some View {
-        BPSegmentedPicker(options: GoalMode.allCases, selection: $selectedGoal, title: \.pillLabel, layout: layout)
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("Goal")
-            .accessibilityIdentifier("reports.goal")
+    private var goalPicker: some View {
+        LHSegmented(
+            GoalMode.allCases.map { LHSegmented<GoalMode>.Option($0, $0.pillLabel) },
+            selection: $selectedGoal,
+            accessibilityLabel: RR.t("reports.goal", "Goal")
+        )
+        .accessibilityIdentifier("reports.goal")
     }
 
     // MARK: Standing
 
     private var standingSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            BPSectionHeader(title: "Where you stand")
-                .padding(.horizontal, 4)
-            ForEach(standings) { standing in
-                StandingCard(standing: standing, year: selectedYear, isLoading: isLoading)
+        VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+            LHSectionHeader(RR.t("reports.section.stand", "Where you stand"))
+            VStack(spacing: 12) {
+                ForEach(Array(standings.enumerated()), id: \.element.id) { index, standing in
+                    if index == 0 {
+                        RingStandingCard(standing: standing, year: selectedYear, isLoading: isLoading)
+                    } else {
+                        CompactStandingCard(standing: standing, year: selectedYear, isLoading: isLoading)
+                    }
+                }
+                if showsParticipationRow { participationRow }
+                if !paceTiles.isEmpty {
+                    LHTile.StatGrid {
+                        ForEach(paceTiles, id: \.label) { tile in
+                            LHTile.Stat(value: tile.value, label: tile.label)
+                        }
+                    }
+                    .accessibilityIdentifier("reports.paceTiles")
+                }
             }
-            if showsParticipationRow {
-                participationRow
-            }
-            Text(throughLine)
-                .font(.footnote)
-                .foregroundStyle(colors.textSecondary)
-                .padding(.horizontal, 4)
         }
         .lhMotion(AppAnimation.standard, value: selectedGoal)
     }
@@ -246,94 +274,118 @@ struct ReportsView: View {
         let answer = materialParticipation.noOneParticipatedMore
         let title: String
         let symbol: String
-        let tint: Color
+        let tint: LHRowGlyph.Tint
         switch answer {
         case .none:
-            title = "Did anyone else do more?"
+            title = RR.t("reports.participation.ask", "Did anyone else do more?")
             symbol = "questionmark.circle.fill"
-            tint = colors.caution
+            tint = .caution
         case .some(true):
-            title = "No one participated more"
+            title = RR.t("reports.participation.nobody", "No one did more")
             symbol = "checkmark.circle.fill"
-            tint = colors.positive
+            tint = .positive
         case .some(false):
-            title = "Someone participated more"
+            title = RR.t("reports.participation.someone", "Someone did more")
             symbol = "exclamationmark.circle.fill"
-            tint = colors.caution
+            tint = .caution
         }
-        return Button {
-            showingParticipationSheet = true
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: symbol)
-                    .font(.title3)
-                    .foregroundStyle(tint)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(colors.textPrimary)
-                    Text(answer == nil ? "Answer for \(String(selectedYear)) to settle the 100-hour test." : "Tap to change your answer for \(String(selectedYear)).")
-                        .font(.subheadline)
-                        .foregroundStyle(colors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
-                Text(answer == nil ? "Answer" : "Change")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(answer == nil ? colors.onAction : colors.action)
-                    .padding(.horizontal, 14)
-                    .frame(minHeight: 36)
-                    .background(Capsule().fill(answer == nil ? colors.action : colors.actionSurface))
-            }
-            .padding(16)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
+        let meta = answer == nil
+            ? RR.t("reports.participation.meta.ask", "Answer for \(String(selectedYear)) to settle the 100-hour test.")
+            : RR.t("reports.participation.meta.change", "Tap to change your answer for \(String(selectedYear)).")
+        return LHRowGroup {
+            LHRow.Browse(
+                title: title,
+                meta: meta,
+                value: answer == nil ? RR.t("reports.participation.answer", "Answer") : RR.t("reports.participation.change", "Change"),
+                systemImage: symbol,
+                tint: tint,
+                action: { showingParticipationSheet = true }
+            )
         }
-        .buttonStyle(.lhPressable)
         .accessibilityIdentifier("reports.mp100.confirmRow")
-        .accessibilityHint("Opens the 100-hour test question")
+        .accessibilityHint(RR.t("reports.participation.hint", "Opens the 100-hour test question"))
     }
 
-    // MARK: Breakdown
+    // MARK: Breakdowns
 
-    private func breakdown(title: String, bars: [(label: String, hours: Double)], footnote: String?) -> some View {
-        let total = bars.reduce(0) { $0 + $1.hours }
-        let maxValue = bars.map(\.hours).max() ?? 0
-        return VStack(alignment: .leading, spacing: 8) {
-            BPSectionHeader(title: title, trailing: BPHours.short(total), trailingAccessibility: "\(BPHours.spoken(total)) total")
-                .padding(.horizontal, 4)
-            VStack(spacing: 2) {
-                if bars.isEmpty {
-                    Text("Nothing logged here yet.")
-                        .font(.subheadline)
-                        .foregroundStyle(colors.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 6)
+    private func sectionTitle(_ title: String, total: Double) -> String {
+        RR.t("reports.header.total", "\(title) \u{00B7} \(LHFormat.hours(total))")
+    }
+
+    private var rentalSection: some View {
+        let rows = rentalRows
+        let total = rows.reduce(0) { $0 + $1.hours }
+        let title = RR.t("reports.section.rental", "By rental")
+        return VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+            LHSectionHeader(sectionTitle(title, total: total))
+            LHRowGroup {
+                if rows.isEmpty {
+                    emptyBar
                 } else {
-                    ForEach(Array(bars.enumerated()), id: \.offset) { _, bar in
-                        BPBarRow(
-                            label: bar.label,
-                            value: bar.hours,
-                            maxValue: maxValue,
-                            valueText: BPHours.short(bar.hours),
-                            accessibilityValueText: "\(BPHours.spoken(bar.hours)), \(total > 0 ? Int((bar.hours / total * 100).rounded()) : 0) percent"
-                        )
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                        if index > 0 { LHDivider(leadingInset: LHRow.insets.leading + 44 + 12) }
+                        LHRow.Browse(
+                            title: row.name,
+                            meta: ReportsLogic.shareLine(row.share),
+                            value: LHFormat.hours(row.hours),
+                            showsChevron: false
+                        ) {
+                            LHThumb.row(row.stage, lit: row.loggedToday)
+                        }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(row.name)
+                        .accessibilityValue(RR.t("reports.rental.spoken", "\(LHFormat.spokenHours(row.hours)), \(Int((row.share * 100).rounded())) percent"))
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
-            if let footnote {
-                Text(footnote)
-                    .font(.footnote)
-                    .foregroundStyle(colors.textSecondary)
-                    .padding(.horizontal, 4)
-                    .fixedSize(horizontal: false, vertical: true)
+            Text(RR.t("reports.rental.footnote", "Every hour that counts as rental work, yours and your spouse\u{2019}s."))
+                .font(.footnote)
+                .foregroundStyle(colors.textSecondary)
+                .padding(.horizontal, 4)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("reports.section.rental")
+    }
+
+    private var emptyBar: some View {
+        Text(RR.t("reports.nothingYet", "Nothing logged here yet."))
+            .font(.subheadline)
+            .foregroundStyle(colors.textSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(LHRow.insets)
+    }
+
+    private func barSection(title: String, bars: [(label: String, hours: Double)]) -> some View {
+        let total = bars.reduce(0) { $0 + $1.hours }
+        let maxValue = bars.map(\.hours).max() ?? 0
+        return VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+            LHSectionHeader(sectionTitle(title, total: total))
+            VStack(spacing: 14) {
+                if bars.isEmpty {
+                    emptyBar.padding(-16)
+                } else {
+                    ForEach(Array(bars.enumerated()), id: \.offset) { _, bar in
+                        LHBarRow(label: bar.label, value: LHFormat.hours(bar.hours), fraction: maxValue > 0 ? bar.hours / maxValue : 0)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(bar.label)
+                            .accessibilityValue(RR.t("reports.bar.spoken", "\(LHFormat.spokenHours(bar.hours)), \(total > 0 ? Int((bar.hours / total * 100).rounded()) : 0) percent"))
+                    }
+                }
             }
+            .padding(LHMetrics.cardPadding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+            .overlay { cardEdge }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("reports.section.\(title)")
+    }
+
+    @ViewBuilder private var cardEdge: some View {
+        if colorScheme == .dark {
+            RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
+                .strokeBorder(colors.border, lineWidth: LHMetrics.hairline)
+        }
     }
 
     private var monthSection: some View {
@@ -342,9 +394,8 @@ struct ReportsView: View {
         let symbols = Calendar.current.shortMonthSymbols
         let currentMonth = Calendar.current.component(.month, from: Date())
         let isCurrentYear = Calendar.current.component(.year, from: Date()) == selectedYear
-        return VStack(alignment: .leading, spacing: 8) {
-            BPSectionHeader(title: "By month", trailing: BPHours.short(total), trailingAccessibility: "\(BPHours.spoken(total)) total")
-                .padding(.horizontal, 4)
+        return VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+            LHSectionHeader(sectionTitle(RR.t("reports.section.month", "By month"), total: total))
             Chart {
                 ForEach(0..<12, id: \.self) { index in
                     BarMark(
@@ -352,9 +403,9 @@ struct ReportsView: View {
                         y: .value("Hours", values[index])
                     )
                     .foregroundStyle(isCurrentYear && index + 1 > currentMonth ? colors.border : colors.action)
-                    .cornerRadius(3)
+                    .cornerRadius(4)
                     .accessibilityLabel(Calendar.current.monthSymbols[index])
-                    .accessibilityValue(BPHours.spoken(values[index]))
+                    .accessibilityValue(LHFormat.spokenHours(values[index]))
                 }
             }
             .chartXAxis {
@@ -373,7 +424,7 @@ struct ReportsView: View {
                     AxisGridLine().foregroundStyle(colors.border.opacity(0.7))
                     AxisValueLabel {
                         if let hours = value.as(Double.self) {
-                            Text("\(Int(hours))h")
+                            Text(LHFormat.hours(hours))
                                 .font(.caption2)
                                 .monospacedDigit()
                                 .foregroundStyle(colors.textSecondary)
@@ -381,73 +432,60 @@ struct ReportsView: View {
                     }
                 }
             }
-            .frame(height: dynamicTypeSize.isAccessibilitySize ? 200 : 150)
+            .frame(height: ax ? 200 : 150)
             .opacity(isLoading ? 0 : 1)
             .overlay {
-                if isLoading { BPLoadingPlaceholder(kind: .chart, width: nil, height: 150) }
+                if isLoading {
+                    RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous)
+                        .fill(colors.backgroundTertiary)
+                }
             }
-            .padding(16)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
-            .accessibilityLabel("Hours by month, \(String(selectedYear))")
+            .padding(LHMetrics.cardPadding)
+            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+            .overlay { cardEdge }
+            .accessibilityLabel(RR.t("reports.month.spoken", "Hours by month, \(String(selectedYear))"))
             .accessibilityIdentifier("reports.monthChart")
         }
     }
 
     // MARK: Export
 
+    private var pdfTitle: String {
+        String(format: String(localized: "pdf.title", defaultValue: "Rental hours record %lld"), selectedYear)
+    }
+
+    private var exportRow: some View {
+        LHRow.Browse(
+            title: pdfTitle,
+            meta: RR.t("reports.export.meta", "The PDF and the spreadsheet, with where each hour came from."),
+            systemImage: "doc.richtext",
+            action: ProGate.isExportLocked(isPro: subscriptionManager.isPro) ? nil : exportAction
+        )
+    }
+
     /// Free: the card is a `.row` locked preview (the Reports free preview); every report above
-    /// stays free. Pro: a plain link to the export.
+    /// stays free. Pro: a plain link to the PDF.
     @ViewBuilder
     private var exportCard: some View {
         if ProGate.isExportLocked(isPro: subscriptionManager.isPro) {
-            LockedPreview(
-                size: .row,
-                entry: .reportsExport,
-                line: ProGate.lockLine(.reportsExport),
-                keeps: ProGate.keepsLine(.reportsExport),
-                onUnlock: openExportPaywall
-            ) {
-                exportCardRow.padding(16)
+            LHRowGroup {
+                LockedPreview(
+                    size: .row,
+                    entry: .reportsExport,
+                    line: ProGate.lockLine(.reportsExport),
+                    keeps: ProGate.keepsLine(.reportsExport),
+                    onUnlock: openExportPaywall
+                ) {
+                    exportRow
+                }
             }
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
         } else {
-            Button(action: exportAction) {
-                exportCardRow
-                    .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
-            }
-            .buttonStyle(.lhPressable)
-            .accessibilityIdentifier("reports.exportCard")
+            LHRowGroup { exportRow }
+                .accessibilityIdentifier("reports.exportCard")
         }
     }
 
-    private var exportCardRow: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "doc.richtext")
-                .font(.system(size: 22))
-                .foregroundStyle(colors.action)
-                .frame(width: 44, height: 44)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(colors.actionSurface))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("The record your accountant gets")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(colors.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text("PDF and CSV of every \(String(selectedYear)) entry, with where it came from.")
-                    .font(.subheadline)
-                    .foregroundStyle(colors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 8)
-            Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(colors.textTertiary)
-                .accessibilityHidden(true)
-        }
-    }
-
-    /// Export always opens the Export page; a free user sees it as a locked preview there.
+    /// Export always opens the PDF page; a free user sees it as a locked preview there.
     private func exportAction() {
         showingExportSheet = true
     }
@@ -458,20 +496,23 @@ struct ReportsView: View {
     }
 }
 
-// MARK: - Standing card
+// MARK: - Standing cards
 
-/// One person's honest status: hours against the goal, a plain bar, the status in words with a
+private extension ReportStanding {
+    var spokenValue: String {
+        RR.t("reports.standing.spoken", "\(LHFormat.spokenHours(hours)) of \(Int(target)) hours. \(status). \(detail ?? "")")
+    }
+}
+
+/// The lead standing: the ring at 260 with the hours in its centre, the status in words with a
 /// glyph (colour is never the only cue), and the one rule that matters next.
-private struct StandingCard: View {
+private struct RingStandingCard: View {
     let standing: ReportStanding
     let year: Int
-    var isLoading: Bool = false
+    var isLoading = false
 
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var appeared = false
-    /// Gap between "165h" and "of 750h"; scales so the words never touch at large sizes.
-    @ScaledMetric(relativeTo: .title3) private var numberGap: CGFloat = 8
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     private var toneColor: Color {
@@ -491,92 +532,136 @@ private struct StandingCard: View {
     }
 
     private var eyebrow: String {
-        "\(String(year)) · \(standing.name)"
+        RR.t("reports.standing.eyebrow", "\(String(year)) \u{00B7} \(standing.name)")
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(spacing: 16) {
             Text(eyebrow)
                 .font(AppTypography.drafting)
                 .textCase(.uppercase)
                 .tracking(1.3)
                 .foregroundStyle(colors.draftingInk)
-            if isLoading {
-                BPLoadingPlaceholder(kind: .number, width: 120, height: 34)
-            } else {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .firstTextBaseline, spacing: numberGap) { number; ofTarget }
-                    VStack(alignment: .leading, spacing: 0) { number; ofTarget }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            LHRing(progress: standing.progress, tone: standing.tone == .positive ? .positive : (standing.tone == .caution ? .caution : .action), accessibilityValue: standing.spokenValue) {
+                VStack(spacing: 2) {
+                    Text(String(Int(standing.hours.rounded(.down))))
+                        .font(.largeTitle.weight(.bold))
+                        .fontDesign(.rounded)
+                        .monospacedDigit()
+                        .foregroundStyle(colors.textPrimary)
+                        .contentTransition(.numericText())
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .redacted(reason: isLoading ? .placeholder : [])
+                    Text(RR.t("reports.standing.of", "of \(Int(standing.target)) hours"))
+                        .font(.subheadline)
+                        .foregroundStyle(colors.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal, 36)
+            }
+            VStack(spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: toneSymbol)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(toneColor)
+                        .accessibilityHidden(true)
+                    Text(standing.status)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(standing.tone == .neutral ? colors.textPrimary : toneColor)
+                        .multilineTextAlignment(.center)
+                }
+                if let detail = standing.detail {
+                    Text(detail)
+                        .font(.subheadline)
+                        .foregroundStyle(colors.textSecondary)
+                        .multilineTextAlignment(.center)
                 }
             }
-            progressBar
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Image(systemName: toneSymbol)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(toneColor)
-                    .accessibilityHidden(true)
-                Text(standing.status)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(standing.tone == .neutral ? colors.textPrimary : toneColor)
-            }
-            if let detail = standing.detail {
-                Text(detail)
-                    .font(.subheadline)
-                    .foregroundStyle(colors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(LHMetrics.cardPadding)
+        .frame(maxWidth: .infinity)
+        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+        .overlay {
+            if colorScheme == .dark {
+                RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
+                    .strokeBorder(colors.border, lineWidth: LHMetrics.hairline)
             }
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(colors.backgroundSecondary))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(colors.border.opacity(0.6), lineWidth: 0.5))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(standing.name), \(standing.goal.spokenName)")
-        .accessibilityValue("\(BPHours.spoken(standing.hours)) of \(Int(standing.target)) hours. \(standing.status). \(standing.detail ?? "")")
+        .accessibilityLabel(RR.t("reports.standing.label", "\(standing.name), \(standing.goal.spokenName)"))
+        .accessibilityValue(standing.spokenValue)
         .accessibilityIdentifier("reports.standing.\(standing.person.rawValue)")
-        .onAppear {
-            if reduceMotion { appeared = true } else {
-                withAnimation(.spring(response: 0.6, dampingFraction: 1).delay(0.05)) { appeared = true }
-            }
-        }
-    }
-
-    private var number: some View {
-        Text(BPHours.short(standing.hours))
-            .font(.system(.largeTitle, design: .rounded, weight: .bold))
-            .monospacedDigit()
-            .foregroundStyle(colors.textPrimary)
-            .contentTransition(.numericText())
-            .lineLimit(1)
-            .minimumScaleFactor(0.7)
-    }
-
-    private var ofTarget: some View {
-        Text("of \(Int(standing.target))h")
-            .font(.title3)
-            .foregroundStyle(colors.textSecondary)
-    }
-
-    private var progressBar: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Capsule().fill(colors.backgroundTertiary)
-                    .overlay(Capsule().strokeBorder(colors.border.opacity(0.7), lineWidth: 0.5))
-                Capsule()
-                    .fill(standing.tone == .positive ? colors.positive : colors.action)
-                    .frame(width: max(standing.progress > 0 ? 8 : 0, proxy.size.width * (appeared ? standing.progress : 0)))
-            }
-        }
-        .frame(height: 8)
-        .accessibilityHidden(true)
     }
 }
 
-// MARK: - 100-Hour Test Confirmation Sheet
+/// Any further standing (a spouse's own count): a small ring beside the words.
+private struct CompactStandingCard: View {
+    let standing: ReportStanding
+    let year: Int
+    var isLoading = false
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var typeSize
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    private var eyebrow: String {
+        RR.t("reports.standing.eyebrow", "\(String(year)) \u{00B7} \(standing.name)")
+    }
+
+    var body: some View {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: 16))
+        layout {
+            LHRing(progress: standing.progress, tone: standing.tone == .positive ? .positive : (standing.tone == .caution ? .caution : .action), diameter: 72, lineWidth: 9,
+                   accessibilityValue: standing.spokenValue) {
+                EmptyView()
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(eyebrow)
+                    .font(AppTypography.drafting)
+                    .textCase(.uppercase)
+                    .tracking(1.3)
+                    .foregroundStyle(colors.draftingInk)
+                Text(RR.t("reports.standing.ofHours", "\(LHFormat.hours(standing.hours)) of \(Int(standing.target))h"))
+                    .font(.title3.weight(.semibold))
+                    .fontDesign(.rounded)
+                    .monospacedDigit()
+                    .foregroundStyle(colors.textPrimary)
+                    .redacted(reason: isLoading ? .placeholder : [])
+                Text(standing.status)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(colors.textPrimary)
+                if let detail = standing.detail {
+                    Text(detail)
+                        .font(.subheadline)
+                        .foregroundStyle(colors.textSecondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(LHMetrics.cardPadding)
+        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+        .overlay {
+            if colorScheme == .dark {
+                RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
+                    .strokeBorder(colors.border, lineWidth: LHMetrics.hairline)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(RR.t("reports.standing.label", "\(standing.name), \(standing.goal.spokenName)"))
+        .accessibilityValue(standing.spokenValue)
+        .accessibilityIdentifier("reports.standing.\(standing.person.rawValue)")
+    }
+}
+
+// MARK: - 100-hour test question sheet
 //
-// Shared by Reports and the Settings tax profile. Records the per-tax-year answer to
-// IRS Test 3's "did anyone else participate more?" prong. Answers are glyph + text so
-// the choice never depends on colour alone.
+// Shared by Reports, Today and Settings. Records the per-tax-year answer to the "did anyone else
+// do more?" part of the 100-hour test. Answers are glyph + text so the choice never depends on
+// colour alone.
 struct ParticipationConfirmationSheet: View {
     let year: Int
     let currentAnswer: Bool?
@@ -587,113 +672,67 @@ struct ParticipationConfirmationSheet: View {
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: AppSpacing.xl) {
-                    VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                        Text("\(String(year)) · 100-hour test")
-                            .font(AppTypography.drafting)
-                            .textCase(.uppercase)
-                            .tracking(1.3)
-                            .foregroundStyle(colors.draftingInk)
+        LHSheet(
+            RR.t("reports.sheet.title", "100-hour test"),
+            subtitle: String(year),
+            onClose: { dismiss() }
+        ) {
+            VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
+                Text(RR.t("reports.sheet.question", "Did a manager or contractor put in more hours than you and your spouse this year, at any rental?"))
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(colors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                        Text("Did anyone else, like a property manager or contractor, spend more time on any of your rentals than you and your spouse this year?")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(colors.textPrimary)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Text("\u{201C}Anyone else\u{201D} means a manager, contractor or co-owner who isn\u{2019}t your spouse.")
-                            .font(.subheadline)
-                            .foregroundStyle(colors.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                LHRowGroup {
+                    answerRow(
+                        title: RR.t("reports.sheet.no", "No one did more"),
+                        subtitle: RR.t("reports.sheet.no.detail", "You and your spouse put in the most time."),
+                        symbol: "checkmark.circle.fill",
+                        tint: .positive,
+                        isSelected: currentAnswer == true,
+                        identifier: "participation.answer.yes"
+                    ) {
+                        onAnswer(true)
+                        dismiss()
                     }
-
-                    VStack(spacing: AppSpacing.sm) {
-                        answerButton(
-                            title: "No one did more",
-                            subtitle: "You and your spouse put in the most time",
-                            symbol: "checkmark.circle.fill",
-                            tint: colors.positive,
-                            isSelected: currentAnswer == true,
-                            identifier: "participation.answer.yes"
-                        ) {
-                            onAnswer(true)
-                            dismiss()
-                        }
-
-                        answerButton(
-                            title: "Someone did more",
-                            subtitle: "A manager, contractor or co-owner outpaced you",
-                            symbol: "exclamationmark.circle.fill",
-                            tint: colors.caution,
-                            isSelected: currentAnswer == false,
-                            identifier: "participation.answer.no"
-                        ) {
-                            onAnswer(false)
-                            dismiss()
-                        }
+                    LHDivider(leadingInset: LHRow.browseDividerInset)
+                    answerRow(
+                        title: RR.t("reports.sheet.yes", "Someone did more"),
+                        subtitle: RR.t("reports.sheet.yes.detail", "A manager, contractor or co-owner put in more."),
+                        symbol: "exclamationmark.circle.fill",
+                        tint: .caution,
+                        isSelected: currentAnswer == false,
+                        identifier: "participation.answer.no"
+                    ) {
+                        onAnswer(false)
+                        dismiss()
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 24)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .background(colors.background.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                        .foregroundStyle(colors.action)
-                }
-            }
+            .padding(.top, 8)
         }
-        .presentationDetents([.medium, .large])
+        .lhSheetPresentation(.standard)
         .accessibilityIdentifier("participation.sheet")
     }
 
-    private func answerButton(
+    private func answerRow(
         title: String,
         subtitle: String,
         symbol: String,
-        tint: Color,
+        tint: LHRowGlyph.Tint,
         isSelected: Bool,
         identifier: String,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                Image(systemName: symbol)
-                    .font(.title2)
-                    .foregroundStyle(tint)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(colors.textPrimary)
-                    Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(colors.textSecondary)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(colors.action)
-                        .accessibilityHidden(true)
-                }
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(colors.backgroundSecondary))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(isSelected ? colors.action : colors.border, lineWidth: isSelected ? 1.5 : 1)
-            }
+        LHRow.Browse(
+            title: title,
+            meta: subtitle,
+            value: isSelected ? RR.t("reports.sheet.selected", "Chosen") : nil,
+            showsChevron: false,
+            action: action
+        ) {
+            LHRowGlyph(systemImage: symbol, tint: tint)
         }
-        .buttonStyle(.lhPressable)
         .accessibilityIdentifier(identifier)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
