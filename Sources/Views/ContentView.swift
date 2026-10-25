@@ -108,8 +108,6 @@ struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.requestReview) private var requestReview
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.dynamicTypeSize) private var readerTypeSize
     @ObservedObject private var ratingPrompt = RatingPromptCoordinator.shared
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @StateObject private var goalManager = GoalManager.shared
@@ -326,8 +324,7 @@ struct ContentView: View {
 
     var mainContent: some View {
         tabView
-            .modifier(ShellChromeLimits(regular: horizontalSizeClass == .regular))
-            .tint(horizontalSizeClass == .regular ? colors.sidebarTint : colors.action)
+            .tint(colors.action)
             .modifier(TabBarMinimizeOnScroll())
             .background {
                 // ⌘N logs time from anywhere (§1.27 keyboard).
@@ -463,7 +460,7 @@ struct ContentView: View {
             .accessibilityLabel(ShellItem.logTime.title)
             .accessibilityIdentifier(ShellItem.logTime.accessibilityIdentifier)
         }
-        .tabViewStyle(.sidebarAdaptable)
+        .tabViewStyle(.tabBarOnly)
     }
 
     @ViewBuilder
@@ -475,12 +472,11 @@ struct ContentView: View {
         }
     }
 
-    /// Each tab root: the reader's own text size (the bar is capped in regular width), the export
+    /// Each tab root: the export
     /// banner in its own row above the bar, and the bottom toasts above the bar.
     private func shellRoot<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         content()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .modifier(ReaderTypeSize(size: readerTypeSize, active: horizontalSizeClass == .regular))
             .tint(colors.action)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if let banner = exportBanner {
@@ -553,33 +549,6 @@ private struct TabBarMinimizeOnScroll: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
             content.tabBarMinimizeBehavior(.onScrollDown)
-        } else {
-            content
-        }
-    }
-}
-
-/// §1.27: in regular width the sidebar draws its own labels at a fixed width and broke words at AX
-/// sizes, so the bar and sidebar are capped at xxxLarge; every tab root restores the reader's size.
-private struct ShellChromeLimits: ViewModifier {
-    let regular: Bool
-    func body(content: Content) -> some View {
-        if regular {
-            // standard:§1.27-sidebar-clamp
-            content.dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-        } else {
-            content
-        }
-    }
-}
-
-private struct ReaderTypeSize: ViewModifier {
-    let size: DynamicTypeSize
-    let active: Bool
-    func body(content: Content) -> some View {
-        if active {
-            // standard:§1.27-sidebar-clamp (restores the reader's own size inside the tab roots)
-            content.dynamicTypeSize(size)
         } else {
             content
         }

@@ -20,6 +20,11 @@ enum AppColors {
     // MARK: Hex sources (shared by AppColors, AdaptiveColors and the widget: Shared/BrandPalette.swift)
     typealias Hex = BrandHex
 
+    // MARK: - Adaptive (two-pane)
+    /// §1.27 DU11: the work pane's card edge at night in two-pane and stacked windows. Dark only:
+    /// light windows keep `pageCardEdge`, so read it through that token in light.
+    static let duoNightCardEdge = Color(hex: Hex.duoNightCardEdge)
+
     // MARK: - Brand (new in 2.0)
     /// Blueprint blue. Theme-fixed: the hero, the app icon and brand fills. White on it is 9.06:1.
     static let brand = Color(hex: Hex.brand)
@@ -338,8 +343,6 @@ struct AdaptiveColors {
     var heroChipHairline: Color { isDark ? Color.white.opacity(0.14) : Color(hex: H.heroChipHairline).opacity(0.8) }
     /// The idle page dot (draw at 0.5); the current dot is `textPrimary`.
     var heroDot: Color { pick(H.heroDot, H.darkHeroDot) }
-    /// §1.27: the tab tint in regular width (the sidebar's selected row is white on it).
-    var sidebarTint: Color { pick(AppColors.actionLightHex, H.darkSidebarTint) }
 
     // Brand (new in 2.0)
     var brand: Color { AppColors.brand }

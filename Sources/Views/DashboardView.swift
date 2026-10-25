@@ -251,7 +251,7 @@ struct DashboardView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     page
-                        .frame(maxWidth: band == .a ? .infinity : (band == .c ? 960 : LHMetrics.readingColumn))
+                        .frame(maxWidth: band == .a ? .infinity : LHMetrics.readingColumn)
                         .frame(maxWidth: .infinity)
                         .padding(.bottom, 24)
                 }
@@ -357,21 +357,9 @@ struct DashboardView: View {
     // MARK: Layout
 
     @ViewBuilder private var page: some View {
-        if band == .c {
-            // H6 band C: the hero and the number on the left, To confirm on the right.
-            HStack(alignment: .top, spacing: LHMetrics.sectionGap) {
-                VStack(spacing: 0) { heroColumn }
-                    .frame(maxWidth: .infinity)
-                VStack(spacing: 0) { belowHero }
-                    .frame(maxWidth: 420)
-                    .padding(.top, 64)
-            }
-            .padding(.horizontal, LHMetrics.wideGutter)
-        } else {
-            VStack(spacing: 0) {
-                heroColumn
-                belowHero
-            }
+        VStack(spacing: 0) {
+            heroColumn
+            belowHero
         }
     }
 

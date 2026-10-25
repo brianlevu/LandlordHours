@@ -22,6 +22,7 @@
 		0D41B7310365067EB90C2D1D /* AppDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71D542D8D3135A25F2D304F8 /* AppDestination.swift */; };
 		0F352493E9D7EEA53D9D38FC /* RecordsLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 401D542F4CD2262A89C17B07 /* RecordsLogic.swift */; };
 		0FCAFAA435C8D031405C2C69 /* CaptureNotificationRefresher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56416E7776DD2506FD147689 /* CaptureNotificationRefresher.swift */; };
+		100B88263DFBFE6A54119AA0 /* HouseNumberBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC89C6AA748F34B691BABDE4 /* HouseNumberBlock.swift */; };
 		1271C43405BD7788AF2A11A9 /* LockedPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2487D044B1E2C51F52E4363B /* LockedPreview.swift */; };
 		12BA2B1FF6DA34B9708EABF4 /* ExportPDFView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37718C6C352F5146B1B19AAA /* ExportPDFView.swift */; };
 		13B70E45F6EC9C686901E6BB /* OnboardingCaptureUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57343B4D218F75B37CA7F147 /* OnboardingCaptureUITests.swift */; };
@@ -48,6 +49,7 @@
 		2846D3E26FF2EA4A60FAF7D6 /* LandlordHoursTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01B3B8EADDB251440528314 /* LandlordHoursTests.swift */; };
 		2B472BDC3D272BDBF47FD23D /* OnboardingProfileHoldTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11EED8A5BAF425DA25A6158C /* OnboardingProfileHoldTests.swift */; };
 		2B843690B8A92B72AA874888 /* EngagementLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F7DEC5DC48828C8FF4C48C2 /* EngagementLabView.swift */; };
+		2BD38066EE97B81669FD3545 /* SharedHouseViewsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D849E48B0FFA7D3341D18B8C /* SharedHouseViewsTests.swift */; };
 		2CF2678CBE8415E9B3A17DAA /* WidgetAssets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B60784946AA258E7546B9B1E /* WidgetAssets.xcassets */; };
 		2D584B9C2E78E1F521AAB70A /* NoteModelBackends.swift in Sources */ = {isa = PBXBuildFile; fileRef = D637034249888D9B04756FBB /* NoteModelBackends.swift */; };
 		2D5B96848DC40BDCD46B0B19 /* LearnDeleteRestoreUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC4824702FAEA12859642F18 /* LearnDeleteRestoreUITests.swift */; };
@@ -150,6 +152,7 @@
 		9A4861CCD161E7AEBD9ABCD9 /* TodayConfirmUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 435624AEE2D53F77DFB56482 /* TodayConfirmUITests.swift */; };
 		9AB1EED1A55B244ACC72AF79 /* WPLCaptureUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8595069CED3C00604518A91 /* WPLCaptureUITests.swift */; };
 		9B00BAB05110B0C26F85C687 /* HouseProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECAC09A18663B8CBE3E7BE3 /* HouseProgress.swift */; };
+		9B4DCD57764982609DEB9C3A /* RentalSkyline.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1D83148AECDA4DA11530B33 /* RentalSkyline.swift */; };
 		9C15068AF606A3C94684DDF4 /* LHMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9B34F9F4C44110FC713F160 /* LHMark.swift */; };
 		9C56CFF4C0A527580463AA1D /* CaptureModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB3ABA94307D665EF31EC294 /* CaptureModelTests.swift */; };
 		9ED242B446E98033F81CEF73 /* HousePreviewUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016D2C699C6EA42FF25E0767 /* HousePreviewUITests.swift */; };
@@ -459,6 +462,7 @@
 		AAAF00655E068F4BF173013C /* craft_build_light.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = craft_build_light.mov; sourceTree = "<group>"; };
 		ABA03DAE44AC1D26CFF6FE77 /* NoteReading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteReading.swift; sourceTree = "<group>"; };
 		AC4824702FAEA12859642F18 /* LearnDeleteRestoreUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnDeleteRestoreUITests.swift; sourceTree = "<group>"; };
+		AC89C6AA748F34B691BABDE4 /* HouseNumberBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseNumberBlock.swift; sourceTree = "<group>"; };
 		AD7F02E55592B09E432C55E4 /* ExportJob.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportJob.swift; sourceTree = "<group>"; };
 		AF9B535DB5BD7E99323CD2C5 /* ReportsLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsLogic.swift; sourceTree = "<group>"; };
 		AFF3C2F4E4EAC2D09DCB3F5B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -505,6 +509,7 @@
 		D360CC0C0B0E09F2BA4F57D8 /* ProGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProGate.swift; sourceTree = "<group>"; };
 		D36B83A1EDCB4BEA30A0F2CF /* craft_build_dark.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = craft_build_dark.mov; sourceTree = "<group>"; };
 		D637034249888D9B04756FBB /* NoteModelBackends.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteModelBackends.swift; sourceTree = "<group>"; };
+		D849E48B0FFA7D3341D18B8C /* SharedHouseViewsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedHouseViewsTests.swift; sourceTree = "<group>"; };
 		D8753671DC612116EB1125E2 /* LHMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHMetrics.swift; sourceTree = "<group>"; };
 		D87C61D0D4C65EDFDCB0649B /* AuditReportBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditReportBuilder.swift; sourceTree = "<group>"; };
 		D91BDD921FD02E42B58FE334 /* PropertiesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertiesView.swift; sourceTree = "<group>"; };
@@ -518,6 +523,7 @@
 		DE13F908989158FDAB28BF57 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		DEA07735A91C141EB38666AE /* CalendarDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarDetector.swift; sourceTree = "<group>"; };
 		E078FA57ABF4C028DDE04C86 /* LandlordHoursTimerAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordHoursTimerAttributes.swift; sourceTree = "<group>"; };
+		E1D83148AECDA4DA11530B33 /* RentalSkyline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RentalSkyline.swift; sourceTree = "<group>"; };
 		E44332A1A42FF1860E8AFFEA /* Fraunces-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Fraunces-OFL.txt"; sourceTree = "<group>"; };
 		E608074A1B1B6BCDFA4736E4 /* OnboardingScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingScene.swift; sourceTree = "<group>"; };
 		E6D41E394791AE4ADCA1F725 /* EngagementIntelligenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngagementIntelligenceService.swift; sourceTree = "<group>"; };
@@ -689,9 +695,11 @@
 				B7E98F3220D6538A3E026AF2 /* CraftHouseView.swift */,
 				28DDB6B86D81AC402BB21273 /* CraftStage.swift */,
 				12683538DF1ED2391553A149 /* HouseArtView.swift */,
+				AC89C6AA748F34B691BABDE4 /* HouseNumberBlock.swift */,
 				C019323AC4557CF99AE2FE0F /* HousePreviewLaunchHook.swift */,
 				45315D80200D5FEE893898D7 /* HouseTokens.swift */,
 				F4FBBCE8DA693BAC7640B104 /* MilestoneCelebrationView.swift */,
+				E1D83148AECDA4DA11530B33 /* RentalSkyline.swift */,
 			);
 			path = House;
 			sourceTree = "<group>";
@@ -814,6 +822,7 @@
 				FF70C30146DF1981684327FB /* ProGateTests.swift */,
 				6252BC3F79F79B6164763816 /* ProMomentsTests.swift */,
 				7B19069D2DB3708B654ABA06 /* PropertiesTests.swift */,
+				D849E48B0FFA7D3341D18B8C /* SharedHouseViewsTests.swift */,
 				22F2A5256E57CEBACC7BDAAC /* StoreKitLocalIntegrationTests.swift */,
 				C976B97E05FA0DD306218404 /* SurfacesTests.swift */,
 				BDAC9A2FCA588960D010499D /* SyncGateAndTimerDraftTests.swift */,
@@ -1327,6 +1336,7 @@
 				A47503D607E3D15AB9B78D16 /* HistoryView.swift in Sources */,
 				3736EF25A1251F900A2E6B8B /* HouseArtView.swift in Sources */,
 				027EEB6EAD48ECF64277563C /* HouseMotion.swift in Sources */,
+				100B88263DFBFE6A54119AA0 /* HouseNumberBlock.swift in Sources */,
 				0288240124BEE80CFC6AF84E /* HousePreviewLaunchHook.swift in Sources */,
 				9B00BAB05110B0C26F85C687 /* HouseProgress.swift in Sources */,
 				DABEFE3725F860151429E838 /* HouseTokens.swift in Sources */,
@@ -1398,6 +1408,7 @@
 				8ED8AAEC6D50C47E9DC615C1 /* PropertyFigures.swift in Sources */,
 				3B6ADC833422DD7187669B64 /* RecordPagePreview.swift in Sources */,
 				0F352493E9D7EEA53D9D38FC /* RecordsLogic.swift in Sources */,
+				9B4DCD57764982609DEB9C3A /* RentalSkyline.swift in Sources */,
 				7051CBC82B2AC4E74FCF8D3B /* ReportsLogic.swift in Sources */,
 				1A2A80F489BB65C766EBA321 /* ReportsView.swift in Sources */,
 				1E22CC769FADF34EB190DD19 /* RetiredMockLaunches.swift in Sources */,
@@ -1476,6 +1487,7 @@
 				FEF2ADF1DF06A3C6BA058BE9 /* ProMomentsTests.swift in Sources */,
 				D04500E9427ED37526E8B26D /* ProfileIdentityTests.swift in Sources */,
 				F53BA48CC55E73BBAE52C0E0 /* PropertiesTests.swift in Sources */,
+				2BD38066EE97B81669FD3545 /* SharedHouseViewsTests.swift in Sources */,
 				1424FAA16D7E9B48091EBE67 /* StoreKitLocalIntegrationTests.swift in Sources */,
 				F720C278D683FD57E9F8717F /* SurfacesTests.swift in Sources */,
 				5237EDB83B597E6CAE0D5272 /* SyncGateAndTimerDraftTests.swift in Sources */,

@@ -42,8 +42,9 @@ enum BrandHex {
     /// Page dots under the house (§H.8): the current dot is `textPrimary`, the rest this at 0.5.
     static let heroDot = "8A8FA3"
     static let darkHeroDot = "5D6788"
-    /// §1.27: the regular-width tab tint in dark (white on it 4.58:1 in the selected sidebar row).
-    static let darkSidebarTint = "4774C6"
+    /// §1.27 DU11: the work pane's card edge on the night page in two-pane and stacked windows
+    /// (dark only; light keeps `pageCardEdge`). 2.02:1 on the night room away from the warm pool.
+    static let duoNightCardEdge = "3C4675"
 
     // Light
     static let canvas = "EEF2FA"

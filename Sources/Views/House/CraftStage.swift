@@ -119,7 +119,7 @@ enum CraftHeroSize {
     /// The diorama (with its lot) is never drawn under this side (§H.5, thumbnail minimum).
     static let minimumDioramaSide: CGFloat = 220
     /// House-only thumbnail sizes: rows (44), picker grids and sheet headers (56), the onboarding
-    /// step, sidebar header and widgets (120). Never under 44.
+    /// step and widgets (120). Never under 44.
     static let thumbnailRow: CGFloat = 44
     static let thumbnailHeader: CGFloat = 56
     static let thumbnailLarge: CGFloat = 120

@@ -5,7 +5,7 @@ import UIKit
 //
 // `craft_thumb_<stage>`: the house only (camera framed at 90% of the house's bounding box, no lot,
 // contact shadow only), Any = dusk, Dark = night, lit only. Sizes: 44 in rental rows and Reports
-// rows, 56 in picker grids and sheet headers, 120 on the onboarding step, the iPad sidebar header and
+// rows, 56 in picker grids and sheet headers, 120 on the onboarding step, and
 // the widgets. Never under 44: the diorama with its lot is never shown under 220.
 //
 // Lit state by `loggedToday`: the asset is lit only, so an unlit thumbnail is the lit render
@@ -33,7 +33,7 @@ struct LHThumb: View {
     static func row(_ stage: CraftStage, lit: Bool) -> LHThumb { LHThumb(stage: stage, lit: lit, size: CraftHeroSize.thumbnailRow) }
     /// 56 in sheet headers and picker grids.
     static func header(_ stage: CraftStage, lit: Bool) -> LHThumb { LHThumb(stage: stage, lit: lit, size: CraftHeroSize.thumbnailHeader) }
-    /// 120 on the onboarding step, the sidebar header and the widgets.
+    /// 120 on the onboarding step, and the widgets.
     static func large(_ stage: CraftStage, lit: Bool) -> LHThumb { LHThumb(stage: stage, lit: lit, size: CraftHeroSize.thumbnailLarge) }
 
     static func hasThumbnail(_ stage: CraftStage) -> Bool { UIImage(named: stage.thumbnailName) != nil }

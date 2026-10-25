@@ -32,26 +32,24 @@ enum LHMetrics {
 
 // MARK: - Layout band
 
-/// Window-width band (§1.27): A < 600 (the phone layout), B 600–899 (one column ≤ 600), C ≥ 900.
-/// Bands carry 8pt hysteresis (A↔B at 592/608, B↔C at 892/908). This is the only place a band is
+/// Compact split (§1.27 AD1): A < 600 (the phone layout), B 600–899 (one column ≤ 600). Band C and
+/// its 900 threshold are retired: windows from 800×645 up are two-pane (`LayoutMode`, package J),
+/// not a third band. Bands carry 8pt hysteresis (A↔B at 592/608). This is the only place a band is
 /// computed; the root reads the scene width with `onGeometryChange` and passes the band down.
 enum LayoutBand: String, Equatable, Sendable, CaseIterable {
-    case a, b, c
+    case a, b
 
     static let hysteresis: CGFloat = 8
 
     /// The band for `width`, keeping `previous` while the width sits inside its 8pt hysteresis.
     static func resolve(previous: LayoutBand?, width: CGFloat) -> LayoutBand {
         guard width.isFinite, width > 0 else { return previous ?? .a }
-        let raw: LayoutBand = width < 600 ? .a : (width < 900 ? .b : .c)
+        let raw: LayoutBand = width < 600 ? .a : .b
         guard let previous, previous != raw else { return raw }
         // Stay in the previous band until the width clears the boundary by the hysteresis.
-        switch (previous, raw) {
-        case (.a, .b): return width >= 600 + hysteresis ? .b : .a
-        case (.b, .a): return width < 600 - hysteresis ? .a : .b
-        case (.b, .c): return width >= 900 + hysteresis ? .c : .b
-        case (.c, .b): return width < 900 - hysteresis ? .b : .c
-        default: return raw   // a jump over a whole band (a ↔ c) is never held
+        switch previous {
+        case .a: return width >= 600 + hysteresis ? .b : .a
+        case .b: return width < 600 - hysteresis ? .a : .b
         }
     }
 }

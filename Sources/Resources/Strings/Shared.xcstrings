@@ -1,6 +1,90 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "allRentals.allOnPace": {
+      "comment": "Shelf label when no rental is behind.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All on pace"
+          }
+        }
+      }
+    },
+    "allRentals.behind": {
+      "comment": "Shelf label and, after a dot, the number line: how many rentals are behind their own pace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld of %lld behind"
+          }
+        }
+      }
+    },
+    "allRentals.everyOnPace": {
+      "comment": "All rentals pace line when no rental is behind.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every rental is on pace."
+          }
+        }
+      }
+    },
+    "allRentals.hoursAcross": {
+      "comment": "All rentals number line: total hours, then the rental count (two or more rentals).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld hours across %lld rentals"
+          }
+        }
+      }
+    },
+    "allRentals.name": {
+      "comment": "The first page and shelf slot: every rental at once.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All rentals"
+          }
+        }
+      }
+    },
+    "allRentals.tapHouse": {
+      "comment": "All rentals pace line when some rentals are behind.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap a house to see its pace."
+          }
+        }
+      }
+    },
+    "hero.ofGoal": {
+      "comment": "One rental under the number: the goal, a dot, then the rental name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "of %lld hours · %@"
+          }
+        }
+      }
+    },
     "stage.complete": {
       "comment": "Crafted house stage: the house is finished.",
       "extractionState": "manual",

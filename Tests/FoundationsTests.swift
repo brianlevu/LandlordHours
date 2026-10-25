@@ -73,8 +73,8 @@ final class FoundationsTests: XCTestCase {
         XCTAssertEqual(LayoutBand.resolve(previous: nil, width: 599), .a)
         XCTAssertEqual(LayoutBand.resolve(previous: nil, width: 600), .b)
         XCTAssertEqual(LayoutBand.resolve(previous: nil, width: 899), .b)
-        XCTAssertEqual(LayoutBand.resolve(previous: nil, width: 900), .c)
-        XCTAssertEqual(LayoutBand.resolve(previous: nil, width: 1366), .c)
+        XCTAssertEqual(LayoutBand.resolve(previous: nil, width: 900), .b)   // band C retired (AD1)
+        XCTAssertEqual(LayoutBand.resolve(previous: nil, width: 1366), .b)
     }
 
     func testBandHysteresis() {
@@ -83,13 +83,10 @@ final class FoundationsTests: XCTestCase {
         XCTAssertEqual(LayoutBand.resolve(previous: .a, width: 608), .b)
         XCTAssertEqual(LayoutBand.resolve(previous: .b, width: 595), .b)
         XCTAssertEqual(LayoutBand.resolve(previous: .b, width: 591), .a)
-        // B ↔ C at 908 / 892.
-        XCTAssertEqual(LayoutBand.resolve(previous: .b, width: 905), .b)
-        XCTAssertEqual(LayoutBand.resolve(previous: .b, width: 908), .c)
-        XCTAssertEqual(LayoutBand.resolve(previous: .c, width: 895), .c)
-        XCTAssertEqual(LayoutBand.resolve(previous: .c, width: 891), .b)
-        // A jump over a band is never held.
-        XCTAssertEqual(LayoutBand.resolve(previous: .a, width: 1000), .c)
+        // Band C is retired (AD1): a wide window stays in B from either side.
+        XCTAssertEqual(LayoutBand.resolve(previous: .b, width: 908), .b)
+        XCTAssertEqual(LayoutBand.resolve(previous: .a, width: 1000), .b)
+        XCTAssertEqual(LayoutBand.allCases, [.a, .b])
     }
 
     func testBandBadWidthKeepsPrevious() {

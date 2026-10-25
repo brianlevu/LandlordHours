@@ -27,6 +27,12 @@ struct LandlordHoursApp: App {
         UITabBar.appearance().standardAppearance = tabBar
         UITabBar.appearance().scrollEdgeAppearance = tabBar
         UITabBar.appearance().tintColor = UIColor(AppColors.primary)
+        // The one allowed appearance line (§1.25, §1.27 AD17): unselected items take the house ink,
+        // textPrimary at 0.85, in every mode.
+        UITabBar.appearance().unselectedItemTintColor = UIColor { traits in
+            UIColor(lhHex: traits.userInterfaceStyle == .dark ? AppColors.Hex.darkTextPrimary : AppColors.Hex.textPrimary)
+                .withAlphaComponent(0.85)
+        }
 
         // Navigation bar — transparent; inline titles SF Pro, large titles Fraunces (2.0 brand,
         // 34pt ≥ the 28pt floor) so system large titles such as Records match the custom roots.
