@@ -150,7 +150,6 @@ final class InboxUITests: XCTestCase {
         // One header per day (standard §1.15a), newest first.
         XCTAssertTrue(app.staticTexts["Today"].exists)
         XCTAssertTrue(app.staticTexts["Wed Oct 14"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["inbox.backfillBanner"].exists)
         // Rows carry Confirm / Not work, so they are taller: scroll to each one.
         XCTAssertTrue(scrollTo(row("call-sam")))
         XCTAssertTrue(row("call-sam").label.contains("Not sure"), row("call-sam").label)
@@ -285,7 +284,7 @@ final class InboxUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["capture.notificationPreview"].waitForExistence(timeout: 3))
         app.buttons["capture.priming.continue"].tap()
         passReveal()
-        XCTAssertTrue(app.descendants(matching: .any)["inbox.backfillBanner"].waitForExistence(timeout: 10))
+        XCTAssertTrue(row("bf-0").waitForExistence(timeout: 10), "The look-back's items are rows now")
         XCTAssertTrue(waitForBadge("22 to confirm", timeout: 10))
         XCTAssertFalse(app.descendants(matching: .any)["inbox.backfill.header"].exists, "Header leaves when done")
         XCTAssertFalse(app.buttons["inbox.empty.backfill"].exists, "A finished look-back is done")

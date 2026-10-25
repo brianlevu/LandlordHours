@@ -10,7 +10,8 @@ import SwiftUI
 //     "Not rental work". The row tap opens the confirm sheet.
 //   - "Confirm N likely" (N >= 2): a `.tertiary` at the card foot when the foot is on screen, a
 //     pinned capsule above the tab bar when it is not (§1.3b). One action, one toast "Logged 3".
-//   - The look-back: one grouped row above the card while it runs, one quiet row after it.
+//   - The look-back: one grouped row above the card while it runs. Afterwards its items are plain
+//     rows under their own day headers (a summary row cost a row of the five D3 asks for).
 //   - Nothing waiting: the diorama of the first rental on the dusk/night page (§H.5, §1.18).
 //
 // The tab switch from Today (dusk page) to this plain canvas has no push, so the canvas dissolves in
@@ -93,12 +94,6 @@ struct InboxView: View {
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         .transition(.opacity)
-                }
-                if model.backfillCount > 0 && !backfill.isScanning {
-                    backfillRow
-                        .listRowInsets(EdgeInsets(top: 4, leading: LHMetrics.gutter, bottom: 4, trailing: LHMetrics.gutter))
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
                 }
             }
             Section {
@@ -289,26 +284,6 @@ struct InboxView: View {
         UIAccessibility.post(notification: .announcement, argument: InboxText.notWorkAnnouncement)
     }
 
-    // MARK: The look-back's summary row
-
-    /// One quiet row after the look-back: how many of the items came from the last 90 days. The
-    /// total is already in the section header.
-    private var backfillRow: some View {
-        LHRowGroup {
-            HStack(spacing: 12) {
-                if !typeSize.isAccessibilitySize { LHRowGlyph(systemImage: "calendar.badge.clock", tint: .action) }
-                Text(InboxText.fromBackfill(model.backfillCount))
-                    .font(.body)
-                    .foregroundStyle(colors.textPrimary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(LHRow.insets)
-            .frame(minHeight: LHMetrics.rowMinHeight)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("inbox.backfillBanner")
-    }
-
     // MARK: Empty
 
     /// The first rental's house as the empty state: its stage, lit when hours were logged today.
@@ -365,10 +340,6 @@ enum InboxText {
     static func confirmLikely(_ count: Int) -> String {
         String(localized: "inbox.batch.confirm", defaultValue: "Confirm \(count) likely", table: "Inbox",
                comment: "Logs every row that is sure and complete, e.g. Confirm 3 likely")
-    }
-
-    static func fromBackfill(_ count: Int) -> String {
-        String(localized: "inbox.backfill.title", defaultValue: "\(count) from your last 90 days", table: "Inbox")
     }
 
     static var loggedAnnouncement: String {

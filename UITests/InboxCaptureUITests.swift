@@ -136,7 +136,7 @@ final class InboxCaptureUITests: XCTestCase {
             shoot("backfill-reveal", scheme)
             review.tap()
         }
-        XCTAssertTrue(app.descendants(matching: .any)["inbox.backfillBanner"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.descendants(matching: .any)["inbox.row.cal:debug-bf-0"].waitForExistence(timeout: 20))
         shoot("backfill-results", scheme)
 
         // 6. Onboarding priming (new users).

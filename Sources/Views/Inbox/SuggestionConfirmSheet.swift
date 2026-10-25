@@ -236,7 +236,7 @@ struct SuggestionConfirmSheet: View {
                         Button(property.name) { propertyId = property.id }
                     }
                 } label: {
-                    LHRow.Value(confirmText(.property), value: propertyName ?? confirmText(.choose), accessory: .menu).content
+                    LHRow.Value(confirmText(.property), value: propertyName ?? confirmText(.choose), accessory: .menu)
                 }
                 .accessibilityIdentifier("confirm.property")
             }
@@ -249,7 +249,7 @@ struct SuggestionConfirmSheet: View {
                     }
                 }
             } label: {
-                LHRow.Value(confirmText(.category), value: category?.inboxLabel ?? confirmText(.choose), accessory: .menu).content
+                LHRow.Value(confirmText(.category), value: category?.inboxLabel ?? confirmText(.choose), accessory: .menu)
             }
             .accessibilityIdentifier("confirm.category")
             LHRow.Value(confirmText(.date), value: InboxFormat.longDay(suggestion.start), accessory: .none)

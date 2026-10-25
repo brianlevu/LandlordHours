@@ -815,17 +815,6 @@
         }
       }
     },
-    "inbox.backfill.title": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld from your last 90 days"
-          }
-        }
-      }
-    },
     "inbox.batch.confirm": {
       "extractionState": "manual",
       "localizations": {
