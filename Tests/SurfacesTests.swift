@@ -147,7 +147,7 @@ final class WidgetSurfaceDisplayTests: XCTestCase {
         XCTAssertEqual(d.pill?.text, "Stop and review")
         XCTAssertEqual(d.status?.text, "Pine Cabin")
         XCTAssertEqual(d.inlineText(elapsed: "0:42"), "Timer 0:42 · Pine Cabin")
-        XCTAssertEqual(d.rectangularLine, "Stop it to review")
+        XCTAssertEqual(d.rectangularLine, "Stop and review")
         XCTAssertEqual(d.url, WidgetLinks.logTime)
         XCTAssertEqual(WidgetSurfaceDisplay.elapsedText(from: start, to: start.addingTimeInterval(42 * 60 + 59)), "0:42")
         XCTAssertEqual(WidgetSurfaceDisplay.elapsedText(from: start, to: start.addingTimeInterval(4 * 3600 + 12 * 60)), "4:12")
