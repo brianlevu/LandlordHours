@@ -91,7 +91,8 @@ enum AdaptiveSnapshotter {
     static var started = false
     static var windows: [UIWindow] = []
     /// While a Duo frame renders, the window size that stands for the open or propped Duo.
-    static var duoSizes: Set<String> = []
+    /// The Duo shot being rendered (its target size), nil otherwise.
+    static var duoShot: CGSize?
 
     static let duoOpen = CGSize(width: 951, height: 669)
     static let duoPropped = CGSize(width: 669, height: 951)
@@ -99,12 +100,14 @@ enum AdaptiveSnapshotter {
     static let foldBand: CGFloat = 24
 
     nonisolated static func division(for size: CGSize) -> PaneDivision? {
-        let key = "\(Int(size.width.rounded()))x\(Int(size.height.rounded()))"
-        guard MainActor.assumeIsolated({ duoSizes.contains(key) }) else { return nil }
-        if size.width > size.height {
-            return PaneDivision(rect: CGRect(x: (size.width - foldBand) / 2, y: 0, width: foldBand, height: size.height))
+        // The Duo shot being rendered; the measured size may drift by the capture's inset
+        // compensation for a frame or two, so match within a band and split at the shot's centre.
+        guard let shot = MainActor.assumeIsolated({ duoShot }),
+              abs(size.width - shot.width) < 30, abs(size.height - shot.height) < 30 else { return nil }
+        if shot.width > shot.height {
+            return PaneDivision(rect: CGRect(x: (shot.width - foldBand) / 2, y: 0, width: foldBand, height: size.height))
         }
-        return PaneDivision(rect: CGRect(x: 0, y: (size.height - foldBand) / 2, width: size.width, height: foldBand))
+        return PaneDivision(rect: CGRect(x: 0, y: (shot.height - foldBand) / 2, width: size.width, height: foldBand))
     }
 
     struct Shot {
@@ -167,7 +170,7 @@ enum AdaptiveSnapshotter {
         for dark in [false, true] {
             let tag = dark ? "dark" : "light"
             for shot in shots {
-                if shot.duo { duoSizes.insert("\(Int(shot.size.width.rounded()))x\(Int(shot.size.height.rounded()))") }
+                duoShot = shot.duo ? shot.size : nil
                 AdaptiveSnapshotSelection.args = shot.args
                 let w = makeWindow(size: shot.size, dark: dark, category: shot.category, insets: shot.insets, scene: scene)
                 // The scene's own insets can move once the window lays out (a status bar or home bar
@@ -181,7 +184,7 @@ enum AdaptiveSnapshotter {
                 writePanes(w, size: shot.size, to: dir.appendingPathComponent("\(shot.name)-\(tag).panes.json"))
                 w.isHidden = true
                 windows.removeAll { $0 === w }
-                duoSizes.removeAll()
+                duoShot = nil
             }
         }
         try? "done".write(to: dir.appendingPathComponent("DONE"), atomically: true, encoding: .utf8)

@@ -73,6 +73,7 @@ struct TwoPaneLayout<Work: View>: View {
     private var house: some View {
         HousePane(split: split, showsDoor: split.isDivision, clock: clock)
             .environmentObject(selection)
+            .clipped()   // nothing in the house pane ever crosses the gap or fold (DU2)
     }
 
     private var workPane: some View {

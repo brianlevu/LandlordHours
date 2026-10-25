@@ -134,8 +134,12 @@ def check(png, scale=None):
         # DU9: wall either side of the fold, rows where both sides are bare wall
         dEs = []
         for y in range(40, int(H / s) - 100, 30):
-            a = np.median(img[int(y * s):int((y + 4) * s), int((gx - 6) * s):int((gx - 1) * s)].reshape(-1, 3), axis=0)
-            b = np.median(img[int(y * s):int((y + 4) * s), int((gx + gw + 1) * s):int((gx + gw + 6) * s)].reshape(-1, 3), axis=0)
+            pa = img[int(y * s):int((y + 4) * s), int((gx - 6) * s):int((gx - 1) * s)].reshape(-1, 3).astype(float)
+            pb = img[int(y * s):int((y + 4) * s), int((gx + gw + 1) * s):int((gx + gw + 6) * s)].reshape(-1, 3).astype(float)
+            # Bare wall only: skip samples on a card or with art or text in them (spread > 12/255).
+            if pa.std(axis=0).max() > 12 or pb.std(axis=0).max() > 12:
+                continue
+            a, b = np.median(pa, axis=0), np.median(pb, axis=0)
             if np.abs(a - CARD[theme]).max() < 8 or np.abs(b - CARD[theme]).max() < 8:
                 continue
             dEs.append(float(np.linalg.norm(lab(a) - lab(b))))
@@ -144,8 +148,13 @@ def check(png, scale=None):
             out["DU9_dE_max"] = round(float(np.max(dEs)), 1)
             out["DU9"] = "PASS" if out["DU9_dE_mean"] <= 5 and out["DU9_dE_max"] <= 10 else "FAIL"
         # DU10: brightest wall pixel at y = 60pt across the work pane
-        row = img[int(60 * s), int((gx + gw) * s):int((work[0] + work[2]) * s), :3]
-        L = luma(row.astype(float))
+        row = img[int(60 * s), int((gx + gw) * s):int((work[0] + work[2]) * s), :3].astype(float)
+        L = luma(row)
+        # Wall pixels only: not the card colour, no hard neighbour step (text, card edge).
+        g8 = row.mean(axis=1)
+        step = np.abs(np.diff(g8, prepend=g8[0])) + np.abs(np.diff(g8, append=g8[-1]))
+        wall = (np.abs(row - CARD[theme]).max(axis=1) >= 8) & (step < 6)
+        L = np.where(wall, L, -1)
         xb = int(np.argmax(L)) / s
         out["DU10_brightest_from_fold_pt"] = round(xb, 1)
         out["DU10"] = "PASS" if xb <= 120 else "FAIL"
