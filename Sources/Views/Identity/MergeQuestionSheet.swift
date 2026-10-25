@@ -30,14 +30,17 @@ struct MergeQuestionSheet: View {
                 case .spouse: confirm(String(localized: "Add \(IdentityCopy.hours(group.hours)) as your spouse’s? Their hours count with yours for the 500-hour test. They stay separate for the 750. You can undo this for 30 days.", table: "Identity"))
                 case .aside: confirm(String(localized: "Keep \(IdentityCopy.hours(group.hours)) aside? Nothing is deleted. You’ll find them under Earlier records.", table: "Identity"))
                 }
+                // The other answers scroll with the words; only the one `.primary` is pinned, so a
+                // tall footer never sits over the content at accessibility sizes.
+                VStack(alignment: .leading, spacing: 0) { secondaryActions }
             }
             .padding(.top, 4)
             .animation(reduceMotion ? nil : AppAnimation.quick, value: step)
         } footer: {
-            footer
+            primaryAction
         }
         .background(colors.backgroundSecondary.ignoresSafeArea())
-        .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.fraction(0.8), .large])
+        .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.fraction(0.75), .large])
         .presentationDragIndicator(.visible)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("identity.mergeQuestion")
@@ -92,30 +95,33 @@ struct MergeQuestionSheet: View {
             .foregroundStyle(colors.textPrimary)
     }
 
-    @ViewBuilder private var footer: some View {
+    @ViewBuilder private var secondaryActions: some View {
         switch step {
         case .ask:
-            // One `.primary`; the two other answers are `.tertiary` (stacked, never side by side).
             Button(String(localized: "These are my spouse’s hours", table: "Identity")) { step = .spouse }
                 .buttonStyle(LHButton.tertiary)
                 .accessibilityIdentifier("identity.merge.spouse")
             Button(String(localized: "Not mine, keep them aside", table: "Identity")) { step = .aside }
                 .buttonStyle(LHButton.tertiary)
                 .accessibilityIdentifier("identity.merge.aside")
+        case .spouse, .aside:
+            Button(String(localized: "Back", table: "Identity")) { step = .ask }
+                .buttonStyle(LHButton.tertiary)
+                .accessibilityIdentifier("identity.merge.back")
+        }
+    }
+
+    @ViewBuilder private var primaryAction: some View {
+        switch step {
+        case .ask:
             Button(String(localized: "Yes, combine them", table: "Identity")) { finish(.combine) }
                 .buttonStyle(LHButton.primary)
                 .accessibilityIdentifier("identity.merge.combine")
         case .spouse:
-            Button(String(localized: "Back", table: "Identity")) { step = .ask }
-                .buttonStyle(LHButton.tertiary)
-                .accessibilityIdentifier("identity.merge.back")
             Button(String(localized: "Add as your spouse’s hours", table: "Identity")) { finish(.spouse) }
                 .buttonStyle(LHButton.primary)
                 .accessibilityIdentifier("identity.merge.confirmSpouse")
         case .aside:
-            Button(String(localized: "Back", table: "Identity")) { step = .ask }
-                .buttonStyle(LHButton.tertiary)
-                .accessibilityIdentifier("identity.merge.back")
             Button(String(localized: "Keep aside", table: "Identity")) { finish(.aside) }
                 .buttonStyle(LHButton.primary)
                 .accessibilityIdentifier("identity.merge.confirmAside")

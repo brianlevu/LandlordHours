@@ -25,16 +25,16 @@ struct BulkAbsenceSheet: View {
                 Text(String(localized: "Nothing has been deleted here.", table: "Identity"))
                     .font(.body.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
+                Button(String(localized: "Remove them from this iPhone", table: "Identity")) {
+                    viewModel.answerBulk(.remove)
+                    LHToastCenter.shared.show(.success, String(localized: "Moved to Recently removed. You can put them back.", table: "Identity"))
+                    dismiss()
+                }
+                .buttonStyle(LHButton.tertiary)
+                .accessibilityIdentifier("identity.bulk.remove")
             }
             .padding(.top, 4)
         } footer: {
-            Button(String(localized: "Remove them from this iPhone", table: "Identity")) {
-                viewModel.answerBulk(.remove)
-                LHToastCenter.shared.show(.success, String(localized: "Moved to Recently removed. You can put them back.", table: "Identity"))
-                dismiss()
-            }
-            .buttonStyle(LHButton.tertiary)
-            .accessibilityIdentifier("identity.bulk.remove")
             Button(String(localized: "Keep them on this iPhone and in iCloud", table: "Identity")) {
                 viewModel.answerBulk(.keep)
                 dismiss()

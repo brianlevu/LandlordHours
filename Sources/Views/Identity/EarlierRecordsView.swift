@@ -22,11 +22,11 @@ struct EarlierRecordsView: View {
         let identity = viewModel.identity
         List {
             Section {
+            } header: {
                 Text(String(localized: "Records from an earlier version, another device or another sign-in. Add them to yours, or delete them. Nothing changes until you choose.", table: "Identity"))
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
+                    .textCase(nil)
             }
             if identity.searchFailed {
                 Section {
@@ -35,6 +35,8 @@ struct EarlierRecordsView: View {
                                  value: String(localized: "Try again", table: "Identity"), systemImage: "exclamationmark.icloud", tint: .caution) {
                         viewModel.syncNow()
                     }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(colors.backgroundSecondary)
                     .accessibilityIdentifier("earlier.searchFailed")
                 }
             }
@@ -44,6 +46,8 @@ struct EarlierRecordsView: View {
                                  meta: String(localized: "Answer now", table: "Identity"), systemImage: "exclamationmark.icloud", tint: .caution) {
                         showBulk = true
                     }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(colors.backgroundSecondary)
                     .accessibilityIdentifier("earlier.bulk")
                 }
             }
@@ -53,12 +57,14 @@ struct EarlierRecordsView: View {
                     ForEach(groups) { group in
                         groupRow(group)
                             .listRowInsets(EdgeInsets())
+                            .listRowBackground(colors.backgroundSecondary)
                     }
                     ForEach(identity.settingsOnlyGroups) { group in
                         LHRow.Browse(title: String(localized: "Settings only, no hours", table: "Identity"),
                                      meta: IdentityCopy.groupSource(group.source), systemImage: "slider.horizontal.3", tint: .neutral,
                                      showsChevron: false)
                             .listRowInsets(EdgeInsets())
+                            .listRowBackground(colors.backgroundSecondary)
                             .accessibilityIdentifier("earlier.settingsOnly")
                     }
                 }
@@ -70,6 +76,7 @@ struct EarlierRecordsView: View {
                         showRemoved = true
                     }
                     .listRowInsets(EdgeInsets())
+                    .listRowBackground(colors.backgroundSecondary)
                     .accessibilityIdentifier("earlier.recentlyRemoved")
                 }
             }
@@ -120,7 +127,7 @@ struct EarlierRecordsView: View {
         let glyph: String
         switch group.status {
         case .pending:
-            meta = String(localized: "\(IdentityCopy.groupSource(group.source)) · Waiting for your answer", table: "Identity")
+            meta = String(localized: "Waiting for your answer", table: "Identity")
             glyph = "questionmark.circle"
         case .spouse:
             let until = viewModel.identity.groups?.group(group.id)?.undoUntil
@@ -182,6 +189,7 @@ struct RecentlyRemovedView: View {
                         selected = item
                     }
                     .listRowInsets(EdgeInsets())
+                    .listRowBackground(colors.backgroundSecondary)
                 }
             } footer: {
                 if removed.count > 1 {

@@ -19,34 +19,35 @@ struct TodayIdentityCard: View {
     var body: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
         LHRowGroup(onPage: true) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 12) {
-                    LHRowGlyph(systemImage: glyph, tint: tint)
+            HStack(alignment: .top, spacing: 12) {
+                LHRowGlyph(systemImage: glyph, tint: tint)
+                VStack(alignment: .leading, spacing: 4) {
                     Text(text)
                         .font(.subheadline)
                         .foregroundStyle(colors.textPrimary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                if actionTitle != nil || dismissible {
-                    HStack(spacing: 12) {
-                        if let actionTitle {
-                            Button(actionTitle, action: act)
-                                .buttonStyle(LHButton.secondary)
-                                .accessibilityIdentifier("today.identity.action")
-                        }
-                        Spacer(minLength: 0)
-                        if dismissible {
-                            Button(String(localized: "Not now", table: "Identity")) {
-                                withAnimation(AppAnimation.quick) { viewModel.identity.dismissNotice(notice) }
+                    if actionTitle != nil || dismissible {
+                        // Text actions under the words, leading: no empty band (D4).
+                        HStack(spacing: 20) {
+                            if let actionTitle {
+                                Button(actionTitle, action: act)
+                                    .buttonStyle(LHButton.tertiary)
+                                    .accessibilityIdentifier("today.identity.action")
                             }
-                            .buttonStyle(LHButton.tertiary)
-                            .accessibilityIdentifier("today.identity.dismiss")
+                            if dismissible {
+                                Button(String(localized: "Not now", table: "Identity")) {
+                                    withAnimation(AppAnimation.quick) { viewModel.identity.dismissNotice(notice) }
+                                }
+                                .buttonStyle(LHButton.tertiary)
+                                .accessibilityIdentifier("today.identity.dismiss")
+                            }
                         }
                     }
-                    .padding(.leading, 48)
                 }
             }
-            .padding(16)
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, actionTitle != nil || dismissible ? 2 : 14)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("today.identity.\(notice.id)")

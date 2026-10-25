@@ -53,7 +53,10 @@ def prop_key(p):
 def zone_value(v):
     if v is None:
         return None
+    # Swift encodes `.date(Date)` as {"date": {"_0": <seconds since 2001>}}.
     (kind, value), = v.items()
+    if isinstance(value, dict) and "_0" in value:
+        value = value["_0"]
     return value
 
 

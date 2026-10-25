@@ -6,15 +6,16 @@ import SwiftUI
 // export still says who it is for.
 
 struct YourNameRow: View {
-    var onTap: () -> Void
     @EnvironmentObject private var viewModel: AppViewModel
+    @State private var showName = false
 
     var body: some View {
         LHRow.Browse(title: String(localized: "Your name", table: "Identity"),
-                     meta: String(localized: "Shown on your reports as “Prepared for”", table: "Identity"),
+                     meta: String(localized: "On your reports", table: "Identity"),
                      value: viewModel.userName.isEmpty ? String(localized: "Optional", table: "Identity") : viewModel.userName,
-                     systemImage: "person.text.rectangle", tint: .neutral, action: onTap)
+                     systemImage: "person.text.rectangle", tint: .neutral) { showName = true }
             .accessibilityIdentifier("settings.yourName")
+            .sheet(isPresented: $showName) { YourNameSheet().environmentObject(viewModel) }
     }
 }
 

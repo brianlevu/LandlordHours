@@ -15,7 +15,6 @@ struct ICloudRecordsSection: View {
     @ObservedObject private var identity: IdentityCoordinator
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.openURL) private var openURL
-    @State private var showName = false
 
     init(viewModel: AppViewModel, onDeleteData: @escaping () -> Void) {
         self.onDeleteData = onDeleteData
@@ -58,7 +57,7 @@ struct ICloudRecordsSection: View {
                 .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 16))
                 .accessibilityIdentifier("settings.earlierRecords")
             }
-            YourNameRow { showName = true }
+            YourNameRow()
                 .listRowInsets(EdgeInsets())
             LHRow.Browse(title: String(localized: "Delete all data", table: "Identity"),
                          meta: deleteMeta, systemImage: "trash", tint: .caution, action: onDeleteData)
@@ -74,7 +73,6 @@ struct ICloudRecordsSection: View {
                 .foregroundStyle(colors.textSecondary)
         }
         .listRowBackground(colors.backgroundSecondary)
-        .sheet(isPresented: $showName) { YourNameSheet().environmentObject(viewModel) }
         .onAppear { identity.refresh(sync: sync) }
         .onChange(of: sync.isSyncing) { _, _ in identity.updateStatus(sync) }
         .onChange(of: sync.accountState) { _, _ in identity.updateStatus(sync) }
@@ -83,8 +81,7 @@ struct ICloudRecordsSection: View {
 
     private var syncMeta: String {
         if identity.status == .syncing { return String(localized: "Syncing…", table: "Identity") }
-        if case .on(let date) = identity.status { return IdentityCopy.lastSynced(date) }
-        return String(localized: "Send and get the latest from iCloud", table: "Identity")
+        return String(localized: "Send and get the latest", table: "Identity")
     }
 
     private var earlierMeta: String {
@@ -97,8 +94,8 @@ struct ICloudRecordsSection: View {
 
     private var deleteMeta: String {
         identity.status == .off
-            ? String(localized: "Removes everything on this iPhone", table: "Identity")
-            : String(localized: "Removes everything on this iPhone and in your iCloud", table: "Identity")
+            ? String(localized: "Everything on this iPhone", table: "Identity")
+            : String(localized: "This iPhone and your iCloud", table: "Identity")
     }
 }
 
@@ -127,9 +124,9 @@ struct ICloudStatusRow: View {
         switch s {
         case .on(let date): return IdentityCopy.lastSynced(date)
         case .syncing: return String(localized: "Syncing…", table: "Identity")
-        case .off: return String(localized: "Your hours are only on this iPhone.", table: "Identity")
-        case .restricted: return String(localized: "This iCloud account can’t be used for sync.", table: "Identity")
-        case .problem: return String(localized: "Your records are safe on this iPhone.", table: "Identity")
+        case .off: return String(localized: "Only on this iPhone", table: "Identity")
+        case .restricted: return String(localized: "Can’t be used for sync", table: "Identity")
+        case .problem: return String(localized: "Safe on this iPhone", table: "Identity")
         }
     }
 
@@ -187,7 +184,7 @@ struct ICloudRecordsView: View {
                         if let url = identity.backupURL {
                             ShareLink(item: url) {
                                 LHRow.Browse(title: String(localized: "Export the update backup", table: "Identity"),
-                                             meta: String(localized: "A copy of what this iPhone held before 2.2", table: "Identity"),
+                                             meta: String(localized: "What this iPhone held before", table: "Identity"),
                                              systemImage: "square.and.arrow.up", tint: .neutral, showsChevron: false) {}
                             }
                             .accessibilityIdentifier("icloud.exportBackup")

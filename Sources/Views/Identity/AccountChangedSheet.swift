@@ -24,16 +24,18 @@ struct AccountChangedSheet: View {
                 Text(String(localized: "Your \(IdentityCopy.hours(viewModel.timeEntries.reduce(0) { $0 + $1.hours })) at \(IdentityCopy.rentals(viewModel.properties.count)) are still on this iPhone. What should happen to them?", table: "Identity"))
                     .font(.body)
                     .foregroundStyle(colors.textSecondary)
+                VStack(alignment: .leading, spacing: 0) {
+                    Button(String(localized: "Use this iCloud’s records instead", table: "Identity")) { choose(.useThisICloud) }
+                        .buttonStyle(LHButton.tertiary)
+                        .disabled(working)
+                        .accessibilityIdentifier("identity.account.useThis")
+                    Button(String(localized: "Decide later", table: "Identity")) { later() }
+                        .buttonStyle(LHButton.tertiary)
+                        .accessibilityIdentifier("identity.account.later")
+                }
             }
             .padding(.top, 4)
         } footer: {
-            Button(String(localized: "Use this iCloud’s records instead", table: "Identity")) { choose(.useThisICloud) }
-                .buttonStyle(LHButton.tertiary)
-                .disabled(working)
-                .accessibilityIdentifier("identity.account.useThis")
-            Button(String(localized: "Decide later", table: "Identity")) { later() }
-                .buttonStyle(LHButton.tertiary)
-                .accessibilityIdentifier("identity.account.later")
             Button(String(localized: "Keep them with this iCloud", table: "Identity")) { choose(.keepWithThisICloud) }
                 .buttonStyle(LHButton.primary)
                 .disabled(working)
@@ -84,13 +86,13 @@ struct ZoneGoneSheet: View {
                 Text(String(localized: "Keep this iPhone’s copy and put it back in iCloud, or delete it here too?", table: "Identity"))
                     .font(.body)
                     .foregroundStyle(colors.textSecondary)
+                Button(String(localized: "Delete here too", table: "Identity"), role: .destructive) { confirmDelete = true }
+                    .buttonStyle(LHButton.destructiveTertiary)
+                    .disabled(working)
+                    .accessibilityIdentifier("identity.zoneGone.delete")
             }
             .padding(.top, 4)
         } footer: {
-            Button(String(localized: "Delete here too", table: "Identity"), role: .destructive) { confirmDelete = true }
-                .buttonStyle(LHButton.destructiveTertiary)
-                .disabled(working)
-                .accessibilityIdentifier("identity.zoneGone.delete")
             Button(String(localized: "Keep and put back in iCloud", table: "Identity")) {
                 working = true
                 Task {
