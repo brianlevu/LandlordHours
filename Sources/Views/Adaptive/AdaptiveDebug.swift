@@ -99,7 +99,7 @@ enum AdaptiveSnapshotter {
     static let foldBand: CGFloat = 24
 
     nonisolated static func division(for size: CGSize) -> PaneDivision? {
-        let key = "\(Int(size.width))x\(Int(size.height))"
+        let key = "\(Int(size.width.rounded()))x\(Int(size.height.rounded()))"
         guard MainActor.assumeIsolated({ duoSizes.contains(key) }) else { return nil }
         if size.width > size.height {
             return PaneDivision(rect: CGRect(x: (size.width - foldBand) / 2, y: 0, width: foldBand, height: size.height))
@@ -167,7 +167,7 @@ enum AdaptiveSnapshotter {
         for dark in [false, true] {
             let tag = dark ? "dark" : "light"
             for shot in shots {
-                if shot.duo { duoSizes.insert("\(Int(shot.size.width))x\(Int(shot.size.height))") }
+                if shot.duo { duoSizes.insert("\(Int(shot.size.width.rounded()))x\(Int(shot.size.height.rounded()))") }
                 AdaptiveSnapshotSelection.args = shot.args
                 let w = makeWindow(size: shot.size, dark: dark, category: shot.category, insets: shot.insets, scene: scene)
                 try? await Task.sleep(for: .seconds(shot.args["route"] == nil ? 2.8 : 4.0))
