@@ -90,3 +90,66 @@ struct LogSparkle: View {
             .accessibilityHidden(true)
     }
 }
+
+// MARK: Sheet chrome
+
+/// `LHSheet` (§1.20) with one difference: the header and the footer are backed by the sheet's own
+/// opaque surface, so rows that scroll beneath them (when a row opens or the keyboard rises) never
+/// show through the title or the Log button. The spec is `LHSheet`'s: a 56pt header with the title
+/// and a `.icon` close at the trailing edge, gutter 20, the pinned footer inset 16. (Blocker note
+/// for package A: give `LHSheet` this backing, then this type is deleted.)
+struct LogSheetChrome<Content: View, Footer: View>: View {
+    let title: String
+    var subtitle: String? = nil
+    var onClose: () -> Void
+    @ViewBuilder var content: Content
+    @ViewBuilder var footer: Footer
+
+    @Environment(\.colorScheme) private var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        ScrollView {
+            content
+                .padding(.horizontal, LHMetrics.gutter)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .top, spacing: 0) { header }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 4) { footer }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
+                .background(colors.backgroundSecondary.ignoresSafeArea(edges: .bottom))
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(colors.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(colors.textSecondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button(action: onClose) { Image(systemName: "xmark") }
+                .buttonStyle(LHButton.icon)
+                .accessibilityLabel(String(localized: "sheet.close", defaultValue: "Close", table: "Foundations"))
+                .accessibilityIdentifier("sheet.close")
+        }
+        .padding(.horizontal, LHMetrics.gutter)
+        .padding(.top, 12)
+        .padding(.bottom, 4)
+        .frame(minHeight: 56)
+        .background(colors.backgroundSecondary)
+    }
+}

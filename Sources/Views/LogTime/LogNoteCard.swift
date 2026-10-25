@@ -12,6 +12,9 @@ struct LogTextField: View {
     let placeholder: String
     @Binding var text: String
     var multiline = false
+    /// A note that is done (the rows have unfolded and the keyboard is down) shrinks to its text,
+    /// so the rows get the room; empty or focused it is the spec's 104.
+    var compact = false
     var focus: FocusState<Bool>.Binding
     var label: String
     var identifier: String
@@ -29,7 +32,7 @@ struct LogTextField: View {
         .font(.body)
         .foregroundStyle(colors.textPrimary)
         .tint(colors.action)
-        .lineLimit(multiline ? 3...8 : 1...1)
+        .lineLimit(multiline ? (compact ? 1...8 : 3...8) : 1...1)
         .focused(focus)
         .submitLabel(submitLabel)
         .onSubmit { onSubmit?() }
@@ -38,7 +41,7 @@ struct LogTextField: View {
         .accessibilityIdentifier(identifier)
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .frame(maxWidth: .infinity, minHeight: multiline ? LHField.multilineMinHeight : LHField.height,
+        .frame(maxWidth: .infinity, minHeight: multiline && !compact ? LHField.multilineMinHeight : LHField.height,
                alignment: multiline ? .topLeading : .leading)
         .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
         .overlay(
@@ -61,7 +64,8 @@ extension LogTimeSheet {
     }
 
     var noteField: some View {
-        LogTextField(placeholder: notePlaceholder, text: $form.note, multiline: true, focus: $noteFocused,
+        LogTextField(placeholder: notePlaceholder, text: $form.note, multiline: true,
+                     compact: unfolded && !noteFocused && !form.note.isEmpty, focus: $noteFocused,
                      label: lt("Note"), identifier: "log.note")
     }
 

@@ -397,6 +397,9 @@ final class LogTimeUITests: XCTestCase {
         Shot(name: "ai-partial", seed: "four", extra: ["-LHOpenLog", "aiPartial", "-LHNoteModel", "fake"], waitFor: "log.fill.caption", settle: 1.5),
         Shot(name: "ai-two-rentals", seed: "four", extra: ["-LHOpenLog", "aiTwoRentals", "-LHNoteModel", "fake"], waitFor: "log.propertyHint", settle: 1.5),
         Shot(name: "ai-rules-only", seed: "four", extra: ["-LHOpenLog", "aiNote", "-LHNoteModel", "unavailable"], waitFor: "log.fill.caption", settle: 1.5),
+        Shot(name: "picker-category", seed: "four", extra: ["-LHOpenLog", "pickerCategory"], waitFor: "picker.category", settle: 2),
+        Shot(name: "picker-property", seed: "four", extra: ["-LHOpenLog", "pickerProperty"], waitFor: "picker.property", settle: 2),
+        Shot(name: "pane-probe", seed: "four", extra: ["-LHOpenLog", "nfModel", "-LHLogPlacement", "pane"], waitFor: "log.fill.caption"),
         Shot(name: "today-timer-running", seed: "four", extra: ["-LHTodayTimer", "running"], waitFor: "today.timer.stop", settle: 2),
         Shot(name: "today-timer-draft", seed: "four", extra: ["-LHTodayTimer", "draft"], waitFor: "today.timerDraft", settle: 2),
         Shot(name: "today-timer-discarded", seed: "four", extra: ["-LHTodayTimer", "discarded"], waitFor: "shell.toast", settle: 1),
@@ -446,6 +449,8 @@ final class LogTimeUITests: XCTestCase {
 
     func testCaptureNoteFirstLightDefault() { captureNoteFirst(scheme: "light", size: nil) }
     func testCaptureNoteFirstDarkDefault() { captureNoteFirst(scheme: "dark", size: nil) }
+    func testCaptureNoteFirstLightXXL() { captureNoteFirst(scheme: "light", size: "xxl") }
+    func testCaptureNoteFirstDarkXXL() { captureNoteFirst(scheme: "dark", size: "xxl") }
     func testCaptureNoteFirstLightAX3() { captureNoteFirst(scheme: "light", size: "ax3") }
     func testCaptureNoteFirstDarkAX3() { captureNoteFirst(scheme: "dark", size: "ax3") }
     func testCaptureNoteFirstLightAX5() { captureNoteFirst(scheme: "light", size: "ax5", only: ["01-initial", "03-model-landed", "05-two-rentals", "07a-inline-edit-hours", "06a-zero-property"]) }
@@ -488,6 +493,20 @@ final class LogTimeUITests: XCTestCase {
         case "ax5": return ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         default: return []
         }
+    }
+
+    /// Package E (v2): the states the note-first set does not cover, light and dark, default / XXL / AX3.
+    func testCaptureV2Extras() {
+        let names: Set<String> = ["log-filled-spouse", "log-not-counted", "log-save-failed", "log-keyboard", "log-voice-denied",
+                                  "log-voice-first", "timer-idle", "timer-running", "picker-category", "picker-property",
+                                  "today-timer-running", "today-timer-draft"]
+        for scheme in ["light", "dark"] {
+            for size in [nil, "xxl", "ax3"] as [String?] { captureAll(scheme: scheme, size: size, names: names) }
+        }
+    }
+
+    func testCapturePaneProbe() {
+        for scheme in ["light", "dark"] { captureAll(scheme: scheme, size: nil, names: ["pane-probe"]) }
     }
 
     /// The states a fix touched, in every scheme and size.

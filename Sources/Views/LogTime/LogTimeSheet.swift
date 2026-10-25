@@ -128,7 +128,7 @@ struct LogTimeSheet: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            LHSheet(title, subtitle: subtitle, onClose: onClose) {
+            LogSheetChrome(title: title, subtitle: subtitle, onClose: onClose) {
                 VStack(alignment: .leading, spacing: 16) {
                     switch mode {
                     case .timerIdle: timerIdle
@@ -136,16 +136,8 @@ struct LogTimeSheet: View {
                     default: logContent
                     }
                 }
-                .padding(.top, 4)
             } footer: {
-                // Solid under the pinned button, so rows scrolling beneath it never show through.
                 footerContent
-                    .background(alignment: .top) {
-                        colors.backgroundSecondary
-                            .padding(.top, -8)
-                            .padding(.horizontal, -16)
-                            .ignoresSafeArea(edges: .bottom)
-                    }
             }
             .onChange(of: expanded) { _, field in
                 guard let field else { return }

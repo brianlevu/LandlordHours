@@ -177,7 +177,7 @@ final class LogButtonWordsTests: XCTestCase {
         let text = LogTimeFormat.buttonTitle(form: form, properties: [pine]).replacingOccurrences(of: "\u{00A0}", with: " ")
         XCTAssertEqual(text, "Log 1h at Pine Cabin · Yesterday")
         let ax = LogTimeFormat.buttonTitle(form: form, properties: [pine], ax: true).replacingOccurrences(of: "\u{00A0}", with: " ")
-        XCTAssertEqual(ax, "Log 1h at Pine Cabin Yesterday")
+        XCTAssertEqual(ax, "Log 1h at Pine Cabin", "at AX the day stays on the Date row")
     }
 
     func testFirstRunNamesBothThings() {

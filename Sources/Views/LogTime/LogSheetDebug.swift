@@ -281,7 +281,10 @@ enum LogShellDebug {
             case "running":
                 if let pine { app.restoreTimer(propertyId: pine.id, category: .repairs, startTime: Date().addingTimeInterval(-42)) }
             case "draft":
-                LogSheetDebug.seedStoppedDraft(properties: app.properties, elapsed: 3600 + 12 * 60)
+                // After the launch's own profile set-up, so the draft lands under the profile's key.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    LogSheetDebug.seedStoppedDraft(properties: app.properties, elapsed: 3600 + 12 * 60)
+                }
             case "discarded":
                 if let pine { app.restoreTimer(propertyId: pine.id, category: .repairs, startTime: Date().addingTimeInterval(-42)) }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {

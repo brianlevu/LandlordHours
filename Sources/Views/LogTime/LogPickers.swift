@@ -19,7 +19,8 @@ struct LogCategoryPicker: View {
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
-        LHSheet(lt("Kind of work"), onClose: { dismiss() }) {
+        LogSheetChrome(title: lt("Kind of work"), onClose: { dismiss() }) {
+            
             VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: columns), spacing: 12) {
                     ForEach(LogCategoryGroups.counted, id: \.self) { category in
@@ -38,7 +39,8 @@ struct LogCategoryPicker: View {
                     LHFootnote(lt("Investor work. Log it for your records; it never counts toward your hours."))
                 }
             }
-            .padding(.top, 8)
+        } footer: {
+            EmptyView()
         }
         .sensoryFeedback(.impact(weight: .light), trigger: pickTick)
         .accessibilityIdentifier("picker.category")
@@ -121,7 +123,8 @@ struct LogPropertyPicker: View {
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
-        LHSheet(lt("Which rental?"), onClose: { dismiss() }) {
+        LogSheetChrome(title: lt("Which rental?"), onClose: { dismiss() }) {
+            
             VStack(spacing: 0) {
                 ForEach(Array(properties.enumerated()), id: \.element.id) { index, property in
                     row(property, index: index)
@@ -140,7 +143,8 @@ struct LogPropertyPicker: View {
                 }
             }
             .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
-            .padding(.top, 8)
+        } footer: {
+            EmptyView()
         }
         .sensoryFeedback(.impact(weight: .light), trigger: pickTick)
         .proPaywall($paywall)

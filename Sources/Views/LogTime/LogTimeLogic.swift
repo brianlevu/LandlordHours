@@ -563,7 +563,7 @@ enum LogTimeFormat {
     /// What the Log button says it will do: hours and rental (plus the day when it isn't today),
     /// or the first thing still missing. The button is never dead; tapping a gap opens that editor.
     /// Spaces inside each phrase are non-breaking, so a wrapped label breaks before "at", never
-    /// inside "Pine Cabin". At AX sizes the day follows on its own line, no separator to strand.
+    /// inside "Pine Cabin". At AX sizes the day is left off (the Date row says it).
     static func buttonTitle(form: LogForm, properties: [RentalProperty], firstRunName: String? = nil,
                             now: Date = Date(), calendar: Calendar = .current, ax: Bool = false) -> String {
         switch form.gap(properties: properties, firstRunName: firstRunName) {
@@ -581,9 +581,9 @@ enum LogTimeFormat {
                 let name = properties.first { $0.id == form.propertyId }?.name ?? ""
                 text = nb(lt("Log \(hoursText)")) + " " + nb(lt("at \(name)"))
             }
-            if !calendar.isDate(form.date, inSameDayAs: now) {
-                let day = dayWord(form.date, now: now, calendar: calendar)
-                text += ax ? " " + day : "\u{00A0}\u{00B7} " + day
+            // At accessibility sizes the day stays on the Date row: the button keeps to two lines.
+            if !ax, !calendar.isDate(form.date, inSameDayAs: now) {
+                text += "\u{00A0}\u{00B7} " + dayWord(form.date, now: now, calendar: calendar)
             }
             return text
         }
