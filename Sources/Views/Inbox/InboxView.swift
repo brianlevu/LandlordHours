@@ -524,12 +524,15 @@ private struct InboxEmptyPage: View {
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     private var ax: Bool { typeSize.isAccessibilitySize }
 
-    /// The Inbox's empty state is a hero screen (§H.5): the same frame as Today's (44.6% of the
-    /// window at default, 33.7% at accessibility sizes), so the house owns the page.
+    /// The Inbox's empty state is a hero screen (§H.5): the same frame as Today's (capped at 36% of the
+    /// window for the frame, so the art stays under 28%).
     private var side: CGFloat {
         guard window.width > 0 else { return CraftHeroSize.minimumDioramaSide }
-        return max(CraftHeroSize.minimumDioramaSide,
-                   CraftHeroSize.hero(windowWidth: window.width, windowHeight: window.height, accessibility: ax))
+        // Conductor ruling 2026-10-26: the Inbox house is capped (art <= 240pt and <= 28% of the
+        // window, §H.5/§1.18); the 36-46% hero band is Today's. The art is ~0.65 of the frame.
+        let capped = min(CraftHeroSize.hero(windowWidth: window.width, windowHeight: window.height, accessibility: ax),
+                         window.height * 0.36)
+        return max(CraftHeroSize.minimumDioramaSide, capped)
     }
 
     private var button: some View {
