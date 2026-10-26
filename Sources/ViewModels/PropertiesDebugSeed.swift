@@ -9,6 +9,10 @@ import Foundation
 //        twelve rentals; or Pine Cabin alone as a FREE user at the limit; or none).
 //        four/twelve are Pro; limit/empty are free. Goal REPS, spouse hours off.
 //        brian: Delaney Ct (long), Santa Ray Ave (short), Yeandle Ave (long), 0h, Pro.
+//        stages: five rentals, one per crafted stage at the 750 (Pro): 40h started, 250h frame70,
+//        400h framing, 600h half, 760h complete.
+//   -LHPropertiesLitToday 0,2  the listed rentals (by index) logged hours today, so their windows
+//                              are lit (the first recent entry moves to today; hours unchanged)
 //   -LHPropertiesGoal mp100    the material participation goal, no grouping election
 //                              (rows read "80h of 100h" / "212h · past 100h")
 extension AppViewModel {
@@ -48,6 +52,12 @@ extension AppViewModel {
             seeds = [Seed(name: "Delaney Ct", address: "1 Delaney Ct", type: .ltr, hours: 0),
                      Seed(name: "Santa Ray Ave", address: "2 Santa Ray Ave", type: .str, hours: 0),
                      Seed(name: "Yeandle Ave", address: "3 Yeandle Ave", type: .ltr, hours: 0)]
+        case "stages":
+            seeds = [Seed(name: "Birch Lane House", address: "5 Birch Ln, Pasadena", type: .ltr, hours: 40),
+                     Seed(name: "Pine Cabin", address: "88 Ridge Rd, Big Bear", type: .str, hours: 250, aliases: ["Cabin", "Big Bear"]),
+                     Seed(name: "Cedar Triplex", address: "77 Cedar Ave, Glendale", type: .ltr, hours: 400),
+                     Seed(name: "Oak Street Duplex", address: "214 Oak St, Pasadena", type: .ltr, hours: 600, aliases: ["Oak St"], home: true),
+                     Seed(name: "Harbor View 2", address: "40 Harbor Dr, Long Beach", type: .str, hours: 760)]
         case "limit": seeds = [pine]
         case "empty": seeds = []
         default: seeds = [pine, oak, lofts, maple]
@@ -55,7 +65,10 @@ extension AppViewModel {
 
         // Captures show the screen itself, not the first-run guided overlay.
         GuidedOnboardingStore.skip()
-        let pro = set == "four" || set == "twelve" || set == "brian"
+        let pro = set == "four" || set == "twelve" || set == "brian" || set == "stages"
+        let litToday: Set<Int> = arguments.firstIndex(of: "-LHPropertiesLitToday")
+            .flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
+            .map { Set($0.split(separator: ",").compactMap { Int($0) }) } ?? []
         UserDefaults.standard.set(pro, forKey: UserScope.key("isProUser"))
         UserDefaults.standard.set(pro, forKey: UserScope.key("hasPurchasedPro"))
         SubscriptionManager.shared.reload()
@@ -90,9 +103,10 @@ extension AppViewModel {
             targets[mix.last!.0] = seed.hours - assigned
             var back = 14
             if seed.hours >= 10 {
-                for r in recent {
+                for (n, r) in recent.enumerated() {
+                    let back = (n == 0 && litToday.contains(index)) ? 0 : r.4
                     newEntries.append(TimeEntry(propertyId: property.id, participant: .selfParticipant, category: r.0, hours: r.1,
-                                                date: day(r.4), notes: r.2, importSource: r.3))
+                                                date: day(back, hour: back == 0 ? 0 : 10), notes: r.2, importSource: r.3))
                     targets[r.0, default: 0] -= r.1
                 }
             }

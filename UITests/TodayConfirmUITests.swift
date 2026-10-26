@@ -17,6 +17,13 @@ final class TodayConfirmUITests: XCTestCase {
         super.tearDown()
     }
 
+    private static var todayAt3pm: String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd'T'15:00"
+        return f.string(from: Date())
+    }
+
     private func launch(limit: Int? = 3, extra: [String] = []) {
         app.terminate()
         app.launchArguments = [
@@ -25,6 +32,10 @@ final class TodayConfirmUITests: XCTestCase {
             "-LHTodayHours", "212",
             "-LHSeedSuggestions", "inbox",
             "-LHNoSwipePeek",
+            // The inbox seed is relative to "now" (the plumber is today 8-10): pin the clock to 15:00
+            // on the real day so the list is the same at any hour. Run at 00:30 the plumber was still
+            // in the future and the list had 7 items, not 8. (A fixed past date breaks logging.)
+            "-LHFixedNow", Self.todayAt3pm,
             "-LHInitialTab", "0",
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US"
@@ -33,19 +44,28 @@ final class TodayConfirmUITests: XCTestCase {
     }
 
     private var hero: XCUIElement { app.descendants(matching: .any)["today.hero"] }
+    private var number: XCUIElement { app.descendants(matching: .any)["today.number"].firstMatch }
     private var count: XCUIElement { app.descendants(matching: .any)["today.confirm.count"] }
-    private var inboxTab: XCUIElement { app.buttons["tab.inbox"] }
-    private var undo: XCUIElement { app.buttons["inbox.undo"] }
+    private var tabBar: XCUIElement { app.tabBars.firstMatch }
+    private var inboxTab: XCUIElement { tabBar.buttons["Inbox"] }
+    private var undo: XCUIElement { app.buttons["inbox.undo"].firstMatch }
     private func row(_ key: String) -> XCUIElement { app.descendants(matching: .any)["today.row.cal:debug-\(key)"] }
+    /// The row's leading circle: a button inside the row (its label is "Confirm 2 hours" or "Review and confirm").
+    private func control(_ key: String) -> XCUIElement { row(key).buttons.firstMatch }
 
-    private func badgeValue() -> String { (inboxTab.value as? String) ?? "" }
-
-    /// "… House built to 213 of 750 hours …" → 213 (the seed adds a hand-logged hour to the 212).
-    private func heroHours() -> Int {
-        let label = hero.label
-        guard let range = label.range(of: #"built to \d+ of"#, options: .regularExpression) else { return -1 }
-        return Int(String(label[range].filter(\.isNumber))) ?? -1
+    /// The Inbox tab's badge is the system's ("8 items"): the number is what must match Today's.
+    private func badgeCount() -> Int {
+        let text = (inboxTab.value as? String) ?? ""
+        return Int(text.prefix(while: \.isNumber)) ?? 0
     }
+
+    /// "To confirm · 8" → 8; the title alone ("To confirm") → 0.
+    private func countedOnToday() -> Int {
+        Int(count.label.split(separator: "·").last.map { String($0).trimmingCharacters(in: .whitespaces) } ?? "") ?? 0
+    }
+
+    /// The hero number ("213"): the seed adds a hand-logged hour to the 212.
+    private func heroHours() -> Int { Int(number.label) ?? -1 }
 
     private func waitForHeroHours(_ test: @escaping (Int) -> Bool, timeout: TimeInterval = 10) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
@@ -61,18 +81,12 @@ final class TodayConfirmUITests: XCTestCase {
         XCTAssertTrue(element.waitForExistence(timeout: 20))
         var tries = 0
         while tries < 8 {
-            let barTop = inboxTab.frame.minY
+            let barTop = tabBar.frame.minY
             if element.isHittable, element.frame.maxY < barTop - 8, element.frame.minY > 120 { break }
             app.swipeUp(velocity: .slow)
             tries += 1
         }
         Thread.sleep(forTimeInterval: 0.6)
-    }
-
-    private func drag(_ element: XCUIElement, right: Bool) {
-        let start = element.coordinate(withNormalizedOffset: CGVector(dx: right ? 0.15 : 0.85, dy: 0.5))
-        let end = element.coordinate(withNormalizedOffset: CGVector(dx: right ? 0.95 : 0.05, dy: 0.5))
-        start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .fast, thenHoldForDuration: 0)
     }
 
     private func waitFor(_ element: XCUIElement, label predicate: String, timeout: TimeInterval = 8) -> Bool {
@@ -84,101 +98,118 @@ final class TodayConfirmUITests: XCTestCase {
         launch(limit: nil)
         XCTAssertTrue(hero.waitForExistence(timeout: 20))
         bringIntoView(count)
-        XCTAssertEqual(count.label, "8 to confirm")
-        XCTAssertEqual(badgeValue(), "8 to confirm", "One number: Today's capsule is the Inbox badge")
-        XCTAssertTrue(app.buttons["today.confirm.reviewAll"].exists, "More than three: Review all 8")
-        XCTAssertEqual(app.buttons["today.confirm.reviewAll"].label, "Review all 8")
+        XCTAssertEqual(count.label, "To confirm · 8")
+        XCTAssertEqual(badgeCount(), 8, "One number: Today's count is the Inbox badge (\(inboxTab.value ?? "nil"))")
+        XCTAssertTrue(app.buttons["today.confirm.seeAll"].exists, "More than the rows hold: See all 8")
+        XCTAssertEqual(app.buttons["today.confirm.seeAll"].label, "See all 8")
     }
 
     func testConfirmFromTodayLogsBuildsTheHouseAndDropsTheBadge() {
         launch()
         XCTAssertTrue(hero.waitForExistence(timeout: 20))
         let before = heroHours()
-        XCTAssertGreaterThanOrEqual(before, 212, hero.label)
+        XCTAssertGreaterThanOrEqual(before, 212, number.label)
         bringIntoView(row("plumber"))
-        XCTAssertEqual(count.label, "3 to confirm")
-        XCTAssertEqual(badgeValue(), "3 to confirm")
+        XCTAssertEqual(count.label, "To confirm · 3")
+        XCTAssertEqual(badgeCount(), 3)
 
-        let confirm = app.buttons["inbox.confirm.cal:debug-plumber"]
+        let confirm = control("plumber")
         XCTAssertTrue(confirm.exists)
         confirm.tap()
 
         XCTAssertTrue(undo.waitForExistence(timeout: 4), "The shared Undo toast")
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Logged'")).firstMatch.exists)
-        XCTAssertTrue(waitFor(count, label: "label == '2 to confirm'"))
-        XCTAssertEqual(badgeValue(), "2 to confirm")
+        XCTAssertTrue(waitFor(count, label: "label == 'To confirm · 2'"))
+        XCTAssertEqual(badgeCount(), 2)
         XCTAssertFalse(row("plumber").exists)
         // The hero counts the confirmed hours (after its build plays).
-        XCTAssertTrue(waitForHeroHours { $0 > before }, hero.label)
+        XCTAssertTrue(waitForHeroHours { $0 > before }, number.label)
 
         // The Inbox shows the same list: the plumber is gone there too.
         inboxTab.tap()
         XCTAssertTrue(app.descendants(matching: .any)["inbox.screen"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.descendants(matching: .any)["inbox.row.cal:debug-plumber"].waitForExistence(timeout: 2))
-        XCTAssertEqual(badgeValue(), "2 to confirm")
+        XCTAssertEqual(badgeCount(), 2)
+    }
+
+    /// Today's rows have no swipe (the Inbox keeps its own): "Not rental work" is on the row's
+    /// context menu (and VoiceOver's actions).
+    /// The toast under a "Not rental work": the inbox's own ("Marked not rental work") takes the slot first
+    /// and Today's shared one ("Marked not rental work.") queues behind it, so either wording counts.
+    private var markedNotWorkToast: XCUIElement {
+        app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Marked not rental work'")).firstMatch
+    }
+
+    private func markNotRentalWork(_ key: String) {
+        row(key).press(forDuration: 1.0)
+        let notWork = app.buttons["Not rental work"].firstMatch
+        XCTAssertTrue(notWork.waitForExistence(timeout: 5), "The row's menu offers Not rental work")
+        notWork.tap()
     }
 
     func testNotRentalWorkFromTodayLeavesTheHouseAndUndoRestores() {
         launch()
         XCTAssertTrue(hero.waitForExistence(timeout: 20))
         let before = heroHours()
-        bringIntoView(row("showing"))
-        app.buttons["inbox.notWork.cal:debug-showing"].tap()
-        XCTAssertTrue(app.staticTexts["Marked not rental work"].waitForExistence(timeout: 4))
-        XCTAssertTrue(waitFor(count, label: "label == '2 to confirm'"))
-        XCTAssertEqual(badgeValue(), "2 to confirm")
-        Thread.sleep(forTimeInterval: 1.5)
-        XCTAssertEqual(heroHours(), before, "Not rental work never counts: \(hero.label)")
+        bringIntoView(row("inspection"))
+        markNotRentalWork("inspection")
+        XCTAssertTrue(markedNotWorkToast.waitForExistence(timeout: 4))
+        XCTAssertTrue(waitFor(count, label: "label == 'To confirm · 2'"))
+        XCTAssertEqual(badgeCount(), 2)
+        XCTAssertFalse(row("inspection").exists)
+        Thread.sleep(forTimeInterval: 1.0)
+        XCTAssertEqual(heroHours(), before, "Not rental work never counts: \(number.label)")
+        // Undo promptly: the toast (the inbox's own) keeps Undo for 5 s.
         undo.tap()
-        XCTAssertTrue(waitFor(count, label: "label == '3 to confirm'"))
-        XCTAssertEqual(badgeValue(), "3 to confirm")
-        XCTAssertTrue(row("showing").waitForExistence(timeout: 3))
+        XCTAssertTrue(waitFor(count, label: "label == 'To confirm · 3'"))
+        XCTAssertEqual(badgeCount(), 3)
+        XCTAssertTrue(row("inspection").waitForExistence(timeout: 3))
     }
 
-    func testSwipeRightLogsAndSwipeLeftMarksNotRentalWork() {
+    func testControlLogsAtOnceAndContextMenuMarksNotRentalWork() {
         launch()
         XCTAssertTrue(hero.waitForExistence(timeout: 20))
         bringIntoView(row("plumber"))
-        drag(row("plumber"), right: true)
-        XCTAssertTrue(undo.waitForExistence(timeout: 4), "Swipe right logs at once (complete, scheduled item)")
-        XCTAssertFalse(app.buttons["confirm.log"].waitForExistence(timeout: 1.5), "A swipe never also opens the sheet")
-        XCTAssertTrue(waitFor(count, label: "label == '2 to confirm'"))
-        XCTAssertEqual(badgeValue(), "2 to confirm")
+        control("plumber").tap()
+        XCTAssertTrue(undo.waitForExistence(timeout: 4), "The control logs at once (complete, scheduled item)")
+        XCTAssertFalse(app.buttons["confirm.log"].waitForExistence(timeout: 1.5), "Logging from the control never opens the sheet")
+        XCTAssertTrue(waitFor(count, label: "label == 'To confirm · 2'"))
+        XCTAssertEqual(badgeCount(), 2)
 
-        // Let the Undo toast go, so the next row isn't under it.
+        // Toasts queue one at a time and one with Undo stays 8 s (§1.19): let it go before the next action.
         let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: undo)
-        _ = XCTWaiter.wait(for: [gone], timeout: 8)
-        let showing = row("showing")
-        bringIntoView(showing)
-        drag(showing, right: false)
-        XCTAssertTrue(app.staticTexts["Marked not rental work"].waitForExistence(timeout: 4), "Swipe left: not rental work")
-        XCTAssertTrue(waitFor(count, label: "label == '1 to confirm'"))
-        XCTAssertEqual(badgeValue(), "1 to confirm")
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 12), .completed, "The Undo toast goes after its 8 s")
+        let inspection = row("inspection")
+        bringIntoView(inspection)
+        markNotRentalWork("inspection")
+        XCTAssertTrue(markedNotWorkToast.waitForExistence(timeout: 4), "Not rental work")
+        XCTAssertTrue(waitFor(count, label: "label == 'To confirm · 1'"))
+        XCTAssertEqual(badgeCount(), 1)
     }
 
     func testTapOpensTheConfirmSheetAndLoggingThereUpdatesToday() {
         launch()
         XCTAssertTrue(hero.waitForExistence(timeout: 20))
-        bringIntoView(row("showing"))
-        row("showing").tap()
+        bringIntoView(row("inspection"))
+        row("inspection").tap()
         let log = app.buttons["confirm.log"]
         XCTAssertTrue(log.waitForExistence(timeout: 5), "The Inbox's confirm sheet opens from Today")
         XCTAssertTrue(app.buttons["confirm.dismiss"].exists)
         XCTAssertEqual(app.buttons["confirm.dismiss"].label, "Not rental work")
         log.tap()
-        XCTAssertTrue(waitFor(count, label: "label == '2 to confirm'"))
-        XCTAssertEqual(badgeValue(), "2 to confirm")
+        XCTAssertTrue(waitFor(count, label: "label == 'To confirm · 2'"))
+        XCTAssertEqual(badgeCount(), 2)
     }
 
     func testCaughtUpAfterTheLastOne() {
         launch(limit: 1)
         XCTAssertTrue(hero.waitForExistence(timeout: 20))
         bringIntoView(row("plumber"))
-        app.buttons["inbox.confirm.cal:debug-plumber"].tap()
+        control("plumber").tap()
         let caughtUp = app.descendants(matching: .any)["today.caughtUp"]
         XCTAssertTrue(caughtUp.waitForExistence(timeout: 6))
-        XCTAssertFalse(count.exists)
-        XCTAssertEqual(badgeValue(), "")
+        XCTAssertEqual(count.label, "To confirm", "The title stays, with no count")
+        XCTAssertEqual(badgeCount(), 0)
     }
 
     func testCaughtUpWithSuggestionsOffOffersTurnOn() {
@@ -199,17 +230,5 @@ final class TodayConfirmUITests: XCTestCase {
         turnOn.tap()
         XCTAssertTrue(app.descendants(matching: .any)["capture.toggle.calendar"].waitForExistence(timeout: 5),
                       "Turn on opens the suggestions setup")
-    }
-
-    func testWeekStripReadsEachDay() {
-        launch(extra: ["-LHFixedNow", "2026-10-22T15:00", "-LHTodayWeekSample", "1.5,0,3,2"])
-        XCTAssertTrue(hero.waitForExistence(timeout: 20))
-        let total = app.descendants(matching: .any)["today.week.total"]
-        bringIntoView(total)
-        XCTAssertEqual(total.label, "6 hours 30 minutes this week")
-        XCTAssertEqual(app.buttons["today.week.day.0"].label, "Monday, 1 hour 30 minutes")
-        XCTAssertEqual(app.buttons["today.week.day.1"].label, "Tuesday, no hours")
-        XCTAssertEqual(app.buttons["today.week.day.3"].label, "Thursday, today, 2 hours")
-        XCTAssertEqual(app.buttons["today.week.day.4"].label, "Friday, not yet")
     }
 }

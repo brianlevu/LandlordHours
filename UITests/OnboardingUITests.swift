@@ -34,6 +34,21 @@ final class OnboardingUITests: XCTestCase {
         element.tap()
     }
 
+    private var tabBar: XCUIElement { app.tabBars.firstMatch }
+    private var todayTab: XCUIElement { tabBar.buttons["Today"] }
+    private var inboxTab: XCUIElement { tabBar.buttons["Inbox"] }
+
+    /// The Inbox tab's badge is the system's ("22 items"): the number is what matters.
+    private func waitForInboxBadge(_ count: Int, timeout: TimeInterval = 10) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let text = (inboxTab.value as? String) ?? ""
+            if Int(text.prefix(while: \.isNumber)) == count { return true }
+            Thread.sleep(forTimeInterval: 0.25)
+        }
+        return false
+    }
+
     private func waitForValue(_ element: XCUIElement, _ value: String, timeout: TimeInterval = 10) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
@@ -117,15 +132,16 @@ final class OnboardingUITests: XCTestCase {
         let review = app.buttons["onb-today"]
         XCTAssertEqual(review.label, "Review 22 suggestions")
         tap(review)
-        XCTAssertTrue(app.buttons["tab.inbox"].waitForExistence(timeout: 10))
-        XCTAssertTrue(waitForValue(app.buttons["tab.inbox"], "22 to confirm"),
-                      "Every hour found is in the Inbox: \(app.buttons["tab.inbox"].value ?? "nil")")
-        // The count was shown once on Staked: Today does not replay it, and keeps "35h found".
-        tap(app.buttons["tab.today"])
+        XCTAssertTrue(inboxTab.waitForExistence(timeout: 10))
+        XCTAssertTrue(waitForInboxBadge(22),
+                      "Every hour found is in the Inbox: \(inboxTab.value ?? "nil")")
+        // The count was shown once on Staked: Today does not replay it, and keeps the 22 under "To confirm".
+        tap(todayTab)
         XCTAssertFalse(app.buttons["backfill-review"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["today.hero.found"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["today.confirm.count"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["today.confirm.count"].label, "To confirm · 22", "Today keeps what was found")
         XCTAssertFalse(app.descendants(matching: .any)["guidedSetup.overlay"].exists, "No coach mark")
-        tap(app.buttons["tab.inbox"])
+        tap(inboxTab)
         // Found before the property existed, placed on it when it was saved: Confirm logs in one tap.
         let confirm = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "inbox.confirm.")).firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Every Inbox row shows Confirm")
@@ -134,7 +150,7 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Pick a property"].exists, "The only property was attached to every suggestion")
         tap(confirm)
         XCTAssertFalse(app.buttons["confirm.log"].waitForExistence(timeout: 2), "No sheet: nothing was missing")
-        XCTAssertTrue(waitForValue(app.buttons["tab.inbox"], "21 to confirm"), "Confirm logged the row")
+        XCTAssertTrue(waitForInboxBadge(21), "Confirm logged the row")
     }
 
     // MARK: Skip path: seven taps to Today
@@ -147,13 +163,15 @@ final class OnboardingUITests: XCTestCase {
         tap(app.buttons["onb-link"])                               // 5 Not now
         tap(app.buttons["onb-primary"])                            // 6 Continue
         tap(app.buttons["onb-link"])                               // 7 I'll add it later
-        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["today.hero.addProperty"].waitForExistence(timeout: 5), "The empty lot carries Add property")
-        XCTAssertTrue(app.buttons["today-find-hours"].exists, "Look at my calendar waits on Today")
+        XCTAssertTrue(todayTab.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["today.addRental"].waitForExistence(timeout: 5), "The empty lot carries Add a rental")
+        // With no rental the hero's own action carries the screen: the To confirm block (and with it
+        // the way back to the calendar) waits for the first rental.
+        XCTAssertFalse(app.descendants(matching: .any)["today.confirm"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["guidedSetup.overlay"].exists, "No coach mark")
-        XCTAssertEqual(app.staticTexts["today.header.title"].label, "Add your first property")
+        XCTAssertTrue(app.staticTexts["today.pace"].label.hasPrefix("Add a rental."), "The empty lot says what to do")
         let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); shot.name = "skip-today"; shot.lifetime = .keepAlways; add(shot)
-        tap(app.buttons["today.hero.addProperty"].firstMatch)
+        tap(app.buttons["today.addRental"].firstMatch)
         let after = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); after.name = "skip-after-tap"; after.lifetime = .keepAlways; add(after)
         XCTAssertTrue(app.textFields["property.name"].waitForExistence(timeout: 6), "The empty lot's Add property opens the form")
     }
@@ -179,7 +197,7 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["staked-setup"].label, "You’re set up to keep a record.")
         XCTAssertEqual(app.buttons["onb-today"].label, "Go to Today")
         tap(app.buttons["onb-today"])
-        XCTAssertTrue(app.buttons["today-find-hours"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["today.confirm.turnOn"].waitForExistence(timeout: 8), "Today keeps a way back to the calendar")
     }
 
     func testNotificationsDeclinedInAppNeverPrompts() {
@@ -289,7 +307,7 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["staked-setup"].waitForExistence(timeout: 8), "No visit-end note without the calendar")
         XCTAssertEqual(app.buttons["onb-today"].label, "Go to Today")
         tap(app.buttons["onb-today"])
-        XCTAssertTrue(app.buttons["today-find-hours"].waitForExistence(timeout: 8), "Today keeps a way back to the calendar")
+        XCTAssertTrue(app.buttons["today.confirm.turnOn"].waitForExistence(timeout: 8), "Today keeps a way back to the calendar")
     }
 
     // MARK: Only non-countable work found
@@ -313,8 +331,8 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["staked-found"].exists, "Never a found-hours headline")
         XCTAssertEqual(app.buttons["onb-today"].label, "Review 22 suggestions", "They still wait in the Inbox")
         tap(app.buttons["onb-today"])
-        tap(app.buttons["tab.today"])
-        XCTAssertFalse(app.staticTexts["today.hero.found"].waitForExistence(timeout: 3), "Today shows no found hours either")
+        tap(todayTab)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'found'")).firstMatch.waitForExistence(timeout: 3), "Today shows no found hours either")
         XCTAssertFalse(app.buttons["backfill-review"].exists, "No reveal for work that never counts")
     }
 }
