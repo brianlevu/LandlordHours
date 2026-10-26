@@ -449,3 +449,62 @@ final class CategoryInkTests: XCTestCase {
         }
     }
 }
+
+// MARK: - Rentals gallery: the pace line under each tile (Brian, 2026-10-26)
+
+final class RentalTilePaceTests: XCTestCase {
+    private var cal: Calendar { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "UTC")!; return c }
+    private func date(_ m: Int, _ d: Int) -> Date { cal.date(from: DateComponents(year: 2026, month: m, day: d, hour: 12))! }
+    private func pace(_ hours: Double, goal: Double = 100, record: Bool = false, now: Date? = nil, days: Int = 120) -> RentalTilePace {
+        RentalTilePace.make(hours: hours, goal: goal, isRecord: record, year: 2026, now: now ?? date(10, 26), calendar: cal, daysOfData: days)
+    }
+
+    func testDoneForTheYearOnceTheGoalIsMet() {
+        XCTAssertEqual(pace(100), RentalTilePace(text: "Done for the year", tone: .positive))
+        XCTAssertEqual(pace(112).text, "Done for the year")
+    }
+
+    func testBehindSaysByHowMuchInTheBehindTone() {
+        // 100h × 299/365 expected by Oct 26 (day 299) = 82h; 46h logged is 36h behind.
+        let p = pace(46)
+        XCTAssertEqual(p.text, "Behind by 36h")
+        XCTAssertEqual(p.tone, .behind)
+    }
+
+    func testOnPaceWhenAtOrAheadOfTheYearsPace() {
+        let p = pace(88)
+        XCTAssertEqual(p.text, "On pace")
+        XCTAssertEqual(p.tone, .positive)
+    }
+
+    func testNoPaceYetSaysWhatAWeekGetsThere() {
+        // 8h over 5 days of data: under 10h and under two weeks, so no pace; 92h over ~9.4 weeks left.
+        let p = pace(8, days: 5)
+        XCTAssertEqual(p.tone, .neutral)
+        XCTAssertTrue(p.text.hasSuffix("h a week to go"), p.text)
+        XCTAssertEqual(p.text, "10h a week to go")
+    }
+
+    func testNoHoursAndRecordAreNeutralPlainWords() {
+        XCTAssertEqual(pace(0), RentalTilePace(text: "No hours yet", tone: .neutral))
+        XCTAssertEqual(pace(30, goal: 0, record: true), RentalTilePace(text: "Keeping a record", tone: .neutral))
+        XCTAssertEqual(pace(30, record: true).text, "Keeping a record")
+    }
+
+    func testBadHoursNeverCrash() {
+        XCTAssertEqual(pace(.nan).text, "No hours yet")
+        XCTAssertEqual(pace(-5).text, "No hours yet")
+    }
+
+    func testNoTrailingFullStopsAndNoConfirmCount() {
+        for h in [0.0, 8, 46, 88, 100] { XCTAssertFalse(pace(h, days: 120).text.hasSuffix("."), "\(h)") }
+    }
+
+    func testTileHoursLineSaysTheGoalOrJustTheHours() {
+        let row = RentalRowModel(id: UUID(), name: "Santa Ray Ave", hours: 88.9, goal: 100, lit: false, kind: .str)
+        let withGoal = RentalTileModel(row: row, goal: 100, pace: pace(88))
+        XCTAssertEqual(withGoal.hoursLine, "88 of 100h")
+        XCTAssertEqual(withGoal.spoken, "Santa Ray Ave, 88 of 100h, On pace")
+        XCTAssertEqual(RentalTileModel(row: row, goal: 0, pace: pace(88, goal: 0, record: true)).hoursLine, "88h")
+    }
+}

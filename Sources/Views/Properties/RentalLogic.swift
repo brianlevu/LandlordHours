@@ -321,3 +321,89 @@ enum RentalsText {
                       defaultValue: "\(name) goes from this iPhone and iCloud. This can’t be undone.", table: "Rentals")
     }
 }
+
+// MARK: - Gallery tile (Rentals tab, decided by Brian 2026-10-26)
+
+/// The one pace line under a rental's tile: "On pace", "Behind by 36h", "10h a week to go",
+/// "Done for the year". Plain words only; the tone picks the token (positive, behind, neutral).
+struct RentalTilePace: Equatable {
+    enum Tone: Equatable { case positive, behind, neutral }
+
+    let text: String
+    let tone: Tone
+
+    static func make(hours: Double, goal: Double, isRecord: Bool, year: Int, now: Date,
+                     calendar: Calendar = .current, daysOfData: Int) -> RentalTilePace {
+        let hours = hours.isFinite ? max(0, hours) : 0
+        if isRecord || goal <= 0 {
+            return RentalTilePace(text: RentalsText.tilePaceRecord, tone: .neutral)
+        }
+        if hours >= goal {
+            return RentalTilePace(text: RentalsText.tilePaceDone, tone: .positive)
+        }
+        if hours <= 0 {
+            return RentalTilePace(text: RentalsText.tilePaceNone, tone: .neutral)
+        }
+        if !TodayHeroCopy.paceIsReady(hours: hours, daysOfData: daysOfData) {
+            let weeks = TodayPaceCards.weeksLeft(now: now, calendar: calendar)
+            let weekly = max(1, Int((max(goal - hours, 0) / weeks).rounded(.up)))
+            return RentalTilePace(text: RentalsText.tilePaceWeekly(weekly), tone: .neutral)
+        }
+        let sentence = TodayPaceSentence.make(.init(hours: hours, goal: goal, year: year, now: now,
+                                                    calendar: calendar, isRecord: false, paceReady: true))
+        var lead = sentence.lead ?? sentence.rest
+        if lead.hasSuffix(".") { lead.removeLast() }
+        return RentalTilePace(text: lead, tone: sentence.tone == .behind ? .behind : .positive)
+    }
+}
+
+/// Everything one gallery tile says.
+struct RentalTileModel: Identifiable, Equatable {
+    let row: RentalRowModel
+    /// The goal in whole hours; 0 for "just keep a record" (the tile shows the hours alone).
+    let goal: Int
+    let pace: RentalTilePace
+
+    var id: UUID { row.id }
+
+    /// "88 of 100h"; "88h" with no goal.
+    var hoursLine: String {
+        goal > 0 ? RentalsText.tileOfGoal(row.wholeHours, goal) : row.value
+    }
+
+    /// VoiceOver: "Santa Ray Ave, 88 of 100h, On pace".
+    var spoken: String { RentalsText.tileSpoken(name: row.name, hours: hoursLine, pace: pace.text) }
+}
+
+extension AppViewModel {
+    func rentalTiles(now: Date = InboxClock.now(), year: Int? = nil) -> [RentalTileModel] {
+        let y = year ?? Calendar.current.component(.year, from: now)
+        let target = houseGoal.targetHours
+        let isRecord = GoalManager.shared.goalChoice == .record
+        let calendar = Calendar.current
+        return rentalRows(now: now, year: y).map { row in
+            let entries = propertyCountableEntries(row.id, goal: houseGoal, year: y)
+            let pace = RentalTilePace.make(hours: row.hours, goal: target, isRecord: isRecord, year: y, now: now,
+                                           calendar: calendar,
+                                           daysOfData: RentalWeek.daysOfData(entries: entries, year: y, now: now, calendar: calendar))
+            return RentalTileModel(row: row, goal: isRecord ? 0 : Int(target.rounded()), pace: pace)
+        }
+    }
+}
+
+extension RentalsText {
+    /// "88 of 100h".
+    static func tileOfGoal(_ whole: Int, _ goal: Int) -> String {
+        String(localized: "rentals.tile.ofGoal", defaultValue: "\(whole) of \(goal)h", table: "Rentals")
+    }
+    static var tilePaceDone: String { String(localized: "rentals.tile.pace.done", defaultValue: "Done for the year", table: "Rentals") }
+    static var tilePaceNone: String { String(localized: "rentals.tile.pace.none", defaultValue: "No hours yet", table: "Rentals") }
+    static var tilePaceRecord: String { String(localized: "rentals.tile.pace.record", defaultValue: "Keeping a record", table: "Rentals") }
+    /// "10h a week to go".
+    static func tilePaceWeekly(_ n: Int) -> String {
+        String(localized: "rentals.tile.pace.weekly", defaultValue: "\(n)h a week to go", table: "Rentals")
+    }
+    static func tileSpoken(name: String, hours: String, pace: String) -> String {
+        String(localized: "rentals.tile.spoken", defaultValue: "\(name), \(hours), \(pace)", table: "Rentals")
+    }
+}

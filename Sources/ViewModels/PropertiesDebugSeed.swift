@@ -30,7 +30,7 @@ extension AppViewModel {
         TaxProfileManager.shared.spouseTracking = false
         TaxProfileManager.shared.groupingElection = false
 
-        struct Seed { let name: String; let address: String; let type: PropertyType; let hours: Double; var aliases: [String] = []; var home = false }
+        struct Seed { let name: String; let address: String; let type: PropertyType; let hours: Double; var aliases: [String] = []; var home = false; var fresh = false }
         let pine = Seed(name: "Pine Cabin", address: "88 Ridge Rd, Big Bear", type: .str, hours: 212, aliases: ["Cabin", "Big Bear"])
         let oak = Seed(name: "Oak Street Duplex", address: "214 Oak St, Pasadena", type: .ltr, hours: 520, aliases: ["Oak St", "The duplex"], home: true)
         let lofts = Seed(name: "The Arroyo Seco Schoolhouse Lofts, Unit 4B", address: "1 Arroyo Blvd, Pasadena", type: .ltr, hours: 128)
@@ -58,14 +58,33 @@ extension AppViewModel {
                      Seed(name: "Cedar Triplex", address: "77 Cedar Ave, Glendale", type: .ltr, hours: 400),
                      Seed(name: "Oak Street Duplex", address: "214 Oak St, Pasadena", type: .ltr, hours: 600, aliases: ["Oak St"], home: true),
                      Seed(name: "Harbor View 2", address: "40 Harbor Dr, Long Beach", type: .str, hours: 760)]
+        case "layouts1", "layouts3", "layouts8":
+            // proto/rentals-layouts (throwaway mock): Brian's three at different stages against
+            // the 100h goal (run with -LHPropertiesGoal mp100), and an 8-rental spread.
+            // Pine Cabin is "fresh": a week of data under 10h, so its pace isn't ready yet.
+            let santa = Seed(name: "Santa Ray Ave", address: "2 Santa Ray Ave", type: .str, hours: 88)
+            let delaney = Seed(name: "Delaney Ct", address: "1 Delaney Ct", type: .ltr, hours: 46)
+            let cabin = Seed(name: "Pine Cabin", address: "88 Ridge Rd, Big Bear", type: .str, hours: 8, fresh: true)
+            switch set {
+            case "layouts1": seeds = [delaney]
+            case "layouts3": seeds = [santa, delaney, cabin]
+            default:
+                seeds = [santa, delaney, cabin,
+                         Seed(name: "Oak Street Duplex", address: "214 Oak St, Pasadena", type: .ltr, hours: 112),
+                         Seed(name: "Cedar Triplex", address: "77 Cedar Ave", type: .ltr, hours: 55),
+                         Seed(name: "Harbor View 2", address: "40 Harbor Dr", type: .str, hours: 64),
+                         Seed(name: "The Arroyo Seco Schoolhouse Lofts, Unit 4B", address: "1 Arroyo Blvd", type: .ltr, hours: 21),
+                         Seed(name: "Birch Lane House", address: "5 Birch Ln", type: .ltr, hours: 0)]
+            }
         case "limit": seeds = [pine]
+        case "limit2": seeds = [pine, oak]
         case "empty": seeds = []
         default: seeds = [pine, oak, lofts, maple]
         }
 
         // Captures show the screen itself, not the first-run guided overlay.
         GuidedOnboardingStore.skip()
-        let pro = set == "four" || set == "twelve" || set == "brian" || set == "stages"
+        let pro = set == "four" || set == "twelve" || set == "brian" || set == "stages" || set.hasPrefix("layouts")
         let litToday: Set<Int> = arguments.firstIndex(of: "-LHPropertiesLitToday")
             .flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
             .map { Set($0.split(separator: ",").compactMap { Int($0) }) } ?? []
@@ -89,6 +108,19 @@ extension AppViewModel {
             property.createdAt = Date(timeIntervalSince1970: 1_760_000_000 + Double(index) * 60)
             newProperties.append(property)
             guard seed.hours > 0 else { continue }
+            if seed.fresh {
+                // Added this week: 2h chunks over the last six days, nothing older.
+                var remaining = seed.hours, back = 1
+                while remaining > 0.0001 {
+                    let h = min(2, remaining)
+                    let lit = back == 1 && litToday.contains(index)
+                    newEntries.append(TimeEntry(propertyId: property.id, participant: .selfParticipant, category: .repairs, hours: h,
+                                                date: day(lit ? 0 : back, hour: lit ? 0 : 10), notes: ""))
+                    remaining -= h
+                    back += 1
+                }
+                continue
+            }
 
             // Recent three (as the sandbox shows them), then the rest by kind of work.
             let recent: [(ActivityCategory, Double, String, String?, Int)] = seed.name == oak.name

@@ -20,8 +20,9 @@ final class PropertiesUITests: XCTestCase {
 
     // MARK: Journeys
 
+    /// Two rentals on a free plan (a downgrade): the gallery shows, with the one locked preview below it.
     func testFreeUserAtTheLimitPreviewsAndUnlockOpensThePropertyPaywall() {
-        launch(seed: "limit", extra: [])
+        launch(seed: "limit2", extra: [])
         let lock = app.buttons["lock.unlock"]
         XCTAssertTrue(lock.waitForExistence(timeout: 12), "At the free limit the locked row shows")
         XCTAssertTrue(app.staticTexts["Free covers one rental."].exists)
@@ -37,9 +38,65 @@ final class PropertiesUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["paywall.secondProperty"].waitForExistence(timeout: 8))
     }
 
+    /// Exactly one rental on the free plan: the tab IS that rental's page, and its Add rental opens
+    /// the paywall about adding a rental, with a clean back-out.
+    func testOneRentalOpensStraightToItsPageAndAddRentalHitsTheLimit() {
+        launch(seed: "limit", extra: [])
+        let hero = app.descendants(matching: .any)["property.hero"]
+        XCTAssertTrue(hero.waitForExistence(timeout: 12), "one rental: the page, not a gallery")
+        XCTAssertFalse(app.descendants(matching: .any)["properties.gallery"].exists)
+        XCTAssertTrue(hero.label.contains("Frame going up"), hero.label)
+        let add = app.buttons["properties.add"].firstMatch
+        XCTAssertTrue(add.exists, "Add rental is on the page")
+        add.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.secondProperty"].waitForExistence(timeout: 8))
+        let close = app.buttons["paywall.close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        close.tap()
+        XCTAssertTrue(hero.waitForExistence(timeout: 5), "clean back-out to the page")
+    }
+
+    /// A Pro owner with one rental: Add rental opens the sheet, and a second rental turns the tab
+    /// into the gallery.
+    func testOneRentalAddRentalOpensTheSheetForProAndTwoRentalsMakeAGallery() {
+        launch(seed: "layouts1", extra: ["-LHPropertiesGoal", "mp100"])
+        XCTAssertTrue(app.descendants(matching: .any)["property.hero"].waitForExistence(timeout: 12))
+        app.buttons["properties.add"].firstMatch.tap()
+        let name = app.textFields["property.name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        name.typeText("Cedar Court")
+        let save = app.buttons["property.save"]
+        XCTAssertTrue(save.isEnabled)
+        save.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["properties.tile.1"].waitForExistence(timeout: 10), "two rentals: the gallery")
+        XCTAssertTrue(app.descendants(matching: .any)["properties.tile.0"].exists)
+    }
+
+    /// The gallery's words: name, "46 of 100h", one pace line; a tap opens that rental's page.
+    func testGalleryTilesSayTheirWordsAndOpenTheRentalPage() {
+        launch(seed: "layouts3", extra: ["-LHPropertiesGoal", "mp100"])
+        let first = app.descendants(matching: .any)["properties.tile.0"]
+        XCTAssertTrue(first.waitForExistence(timeout: 12))
+        XCTAssertTrue(first.label.hasPrefix("Santa Ray Ave, 88 of 100h, "), first.label)
+        let second = app.descendants(matching: .any)["properties.tile.1"]
+        XCTAssertTrue(second.label.hasPrefix("Delaney Ct, 46 of 100h, "), second.label)
+        let third = app.descendants(matching: .any)["properties.tile.2"]
+        XCTAssertTrue(third.label.hasPrefix("Pine Cabin, 8 of 100h, "), third.label)
+        XCTAssertTrue(third.label.hasSuffix("a week to go"), third.label)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "3 rentals")).firstMatch.exists)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "to confirm")).firstMatch.exists, "no per-rental confirm count")
+        second.tap()
+        let hero = app.descendants(matching: .any)["property.hero"]
+        XCTAssertTrue(hero.waitForExistence(timeout: 8))
+        let title = app.descendants(matching: .any)["property.title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertTrue(title.label.contains("Delaney Ct"), "that rental's page: \(title.label)")
+    }
+
     func testProUserSeesNoLockAndAddOpensTheSheet() {
         launch(seed: "four", extra: [])
-        XCTAssertTrue(app.buttons["properties.row.0"].waitForExistence(timeout: 12))
+        XCTAssertTrue(app.buttons["properties.tile.0"].waitForExistence(timeout: 12))
         XCTAssertFalse(app.buttons["lock.unlock"].exists)
         app.buttons["properties.add"].firstMatch.tap()
         XCTAssertTrue(app.textFields["property.name"].waitForExistence(timeout: 5))
@@ -56,11 +113,11 @@ final class PropertiesUITests: XCTestCase {
         XCTAssertTrue(alert.buttons["Keep"].exists)
         alert.buttons["Keep"].tap()
         XCTAssertTrue(alert.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.descendants(matching: .any)["properties.row.0"].waitForExistence(timeout: 5), "Keep keeps the rental")
+        XCTAssertTrue(app.descendants(matching: .any)["properties.tile.0"].waitForExistence(timeout: 5), "Keep keeps the rental")
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "4 rentals")).firstMatch.exists)
 
         // Again, from the rental page: Edit, Delete rental, Delete.
-        app.descendants(matching: .any)["properties.row.0"].tap()
+        app.descendants(matching: .any)["properties.tile.0"].tap()
         let edit = app.buttons["property.edit"]
         XCTAssertTrue(edit.waitForExistence(timeout: 5))
         edit.tap()
@@ -70,7 +127,7 @@ final class PropertiesUITests: XCTestCase {
         delete.tap()
         XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 8))
         app.alerts.firstMatch.buttons["Delete"].tap()
-        XCTAssertTrue(app.descendants(matching: .any)["properties.row.0"].waitForExistence(timeout: 8), "back on the list")
+        XCTAssertTrue(app.descendants(matching: .any)["properties.tile.0"].waitForExistence(timeout: 8), "back on the list")
         XCTAssertFalse(app.staticTexts["Pine Cabin"].exists)
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "3 rentals")).firstMatch.exists)
     }
@@ -110,6 +167,30 @@ final class PropertiesUITests: XCTestCase {
         }
     }
 
+    /// The gallery at 1, 3 and 8 rentals (goal 100; Santa Ray Ave lit today), light and dark, default,
+    /// XXL and AX3. 8 is also shot scrolled to the end, to check the last tile clears the tab bar.
+    func testCaptureGallery() {
+        for scheme in ["light", "dark"] {
+            for size in [nil, "xxl", "ax3"] as [String?] {
+                var sizeArgs: [String] = []
+                if size == "xxl" { sizeArgs = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXL"] }
+                if size == "ax3" { sizeArgs = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL"] }
+                let suffix = "-\(scheme)\(size.map { "-\($0)" } ?? "")"
+                let base = ["-LHPropertiesGoal", "mp100", "-LHPropertiesLitToday", "0"] + sizeArgs
+                for (name, seed, wait, extra) in [("gallery-1", "layouts1", "property.hero", [String]()),
+                                                  ("gallery-3", "layouts3", "properties.tile.2", [String]()),
+                                                  ("gallery-8", "layouts8", "properties.tile.0", [String]()),
+                                                  ("gallery-8-bottom", "layouts8", "properties.gallery", ["-LHPropertiesScrollBottom"])] {
+                    app.terminate()
+                    launch(seed: seed, scheme: scheme, extra: base + extra)
+                    XCTAssertTrue(app.descendants(matching: .any)[wait].firstMatch.waitForExistence(timeout: 15), "\(name)\(suffix): \(wait)")
+                    Thread.sleep(forTimeInterval: 1.5)
+                    capture(name + suffix)
+                }
+            }
+        }
+    }
+
     func testCaptureLightDefault() { captureAll(scheme: "light", size: nil) }
     func testCaptureDarkDefault() { captureAll(scheme: "dark", size: nil) }
     func testCaptureLightXXL() { captureAll(scheme: "light", size: "xxl") }
@@ -125,14 +206,15 @@ final class PropertiesUITests: XCTestCase {
     }
 
     private let shots: [Shot] = [
-        Shot(name: "props-list", seed: "four", waitFor: "properties.row.0"),
-        Shot(name: "props-list-mp", seed: "four", extra: ["-LHPropertiesGoal", "mp100"], waitFor: "properties.row.0"),
-        Shot(name: "props-stages", seed: "stages", extra: ["-LHPropertiesLitToday", "1,3"], waitFor: "properties.row.4"),
+        Shot(name: "props-list", seed: "four", waitFor: "properties.tile.0"),
+        Shot(name: "props-list-mp", seed: "four", extra: ["-LHPropertiesGoal", "mp100"], waitFor: "properties.tile.0"),
+        Shot(name: "props-stages", seed: "stages", extra: ["-LHPropertiesLitToday", "1,3"], waitFor: "properties.tile.0"),
         Shot(name: "props-12", seed: "twelve", waitFor: "properties.search"),
-        Shot(name: "props-12-bottom", seed: "twelve", extra: ["-LHPropertiesScrollBottom"], waitFor: "properties.row.11"),
+        Shot(name: "props-12-bottom", seed: "twelve", extra: ["-LHPropertiesScrollBottom"], waitFor: "properties.gallery"),
         Shot(name: "props-empty", seed: "empty", waitFor: "properties.empty"),
         Shot(name: "props-loading", seed: "four", extra: ["-LHPropertiesLoading"], waitFor: "properties.loading"),
-        Shot(name: "props-limit", seed: "limit", waitFor: "lock.unlock"),
+        Shot(name: "props-limit", seed: "limit2", waitFor: "lock.unlock"),
+        Shot(name: "props-single", seed: "limit", waitFor: "property.hero"),
         Shot(name: "prop-detail", seed: "four", extra: ["-LHOpenFirstPropertyDetail", "-LHPropertiesMapLoading"], waitFor: "property.hero"),
         Shot(name: "prop-detail-lower", seed: "four", extra: ["-LHOpenFirstPropertyDetailLower"], waitFor: "property.details"),
         Shot(name: "prop-detail-520", seed: "four", extra: ["-LHOpenSecondPropertyDetail", "-LHPropertiesMapLoading"], waitFor: "property.hero"),
