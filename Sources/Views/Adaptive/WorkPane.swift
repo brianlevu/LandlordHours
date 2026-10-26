@@ -102,6 +102,13 @@ struct PaneAwareLogTime<Sheet: View>: ViewModifier {
     @Environment(\.paneContext) private var paneContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.layoutMode) private var mode
+    @Environment(\.paneFoldInset) private var foldInset
+
+    /// How far the interior wall behind Log time reaches below the card: to the bar's top edge
+    /// (measured 23–24pt on iPadOS 26.5 and 27.0, iPad Air 13"), so the tab underneath (Records'
+    /// list, say) never shows between the card and the bar. The bar itself stays uncovered.
+    static var backdropReach: CGFloat { 22 }
 
     func body(content: Content) -> some View {
         switch paneContext {
@@ -116,6 +123,15 @@ struct PaneAwareLogTime<Sheet: View>: ViewModifier {
             content
                 .overlay {
                     if let current = route {
+                        // The pane's own wall behind the card: the tab underneath is covered, not
+                        // framed (it showed around a Log time opened over Records).
+                        InteriorWall(glowCenter: mode == .stacked ? UnitPoint(x: 0.5, y: 0) : UnitPoint(x: 0, y: 0.38),
+                                     foldInset: foldInset, foldAbove: mode == .stacked)
+                            .padding(.bottom, PaneMetrics.barClearance - 12 - Self.backdropReach)
+                            .ignoresSafeArea(edges: [.top, .horizontal])
+                            .contentShape(Rectangle())
+                            .transition(.opacity)
+                            .accessibilityHidden(true)
                         sheet(current)
                             .background(background)
                             .clipShape(RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
