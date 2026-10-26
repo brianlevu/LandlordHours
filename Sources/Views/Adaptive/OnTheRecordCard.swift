@@ -72,6 +72,17 @@ struct OnTheRecordCard: View {
             .prefix(earlierCap))
     }
 
+    /// When one rental is shown and its own history runs out before the bar: the other rentals'
+    /// entries before today, newest first (at most `earlierCap`), under "Earlier at other rentals".
+    /// Real recent work, not an empty card or bare wall (D4, DU4); none on "All rentals".
+    static func earlierElsewhere(_ all: [TimeEntry], rentalID: UUID?, now: Date, calendar: Calendar = .current) -> [TimeEntry] {
+        guard let rentalID else { return [] }
+        let start = calendar.startOfDay(for: now)
+        return Array(all.filter { $0.date < start && $0.propertyId != rentalID }
+            .sorted { $0.date > $1.date }
+            .prefix(earlierCap))
+    }
+
     /// How many earlier rows fit (pure): the rows whose measured bottom, added to where the section
     /// starts, stays inside the room. 0 when not even the header and one row fit.
     static func fitCount(ends: [Int: CGFloat], candidates: Int, top: CGFloat, room: CGFloat?) -> Int {
@@ -87,7 +98,10 @@ struct OnTheRecordCard: View {
     var body: some View {
         let now = InboxClock.now()
         let today = Self.entries(viewModel.timeEntries, rentalID: rentalID, now: now)
-        let earlier = fitHeight == nil ? [] : Self.earlier(viewModel.timeEntries, rentalID: rentalID, now: now)
+        let own = fitHeight == nil ? [] : Self.earlier(viewModel.timeEntries, rentalID: rentalID, now: now)
+        let elsewhere = fitHeight == nil ? [] : Self.earlierElsewhere(viewModel.timeEntries, rentalID: rentalID, now: now)
+        let earlier = own + elsewhere
+        let ownCount = own.count
         let key = EarlierMeasure.key(earlier.map(\.id), typeSize: typeSize)
         let ends = earlierMeasure.key == key ? earlierMeasure.ends : [:]
         let shown = Self.fitCount(ends: ends, candidates: earlier.count, top: earlierTop, room: fitHeight)
@@ -128,13 +142,13 @@ struct OnTheRecordCard: View {
                 .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.space)).minY } action: { earlierTop = $0 }
                 .accessibilityHidden(true)
             if shown > 0 {
-                earlierSection(Array(earlier.prefix(shown)))
+                earlierSection(Array(earlier.prefix(shown)), ownCount: ownCount)
             }
         }
         .background(alignment: .topLeading) {
             // The off-screen measure: every candidate laid out once at the card's width.
             if !earlier.isEmpty {
-                earlierSection(earlier, measuring: true, key: key)
+                earlierSection(earlier, ownCount: ownCount, measuring: true, key: key)
                     .fixedSize(horizontal: false, vertical: true)
                     .id(key)
                     .coordinateSpace(.named("record.measure"))
@@ -147,22 +161,21 @@ struct OnTheRecordCard: View {
     }
 
     /// "Earlier" and its rows, each with its day. `measuring` reports each part's bottom.
-    @ViewBuilder private func earlierSection(_ entries: [TimeEntry], measuring: Bool = false, key: Int = 0) -> some View {
+    /// `entries` are the rental's own (the first `ownCount`) and then the other rentals'; the
+    /// "Earlier at other rentals" heading travels with the first other row, so a fit never ends on it.
+    @ViewBuilder private func earlierSection(_ entries: [TimeEntry], ownCount: Int, measuring: Bool = false, key: Int = 0) -> some View {
         VStack(spacing: 0) {
             LHDivider(leadingInset: LHMetrics.cardPadding)
-            Text(String(localized: "twoPane.record.earlier", defaultValue: "Earlier", table: "Adaptive"))
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(colors.textSecondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, LHMetrics.cardPadding)
-                .padding(.top, 14)
-                .padding(.bottom, 6)
-                .accessibilityAddTraits(.isHeader)
+            subheading(ownCount > 0 ? Self.earlierTitle : Self.earlierElsewhereTitle)
                 .modifier(MeasureEnd(index: 0, measuring: measuring) { earlierMeasure.record(key: key, index: $0, end: $1) })
             ForEach(Array(entries.enumerated()), id: \.element.id) { i, entry in
                 VStack(spacing: 0) {
+                    if ownCount > 0, i == ownCount {
+                        LHDivider(leadingInset: LHMetrics.cardPadding)
+                        subheading(Self.earlierElsewhereTitle)
+                    }
                     LHDivider(leadingInset: LHMetrics.cardPadding)
-                    row(entry, dated: true)
+                    row(entry, dated: true, withRental: i >= ownCount)
                 }
                 .modifier(MeasureEnd(index: i + 1, measuring: measuring) { earlierMeasure.record(key: key, index: $0, end: $1) })
             }
@@ -171,10 +184,29 @@ struct OnTheRecordCard: View {
         .accessibilityIdentifier(measuring ? "" : "pane.record.earlier")
     }
 
-    private func row(_ entry: TimeEntry, dated: Bool) -> some View {
+    static var earlierTitle: String {
+        String(localized: "twoPane.record.earlier", defaultValue: "Earlier", table: "Adaptive")
+    }
+
+    static var earlierElsewhereTitle: String {
+        String(localized: "twoPane.record.earlierElsewhere", defaultValue: "Earlier at other rentals", table: "Adaptive")
+    }
+
+    private func subheading(_ title: String) -> some View {
+        Text(title)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(colors.textSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, LHMetrics.cardPadding)
+            .padding(.top, 14)
+            .padding(.bottom, 6)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func row(_ entry: TimeEntry, dated: Bool, withRental: Bool = false) -> some View {
         let note = entry.notes.split(separator: "\n").first.map(String.init)?.trimmingCharacters(in: .whitespaces) ?? ""
         let title = note.isEmpty ? entry.category.inboxLabel : note
-        let rental = rentalID == nil ? viewModel.properties.first { $0.id == entry.propertyId }?.name : nil
+        let rental = (rentalID == nil || withRental) ? viewModel.properties.first { $0.id == entry.propertyId }?.name : nil
         let day = dated ? entry.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()) : nil
         let meta = [day, rental, note.isEmpty ? nil : entry.category.inboxLabel].compactMap { $0 }.joined(separator: " · ")
         return HStack(alignment: .top, spacing: 8) {

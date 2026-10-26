@@ -94,7 +94,11 @@ def card_holes(img, x0, x1, y0, y1, s, theme):
         for k in range(i, j):
             cur = cur + 1 if rows[k][1] else 0
             hole = max(hole, cur)
-        if j - i >= 24:
+        # A sliver is not a card (r2): a run under one row's height (44pt), or one the scroll edge
+        # cuts at the strip's foot under 120pt, is a card scrolled under the bar or a sheet's fade;
+        # its padding would read as a hole.
+        cut = j >= len(rows)
+        if j - i >= 44 and not (cut and j - i < 120):
             cards.append({"top": int(y0) + i, "height": j - i, "hole": hole})
         i = j
     return cards

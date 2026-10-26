@@ -127,6 +127,24 @@ final class AdaptiveLayoutTests: XCTestCase {
         XCTAssertEqual(OnTheRecordCard.fitCount(ends: m.ends, candidates: 2, top: 100, room: 400), 2)
         XCTAssertEqual(OnTheRecordCard.fitCount(ends: [:], candidates: 2, top: 100, room: 400), 0)
     }
+
+    func testEarlierElsewhereOnlyForOneRentalAndBeforeToday() {
+        let pine = UUID(), oak = UUID()
+        let cal = Calendar(identifier: .gregorian)
+        let now = cal.date(from: DateComponents(year: 2026, month: 10, day: 26, hour: 15))!
+        func entry(_ rental: UUID, daysBack: Int) -> TimeEntry {
+            TimeEntry(propertyId: rental, participant: .selfParticipant, category: .repairs, hours: 1,
+                      date: cal.date(byAdding: .day, value: -daysBack, to: now)!, notes: "")
+        }
+        let all = [entry(pine, daysBack: 1), entry(oak, daysBack: 0), entry(oak, daysBack: 2), entry(oak, daysBack: 1)]
+        let own = OnTheRecordCard.earlier(all, rentalID: pine, now: now, calendar: cal)
+        XCTAssertEqual(own.count, 1)
+        let elsewhere = OnTheRecordCard.earlierElsewhere(all, rentalID: pine, now: now, calendar: cal)
+        XCTAssertEqual(elsewhere.count, 2, "today's entry is on the record, not earlier")
+        XCTAssertTrue(elsewhere.allSatisfy { $0.propertyId == oak })
+        XCTAssertGreaterThan(elsewhere[0].date, elsewhere[1].date, "newest first")
+        XCTAssertTrue(OnTheRecordCard.earlierElsewhere(all, rentalID: nil, now: now, calendar: cal).isEmpty, "All rentals has no elsewhere")
+    }
 }
 
 private extension Suggestion {

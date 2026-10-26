@@ -49,6 +49,18 @@
         }
       }
     },
+    "twoPane.record.earlierElsewhere": {
+      "comment": "Sub-heading inside \"On the record today\" in the iPad and open-Duo work pane, after the shown rental's own earlier entries run out: other rentals' recent entries, each with its rental's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earlier at other rentals"
+          }
+        }
+      }
+    },
     "twoPane.record.empty": {
       "comment": "On the record today, when nothing is logged.",
       "extractionState": "manual",
