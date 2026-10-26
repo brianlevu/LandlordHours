@@ -139,6 +139,156 @@ struct CraftDropLedger {
     }
 }
 
+// MARK: - Reveal on return (standard §B.3 `houseReveal`; Brian, 2026-10-26)
+//
+// The house moves when the user can see it move. Today remembers, per profile, tax year and page
+// (a rental, or "All rentals"), the last state the user SAW: the stage, the windows and the
+// number. When Today becomes visible (its tab is selected, the app is active, nothing covers it),
+// it plays ONE transition from that state to the live one and stores the live one as seen. Saves
+// made elsewhere (Records, the Log time sheet, the Inbox, another device) never play where the
+// user cannot see them, and several saves while away collapse into one transition.
+
+extension CraftStage: Codable {}
+
+/// What the hero showed for one page when the user last saw it.
+struct HouseSeenState: Codable, Equatable, Sendable {
+    var stage: CraftStage
+    var lit: Bool
+    var hours: Double
+
+    init(stage: CraftStage, lit: Bool, hours: Double) {
+        self.stage = stage
+        self.lit = lit
+        self.hours = hours.isFinite ? max(0, hours) : 0
+    }
+}
+
+/// The last state the user saw, per profile, tax year and page. Stored next to the drop ledger.
+/// Only the current year's pages are kept: a new year starts with nothing seen, so the first look
+/// at a page in a new year shows it as it is.
+struct HouseSeenLedger {
+    static let baseKey = "LandlordHours.house.seen"
+
+    var defaults: UserDefaults = .standard
+    /// The profile; nil = the active one.
+    var userId: String? = UserScope.userId
+
+    private var key: String { UserScope.key(Self.baseKey, userId: userId) }
+
+    static func token(focus: String, year: Int) -> String { "\(year)_\(focus)" }
+
+    private func load() -> [String: HouseSeenState] {
+        guard let data = defaults.data(forKey: key),
+              let map = try? JSONDecoder().decode([String: HouseSeenState].self, from: data) else { return [:] }
+        return map
+    }
+
+    func seen(focus: String, year: Int) -> HouseSeenState? {
+        load()[Self.token(focus: focus, year: year)]
+    }
+
+    /// Stores `state` as seen for `focus` in `year`, and drops every other year's pages.
+    func markSeen(_ state: HouseSeenState, focus: String, year: Int) {
+        let prefix = "\(year)_"
+        var map = load().filter { $0.key.hasPrefix(prefix) }
+        map[Self.token(focus: focus, year: year)] = state
+        if let data = try? JSONEncoder().encode(map) { defaults.set(data, forKey: key) }
+    }
+
+    func reset() { defaults.removeObject(forKey: key) }
+}
+
+/// The one transition Today plays from the last-seen state to the live one.
+struct HouseRevealPlan: Equatable, Sendable {
+    enum Direction: Equatable, Sendable { case up, down, same }
+
+    let from: HouseSeenState
+    let to: HouseSeenState
+    let direction: Direction
+    /// `timberDrop` going up into framing (once per stage per rental, never under Reduce Motion);
+    /// `stageFade` for any other stage change (a quiet fade going down); `none` within a stage.
+    let stageMotion: CraftStageMotion
+    /// The windows change (on after the stage lands; off with a plain fade).
+    let windowsChange: Bool
+    /// The number rolls from the seen hours to the live ones (never under Reduce Motion: it jumps).
+    let rollsNumber: Bool
+    /// The number waits on the seen hours until the last timber lands.
+    var holdsNumberUntilSettled: Bool { stageMotion == .timberDrop }
+    /// Going down never builds in reverse: the lower still fades in with no scale settle.
+    var isQuiet: Bool { direction == .down }
+
+    /// Seconds until the hero is still again (milestones wait this long).
+    var duration: Double {
+        let stageEnd: Double
+        switch stageMotion {
+        case .none: stageEnd = 0
+        case .timberDrop: stageEnd = CraftMotion.dropFadeIn + CraftMotion.dropClip + CraftMotion.dropCrossfade
+        case .stageFade: stageEnd = CraftMotion.stageFadeDuration
+        }
+        guard windowsChange else { return max(stageEnd, rollsNumber ? 0.6 : 0) }
+        let gap = stageMotion == .timberDrop ? 0 : CraftMotion.windowsAfterSettle
+        return stageEnd + gap + CraftMotion.windowsFade
+    }
+}
+
+enum HouseReveal {
+    /// The transition from what the user last saw to the live state. nil when there is nothing to
+    /// play: the page was never seen this year (it shows as it is), or nothing changed.
+    static func plan(seen: HouseSeenState?, current: HouseSeenState, dropAllowed: Bool, reduceMotion: Bool) -> HouseRevealPlan? {
+        guard let seen, seen != current else { return nil }
+        let direction: HouseRevealPlan.Direction
+        if current.hours > seen.hours || (current.hours == seen.hours && current.stage > seen.stage) {
+            direction = .up
+        } else if current.hours < seen.hours || current.stage < seen.stage {
+            direction = .down
+        } else {
+            direction = .same
+        }
+        var motion = CraftMotion.stageMotion(from: seen.stage, to: current.stage)
+        if motion == .timberDrop && (direction != .up || !dropAllowed || reduceMotion) { motion = .stageFade }
+        return HouseRevealPlan(from: seen, to: current, direction: direction, stageMotion: motion,
+                               windowsChange: seen.lit != current.lit,
+                               rollsNumber: !reduceMotion && Int(seen.hours.rounded(.down)) != Int(current.hours.rounded(.down)))
+    }
+}
+
+/// Today's side of the rule: called each time Today is visible with the live state of the shown
+/// page. Returns the one transition to play (nil = show the page as it is) and stores the live
+/// state as seen, so the same change never plays twice.
+struct HouseRevealCoordinator {
+    var ledger = HouseSeenLedger()
+
+    @discardableResult
+    func reveal(focus: String, current: HouseSeenState, year: Int, dropAllowed: Bool, reduceMotion: Bool) -> HouseRevealPlan? {
+        let plan = HouseReveal.plan(seen: ledger.seen(focus: focus, year: year), current: current,
+                                    dropAllowed: dropAllowed, reduceMotion: reduceMotion)
+        ledger.markSeen(current, focus: focus, year: year)
+        return plan
+    }
+
+    /// What the hero should draw first for `focus`: the last-seen state when there is one to play
+    /// from, else the live state.
+    func startState(focus: String, current: HouseSeenState, year: Int) -> HouseSeenState {
+        ledger.seen(focus: focus, year: year) ?? current
+    }
+}
+
+#if DEBUG
+/// `-LHRevealProbe`: an ordered log of reveal events for UI tests ("logSheetDismissed",
+/// "reveal:timberDrop:45->47"). Today shows it as a hidden `today.revealProbe` element.
+@MainActor
+final class HouseRevealDebugLog: ObservableObject {
+    static let shared = HouseRevealDebugLog()
+    static var isEnabled: Bool { ProcessInfo.processInfo.arguments.contains("-LHRevealProbe") }
+    @Published private(set) var events: [String] = []
+
+    func record(_ event: String) {
+        guard Self.isEnabled else { return }
+        events.append(event)
+    }
+}
+#endif
+
 // MARK: - Celebrate-once ledger
 
 /// Remembers which house celebrations a profile has seen, per tax year and milestone, so a
@@ -339,6 +489,8 @@ extension AppViewModel {
             guard let i = arguments.firstIndex(of: flag), arguments.indices.contains(i + offset) else { return nil }
             return arguments[i + offset]
         }
+        // A mock scenario replaces the data: nothing on Today has been seen yet.
+        HouseSeenLedger().reset()
         if let raw = value("-LHGoalChoice"), let choice = GoalChoice(rawValue: raw) {
             GoalManager.shared.setGoalChoice(choice)
         }

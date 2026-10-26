@@ -137,6 +137,9 @@ struct ContentView: View {
     @State private var showCaptureWhatsNew = false
     /// The Log time sheet (or the timer), opened by the fifth tab, ⌘N and every 1.x "+" route.
     @State private var logRoute: LogSheetRoute?
+    /// The Log time sheet is on screen, from the moment it opens until it has finished dismissing
+    /// (`onDismiss`), so Today's reveal waits for the sheet to be gone (§B.3 `houseReveal`).
+    @State private var logSheetUp = false
     /// 2.0 surfaces: the one toast queue (Log time and the timer post to it through
     /// `AppToastCenter`), and Get help opened from the load-error toast.
     @ObservedObject private var toastCenter = LHToastCenter.shared
@@ -365,6 +368,9 @@ struct ContentView: View {
                     openLog(plusRoute)
                     return
                 }
+                #if DEBUG
+                if oldTab != .logTime, newTab != .logTime { HouseRevealDebugLog.shared.record(newTab.accessibilityIdentifier) }
+                #endif
                 // Leaving Today closes Reports or Settings, as the 1.x bar did.
                 if oldTab == .today, newTab != .today { todayRoute = .dashboard }
                 inboxModel.dismissToast()
@@ -374,7 +380,12 @@ struct ContentView: View {
             .onReceive(NotificationCenter.default.publisher(for: .openLogSheet)) { note in
                 openLog((note.object as? LogSheetRoute) ?? .log)
             }
-            .sheet(item: $logRoute) { route in
+            .sheet(item: $logRoute, onDismiss: {
+                logSheetUp = false
+                #if DEBUG
+                HouseRevealDebugLog.shared.record("logSheetDismissed")
+                #endif
+            }) { route in
                 LogTimeSheet(route: route) { logRoute = nil }
                     .environmentObject(viewModel)
                     .presentationDetents([.large])
@@ -467,9 +478,18 @@ struct ContentView: View {
     private var todayContent: some View {
         switch todayRoute {
         case .dashboard: DashboardView(inbox: inboxModel)
+            .environment(\.todayShellUncovered, todayUncovered)
         case .reports: ReportsView()
         case .settings: SettingsView()
         }
+    }
+
+    /// Nothing of the shell's covers Today: its tab is selected on the dashboard, and no shell sheet
+    /// or cover is up (the Log time sheet counts until it has finished dismissing).
+    private var todayUncovered: Bool {
+        tab == .today && todayRoute == .dashboard && logRoute == nil && !logSheetUp
+            && exportShare == nil && !showCaptureWhatsNew && shellBackfillReveal == nil && !showGetHelp
+            && viewModel.activeCelebration == nil
     }
 
     /// Each tab root: the export
@@ -537,6 +557,7 @@ struct ContentView: View {
     private func openLog(_ route: LogSheetRoute) {
         AppToastCenter.shared.dismiss()
         guard logRoute == nil else { return }
+        logSheetUp = true
         logRoute = route
     }
 }

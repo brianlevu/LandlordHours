@@ -23,7 +23,8 @@ import UIKit
 //   - a change that ends at `framing` from an earlier stage plays the 39-piece timber drop (clip
 //     fade-in 0.20, 2.0 s, crossfade 0.30), once per stage per rental (`dropAllowed`, from
 //     `CraftDropLedger`), then the knock haptic and `onStageSettled`;
-//   - any other stage change is one `stageFade` (0.25 crossfade, 0.97 → 1);
+//   - any other stage change is one `stageFade` (0.25 crossfade, 0.97 → 1); going down (an edit or
+//     a delete) is a plain 0.25 fade with no scale and never a reverse build;
 //   - the windows fade on 0.40 s after the drop's crossfade, or 0.30 s after the still settles; they
 //     are held dark through the drop (the lit clip is multiplied to the unlit still's mean luma);
 //   - Reduce Motion: no clip (the still crossfades 0.15, the knock is kept), the windows fade linear.
@@ -59,6 +60,8 @@ struct CraftHouseView: View {
     @State private var pendingStage: CraftStage?
     @State private var litTask: Task<Void, Never>?
     @State private var knock = 0
+    /// The last stage change went down (an edit or a delete): a quiet fade, no scale settle.
+    @State private var fadingDown = false
 
     init(stage: CraftStage, windowsLit: Bool, side: CGFloat, fillsStage: Bool = true, dropAllowed: Bool = true,
          onStageSettled: ((CraftStageMotion) -> Void)? = nil, onSwipe: ((Int) -> Void)? = nil) {
@@ -159,7 +162,7 @@ struct CraftHouseView: View {
         ZStack {
             stills
                 .id(displayedStage)
-                .transition(reduceMotion ? .opacity : .asymmetric(
+                .transition(reduceMotion || fadingDown ? .opacity : .asymmetric(
                     insertion: .opacity.combined(with: .scale(scale: CraftMotion.stageFadeStartScale)),
                     removal: .opacity))
             if building, let url = Self.buildClipURL(dark: dark) {
@@ -202,6 +205,7 @@ struct CraftHouseView: View {
         let from = shownStage ?? old.stage
         let fromLit = shownLit ?? old.lit
         var motion = CraftMotion.stageMotion(from: from, to: new.stage)
+        fadingDown = new.stage < from
         let wouldDrop = motion == .timberDrop
         if motion == .timberDrop && (!dropAllowed || reduceMotion || Self.buildClipURL(dark: dark) == nil) {
             motion = .stageFade
