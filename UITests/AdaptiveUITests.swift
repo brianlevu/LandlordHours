@@ -85,7 +85,11 @@ final class AdaptiveUITests: XCTestCase {
         XCTAssertTrue(count.waitForExistence(timeout: 10))
         XCTAssertFalse(app.descendants(matching: .any)["pane.filter"].exists, "All rentals shows no filter chip")
         let pine = app.buttons["shelf.Pine Cabin"]
-        if !pine.isHittable { app.descendants(matching: .any)["house.shelf"].swipeLeft() }
+        // The shelf scrolls inside the house pane: a slot past the pane's edge still reports
+        // hittable (the scroll view does not clip it for accessibility), so check the frame.
+        let shelf = app.descendants(matching: .any)["house.shelf"]
+        for _ in 0..<3 where pine.frame.maxX > shelf.frame.maxX + 1 { shelf.swipeLeft(); sleep(1) }
+        XCTAssertLessThanOrEqual(pine.frame.maxX, shelf.frame.maxX + 1, "Pine Cabin scrolls into the shelf")
         pine.tap()
         XCTAssertTrue(app.descendants(matching: .any)["pane.filter"].waitForExistence(timeout: 5), "picking a rental filters To confirm")
         app.descendants(matching: .any)["pane.filter"].tap()
