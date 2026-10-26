@@ -86,7 +86,10 @@ struct SettingsView: View {
                 supportSection
                 SettingsAccountSection(onDeleteData: { route = .deleteData })
 
+                // A section footer, not a clear row: a row at the end of an inset-grouped list is
+                // clipped by the section's corner mask, which cut the first glyph of each line.
                 Section {
+                } footer: {
                     VStack(alignment: .leading, spacing: 12) {
                         LHFootnote(HS.cpaFootnote)
                             .accessibilityIdentifier("settings.notTaxAdvice")
@@ -96,8 +99,8 @@ struct SettingsView: View {
                             .foregroundStyle(colors.textSecondary)
                             .accessibilityIdentifier("settings.version")
                     }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                    .textCase(nil)
+                    .padding(.top, 4)
                 }
 
                 #if DEBUG
@@ -829,6 +832,7 @@ struct MutedSuggestionsView: View {
                 Section {
                     LHEmptyState(
                         systemImage: "speaker.slash",
+                        tone: .action,
                         headline: HS.t("muted.empty.headline", "Nothing muted"),
                         message: HS.t("muted.empty.message", "Muted things show up here.")
                     )
@@ -923,6 +927,7 @@ struct TaxProfileView: View {
     @ObservedObject private var goalManager = GoalManager.shared
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var showWorkHoursInput = false
@@ -1150,11 +1155,38 @@ struct TaxProfileView: View {
     private var addPropertySheet: some View {
         LHSheet(HS.t("filing.add.title", "Add a rental"), onClose: { showAddProperty = false }) {
             VStack(alignment: .leading, spacing: 16) {
-                LHSegmented(
-                    [.init(PropertyType.ltr, PropertyType.ltr.fullName), .init(PropertyType.str, PropertyType.str.fullName)],
-                    selection: $newPropertyType,
-                    accessibilityLabel: HS.t("filing.add.type", "Type")
-                )
+                if typeSize.isAccessibilitySize {
+                    // Two long labels do not fit one capsule track at AX sizes: stack them.
+                    VStack(spacing: 8) {
+                        ForEach([PropertyType.ltr, PropertyType.str], id: \.self) { kind in
+                            Button { newPropertyType = kind } label: {
+                                HStack {
+                                    Text(kind.fullName)
+                                        .font(.body)
+                                        .foregroundStyle(colors.textPrimary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    if newPropertyType == kind {
+                                        Image(systemName: "checkmark").foregroundStyle(colors.action)
+                                    }
+                                }
+                                .padding(LHRow.insets)
+                                .frame(minHeight: LHMetrics.minTap)
+                                .background(newPropertyType == kind ? colors.primarySurface : colors.backgroundTertiary,
+                                            in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(newPropertyType == kind ? .isSelected : [])
+                        }
+                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel(HS.t("filing.add.type", "Type"))
+                } else {
+                    LHSegmented(
+                        [.init(PropertyType.ltr, PropertyType.ltr.fullName), .init(PropertyType.str, PropertyType.str.fullName)],
+                        selection: $newPropertyType,
+                        accessibilityLabel: HS.t("filing.add.type", "Type")
+                    )
+                }
                 LHField(HS.t("filing.add.name", "Rental name"), text: $newPropertyName)
                 LHField(HS.t("filing.add.address", "Address"), text: $newPropertyAddress)
             }

@@ -44,14 +44,14 @@ final class SettingsLongTailCaptureUITests: XCTestCase {
             launch(scenario: "frequent", scheme: scheme, category: size, extra: [])
             XCTAssertTrue(element("settings.profile").waitForExistence(timeout: 25))
             settleAndCapture("settings-pro-\(tag)")
-            scrollCapture("settings-pro-\(tag)", stopAt: "settings.version", maxPages: 9)
+            scrollCapture("settings-pro-\(tag)", stopAt: "settings.version", maxPages: 14)
 
             // Free: the Pro card and the locked export row.
             launch(scenario: "occasional", scheme: scheme, category: size, extra: [])
             XCTAssertTrue(element("settings.profile").waitForExistence(timeout: 25))
             settleAndCapture("settings-free-\(tag)")
             if size == nil || tag.hasPrefix("ax3") {
-                scrollCapture("settings-free-\(tag)", stopAt: "settings.version", maxPages: 9)
+                scrollCapture("settings-free-\(tag)", stopAt: "settings.version", maxPages: 14)
             }
         }
     }

@@ -90,10 +90,12 @@ struct DeleteAllDataView: View {
                         showVoiceOverConfirm = true
                     }
                     .padding(.bottom, 4)
-                    Text(HS.t("delete.hold.hint", "Hold for a moment to confirm."))
-                        .font(.footnote)
-                        .foregroundStyle(colors.textSecondary)
-                        .multilineTextAlignment(.center)
+                    if !isDeleting {
+                        Text(HS.t("delete.hold.hint", "Hold for a moment to confirm."))
+                            .font(.footnote)
+                            .foregroundStyle(colors.textSecondary)
+                            .multilineTextAlignment(.center)
+                    }
                     Button(HS.t("delete.cancel", "Cancel")) { dismiss() }
                         .buttonStyle(LHButton.tertiary)
                         .accessibilityIdentifier("delete.cancel")

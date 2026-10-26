@@ -6,6 +6,7 @@ import MessageUI
 struct ContactSupportView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     @State private var subject: String = ""
     @State private var message: String = ""
@@ -41,6 +42,9 @@ struct ContactSupportView: View {
                         .foregroundStyle(colors.textSecondary)
                         .padding(.top, 4)
                 }
+
+                // At accessibility sizes the button is too tall to pin: it ends the content.
+                if typeSize.isAccessibilitySize { sendButton }
             }
             .frame(maxWidth: LHMetrics.readingColumn, alignment: .leading)
             .padding(.horizontal, LHMetrics.gutter)
@@ -51,17 +55,14 @@ struct ContactSupportView: View {
         .scrollDismissesKeyboard(.interactively)
         .background { LHCanvas() }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            Button {
-                sendSupportEmail()
-            } label: {
-                Label(HS.t("support.send", "Send email"), systemImage: "paperplane")
+            if !typeSize.isAccessibilitySize {
+                sendButton
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 16)
+                    .frame(maxWidth: .infinity)
+                    .background(colors.background)
             }
-            .buttonStyle(LHButton.primary)
-            .disabled(!canSend)
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 16)
-            .accessibilityIdentifier("support.send")
         }
         .toolbar(.hidden, for: .navigationBar)
         .hidesAppTabBar()
@@ -69,6 +70,17 @@ struct ContactSupportView: View {
             MailComposeView(subject: subject, body: message, to: supportEmail)
         }
         .accessibilityIdentifier("support.screen")
+    }
+
+    private var sendButton: some View {
+        Button {
+            sendSupportEmail()
+        } label: {
+            Label(HS.t("support.send", "Send email"), systemImage: "paperplane")
+        }
+        .buttonStyle(LHButton.primary)
+        .disabled(!canSend)
+        .accessibilityIdentifier("support.send")
     }
 
     private func sendSupportEmail() {
