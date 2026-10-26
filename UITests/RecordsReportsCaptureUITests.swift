@@ -63,6 +63,10 @@ final class RecordsReportsCaptureUITests: XCTestCase {
                 app.swipeDown()
                 app.buttons["entry.edit"].tap()
                 settleAndCapture("record-edit-\(tag)")
+                app.swipeUp()
+                settleAndCapture("record-edit-\(tag)-scrolled1")
+                app.swipeUp()
+                settleAndCapture("record-edit-\(tag)-scrolled2")
             }
         }
     }

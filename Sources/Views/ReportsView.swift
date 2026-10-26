@@ -256,7 +256,7 @@ struct ReportsView: View {
                         } else {
                             CompactStandingCard(standing: standing, year: selectedYear, isLoading: isLoading)
                         }
-                        if ax, let detail = standing.detail {
+                        if (index == 0 ? ax : dynamicTypeSize >= .xxLarge), let detail = standing.detail {
                             Text(detail)
                                 .font(.subheadline)
                                 .foregroundStyle(colors.textSecondary)
@@ -677,7 +677,7 @@ private struct CompactStandingCard: View {
                 Text(standing.status)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
-                if let detail = standing.detail, !typeSize.isAccessibilitySize {
+                if let detail = standing.detail, typeSize < .xxLarge {
                     Text(detail)
                         .font(.subheadline)
                         .foregroundStyle(colors.textSecondary)

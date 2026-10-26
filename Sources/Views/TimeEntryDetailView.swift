@@ -308,8 +308,12 @@ struct TimeEntryDetailView: View {
 
         VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
             LHSectionHeader(RR.t("record.notes", "Notes"))
-            LHField(RR.t("record.notes.placeholder", "What did you do?"), text: $notes, multiline: true,
-                    identifier: "entry.edit.notes")
+            if dynamicTypeSize.isAccessibilitySize {
+                axNotesField
+            } else {
+                LHField(RR.t("record.notes.placeholder", "What did you do?"), text: $notes, multiline: true,
+                        identifier: "entry.edit.notes")
+            }
             Text(RR.t("record.notes.footer", "A short note helps if anyone asks later."))
                 .font(.footnote)
                 .foregroundStyle(colors.textSecondary)
@@ -319,14 +323,46 @@ struct TimeEntryDetailView: View {
 
     /// The date as a value row with the system date picker on top, so tapping opens the calendar.
     private var dateRow: some View {
-        DatePicker(RR.t("record.fact.date", "Date"), selection: $date, in: ...Date.distantFuture, displayedComponents: .date)
-            .tint(colors.action)
-            .foregroundStyle(colors.textPrimary)
-            .padding(.horizontal, LHMetrics.cardPadding)
-            .padding(.vertical, 6)
-            .frame(maxWidth: .infinity, minHeight: LHMetrics.rowMinHeight, alignment: .leading)
-            .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
-            .accessibilityIdentifier("entry.edit.date")
+        let ax = dynamicTypeSize.isAccessibilitySize
+        let layout = ax ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(alignment: .center, spacing: 8))
+        return layout {
+            if ax {
+                Text(RR.t("record.fact.date", "Date"))
+                    .font(.subheadline)
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                DatePicker(RR.t("record.fact.date", "Date"), selection: $date, in: ...Date.distantFuture, displayedComponents: .date)
+                    .labelsHidden()
+                    .tint(colors.action)
+            } else {
+                DatePicker(RR.t("record.fact.date", "Date"), selection: $date, in: ...Date.distantFuture, displayedComponents: .date)
+                    .tint(colors.action)
+                    .foregroundStyle(colors.textPrimary)
+            }
+        }
+        .padding(.horizontal, LHMetrics.cardPadding)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, minHeight: LHMetrics.rowMinHeight, alignment: .leading)
+        .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("entry.edit.date")
+    }
+
+    /// Notes at accessibility sizes: the foundation field clamps to three lines, which clips a
+    /// long note. This grows with the text instead.
+    private var axNotesField: some View {
+        SwiftUI.TextField(text: $notes, prompt: Text(RR.t("record.notes.placeholder", "What did you do?")).foregroundStyle(colors.textTertiary), axis: .vertical) {
+            Text(RR.t("record.notes.placeholder", "What did you do?"))
+        }
+        .font(.body)
+        .foregroundStyle(colors.textPrimary)
+        .tint(colors.action)
+        .lineLimit(1...)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(minHeight: LHField.multilineMinHeight, alignment: .topLeading)
+        .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
+        .accessibilityIdentifier("entry.edit.notes")
     }
 
     // MARK: Actions
