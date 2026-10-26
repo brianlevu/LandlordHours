@@ -32,7 +32,7 @@ final class PropertiesUITests: XCTestCase {
         XCTAssertTrue(close.waitForExistence(timeout: 5))
         close.tap()
         XCTAssertTrue(lock.waitForExistence(timeout: 5), "clean back-out")
-        // The header's Add property goes to the same paywall.
+        // The toolbar's Add rental goes to the same paywall.
         app.buttons["properties.add"].firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any)["paywall.secondProperty"].waitForExistence(timeout: 8))
     }
@@ -46,30 +46,58 @@ final class PropertiesUITests: XCTestCase {
         XCTAssertFalse(app.buttons["property.save"].isEnabled, "disabled until there's a name")
     }
 
-    func testDeleteAsksWithCancelAndRemovesTheRental() {
+    func testDeleteAsksWithKeepAndRemovesTheRental() {
         launch(seed: "four", extra: ["-LHOpenFirstPropertyDelete"])
+        // "Delete rental" closes the sheet; the one alert asks (§1.21: verbs, ≤ 6 words).
         let alert = app.alerts.firstMatch
         XCTAssertTrue(alert.waitForExistence(timeout: 12))
-        XCTAssertTrue(alert.label.hasPrefix("Delete Pine Cabin and its"), alert.label)
-        XCTAssertTrue(alert.buttons["Cancel"].exists)
-        alert.buttons["Cancel"].tap()
-        XCTAssertTrue(app.buttons["property.delete"].waitForExistence(timeout: 5), "Cancel keeps the sheet and the rental")
-        app.buttons["property.delete"].tap()
-        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(alert.label, "Delete this rental?")
+        XCTAssertTrue(alert.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Pine Cabin, its")).firstMatch.exists)
+        XCTAssertTrue(alert.buttons["Keep"].exists)
+        alert.buttons["Keep"].tap()
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["properties.row.0"].waitForExistence(timeout: 5), "Keep keeps the rental")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "4 rentals")).firstMatch.exists)
+
+        // Again, from the rental page: Edit, Delete rental, Delete.
+        app.descendants(matching: .any)["properties.row.0"].tap()
+        let edit = app.buttons["property.edit"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 5))
+        edit.tap()
+        let delete = app.buttons["property.delete"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5))
+        bringIntoView(delete)
+        delete.tap()
+        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 8))
         app.alerts.firstMatch.buttons["Delete"].tap()
-        XCTAssertTrue(app.buttons["properties.row.0"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["properties.row.0"].waitForExistence(timeout: 8), "back on the list")
         XCTAssertFalse(app.staticTexts["Pine Cabin"].exists)
-        XCTAssertTrue(app.staticTexts["properties.subtitle"].label.hasPrefix("3 rentals"))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "3 rentals")).firstMatch.exists)
     }
 
     func testDetailShowsTheRentalsOwnHoursAndSeeAllOpensRecords() {
         launch(seed: "four", extra: ["-LHOpenFirstPropertyDetail"])
         let hero = app.descendants(matching: .any)["property.hero"]
         XCTAssertTrue(hero.waitForExistence(timeout: 12))
-        XCTAssertTrue(hero.label.contains("212 hours this year"), hero.label)
         XCTAssertTrue(hero.label.contains("Frame going up"), hero.label)
-        app.buttons["property.seeAllRecords"].tap()
+        let number = app.descendants(matching: .any)["house.numberBlock"]
+        XCTAssertTrue(number.waitForExistence(timeout: 5))
+        XCTAssertTrue(number.label.contains("212"), number.label)
+        XCTAssertTrue(number.label.contains("of 750 hours"), number.label)
+        XCTAssertTrue(app.descendants(matching: .any)["property.tile.finish"].exists, "the pace tiles live here now")
+        let seeAll = app.buttons["property.seeAllRecords"]
+        bringIntoView(seeAll)
+        seeAll.tap()
         XCTAssertTrue(app.descendants(matching: .any)["records.total"].waitForExistence(timeout: 8))
+    }
+
+    private func bringIntoView(_ element: XCUIElement) {
+        let scroll = app.scrollViews.firstMatch
+        for _ in 0..<6 {
+            let frame = element.frame, screen = app.windows.firstMatch.frame
+            if element.exists, element.isHittable, frame.maxY < screen.maxY - 120 { return }
+            scroll.swipeUp(velocity: .slow)
+        }
     }
 
     // MARK: Frames
@@ -99,7 +127,7 @@ final class PropertiesUITests: XCTestCase {
     private let shots: [Shot] = [
         Shot(name: "props-list", seed: "four", waitFor: "properties.row.0"),
         Shot(name: "props-list-mp", seed: "four", extra: ["-LHPropertiesGoal", "mp100"], waitFor: "properties.row.0"),
-        Shot(name: "props-list-info", seed: "four", extra: ["-LHPropertiesInfo"], waitFor: "properties.infoNote"),
+        Shot(name: "props-stages", seed: "stages", extra: ["-LHPropertiesLitToday", "1,3"], waitFor: "properties.row.4"),
         Shot(name: "props-12", seed: "twelve", waitFor: "properties.search"),
         Shot(name: "props-12-bottom", seed: "twelve", extra: ["-LHPropertiesScrollBottom"], waitFor: "properties.row.11"),
         Shot(name: "props-empty", seed: "empty", waitFor: "properties.empty"),
@@ -194,7 +222,15 @@ final class PropertiesUITests: XCTestCase {
         ] + extra
         app.launch()
         // The launch bridge fades out over the first seconds and swallows taps until it's gone.
-        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 15))
+        // A launch that opens a sheet or the delete alert hides the tab bar from accessibility
+        // (the presentation is modal), so any of the three counts as "launched".
+        let deadline = Date().addingTimeInterval(15)
+        var ready = false
+        while Date() < deadline && !ready {
+            ready = app.buttons["tab.today"].exists || app.alerts.firstMatch.exists || app.buttons["sheet.close"].exists
+            if !ready { Thread.sleep(forTimeInterval: 0.25) }
+        }
+        XCTAssertTrue(ready, "the app launched to the tab bar, a sheet or an alert")
         Thread.sleep(forTimeInterval: 3)
         // First keyboard on a fresh simulator shows a one-time typing tip.
         let tip = app.buttons["Continue"]
