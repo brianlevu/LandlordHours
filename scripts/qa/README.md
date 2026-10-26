@@ -50,3 +50,17 @@ Heuristics: tiny preview text, gradients and translucent bars can false-flag, an
 - `frame_check.py hero A.png ... --pairs lit=dark [--windows craft_windows.json] [--strict]`: p99 art contrast, window delta, saturation, hue bins, ground line. Saturation is REVIEW unless `--strict` (screenshot masks include shadow and ground).
 - `asset_check.py`, `motion_check.py`: new, with `test_asset_check.py`, `test_motion_check.py`.
 - `standard_lint.py`: clamp quota 3, CraftHouseView `DragGesture`, `craft-image`, `hero-card`, `blueprint-retired`, `tab-shell`, `page-ink`, `timeline-view`, `section-header-mono`. New rules are baselined; `swatch_matrix.py` and `ambient_check.py` (items 7 and 8) wait for features F.1 and F.2.
+
+## test_triage.py (Jev failure triage): NOT READY, do not integrate
+
+    python3 scripts/qa/test_triage.py triage RESULT.xcresult|ui.log [--out triage.json] [--calibration CAL.json] [--threshold P] [--no-ai]
+    python3 scripts/qa/test_triage.py calibrate --labels scripts/qa/test_triage_labels.json --out scripts/qa/test_triage_calibration.json
+
+- Project-agnostic, stdlib only. Reads an `.xcresult` (via `xcrun xcresulttool`) or an xcodebuild log, and sends each failure's test name, suite, first failure message and two counts (failures in the same suite and with the same message in that run) to Jev as one Choice: stale selector or string / real behaviour bug / environment or infrastructure / test logic bug.
+- Output is a JSON list: `label`, `probability`, `probs`, `route`. `route: "agent"` means unlabelled, route to agent. It fails open: no key, no network, a Jev error, no calibration, or a calibration marked `ready: false` all give `route: "agent"`. It never drops a failure and never retries or edits a test.
+- Key and cache: `$TYPESAFE_API_KEY` or `~/.config/typesafe/api_key` (never printed); cache `~/AgentScratch/jev-harness/test-triage-cache.json`.
+- Calibration (51 labelled failures, 16 held out): the 38 UI failures of the 2026-10-25 base run, labelled from the `fix/uitests-bc` repair, plus 13 from other 2026-10 logs labelled from the message (`test_triage_labels.json`). Result in `test_triage_calibration.json`.
+  - Held-out: 87.5% at 50% coverage (7 of 8), but only 8 items. Dev at the same threshold: 72%. Pooled: 77% at 51%. With no threshold: 45% overall against a 69% always-stale baseline. So: NOT READY.
+  - Why: 39 of 51 labels are "stale selector", and 1 is a real bug. A bare "XCTAssertTrue failed - House, Frame going up, lights off" gives no clue, so Jev scatters those across test-logic and real-bug. It is right on environment failures (8 of 8) and on explicit "Multiple matching elements".
+  - What would improve it: an answer key with real bugs and test-logic cases (aim for 10+ of each); the failing element's accessibility dump or the assertion source line as state; and a before/after diff of the UI strings. Recalibrate and re-test on fresh failures before trusting it.
+- Each new project calibrates its own threshold against its own answer key before relying on it.

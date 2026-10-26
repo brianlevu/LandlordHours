@@ -1,0 +1,515 @@
+{
+ "note": "Answer key for LandlordHours UI failures. Core 38 = base-sim.log failures, labelled from the repair commit; test750SaysWhoseCountItIs is the spouse-as-pro real bug (its logged message is the stale house label, so a message-only triage cannot see it). Supplemental rows are labelled from the message.",
+ "items": [
+  {
+   "id": "FreeUserPaywallUITests.testAskToBuyShowsWaitingForApproval",
+   "test": "testAskToBuyShowsWaitingForApproval",
+   "suite": "FreeUserPaywallUITests",
+   "message": "XCTAssertTrue failed - Missing \"Open profile and settings\" Button",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 8,
+   "same_message_failed": 2
+  },
+  {
+   "id": "FreeUserPaywallUITests.testFailedPurchaseCanBeRetried",
+   "test": "testFailedPurchaseCanBeRetried",
+   "suite": "FreeUserPaywallUITests",
+   "message": "XCTAssertTrue failed - Missing \"Open profile and settings\" Button",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 8,
+   "same_message_failed": 2
+  },
+  {
+   "id": "FreeUserPaywallUITests.testPropertiesSecondRental",
+   "test": "testPropertiesSecondRental",
+   "suite": "FreeUserPaywallUITests",
+   "message": "XCTAssertTrue failed - Missing \"Properties\" Button",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 8,
+   "same_message_failed": 1
+  },
+  {
+   "id": "FreeUserPaywallUITests.testReportsExportCardLock",
+   "test": "testReportsExportCardLock",
+   "suite": "FreeUserPaywallUITests",
+   "message": "XCTAssertTrue failed - Missing \"Open reports\" Button",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 8,
+   "same_message_failed": 2
+  },
+  {
+   "id": "FreeUserPaywallUITests.testReportsExportPageLock",
+   "test": "testReportsExportPageLock",
+   "suite": "FreeUserPaywallUITests",
+   "message": "XCTAssertTrue failed - Missing \"Open reports\" Button",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 8,
+   "same_message_failed": 2
+  },
+  {
+   "id": "FreeUserPaywallUITests.testSettingsExportRowLock",
+   "test": "testSettingsExportRowLock",
+   "suite": "FreeUserPaywallUITests",
+   "message": "XCTAssertTrue failed - Home tab bar should load",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 8,
+   "same_message_failed": 3
+  },
+  {
+   "id": "FreeUserPaywallUITests.testSettingsProCard",
+   "test": "testSettingsProCard",
+   "suite": "FreeUserPaywallUITests",
+   "message": "XCTAssertTrue failed - Home tab bar should load",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 8,
+   "same_message_failed": 3
+  },
+  {
+   "id": "FreeUserPaywallUITests.testTodayYourRecordLock",
+   "test": "testTodayYourRecordLock",
+   "suite": "FreeUserPaywallUITests",
+   "message": "XCTAssertTrue failed - Home tab bar should load",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 8,
+   "same_message_failed": 3
+  },
+  {
+   "id": "HousePreviewUITests.testConfirmCrossingFiveHundredOpensTheCelebrationWithContinue",
+   "test": "testConfirmCrossingFiveHundredOpensTheCelebrationWithContinue",
+   "suite": "HousePreviewUITests",
+   "message": "XCTAssertTrue failed - the 500h celebration should open after the confirm",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 3,
+   "same_message_failed": 1
+  },
+  {
+   "id": "HousePreviewUITests.testHeroIsOneLabelledImageWithHoursGoalAndNextMilestone",
+   "test": "testHeroIsOneLabelledImageWithHoursGoalAndNextMilestone",
+   "suite": "HousePreviewUITests",
+   "message": "XCTAssertTrue failed",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 3,
+   "same_message_failed": 9
+  },
+  {
+   "id": "HousePreviewUITests.testMPGoalHeroDark",
+   "test": "testMPGoalHeroDark",
+   "suite": "HousePreviewUITests",
+   "message": "XCTAssertTrue failed",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 3,
+   "same_message_failed": 9
+  },
+  {
+   "id": "OnboardingUITests.testCalendarDeniedSkipsTheNoteAndStakesQuietly",
+   "test": "testCalendarDeniedSkipsTheNoteAndStakesQuietly",
+   "suite": "OnboardingUITests",
+   "message": "XCTAssertTrue failed",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 6,
+   "same_message_failed": 9
+  },
+  {
+   "id": "OnboardingUITests.testHappyPathFindsHoursAndReviewOpensTheInbox",
+   "test": "testHappyPathFindsHoursAndReviewOpensTheInbox",
+   "suite": "OnboardingUITests",
+   "message": "XCTAssertTrue failed - Every hour found is in the Inbox: 22 items",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 6,
+   "same_message_failed": 1
+  },
+  {
+   "id": "OnboardingUITests.testRealCalendarPromptDontAllowContinuesQuietly",
+   "test": "testRealCalendarPromptDontAllowContinuesQuietly",
+   "suite": "OnboardingUITests",
+   "message": "XCTAssertTrue failed - Today keeps a way back to the calendar",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 6,
+   "same_message_failed": 1
+  },
+  {
+   "id": "OnboardingUITests.testRestoreShowsPlainErrorAndTryAgainFindsTheRecords",
+   "test": "testRestoreShowsPlainErrorAndTryAgainFindsTheRecords",
+   "suite": "OnboardingUITests",
+   "message": "XCTAssertTrue failed",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 6,
+   "same_message_failed": 9
+  },
+  {
+   "id": "OnboardingUITests.testSkipPathIsSevenTapsToTheEmptyLot",
+   "test": "testSkipPathIsSevenTapsToTheEmptyLot",
+   "suite": "OnboardingUITests",
+   "message": "XCTAssertTrue failed - The empty lot carries Add property",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 6,
+   "same_message_failed": 1
+  },
+  {
+   "id": "OnboardingUITests.testUnfinishedProfileStillSeesSignInAndRestore",
+   "test": "testUnfinishedProfileStillSeesSignInAndRestore",
+   "suite": "OnboardingUITests",
+   "message": "XCTAssertTrue failed - Restore opens Today",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 6,
+   "same_message_failed": 1
+  },
+  {
+   "id": "SignInReplacementUITests.testSignedOutUpgradeShowsWelcomeWithRestoreAndRestoresProfile",
+   "test": "testSignedOutUpgradeShowsWelcomeWithRestoreAndRestoresProfile",
+   "suite": "SignInReplacementUITests",
+   "message": "XCTAssertTrue failed",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 1,
+   "same_message_failed": 9
+  },
+  {
+   "id": "TodayConfirmUITests.testCaughtUpAfterTheLastOne",
+   "test": "testCaughtUpAfterTheLastOne",
+   "suite": "TodayConfirmUITests",
+   "message": "Failed to tap \"inbox.confirm.cal:debug-plumber\" Button: No matches found for Elements matching predicate '\"inbox.confirm.cal:debug-plumber\" IN identifiers' from input {(",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 7,
+   "same_message_failed": 1
+  },
+  {
+   "id": "TodayConfirmUITests.testConfirmFromTodayLogsBuildsTheHouseAndDropsTheBadge",
+   "test": "testConfirmFromTodayLogsBuildsTheHouseAndDropsTheBadge",
+   "suite": "TodayConfirmUITests",
+   "message": "XCTAssertGreaterThanOrEqual failed: (\"-1\") is less than (\"212\") - House, Frame going up, lights off",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 7,
+   "same_message_failed": 1
+  },
+  {
+   "id": "TodayConfirmUITests.testCountCapsuleMatchesTheInboxBadge",
+   "test": "testCountCapsuleMatchesTheInboxBadge",
+   "suite": "TodayConfirmUITests",
+   "message": "XCTAssertEqual failed: (\"To confirm \u00b7 8\") is not equal to (\"8 to confirm\")",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 7,
+   "same_message_failed": 1
+  },
+  {
+   "id": "TodayConfirmUITests.testNotRentalWorkFromTodayLeavesTheHouseAndUndoRestores",
+   "test": "testNotRentalWorkFromTodayLeavesTheHouseAndUndoRestores",
+   "suite": "TodayConfirmUITests",
+   "message": "XCTAssertTrue failed",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 7,
+   "same_message_failed": 9
+  },
+  {
+   "id": "TodayConfirmUITests.testSwipeRightLogsAndSwipeLeftMarksNotRentalWork",
+   "test": "testSwipeRightLogsAndSwipeLeftMarksNotRentalWork",
+   "suite": "TodayConfirmUITests",
+   "message": "XCTAssertTrue failed - Swipe right logs at once (complete, scheduled item)",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 7,
+   "same_message_failed": 1
+  },
+  {
+   "id": "TodayConfirmUITests.testTapOpensTheConfirmSheetAndLoggingThereUpdatesToday",
+   "test": "testTapOpensTheConfirmSheetAndLoggingThereUpdatesToday",
+   "suite": "TodayConfirmUITests",
+   "message": "XCTAssertTrue failed",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 7,
+   "same_message_failed": 9
+  },
+  {
+   "id": "TodayConfirmUITests.testWeekStripReadsEachDay",
+   "test": "testWeekStripReadsEachDay",
+   "suite": "TodayConfirmUITests",
+   "message": "XCTAssertTrue failed",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 7,
+   "same_message_failed": 9
+  },
+  {
+   "id": "TodayHouseUITests.test750SaysWhoseCountItIs",
+   "test": "test750SaysWhoseCountItIs",
+   "suite": "TodayHouseUITests",
+   "message": "XCTAssertTrue failed - House, Frame going up, lights on",
+   "label": "real_behaviour_bug",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 10,
+   "same_message_failed": 2
+  },
+  {
+   "id": "TodayHouseUITests.testCrossing500CelebratesOnceAndNeverAgain",
+   "test": "testCrossing500CelebratesOnceAndNeverAgain",
+   "suite": "TodayHouseUITests",
+   "message": "XCTAssertTrue failed",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 10,
+   "same_message_failed": 9
+  },
+  {
+   "id": "TodayHouseUITests.testHeroBehindSaysTheHoursAWeek",
+   "test": "testHeroBehindSaysTheHoursAWeek",
+   "suite": "TodayHouseUITests",
+   "message": "XCTAssertTrue failed - House, Frame going up, lights on",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 10,
+   "same_message_failed": 2
+  },
+  {
+   "id": "TodayHouseUITests.testHeroSaysTheTargetAndThatYouAreOnPace",
+   "test": "testHeroSaysTheTargetAndThatYouAreOnPace",
+   "suite": "TodayHouseUITests",
+   "message": "XCTAssertTrue failed - House, Roof on, siding going up, lights on",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 10,
+   "same_message_failed": 1
+  },
+  {
+   "id": "TodayHouseUITests.testLoggingTwoHoursViaPlusBuildsTheHouseOnReturn",
+   "test": "testLoggingTwoHoursViaPlusBuildsTheHouseOnReturn",
+   "suite": "TodayHouseUITests",
+   "message": "XCTAssertTrue failed - House, Frame going up, lights off",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 10,
+   "same_message_failed": 5
+  },
+  {
+   "id": "TodayHouseUITests.testOver100HoursAsksWhetherAnyoneDidMoreBeforeSayingReached",
+   "test": "testOver100HoursAsksWhetherAnyoneDidMoreBeforeSayingReached",
+   "suite": "TodayHouseUITests",
+   "message": "XCTAssertTrue failed - House, House finished, lights on",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 10,
+   "same_message_failed": 1
+  },
+  {
+   "id": "TodayHouseUITests.testShortStayHeroShowsTheCabinsOwnCount",
+   "test": "testShortStayHeroShowsTheCabinsOwnCount",
+   "suite": "TodayHouseUITests",
+   "message": "XCTAssertTrue failed - Both kinds of rental: the short-term rental's own count, not the duplex's 212. House, Roof on, siding going up, lights on",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 10,
+   "same_message_failed": 1
+  },
+  {
+   "id": "TodayHouseUITests.testTodayAt212HoursShowsFrameAndNextMilestone",
+   "test": "testTodayAt212HoursShowsFrameAndNextMilestone",
+   "suite": "TodayHouseUITests",
+   "message": "XCTAssertTrue failed - House, Frame going up, lights off",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 10,
+   "same_message_failed": 5
+  },
+  {
+   "id": "TodayHouseUITests.testTodayAt751HoursShowsFinishedHouseAndGoalHours",
+   "test": "testTodayAt751HoursShowsFinishedHouseAndGoalHours",
+   "suite": "TodayHouseUITests",
+   "message": "XCTAssertTrue failed - House, House finished, lights off",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 10,
+   "same_message_failed": 1
+  },
+  {
+   "id": "TodayHouseUITests.testTodayAtZeroHoursShowsEmptyLotAndUncheckedRule",
+   "test": "testTodayAtZeroHoursShowsEmptyLotAndUncheckedRule",
+   "suite": "TodayHouseUITests",
+   "message": "XCTAssertTrue failed - House, Framing started, lights off",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 10,
+   "same_message_failed": 1
+  },
+  {
+   "id": "TodayLoadingUITests.testHoursSettleInWhenThePullLands",
+   "test": "testHoursSettleInWhenThePullLands",
+   "suite": "TodayLoadingUITests",
+   "message": "XCTAssertTrue failed - House, Frame going up, lights off",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 3,
+   "same_message_failed": 5
+  },
+  {
+   "id": "TodayLoadingUITests.testLoadingStateDark",
+   "test": "testLoadingStateDark",
+   "suite": "TodayLoadingUITests",
+   "message": "XCTAssertTrue failed - House, Frame going up, lights off",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 3,
+   "same_message_failed": 5
+  },
+  {
+   "id": "TodayLoadingUITests.testTodayIsInteractiveWhileInitialPullIsPending",
+   "test": "testTodayIsInteractiveWhileInitialPullIsPending",
+   "suite": "TodayLoadingUITests",
+   "message": "XCTAssertTrue failed - House, Frame going up, lights off",
+   "label": "stale_selector_or_string",
+   "source": "answer-key: repair agent 2026-10-25 (fix/uitests-bc a9c31aea), base-sim.log",
+   "suite_failed": 3,
+   "same_message_failed": 5
+  },
+  {
+   "id": "LandlordHoursUITests.testMainTabVisualSmokeMatrix",
+   "test": "testMainTabVisualSmokeMatrix",
+   "suite": "LandlordHoursUITests",
+   "message": "Failed to get launch progress for <XCUIApplicationImpl: 0x10a1dc500 com.openclaw.landlordhours at /Users/brian/tmp/DerivedData/landlordhours-verify-signin/Build/Products/Debug-iphonesimulator/Landlord",
+   "label": "environment_or_infrastructure",
+   "source": "supplemental: other 2026-10 logs, labelled from the message by the calibrating agent (not repair-verified)",
+   "suite_failed": 9,
+   "same_message_failed": 1
+  },
+  {
+   "id": "LogTimeUITests.testAtTheFreeLimitThePropertyPickerShowsTheLock",
+   "test": "testAtTheFreeLimitThePropertyPickerShowsTheLock",
+   "suite": "LogTimeUITests",
+   "message": "Failed to tap \"lock.unlock\" Button: Find single matching element. Multiple matching elements found for <XCUIElementQuery: 0x10827a030>.",
+   "label": "test_logic_bug",
+   "source": "supplemental: other 2026-10 logs, labelled from the message by the calibrating agent (not repair-verified)",
+   "suite_failed": 30,
+   "same_message_failed": 1
+  },
+  {
+   "id": "LogTimeUITests.testCaptureDarkAX3",
+   "test": "testCaptureDarkAX3",
+   "suite": "LogTimeUITests",
+   "message": "Failed to get matching snapshot: Application com.openclaw.landlordhours is not running",
+   "label": "environment_or_infrastructure",
+   "source": "supplemental: other 2026-10 logs, labelled from the message by the calibrating agent (not repair-verified)",
+   "suite_failed": 30,
+   "same_message_failed": 2
+  },
+  {
+   "id": "LogTimeUITests.testCaptureDarkDefault",
+   "test": "testCaptureDarkDefault",
+   "suite": "LogTimeUITests",
+   "message": "Failed to get matching snapshot: Application com.openclaw.landlordhours is not running",
+   "label": "environment_or_infrastructure",
+   "source": "supplemental: other 2026-10 logs, labelled from the message by the calibrating agent (not repair-verified)",
+   "suite_failed": 30,
+   "same_message_failed": 2
+  },
+  {
+   "id": "LogTimeUITests.testCaptureDarkXXL",
+   "test": "testCaptureDarkXXL",
+   "suite": "LogTimeUITests",
+   "message": "Failed to get matching snapshots: Not authorized for performing UI testing actions.",
+   "label": "environment_or_infrastructure",
+   "source": "supplemental: other 2026-10 logs, labelled from the message by the calibrating agent (not repair-verified)",
+   "suite_failed": 30,
+   "same_message_failed": 22
+  },
+  {
+   "id": "LogTimeUITests.testCaptureV2Extras",
+   "test": "testCaptureV2Extras",
+   "suite": "LogTimeUITests",
+   "message": "Failed to get matching snapshot: No matches found for Elements matching predicate '\"tab.today\" IN identifiers' from input {(",
+   "label": "stale_selector_or_string",
+   "source": "supplemental: other 2026-10 logs, labelled from the message by the calibrating agent (not repair-verified)",
+   "suite_failed": 30,
+   "same_message_failed": 1
+  },
+  {
+   "id": "LogTimeUITests.testTimerStartStopReviewAndLog",
+   "test": "testTimerStartStopReviewAndLog",
+   "suite": "LogTimeUITests",
+   "message": "Failed to get matching snapshots: Not authorized for performing UI testing actions.",
+   "label": "environment_or_infrastructure",
+   "source": "supplemental: other 2026-10 logs, labelled from the message by the calibrating agent (not repair-verified)",
+   "suite_failed": 30,
+   "same_message_failed": 22
+  },
+  {
+   "id": "OnboardingUITests.testSkipPathIsSixTapsToTheEmptyLot",
+   "test": "testSkipPathIsSixTapsToTheEmptyLot",
+   "suite": "OnboardingUITests",
+   "message": "XCTAssertTrue failed - missing \"goal-750\" Button",
+   "label": "stale_selector_or_string",
+   "source": "supplemental: other 2026-10 logs, labelled from the message by the calibrating agent (not repair-verified)",
+   "suite_failed": 11,
+   "same_message_failed": 4
+  },
+  {
+   "id": "PropertiesUITests.testDetailShowsTheRentalsOwnHoursAndSeeAllOpensRecords",
+   "test": "testDetailShowsTheRentalsOwnHoursAndSeeAllOpensRecords",
+   "suite": "PropertiesUITests",
+   "message": "com.openclaw.landlordhours crashed",
+   "label": "environment_or_infrastructure",
+   "source": "supplemental: other 2026-10 logs, labelled from the message by the calibrating agent (not repair-verified)",
+   "suite_failed": 4,
+   "same_message_failed": 1
+  },
+  {
+   "id": "TimerDraftUITests.testNoPropertiesShowsTheRunTimeAndDiscard",
+   "test": "testNoPropertiesShowsTheRunTimeAndDiscard",
+   "suite": "TimerDraftUITests",
+   "message": "Failed to get matching snapshots: Not authorized for performing UI testing actions.",
+   "label": "environment_or_infrastructure",
+   "source": "supplemental: other 2026-10 logs, labelled from the message by the calibrating agent (not repair-verified)",
+   "suite_failed": 5,
+   "same_message_failed": 22
+  },
+  {
+   "id": "TimerDraftUITests.testTwoDraftsSayThereIsMore",
+   "test": "testTwoDraftsSayThereIsMore",
+   "suite": "TimerDraftUITests",
+   "message": "Failed to get matching snapshots: Not authorized for performing UI testing actions.",
+   "label": "environment_or_infrastructure",
+   "source": "supplemental: other 2026-10 logs, labelled from the message by the calibrating agent (not repair-verified)",
+   "suite_failed": 5,
+   "same_message_failed": 22
+  },
+  {
+   "id": "TodayConfirmUITests.testUndoStillWorksForTheWholeTimeTheToastShowsIt",
+   "test": "testUndoStillWorksForTheWholeTimeTheToastShowsIt",
+   "suite": "TodayConfirmUITests",
+   "message": "XCTAssertTrue failed - The toast still offers Undo at 5.5 s (it stays 8 s)",
+   "label": "test_logic_bug",
+   "source": "supplemental: other 2026-10 logs, labelled from the message by the calibrating agent (not repair-verified)",
+   "suite_failed": 9,
+   "same_message_failed": 1
+  },
+  {
+   "id": "TodayConfirmUITests.testNotRentalWorkFromTodayLeavesTheHouseAndUndoRestores#multi",
+   "test": "testNotRentalWorkFromTodayLeavesTheHouseAndUndoRestores",
+   "suite": "TodayConfirmUITests",
+   "message": "Failed to tap \"inbox.undo\" Button: Find single matching element. Multiple matching elements found for <XCUIElementQuery: 0x10ddaadf0>.",
+   "label": "test_logic_bug",
+   "source": "answer-key: repair a9c31aea changed the query to .firstMatch (later-run message)",
+   "suite_failed": 9,
+   "same_message_failed": 1
+  }
+ ]
+}
