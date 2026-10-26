@@ -1596,6 +1596,17 @@
         }
       }
     },
+    "reports.standing.ofShort": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "of %lldh"
+          }
+        }
+      }
+    },
     "reports.standing.spoken": {
       "extractionState": "manual",
       "localizations": {

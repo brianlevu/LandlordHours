@@ -250,10 +250,20 @@ struct ReportsView: View {
             LHSectionHeader(RR.t("reports.section.stand", "Where you stand"))
             VStack(spacing: 12) {
                 ForEach(Array(standings.enumerated()), id: \.element.id) { index, standing in
-                    if index == 0 {
-                        RingStandingCard(standing: standing, year: selectedYear, isLoading: isLoading)
-                    } else {
-                        CompactStandingCard(standing: standing, year: selectedYear, isLoading: isLoading)
+                    VStack(alignment: .leading, spacing: 8) {
+                        if index == 0 {
+                            RingStandingCard(standing: standing, year: selectedYear, isLoading: isLoading)
+                        } else {
+                            CompactStandingCard(standing: standing, year: selectedYear, isLoading: isLoading)
+                        }
+                        if ax, let detail = standing.detail {
+                            Text(detail)
+                                .font(.subheadline)
+                                .foregroundStyle(colors.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.horizontal, 4)
+                                .accessibilityHidden(true)
+                        }
                     }
                 }
                 if showsParticipationRow { participationRow }
@@ -432,7 +442,7 @@ struct ReportsView: View {
                     }
                 }
             }
-            .frame(height: ax ? 200 : 150)
+            .frame(height: ax ? 160 : 120)
             .opacity(isLoading ? 0 : 1)
             .overlay {
                 if isLoading {
@@ -504,8 +514,11 @@ private extension ReportStanding {
     }
 }
 
-/// The lead standing: the ring at 260 with the hours in its centre, the status in words with a
-/// glyph (colour is never the only cue), and the one rule that matters next.
+/// The lead standing. D6 caps a non-hero card at 20% of the window, so the ring sits beside the
+/// words (112 at default, 96 at XXL) instead of above them at the 260 that standard section 1.12
+/// names; both cannot hold, and the cap is the measured rule. At accessibility sizes the card is
+/// words only (the ring would stack above them) and the long detail line sits under it on the
+/// page, so no card passes 20%.
 private struct RingStandingCard: View {
     let standing: ReportStanding
     let year: Int
@@ -535,60 +548,78 @@ private struct RingStandingCard: View {
         RR.t("reports.standing.eyebrow", "\(String(year)) \u{00B7} \(standing.name)")
     }
 
-    /// The ring is the screen's hero but sits in a card, so the card stays <= 40% of the window
-    /// (D6 under the hero allowance): 200 at regular sizes, smaller as the words grow.
-    private var ringDiameter: CGFloat {
-        if typeSize.isAccessibilitySize { return 200 }
-        return typeSize >= .xxLarge ? 176 : 200
+    private var ringDiameter: CGFloat { typeSize >= .xxLarge ? 96 : 112 }
+
+    private var statusLine: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: toneSymbol)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(toneColor)
+                .accessibilityHidden(true)
+            Text(standing.status)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(standing.tone == .neutral ? colors.textPrimary : toneColor)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var eyebrowText: some View {
+        Text(eyebrow)
+            .font(AppTypography.drafting)
+            .textCase(.uppercase)
+            .tracking(1.3)
+            .foregroundStyle(colors.draftingInk)
     }
 
     var body: some View {
-        VStack(spacing: 10) {
-            Text(eyebrow)
-                .font(AppTypography.drafting)
-                .textCase(.uppercase)
-                .tracking(1.3)
-                .foregroundStyle(colors.draftingInk)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            LHRing(progress: standing.progress, tone: standing.tone == .positive ? .positive : (standing.tone == .caution ? .caution : .action), diameter: ringDiameter, lineWidth: 14, accessibilityValue: standing.spokenValue) {
-                VStack(spacing: 2) {
-                    Text(String(Int(standing.hours.rounded(.down))))
-                        .font(.largeTitle.weight(.bold))
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 4) {
+                    eyebrowText
+                    Text(RR.t("reports.standing.ofHours", "\(LHFormat.hours(standing.hours)) of \(Int(standing.target))h"))
+                        .font(.title3.weight(.semibold))
                         .fontDesign(.rounded)
                         .monospacedDigit()
                         .foregroundStyle(colors.textPrimary)
-                        .contentTransition(.numericText())
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
                         .redacted(reason: isLoading ? .placeholder : [])
-                    Text(RR.t("reports.standing.of", "of \(Int(standing.target)) hours"))
-                        .font(.subheadline)
-                        .foregroundStyle(colors.textSecondary)
-                        .multilineTextAlignment(.center)
+                    statusLine
                 }
-                .padding(.horizontal, 24)
-            }
-            VStack(spacing: 6) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Image(systemName: toneSymbol)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(toneColor)
-                        .accessibilityHidden(true)
-                    Text(standing.status)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(standing.tone == .neutral ? colors.textPrimary : toneColor)
-                        .multilineTextAlignment(.center)
-                }
-                if let detail = standing.detail {
-                    Text(detail)
-                        .font(.subheadline)
-                        .foregroundStyle(colors.textSecondary)
-                        .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                HStack(alignment: .center, spacing: 16) {
+                    LHRing(progress: standing.progress, tone: standing.tone == .positive ? .positive : (standing.tone == .caution ? .caution : .action), diameter: ringDiameter, lineWidth: 12, accessibilityValue: standing.spokenValue) {
+                        VStack(spacing: 0) {
+                            Text(String(Int(standing.hours.rounded(.down))))
+                                .font(.title.weight(.bold))
+                                .fontDesign(.rounded)
+                                .monospacedDigit()
+                                .foregroundStyle(colors.textPrimary)
+                                .contentTransition(.numericText())
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                                .redacted(reason: isLoading ? .placeholder : [])
+                            Text(RR.t("reports.standing.ofShort", "of \(Int(standing.target))h"))
+                                .font(.caption)
+                                .foregroundStyle(colors.textSecondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        eyebrowText
+                        statusLine
+                        if let detail = standing.detail {
+                            Text(detail)
+                                .font(.subheadline)
+                                .foregroundStyle(colors.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
-        .padding(.horizontal, LHMetrics.cardPadding)
-        .padding(.vertical, 14)
+        .padding(LHMetrics.cardPadding)
         .frame(maxWidth: .infinity)
         .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
         .overlay {
@@ -646,7 +677,7 @@ private struct CompactStandingCard: View {
                 Text(standing.status)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
-                if let detail = standing.detail {
+                if let detail = standing.detail, !typeSize.isAccessibilitySize {
                     Text(detail)
                         .font(.subheadline)
                         .foregroundStyle(colors.textSecondary)

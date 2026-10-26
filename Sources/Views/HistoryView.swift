@@ -345,7 +345,7 @@ private struct RecordsScreen: View {
 
 /// One Records row. Same look as `LHRow.Browse` at regular sizes. At accessibility sizes the tile and
 /// chevron go and the hours move onto the meta line, so the title gets the full width (no mid-word
-/// breaks) and a row stays at D7: title <= 2 lines, meta 1 line.
+/// breaks); the meta line wraps at AX (standard 1.4) so the rental name is never cut.
 private struct RecordRowContent: View {
     let title: String
     let meta: String
@@ -367,7 +367,8 @@ private struct RecordRowContent: View {
                 Text(RR.t("records.row.metaWithHours", "\(value) \u{00B7} \(meta)"))
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
-                    .lineLimit(1)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(LHRow.insets)

@@ -69,6 +69,10 @@ struct TimeEntryDetailView: View {
         .background { LHCanvas() }
         .navigationTitle(isEditing ? RR.t("record.editTitle", "Edit record") : "")
         .navigationBarTitleDisplayMode(.inline)
+        // The title lives in the content, so the floating back and Edit controls need their own
+        // material or scrolled text runs under them (gate B1, AX3).
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackground(.bar, for: .navigationBar)
         .hidesAppTabBar()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
