@@ -52,8 +52,10 @@ struct OnTheRecordCard: View {
     /// Where the "Earlier" section starts in the column.
     @State private var earlierTop: CGFloat = 0
     /// The bottom of the section's header (index 0) and of each candidate row (1...n), laid out
-    /// off-screen at the card's width.
-    @State private var earlierEnds: [Int: CGFloat] = [:]
+    /// off-screen at the card's width, tagged with the candidates and type size they were measured
+    /// for. A stale measure is ignored, never reset after the fact: a reset in `onChange` could land
+    /// after the fresh measure had reported and leave the section empty for good.
+    @State private var earlierMeasure = EarlierMeasure()
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     /// Today's entries for the rental, newest first.
@@ -86,7 +88,9 @@ struct OnTheRecordCard: View {
         let now = InboxClock.now()
         let today = Self.entries(viewModel.timeEntries, rentalID: rentalID, now: now)
         let earlier = fitHeight == nil ? [] : Self.earlier(viewModel.timeEntries, rentalID: rentalID, now: now)
-        let shown = Self.fitCount(ends: earlierEnds, candidates: earlier.count, top: earlierTop, room: fitHeight)
+        let key = EarlierMeasure.key(earlier.map(\.id), typeSize: typeSize)
+        let ends = earlierMeasure.key == key ? earlierMeasure.ends : [:]
+        let shown = Self.fitCount(ends: ends, candidates: earlier.count, top: earlierTop, room: fitHeight)
         PaneCard {
             HStack(alignment: .firstTextBaseline) {
                 Text(String(localized: "twoPane.record.title", defaultValue: "On the record today", table: "Adaptive"))
@@ -130,21 +134,20 @@ struct OnTheRecordCard: View {
         .background(alignment: .topLeading) {
             // The off-screen measure: every candidate laid out once at the card's width.
             if !earlier.isEmpty {
-                earlierSection(earlier, measuring: true)
+                earlierSection(earlier, measuring: true, key: key)
                     .fixedSize(horizontal: false, vertical: true)
+                    .id(key)
                     .coordinateSpace(.named("record.measure"))
                     .hidden()
                     .accessibilityHidden(true)
             }
         }
-        .onChange(of: earlier.map(\.id)) { _, _ in earlierEnds = [:] }
-        .onChange(of: typeSize) { _, _ in earlierEnds = [:] }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pane.record")
     }
 
     /// "Earlier" and its rows, each with its day. `measuring` reports each part's bottom.
-    @ViewBuilder private func earlierSection(_ entries: [TimeEntry], measuring: Bool = false) -> some View {
+    @ViewBuilder private func earlierSection(_ entries: [TimeEntry], measuring: Bool = false, key: Int = 0) -> some View {
         VStack(spacing: 0) {
             LHDivider(leadingInset: LHMetrics.cardPadding)
             Text(String(localized: "twoPane.record.earlier", defaultValue: "Earlier", table: "Adaptive"))
@@ -155,13 +158,13 @@ struct OnTheRecordCard: View {
                 .padding(.top, 14)
                 .padding(.bottom, 6)
                 .accessibilityAddTraits(.isHeader)
-                .modifier(MeasureEnd(index: 0, measuring: measuring) { earlierEnds[$0] = $1 })
+                .modifier(MeasureEnd(index: 0, measuring: measuring) { earlierMeasure.record(key: key, index: $0, end: $1) })
             ForEach(Array(entries.enumerated()), id: \.element.id) { i, entry in
                 VStack(spacing: 0) {
                     LHDivider(leadingInset: LHMetrics.cardPadding)
                     row(entry, dated: true)
                 }
-                .modifier(MeasureEnd(index: i + 1, measuring: measuring) { earlierEnds[$0] = $1 })
+                .modifier(MeasureEnd(index: i + 1, measuring: measuring) { earlierMeasure.record(key: key, index: $0, end: $1) })
             }
         }
         .accessibilityElement(children: .contain)
@@ -196,6 +199,25 @@ struct OnTheRecordCard: View {
         .padding(.vertical, 10)
         .frame(minHeight: LHMetrics.rowMinHeight)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// The off-screen measure of the "Earlier" rows and what it was measured for (pure).
+struct EarlierMeasure: Equatable {
+    var key: Int = 0
+    var ends: [Int: CGFloat] = [:]
+
+    static func key(_ ids: [UUID], typeSize: DynamicTypeSize) -> Int {
+        var hasher = Hasher()
+        hasher.combine(ids)
+        hasher.combine(typeSize)
+        return hasher.finalize()
+    }
+
+    /// A report for a newer key replaces the old measure; one for the current key adds to it.
+    mutating func record(key: Int, index: Int, end: CGFloat) {
+        if key != self.key { self = EarlierMeasure(key: key) }
+        ends[index] = end
     }
 }
 

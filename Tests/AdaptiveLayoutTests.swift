@@ -108,6 +108,25 @@ final class AdaptiveLayoutTests: XCTestCase {
         XCTAssertEqual(PaneConfirmFilter.hiddenCount(items, rentalID: pine), 1)
         XCTAssertEqual(PaneConfirmFilter.items(items, rentalID: nil).count, 3)
     }
+
+    func testEarlierMeasureIgnoresStaleAndNeverEmptiesAfterTheFact() {
+        let a = UUID(), b = UUID()
+        let old = EarlierMeasure.key([a], typeSize: .large)
+        let new = EarlierMeasure.key([a, b], typeSize: .large)
+        XCTAssertNotEqual(old, new)
+        XCTAssertNotEqual(new, EarlierMeasure.key([a, b], typeSize: .xxLarge))
+        var m = EarlierMeasure()
+        m.record(key: old, index: 0, end: 30)
+        m.record(key: new, index: 0, end: 32)
+        m.record(key: new, index: 1, end: 90)
+        m.record(key: new, index: 2, end: 150)
+        XCTAssertEqual(m.key, new)
+        XCTAssertEqual(m.ends, [0: 32, 1: 90, 2: 150])
+        // The fresh measure fits rows: the section shows them.
+        XCTAssertEqual(OnTheRecordCard.fitCount(ends: m.ends, candidates: 2, top: 100, room: 220), 1)
+        XCTAssertEqual(OnTheRecordCard.fitCount(ends: m.ends, candidates: 2, top: 100, room: 400), 2)
+        XCTAssertEqual(OnTheRecordCard.fitCount(ends: [:], candidates: 2, top: 100, room: 400), 0)
+    }
 }
 
 private extension Suggestion {
