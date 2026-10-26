@@ -10,14 +10,20 @@ struct WelcomeRecordsFooter: View {
     let state: WelcomeRecordsState
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        // A spinner has no text baseline, so it is centred on the line; when the line wraps
+        // (XXL and up) it sits above the text, centred, instead of beside the first line (gate B5).
+        let stacked = state == .checking && typeSize >= .xxLarge
+        let layout = stacked ? AnyLayout(VStackLayout(alignment: .center, spacing: 6))
+                             : AnyLayout(HStackLayout(alignment: state == .checking ? .center : .firstTextBaseline, spacing: 8))
+        layout {
             switch state {
             case .checking:
                 ProgressView()
-                    .controlSize(.mini)
+                    .controlSize(.small)
                     .tint(colors.textSecondary)
                     .accessibilityHidden(true)
                 Text(IdentityCopy.welcomeChecking)

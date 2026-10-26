@@ -43,8 +43,28 @@
     },
     "%@ waiting for your answer about iCloud": {},
     "%@ you can put back": {},
+    "%@ · %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ · %2$@"
+          }
+        }
+      }
+    },
     "%@ · Kept aside": {},
     "%@ · Only custom categories": {},
+    "%@. %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@. %2$@"
+          }
+        }
+      }
+    },
     "%lld hours": {},
     "%lld records in iCloud couldn’t be read": {},
     "%lld rentals": {},

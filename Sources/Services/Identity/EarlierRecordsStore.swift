@@ -186,7 +186,7 @@ final class EarlierRecordsStore: ObservableObject {
         guard !records.isEmpty else { return }
         var byName = Dictionary(removed.map { ($0.name, $0) }, uniquingKeysWith: { a, _ in a })
         for record in records { byName[record.name] = record }
-        writeRemoved(byName.values.sorted { $0.removedAt > $1.removedAt })
+        writeRemoved(RemovedRecord.newestFirst(Array(byName.values)))
     }
 
     /// Takes records out of Recently removed (Put back, or the person acted).
@@ -242,4 +242,19 @@ final class EarlierRecordsStore: ObservableObject {
     }
     var removedVersions: Set<RecordVersion> { Set(removed.compactMap(\.version)) }
     var unparsedNames: Set<String> { Set(groups.flatMap { $0.unparsedRecords.map(\.recordName) }) }
+}
+
+extension RemovedRecord {
+    /// Newest first; records removed in the same moment (a bulk removal) keep one stable order by name,
+    /// so the list never reshuffles between launches.
+    static func newestFirst(_ records: [RemovedRecord]) -> [RemovedRecord] {
+        records.sorted { a, b in
+            if a.removedAt != b.removedAt { return a.removedAt > b.removedAt }
+            let da = a.entry?.date ?? .distantPast, db = b.entry?.date ?? .distantPast
+            if da != db { return da > db }
+            let la = a.property?.name ?? a.category?.name ?? "", lb = b.property?.name ?? b.category?.name ?? ""
+            if la != lb { return la < lb }
+            return a.name < b.name
+        }
+    }
 }

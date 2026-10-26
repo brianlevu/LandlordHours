@@ -70,10 +70,18 @@ extension View {
     func identitySheetFooter(_ colors: AdaptiveColors) -> some View {
         frame(maxWidth: .infinity)
             .background(alignment: .top) {
-                colors.backgroundSecondary
-                    .padding(.horizontal, -16)
-                    .padding(.top, -8)
-                    .padding(.bottom, -40)
+                // The sheet fill under the pinned primary, with a 24pt fade above it so text that
+                // scrolls under the footer fades out instead of being cut mid-glyph (gate K 1.1 B2).
+                VStack(spacing: 0) {
+                    LinearGradient(colors: [colors.backgroundSecondary.opacity(0), colors.backgroundSecondary],
+                                   startPoint: .top, endPoint: .bottom)
+                        .frame(height: 24)
+                    colors.backgroundSecondary
+                }
+                .padding(.horizontal, -16)
+                .padding(.top, -32)
+                .padding(.bottom, -40)
+                .allowsHitTesting(false)
             }
     }
 }

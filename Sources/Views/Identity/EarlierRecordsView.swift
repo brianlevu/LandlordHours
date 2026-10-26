@@ -180,7 +180,7 @@ struct RecentlyRemovedView: View {
 
     var body: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
-        let removed = viewModel.identity.removed
+        let removed = RemovedRecord.newestFirst(viewModel.identity.removed)
         List {
             Section {
                 ForEach(removed) { item in
@@ -219,7 +219,7 @@ struct RecentlyRemovedView: View {
         if let property = item.property { return property.name }
         if let entry = item.entry {
             let rental = viewModel.properties.first { $0.id == entry.propertyId }?.name ?? String(localized: "No rental", table: "Identity")
-            return "\(rental) · \(IdentityCopy.shortDate(entry.date))"
+            return String(localized: "\(rental) · \(IdentityCopy.shortDate(entry.date))", table: "Identity")
         }
         return item.category?.name ?? item.name
     }

@@ -15,6 +15,7 @@ struct ICloudRecordsSection: View {
     @ObservedObject private var identity: IdentityCoordinator
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.openURL) private var openURL
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     init(viewModel: AppViewModel, onDeleteData: @escaping () -> Void) {
         self.onDeleteData = onDeleteData
@@ -50,7 +51,7 @@ struct ICloudRecordsSection: View {
             if identity.earlierCount > 0 || identity.searchFailed || identity.bulkHold != nil {
                 NavigationLink { EarlierRecordsView() } label: {
                     LHRow.Browse(title: String(localized: "Earlier records", table: "Identity"), meta: earlierMeta,
-                                 value: identity.earlierCount > 0 ? "\(identity.earlierCount)" : nil,
+                                 value: identity.earlierCount > 0 && !typeSize.isAccessibilitySize ? "\(identity.earlierCount)" : nil,
                                  systemImage: "clock.arrow.circlepath",
                                  tint: identity.waitingCount > 0 || identity.searchFailed ? .caution : .neutral, showsChevron: false)
                 }
@@ -104,10 +105,15 @@ struct ICloudStatusRow: View {
     var showsChevron = true
     var onTap: () -> Void
     @EnvironmentObject private var viewModel: AppViewModel
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let status = viewModel.identity.status
-        LHRow.Browse(title: String(localized: "iCloud", table: "Identity"), meta: meta(status), value: value(status),
+        // At accessibility sizes a trailing value squeezes the text column to a few points and
+        // interleaves with the wrapped meta (gate K 1.1 B1), so the value leads the meta line instead.
+        let ax = typeSize.isAccessibilitySize
+        let metaLine = ax ? String(localized: "\(value(status)). \(meta(status))", table: "Identity") : meta(status)
+        LHRow.Browse(title: String(localized: "iCloud", table: "Identity"), meta: metaLine, value: ax ? nil : value(status),
                      systemImage: glyph(status), tint: tint(status), showsChevron: showsChevron, action: showsChevron ? onTap : nil)
             .accessibilityIdentifier("settings.icloud.status")
     }
