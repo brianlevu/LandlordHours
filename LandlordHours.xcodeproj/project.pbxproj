@@ -124,6 +124,7 @@
 		715E16CD866CB2288E172949 /* PaneContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91CD83D159BA8BABADD2DF77 /* PaneContext.swift */; };
 		74917696E05B000CA0E13CC7 /* TodayHouseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 301638903EBA477566BCEDF5 /* TodayHouseTests.swift */; };
 		74D209D746B1A829CC37BB07 /* ConversionPath.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = FBB2664D1A41FBACDD44EC57 /* ConversionPath.xcstrings */; };
+		793689EAB5B13373403A4638 /* RentalLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2103E62B91A461716840A28E /* RentalLogic.swift */; };
 		7A5C510D68D0C7652FC67178 /* LogTimeLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C3403D84E20A7CB20F711A0 /* LogTimeLogic.swift */; };
 		7ABC0EB90D3C20FC948B6FB9 /* PCCReceiptReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B764E672F43604FFA6F8C8A /* PCCReceiptReader.swift */; };
 		7BE636161E5D4B92208041FC /* LandlordHoursTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E078FA57ABF4C028DDE04C86 /* LandlordHoursTimerAttributes.swift */; };
@@ -135,6 +136,7 @@
 		8032DDB8A814D5CA5A69FCD2 /* NotificationCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75598601544E6898E955D9D4 /* NotificationCopy.swift */; };
 		80CEA4EE10BA0654A9DC6216 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2866F8C3251DDD2D9593392E /* AppGroup.swift */; };
 		826B4790C35C2F223F1B5C19 /* HouseRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F6C712F36C0B59A33BB4D48 /* HouseRenderingTests.swift */; };
+		84DE670DB1373A17E2492B91 /* Rentals.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7EFF1A62FB52ACFBA349CFB9 /* Rentals.xcstrings */; };
 		86277D1C3EF4C21CAB223CB5 /* ProMoments.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF39EBE443D66C2EA654096 /* ProMoments.swift */; };
 		874E4639B3AFACC6422540B5 /* LearnArticles.json in Resources */ = {isa = PBXBuildFile; fileRef = 86103C34CCCA866F131145AD /* LearnArticles.json */; };
 		87DBB30F160545549CF94050 /* PropertyComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51E8F6B031DC6C7B4F7EA032 /* PropertyComponents.swift */; };
@@ -235,6 +237,7 @@
 		D22873F8F007BD7B0F0897C2 /* RulesClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66F916D5F37122A02CA6ADF4 /* RulesClassifier.swift */; };
 		D266980AFE730B80E66D1C5D /* TodayComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54C146F6CE8492F0156CDA8B /* TodayComponents.swift */; };
 		D39EE704705B0D5F6985A03D /* BrandPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = D944CCEA37395433E56D818F /* BrandPalette.swift */; };
+		D4E64B3B2C9CA6128B73234F /* RentalEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30A1ABE413AFC1231FBE2394 /* RentalEditSheet.swift */; };
 		D6F01A1BCC4C63937DFC7BB8 /* CalendarDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEA07735A91C141EB38666AE /* CalendarDetector.swift */; };
 		D944AA90DB2DCE59079C61F9 /* AuditReportPDFRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46C2C28508D1F64A007B6BF9 /* AuditReportPDFRenderer.swift */; };
 		DABEFE3725F860151429E838 /* HouseTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45315D80200D5FEE893898D7 /* HouseTokens.swift */; };
@@ -270,6 +273,7 @@
 		F87FAB49553E4595D4C1D27A /* LHSectionHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25592AA9D045230F14E3390A /* LHSectionHeader.swift */; };
 		FA95A196F8212B3525A97088 /* FreeUserPaywallUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 548394DDA38D7BBFDD18E815 /* FreeUserPaywallUITests.swift */; };
 		FD134A0FE3D7F4B5F484C09A /* NoteReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF04BC6B88E4C747F2744B52 /* NoteReaderTests.swift */; };
+		FD1915E10564E5F4022DAE85 /* RentalPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B67FB6A28B23FCA3936ACEB1 /* RentalPage.swift */; };
 		FDD3B102E7A6EF978ED26ADB /* CraftHouseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E98F3220D6538A3E026AF2 /* CraftHouseView.swift */; };
 		FDFADD9A3B0AC288AD87E888 /* OnboardingFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB0388B49984CE37ED41B888 /* OnboardingFlow.swift */; };
 		FEF2ADF1DF06A3C6BA058BE9 /* ProMomentsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6252BC3F79F79B6164763816 /* ProMomentsTests.swift */; };
@@ -348,6 +352,7 @@
 		1D6A18BDE3378CA9EE7B92F5 /* ShellTabUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellTabUITests.swift; sourceTree = "<group>"; };
 		1E4FDA46A18FD2D2EB716A39 /* LHIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHIcons.swift; sourceTree = "<group>"; };
 		2084B656B116C58A4F214944 /* LogTimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogTimeTests.swift; sourceTree = "<group>"; };
+		2103E62B91A461716840A28E /* RentalLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RentalLogic.swift; sourceTree = "<group>"; };
 		22F2A5256E57CEBACC7BDAAC /* StoreKitLocalIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitLocalIntegrationTests.swift; sourceTree = "<group>"; };
 		2487D044B1E2C51F52E4363B /* LockedPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockedPreview.swift; sourceTree = "<group>"; };
 		25592AA9D045230F14E3390A /* LHSectionHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHSectionHeader.swift; sourceTree = "<group>"; };
@@ -363,6 +368,7 @@
 		2F1E3C866671C47777936C66 /* LHRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHRing.swift; sourceTree = "<group>"; };
 		2F2F3D79FA076E4AEDF11086 /* InboxComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxComponents.swift; sourceTree = "<group>"; };
 		301638903EBA477566BCEDF5 /* TodayHouseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayHouseTests.swift; sourceTree = "<group>"; };
+		30A1ABE413AFC1231FBE2394 /* RentalEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RentalEditSheet.swift; sourceTree = "<group>"; };
 		31A39D3EEA4003C1B931EDA8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		32A3407BEDF04CD24CEB6090 /* Polish2CaptureUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Polish2CaptureUITests.swift; sourceTree = "<group>"; };
 		342041CF2446911C896970F7 /* Adaptive.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Adaptive.xcstrings; sourceTree = "<group>"; };
@@ -441,6 +447,7 @@
 		7B19069D2DB3708B654ABA06 /* PropertiesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertiesTests.swift; sourceTree = "<group>"; };
 		7B4B3AC0F459D7FC09BE5961 /* CalendarDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarDetectorTests.swift; sourceTree = "<group>"; };
 		7EDD092218956B458C07C886 /* LHTag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHTag.swift; sourceTree = "<group>"; };
+		7EFF1A62FB52ACFBA349CFB9 /* Rentals.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Rentals.xcstrings; sourceTree = "<group>"; };
 		7F0B8274FBC9C3C8703637AE /* LHComponentSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHComponentSheet.swift; sourceTree = "<group>"; };
 		8094F7C54F228CDDA5D87828 /* ProfileIdentityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileIdentityTests.swift; sourceTree = "<group>"; };
 		80FA7F95B6FE60E29F67E1C5 /* OnboardingSteps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingSteps.swift; sourceTree = "<group>"; };
@@ -495,6 +502,7 @@
 		B1A0DB5C3FFA3B6AC6F14C96 /* note-eval.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "note-eval.json"; sourceTree = "<group>"; };
 		B3C1266007D5A65E91EE7405 /* InboxViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxViewModel.swift; sourceTree = "<group>"; };
 		B60784946AA258E7546B9B1E /* WidgetAssets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = WidgetAssets.xcassets; sourceTree = "<group>"; };
+		B67FB6A28B23FCA3936ACEB1 /* RentalPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RentalPage.swift; sourceTree = "<group>"; };
 		B6B814AF623B0F8FBA1ADFD8 /* CategoryToolTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryToolTile.swift; sourceTree = "<group>"; };
 		B7E98F3220D6538A3E026AF2 /* CraftHouseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CraftHouseView.swift; sourceTree = "<group>"; };
 		B7ECB76E7A5D6C4DDACBA2AD /* AppDesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDesignSystem.swift; sourceTree = "<group>"; };
@@ -626,6 +634,9 @@
 			isa = PBXGroup;
 			children = (
 				51E8F6B031DC6C7B4F7EA032 /* PropertyComponents.swift */,
+				30A1ABE413AFC1231FBE2394 /* RentalEditSheet.swift */,
+				2103E62B91A461716840A28E /* RentalLogic.swift */,
+				B67FB6A28B23FCA3936ACEB1 /* RentalPage.swift */,
 			);
 			path = Properties;
 			sourceTree = "<group>";
@@ -693,6 +704,7 @@
 				342041CF2446911C896970F7 /* Adaptive.xcstrings */,
 				FBB2664D1A41FBACDD44EC57 /* ConversionPath.xcstrings */,
 				06883004BB1E57213877840B /* Foundations.xcstrings */,
+				7EFF1A62FB52ACFBA349CFB9 /* Rentals.xcstrings */,
 				FB2D8BC7BF72372AC3FCB6CB /* Shared.xcstrings */,
 				4DD8A9101BBFD3FB3025E7D0 /* Today.xcstrings */,
 			);
@@ -1296,6 +1308,7 @@
 				874E4639B3AFACC6422540B5 /* LearnArticles.json in Resources */,
 				6FF8DEEA40E74248CCB2F869 /* Localizable.xcstrings in Resources */,
 				A6D2501F6D2AE42B9C7BA27E /* PrivacyInfo.xcprivacy in Resources */,
+				84DE670DB1373A17E2492B91 /* Rentals.xcstrings in Resources */,
 				A81AC2AFE56755BA9AC332FD /* Shared.xcstrings in Resources */,
 				35E06CE7D63383B38C5B73AE /* Today.xcstrings in Resources */,
 				2CF2678CBE8415E9B3A17DAA /* WidgetAssets.xcassets in Resources */,
@@ -1474,6 +1487,9 @@
 				8ED8AAEC6D50C47E9DC615C1 /* PropertyFigures.swift in Sources */,
 				3B6ADC833422DD7187669B64 /* RecordPagePreview.swift in Sources */,
 				0F352493E9D7EEA53D9D38FC /* RecordsLogic.swift in Sources */,
+				D4E64B3B2C9CA6128B73234F /* RentalEditSheet.swift in Sources */,
+				793689EAB5B13373403A4638 /* RentalLogic.swift in Sources */,
+				FD1915E10564E5F4022DAE85 /* RentalPage.swift in Sources */,
 				9088F0862E8DE7E8A0A2A118 /* RentalShelf.swift in Sources */,
 				9B4DCD57764982609DEB9C3A /* RentalSkyline.swift in Sources */,
 				7051CBC82B2AC4E74FCF8D3B /* ReportsLogic.swift in Sources */,
