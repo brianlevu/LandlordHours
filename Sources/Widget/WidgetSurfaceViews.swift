@@ -266,6 +266,8 @@ private struct WidgetNumberBlock: View {
     var statusLines = 3
     /// Short on height (medium at a large text size): the caption shrinks to one line instead of wrapping.
     var captionShrinks = false
+    /// A smaller text style for the status line (small at AX: the number must stay the biggest thing).
+    var statusFont: Font?
     @Environment(\.dynamicTypeSize) private var typeSize
 
     private var ax: Bool { typeSize.isAccessibilitySize }
@@ -280,7 +282,8 @@ private struct WidgetNumberBlock: View {
             } else {
                 numberText
                     .lineLimit(1)
-                    .minimumScaleFactor(0.5)
+                    .minimumScaleFactor(0.85)
+                    .layoutPriority(2)
                     .widgetAccentable()
                 if !ax {
                     Text(display.state == .timer ? String(localized: "widget.timer.running", defaultValue: "Timer running", table: "Widgets") : display.caption)
@@ -317,7 +320,7 @@ private struct WidgetNumberBlock: View {
             Image(systemName: s.symbol).font(.caption.weight(.bold))
             Text(s.text).lineLimit(ax ? max(3, statusLines) : statusLines)
         }
-        .font(.subheadline.weight(.semibold))
+        .font(statusFont ?? .subheadline.weight(.semibold))
         .foregroundStyle(ink.tone(s.tone))
         .fixedSize(horizontal: false, vertical: true)
     }
@@ -549,7 +552,7 @@ struct WidgetSmallView: View {
                     .accessibilityHidden(true)
             }
             Spacer(minLength: 6)
-            WidgetNumberBlock(display: display, ink: ink, numeral: min(numeral, typeSize > .large ? 40 : 56), statusLines: 4)
+            WidgetNumberBlock(display: display, ink: ink, numeral: min(numeral, typeSize > .large ? 40 : 56), statusLines: 4, statusFont: typeSize.isAccessibilitySize ? .footnote.weight(.semibold) : nil)
         }
         .padding(typeSize > .large ? 12 : 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -572,7 +575,7 @@ struct WidgetMediumView: View {
             let house = WidgetHouseSlot(display: display, look: look, side: slot, skylineWidth: 168)
             HStack(alignment: .center, spacing: 0) {
                 VStack(alignment: .leading, spacing: 0) {
-                    WidgetNumberBlock(display: display, ink: ink, numeral: typeSize > .large ? min(numeral, 40) : numeral, captionShrinks: typeSize > .large && display.isAllRentals)
+                    WidgetNumberBlock(display: display, ink: ink, numeral: typeSize > .large ? min(numeral, 40) : numeral, statusLines: typeSize > .large ? 2 : 3, captionShrinks: typeSize > .large)
                     Spacer(minLength: 4)
                     WidgetFooter(display: display, ink: ink)
                 }
@@ -601,25 +604,37 @@ struct WidgetLargeView: View {
         VStack(spacing: 12) {
             // The house block takes whatever the rows leave, so a short list never leaves a blank tail.
             GeometryReader { geo in
-                let side = min(geo.size.height, 176)
-                let house = WidgetHouseSlot(display: display, look: look, side: side, skylineWidth: 200)
-                HStack(alignment: .center, spacing: 0) {
+                if typeSize.isAccessibilitySize {
+                    // At AX the text takes the full width and the house sits under it, so no line is cut.
+                    let side = min(geo.size.height * 0.5, 176)
+                    let house = WidgetHouseSlot(display: display, look: look, side: side, skylineWidth: 200)
                     VStack(alignment: .leading, spacing: 0) {
                         WidgetNumberBlock(display: display, ink: ink, numeral: numeral)
                         Spacer(minLength: 4)
-                        if typeSize <= .large, display.state != .timer, display.state != .noProperty, let stage = display.stageLine {
-                            Text(stage)
-                                .font(.footnote)
-                                .foregroundStyle(ink.secondary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.85)
-                        }
+                        house.frame(width: geo.size.width, height: side, alignment: .bottomTrailing)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(.trailing, 8)
-                    house.frame(width: house.width, height: geo.size.height, alignment: .bottom)
+                    .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+                } else {
+                    let side = min(geo.size.height, 176)
+                    let house = WidgetHouseSlot(display: display, look: look, side: side, skylineWidth: 200)
+                    HStack(alignment: .center, spacing: 0) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            WidgetNumberBlock(display: display, ink: ink, numeral: numeral)
+                            Spacer(minLength: 4)
+                            if typeSize <= .large, display.state != .timer, display.state != .noProperty, let stage = display.stageLine {
+                                Text(stage)
+                                    .font(.footnote)
+                                    .foregroundStyle(ink.secondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(.trailing, 8)
+                        house.frame(width: house.width, height: geo.size.height, alignment: .bottom)
+                    }
+                    .frame(width: geo.size.width, height: geo.size.height)
                 }
-                .frame(width: geo.size.width, height: geo.size.height)
             }
             WidgetConfirmCard(display: display, ink: ink, limit: 3, axLimit: 1, largeTypeLimit: 2)
         }
