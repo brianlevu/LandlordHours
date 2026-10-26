@@ -145,7 +145,7 @@ private final class Composer {
         }
         let rows: [[String]] = [
             [L("pdf.total.hours.logged", "Total hours logged"), AuditReportFormat.hours(s.totalHours)],
-            [L("pdf.hours.in.reps.countable.activities", "Hours that count toward 750"), AuditReportFormat.hours(s.repsCountableHours)],
+            [L("pdf.hours.in.h750.counts.activities", "Hours that count toward 750"), AuditReportFormat.hours(s.repsCountableHours)],
             [L("pdf.hours.in.investor.level.activities.not", "Investor hours (don’t count)"), AuditReportFormat.hours(s.nonCountableHours)],
             [L("pdf.time.entries", "Records"), "\(s.entryCount)"],
             [L("pdf.properties.with.logged.time", "Rentals with hours"), "\(s.propertyCount)"],
@@ -166,7 +166,7 @@ private final class Composer {
     }
 
     private func drawQualification() {
-        sectionTitle(L("pdf.reps.hours.by.participant", "Hours toward 750, by person"))
+        sectionTitle(L("pdf.h750.hours.by.person", "Hours toward 750, by person"))
         let rows = report.qualifications.map { q -> [String] in
             [
                 q.participant.rawValue,
@@ -179,7 +179,7 @@ private final class Composer {
         }
         table(
             columns: [
-                Column(title: L("pdf.participant", "Who"), width: 80),
+                Column(title: L("pdf.person", "Who"), width: 80),
                 Column(title: L("pdf.real.estate.hours", "Real estate hours"), width: 90, alignment: .right),
                 Column(title: L("pdf.more.than.750.hours", "More than 750 hours"), width: 95),
                 Column(title: L("pdf.non.real.estate.work.hours", "Non-real-estate work hours"), width: 120, alignment: .right),
@@ -187,7 +187,7 @@ private final class Composer {
                 Column(title: L("pdf.result", "Result"), width: 210),
             ],
             rows: rows,
-            trailingNote: L("pdf.reps.is.tested.for.each.spouse", "REPS is tested for each spouse separately; spouse hours are not combined for the 750-hour test. Investor-level tasks (investing, financing, purchase negotiation) are excluded. Non-real-estate work hours come from Filing and goal in the app; spouse work hours aren’t tracked in the app yet, so the spouse’s more-than-half test is not evaluated.")
+            trailingNote: L("pdf.h750.is.tested.for.each.spouse", "REPS is tested for each spouse separately; spouse hours are not combined for the 750-hour test. Investor-level tasks (investing, financing, purchase negotiation) are excluded. Non-real-estate work hours come from Filing and goal in the app; spouse work hours aren’t tracked in the app yet, so the spouse’s more-than-half test is not evaluated.")
         )
 
         if !report.materialParticipation.isEmpty {
@@ -202,16 +202,16 @@ private final class Composer {
                 ]
             }
             table(
-                title: report.groupingElection ? L("pdf.material.participation.grouped.activity", "Material participation (grouped activity)") : L("pdf.material.participation.by.property", "Material participation by property"),
+                title: report.groupingElection ? L("pdf.material.part.grouped.activity", "Material participation (grouped activity)") : L("pdf.material.part.by.property", "Material participation by property"),
                 columns: [
                     Column(title: L("pdf.activity", "Activity"), width: 200),
-                    Column(title: L("pdf.countable.hours.excl.investor", "Hours that count (no investor hours)"), width: 100, alignment: .right),
+                    Column(title: L("pdf.counts.hours.excl.investor", "Hours that count (no investor hours)"), width: 100, alignment: .right),
                     Column(title: L("pdf.500.hour.test", "500-hour test"), width: 90),
                     Column(title: L("pdf.100.hour.test", "100-hour test"), width: 100),
                     Column(title: L("pdf.result", "Result"), width: 230),
                 ],
                 rows: mpRows,
-                trailingNote: L("pdf.countable.hours.leave.out.investor.level", "Countable hours leave out investor-level tasks, so they can be lower than the totals in the Hours by rental table. The 100-hour test also requires that no other individual participated more. LandlordHours only marks it met after you confirm that in the app.")
+                trailingNote: L("pdf.counts.hours.leave.out.investor.level", "Countable hours leave out investor-level tasks, so they can be lower than the totals in the Hours by rental table. The 100-hour test also requires that no other individual participated more. LandlordHours only marks it met after you confirm that in the app.")
             )
         }
         y += 10
@@ -230,7 +230,7 @@ private final class Composer {
                 Column(title: L("pdf.self.hours", "Your hours"), width: 60, alignment: .right),
                 Column(title: L("pdf.spouse.hours", "Spouse hours"), width: 60, alignment: .right),
                 Column(title: L("pdf.total.hours", "Total hours"), width: 55, alignment: .right),
-                Column(title: L("pdf.reps.countable", "Counts toward 750"), width: 55, alignment: .right),
+                Column(title: L("pdf.h750.counts", "Counts toward 750"), width: 55, alignment: .right),
             ],
             rows: report.propertyTotals.map {
                 [$0.name, $0.propertyType, $0.address, "\($0.entryCount)",
@@ -244,7 +244,7 @@ private final class Composer {
         table(
             columns: [
                 Column(title: L("pdf.category", "Category"), width: 220),
-                Column(title: L("pdf.counts.toward.reps", "Counts toward 750"), width: 110),
+                Column(title: L("pdf.counts.toward.h750", "Counts toward 750"), width: 110),
                 Column(title: L("pdf.entries", "Records"), width: 70, alignment: .right),
                 Column(title: L("pdf.hours", "Hours"), width: 80, alignment: .right),
             ],
@@ -254,13 +254,13 @@ private final class Composer {
         )
         y += 12
 
-        sectionTitle(L("pdf.hours.by.participant", "Hours by person"))
+        sectionTitle(L("pdf.hours.by.person", "Hours by person"))
         table(
             columns: [
-                Column(title: L("pdf.participant", "Who"), width: 120),
+                Column(title: L("pdf.person", "Who"), width: 120),
                 Column(title: L("pdf.entries", "Records"), width: 70, alignment: .right),
                 Column(title: L("pdf.total.hours", "Total hours"), width: 90, alignment: .right),
-                Column(title: L("pdf.reps.countable.hours", "Hours toward 750"), width: 120, alignment: .right),
+                Column(title: L("pdf.h750.counts.hours", "Hours toward 750"), width: 120, alignment: .right),
             ],
             rows: report.participantTotals.map {
                 [$0.participant.rawValue, "\($0.entryCount)", AuditReportFormat.hours($0.totalHours), AuditReportFormat.hours($0.repsCountableHours)]
@@ -285,7 +285,7 @@ private final class Composer {
                 row.reference,
                 dateFormatter.string(from: row.date),
                 row.propertyName,
-                row.category.rawValue + (row.category.countsForREPS ? "" : L("pdf.notcountable", " (doesn’t count)")),
+                row.category.rawValue + (row.category.countsForREPS ? "" : L("pdf.notcounts", " (doesn’t count)")),
                 row.participant.rawValue,
                 AuditReportFormat.hours(row.hours),
                 description,

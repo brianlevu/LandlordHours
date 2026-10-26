@@ -1299,7 +1299,7 @@
         }
       }
     },
-    "pdf.countable.hours.excl.investor": {
+    "pdf.counts.hours.excl.investor": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1310,7 +1310,7 @@
         }
       }
     },
-    "pdf.countable.hours.leave.out.investor.level": {
+    "pdf.counts.hours.leave.out.investor.level": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1321,7 +1321,7 @@
         }
       }
     },
-    "pdf.counts.toward.reps": {
+    "pdf.counts.toward.h750": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1453,7 +1453,7 @@
         }
       }
     },
-    "pdf.hours.by.participant": {
+    "pdf.hours.by.person": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1486,7 +1486,7 @@
         }
       }
     },
-    "pdf.hours.in.reps.countable.activities": {
+    "pdf.hours.in.h750.counts.activities": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1563,7 +1563,7 @@
         }
       }
     },
-    "pdf.material.participation.by.property": {
+    "pdf.material.part.by.property": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1574,7 +1574,7 @@
         }
       }
     },
-    "pdf.material.participation.grouped.activity": {
+    "pdf.material.part.grouped.activity": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1695,7 +1695,7 @@
         }
       }
     },
-    "pdf.notcountable": {
+    "pdf.notcounts": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1717,7 +1717,7 @@
         }
       }
     },
-    "pdf.participant": {
+    "pdf.person": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1794,7 +1794,7 @@
         }
       }
     },
-    "pdf.reps.countable": {
+    "pdf.h750.counts": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1805,7 +1805,7 @@
         }
       }
     },
-    "pdf.reps.countable.hours": {
+    "pdf.h750.counts.hours": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1816,7 +1816,7 @@
         }
       }
     },
-    "pdf.reps.hours.by.participant": {
+    "pdf.h750.hours.by.person": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1827,7 +1827,7 @@
         }
       }
     },
-    "pdf.reps.is.tested.for.each.spouse": {
+    "pdf.h750.is.tested.for.each.spouse": {
       "extractionState": "manual",
       "localizations": {
         "en": {
