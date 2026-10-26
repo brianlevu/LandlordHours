@@ -251,6 +251,7 @@ struct SettingsAccountSection: View {
                     SettingRow(symbol: "rectangle.portrait.and.arrow.right", title: "Sign out")
                 }
                 .buttonStyle(.plain)
+                .longTailRow()
                 .accessibilityIdentifier("settings.signOut")
             } else {
                 Button {
@@ -259,6 +260,7 @@ struct SettingsAccountSection: View {
                     SettingRow(symbol: "arrow.left.arrow.right", title: "Switch profile", subtitle: "Open other data or start fresh")
                 }
                 .buttonStyle(.plain)
+                .longTailRow()
                 .accessibilityIdentifier("settings.switchProfile")
                 .sheet(isPresented: $showSwitchConfirm) {
                     ProfileSwitchConfirmSheet(
@@ -287,6 +289,7 @@ struct SettingsAccountSection: View {
                 )
             }
             .buttonStyle(.plain)
+            .longTailRow()
             .accessibilityIdentifier("settings.deleteData")
         } header: {
             BPSectionHeader(title: "Account")

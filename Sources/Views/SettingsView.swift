@@ -224,7 +224,7 @@ struct SettingsView: View {
                             Text(email)
                                 .font(.subheadline)
                                 .foregroundStyle(colors.textSecondary)
-                                .lineLimit(1)
+                                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                                 .truncationMode(.middle)
                         }
                         planBadge
@@ -610,6 +610,9 @@ struct ProfileAvatar: View {
                         Text(initials)
                             .font(.headline)
                             .fontDesign(.rounded)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                            .padding(.horizontal, 4)
                             .foregroundStyle(colors.action)
                     }
                 }

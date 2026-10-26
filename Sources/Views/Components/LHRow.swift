@@ -193,19 +193,61 @@ extension LHRow {
             }
         }
 
-        private var content: some View {
+        @ViewBuilder private var content: some View {
+            if typeSize.isAccessibilitySize { axContent } else { regularContent }
+        }
+
+        /// At accessibility sizes the leading glyph and chevron share a top line so the title and
+        /// meta get the whole row width; a narrow title column hyphenates mid-word (rubric §2).
+        private var axContent: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    leading
+                    Spacer(minLength: 0)
+                    if let value {
+                        Text(value)
+                            .font(.subheadline)
+                            .fontDesign(.rounded)
+                            .monospacedDigit()
+                            .foregroundStyle(colors.textSecondary)
+                    }
+                    if showsChevron {
+                        Image(systemName: "chevron.right")
+                            .font(.footnote)
+                            .foregroundStyle(colors.textTertiary)
+                            .accessibilityHidden(true)
+                    }
+                }
+                Text(title)
+                    .font(.body)
+                    .foregroundStyle(colors.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let meta {
+                    Text(meta)
+                        .font(.subheadline)
+                        .foregroundStyle(colors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(LHRow.insets)
+            .frame(minHeight: LHMetrics.rowMinHeight)
+            .contentShape(Rectangle())
+            .accessibilityElement(children: .combine)
+        }
+
+        private var regularContent: some View {
             HStack(spacing: 12) {
                 leading
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.body)
                         .foregroundStyle(colors.textPrimary)
-                        .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
+                        .lineLimit(2)
                     if let meta {
                         Text(meta)
                             .font(.subheadline)
                             .foregroundStyle(colors.textSecondary)
-                            .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
+                            .lineLimit(2)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

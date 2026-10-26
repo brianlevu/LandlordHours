@@ -101,7 +101,52 @@ struct SettingRow: View {
         }
     }
 
-    private var legacyFace: some View {
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    @ViewBuilder private var legacyFace: some View {
+        if typeSize.isAccessibilitySize { axLegacyFace } else { regularLegacyFace }
+    }
+
+    /// At accessibility sizes the glyph and chevron share a top line so the text gets the whole
+    /// row width (a narrow column hyphenates mid-word).
+    private var axLegacyFace: some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                LHRowGlyph(systemImage: symbol, tint: isDestructive ? .caution : .neutral)
+                Spacer(minLength: 0)
+                if let value {
+                    Text(value)
+                        .font(.subheadline)
+                        .fontDesign(.rounded)
+                        .monospacedDigit()
+                        .foregroundStyle(valueColor ?? colors.textSecondary)
+                }
+                if showsChevron {
+                    Image(systemName: "chevron.right")
+                        .font(.footnote)
+                        .foregroundStyle(colors.textTertiary)
+                        .accessibilityHidden(true)
+                }
+            }
+            Text(title)
+                .font(.body)
+                .foregroundStyle(isDestructive ? colors.destructive : colors.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(colors.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(LHRow.insets)
+        .frame(minHeight: LHMetrics.rowMinHeight)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+
+    private var regularLegacyFace: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
         return HStack(alignment: subtitle == nil ? .center : .top, spacing: 12) {
             LHRowGlyph(systemImage: symbol, tint: isDestructive ? .caution : .neutral)

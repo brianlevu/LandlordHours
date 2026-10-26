@@ -167,7 +167,7 @@ struct ExportPDFView: View {
                 .environment(\.colorScheme, .light)
             }
         }
-        .aspectRatio(11 / 8.5, contentMode: .fit)
+        .aspectRatio(isLocked ? 11 / 6 : 11 / 8.5, contentMode: .fit)
         .frame(maxWidth: 420)
         .frame(maxWidth: .infinity)
         .animation(reduceMotion ? nil : AppAnimation.reveal, value: previewYear)

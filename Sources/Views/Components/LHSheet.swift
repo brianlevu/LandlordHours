@@ -40,10 +40,15 @@ struct LHSheet<Content: View, Footer: View>: View {
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .top, spacing: 0) { header }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 4) { footer }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 16)
+            if Footer.self != EmptyView.self {
+                // Opaque, so scrolled rows never read through the pinned action (§1.20).
+                VStack(spacing: 4) { footer }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 16)
+                    .frame(maxWidth: .infinity)
+                    .background(colors.backgroundSecondary)
+            }
         }
     }
 
@@ -70,7 +75,11 @@ struct LHSheet<Content: View, Footer: View>: View {
         }
         .padding(.horizontal, LHMetrics.gutter)
         .padding(.top, 12)
+        .padding(.bottom, 8)
         .frame(minHeight: 56)
+        // Opaque, so scrolled content never reads through the title (§1.20).
+        .frame(maxWidth: .infinity)
+        .background(colors.backgroundSecondary)
     }
 }
 
@@ -95,6 +104,7 @@ private struct LHSheetPresentationModifier: ViewModifier {
             content
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+                .presentationBackground(AdaptiveColors(colorScheme: colorScheme).backgroundSecondary)
         case .focused:
             content
                 .presentationDetents([.large])
