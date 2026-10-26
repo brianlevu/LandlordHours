@@ -74,6 +74,7 @@
 		41608B6514C2E6C81B7359F2 /* AuditReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA55F7A788AAB40693166F60 /* AuditReportTests.swift */; };
 		419FFD77F3F65250D39D2867 /* CategoryToolTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B814AF623B0F8FBA1ADFD8 /* CategoryToolTile.swift */; };
 		41D5547191C590C8DB391022 /* CalendarCaptureCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCE30070327091F72B0D4F65 /* CalendarCaptureCoordinator.swift */; };
+		45D7BE7A4D5B74209895E617 /* HouseRevealTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3481944DA03AF4F158A280AF /* HouseRevealTests.swift */; };
 		45DB616E2423B2CFDAB31C8E /* TaxProfileModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BAAF42493E4F3A16978B2B2 /* TaxProfileModels.swift */; };
 		484E25374A62B01C3588F609 /* LoadingJobsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 820B581AFB8B62B3E8DF9D48 /* LoadingJobsTests.swift */; };
 		494B71178010F1EDB70BC3A5 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 884A37AD32EE90EF18CEDAE9 /* RevenueCat */; };
@@ -114,6 +115,7 @@
 		70D541578CDEBFFF0DE8591C /* TodayHouse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 612AD15E9D33825E7BD9C05B /* TodayHouse.swift */; };
 		74917696E05B000CA0E13CC7 /* TodayHouseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 301638903EBA477566BCEDF5 /* TodayHouseTests.swift */; };
 		74D209D746B1A829CC37BB07 /* ConversionPath.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = FBB2664D1A41FBACDD44EC57 /* ConversionPath.xcstrings */; };
+		79031FFCF15DD092CE881040 /* HouseRevealUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BBB3376945D830755F77630 /* HouseRevealUITests.swift */; };
 		793689EAB5B13373403A4638 /* RentalLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2103E62B91A461716840A28E /* RentalLogic.swift */; };
 		7A5C510D68D0C7652FC67178 /* LogTimeLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C3403D84E20A7CB20F711A0 /* LogTimeLogic.swift */; };
 		7ABC0EB90D3C20FC948B6FB9 /* PCCReceiptReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B764E672F43604FFA6F8C8A /* PCCReceiptReader.swift */; };
@@ -344,6 +346,7 @@
 		287714393B454D0826EED824 /* SurfacesNotificationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurfacesNotificationUITests.swift; sourceTree = "<group>"; };
 		28DDB6B86D81AC402BB21273 /* CraftStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CraftStage.swift; sourceTree = "<group>"; };
 		294885677A14CB0F22849EF0 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		2BBB3376945D830755F77630 /* HouseRevealUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseRevealUITests.swift; sourceTree = "<group>"; };
 		2BEE2CF6FCD6116BAC0787F9 /* TodayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayTests.swift; sourceTree = "<group>"; };
 		2D6F3B35F2EFEC3249A5553A /* TodayWindowStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayWindowStateTests.swift; sourceTree = "<group>"; };
 		2F1E3C866671C47777936C66 /* LHRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHRing.swift; sourceTree = "<group>"; };
@@ -352,6 +355,7 @@
 		30A1ABE413AFC1231FBE2394 /* RentalEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RentalEditSheet.swift; sourceTree = "<group>"; };
 		31A39D3EEA4003C1B931EDA8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		32A3407BEDF04CD24CEB6090 /* Polish2CaptureUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Polish2CaptureUITests.swift; sourceTree = "<group>"; };
+		3481944DA03AF4F158A280AF /* HouseRevealTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseRevealTests.swift; sourceTree = "<group>"; };
 		3612BFB5E9C63EC911F605B5 /* LegacyBlueprint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyBlueprint.swift; sourceTree = "<group>"; };
 		37718C6C352F5146B1B19AAA /* ExportPDFView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPDFView.swift; sourceTree = "<group>"; };
 		39B0EF9F3EAF62E2B3ADF0FE /* SuggestionConfirmSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestionConfirmSheet.swift; sourceTree = "<group>"; };
@@ -817,6 +821,7 @@
 				87EEBA1DDCBACA2908D1569A /* FoundationsTests.swift */,
 				581F7881E36776AC87431D40 /* HouseProgressTests.swift */,
 				5F6C712F36C0B59A33BB4D48 /* HouseRenderingTests.swift */,
+				3481944DA03AF4F158A280AF /* HouseRevealTests.swift */,
 				090AC6457EB4FB394F170292 /* InboxTests.swift */,
 				A01B3B8EADDB251440528314 /* LandlordHoursTests.swift */,
 				0914D43BECE24E5CB862706D /* LandlordPurchasesTests.swift */,
@@ -907,6 +912,7 @@
 			children = (
 				548394DDA38D7BBFDD18E815 /* FreeUserPaywallUITests.swift */,
 				016D2C699C6EA42FF25E0767 /* HousePreviewUITests.swift */,
+				2BBB3376945D830755F77630 /* HouseRevealUITests.swift */,
 				DD0C1C4662F46051DF0E5A62 /* InboxCaptureUITests.swift */,
 				00D256C8A4030CDDD3F2378D /* InboxUITests.swift */,
 				8248EAB41ECD1E6CF7808498 /* LandlordHoursUITests.swift */,
@@ -1486,6 +1492,7 @@
 				E012C380A33D1F00DC5273F9 /* FoundationsTests.swift in Sources */,
 				A5A4A54EDF6C065AFC4FD776 /* HouseProgressTests.swift in Sources */,
 				826B4790C35C2F223F1B5C19 /* HouseRenderingTests.swift in Sources */,
+				45D7BE7A4D5B74209895E617 /* HouseRevealTests.swift in Sources */,
 				3455FD1A4EC9DB8EBF327EA6 /* InboxTests.swift in Sources */,
 				2846D3E26FF2EA4A60FAF7D6 /* LandlordHoursTests.swift in Sources */,
 				A130AD4A0C3826D57BDE0E2C /* LandlordPurchasesTests.swift in Sources */,
@@ -1521,6 +1528,7 @@
 			files = (
 				FA95A196F8212B3525A97088 /* FreeUserPaywallUITests.swift in Sources */,
 				9ED242B446E98033F81CEF73 /* HousePreviewUITests.swift in Sources */,
+				79031FFCF15DD092CE881040 /* HouseRevealUITests.swift in Sources */,
 				F7C5F8A5FB802ED1144DAB1B /* InboxCaptureUITests.swift in Sources */,
 				E7C67889F1F2B1F8138B9B71 /* InboxUITests.swift in Sources */,
 				20622DC1C008655024F7676F /* LandlordHoursUITests.swift in Sources */,

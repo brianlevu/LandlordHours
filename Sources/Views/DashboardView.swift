@@ -58,9 +58,25 @@ enum TodayPresentation {
 // "of 100 hours" · the pace sentence · "To confirm · N" with ≤ 2 `LHRow.Action` rows and a
 // "See all N" foot. Pace tiles and "This week" left Today (rental page, Reports).
 //
-// Motion is the house's own (`timberDrop`, `windowsOn`, `stageFade`) and `rentalSlide`, bound to
-// the live hours while Today is visible. While Today is off screen the hero is frozen, and on
-// return it remounts at the new state with no motion (§H.6 "never on appear").
+// Motion is the house's own (`timberDrop`, `windowsOn`, `stageFade`) and `rentalSlide`. Reveal on
+// return (§B.3 `houseReveal`, Brian 2026-10-26): the hero draws what the user last SAW
+// (`HouseSeenLedger`) until Today is visible — its tab selected, the app active, no sheet or cover
+// over it — then plays ONE transition to the live state and stores that as seen. A save in Records,
+// under the Log time sheet or on another device never plays out of sight.
+
+/// The shell tells Today whether anything of its own covers the Today tab (another tab selected,
+/// Reports or Settings in its place, the Log time sheet until it has finished dismissing, a shell
+/// cover). Today adds its own sheets and the scene phase.
+private struct TodayShellUncoveredKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    var todayShellUncovered: Bool {
+        get { self[TodayShellUncoveredKey.self] }
+        set { self[TodayShellUncoveredKey.self] = newValue }
+    }
+}
 
 struct DashboardView: View {
     @EnvironmentObject var viewModel: AppViewModel
@@ -70,6 +86,8 @@ struct DashboardView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.layoutBand) private var band
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.todayShellUncovered) private var shellUncovered
     /// The Inbox's model (shell-owned): Today's To confirm reads and writes the same list, so the
     /// count here, the Inbox and its tab badge are one number.
     @ObservedObject var inbox: InboxViewModel
@@ -83,16 +101,24 @@ struct DashboardView: View {
     @State private var slideEdge: Edge = .trailing
     @State private var window: CGSize = .zero
     @State private var heroSide: CraftHeroSide?
-    @State private var isVisible = false
-    /// The hero as it was when Today left the screen; nil while Today is visible.
-    @State private var frozen: HeroSnapshot?
-    /// Bumped to remount the hero without motion (return to Today, a DEBUG seed).
+    /// Today's view is in the window (its tab is selected). `isVisible` adds the rest.
+    @State private var onScreen = false
+    /// What the hero draws: the last-seen state until a reveal plays, then the live one. It never
+    /// follows the live data while Today is hidden. nil = the live state (first draw).
+    @State private var shown: HeroSnapshot?
+    /// The number while a reveal is in flight (the seen hours until the stage lands); nil = the
+    /// hero's hours. Set in the same transaction as `shown`, so it never flashes the new value first.
+    @State private var shownNumber: Double?
+    /// A local sheet or cover has been told to close and has not finished dismissing.
+    @State private var coverClosing = false
+    @State private var revealTask: Task<Void, Never>?
+    /// When the last rental slide started: a catch-up waits for the slide to land.
+    @State private var slideStarted: Date?
+    /// Bumped to remount the hero without motion (a page shown as it is, a DEBUG seed).
     @State private var heroMount = 0
-    /// The hours the number last landed on, per page. While a timber drop is pending from these
-    /// hours to the live ones, the number shows these, then rolls as the last timber lands
-    /// (`heroCountUp`). Derived in `shownHours`, so the number never flashes the new value first
-    /// (r2 showed 46 → 48 → 46 for eight frames when the hold was set in `onChange`).
-    @State private var settledHours: (focus: String, hours: Double)?
+    #if DEBUG
+    @ObservedObject private var revealLog = HouseRevealDebugLog.shared
+    #endif
     @State private var calendarSuggestionsOn = CaptureOptIn.calendarSuggestionsEnabled()
     @State private var showParticipationSheet = false
     @State private var showRecordExport = false
@@ -107,6 +133,19 @@ struct DashboardView: View {
         let stage: CraftStage
         let lit: Bool
         let hours: Double
+
+        init(focus: String, stage: CraftStage, lit: Bool, hours: Double) {
+            self.focus = focus
+            self.stage = stage
+            self.lit = lit
+            self.hours = hours
+        }
+
+        init(_ seen: HouseSeenState, focus: String) {
+            self.init(focus: focus, stage: seen.stage, lit: seen.lit, hours: seen.hours)
+        }
+
+        var seen: HouseSeenState { HouseSeenState(stage: stage, lit: lit, hours: hours) }
     }
 
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
@@ -137,30 +176,31 @@ struct DashboardView: View {
         TodayWindowState.loggedToday(entries: viewModel.timeEntries, rentalIDs: focus.rentalIDs, now: InboxClock.now())
     }
 
-    /// What the hero draws: the live state, or the frozen one while Today is off screen.
+    /// What the hero draws: the last state shown (seen, or mid-reveal), else the live one.
     private var heroState: HeroSnapshot {
-        frozen ?? liveHeroState()
+        shown ?? liveHeroState()
     }
 
-    /// The number shown: held at the pre-save value through a drop.
+    /// The number shown: the hero's hours, held at the seen value until a drop lands.
     private var shownHours: Double {
-        let live = heroState.hours
-        if let settled = settledHours, settled.focus == heroState.focus, dropPending(from: settled.hours, to: live) {
-            return settled.hours
-        }
-        return live
+        shownNumber ?? heroState.hours
     }
 
-    /// A save on the shown page that will play the timber drop (the same test `CraftHouseView` makes).
-    private func dropPending(from old: Double, to new: Double) -> Bool {
-        guard isVisible, frozen == nil, new > old, let focus, dropAllowed, !reduceMotion,
-              CraftHouseView.buildClipURL(dark: colorScheme == .dark) != nil else { return false }
-        return CraftMotion.stageMotion(from: CraftStage.stage(hours: old, goal: focus.goal),
-                                       to: CraftStage.stage(hours: new, goal: focus.goal)) == .timberDrop
+    /// A sheet or cover of Today's own is up (or still closing).
+    private var locallyCovered: Bool {
+        showRecordExport || inbox.sheetSuggestion != nil || showCaptureSetup || showParticipationSheet
+            || showLearningCenter || shownCelebration != nil || shownBackfill != nil || coverClosing
     }
 
-    private func settleNumber() {
-        settledHours = focus.map { ($0.id, $0.hours) }
+    /// Today can be seen: its tab is selected with nothing over it, and the app is active.
+    private var isVisible: Bool {
+        onScreen && shellUncovered && scenePhase == .active && !locallyCovered
+    }
+
+    /// Local sheets that close through `onDismiss` (the navigation push has none).
+    private var localSheetUp: Bool {
+        showRecordExport || inbox.sheetSuggestion != nil || showCaptureSetup || showParticipationSheet
+            || shownCelebration != nil || shownBackfill != nil
     }
 
     private var side: CGFloat {
@@ -262,9 +302,13 @@ struct DashboardView: View {
                     inbox.reload()
                     refreshCaptureState()
                     resolveFocus()
-                    if let i = TodayDebugSeed.focusIndex, focuses.indices.contains(i) { focusID = focuses[i].id }
-                    heroMount += 1   // the seed replaced the data: remount, no motion
-                    settleNumber()
+                    // Once per launch (`.task` runs on every appear): the seed replaced the data,
+                    // so show it as it is, with no motion, and store it as seen.
+                    if !Self.didAcceptSeed {
+                        Self.didAcceptSeed = true
+                        if let i = TodayDebugSeed.focusIndex, focuses.indices.contains(i) { focusID = focuses[i].id }
+                        showLiveAsSeen()
+                    }
                     if let focus { TodayDebugSeed.scheduleLog(app: viewModel, rentalID: focus.rentalID, rentalName: focus.name) }
                     TodayDebugSeed.runTabTour()
                     guard TodayDebugSeed.scrollsToEnd else { return }
@@ -288,16 +332,35 @@ struct DashboardView: View {
             .toolbar(.hidden, for: .navigationBar)
             .sensoryFeedback(.selection, trigger: focusID)
             .onAppear(perform: appeared)
-            .onDisappear(perform: disappeared)
+            .onDisappear { onScreen = false }
+            .onChange(of: isVisible) { _, visible in if visible { becameVisible() } }
+            .onChange(of: localSheetUp) { wasUp, isUp in
+                // The sheet is closing: Today waits for `onDismiss` before it plays anything.
+                guard wasUp, !isUp else { return }
+                coverClosing = true
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(1.0))   // safety net if onDismiss never comes
+                    coverClosing = false
+                }
+            }
             .onChange(of: dynamicTypeSize) { _, _ in resolveHeroSide() }
             .onChange(of: band) { _, _ in resolveHeroSide() }
             .onChange(of: focuses.map(\.id)) { _, _ in resolveFocus() }
-            .onChange(of: focus?.hours) { old, new in hoursChanged(from: old, to: new) }
+            .onChange(of: liveHeroState()) { _, _ in
+                // A change while Today is visible plays now; a hidden one waits for the return.
+                if isVisible { reveal() }
+            }
+            .onChange(of: hoursPending) { wasPending, isPending in
+                if wasPending, !isPending, isVisible { reveal() }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .captureSuggestionsDidChange)) { _ in refreshCaptureState() }
             .onChange(of: hoursPending) { wasPending, isPending in
                 guard wasPending, !isPending else { return }
                 UIAccessibility.post(notification: .announcement, argument: pace.spoken)
             }
+            #if DEBUG
+            .overlay(alignment: .topLeading) { revealProbe }
+            #endif
             .onChange(of: houseEvents.pendingConfirm) { _, confirm in
                 // The hero builds from the live hours; consume the event so nothing replays later.
                 guard confirm != nil, isVisible else { return }
@@ -305,17 +368,18 @@ struct DashboardView: View {
             }
             .onChange(of: houseEvents.celebrationTick) { _, _ in
                 guard isVisible else { return }
-                scheduleCelebration(after: shownHours != heroState.hours ? Self.afterDrop : Self.afterSettle)
+                scheduleCelebration(after: shownNumber != nil ? Self.afterDrop : Self.afterSettle)
             }
             .onChange(of: houseEvents.pendingBackfill) { _, reveal in
                 guard reveal != nil, isVisible else { return }
                 presentBackfillIfNeeded()
             }
-            .sheet(isPresented: $showRecordExport) { ExportPDFView(year: currentYear) }
-            .sheet(item: $inbox.sheetSuggestion) { suggestion in
+            .sheet(isPresented: $showRecordExport, onDismiss: coverDismissed) { ExportPDFView(year: currentYear) }
+            .sheet(item: $inbox.sheetSuggestion, onDismiss: coverDismissed) { suggestion in
                 SuggestionConfirmSheet(suggestion: suggestion, model: inbox)
             }
             .sheet(isPresented: $showCaptureSetup, onDismiss: {
+                coverDismissed()
                 refreshCaptureState()
                 inbox.reload()
             }) {
@@ -324,7 +388,7 @@ struct DashboardView: View {
                 }
                 .environmentObject(viewModel)
             }
-            .sheet(isPresented: $showParticipationSheet) {
+            .sheet(isPresented: $showParticipationSheet, onDismiss: coverDismissed) {
                 ParticipationConfirmationSheet(year: currentYear,
                                                currentAnswer: taxProfile.noOneParticipatedMore(forYear: currentYear)) { answer in
                     taxProfile.setNoOneParticipatedMore(answer, forYear: currentYear)
@@ -332,6 +396,7 @@ struct DashboardView: View {
             }
             .navigationDestination(isPresented: $showLearningCenter) { LearningCenterView() }
             .fullScreenCover(item: $shownCelebration, onDismiss: {
+                coverDismissed()
                 presentBackfillIfNeeded()
                 presentNextCelebration()
             }) { item in
@@ -340,7 +405,10 @@ struct DashboardView: View {
                                          onContinue: { shownCelebration = nil })
             }
         }
-        .fullScreenCover(item: $shownBackfill, onDismiss: { presentNextCelebration() }) { reveal in
+        .fullScreenCover(item: $shownBackfill, onDismiss: {
+            coverDismissed()
+            presentNextCelebration()
+        }) { reveal in
             BackfillRevealView(
                 foundHours: reveal.foundHours,
                 suggestionCount: reveal.suggestionCount,
@@ -513,8 +581,18 @@ struct DashboardView: View {
         let pages = focuses
         let to = pages.firstIndex { $0.id == id } ?? 0
         slideEdge = to > focusIndex ? .trailing : .leading
-        if let page = pages.first(where: { $0.id == id }) { settledHours = (page.id, page.hours) }
-        withAnimation(CraftHouseView.rentalSlideAnimation(reduceMotion: reduceMotion)) { focusID = id }
+        // The new page slides in as the user last saw it; if it changed since, its catch-up plays
+        // once after the slide (`reveal`). A page with nothing new never replays its build.
+        let start = pages.first(where: { $0.id == id }).map { page -> HeroSnapshot in
+            let live = snapshot(page)
+            return HeroSnapshot(revealCoordinator.startState(focus: page.id, current: live.seen, year: currentYear), focus: page.id)
+        }
+        slideStarted = Date()
+        withAnimation(CraftHouseView.rentalSlideAnimation(reduceMotion: reduceMotion)) {
+            focusID = id
+            shown = start
+            shownNumber = nil
+        }
         rememberedFocus = id
     }
 
@@ -540,19 +618,12 @@ struct DashboardView: View {
         heroSide = CraftHeroSide.resolve(previous: heroSide, kind: .hero, window: window, band: band, accessibility: ax)
     }
 
-    /// Hours on the shown page changed. Unless the change plays the timber drop (the number then
-    /// waits in `shownHours` for the last timber), the number lands on the new hours now.
-    private func hoursChanged(from old: Double?, to new: Double?) {
-        guard let focus, let new else { return }
-        if settledHours?.focus == focus.id, let settled = settledHours?.hours, dropPending(from: settled, to: new) { return }
-        settledHours = (focus.id, new)
-    }
-
     private func stageSettled(_ motion: CraftStageMotion) {
         if motion == .timberDrop, let focus {
             CraftDropLedger().markPlayed(rentalID: focus.rentalID, stage: .framing, year: currentYear)
         }
-        settleNumber()
+        // The number rolls as the stage lands (`heroCountUp`).
+        shownNumber = nil
     }
 
     private func rowLogged(_ suggestion: Suggestion) {
@@ -566,27 +637,110 @@ struct DashboardView: View {
     }
 
     private func appeared() {
-        isVisible = true
         refreshCaptureState()
         resolveFocus()
-        if let frozen, frozen != liveHeroState() {
-            // Saved while away: show the new state at once, with no motion (§H.6).
-            heroMount += 1
-        }
-        frozen = nil
-        settleNumber()
-        houseEvents.takeConfirm()
-        scheduleCelebration(after: Self.afterAppear)
+        onScreen = true   // `onChange(isVisible)` plays the reveal
     }
 
-    private func disappeared() {
-        frozen = heroState
-        isVisible = false
+    /// Today just became visible: play the catch-up (if any), then any queued milestone.
+    private func becameVisible() {
+        houseEvents.takeConfirm()
+        let plan = reveal()
+        let delay: Double
+        if let plan, plan.stageMotion == .timberDrop || plan.windowsChange {
+            delay = plan.stageMotion == .timberDrop ? Self.afterDrop : Self.afterSettle
+        } else if plan?.stageMotion == .stageFade {
+            delay = Self.afterSettle
+        } else {
+            delay = Self.afterAppear
+        }
+        scheduleCelebration(after: delay)
+    }
+
+    private func coverDismissed() {
+        coverClosing = false
+    }
+
+    private var revealCoordinator: HouseRevealCoordinator { HouseRevealCoordinator() }
+
+    private func snapshot(_ focus: TodayFocus) -> HeroSnapshot {
+        HeroSnapshot(focus: focus.id, stage: focus.stage, lit: lit(focus), hours: focus.hours)
     }
 
     private func liveHeroState() -> HeroSnapshot {
         guard let focus else { return HeroSnapshot(focus: "none", stage: .started, lit: false, hours: 0) }
-        return HeroSnapshot(focus: focus.id, stage: focus.stage, lit: lit(focus), hours: focus.hours)
+        return snapshot(focus)
+    }
+
+    /// Reveal on return (§B.3 `houseReveal`): one transition from what the user last saw on this
+    /// page to the live state, then the live state is stored as seen. Only while Today is visible.
+    @discardableResult
+    private func reveal() -> HouseRevealPlan? {
+        guard isVisible, !hoursPending, let focus else { return nil }
+        let live = snapshot(focus)
+        let plan = revealCoordinator.reveal(focus: focus.id, current: live.seen, year: currentYear,
+                                            dropAllowed: dropAllowed, reduceMotion: reduceMotion)
+        revealTask?.cancel()
+        guard let plan else {
+            // Never seen this year, or nothing changed: show the page as it is, with no motion.
+            if shown != live {
+                if shown?.focus == live.focus { heroMount += 1 }
+                shown = live
+            }
+            shownNumber = nil
+            return nil
+        }
+        let base = HeroSnapshot(plan.from, focus: focus.id)
+        var wait: Double = 0
+        if shown != base {
+            // The hero is not drawing the seen state (first draw, a relaunch): put it there first.
+            if shown?.focus == base.focus || shown == nil { heroMount += 1 }
+            shown = base
+            wait = 0.08
+        }
+        if let slideStarted, Date().timeIntervalSince(slideStarted) < CraftMotion.rentalSlide { wait = max(wait, CraftMotion.rentalSlide + 0.05) }
+        shownNumber = plan.from.hours
+        #if DEBUG
+        let label = "reveal:\(plan.stageMotion):\(Int(plan.from.hours))->\(Int(plan.to.hours))"
+        #endif
+        revealTask = Task { @MainActor in
+            if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
+            guard !Task.isCancelled else { return }
+            #if DEBUG
+            HouseRevealDebugLog.shared.record(label)
+            #endif
+            shown = live
+            // The number rolls now, or as the last timber lands (`stageSettled`).
+            if !plan.holdsNumberUntilSettled { shownNumber = nil }
+        }
+        return plan
+    }
+
+    #if DEBUG
+    @MainActor private static var didAcceptSeed = false
+
+    /// `-LHRevealProbe`: the ordered reveal events, for UI tests (never drawn visibly).
+    @ViewBuilder private var revealProbe: some View {
+        if HouseRevealDebugLog.isEnabled {
+            Text(revealLog.events.isEmpty ? "none" : revealLog.events.joined(separator: ","))
+                .font(.caption2)
+                .frame(width: 1, height: 1)
+                .clipped()
+                .opacity(0.02)
+                .allowsHitTesting(false)
+                .accessibilityIdentifier("today.revealProbe")
+        }
+    }
+    #endif
+
+    /// DEBUG seeds and data resets: show the live state as it is and store it as seen.
+    private func showLiveAsSeen() {
+        guard let focus else { return }
+        let live = snapshot(focus)
+        HouseSeenLedger().markSeen(live.seen, focus: focus.id, year: currentYear)
+        heroMount += 1
+        shown = live
+        shownNumber = nil
     }
 
     // MARK: Celebrations and the Day-1 reveal
