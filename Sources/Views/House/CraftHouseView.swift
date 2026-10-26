@@ -178,10 +178,10 @@ struct CraftHouseView: View {
     /// The unlit still underneath, the lit still fading over it. A missing `-unlit` twin falls back
     /// to the lit asset (a gate FAIL, §H.3).
     @ViewBuilder private var stills: some View {
-        let lit = Image(displayedStage.assetName(lit: true)).resizable().interpolation(.high).scaledToFit()
+        let lit = Image(decorative: displayedStage.assetName(lit: true)).resizable().interpolation(.high).scaledToFit()
         if Self.hasUnlitTwin(displayedStage) {
             ZStack {
-                Image(displayedStage.assetName(lit: false)).resizable().interpolation(.high).scaledToFit()
+                Image(decorative: displayedStage.assetName(lit: false)).resizable().interpolation(.high).scaledToFit()
                 lit.opacity(displayedLit ? 1 : 0).animation(windowsAnimation, value: displayedLit)
             }
         } else {

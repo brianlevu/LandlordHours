@@ -94,6 +94,13 @@ struct LHComponentSheet: View {
                     .buttonStyle(LHButton.icon).accessibilityLabel(fx("Close"))
             }
             Button(fx("Disabled")) {}.buttonStyle(LHButton.primary).disabled(true)
+                .accessibilityIdentifier("lh.componentSheet.disabledPrimary")
+            flow(spacing: 12) {
+                Button(fx("Disabled")) {}.buttonStyle(LHButton.secondary).disabled(true)
+                Button(fx("Disabled")) {}.buttonStyle(LHButton.tertiary).disabled(true)
+                Button {} label: { Image(systemName: "xmark") }
+                    .buttonStyle(LHButton.icon).disabled(true).accessibilityLabel(fx("Close"))
+            }
         }
         LHSectionHeader(fx("To confirm"), count: 7, trailingTitle: fx("See all"), trailingAction: {})
         flow(spacing: 8) {

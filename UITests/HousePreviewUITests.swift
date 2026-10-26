@@ -22,34 +22,53 @@ final class HousePreviewUITests: XCTestCase {
         app.launch()
     }
 
-    func testHeroIsOneLabelledImageWithHoursGoalAndNextMilestone() {
+    /// The crafted house is one labelled image: the stage and the lights. The hours, the goal and
+    /// the pace are Today's number block, not the house (package C; covered in TodayHouseUITests).
+    private var house: XCUIElement { app.descendants(matching: .any)["craft.house"] }
+
+    func testHeroIsOneLabelledImageWithTheStageAndTheLights() {
         launch("212")
-        let house = app.descendants(matching: .any)["house-hero"]
         XCTAssertTrue(house.waitForExistence(timeout: 10))
-        XCTAssertTrue(house.label.contains("212 of 750 hours"), house.label)
-        XCTAssertTrue(house.label.contains("REPS goal"), house.label)
-        XCTAssertTrue(house.label.contains("roof at 500 hours"), house.label)
+        XCTAssertEqual(house.label, "House, Frame going up, lights on")
         // Decorative layers stay out of the tree: no image element named after an asset.
         XCTAssertEqual(app.images.matching(NSPredicate(format: "identifier BEGINSWITH 'bp_'")).count, 0)
         XCTAssertEqual(app.images.matching(NSPredicate(format: "label CONTAINS 'bp_'")).count, 0)
     }
 
-    func testMPGoalHeroDark() {
-        launch("120", "mp500", scheme: "dark")
-        let house = app.descendants(matching: .any)["house-hero"]
+    /// BUG (found repairing these tests): the crafted house's stills are `Image(name)`, not
+    /// `Image(decorative:)`, so the asset names ("craft_frame70", "craft_frame70-unlit") sit in the
+    /// accessibility tree under the house. The old house hid its art; this check passed then.
+    /// Strict: when the stills are made decorative this starts passing, and the expectation must go.
+    func testArtLayersAreHiddenFromVoiceOver() {
+        launch("212")
         XCTAssertTrue(house.waitForExistence(timeout: 10))
-        XCTAssertTrue(house.label.contains("120 of 500 hours"), house.label)
+        XCTAssertEqual(app.images.matching(NSPredicate(format: "label BEGINSWITH 'craft_'")).count, 0,
+                       "The art layers are hidden from VoiceOver: only the house is read")
     }
 
-    func testConfirmCrossingFiveHundredOpensTheCelebrationWithContinue() {
-        launch("499", extra: ["-LHHouseScene", "confirm", "-LHHouseConfirmHours", "2", "-LHHouseConfirmDelay", "0.5"])
+    func testMPGoalHeroDark() {
+        launch("120", "mp500", scheme: "dark")
+        XCTAssertTrue(house.waitForExistence(timeout: 10))
+        XCTAssertEqual(house.label, "House, Frame going up, lights on")
+    }
+
+    /// The confirm scene adds hours to an unlit house: the stage advances and the lights come on.
+    func testConfirmCrossingToTheRoofChangesTheStageAndLightsTheWindows() {
+        launch("440", extra: ["-LHHouseScene", "confirm", "-LHHouseConfirmHours", "20", "-LHHouseConfirmDelay", "6", "-LHHouseUnlit"])
+        XCTAssertTrue(house.waitForExistence(timeout: 10))
+        XCTAssertEqual(house.label, "House, Frame finished, lights off")
+        let after = NSPredicate(format: "label == %@", "House, Roof on, siding going up, lights on")
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "craft.house").matching(after).firstMatch
+            .waitForExistence(timeout: 10), "after the confirm: \(house.label)")
+    }
+
+    /// The celebration itself (Continue and Share) is shown by the milestone scene; Today presents it on real data.
+    func testMilestoneSceneCarriesContinueAndShare() {
+        launch("501", extra: ["-LHHouseScene", "milestone", "-LHHouseMilestone", "500", "-LHHouseSettled"])
         let cont = app.buttons["milestone-continue"]
-        XCTAssertTrue(cont.waitForExistence(timeout: 10), "the 500h celebration should open after the confirm")
+        XCTAssertTrue(cont.waitForExistence(timeout: 10), "the 500h celebration shows Continue")
         XCTAssertTrue(cont.isHittable)
         XCTAssertTrue(app.buttons["milestone-share"].waitForExistence(timeout: 3), "celebrations carry Share")
-        cont.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["house-hero"].waitForExistence(timeout: 5))
-        XCTAssertFalse(cont.exists)
     }
 
     func testBackfillIsSkippable() {

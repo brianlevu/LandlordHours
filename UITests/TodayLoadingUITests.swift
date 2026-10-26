@@ -34,10 +34,20 @@ final class TodayLoadingUITests: XCTestCase {
     }
 
     private var hero: XCUIElement { app.descendants(matching: .any)["today.hero"] }
+    private var number: XCUIElement { app.descendants(matching: .any)["today.number"].firstMatch }
+    private var pace: XCUIElement { app.descendants(matching: .any)["today.pace"].firstMatch }
 
-    private func heroLabel(containing text: String, timeout: TimeInterval) -> Bool {
+    /// The package C Today: the house is always drawn; only the number (a dash) and the pace line
+    /// ("Bringing in your latest hours from iCloud.") wait for the pull.
+    private func paceLabel(containing text: String, timeout: TimeInterval) -> Bool {
         let predicate = NSPredicate(format: "label CONTAINS %@", text)
-        return app.descendants(matching: .any).matching(identifier: "today.hero").matching(predicate)
+        return app.descendants(matching: .any).matching(identifier: "today.pace").matching(predicate)
+            .firstMatch.waitForExistence(timeout: timeout)
+    }
+
+    private func numberLabel(is text: String, timeout: TimeInterval) -> Bool {
+        let predicate = NSPredicate(format: "label == %@", text)
+        return app.descendants(matching: .any).matching(identifier: "today.number").matching(predicate)
             .firstMatch.waitForExistence(timeout: timeout)
     }
 
@@ -56,9 +66,10 @@ final class TodayLoadingUITests: XCTestCase {
     func testTodayIsInteractiveWhileInitialPullIsPending() {
         launch(pendingSeconds: "60")
         XCTAssertTrue(hero.waitForExistence(timeout: 15), "Today renders at once: no splash, no loading screen")
-        XCTAssertTrue(heroLabel(containing: "Loading your hours", timeout: 3), hero.label)
-        XCTAssertFalse(hero.label.contains("212 of 750"), "The number waits for the pull")
-        XCTAssertTrue(app.staticTexts["today.header.title"].exists, "The rest of Today is there")
+        XCTAssertTrue(paceLabel(containing: "Bringing in your latest hours", timeout: 3), pace.label)
+        XCTAssertTrue(numberLabel(is: "—", timeout: 3), "The number waits for the pull: \(number.label)")
+        XCTAssertFalse(app.descendants(matching: .any)["today.numberBlock"].label.contains("212"), "The number waits for the pull")
+        XCTAssertTrue(app.buttons["today.account"].exists, "The rest of Today is there")
         attach("today-loading-light")
 
         // "+" works while the hours are still loading.
@@ -71,21 +82,22 @@ final class TodayLoadingUITests: XCTestCase {
 
         // Back on Today it is still loading the Blueprint way, not blocked.
         app.buttons["tab.today"].tap()
-        XCTAssertTrue(heroLabel(containing: "Loading your hours", timeout: 5), hero.label)
-        XCTAssertTrue(app.buttons["Open reports"].isHittable, "Header actions stay tappable")
+        XCTAssertTrue(paceLabel(containing: "Bringing in your latest hours", timeout: 5), pace.label)
+        XCTAssertTrue(app.buttons["today.account"].isHittable, "Header actions stay tappable")
     }
 
     /// When the pull lands the real house and number settle in.
     func testHoursSettleInWhenThePullLands() {
         launch(pendingSeconds: "2.5")
         XCTAssertTrue(hero.waitForExistence(timeout: 15))
-        XCTAssertTrue(heroLabel(containing: "212 of 750 hours", timeout: 12), hero.label)
-        XCTAssertFalse(hero.label.contains("Loading"), "No loader once settled")
+        XCTAssertTrue(numberLabel(is: "212", timeout: 12), number.label)
+        XCTAssertTrue(app.descendants(matching: .any)["today.numberBlock"].label.contains("of 750 hours"))
+        XCTAssertFalse(pace.label.contains("Bringing in"), "No loader once settled")
     }
 
     func testLoadingStateDark() {
         launch(pendingSeconds: "60", scheme: "dark")
-        XCTAssertTrue(heroLabel(containing: "Loading your hours", timeout: 15), hero.label)
+        XCTAssertTrue(paceLabel(containing: "Bringing in your latest hours", timeout: 15), pace.label)
         Thread.sleep(forTimeInterval: 1.0)
         attach("today-loading-dark")
     }
