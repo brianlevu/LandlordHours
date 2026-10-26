@@ -201,6 +201,28 @@ final class MigrationRulesTests: XCTestCase {
         XCTAssertEqual(LegacyGroupKind.of("001234.abc.0101"), .apple)
         XCTAssertEqual(LegacyGroupKind.of(LegacyInventory.unscopedGroupId), .unscoped)
     }
+
+    // MARK: Recently removed order (gate K 1.1 B3)
+
+    /// A bulk removal stamps every record with the same moment; the list must not reshuffle
+    /// between launches. Newest removal first, then newest entry date, then name, then record name.
+    func testRecentlyRemovedOrderIsStableForTies() {
+        let at = Date(timeIntervalSince1970: 1_790_100_000)
+        func removed(_ id: String, day: Double) -> RemovedRecord {
+            var e = entry(id)
+            e.date = Date(timeIntervalSince1970: 1_790_000_000 + day * 86_400)
+            return RemovedRecord(name: id, reason: .bulkRemoved, removedAt: at, keepUntil: nil, entry: e)
+        }
+        let a = removed("00000000-0000-0000-0000-00000000000A", day: 1)
+        let b = removed("00000000-0000-0000-0000-00000000000B", day: 3)
+        let c = removed("00000000-0000-0000-0000-00000000000C", day: 3)
+        var later = removed("00000000-0000-0000-0000-00000000000D", day: 0)
+        later.removedAt = at.addingTimeInterval(60)
+        let expected = [later.name, b.name, c.name, a.name]
+        for shuffled in [[a, b, c, later], [c, later, a, b], [later, c, b, a]] {
+            XCTAssertEqual(RemovedRecord.newestFirst(shuffled).map(\.name), expected)
+        }
+    }
 }
 
 /// The §2.3 invariant over (UUID, content hash).
