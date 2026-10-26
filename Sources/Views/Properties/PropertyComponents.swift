@@ -1,9 +1,14 @@
 import SwiftUI
 
-// MARK: - Properties (2.0) shared parts
+// MARK: - Properties: parts other packages still call (v2, plan package F)
 //
-// The rental's identity (seal), its own mini-house, and the `.row` size of the one locked
-// preview. Spec: AgentScratch redesign-specs.md §0 + §4; sandbox S2Core.swift (approved r4).
+// The v2 Rentals screens use the `LH*` components and the house-only thumbnail (`LHThumb`); none
+// of the types below appears on them. They stay only because other packages' 1.x screens still
+// call them (`PropertySeal`: Log time pickers, profile sheets; `propertyCard`/`PropertyInsetDivider`:
+// Learn, Delete all data, profile sheets; `PropertySectionHeader`: Log time pickers;
+// `PropertyTintedButtonStyle`: Log time, the timer, Delete all data). Each lane removes its own
+// uses; the cleanup pass (plan §3 step 7) deletes this file's legacy types when no caller remains.
+// `PropertyChipFlow` is the edit sheet's wrapping layout for other names.
 
 /// The rental's identity: a circle in its colour at a 14% wash, a 1pt ring at 40%, an inner
 /// hairline inset 3pt, and a two-letter monogram. Colour by creation order (PropertySealStyle).
@@ -46,63 +51,6 @@ struct PropertySeal: View {
                 .lineLimit(1)
         }
         .frame(width: size, height: size)
-        .accessibilityHidden(true)
-    }
-}
-
-/// The rental's own hours as a house stage (Today's mapping), on a small blueprint tile. The
-/// plaster slab and timber frame read against blue; linework is left off at mini size so the
-/// built stage is what reads. Always shown beside an hours label. Decorative.
-struct PropertyHouseTile: View {
-    let hours: Double
-    var size: CGFloat = 48
-
-    var body: some View {
-        let keyframe = PropertyHouseStage.keyframe(for: hours)
-        InboxBlueprintPaper(cornerRadius: size * 0.28)
-            .frame(width: size, height: size)
-            .overlay {
-                ZStack {
-                    Image(decorative: keyframe.builtImageName)
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFit()
-                    if size >= 80 {
-                        HouseLineworkImage(name: keyframe.linesImageName)
-                            .foregroundStyle(HouseTokens.drafting)
-                            .opacity(0.8)
-                    }
-                }
-                .aspectRatio(1, contentMode: .fit)
-                .scaleEffect(1.18)
-                .offset(y: -size * 0.02)
-            }
-            .overlay(alignment: .bottom) {
-                // Below the slab the art can't move yet (0h and 27h are the same empty lot), so a
-                // thin drafting line fills toward "Foundation at 100h".
-                if hours < HouseStep.foundation.thresholdHours {
-                    GroundworkProgressLine(fraction: max(0, hours) / HouseStep.foundation.thresholdHours)
-                        .padding(.horizontal, size * 0.16)
-                        .padding(.bottom, size * 0.1)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
-            .accessibilityHidden(true)
-    }
-}
-
-/// Progress toward the slab, drawn on the blueprint tile: a 3pt drafting track with a cyan fill.
-struct GroundworkProgressLine: View {
-    let fraction: Double
-    var body: some View {
-        GeometryReader { g in
-            ZStack(alignment: .leading) {
-                Capsule().fill(HouseTokens.drafting.opacity(0.3))
-                Capsule().fill(HouseTokens.drafting)
-                    .frame(width: fraction > 0 ? max(3, g.size.width * min(1, fraction)) : 0)
-            }
-        }
-        .frame(height: 3)
         .accessibilityHidden(true)
     }
 }
@@ -186,71 +134,6 @@ extension PropertySectionHeader where Trailing == EmptyView {
     }
 }
 
-/// Scroll edge under the status bar: content fades into the canvas instead of meeting the clock.
-struct PropertyTopEdgeFade: View {
-    @Environment(\.colorScheme) private var colorScheme
-    var body: some View {
-        let canvas = AdaptiveColors(colorScheme: colorScheme).background
-        Color.clear.frame(maxWidth: .infinity).frame(height: 0)
-            .overlay(alignment: .bottom) {
-                LinearGradient(stops: [.init(color: canvas, location: 0), .init(color: canvas, location: 0.78),
-                                       .init(color: canvas.opacity(0), location: 1)],
-                               startPoint: .top, endPoint: .bottom)
-                    .frame(height: 96)
-                    .offset(y: 18)
-            }
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-    }
-}
-
-/// "How do guests stay?": two capsules in one track.
-struct PropertyStaySegment: View {
-    @Binding var propertyType: PropertyType
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        let stacked = dynamicTypeSize.isAccessibilitySize
-        let layout = stacked
-            ? AnyLayout(VStackLayout(spacing: 4))
-            : AnyLayout(HStackLayout(spacing: 2))
-        // Stacked (AX sizes), the pills are rounded rectangles with an equal 4pt gap on every
-        // side of the container, so the selected one is centred in its track.
-        let radius: CGFloat = stacked ? 24 : 26
-        layout {
-            segment("Months or longer", type: .ltr, colors: colors)
-            segment("A few nights at a time", type: .str, colors: colors)
-        }
-        .padding(stacked ? 4 : 3)
-        .background(RoundedRectangle(cornerRadius: radius + 4, style: .continuous).fill(colors.backgroundSecondary))
-        .overlay(RoundedRectangle(cornerRadius: radius + 4, style: .continuous).strokeBorder(colors.border, lineWidth: 0.5))
-        .sensoryFeedback(.selection, trigger: propertyType)
-    }
-
-    private func segment(_ title: String, type: PropertyType, colors: AdaptiveColors) -> some View {
-        let on = propertyType == type
-        return Button {
-            if reduceMotion { propertyType = type } else { withAnimation(AppAnimation.quick) { propertyType = type } }
-        } label: {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(on ? colors.onAction : colors.textPrimary)
-                .padding(.horizontal, 8)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .background(RoundedRectangle(cornerRadius: dynamicTypeSize.isAccessibilitySize ? 24 : 26, style: .continuous).fill(on ? colors.action : Color.clear))
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.lhPressable)
-        .accessibilityAddTraits(on ? .isSelected : [])
-        .accessibilityIdentifier(type == .ltr ? "property.stay.long" : "property.stay.short")
-    }
-}
-
 /// Wraps chips onto as many rows as they need (other names).
 struct PropertyChipFlow: Layout {
     var spacing: CGFloat = 8
@@ -277,13 +160,4 @@ struct PropertyChipFlow: Layout {
             rowHeight = max(rowHeight, size.height)
         }
     }
-}
-
-/// A future "PEOPLE" section on the property detail (smart layer: key contacts). Data-driven:
-/// with no people it renders nothing and reserves no space. No feature is built yet.
-struct PropertyPerson: Identifiable, Equatable {
-    let id: String
-    let name: String
-    let role: String
-    let visits: Int
 }

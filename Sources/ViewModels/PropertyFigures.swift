@@ -84,6 +84,35 @@ extension AppViewModel {
         )
     }
 
+    /// The Rentals list (v2): one row per rental with its own stage and lit state. The goal is the
+    /// one Today measures each rental's own page against, so the thumbnail matches Today.
+    func rentalRows(now: Date = InboxClock.now(), year: Int? = nil) -> [RentalRowModel] {
+        let y = year ?? Calendar.current.component(.year, from: now)
+        let goal = houseGoal
+        return properties.map { p in
+            RentalRowModel(id: p.id, name: p.name,
+                           hours: propertyCountableHours(p.id, goal: goal, year: y),
+                           goal: goal.targetHours,
+                           lit: TodayWindowState.loggedToday(entries: timeEntries, rentalIDs: [p.id], now: now),
+                           kind: p.propertyType)
+        }
+    }
+
+    /// The rental page's hero, number block, pace and tiles, from this rental's own countable hours.
+    func rentalPageFigures(for property: RentalProperty, now: Date = InboxClock.now(), year: Int? = nil) -> RentalPageFigures {
+        let y = year ?? Calendar.current.component(.year, from: now)
+        let goal = houseGoal
+        let countable = propertyCountableEntries(property.id, goal: goal, year: y)
+        let week = RentalWeek.hours(entries: countable, now: now)
+        return RentalPageFigures.make(.init(
+            hours: propertyCountableHours(property.id, goal: goal, year: y),
+            goal: goal.targetHours,
+            isRecord: GoalManager.shared.goalChoice == .record,
+            thisWeek: week.thisWeek, lastWeek: week.lastWeek,
+            year: y, now: now,
+            daysOfData: RentalWeek.daysOfData(entries: countable, year: y, now: now)))
+    }
+
     /// Free plan: one rental. True when adding another needs Pro.
     var propertiesAtFreeLimit: Bool {
         ProGate.isAtPropertyLimit(isPro: SubscriptionManager.shared.isPro, propertyCount: properties.count)
@@ -129,25 +158,6 @@ struct PropertyFigures {
     let recent: [TimeEntry]
 }
 
-// MARK: - The mini-house stage
-
-/// The property mini-house is pinned to the 500h line (owner decision, 2026-10-19): a rental's
-/// own house is complete with the roof on at 500h and never goes past it. Below that it uses
-/// Today's floor-rule keyframes (slab at 100h, framing between).
-enum PropertyHouseStage {
-    static let completeHours: Double = 500
-
-    static func keyframe(for hours: Double) -> HouseKeyframe {
-        let h = hours.isFinite ? max(0, hours) : 0
-        return HouseProgress.keyframe(for: min(h, completeHours))
-    }
-
-    static func stage(for hours: Double) -> HouseStage {
-        let h = hours.isFinite ? max(0, hours) : 0
-        return HouseProgress(hours: min(h, completeHours), goal: .reps750).stage
-    }
-}
-
 enum PropertyMeta {
     /// "212h this year". A rental with its own target reads "12h of 100h" (the goal's own number:
     /// 100, 500) until it passes the line, then "120h this year" (the stage lives on the house
@@ -157,9 +167,11 @@ enum PropertyMeta {
     /// the records.
     static func hoursLine(_ hours: Double, goal: HouseGoal, groupingElection: Bool, counted: Bool = true) -> String {
         let whole = Int(max(0, hours.isFinite ? hours : 0).rounded(.down))
-        guard counted, isPerPropertyTest(goal: goal, groupingElection: groupingElection) else { return "\(whole)h this year" }
+        guard counted, isPerPropertyTest(goal: goal, groupingElection: groupingElection) else { return RentalsText.hoursThisYear(whole) }
         let target = Int(goal.targetHours)
-        return whole < target ? "\(whole)h of \(target)h" : String(localized: "\(whole)h this year")
+        return whole < target
+            ? String(localized: "rentals.hoursOfTarget", defaultValue: "\(whole)h of \(target)h", table: "Rentals")
+            : RentalsText.hoursThisYear(whole)
     }
 
     /// A per-rental target applies only to material participation without grouping.
@@ -168,9 +180,7 @@ enum PropertyMeta {
     }
 
     /// "Long stays" / "A few nights" (never LTR/STR).
-    static func kindLabel(_ type: PropertyType) -> String {
-        type == .ltr ? "Long stays" : "A few nights"
-    }
+    static func kindLabel(_ type: PropertyType) -> String { RentalsText.kind(type) }
 }
 
 // MARK: - Free limit
@@ -222,32 +232,28 @@ enum PropertySealStyle {
 
 // MARK: - Delete
 
-/// The delete alert says what deleteProperty actually does: the rental, its entries and their
-/// photos go, on this iPhone and (tombstoned) in iCloud.
+/// The delete alert says what deleteProperty actually does: the rental, its logged time and their
+/// photos go, on this iPhone and (tombstoned) in iCloud. §1.21: title ≤ 6 words, ≤ 2 sentences,
+/// verb buttons ("Delete", "Keep").
 struct PropertyDeletion: Identifiable, Equatable {
     let property: RentalProperty
     let entryCount: Int
+    /// Every hour logged at this rental (any year), as the alert says it.
+    var loggedHours: Double = 0
     var id: UUID { property.id }
 
-    var title: String {
-        switch entryCount {
-        case 0: return "Delete \(property.name)?"
-        case 1: return "Delete \(property.name) and its 1 entry?"
-        default: return "Delete \(property.name) and its \(entryCount) entries?"
-        }
-    }
+    var title: String { RentalsText.deleteTitle }
 
     var message: String {
-        switch entryCount {
-        case 0: return "It’s removed from this iPhone and iCloud. This can’t be undone."
-        case 1: return "Its entry and any photos are deleted too, on this iPhone and in iCloud. This can’t be undone."
-        default: return "Its \(entryCount) entries and their photos are deleted too, on this iPhone and in iCloud. This can’t be undone."
-        }
+        let hours = entryCount == 0 || loggedHours <= 0 ? nil : LHFormat.hours(loggedHours)
+        return RentalsText.deleteMessage(name: property.name, hours: hours)
     }
 
     @MainActor
     static func make(for property: RentalProperty, in viewModel: AppViewModel) -> PropertyDeletion {
-        PropertyDeletion(property: property, entryCount: viewModel.timeEntries.filter { $0.propertyId == property.id }.count)
+        let mine = viewModel.timeEntries.filter { $0.propertyId == property.id }
+        return PropertyDeletion(property: property, entryCount: mine.count,
+                                loggedHours: mine.reduce(0) { $0 + max(0, $1.hours.isFinite ? $1.hours : 0) })
     }
 
     /// Through the view model, which tombstones the property and its entries for iCloud.
