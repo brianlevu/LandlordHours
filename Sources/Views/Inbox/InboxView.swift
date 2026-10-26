@@ -351,6 +351,9 @@ struct InboxView: View {
         let needsLookBack = captureOn && !CaptureOptIn.backfillCompleted()
         let actionID = !captureOn ? "inbox.empty.setup" : (needsLookBack ? "inbox.empty.backfill" : "inbox.empty.log")
         return InboxEmptyPage(
+            banner: BackfillJob.showsHeader(backfill.phase)
+                ? AnyView(BackfillProgressHeader(job: backfill, found: model.backfillCount, onRetry: runBackfillAgain))
+                : nil,
             stage: emptyStage,
             windowsLit: emptyLit,
             headline: captureOn
@@ -509,6 +512,8 @@ extension InboxToast {
 /// headline, one line, one `.primary`) with an identifier on the button, which the page component
 /// does not take yet (note for package A: add `actionIdentifier` there and drop this copy).
 private struct InboxEmptyPage: View {
+    /// A stopped or blocked look-back, shown above the house; the page keeps one headline, one line, one primary.
+    var banner: AnyView? = nil
     let stage: CraftStage
     let windowsLit: Bool
     let headline: String
@@ -535,6 +540,10 @@ private struct InboxEmptyPage: View {
         return max(CraftHeroSize.minimumDioramaSide, capped)
     }
 
+    /// With the look-back banner above the house the copy can run long, so the button scrolls with it
+    /// instead of pinning over the last line.
+    private var inFlowButton: Bool { ax || banner != nil }
+
     private var button: some View {
         Button(actionTitle, action: action)
             .buttonStyle(LHButton.primary)
@@ -546,6 +555,7 @@ private struct InboxEmptyPage: View {
             VStack(spacing: 12) {
                 LHScreenTitle(String(localized: "inbox.title", defaultValue: "Inbox", table: "Inbox"))
                     .padding(.top, 8)
+                if let banner { banner }
                 // The frame can be wider than the 20pt gutters allow; it is an overlay so it never
                 // widens the column the title and button size themselves from.
                 Color.clear
@@ -569,7 +579,7 @@ private struct InboxEmptyPage: View {
                     .fixedSize(horizontal: false, vertical: true)
                 // Accessibility sizes: the button is as tall as the copy, so it scrolls with it
                 // instead of pinning over it.
-                if ax { button.padding(.top, 8) }
+                if inFlowButton { button.padding(.top, 8) }
             }
             .padding(.horizontal, LHMetrics.gutter)
             .padding(.bottom, 16)
@@ -577,7 +587,7 @@ private struct InboxEmptyPage: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .safeAreaInset(edge: .bottom) {
-            if !ax {
+            if !inFlowButton {
                 button
                     .padding(.horizontal, LHMetrics.gutter)
                     .padding(.bottom, 16)

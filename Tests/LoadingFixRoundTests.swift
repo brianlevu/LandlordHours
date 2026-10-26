@@ -76,8 +76,8 @@ final class BackfillJobFixRoundTests: XCTestCase {
         XCTAssertTrue(BackfillJob.showsEmptyState(visibleIsEmpty: true, phase: .idle))
         XCTAssertTrue(BackfillJob.showsEmptyState(visibleIsEmpty: true, phase: .finished(found: 0)))
         XCTAssertFalse(BackfillJob.showsEmptyState(visibleIsEmpty: true, phase: .scanning(completed: 0, total: 0)))
-        XCTAssertFalse(BackfillJob.showsEmptyState(visibleIsEmpty: true, phase: .cancelled))
-        XCTAssertFalse(BackfillJob.showsEmptyState(visibleIsEmpty: true, phase: .blocked(.denied)))
+        XCTAssertTrue(BackfillJob.showsEmptyState(visibleIsEmpty: true, phase: .cancelled))
+        XCTAssertTrue(BackfillJob.showsEmptyState(visibleIsEmpty: true, phase: .blocked(.denied)))
         XCTAssertFalse(BackfillJob.showsEmptyState(visibleIsEmpty: false, phase: .idle))
     }
 }
