@@ -15,6 +15,8 @@ import UIKit
 
 struct WorkPane<Content: View>: View {
     let content: Content
+    /// The bridge's handle on its hosting controller (Log time hides the tab content under it).
+    @State private var bridge = PaneHostBridge()
 
     init(@ViewBuilder content: () -> Content) { self.content = content() }
 
@@ -29,7 +31,12 @@ struct WorkPane<Content: View>: View {
 
     var body: some View {
         if Self.usesCompactBridge {
-            CompactPaneHost(content: content.modifier(NoVerticalBar()))
+            let bridge = self.bridge
+            CompactPaneHost(content: content.modifier(NoVerticalBar())
+                .onPreferenceChange(PaneCoversTabKey.self) { covered in
+                    MainActor.assumeIsolated { bridge.setTabContentCovered(covered) }
+                },
+                            bridge: bridge)
         } else {
             content.modifier(NoVerticalBar())
         }
@@ -43,19 +50,72 @@ private struct NoVerticalBar: ViewModifier {
     }
 }
 
+/// True while something in the pane (Log time) covers the selected tab's content.
+struct PaneCoversTabKey: PreferenceKey {
+    static let defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
+}
+
+/// The work pane's handle on its hosting controller. While Log time is open in the pane, the tab
+/// content under it is hidden at the UIKit level, so nothing of the tab underneath (Records' list,
+/// say) shows around the card, between the card and the bar, or through the bar's glass: the bar
+/// floats over the pane's own wall (§1.27; gate J r2, mp12 frames). The bar itself stays.
+@MainActor
+final class PaneHostBridge {
+    weak var host: UIViewController?
+    private(set) var covered = false
+
+    func setTabContentCovered(_ covered: Bool) {
+        self.covered = covered
+        apply(animated: true)
+    }
+
+    /// Hides (or shows) every tab's content view; the tab bar is the tab controller's own view
+    /// and is never touched.
+    func apply(animated: Bool) {
+        guard let host, let tabs = Self.tabBarController(in: host) else { return }
+        let alpha: CGFloat = covered ? 0 : 1
+        let views = (tabs.viewControllers ?? []).compactMap(\.viewIfLoaded)
+        let change = {
+            for view in views {
+                view.alpha = alpha
+                view.accessibilityElementsHidden = self.covered
+            }
+        }
+        if animated, !UIAccessibility.isReduceMotionEnabled {
+            UIView.animate(withDuration: 0.2, delay: 0, options: [.beginFromCurrentState, .curveEaseOut], animations: change)
+        } else {
+            change()
+        }
+    }
+
+    static func tabBarController(in controller: UIViewController) -> UITabBarController? {
+        if let tabs = controller as? UITabBarController { return tabs }
+        for child in controller.children {
+            if let tabs = tabBarController(in: child) { return tabs }
+        }
+        return nil
+    }
+}
+
 /// The one child hosting controller with the compact horizontal size class.
 private struct CompactPaneHost<C: View>: UIViewControllerRepresentable {
     let content: C
+    let bridge: PaneHostBridge
 
     func makeUIViewController(context: Context) -> UIHostingController<C> {
         let host = UIHostingController(rootView: content)
         host.view.backgroundColor = .clear
         host.traitOverrides.horizontalSizeClass = .compact
+        bridge.host = host
         return host
     }
 
     func updateUIViewController(_ host: UIHostingController<C>, context: Context) {
         host.rootView = content
+        bridge.host = host
+        // A tab loaded while Log time was open takes the same state.
+        if bridge.covered { bridge.apply(animated: false) }
     }
 }
 
@@ -72,6 +132,8 @@ struct WorkPaneEnvironment: ViewModifier {
     var band: LayoutBand = .a
     /// Half the gap (two-pane), so the pane's wall lines up with the fold (DU9).
     var foldInset: CGFloat = 0
+    /// The gutter inside the pane (16 on the Duo and under 440, else 24).
+    var gutter: CGFloat = 16
 
     func body(content: Content) -> some View {
         content
@@ -84,6 +146,7 @@ struct WorkPaneEnvironment: ViewModifier {
             .environment(\.layoutMode, mode)
             .environment(\.layoutBand, band)
             .environment(\.paneFoldInset, foldInset)
+            .environment(\.paneGutter, gutter)
             .environment(\.paneLogRental, context == .pane ? selection.selectedRentalID : nil)
             .environment(\.dynamicTypeSize, typeSize)
             .environment(\.colorScheme, colorScheme)
@@ -104,6 +167,7 @@ struct PaneAwareLogTime<Sheet: View>: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.layoutMode) private var mode
     @Environment(\.paneFoldInset) private var foldInset
+    @Environment(\.paneGutter) private var gutter
 
     /// How far the interior wall behind Log time reaches below the card: to the bar's top edge
     /// (measured 23–24pt on iPadOS 26.5 and 27.0, iPad Air 13"), so the tab underneath (Records'
@@ -138,7 +202,7 @@ struct PaneAwareLogTime<Sheet: View>: ViewModifier {
                             .overlay(RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
                                 .strokeBorder(colorScheme == .dark ? AppColors.duoNightCardEdge
                                                                    : AdaptiveColors(colorScheme: colorScheme).pageCardEdge, lineWidth: 1))
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, gutter)
                             .padding(.top, 8)
                             .padding(.bottom, PaneMetrics.barClearance - 12)
                             .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
@@ -146,6 +210,8 @@ struct PaneAwareLogTime<Sheet: View>: ViewModifier {
                     }
                 }
                 .animation(reduceMotion ? AppAnimation.quick : AppAnimation.flow, value: route?.id)
+                // The tab underneath is hidden while the card is up (`PaneHostBridge`).
+                .preference(key: PaneCoversTabKey.self, value: route != nil)
         }
     }
 }

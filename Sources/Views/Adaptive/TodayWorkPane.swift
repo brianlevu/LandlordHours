@@ -24,6 +24,52 @@ enum PaneConfirmFilter {
     }
 }
 
+/// How much of Today's work pane sits above the bar at rest (pure; gate J r2). Every card is whole:
+/// the bar never cuts a row, a foot or "On the record today" at rest.
+///
+/// `ends` are To confirm's measured bottoms in its own card: 0 the header, 1...n each row; `seeAll`
+/// and `moreElsewhere` are the heights of the two feet. `record` is the height of "On the record
+/// today" without "Earlier" (header and today's rows). `room` is how far the column may reach.
+///   · Everything fits: every row, then the record (its "Earlier" rows fill what is left).
+///   · A rental is picked (DU4 filtered): at least 3 rows (or all of them), "See all N" and the
+///     record, if that fits.
+///   · Otherwise, and on "All rentals" (DU4: rows run to the bar): as many whole rows as fit, with
+///     "See all N"; the record follows only if it fits too.
+///   · At AX a single row may be taller than the pane: then 1 row, and it scrolls.
+enum PaneConfirmFit {
+    struct Plan: Equatable {
+        var rows: Int
+        var showsRecord: Bool
+    }
+
+    static let top: CGFloat = 8
+    static let gap: CGFloat = 10
+
+    static func plan(ends: [Int: CGFloat], count n: Int, hidden: Int, seeAll: CGFloat?, moreElsewhere: CGFloat?,
+                     record: CGFloat?, filtered: Bool, room: CGFloat) -> Plan {
+        guard n > 0, let seeAll, let moreElsewhere, let record, room > 0,
+              (0...n).allSatisfy({ ends[$0] != nil }) else { return Plan(rows: n, showsRecord: true) }
+        func card(_ k: Int) -> CGFloat {
+            let foot: CGFloat = k < n ? seeAll : (hidden > 0 ? moreElsewhere : 0)
+            return top + (ends[k] ?? 0) + foot
+        }
+        func fits(_ k: Int, record withRecord: Bool) -> Bool {
+            card(k) + (withRecord ? gap + record : 0) <= room
+        }
+        if fits(n, record: true) { return Plan(rows: n, showsRecord: true) }
+        if filtered {
+            for k in stride(from: n - 1, through: min(3, n), by: -1) where fits(k, record: true) {
+                return Plan(rows: k, showsRecord: true)
+            }
+        }
+        for k in stride(from: n, through: 1, by: -1) where fits(k, record: false) {
+            // Room left under the rows for the record too (a short list on "All rentals").
+            return Plan(rows: k, showsRecord: fits(k, record: true))
+        }
+        return Plan(rows: 1, showsRecord: false)
+    }
+}
+
 /// The Today tab's root: the locked phone Today in compact, the work pane in two-pane and stacked.
 struct AdaptiveToday: View {
     @ObservedObject var inbox: InboxViewModel
@@ -47,8 +93,18 @@ struct TodayWorkPane: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.layoutMode) private var mode
     @Environment(\.paneFoldInset) private var foldInset
+    @Environment(\.paneGutter) private var gutter
     @ObservedObject private var backfill = BackfillJob.shared
     @State private var confirming: Set<String> = []
+    /// To confirm laid out off-screen at the card's width: 0 the header, 1...n each row's bottom,
+    /// n + 1 and n + 2 the bottoms of the two feet below them (`PaneConfirmFit`).
+    @State private var confirmMeasure = EarlierMeasure()
+    /// "On the record today" without "Earlier", laid out off-screen (`PaneConfirmFit`).
+    @State private var recordBase: CGFloat?
+    /// The detail's confirm card at its content height (the scroll's content plus its pinned
+    /// actions), so a tall pane never stretches it into an empty band above Log (D4, gate J r2).
+    @State private var detailIdeal: CGFloat = 0
+    @State private var detailRecordBase: CGFloat?
     @State private var captureOn = CaptureOptIn.calendarSuggestionsEnabled()
     @State private var showCaptureSetup = false
 
@@ -124,23 +180,50 @@ struct TodayWorkPane: View {
         let visible = inbox.visible
         let items = PaneConfirmFilter.items(visible, rentalID: rentalID)
         let hidden = PaneConfirmFilter.hiddenCount(visible, rentalID: rentalID)
+        let measureKey = EarlierMeasure.key(items.map(\.id), typeSize: typeSize) ^ hidden
         return GeometryReader { g in
+            let room = max(0, g.size.height - Self.bottomMargin)
+            let plan: PaneConfirmFit.Plan = (stacked || state != .rows)
+                ? PaneConfirmFit.Plan(rows: items.count, showsRecord: true)
+                : PaneConfirmFit.plan(ends: confirmMeasure.key == measureKey ? confirmMeasure.ends : [:], count: items.count,
+                                      hidden: hidden, seeAll: footHeight(confirmMeasure.key == measureKey, items.count, 1),
+                                      moreElsewhere: footHeight(confirmMeasure.key == measureKey, items.count, 2),
+                                      record: recordBase, filtered: rentalID != nil, room: room)
             ScrollView {
-                // Every card sizes to its content (rows never compress to fit, D7): "On the record
-                // today" goes on with as many "Earlier" rows as fit above the bar, so a tall pane
-                // fills with rows, not with an empty card or bare wall (§1.27, D4, D6, DU4).
-                VStack(spacing: 10) {
+                // Every card sizes to its content (rows never compress to fit, D7) and sits whole
+                // above the bar at rest (`PaneConfirmFit`): To confirm shows the rows that fit with
+                // "See all N", then "On the record today" goes on with as many "Earlier" rows as fit,
+                // so a tall pane fills with rows, not with an empty card or bare wall (§1.27, D4,
+                // D6, DU4), and a short one never has a card under the bar.
+                VStack(spacing: PaneConfirmFit.gap) {
                     if state == .rows {
-                        confirmCard(items: items, hidden: hidden, total: visible.count)
+                        confirmCard(items: items, hidden: hidden, total: visible.count, limit: plan.rows)
                     } else {
                         TodayConfirmBlock(inbox: inbox, state: state, isScanning: backfill.isScanning, limit: 0,
                                           onSeeAll: { NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex) },
                                           onTurnOn: { showCaptureSetup = true })
                     }
-                    OnTheRecordCard(rentalID: rentalID, fitHeight: max(0, g.size.height - Self.bottomMargin))
+                    if plan.showsRecord {
+                        OnTheRecordCard(rentalID: rentalID, fitHeight: room)
+                    }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .background(alignment: .topLeading) {
+                    // The off-screen measures the fit reads (never shown, never read aloud).
+                    VStack(spacing: 0) {
+                        if !stacked, state == .rows, !items.isEmpty {
+                            confirmCard(items: items, hidden: hidden, total: visible.count, limit: nil, measureKey: measureKey)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .coordinateSpace(.named(Self.confirmSpace))
+                        }
+                        OnTheRecordCard(rentalID: rentalID)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { recordBase = $0 }
+                    }
+                    .hidden()
+                    .accessibilityHidden(true)
+                }
+                .padding(.horizontal, gutter)
+                .padding(.top, PaneConfirmFit.top)
                 .coordinateSpace(.named(OnTheRecordCard.space))
                 .frame(maxWidth: PaneMetrics.contentCap)
                 .frame(maxWidth: .infinity)
@@ -153,9 +236,25 @@ struct TodayWorkPane: View {
         .background { paneWall }
     }
 
-    private func confirmCard(items: [Suggestion], hidden: Int, total: Int) -> some View {
-        let shown = stacked ? Array(items.prefix(1)) : items
+    /// The off-screen To confirm's coordinate space.
+    private static let confirmSpace = "pane.confirm.measure"
+
+    /// A foot's measured height (`which` 1: "See all N", 2: "N more at other rentals").
+    private func footHeight(_ current: Bool, _ n: Int, _ which: Int) -> CGFloat? {
+        guard current, let rows = confirmMeasure.ends[n], let first = confirmMeasure.ends[n + 1] else { return nil }
+        if which == 1 { return first - rows }
+        guard let second = confirmMeasure.ends[n + 2] else { return nil }
+        return second - first
+    }
+
+    /// `limit` caps the rows (nil = every row, the off-screen measure); with `measureKey` the card
+    /// reports its parts' bottoms and carries both feet.
+    private func confirmCard(items: [Suggestion], hidden: Int, total: Int, limit: Int?, measureKey: Int? = nil) -> some View {
+        let measuring = measureKey != nil
+        let cap = stacked ? 1 : (limit ?? items.count)
+        let shown = Array(items.prefix(max(1, cap)))
         let remaining = items.count - confirming.count
+        let report: (Int, CGFloat) -> Void = { index, end in confirmMeasure.record(key: measureKey ?? 0, index: index, end: end) }
         return PaneCard {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -193,32 +292,56 @@ struct TodayWorkPane: View {
             .padding(.horizontal, LHMetrics.cardPadding)
             .padding(.top, 12)
             .padding(.bottom, 10)
-            ForEach(shown, id: \.sourceKey) { suggestion in
-                LHDivider(leadingInset: suggestion.sourceKey == shown.first?.sourceKey ? 0 : LHRow.actionDividerInset)
-                row(suggestion)
-                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+            .modifier(MeasureEnd(index: 0, measuring: measuring, space: Self.confirmSpace, report: report))
+            ForEach(Array(shown.enumerated()), id: \.element.sourceKey) { i, suggestion in
+                VStack(spacing: 0) {
+                    LHDivider(leadingInset: i == 0 ? 0 : LHRow.actionDividerInset)
+                    row(suggestion)
+                }
+                .modifier(MeasureEnd(index: i + 1, measuring: measuring, space: Self.confirmSpace, report: report))
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
             }
-            if stacked, items.count > 1 {
-                LHDivider()
-                Button(TodayText.seeAll(items.count)) {
-                    NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex)
-                }
-                .buttonStyle(LHButton.tertiary)
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier("pane.seeAll")
+            if measuring {
+                // Both feet, so the fit knows their heights whichever one it shows.
+                seeAllFoot(items.count)
+                    .modifier(MeasureEnd(index: shown.count + 1, measuring: true, space: Self.confirmSpace, report: report))
+                moreElsewhereFoot(max(hidden, 1))
+                    .modifier(MeasureEnd(index: shown.count + 2, measuring: true, space: Self.confirmSpace, report: report))
+            } else if shown.count < items.count {
+                seeAllFoot(items.count)
             } else if hidden > 0 {
-                LHDivider()
-                Button(String(localized: "twoPane.list.moreElsewhere", defaultValue: "\(hidden) more at other rentals", table: "Adaptive")) {
-                    selection.select(HouseShelf.allID)
-                }
-                .buttonStyle(LHButton.tertiary)
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier("pane.moreElsewhere")
+                moreElsewhereFoot(hidden)
             }
         }
         .animation(reduceMotion ? AppAnimation.quick : AppAnimation.collapse, value: shown.map(\.sourceKey))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pane.confirm")
+    }
+
+    /// "See all N": the rows that did not fit (or, stacked, all but the first) are in Inbox.
+    private func seeAllFoot(_ count: Int) -> some View {
+        VStack(spacing: 0) {
+            LHDivider()
+            Button(TodayText.seeAll(count)) {
+                NotificationCenter.default.post(name: .switchToTab, object: ShellTab.inboxIndex)
+            }
+            .buttonStyle(LHButton.tertiary)
+            .frame(maxWidth: .infinity)
+            .accessibilityIdentifier("pane.seeAll")
+        }
+    }
+
+    /// "N more at other rentals": every row of the picked rental shows; the rest are elsewhere.
+    private func moreElsewhereFoot(_ hidden: Int) -> some View {
+        VStack(spacing: 0) {
+            LHDivider()
+            Button(String(localized: "twoPane.list.moreElsewhere", defaultValue: "\(hidden) more at other rentals", table: "Adaptive")) {
+                selection.select(HouseShelf.allID)
+            }
+            .buttonStyle(LHButton.tertiary)
+            .frame(maxWidth: .infinity)
+            .accessibilityIdentifier("pane.moreElsewhere")
+        }
     }
 
     private func row(_ suggestion: Suggestion) -> some View {
@@ -261,7 +384,8 @@ struct TodayWorkPane: View {
     // MARK: Detail, in the pane
 
     private func detail(_ suggestion: Suggestion) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let recordRental = suggestion.proposedPropertyId ?? rentalID
+        return VStack(alignment: .leading, spacing: 0) {
             Button { selection.close() } label: {
                 Label(String(localized: "twoPane.detail.back", defaultValue: "To confirm", table: "Adaptive"), systemImage: "chevron.left")
                     .font(.body.weight(.semibold))
@@ -270,14 +394,44 @@ struct TodayWorkPane: View {
             .foregroundStyle(colors.action)
             .buttonStyle(LHButton.press)
             .keyboardShortcut(.cancelAction)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, gutter)
             .accessibilityIdentifier("pane.back")
-            SuggestionConfirmSheet(suggestion: suggestion, model: inbox)
-                .clipShape(RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
-                    .strokeBorder(colorScheme == .dark ? AppColors.duoNightCardEdge : colors.pageCardEdge, lineWidth: 1))
-                .padding(.horizontal, 16)
-                .padding(.bottom, 12)
+            GeometryReader { g in
+                let room = g.size.height
+                // The card hugs its content, Log pinned right under it, never stretched into an
+                // empty band (D4); a long item, or a keyboard, makes it scroll inside.
+                let card = detailIdeal > 0 ? min(detailIdeal, room) : room
+                let fitsRecord = detailIdeal > 0 && (detailRecordBase.map { room - card - PaneConfirmFit.gap >= $0 } ?? false)
+                VStack(spacing: PaneConfirmFit.gap) {
+                    SuggestionConfirmSheet(suggestion: suggestion, model: inbox)
+                        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                            (geometry.contentSize.height + geometry.contentInsets.top + geometry.contentInsets.bottom).rounded(.up)
+                        } action: { _, ideal in
+                            detailIdeal = ideal
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
+                            .strokeBorder(colorScheme == .dark ? AppColors.duoNightCardEdge : colors.pageCardEdge, lineWidth: 1))
+                        .frame(height: card)
+                    // A tall pane goes on with what is already on the record at the item's rental
+                    // (the "Might be logged" check, in place), as many whole rows as fit (DU4).
+                    if fitsRecord {
+                        OnTheRecordCard(rentalID: recordRental, fitHeight: room)
+                            .transition(.opacity)
+                    }
+                }
+                .frame(maxHeight: .infinity, alignment: .top)
+                .coordinateSpace(.named(OnTheRecordCard.space))
+                .background(alignment: .topLeading) {
+                    OnTheRecordCard(rentalID: recordRental)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { detailRecordBase = $0 }
+                        .hidden()
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(.horizontal, gutter)
+            .padding(.bottom, 12)
         }
         .frame(maxWidth: PaneMetrics.contentCap)
         .frame(maxWidth: .infinity)

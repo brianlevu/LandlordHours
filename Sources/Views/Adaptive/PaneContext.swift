@@ -52,6 +52,19 @@ extension EnvironmentValues {
     }
 }
 
+private struct PaneGutterKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 16
+}
+
+extension EnvironmentValues {
+    /// The gutter inside the work pane (§1.27 density addendum): 16 on the Duo and in iPad panes
+    /// under 440, else 24. Set by `TwoPaneLayout` from `PaneMetrics.gutter`.
+    var paneGutter: CGFloat {
+        get { self[PaneGutterKey.self] }
+        set { self[PaneGutterKey.self] = newValue }
+    }
+}
+
 // MARK: - What the right pane shows over its tab's root
 
 /// The right pane's own stack: the tab's root, or a detail / Log time opened over it in place.

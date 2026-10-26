@@ -52,12 +52,16 @@ struct HousePane: View {
     var body: some View {
         let shelf = self.shelf
         let shown = shelf.resolved(selection.selectedID)
-        // DU15: the shelf ("All rentals" first) is visible at rest in every mode and at every type
-        // size. When the column fits, it is the resting layout (the free height spread into bands
-        // of air, DU4/DU6); when it does not (AX sizes, a short pane), the hero and the number scroll
-        // in the room above the shelf and the shelf holds the pane's foot.
+        // DU6/DU15: the hero, the number, the pace sentence and the shelf ("All rentals" first) all
+        // sit in the pane at rest. When the column does not fit (a short pane, XXL, AX), the house
+        // art steps down toward its floor (the diorama's 220, §H.5; the skyline's 44pt houses)
+        // before anything scrolls, so the key figure and its sentence are never cut or faded at
+        // rest (gate J r2). Only when even the floor does not fit does the whole column scroll,
+        // from the top, with no fade: the shelf then waits below the fold.
         ViewThatFits(in: .vertical) {
-            resting(shelf, shown)
+            ForEach(heroSides(shelf, shown), id: \.self) { side in
+                resting(shelf, shown, side: side)
+            }
             scrolling(shelf, shown)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -76,26 +80,45 @@ struct HousePane: View {
         .accessibilityIdentifier("pane.house")
     }
 
+    /// The hero sides to try, largest first: the pane's own size, then steps of 10% down to the
+    /// floor. The diorama never goes under 220 (§H.5, H6); the skyline's houses never under 44.
+    private func heroSides(_ shelf: HouseShelf, _ shown: HouseShelfItem?) -> [CGFloat] {
+        let full = heroSide
+        let isAll = shown?.isAll ?? false
+        var sides: [CGFloat] = [full]
+        for step in stride(from: 0.9, through: 0.4, by: -0.1) {
+            var side = (full * step).rounded()
+            if isAll {
+                let houses = RentalSkylineLayout.visible(shelf.skyline, frame: side).count
+                guard side >= 150, RentalSkylineLayout.houseSide(frame: side, count: max(houses, 1)) >= 44 else { break }
+            } else {
+                side = max(side, min(full, CraftHeroSize.minimumDioramaSide))
+            }
+            if side < (sides.last ?? full) { sides.append(side) }
+        }
+        return sides
+    }
+
     // MARK: Layouts
 
     /// Everything fits: the free height becomes bands of air (above the house, around the number,
     /// below the shelf), so no bare band of a tall pane passes 20% (DU4, DU6).
-    @ViewBuilder private func resting(_ shelf: HouseShelf, _ shown: HouseShelfItem?) -> some View {
+    @ViewBuilder private func resting(_ shelf: HouseShelf, _ shown: HouseShelfItem?, side: CGFloat) -> some View {
         VStack(spacing: 0) {
             if stacked {
                 Spacer(minLength: 4)
-                heroRow(shelf, shown)
+                heroRow(shelf, shown, side: side)
                 Spacer(minLength: 8)
                 shelfView(shelf)
                 Spacer(minLength: 8)
             } else {
                 Spacer(minLength: 0)
-                hero(shelf, shown)
+                hero(shelf, shown, side: side)
                 // The skyline's rows of sky already sit above the houses; a fourth band of air
                 // between it and the number keeps every bare band of a tall pane under 20%.
                 if shown?.isAll ?? false { Spacer(minLength: 8) }
                 numberBlock(shelf, shown)
-                    .padding(.top, numberLift(shown))
+                    .padding(.top, numberLift(shown, side: side))
                 Spacer(minLength: ax ? 12 : 16)
                 shelfView(shelf)
                 Spacer(minLength: 12)
@@ -105,43 +128,37 @@ struct HousePane: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// It does not fit: the hero and the number scroll above the shelf, which holds the foot. The
-    /// scroll's last 24pt fade, so a line cut at rest reads as more to scroll, not as a clip.
+    /// Not even the floor fits (AX on a short pane, the propped Duo at AX): the whole column
+    /// scrolls, starting at the top. The hero, the number and the pace sentence are read first and
+    /// whole; nothing is faded or blurred at either edge.
     @ViewBuilder private func scrolling(_ shelf: HouseShelf, _ shown: HouseShelfItem?) -> some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: 0) {
-                    if stacked {
-                        heroRow(shelf, shown)
-                    } else {
-                        hero(shelf, shown)
-                        numberBlock(shelf, shown)
-                            .padding(.top, numberLift(shown))
-                    }
+        let side = heroSides(shelf, shown).last ?? heroSide
+        ScrollView {
+            VStack(spacing: 0) {
+                if stacked {
+                    heroRow(shelf, shown, side: side)
+                } else {
+                    hero(shelf, shown, side: side)
+                    numberBlock(shelf, shown)
+                        .padding(.top, numberLift(shown, side: side))
                 }
-                .padding(.bottom, 24)
-                .frame(maxWidth: PaneMetrics.contentCap)
-                .frame(maxWidth: .infinity)
+                shelfView(shelf)
+                    .padding(.top, ax ? 12 : 16)
             }
-            .scrollIndicators(.hidden)
-            .scrollBounceBehavior(.basedOnSize)
-            .mask {
-                VStack(spacing: 0) {
-                    Color.black
-                    LinearGradient(colors: [.black, .black.opacity(0)], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 24)
-                }
-            }
-            shelfView(shelf)
-                .padding(.top, 4)
-                .padding(.bottom, 8)
+            .padding(.bottom, 12)
+            .frame(maxWidth: PaneMetrics.contentCap)
+            .frame(maxWidth: .infinity)
         }
+        .scrollIndicators(.automatic)
+        .scrollIndicatorsFlash(onAppear: true)
+        .scrollBounceBehavior(.basedOnSize)
+        .modifier(NoScrollEdgeEffect())
     }
 
     /// Stacked: the hero beside the number block.
-    private func heroRow(_ shelf: HouseShelf, _ shown: HouseShelfItem?) -> some View {
+    private func heroRow(_ shelf: HouseShelf, _ shown: HouseShelfItem?, side: CGFloat) -> some View {
         HStack(alignment: .center, spacing: 0) {
-            hero(shelf, shown)
+            hero(shelf, shown, side: side)
             numberBlock(shelf, shown)
                 .frame(maxWidth: .infinity)
         }
@@ -157,14 +174,13 @@ struct HousePane: View {
     }
 
     /// The number sits in the diorama's shadow (H4); at AX and under the skyline it sits below.
-    private func numberLift(_ shown: HouseShelfItem?) -> CGFloat {
-        ax || (shown?.isAll ?? false) ? 4 : -heroSide * 0.10
+    private func numberLift(_ shown: HouseShelfItem?, side: CGFloat) -> CGFloat {
+        ax || (shown?.isAll ?? false) ? 4 : -side * 0.10
     }
 
     // MARK: Hero
 
-    @ViewBuilder private func hero(_ shelf: HouseShelf, _ shown: HouseShelfItem?) -> some View {
-        let side = heroSide
+    @ViewBuilder private func hero(_ shelf: HouseShelf, _ shown: HouseShelfItem?, side: CGFloat) -> some View {
         ZStack {
             if let shown, shown.isAll {
                 // The skyline's houses stand on the ground line at the frame's foot and leave its
@@ -259,3 +275,14 @@ struct HousePane: View {
     }
 }
 
+/// iOS 26+: no soft scroll edge on the house column. Its first line at rest is the numeral (the
+/// propped Duo at AX), which the system's top edge effect blurred (gate J r2).
+private struct NoScrollEdgeEffect: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.scrollEdgeEffectHidden(true, for: .all)
+        } else {
+            content
+        }
+    }
+}

@@ -253,15 +253,16 @@ struct EarlierMeasure: Equatable {
     }
 }
 
-/// Reports a part's bottom in the off-screen measure's space (no-op on the shown copy).
-private struct MeasureEnd: ViewModifier {
+/// Reports a part's bottom in an off-screen measure's space (no-op on the shown copy).
+struct MeasureEnd: ViewModifier {
     let index: Int
     let measuring: Bool
+    var space: String = "record.measure"
     let report: (Int, CGFloat) -> Void
 
     func body(content: Content) -> some View {
         if measuring {
-            content.onGeometryChange(for: CGFloat.self) { $0.frame(in: .named("record.measure")).maxY } action: { report(index, $0) }
+            content.onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(space)).maxY } action: { report(index, $0) }
         } else {
             content
         }
