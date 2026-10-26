@@ -84,46 +84,17 @@ struct PropertiesView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        LHScreenTitle(RentalsText.title, subtitle: subtitle, style: .collection)
-                            .accessibilityIdentifier("properties.title")
-                        if viewModel.properties.count > 8 && !isLoading {
-                            searchField
-                                .padding(.top, 8)
-                        }
-                        Group {
-                            if isLoading {
-                                loadingGroup
-                            } else if viewModel.properties.isEmpty {
-                                emptyGroup
-                            } else {
-                                listGroup
-                            }
-                        }
-                        .padding(.top, 16)
-                        Color.clear.frame(height: 24).id("properties.bottom")
-                    }
-                    .padding(.horizontal, LHMetrics.gutter(for: band))
-                    .frame(maxWidth: band == .a ? .infinity : LHMetrics.readingColumn)
-                    .frame(maxWidth: .infinity)
-                }
-                .scrollIndicators(.hidden)
-                .scrollDismissesKeyboard(.immediately)
-                .background { LHCanvas() }
+            Group {
 #if DEBUG
-                .onAppear { handleDebugLaunchSurfaceIfNeeded(proxy: proxy) }
-#endif
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if !viewModel.properties.isEmpty && !isLoading {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button(RentalsText.addRental, action: openAddProperty)
-                            .accessibilityIdentifier("properties.add")
-                    }
+                // proto/rentals-layouts: with exactly one rental, the gallery opens on its page.
+                if RentalsMockLayout.current == .gallery, viewModel.properties.count == 1, let only = viewModel.properties.first, !isLoading {
+                    PropertyDetailView(propertyId: only.id, onEdit: { property in editor = .edit(property) })
+                } else {
+                    listRoot
                 }
+#else
+                listRoot
+#endif
             }
             .navigationDestination(for: PropertyRoute.self) { route in
                 switch route {
@@ -166,6 +137,50 @@ struct PropertiesView: View {
         }
     }
 
+    private var listRoot: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    LHScreenTitle(RentalsText.title, subtitle: subtitle, style: .collection)
+                        .accessibilityIdentifier("properties.title")
+                    if viewModel.properties.count > 8 && !isLoading {
+                        searchField
+                            .padding(.top, 8)
+                    }
+                    Group {
+                        if isLoading {
+                            loadingGroup
+                        } else if viewModel.properties.isEmpty {
+                            emptyGroup
+                        } else {
+                            contentGroup
+                        }
+                    }
+                    .padding(.top, 16)
+                    Color.clear.frame(height: 24).id("properties.bottom")
+                }
+                .padding(.horizontal, LHMetrics.gutter(for: band))
+                .frame(maxWidth: band == .a ? .infinity : LHMetrics.readingColumn)
+                .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
+            .scrollDismissesKeyboard(.immediately)
+            .background { LHCanvas() }
+#if DEBUG
+            .onAppear { handleDebugLaunchSurfaceIfNeeded(proxy: proxy) }
+#endif
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if !viewModel.properties.isEmpty && !isLoading {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(RentalsText.addRental, action: openAddProperty)
+                        .accessibilityIdentifier("properties.add")
+                }
+            }
+        }
+    }
+
     // MARK: Search
 
     private var searchField: some View {
@@ -186,6 +201,24 @@ struct PropertiesView: View {
     }
 
     // MARK: List
+
+    @ViewBuilder private var contentGroup: some View {
+#if DEBUG
+        switch RentalsMockLayout.current {
+        case .gallery: RentalsGalleryMock(rows: rows, info: mockInfo, open: { path.append(PropertyRoute.detail($0)) })
+        case .cards: RentalsCardsMock(rows: rows, info: mockInfo, open: { path.append(PropertyRoute.detail($0)) })
+        case .list, .none: listGroup
+        }
+#else
+        listGroup
+#endif
+    }
+
+#if DEBUG
+    private var mockInfo: [UUID: RentalMockInfo] {
+        Dictionary(uniqueKeysWithValues: viewModel.properties.map { ($0.id, RentalMockInfo.make(for: $0, in: viewModel)) })
+    }
+#endif
 
     private var listGroup: some View {
         let shown = rows
@@ -410,3 +443,270 @@ struct PropertiesAtLimitRow: View {
     PropertiesView()
         .environmentObject(AppViewModel())
 }
+
+#if DEBUG
+// MARK: - proto/rentals-layouts (throwaway mock, DEBUG only)
+//
+// `-LHRentalsLayout gallery|cards|list` swaps the Rentals list for one of three layouts so the
+// owner can compare them side by side. Not production: the gallery and the cards are a deliberate
+// exception to the standard's "rows, not cards" rule (§1.4), and "to confirm" counts are mock data.
+
+enum RentalsMockLayout: String {
+    case gallery, cards, list
+
+    static let current: RentalsMockLayout? = {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "-LHRentalsLayout"), args.indices.contains(i + 1) else { return nil }
+        return RentalsMockLayout(rawValue: args[i + 1])
+    }()
+}
+
+struct RentalMockInfo {
+    enum Tone { case behind, positive, neutral }
+    let goal: Int
+    let pace: String
+    let tone: Tone
+    let toConfirm: Int
+    let lastLogged: Date?
+
+    /// Mock pending counts by name (the real Inbox has no per-rental count yet).
+    static let mockToConfirm: [String: Int] = ["Santa Ray Ave": 2, "Pine Cabin": 1, "Cedar Triplex": 3,
+                                               "The Arroyo Seco Schoolhouse Lofts, Unit 4B": 1]
+
+    @MainActor
+    static func make(for property: RentalProperty, in vm: AppViewModel, now: Date = Date()) -> RentalMockInfo {
+        let goal = vm.houseGoal
+        let figures = vm.rentalPageFigures(for: property, now: now)
+        let hours = vm.propertyCountableHours(property.id, goal: goal, year: Calendar.current.component(.year, from: now))
+        let target = goal.targetHours
+        let pace: String
+        let tone: Tone
+        if target > 0, hours >= target {
+            pace = String(localized: "rentals.mock.done", defaultValue: "Done for the year", table: "Rentals"); tone = .positive
+        } else if hours <= 0 {
+            pace = String(localized: "rentals.mock.none", defaultValue: "No hours yet", table: "Rentals"); tone = .neutral
+        } else if let lead = figures.pace.lead {
+            pace = lead.hasSuffix(".") ? String(lead.dropLast()) : lead
+            tone = figures.pace.tone == .behind ? .behind : .positive
+        } else {
+            let weekly = max(1, Int((max(target - hours, 0) / TodayPaceCards.weeksLeft(now: now)).rounded(.up)))
+            pace = String(localized: "rentals.mock.weekly", defaultValue: "\(weekly)h a week to go", table: "Rentals"); tone = .neutral
+        }
+        let last = vm.timeEntries.filter { $0.propertyId == property.id }.map(\.date).max()
+        return RentalMockInfo(goal: Int(target.rounded()), pace: pace, tone: tone,
+                              toConfirm: mockToConfirm[property.name] ?? 0, lastLogged: last)
+    }
+
+    func ink(_ colors: AdaptiveColors) -> Color {
+        switch tone {
+        case .behind: return colors.behind
+        case .positive: return colors.positive
+        case .neutral: return colors.textSecondary
+        }
+    }
+
+    static func ofGoal(_ whole: Int, _ goal: Int) -> String {
+        String(localized: "rentals.mock.ofGoal", defaultValue: "\(whole) of \(goal)h", table: "Rentals")
+    }
+
+    func lastLoggedText(now: Date = Date()) -> String? {
+        guard let lastLogged else { return nil }
+        if Calendar.current.isDateInToday(lastLogged) {
+            return String(localized: "rentals.mock.loggedToday", defaultValue: "Logged today", table: "Rentals")
+        }
+        let d = lastLogged.formatted(.dateTime.month(.abbreviated).day())
+        return String(localized: "rentals.mock.lastLogged", defaultValue: "Last logged \(d)", table: "Rentals")
+    }
+
+    var toConfirmText: String {
+        String(localized: "rentals.mock.toConfirm", defaultValue: "\(toConfirm) to confirm", table: "Rentals")
+    }
+}
+
+/// The house still (with its lot), scaled up from the ground line like `LHThumb` but not clipped
+/// to its own square: the tile's inner surface does the cropping, so the lot is cut only at the
+/// surface's edge (LHThumb's interim crop draws a hard lot edge inside the tile).
+struct RentalMockHouse: View {
+    let stage: CraftStage
+    let lit: Bool
+    let side: CGFloat
+    let scale: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Image(stage.assetName(lit: true))
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            .frame(width: side, height: side)
+            .scaleEffect(scale, anchor: UnitPoint(x: 0.5, y: CraftStage.groundLine))
+            .offset(y: side * (1 - CraftStage.groundLine))
+            .colorMultiply(Color(white: CraftMotion.clipDim(windowsLit: lit, dark: colorScheme == .dark)))
+            .accessibilityLabel(CraftHouseView.accessibilityLabel(stage: stage, lit: lit))
+    }
+}
+
+/// Option 1: a two-column gallery of house tiles.
+struct RentalsGalleryMock: View {
+    let rows: [RentalRowModel]
+    let info: [UUID: RentalMockInfo]
+    var open: (UUID) -> Void
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let columns = typeSize >= .accessibility1
+            ? [GridItem(.flexible())]
+            : [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
+            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                if let i = info[row.id] {
+                    RentalGalleryTile(row: row, info: i) { open(row.id) }
+                        .accessibilityIdentifier("properties.tile.\(index)")
+                }
+            }
+        }
+        .accessibilityIdentifier("properties.gallery")
+    }
+}
+
+struct RentalGalleryTile: View {
+    let row: RentalRowModel
+    let info: RentalMockInfo
+    var action: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 0) {
+                GeometryReader { geo in
+                    RentalMockHouse(stage: row.stage, lit: row.lit, side: geo.size.width * 0.86, scale: 1.3)
+                        .frame(width: geo.size.width, height: geo.size.height, alignment: .bottom)
+                }
+                .aspectRatio(1.1, contentMode: .fit)
+                .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(row.name)
+                        .font(.headline)
+                        .foregroundStyle(colors.textPrimary)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
+                    Text(RentalMockInfo.ofGoal(row.wholeHours, info.goal))
+                        .font(.subheadline.monospacedDigit())
+                        .fontDesign(.rounded)
+                        .foregroundStyle(colors.textSecondary)
+                    Text(info.pace)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(info.ink(colors))
+                }
+                .padding(.top, 10)
+                Spacer(minLength: 0)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+            .overlay {
+                if colorScheme == .dark {
+                    RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
+                        .strokeBorder(colors.border, lineWidth: LHMetrics.hairline)
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+        }
+        .buttonStyle(LHButton.press)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(row.name), \(RentalMockInfo.ofGoal(row.wholeHours, info.goal)), \(info.pace)")
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// Option 2: one big card per rental.
+struct RentalsCardsMock: View {
+    let rows: [RentalRowModel]
+    let info: [UUID: RentalMockInfo]
+    var open: (UUID) -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                if let i = info[row.id] {
+                    RentalBigCard(row: row, info: i) { open(row.id) }
+                        .accessibilityIdentifier("properties.card.\(index)")
+                }
+            }
+        }
+        .accessibilityIdentifier("properties.cards")
+    }
+}
+
+struct RentalBigCard: View {
+    let row: RentalRowModel
+    let info: RentalMockInfo
+    var action: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var typeSize
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 12) {
+                RentalMockHouse(stage: row.stage, lit: row.lit, side: 200, scale: 1.3)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 196, alignment: .bottom)
+                    .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
+                VStack(alignment: .leading, spacing: 4) {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(row.name).font(.title3.weight(.semibold)).lineLimit(1)
+                            Spacer(minLength: 8)
+                            hoursText
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(row.name).font(.title3.weight(.semibold))
+                            hoursText
+                        }
+                    }
+                    .foregroundStyle(colors.textPrimary)
+                    Text(info.pace)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(info.ink(colors))
+                    HStack(spacing: 8) {
+                        if info.toConfirm > 0 { LHTag(info.toConfirmText, tone: .caution) }
+                        if let last = info.lastLoggedText() {
+                            Text(last).font(.footnote).foregroundStyle(colors.textSecondary)
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+                .multilineTextAlignment(.leading)
+            }
+            .padding(LHMetrics.cardPadding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+            .overlay {
+                if colorScheme == .dark {
+                    RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
+                        .strokeBorder(colors.border, lineWidth: LHMetrics.hairline)
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+        }
+        .buttonStyle(LHButton.press)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(row.name), \(RentalMockInfo.ofGoal(row.wholeHours, info.goal)), \(info.pace)")
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private var hoursText: some View {
+        Text(RentalMockInfo.ofGoal(row.wholeHours, info.goal))
+            .font(.body.monospacedDigit())
+            .fontDesign(.rounded)
+            .foregroundStyle(colors.textSecondary)
+    }
+}
+#endif
