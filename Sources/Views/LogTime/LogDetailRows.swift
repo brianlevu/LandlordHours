@@ -208,9 +208,9 @@ extension LogTimeSheet {
         return layout {
             Text(label(.participant)).font(.body).foregroundStyle(colors.textPrimary)
             if !isAX { Spacer(minLength: 8) }
-            LHSegmented([.init(Participant.selfParticipant, lt("Me")), .init(Participant.spouse, lt("Spouse"))],
-                        selection: Binding(get: { form.participant }, set: { form.setParticipant($0); edited(.participant) }),
-                        accessibilityLabel: label(.participant))
+            LogWhoSegmented([.init(Participant.selfParticipant, lt("Me")), .init(Participant.spouse, lt("Spouse"))],
+                            selection: Binding(get: { form.participant }, set: { form.setParticipant($0); edited(.participant) }),
+                            accessibilityLabel: label(.participant))
                 .frame(maxWidth: isAX ? .infinity : 190)
         }
         .padding(.horizontal, 16)
@@ -260,5 +260,75 @@ extension LogTimeSheet {
         .buttonStyle(LHButton.tertiary)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("log.receipt")
+    }
+}
+
+
+// MARK: - Who control
+
+/// The Me / Spouse control. It sits on a `backgroundTertiary` row, so `LHSegmented`'s own thumb
+/// (`backgroundSecondary` on a `backgroundTertiary` track) reads 1.06:1 here and the selection is
+/// invisible. This one fills the selected thumb with the action colour (`onAction` ink), which
+/// clears 3:1 against the track in light and dark. Same geometry, motion and haptic as `LHSegmented`.
+private struct LogWhoSegmented<Value: Hashable>: View {
+    struct Option: Identifiable {
+        let value: Value
+        let label: String
+        var id: Value { value }
+        init(_ value: Value, _ label: String) { self.value = value; self.label = label }
+    }
+
+    let options: [Option]
+    @Binding var selection: Value
+    var accessibilityLabel: String
+
+    @Namespace private var thumb
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    init(_ options: [Option], selection: Binding<Value>, accessibilityLabel: String) {
+        self.options = options
+        self._selection = selection
+        self.accessibilityLabel = accessibilityLabel
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(options) { option in
+                let selected = option.value == selection
+                Button {
+                    guard !selected else { return }
+                    withAnimation(reduceMotion ? AppAnimation.quick : AppAnimation.segmentSlide) { selection = option.value }
+                } label: {
+                    Text(option.label)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(selected ? AppColors.onAction : colors.textSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .padding(.horizontal, 10)
+                        .frame(maxWidth: .infinity, minHeight: LHSegmented<Value>.height - 4)
+                        .frame(minWidth: LHSegmented<Value>.minSegmentWidth)
+                        .background {
+                            if selected {
+                                Capsule().fill(colors.action)
+                                    .matchedGeometryEffect(id: "thumb", in: thumb)
+                            }
+                        }
+                        .contentShape(Capsule())
+                        .animation(AppAnimation.quick, value: selected)
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .frame(minHeight: LHSegmented<Value>.height)
+        .background(colors.backgroundTertiary, in: Capsule())
+        .overlay(Capsule().strokeBorder(colors.border, lineWidth: LHMetrics.hairline))
+        .frame(minHeight: LHMetrics.minTap)
+        .sensoryFeedback(.selection, trigger: selection)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(accessibilityLabel)
     }
 }

@@ -375,7 +375,7 @@ final class LogTimeUITests: XCTestCase {
         Shot(name: "log-empty", seed: "four", extra: ["-LHOpenLog", "empty"], waitFor: "log.note"),
         Shot(name: "log-typed", seed: "four", extra: ["-LHOpenLog", "typed"], waitFor: "log.note"),
         Shot(name: "log-filled", seed: "four", extra: ["-LHOpenLog", "filled"], waitFor: "log.fill.caption"),
-        Shot(name: "log-filled-spouse", seed: "four", extra: ["-LHOpenLog", "filled", "-LHLogSpouse"], waitFor: "log.who"),
+        Shot(name: "log-filled-spouse", seed: "four", extra: ["-LHOpenLog", "filled", "-LHLogSpouse"], waitFor: "log.who", scrollTo: "log.who"),
         Shot(name: "log-quick", seed: "limit", extra: ["-LHOpenLog", "quick"], waitFor: "log.note"),
         Shot(name: "log-invalid", seed: "four", extra: ["-LHOpenLog", "invalid"], waitFor: "log.save"),
         Shot(name: "log-keyboard", seed: "four", extra: ["-LHOpenLog", "keyboard"], waitFor: "log.done", settle: 2),
@@ -513,6 +513,13 @@ final class LogTimeUITests: XCTestCase {
     func testCaptureExtrasDarkXXL() { captureAll(scheme: "dark", size: "xxl", names: Self.extraNames) }
     func testCaptureExtrasLightAX3() { captureAll(scheme: "light", size: "ax3", names: Self.extraNames) }
     func testCaptureExtrasDarkAX3() { captureAll(scheme: "dark", size: "ax3", names: Self.extraNames) }
+
+    /// The Who control's selected state, scrolled clear of the pinned footer at every size.
+    func testCaptureWhoOnly() {
+        for scheme in ["light", "dark"] {
+            for size in [nil, "xxl", "ax3"] as [String?] { captureAll(scheme: scheme, size: size, names: ["log-filled-spouse"]) }
+        }
+    }
 
     func testCapturePaneProbe() {
         for scheme in ["light", "dark"] { captureAll(scheme: scheme, size: nil, names: ["pane-probe"]) }
