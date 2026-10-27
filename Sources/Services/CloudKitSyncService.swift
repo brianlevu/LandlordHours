@@ -465,7 +465,9 @@ final class CloudKitSyncService: ObservableObject {
     var changeTracker: SyncChangeTracker? {
         // One tracker for the record set: the engine's (deletes recorded here and baselines the
         // engine writes land in the same instance and the same file).
-        if let engine { return engine.tracker }
+        if let engine, engine.syncRoot.standardizedFileURL.path == changeTrackerBaseDirectory.standardizedFileURL.path {
+            return engine.tracker
+        }
         guard let appUserId else { return nil }
         if let cachedChangeTracker, cachedChangeTracker.userId == appUserId,
            cachedChangeTracker.fileURL.path.hasPrefix(changeTrackerBaseDirectory.path) {
