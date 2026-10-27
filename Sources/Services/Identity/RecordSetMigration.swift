@@ -981,6 +981,7 @@ final class RecordSetMigration {
         }
         let liveNames = Set((live?.liveEntries.map { $0.id.uuidString } ?? []) + (live?.liveProperties.map { $0.id.uuidString } ?? [])
                             + (live?.liveCategories.map { $0.id.uuidString } ?? []))
+        let hashes = (defaults.dictionary(forKey: IdentityKeys.deletedRecordHashes) as? [String: String]) ?? [:]
         let deletedMap = (defaults.dictionary(forKey: IdentityKeys.deletedRecordNames) as? [String: Date]) ?? [:]
         let deleted = deletedNames()
         var liveModifiedAt: [String: Date] = [:]
@@ -989,7 +990,8 @@ final class RecordSetMigration {
         for c in live?.liveCategories ?? [] { liveModifiedAt[c.id.uuidString] = c.modifiedAt }
         return MergeRules.RoutingContext(liveNames: liveNames, archiveMembership: membership, unifiedId: unifiedId,
                                          groups: GroupsFile.load(root: root), deletedNames: deleted,
-                                         tombstones: Set(tracker.pendingDeletes), deletedAt: deletedMap.filter { deleted.contains($0.key) },
+                                         tombstones: Set(tracker.pendingDeletes), deletedHashes: hashes.filter { deleted.contains($0.key) },
+                                         deletedAt: deletedMap.filter { deleted.contains($0.key) },
                                          liveModifiedAt: liveModifiedAt)
     }
 
@@ -1132,9 +1134,7 @@ final class RecordSetMigration {
         if !putBackElsewhere.isEmpty {
             // Put back on another device: live here again, so it leaves Recently removed and R11.
             earlier.takeRemoved(putBackElsewhere)
-            var map = (defaults.dictionary(forKey: IdentityKeys.deletedRecordNames) as? [String: Date]) ?? [:]
-            for name in putBackElsewhere { map[name] = nil }
-            defaults.set(map, forKey: IdentityKeys.deletedRecordNames)
+            forgetDeleted(putBackElsewhere)
         }
         try? groups.save(root: root)
 
@@ -1291,12 +1291,39 @@ final class RecordSetMigration {
         return Set(map.filter { $0.value > cutoff }.keys)
     }
 
-    func noteDeleted(_ names: Set<String>) {
+    /// R11: these names were deleted. `hashes` names the deleted versions; any not given are
+    /// looked up in the live set and Recently removed (the deleted copy is in one of them).
+    func noteDeleted(_ names: Set<String>, hashes given: [String: String] = [:]) {
         var map = (defaults.dictionary(forKey: IdentityKeys.deletedRecordNames) as? [String: Date]) ?? [:]
         let cutoff = now().addingTimeInterval(-90 * 86_400)
         map = map.filter { $0.value > cutoff }
         for name in names { map[name] = now() }
         defaults.set(map, forKey: IdentityKeys.deletedRecordNames)
+        var known: [String: String] = [:]
+        if let live {
+            for e in live.liveEntries where names.contains(e.id.uuidString) { known[e.id.uuidString] = RecordLedger.version(e).hash }
+            for p in live.liveProperties where names.contains(p.id.uuidString) { known[p.id.uuidString] = RecordLedger.version(p).hash }
+            for c in live.liveCategories where names.contains(c.id.uuidString) { known[c.id.uuidString] = RecordLedger.version(c).hash }
+        }
+        for r in earlier.removed where names.contains(r.name) { if let v = r.version { known[r.name] = v.hash } }
+        // Last resort: the version this phone held at its last merge (the ledger's after-cloud copy).
+        for v in LedgerSnapshot.load("v2-after-cloud.json", root: root)?.live ?? [] where names.contains(v.name) && known[v.name] == nil {
+            known[v.name] = v.hash
+        }
+        known.merge(given) { _, new in new }
+        var stored = (defaults.dictionary(forKey: IdentityKeys.deletedRecordHashes) as? [String: String]) ?? [:]
+        stored = stored.filter { map[$0.key] != nil }
+        for name in names { stored[name] = known[name] }
+        defaults.set(stored, forKey: IdentityKeys.deletedRecordHashes)
+    }
+
+    /// Put back here or on another device: no longer deleted (R11).
+    func forgetDeleted(_ names: Set<String>) {
+        var map = (defaults.dictionary(forKey: IdentityKeys.deletedRecordNames) as? [String: Date]) ?? [:]
+        var hashes = (defaults.dictionary(forKey: IdentityKeys.deletedRecordHashes) as? [String: String]) ?? [:]
+        for name in names { map[name] = nil; hashes[name] = nil }
+        defaults.set(map, forKey: IdentityKeys.deletedRecordNames)
+        defaults.set(hashes, forKey: IdentityKeys.deletedRecordHashes)
     }
 
     // MARK: Zone gone (P31) — never recreate on our own

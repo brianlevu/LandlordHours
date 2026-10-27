@@ -52,6 +52,10 @@ enum IdentityKeys {
     static let taxDirtyWhileEmpty = "v2.tax.dirtyWhileEmpty"
     /// Names deleted after migration (90 days): blocks resurrection from 1.1 devices (R11).
     static let deletedRecordNames = "v2.deletedRecordNames"
+    /// The content hash of the version each of `deletedRecordNames` had when it was deleted. Only
+    /// that exact version coming back (a 1.1 device re-pushing it) is ignored; any other version
+    /// (Put back stamps a new one) cancels the delete, whatever the phones' clocks say.
+    static let deletedRecordHashes = "v2.deletedRecordHashes"
     /// The zone was deleted on another device (P31); sync paused until answered.
     static let zoneGone = "v2.sync.zoneGone"
     /// This device has completed at least one sync with the zone (zone-gone guard).

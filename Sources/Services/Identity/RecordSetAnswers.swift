@@ -143,8 +143,9 @@ extension RecordSetMigration {
     }
 
     /// P18 "Put back": the records return to the live set and are pushed as new. Putting back is
-    /// an edit made now: the copies are stamped now, so the devices that saw the delete take them
-    /// back (R11 ignores only copies older than the delete).
+    /// an edit: each copy gets a new version (stamped, always later than the deleted one), so the
+    /// phones that saw the delete take it back (R11 ignores only the deleted version itself, with
+    /// no clock comparison between phones).
     func putBack(_ names: Set<String>) {
         guard let live else { return }
         let taken = earlier.takeRemoved(names)
@@ -153,15 +154,13 @@ extension RecordSetMigration {
         func stamped<T: IdentityRecord>(_ records: [T], _ stamp: (inout T) -> Void) -> [T] {
             records.map { var r = $0; stamp(&r); return r }
         }
-        let entries = stamped(taken.compactMap(\.entry)) { $0.modifiedAt = max($0.modifiedAt, at) }
-        let properties = stamped(taken.compactMap(\.property)) { $0.modifiedAt = max($0.modifiedAt, at) }
-        let categories = stamped(taken.compactMap(\.category)) { $0.modifiedAt = max($0.modifiedAt, at) }
+        let entries = stamped(taken.compactMap(\.entry)) { $0.modifiedAt = max($0.modifiedAt.addingTimeInterval(0.001), at) }
+        let properties = stamped(taken.compactMap(\.property)) { $0.modifiedAt = max($0.modifiedAt.addingTimeInterval(0.001), at) }
+        let categories = stamped(taken.compactMap(\.category)) { $0.modifiedAt = max($0.modifiedAt.addingTimeInterval(0.001), at) }
         live.replaceLive(entries: MergeRules.union(live.liveEntries, entries),
                          properties: MergeRules.union(live.liveProperties, properties),
                          categories: MergeRules.union(live.liveCategories, categories))
-        var map = (defaults.dictionary(forKey: IdentityKeys.deletedRecordNames) as? [String: Date]) ?? [:]
-        for name in names { map[name] = nil }
-        defaults.set(map, forKey: IdentityKeys.deletedRecordNames)
+        forgetDeleted(names)
         tracker.forget(recordNames: Array(names))
         tracker.cancelTombstones(for: names)
         onChange?()

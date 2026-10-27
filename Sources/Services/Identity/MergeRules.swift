@@ -266,8 +266,9 @@ enum MergeRules {
         var groups: GroupsFile?
         var deletedNames: Set<String>
         var tombstones: Set<String>
-        /// When each of `deletedNames` was deleted. A copy edited after that (Put back on another
-        /// device) is not the deleted record coming back from a 1.1 device: it routes normally.
+        /// The content hash of the deleted version of each of `deletedNames`, when known.
+        var deletedHashes: [String: String] = [:]
+        /// When each of `deletedNames` was deleted (fallback when no hash is on file).
         var deletedAt: [String: Date] = [:]
         /// `modifiedAt` of each live record (R20 yields only to a newer copy).
         var liveModifiedAt: [String: Date] = [:]
@@ -284,10 +285,17 @@ enum MergeRules {
     static func route(_ record: ZoneRecord, context: RoutingContext) -> Route {
         let name = record.recordName
         if context.tombstones.contains(name) { return .ignore }
-        if context.deletedNames.contains(name) {
-            guard let at = context.deletedAt[name], let edited = record.modifiedAt, edited > at else { return .ignore }
-        }
         let owner = record.appUserId ?? LegacyInventory.unscopedGroupId
+        if context.deletedNames.contains(name) {
+            // R11 with an explicit cancel: the deleted version itself coming back (a 1.1 device
+            // re-pushing it) is ignored; a different version is a Put back (or an edit) and routes.
+            // With no hash on file, only a copy edited after the delete routes.
+            if let hash = context.deletedHashes[name] {
+                if record.contentHash == hash { return .ignore }
+            } else {
+                guard let at = context.deletedAt[name], let edited = record.modifiedAt, edited > at else { return .ignore }
+            }
+        }
         // R12 before R20: a copy tagged with a spouse group's own id comes from the spouse's 2.0.x
         // device, written from their side (participant Self). It is swapped on arrival even when the
         // record is already live here, or the spouse's hours silently turn back into the owner's.

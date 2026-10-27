@@ -701,21 +701,22 @@ final class CloudKitSyncService: ObservableObject {
     /// Records a local property delete (its entries too). Every delete goes through the
     /// serialized push (tombstone → push → clear).
     func deletePropertyFromCloud(_ property: RentalProperty, cascadedEntryIds: [UUID] = []) {
-        recordLocalDeletes([property.id.uuidString] + cascadedEntryIds.map(\.uuidString))
+        recordLocalDeletes([property.id.uuidString] + cascadedEntryIds.map(\.uuidString),
+                           hashes: [property.id.uuidString: RecordLedger.version(property).hash])
     }
 
     func deleteEntryFromCloud(_ entry: TimeEntry) {
-        recordLocalDeletes([entry.id.uuidString])
+        recordLocalDeletes([entry.id.uuidString], hashes: [entry.id.uuidString: RecordLedger.version(entry).hash])
     }
 
-    private func recordLocalDeletes(_ names: [String]) {
+    private func recordLocalDeletes(_ names: [String], hashes: [String: String] = [:]) {
         guard let tracker = changeTracker else {
             logger.error("Delete of \(names.count) record(s) not queued for iCloud: no record set yet")
             return
         }
         tracker.forget(recordNames: names)
         tracker.addTombstones(names)
-        engine?.noteDeleted(Set(names))
+        engine?.noteDeleted(Set(names), hashes: hashes)
         schedulePush()
     }
 

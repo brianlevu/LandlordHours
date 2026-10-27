@@ -180,6 +180,39 @@ final class AdversarialReviewTests: XCTestCase {
 
     // MARK: F · Put back on a phone whose clock is behind the deleting phone is ignored there
 
+    func testPutBackFromAPhoneWithASlowerClockIsIgnoredByTheDeletingPhone() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let device = legacy(local)
+        let zone = FakeZoneSource(records: Fixture.zoneRecords(entries: device.entries, properties: device.properties, owner: local))
+        let a = EngineHarness(sandbox, zone: zone)
+        try a.device()
+        let doneA = await a.cloud()
+        XCTAssertEqual(doneA, .done)
+        let boxB = IdentitySandbox("clock-phone-b")
+        defer { boxB.tearDown() }
+        let b = EngineHarness(boxB, zone: zone)
+        try b.device()
+        let doneB = await b.cloud()
+        XCTAssertEqual(doneB, .done)
+        let target = try XCTUnwrap(b.entries.first)
+        let name = target.id.uuidString
+        // Phone B's clock runs 10 minutes ahead of phone A's.
+        let realNow = Date()
+        b.engine.now = { realNow.addingTimeInterval(600) }
+        a.engine.now = { realNow }
+        b.live.replaceLive(entries: b.entries.filter { $0.id != target.id }, properties: b.properties, categories: b.live.liveCategories)
+        b.engine.tracker.forget(recordNames: [name])
+        b.engine.tracker.addTombstones([name])
+        b.engine.noteDeleted([name])
+        await b.engine.pushLive()
+        a.engine.applyPull(ZoneDelta(changed: [], deleted: [name: "TimeEntry"], tokenData: nil, incomplete: false))
+        XCTAssertFalse(a.entries.contains { $0.id == target.id })
+        a.engine.putBack([name])
+        await a.engine.pushLive()
+        let restored = try XCTUnwrap(zone.records[name])
+        b.engine.applyPull(ZoneDelta(changed: [restored], deleted: [:], tokenData: nil, incomplete: false))
+        XCTAssertTrue(b.entries.contains { $0.id == target.id }, "Put back on A never reaches B when A's clock is behind B's")
+    }
 
     // MARK: - Added by the fix lane (each one red on d3bb9e2 before its fix)
 
