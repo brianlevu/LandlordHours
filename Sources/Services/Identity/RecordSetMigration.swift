@@ -99,6 +99,9 @@ final class RecordSetMigration {
         // S1 — inventory (memory only).
         let inventory = LegacyInventory.scan(defaults: defaults, root: root)
         setStep(.inventoried, defaults)
+        // A 1.x/2.0 profile that synced (baselines, a zone token, or its first push done) knew the
+        // zone: if it is gone now it was deleted on another phone, and P31 asks (never recreated).
+        if inventory.groups.contains(where: Self.syncedBefore) { defaults.set(true, forKey: IdentityKeys.zoneSeen) }
 
         let backupKeys = MigrationBackup.backedUpKeys(in: defaults.dictionaryRepresentation())
         if inventory.groups.isEmpty && backupKeys.isEmpty {
@@ -285,6 +288,11 @@ final class RecordSetMigration {
             }
         }
         if !drafts.isEmpty { defaults.set(try? JSONEncoder().encode(drafts.sorted { $0.startTime < $1.startTime }), forKey: draftsKey) }
+    }
+
+    static func syncedBefore(_ group: LegacyGroup) -> Bool {
+        !(group.tracker?.fingerprints.isEmpty ?? true) || group.values["cloudkit.zoneChangeToken"] != nil
+            || (group.values["cloudkit.migrationDone"] as? Bool) == true
     }
 
     /// U33: suggestion files of combined groups merge into the live one by `sourceKey`; dismissed

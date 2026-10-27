@@ -30,6 +30,23 @@ final class AdversarialReviewTests: XCTestCase {
 
     // MARK: B · a 2.0.x upgrader that synced before recreates a zone deleted on another phone
 
+    func testAnUpgraderThatSyncedIn20RecreatesAZoneDeletedElsewhere() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let device = legacy(local)
+        // This phone pushed in 2.0 (D10: a tracker with baselines exists).
+        Fixture.writeTracker(owner: local, entries: device.entries, properties: device.properties, in: sandbox)
+        sandbox.defaults.set(true, forKey: "u.\(local).cloudkit.migrationDone")
+        sandbox.defaults.set(Data("old-token".utf8), forKey: "u.\(local).cloudkit.zoneChangeToken")
+        // Meanwhile the other phone (already on 2.2) ran Delete all data: the zone is gone.
+        let zone = FakeZoneSource()
+        zone.zoneExists = false
+        let h = EngineHarness(sandbox, zone: zone)
+        try h.device()
+        let outcome = await h.cloud()
+        XCTAssertEqual(outcome, .zoneGone, "a phone that synced in 2.0 knew the zone: P31 asks, never recreates")
+        XCTAssertFalse(zone.zoneExists, "the deleted zone must stay deleted")
+        XCTAssertTrue(zone.records.isEmpty, "nothing re-uploaded (\(zone.records.count) records came back)")
+    }
 
     // MARK: C · S8 adopts the household owner's id even when that owner is a pending group here
 
