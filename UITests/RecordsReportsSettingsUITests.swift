@@ -169,6 +169,22 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         }
     }
 
+    /// Records' summary caption at default, XXL and AX3, both themes (the gate's clipped-glyph check).
+    func testCaptureRecordsCaptionSizes() {
+        let sizes: [(String?, String)] = [
+            (nil, "default"),
+            ("UICTContentSizeCategoryXXL", "xxl"),
+            ("UICTContentSizeCategoryAccessibilityXXXL", "ax3")
+        ]
+        for (size, tag) in sizes {
+            for scheme in ["light", "dark"] {
+                launch(tab: 6, scheme: scheme, extra: size.map { ["-UIPreferredContentSizeCategoryName", $0] } ?? [])
+                XCTAssertTrue(element("records.totalLabel").waitForExistence(timeout: 20))
+                settleAndCapture("records-\(tag)-\(scheme)")
+            }
+        }
+    }
+
     /// Follow-up frames: Settings with Dark chosen and Reports' branded switcher.
     func testCaptureFollowUpFrames() {
         for scheme in ["light", "dark"] {
