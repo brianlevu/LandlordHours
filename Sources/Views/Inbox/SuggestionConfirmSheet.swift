@@ -73,8 +73,6 @@ struct SuggestionConfirmSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // Accessibility sizes: the header is too tall to pin, so it scrolls with the sheet.
-                if ax { header.padding(.horizontal, -LHMetrics.gutter) }
                 // At accessibility sizes the free plan's previewing line leads the scroll; the
                 // unlock stays pinned and the back-out scrolls after the content (§1.20 AX policy).
                 if ax && atLimit { limitExplanation }
@@ -89,13 +87,19 @@ struct SuggestionConfirmSheet: View {
                 if ax { axScrollingChoices }
             }
             .padding(.horizontal, LHMetrics.gutter)
-            .padding(.top, 8)
             .padding(.bottom, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
         .scrollDismissesKeyboard(.interactively)
-        .safeAreaInset(edge: .top, spacing: 0) { if !ax { header } }
+        // Screen anatomy: a sheet about one item, led by its 56pt tool (§H.5). The scaffold pins the
+        // header below AX and scrolls it away at AX sizes, so the field and the primary keep the room.
+        .lhSheetScreen(InboxFormat.rowTitle(suggestion, propertyName: propertyName),
+                       subtitle: String(localized: "confirm.subtitle", defaultValue: "\(InboxFormat.kindLabel(suggestion.kind)) · \(InboxFormat.longDay(suggestion.start))", table: "Inbox"),
+                       style: .detail,
+                       leading: AnyView(CategoryToolTile(category: category, size: 56)),
+                       onClose: { dismiss() },
+                       background: colors.backgroundSecondary)
         .safeAreaInset(edge: .bottom, spacing: 0) { footer }
         .background(colors.backgroundSecondary)
         .lhSheetPresentation(.focused)
@@ -138,55 +142,6 @@ struct SuggestionConfirmSheet: View {
                 NotificationCenter.default.post(name: .switchToPropertiesAndOpenAddProperty, object: nil)
             }
         })
-    }
-
-    // MARK: Header
-
-    private var header: some View {
-        let title = VStack(alignment: .leading, spacing: 2) {
-            Text(InboxFormat.rowTitle(suggestion, propertyName: propertyName))
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(colors.textPrimary)
-                .lineLimit(ax ? nil : 2)
-                .accessibilityAddTraits(.isHeader)
-            Text(String(localized: "confirm.subtitle", defaultValue: "\(InboxFormat.kindLabel(suggestion.kind)) · \(InboxFormat.longDay(suggestion.start))", table: "Inbox"))
-                .font(.subheadline)
-                .foregroundStyle(colors.textSecondary)
-                .lineLimit(ax ? nil : 1)
-                // At the free plan's limit at accessibility sizes the previewing line and the
-                // unlock take the room; the date is on the Date row below.
-                .opacity(ax && atLimit ? 0 : 1)
-                .frame(maxHeight: ax && atLimit ? 0 : nil)
-                .accessibilityHidden(ax && atLimit)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        let close = Button { dismiss() } label: { Image(systemName: "xmark") }
-            .buttonStyle(LHButton.icon)
-            .accessibilityLabel(String(localized: "sheet.close", defaultValue: "Close", table: "Foundations"))
-            .accessibilityIdentifier("confirm.close")
-        return Group {
-            if ax {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .center) {
-                        CategoryToolTile(category: category, size: 56)
-                        Spacer(minLength: 0)
-                        close
-                    }
-                    title
-                }
-            } else {
-                HStack(alignment: .center, spacing: 12) {
-                    CategoryToolTile(category: category, size: 56)
-                    title
-                    close
-                }
-            }
-        }
-        .padding(.horizontal, LHMetrics.gutter)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
-        .frame(minHeight: 56)
-        .background(colors.backgroundSecondary)
     }
 
     // MARK: Notice

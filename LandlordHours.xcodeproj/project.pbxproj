@@ -339,7 +339,6 @@
 		F87FAB49553E4595D4C1D27A /* LHSectionHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25592AA9D045230F14E3390A /* LHSectionHeader.swift */; };
 		F9780D4E1E88851CF65B6025 /* DormerBrandTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94B6C5116CF19BD791DC038D /* DormerBrandTests.swift */; };
 		FA95A196F8212B3525A97088 /* FreeUserPaywallUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 548394DDA38D7BBFDD18E815 /* FreeUserPaywallUITests.swift */; };
-		FBC76440A0A8D199324C4C62 /* RecordsHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB99CD7EA1B1D3AFFCA9202 /* RecordsHeader.swift */; };
 		FC6D6E7D90E9FA8838B7C4C7 /* RecordsReportsCaptureUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC8D77D86EF7D09160EF0F0A /* RecordsReportsCaptureUITests.swift */; };
 		FD134A0FE3D7F4B5F484C09A /* NoteReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF04BC6B88E4C747F2744B52 /* NoteReaderTests.swift */; };
 		FD1915E10564E5F4022DAE85 /* RentalPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B67FB6A28B23FCA3936ACEB1 /* RentalPage.swift */; };
@@ -426,7 +425,6 @@
 		19BB1C02B8B8230C5B4936FF /* LogTimeParts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogTimeParts.swift; sourceTree = "<group>"; };
 		1AA72A2C13136E24A749E14C /* LandlordHoursUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LandlordHoursUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1AAA75C0ABD5FDA065664E0A /* LogInlineEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogInlineEditors.swift; sourceTree = "<group>"; };
-		1AB99CD7EA1B1D3AFFCA9202 /* RecordsHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsHeader.swift; sourceTree = "<group>"; };
 		1AF16D81B372852B91B92405 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		1C3403D84E20A7CB20F711A0 /* LogTimeLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogTimeLogic.swift; sourceTree = "<group>"; };
 		1D59E5BD8B45AF17ABFDFFAD /* BrandTypographyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandTypographyTests.swift; sourceTree = "<group>"; };
@@ -1339,7 +1337,6 @@
 		E34E082A32AEC40D63C9A7FC /* Records */ = {
 			isa = PBXGroup;
 			children = (
-				1AB99CD7EA1B1D3AFFCA9202 /* RecordsHeader.swift */,
 				401D542F4CD2262A89C17B07 /* RecordsLogic.swift */,
 				E24A02B397BEF678780443FD /* RecordsStrings.swift */,
 			);
@@ -1783,7 +1780,6 @@
 				3B6ADC833422DD7187669B64 /* RecordPagePreview.swift in Sources */,
 				A747A4400A9DBED4FEDF5575 /* RecordSetAnswers.swift in Sources */,
 				452A3671C41118A6CF4C5852 /* RecordSetMigration.swift in Sources */,
-				FBC76440A0A8D199324C4C62 /* RecordsHeader.swift in Sources */,
 				0F352493E9D7EEA53D9D38FC /* RecordsLogic.swift in Sources */,
 				DED5782AA5D2296C19C20623 /* RecordsStrings.swift in Sources */,
 				D4E64B3B2C9CA6128B73234F /* RentalEditSheet.swift in Sources */,

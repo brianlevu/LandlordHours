@@ -23,6 +23,17 @@
         }
       }
     },
+    "record.back": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        }
+      }
+    },
     "record.cancel": {
       "extractionState": "manual",
       "localizations": {

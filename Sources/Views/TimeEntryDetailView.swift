@@ -57,46 +57,35 @@ struct TimeEntryDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
-                header
                 hoursCard
                 if isEditing { editSections } else { readSections }
             }
             .padding(.horizontal, LHMetrics.gutter)
-            .padding(.top, 8)
             .padding(.bottom, LHMetrics.sectionGap)
         }
         .scrollDismissesKeyboard(.interactively)
         .background { LHCanvas() }
-        .navigationTitle(isEditing ? RR.t("record.editTitle", "Edit record") : "")
-        .navigationBarTitleDisplayMode(.inline)
-        // The title lives in the content, so the floating back and Edit controls need their own
-        // material or scrolled text runs under them (gate B1, AX3).
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarBackground(.bar, for: .navigationBar)
-        .hidesAppTabBar()
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+        // Screen anatomy: the detail scaffold owns the title, the back icon, the one trailing action
+        // and the gaps. While editing, back cancels the edit (it asks first when there are changes)
+        // and the one action is Save.
+        .lhDetailScreen(
+            isEditing ? category.inboxLabel : RecordsLogic.title(for: entry, propertyName: propertyName),
+            subtitle: headerSubtitle,
+            back: isEditing
+                ? LHBackAction(label: RR.t("record.cancel", "Cancel"), identifier: "entry.cancel") { cancelEditing() }
+                : LHBackAction(label: RR.t("record.back", "Back"), identifier: "entry.back") { dismiss() },
+            trailing: {
                 if isEditing {
-                    Button(RR.t("record.save", "Save")) { saveChanges() }
-                        .fontWeight(.semibold)
-                        .foregroundStyle(hasChanges ? colors.action : colors.textSecondary)
+                    LHHeaderAction(title: RR.t("record.save", "Save"), identifier: "entry.save") { saveChanges() }
                         .disabled(!hasChanges)
-                        .accessibilityIdentifier("entry.save")
                 } else {
-                    Button(RR.t("record.edit", "Edit")) {
+                    LHHeaderAction(title: RR.t("record.edit", "Edit"), identifier: "entry.edit") {
                         animate { isEditing = true }
                     }
-                    .foregroundStyle(colors.action)
-                    .accessibilityIdentifier("entry.edit")
                 }
             }
-            if isEditing {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(RR.t("record.cancel", "Cancel")) { cancelEditing() }
-                        .foregroundStyle(colors.action)
-                }
-            }
-        }
+        )
+        .hidesAppTabBar()
         .alert(RR.t("record.delete.title", "Delete this record?"), isPresented: $showingDeleteConfirmation) {
             Button(RR.t("record.delete.cancel", "Cancel"), role: .cancel) {}
             Button(RR.t("record.delete.confirm", "Delete"), role: .destructive) {
@@ -124,39 +113,20 @@ struct TimeEntryDetailView: View {
         return RR.t("record.header.subtitle", "\(badge.title) \u{00B7} \(day)")
     }
 
-    private var header: some View {
-        let title = LHScreenTitle(
-            isEditing ? category.inboxLabel : RecordsLogic.title(for: entry, propertyName: propertyName),
-            subtitle: headerSubtitle,
-            style: .detail
-        )
-        .padding(.bottom, -LHMetrics.headerToContent)
-        return Group {
-            if ax {
-                // Tile above the title so the title keeps the full width (no mid-word breaks).
-                VStack(alignment: .leading, spacing: 12) {
-                    CategoryToolTile(category: category, size: 56)
-                    title
-                }
-            } else {
-                HStack(alignment: .center, spacing: 14) {
-                    CategoryToolTile(category: category, size: 56)
-                    title
-                }
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-
+    /// The 56pt tool (§1.17) leads the hours: the scaffold's detail header carries no ornament, so
+    /// the tool and the hours read as one summary under the title.
     private var hoursCard: some View {
-        Group {
+        let layout = ax ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+                        : AnyLayout(HStackLayout(alignment: .center, spacing: 14))
+        return layout {
+            CategoryToolTile(category: category, size: 56)
             if isEditing {
                 LHStepper(hours: $hours, step: 0.25, range: 0.25...24, label: RR.t("record.hours", "Hours"))
                     .accessibilityIdentifier("record.hours.stepper")
                     .frame(maxWidth: .infinity)
             } else {
                 HoursReadout(hours: hours)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(.horizontal, isEditing ? 0 : LHMetrics.cardPadding)
