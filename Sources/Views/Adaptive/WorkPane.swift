@@ -64,6 +64,7 @@ struct PaneCoversTabKey: PreferenceKey {
 final class PaneHostBridge {
     weak var host: UIViewController?
     private(set) var covered = false
+    private var savedBackground: UIColor?
 
     func setTabContentCovered(_ covered: Bool) {
         self.covered = covered
@@ -75,7 +76,17 @@ final class PaneHostBridge {
     func apply(animated: Bool) {
         guard let host, let tabs = Self.tabBarController(in: host) else { return }
         let alpha: CGFloat = covered ? 0 : 1
-        let views = (tabs.viewControllers ?? []).compactMap(\.viewIfLoaded)
+        // The tabs are the tab controller's children (SwiftUI's tab API leaves `viewControllers` nil).
+        let views = tabs.children.compactMap(\.viewIfLoaded)
+        // The tab controller paints its own system background behind the tabs; while covered it
+        // is clear, so the pane's wall shows under the bar (the off-token band, gate J r2).
+        if covered {
+            if savedBackground == nil { savedBackground = tabs.view.backgroundColor ?? .clear }
+            tabs.view.backgroundColor = .clear
+        } else if let saved = savedBackground {
+            tabs.view.backgroundColor = saved
+            savedBackground = nil
+        }
         let change = {
             for view in views {
                 view.alpha = alpha
