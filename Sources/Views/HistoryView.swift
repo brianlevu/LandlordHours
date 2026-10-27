@@ -112,25 +112,24 @@ private struct RecordsScreen: View {
                     .accessibilityIdentifier("records.empty")
                 }
             } else {
-                Section {
-                    summary
-                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                }
-
                 ForEach(sections) { section in
                     Section {
                         ForEach(section.entries) { entry in
                             row(entry)
                         }
                     } header: {
-                        LHSectionHeader(RecordsLogic.monthHeader(section.month, hours: section.totalHours))
-                            .textCase(nil)
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityAddTraits(.isHeader)
-                            .accessibilityLabel(RR.t("records.month.spoken", "\(section.month.formatted(.dateTime.month(.wide).year())), \(LHFormat.spokenHours(section.totalHours)) logged"))
-                            .accessibilityIdentifier("records.month.\(section.month.formatted(.dateTime.year().month(.twoDigits)))")
+                        // The total rides in the first month's header instead of a row of its own:
+                        // a zero-inset clear row in an inset-grouped list is clipped to the
+                        // section's rounded corners, which sliced the caption's first glyph.
+                        VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
+                            if section.id == sections.first?.id { summary }
+                            LHSectionHeader(RecordsLogic.monthHeader(section.month, hours: section.totalHours))
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityAddTraits(.isHeader)
+                                .accessibilityLabel(RR.t("records.month.spoken", "\(section.month.formatted(.dateTime.month(.wide).year())), \(LHFormat.spokenHours(section.totalHours)) logged"))
+                                .accessibilityIdentifier("records.month.\(section.month.formatted(.dateTime.year().month(.twoDigits)))")
+                        }
+                        .textCase(nil)
                     }
                 }
             }
