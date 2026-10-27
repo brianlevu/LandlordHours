@@ -344,13 +344,15 @@ struct LogTimeSheet: View {
             if manual { autoFillOff.opacity(exiting ? 0 : 1).transition(arrive) }
             if !isRecovery { receiptRow.opacity(exiting ? 0 : 1).transition(arrive) }
         } else if !showVoiceIntro {
-            if !recents.isEmpty && !isFirstRun && !isListening { recentsView.opacity(exiting ? 0 : 1).transition(.identity) }
+            // The details line and the manual door sit right under the note: the note is focused on
+            // open, and with the keyboard up the pinned footer covers everything below the recents.
             VStack(alignment: .leading, spacing: 0) {
                 detailsLine
                 enterDetailsButton
             }
             .opacity(exiting ? 0 : 1)
             .transition(.identity)
+            if !recents.isEmpty && !isFirstRun && !isListening { recentsView.opacity(exiting ? 0 : 1).transition(.identity) }
         }
     }
 
@@ -787,6 +789,7 @@ struct LogTimeSheet: View {
     func enterManual() {
         readTask?.cancel()
         Analytics.manualPathOpened()
+        noteFocused = false   // manual entry is the rows, not the note: the keyboard would cover their editors
         Task { @MainActor in
             await arriveRows {
                 manual = true

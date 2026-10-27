@@ -34,7 +34,7 @@ final class LandlordHoursUITests: XCTestCase {
         waitAndTap(app.buttons["onb-primary"])
 
         let save = app.buttons["onb-primary"]
-        XCTAssertTrue(app.staticTexts["Which rental first?"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Add your first rental."].waitForExistence(timeout: 5))
         XCTAssertFalse(save.isEnabled, "Save waits for a name")
         XCTAssertFalse(app.textFields["property-address"].exists, "Address folded away")
         let nameField = app.textFields["property-name"]
@@ -175,17 +175,17 @@ final class LandlordHoursUITests: XCTestCase {
 
     func testMainTabVisualSmokeMatrix() {
         let matrix: [(scenario: String, tab: Int, expectedText: String, attachment: String)] = [
-            ("emptyMainTabs", 0, "Add your first property", "empty-home"),
-            ("emptyMainTabs", 1, "Once we know where your rentals are", "empty-properties"),
-            ("emptyMainTabs", 2, "Add a property to log this.", "empty-track"),
+            ("emptyMainTabs", 0, "Hours you confirm count toward your 750", "empty-home"),
+            ("emptyMainTabs", 1, "Add your first rental", "empty-properties"),
+            ("emptyMainTabs", 2, "Log your first hour", "empty-track"),
             ("emptyMainTabs", 3, "Reports", "empty-reports"),
             ("emptyMainTabs", 4, "Dormer\u{00A0}Pro", "empty-settings"),
-            ("occasional", 0, "Today’s work", "occasional-home"),
-            ("occasional", 1, "1 rental ·", "occasional-properties"),
+            ("occasional", 0, "of 100 hours", "occasional-home"),
+            ("occasional", 1, "214 Oak Street", "occasional-properties"),
             ("occasional", 2, "Log time", "occasional-track"),
             ("occasional", 3, "Reports", "occasional-reports"),
             ("occasional", 4, "Settings", "occasional-settings"),
-            ("frequent", 0, "toward 750 this year", "frequent-home"),
+            ("frequent", 0, "of 750 hours", "frequent-home"),
             ("frequent", 1, "3 rentals ·", "frequent-properties"),
             ("frequent", 2, "Log time", "frequent-track"),
             ("frequent", 3, "Reports", "frequent-reports"),
@@ -198,9 +198,9 @@ final class LandlordHoursUITests: XCTestCase {
                 launch(scenario: item.scenario, tab: item.tab)
                 assertVisibleText(item.expectedText, timeout: 8)
                 if item.attachment == "frequent-home" {
-                    let subtitle = app.descendants(matching: .any)["today.header.subtitle"].firstMatch
-                    XCTAssertTrue(subtitle.waitForExistence(timeout: 5), "Today header line")
-                    XCTAssertTrue(subtitle.label.hasSuffix("toward 750 this year."), subtitle.label)
+                    // 2.2: Today has no header line; the hero ring carries hours toward the goal.
+                    let hero = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "165, of 750 hours")).firstMatch
+                    XCTAssertTrue(hero.waitForExistence(timeout: 5), "Today hero: hours toward 750")
                 }
                 attachScreenshot(named: item.attachment)
                 XCTAssertFalse(app.staticTexts["Welcome to Dormer"].exists)
