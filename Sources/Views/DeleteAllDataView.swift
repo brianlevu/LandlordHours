@@ -21,6 +21,7 @@ struct DeleteAllDataView: View {
     @State private var showExport = false
     @State private var showVoiceOverConfirm = false
     @State private var showICloudOffPrompt = false
+    @State private var showOtherAccountPrompt = false
     @State private var isDeleting = HoldToDeleteButton.debugShowsDeleting
     @ScaledMetric(relativeTo: .body) private var iconColumn: CGFloat = 24
     @State private var deleteError: String? = Self.debugFailure
@@ -124,6 +125,12 @@ struct DeleteAllDataView: View {
         } message: {
             Text("Copies saved in iCloud can’t be removed right now. Delete from this iPhone anyway, or turn on iCloud and try again.")
         }
+        .alert("Different iCloud account", isPresented: $showOtherAccountPrompt) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete from this iPhone", role: .destructive) { runDelete(allowLocalOnly: true) }
+        } message: {
+            Text("This iPhone is signed in to a different iCloud account now. Nothing in that iCloud will be deleted. Delete from this iPhone only?")
+        }
         .alert("Couldn’t delete", isPresented: Binding(
             get: { deleteError != nil },
             set: { if !$0 { deleteError = nil } }
@@ -191,6 +198,8 @@ struct DeleteAllDataView: View {
                 try await viewModel.deleteAllData(allowLocalOnly: allowLocalOnly)
             } catch AppViewModel.ProfileDeletionError.iCloudUnavailable {
                 showICloudOffPrompt = true
+            } catch AppViewModel.ProfileDeletionError.otherICloudAccount {
+                showOtherAccountPrompt = true
             } catch {
                 deleteError = error.localizedDescription
             }

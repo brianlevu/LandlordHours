@@ -374,11 +374,15 @@ class AppViewModel: ObservableObject {
     enum ProfileDeletionError: LocalizedError, Equatable {
         /// iCloud is off/unreachable, so copies saved there can't be removed now.
         case iCloudUnavailable
+        /// The phone is signed in to a different iCloud account: its zone is never deleted.
+        case otherICloudAccount
 
         var errorDescription: String? {
             switch self {
             case .iCloudUnavailable:
                 return String(localized: "iCloud is off, so copies saved there can’t be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?", table: "Identity")
+            case .otherICloudAccount:
+                return String(localized: "This iPhone is signed in to a different iCloud account. Nothing there will be deleted. Delete from this iPhone only?", table: "Identity")
             }
         }
     }
@@ -392,12 +396,19 @@ class AppViewModel: ObservableObject {
     func deleteAllData(allowLocalOnly: Bool = false) async throws {
         syncService.stop()
         if !syncService.accountAvailable { await syncService.checkAccountStatus() }
+        var deletedInICloud = false
         if syncService.accountAvailable {
-            try await syncService.deleteEverythingInICloud()
+            do {
+                try await syncService.deleteEverythingInICloud()
+                deletedInICloud = true
+            } catch is CloudKitSyncService.OtherICloudAccountError {
+                // Another account's iCloud is never touched; this iPhone's copy only when asked.
+                guard allowLocalOnly else { throw ProfileDeletionError.otherICloudAccount }
+            }
         } else if !allowLocalOnly {
             throw ProfileDeletionError.iCloudUnavailable
         }
-        Analytics.deleteAllData(iCloud: syncService.accountAvailable)
+        Analytics.deleteAllData(iCloud: deletedInICloud)
         wipeEverythingLocal()
     }
 

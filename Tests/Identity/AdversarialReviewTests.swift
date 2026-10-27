@@ -36,6 +36,43 @@ final class AdversarialReviewTests: XCTestCase {
 
     // MARK: D · Delete all data after an account change deletes the OTHER account's zone
 
+    func testDeleteAllDataWhileTheAccountChangedDeletesTheOtherAccountsZone() async throws {
+        let zoneA = FakeZoneSource()
+        zoneA.userName = "_accountA"
+        let a = EngineHarness(sandbox, zone: zoneA)
+        XCTAssertEqual(try a.device(), .fresh)
+        let property = RentalProperty(name: "Elm", address: "1 Elm St", propertyType: .ltr)
+        let mine = TimeEntry(propertyId: property.id, participant: .selfParticipant, category: .management, hours: 3, date: Date(), notes: "")
+        a.live.replaceLive(entries: [mine], properties: [property], categories: [])
+        let doneA = await a.cloud()
+        XCTAssertEqual(doneA, .done)
+
+        // The phone is now signed in to someone else's iCloud (their own LandlordHours set lives there).
+        let theirs = IdentityFixtures.sampleGroup(owner: IdentityZone.household, entries: 5, seed: 0x91)
+        let zoneB = FakeZoneSource(records: theirs)
+        zoneB.userName = "_accountB"
+        let relaunched = EngineHarness(sandbox, zone: zoneB)
+        let outcome = await relaunched.cloud()
+        XCTAssertEqual(outcome, .accountChanged, "P13 is showing")
+
+        let keys = [IdentityKeys.zoneGone, IdentityKeys.accountChanged, IdentityKeys.hasSynced, IdentityKeys.icloudUserRecordName,
+                    UserScope.key("cloudkit.zoneChangeToken")]
+        let saved = keys.map { UserDefaults.standard.object(forKey: $0) }
+        defer { for (key, value) in zip(keys, saved) { UserDefaults.standard.set(value, forKey: key) } }
+        UserDefaults.standard.set("_accountA", forKey: IdentityKeys.icloudUserRecordName)
+        UserDefaults.standard.set(true, forKey: IdentityKeys.accountChanged)
+        let service = CloudKitSyncService()
+        service.zoneSourceOverride = zoneB
+        service.engine = relaunched.engine
+        service.accountAvailable = true
+        do {
+            try await service.deleteEverythingInICloud()
+            XCTFail("Delete all data must refuse to delete a zone that belongs to another iCloud account")
+        } catch {
+            // expected
+        }
+        XCTAssertFalse(zoneB.zoneDeleted, "the other account's \(theirs.count) records were deleted from their iCloud")
+    }
 
     // MARK: E · a remote edit drops the live entry's photos
 

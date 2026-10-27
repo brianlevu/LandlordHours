@@ -726,12 +726,29 @@ final class CloudKitSyncService: ObservableObject {
         }
     }
 
+    /// The phone is signed in to a different iCloud account than the record set came from:
+    /// Delete all data never deletes that account's zone (only this iPhone's copy, if asked).
+    struct OtherICloudAccountError: LocalizedError, Equatable {
+        var errorDescription: String? {
+            String(localized: "This iPhone is signed in to a different iCloud account. Nothing in that iCloud was deleted.", table: "Identity")
+        }
+    }
+
     /// Test seam for `deleteEverythingInICloud`.
     var zoneDeleteOverride: (() async throws -> Void)?
 
     /// Delete all data, iCloud side: the whole zone, one atomic operation (§1.4). Throws before
     /// anything local is touched when iCloud can't be reached.
     func deleteEverythingInICloud() async throws {
+        // Only the zone of the account the record set came from (P13 pauses everything else).
+        if UserDefaults.standard.bool(forKey: IdentityKeys.accountChanged) { throw OtherICloudAccountError() }
+        if let engine {
+            switch await engine.confirmAccount() {
+            case .same: break
+            case .changed: throw OtherICloudAccountError()
+            case .unknown: throw AccountDeleteICloudUnreachableError()
+            }
+        }
         isDeletingAccount = true
         defer { isDeletingAccount = false }
         await quiescePushes()
@@ -1293,6 +1310,11 @@ extension CloudKitSyncService: IdentityZoneSource {
     func deleteZone() async throws {
         guard let database else { throw ZoneSourceError.unavailable("no CloudKit") }
         guard await accountState() == .available else { throw AccountDeleteICloudUnreachableError() }
+        // Never another account's zone: the user this set was read from must still be signed in.
+        if let stored = UserDefaults.standard.string(forKey: IdentityKeys.icloudUserRecordName) {
+            guard let current = await userRecordName() else { throw AccountDeleteICloudUnreachableError() }
+            guard current == stored else { throw OtherICloudAccountError() }
+        }
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let op = CKModifyRecordZonesOperation(recordZonesToSave: nil, recordZoneIDsToDelete: [zoneID])
             op.qualityOfService = .userInitiated
