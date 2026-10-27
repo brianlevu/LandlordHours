@@ -662,6 +662,61 @@
         }
       }
     },
+    "rentals.tile.ofGoal": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld of %2$lldh"
+          }
+        }
+      }
+    },
+    "rentals.tile.pace.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done for the year"
+          }
+        }
+      }
+    },
+    "rentals.tile.pace.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hours yet"
+          }
+        }
+      }
+    },
+    "rentals.tile.pace.record": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keeping a record"
+          }
+        }
+      }
+    },
+    "rentals.tile.pace.weekly": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lldh a week to go"
+          }
+        }
+      }
+    },
     "rentals.tile.perWeek": {
       "extractionState": "manual",
       "localizations": {
@@ -680,6 +735,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Reached"
+          }
+        }
+      }
+    },
+    "rentals.tile.spoken": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@, %3$@"
           }
         }
       }

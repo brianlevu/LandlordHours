@@ -97,7 +97,9 @@ final class PropertyAliasUITests: XCTestCase {
         XCTAssertTrue(save.waitForNonExistence(timeout: 5), "Saved")
 
         // Saved aliases and "I live here" show on the detail page.
-        app.buttons["properties.row.0"].tap()
+        // One rental (this mock): the tab is already its page. With more, the first tile opens it.
+        let tile = app.buttons["properties.tile.0"]
+        if tile.waitForExistence(timeout: 3) { tile.tap() }
         let details = app.descendants(matching: .any)["property.details"]
         XCTAssertTrue(details.waitForExistence(timeout: 5))
         bringIntoView(details)

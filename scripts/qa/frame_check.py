@@ -28,6 +28,9 @@ Mode `density` (the [measured] rules of docs/design/DESIGN-STANDARD.md section 2
   empty-band share inside cards. Verdicts: D1 row 56-88pt (default Dynamic Type), D2 item <= 12%
   (<= 45% AX3), D3 >= 5 items above fold (with --items-present), D4 empty bands <= 35%, D6 card <= 20%
   / hero <= 40% (grouped list containers are judged per row). Exit 1 on any FAIL.
+  Rentals gallery (standard 1.4 exception): with the explicit --rentals-gallery flag (never inferred
+  from the frame name), tiles are judged by "D6 Rentals tile <= 38%" instead of the 20% card cap;
+  D6 hero and every other rule still apply.
   Standard amendments applied: D2 <= 45% at AX3; D4 skips grouped value-row containers (>= 3 rows of
   44-68pt, 88pt at XXL; D4 only, D1 and D2 still apply); a card's centred foot action ("Confirm N likely", last
   row < 56pt) is not a row for D1/D2/D3. Not counted as cards: sheets (a box that reaches the screen
@@ -643,8 +646,13 @@ def detect_dt(name: str) -> str:
     return "default"
 
 
+# Standard section 1.4: a Rentals gallery tile measured 27-36.5% of the viewport (r2/r3 frames). The
+# carve-out raises D6's card cap to this hard cap; it is applied only with --rentals-gallery.
+D6_RENTALS_TILE = 0.38
+
+
 def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: int | None, device: str = "iphone",
-            crop_pt=None, hero_rect=None, hero_globs=None):
+            crop_pt=None, hero_rect=None, hero_globs=None, rentals_gallery=False):
     img = Image.open(path).convert("RGB")
     if crop_pt:  # analyse one pane of a multi-column iPad/Duo layout: x0:x1 in points
         img = img.crop((int(crop_pt[0] * scale), 0, int(crop_pt[1] * scale), img.height))
@@ -972,6 +980,13 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
     for c in [c for c in res_cards if not c["hero"] and not c["list_container"]]:
         if c["cut_by_fold"] and dt == "ax":
             continue  # cut by the fold at AX3: a container, judged by D2, not a card
+        if rentals_gallery:
+            # Standard section 1.4 exception: only D6's 20% card cap is lifted for Rentals gallery tiles
+            # (27-36% of the viewport by design; the only screen allowed a card per item). They are
+            # still capped at 38%; D1-D4 and the hero rule apply as usual.
+            chk("D6 Rentals tile <= 38% (standard 1.4)", c["viewport_share"] <= D6_RENTALS_TILE,
+                f"tile at y={c['bbox_px'][1]} is {c['viewport_share']:.1%} ({c['visible_height_pt']}pt)")
+            continue
         chk("D6 card share <= 20%", c["viewport_share"] <= D6_CARD,
             f"card at y={c['bbox_px'][1]} is {c['viewport_share']:.1%} ({c['visible_height_pt']}pt)")
     for c in res_cards:
@@ -1171,7 +1186,8 @@ def cmd_density(args) -> int:
         use_scale(sc)
         crop = [float(v) for v in args.crop.split(":")] if args.crop else None
         hr = [float(v) for v in args.hero_rect.split(",")] if args.hero_rect else None
-        r = analyse(f, dt, sc, fold, args.items_present, dev, crop, hr, args.hero_glob or None)
+        r = analyse(f, dt, sc, fold, args.items_present, dev, crop, hr, args.hero_glob or None,
+                    bool(args.rentals_gallery))
         r["scale"], r["device"] = sc, dev
         results.append(r)
     if args.json:
@@ -1214,6 +1230,9 @@ def main():
         p.add_argument("--crop", help="x0:x1 in pt: analyse one pane of a multi-column layout (list pane, detail pane)")
         p.add_argument("--items-present", type=int, help="items that exist in the screen's data; enables D3")
         p.add_argument("--hero-rect", help="x0,y0,x1,y1 in pt: the hero art region (default: auto-detected on hero frames)")
+        p.add_argument("--rentals-gallery", action="store_true",
+                       help="the frames are the Rentals gallery (standard 1.4): tiles are capped at 38%% "
+                            "instead of D6's 20%%. Never inferred from the frame name.")
         p.add_argument("--hero-glob", action="append", help="frame-name glob that marks a hero frame (repeatable; default today-*, rental-*, welcome*, inbox-empty*, milestone*)")
         return cmd_density(p.parse_args())
     if len(sys.argv) > 1 and sys.argv[1] == "hero":

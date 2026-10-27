@@ -203,6 +203,7 @@
 		BD9C362BDD43E6E640C51BA9 /* LHSegmented.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E78224ED686BF6782F6BDE8 /* LHSegmented.swift */; };
 		BFF6F8AE069FE01CE9E5414F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE13F908989158FDAB28BF57 /* Models.swift */; };
 		C033DAA5B2F3EB1B50CDA1CE /* LandlordHoursApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9CB28BC741E54912DBB35F /* LandlordHoursApp.swift */; };
+		C08FDA5B0943F5EF5C2A6024 /* RentalGallery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F747099660B8B5288B34649 /* RentalGallery.swift */; };
 		C13F913A67BC57432BB87A31 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A28FAF3149C06F54B65F3A23 /* OnboardingView.swift */; };
 		C19E20B4BBD0B73D9CFB97DB /* Fraunces-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = E44332A1A42FF1860E8AFFEA /* Fraunces-OFL.txt */; };
 		C1DD3F6E32D9EB99739435F8 /* LogTimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2084B656B116C58A4F214944 /* LogTimeTests.swift */; };
@@ -366,6 +367,7 @@
 		3BDA44BD54B97B0B3D60A429 /* CalendarImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarImportService.swift; sourceTree = "<group>"; };
 		3CEC2D9DCAA8A77D8C960FA4 /* ClassifierKeywords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassifierKeywords.swift; sourceTree = "<group>"; };
 		3EA245B4D6F6125BDB5D2518 /* ActivityCategory+Display.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ActivityCategory+Display.swift"; sourceTree = "<group>"; };
+		3F747099660B8B5288B34649 /* RentalGallery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RentalGallery.swift; sourceTree = "<group>"; };
 		401D542F4CD2262A89C17B07 /* RecordsLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsLogic.swift; sourceTree = "<group>"; };
 		40795DEE577B245A805AD8B8 /* LearnAndWhatsNewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnAndWhatsNewTests.swift; sourceTree = "<group>"; };
 		42CDC606352C919BAD1B48C9 /* CaptureNotificationCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureNotificationCenter.swift; sourceTree = "<group>"; };
@@ -607,6 +609,7 @@
 			children = (
 				51E8F6B031DC6C7B4F7EA032 /* PropertyComponents.swift */,
 				30A1ABE413AFC1231FBE2394 /* RentalEditSheet.swift */,
+				3F747099660B8B5288B34649 /* RentalGallery.swift */,
 				2103E62B91A461716840A28E /* RentalLogic.swift */,
 				B67FB6A28B23FCA3936ACEB1 /* RentalPage.swift */,
 			);
@@ -1428,6 +1431,7 @@
 				3B6ADC833422DD7187669B64 /* RecordPagePreview.swift in Sources */,
 				0F352493E9D7EEA53D9D38FC /* RecordsLogic.swift in Sources */,
 				D4E64B3B2C9CA6128B73234F /* RentalEditSheet.swift in Sources */,
+				C08FDA5B0943F5EF5C2A6024 /* RentalGallery.swift in Sources */,
 				793689EAB5B13373403A4638 /* RentalLogic.swift in Sources */,
 				FD1915E10564E5F4022DAE85 /* RentalPage.swift in Sources */,
 				9B4DCD57764982609DEB9C3A /* RentalSkyline.swift in Sources */,

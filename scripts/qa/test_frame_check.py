@@ -151,6 +151,48 @@ class Density(unittest.TestCase):
         self.assertTrue(failed(res, "D2"))
 
 
+def make_tile(name, top=800, h=720):
+    """One tall tile (house art block + two text lines) on the canvas, like a Rentals gallery tile."""
+    img = Image.new("RGB", (W, H), CANVAS)
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle([60, top, 1146, top + h], radius=60, fill=CARD)
+    d.rectangle([200, top + 80, 1000, top + 420], fill=(150, 160, 190))      # art
+    d.rectangle([110, top + h - 220, 700, top + h - 160], fill=INK)          # name
+    d.rectangle([110, top + h - 110, 520, top + h - 60], fill=INK)           # hours
+    path = os.path.join(tempfile.mkdtemp(prefix="fc-test-"), name)
+    img.save(path)
+    return path
+
+
+class RentalsGalleryCarveOut(unittest.TestCase):
+    """Standard 1.4 exception: with --rentals-gallery, tiles are capped at 38% instead of D6's 20%."""
+
+    def test_tall_card_fails_d6_on_an_ordinary_frame(self):
+        self.assertTrue(failed(run(make_tile("rentals-x.png")), "D6 card"))
+
+    def test_flag_lifts_the_card_cap_to_the_tile_cap(self):
+        res = fc.analyse(make_tile("anything.png"), "default", 3.0, 0.88, None, rentals_gallery=True)
+        self.assertFalse(failed(res, "D6"))
+        self.assertTrue([c for c in res["checks"] if c["rule"].startswith("D6 Rentals tile") and c["pass_"]])
+
+    def test_gallery_file_name_alone_does_not_trigger_the_carve_out(self):
+        for n in ["gallery-3-dark.png", "gallery-8-bottom-light-ax3.png", "gallery-12-dark.png"]:
+            self.assertTrue(failed(run(make_tile(n)), "D6 card"), n)
+
+    def test_flag_still_fails_a_tile_over_38_percent(self):
+        res = fc.analyse(make_tile("big.png", top=600, h=1100), "default", 3.0, 0.88, None, rentals_gallery=True)
+        self.assertTrue(failed(res, "D6 Rentals tile"))
+
+    def test_cli_flag_reaches_the_check(self):
+        import subprocess
+        path = make_tile("gallery-3-dark.png")
+        script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frame_check.py")
+        plain = subprocess.run([sys.executable, script, "density", path], capture_output=True, text=True)
+        flagged = subprocess.run([sys.executable, script, "density", "--rentals-gallery", path], capture_output=True, text=True)
+        self.assertNotEqual(plain.returncode, 0, plain.stdout)
+        self.assertIn("D6 Rentals tile", flagged.stdout + flagged.stderr)
+
+
 class DayHeaders(unittest.TestCase):
     LAYOUT = ["H", "R", "R", "H", "R", "R"]
 
