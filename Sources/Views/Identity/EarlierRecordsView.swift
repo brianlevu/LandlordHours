@@ -180,7 +180,8 @@ struct RecentlyRemovedView: View {
             Section {
                 ForEach(removed) { item in
                     LHRow.Browse(title: title(item), meta: meta(item), value: item.entry.map { LHFormat.hours($0.hours) },
-                                 systemImage: item.property != nil ? "house" : "clock", tint: .neutral, showsChevron: false) {
+                                 systemImage: item.property != nil ? "house" : "clock", tint: .neutral, showsChevron: false,
+                                 wrapsMeta: true) {   // "Not in iCloud anymore. Kept until you choose." is read whole
                         selected = item
                     }
                     .listRowInsets(EdgeInsets())
