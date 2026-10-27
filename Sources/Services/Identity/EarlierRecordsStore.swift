@@ -25,6 +25,10 @@ struct ArchivedGroup: Codable, Equatable, Identifiable {
     var pushedAsideNames: Set<String> = []
     /// Only settings records were found in iCloud for this owner.
     var settingsOnly = false
+    /// Records whose iCloud copy still carries the live set's tag and must go back under this
+    /// group's own tag (Undo of "These are my spouse's hours"). Never a delete. Optional so
+    /// archive files written before it existed still decode.
+    var retagPending: Set<String>?
 
     var hours: Double { entries.reduce(0) { $0 + $1.hours } }
     var lastEntryDate: Date? { entries.map(\.date).max() }
@@ -132,6 +136,8 @@ final class EarlierRecordsStore: ObservableObject {
             merged.properties = MergeRules.union(existing.properties, group.properties)
             merged.categories = MergeRules.union(existing.categories, group.categories)
             merged.pushedAsideNames.formUnion(existing.pushedAsideNames)
+            let retag = (existing.retagPending ?? []).union(group.retagPending ?? [])
+            merged.retagPending = retag.isEmpty ? nil : retag
             merged.createdAt = min(existing.createdAt, group.createdAt)
             let raw = Dictionary((existing.unparsedRecords + group.unparsedRecords).map { ($0.recordName, $0) }, uniquingKeysWith: { _, b in b })
             merged.unparsedRecords = raw.values.sorted { $0.recordName < $1.recordName }
@@ -150,6 +156,17 @@ final class EarlierRecordsStore: ObservableObject {
     func markPushedAside(_ names: Set<String>, group id: String) {
         guard var group = self.group(id), !names.isSubset(of: group.pushedAsideNames) else { return }
         group.pushedAsideNames.formUnion(names)
+        try? MigrationFiles.writeDurably(JSONEncoder().encode(group), to: groupURL(id))
+        reload()
+    }
+
+    /// These records' iCloud copies are back under the group's own tag (`aside-<id>` when the
+    /// group never came from iCloud).
+    func markRetagged(_ names: Set<String>, group id: String, asideTagged: Bool) {
+        guard var group = self.group(id), !names.isEmpty else { return }
+        let left = (group.retagPending ?? []).subtracting(names)
+        group.retagPending = left.isEmpty ? nil : left
+        if asideTagged { group.pushedAsideNames.formUnion(names) }
         try? MigrationFiles.writeDurably(JSONEncoder().encode(group), to: groupURL(id))
         reload()
     }

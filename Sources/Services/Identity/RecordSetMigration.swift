@@ -1033,7 +1033,9 @@ final class RecordSetMigration {
         t.cancelTombstones(for: Set(all.map(\.recordName)))
         let deletes = t.pendingDeletes
         let changed = t.changedRecords(all.map { $0.ckRecord() }).map(ZoneRecord.init)
-        guard !changed.isEmpty || !deletes.isEmpty else { return ZonePushReport() }
+        guard !changed.isEmpty || !deletes.isEmpty else {
+            return await pushRetags()
+        }
         let report = await source.push(changed, deletes: deletes)
         t.clearTombstones(Array(report.deletedNames))
         t.recordServerState(changed.filter { report.savedNames.contains($0.recordName) }.map { $0.ckRecord() })
@@ -1050,7 +1052,36 @@ final class RecordSetMigration {
         } else if report.failedTypes.isEmpty {
             defaults.removeObject(forKey: IdentityKeys.lastSyncProblem)
         }
+        if !report.zoneGone { _ = await pushRetags() }
         return report
+    }
+
+    /// Undo of a spouse answer: the group's iCloud copies go back under its own tag (its legacy
+    /// id, or `aside-<id>` for a set that was only ever on this device), so they leave the live
+    /// set everywhere without a single delete.
+    @discardableResult
+    func pushRetags() async -> ZonePushReport {
+        var last = ZonePushReport()
+        for group in earlier.groups where !(group.retagPending ?? []).isEmpty && (group.status == .pending || group.status == .aside) {
+            let pending = group.retagPending ?? []
+            let owner = group.source == .device ? IdentityZone.asidePrefix + group.id : group.id
+            var records = group.properties.filter { pending.contains($0.id.uuidString) }
+                .map { ZoneRecord(CloudKitSyncService.record(for: $0, zoneID: IdentityZone.zoneID, appUserId: owner)) }
+            records += group.entries.filter { pending.contains($0.id.uuidString) }
+                .map { ZoneRecord(CloudKitSyncService.record(for: $0, zoneID: IdentityZone.zoneID, appUserId: owner)) }
+            records += group.categories.filter { pending.contains($0.id.uuidString) }
+                .map { ZoneRecord(CloudKitSyncService.record(for: $0, zoneID: IdentityZone.zoneID, appUserId: owner)) }
+            let found = Set(records.map(\.recordName))
+            if !pending.subtracting(found).isEmpty {
+                // Names no longer in the group (combined again, deleted): nothing to put back.
+                earlier.markRetagged(pending.subtracting(found), group: group.id, asideTagged: false)
+            }
+            guard !records.isEmpty else { continue }
+            last = await source.push(records, deletes: [])
+            if last.zoneGone { return last }
+            earlier.markRetagged(last.savedNames, group: group.id, asideTagged: owner.hasPrefix(IdentityZone.asidePrefix))
+        }
+        return last
     }
 
     /// Device-only records of archive groups go to iCloud once, under `aside-<id>` (R10).

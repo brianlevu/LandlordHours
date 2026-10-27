@@ -75,15 +75,28 @@ extension RecordSetMigration {
     }
 
     /// P17 "Undo": the spouse group's entries leave the live set and wait for an answer again.
+    /// Nothing is deleted, here or in iCloud: the hours go back to the group as they are now
+    /// (edits made since the answer included, participants swapped back), and their iCloud
+    /// copies go back under the group's own tag on the next push (`pushRetags`), so every other
+    /// device and a new phone still hold them.
     func undoSpouse(group id: String) {
         earlier.reload()
-        guard let live, let group = earlier.group(id), group.status == .spouse else { return }
+        guard let live, var group = earlier.group(id), group.status == .spouse else { return }
         let names = Set(group.entries.map { $0.id.uuidString })
+        let current = live.liveEntries.filter { names.contains($0.id.uuidString) }
+        group.entries = MergeRules.union(group.entries, MergeRules.swapParticipants(current))
+        group.status = .pending
+        group.retagPending = (group.retagPending ?? []).union(Set(current.map { $0.id.uuidString }))
+        do {
+            try earlier.save(group)
+        } catch {
+            // The archive copy couldn't be written: keep them live rather than risk them.
+            return
+        }
         live.replaceLive(entries: live.liveEntries.filter { !names.contains($0.id.uuidString) },
                          properties: live.liveProperties, categories: live.liveCategories)
-        // Removing them here must reach iCloud too, without touching the archive copy.
-        tracker.addTombstones(Array(names))
-        try? earlier.setStatus(.pending, for: id)
+        // Not live any more: no baseline, and never a tombstone.
+        tracker.forget(recordNames: Array(names))
         updateGroup(id) { $0.status = .pending; $0.undoUntil = nil; $0.answeredAt = nil }
         onChange?()
     }
