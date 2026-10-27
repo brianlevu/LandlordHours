@@ -90,6 +90,9 @@ struct LHScreenHeader<Accessory: View, Trailing: View>: View {
     var subtitle: String? = nil
     var style: LHHeaderStyle = .collection
     var back: LHBackAction? = nil
+    /// A sheet about one item may lead its title row with its ornament (the confirm sheet's 56pt
+    /// tool render, §H.5). Never on tabs.
+    var leading: AnyView? = nil
     @ViewBuilder var accessory: Accessory
     @ViewBuilder var trailing: Trailing
 
@@ -109,6 +112,7 @@ struct LHScreenHeader<Accessory: View, Trailing: View>: View {
                         .frame(maxHeight: ax ? nil : LHScreenAnatomy.titleRowHeight)
                         .padding(.leading, -8)
                 }
+                if let leading { leading }
                 Text(title)
                     .font(style.font)
                     .foregroundStyle(colors.textPrimary)
@@ -273,11 +277,13 @@ extension View {
 struct LHSheetHeader<Trailing: View>: View {
     let title: String
     var subtitle: String? = nil
+    var style: LHHeaderStyle = .sheet
+    var leading: AnyView? = nil
     var onClose: (() -> Void)?
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
-        LHScreenHeader(title: title, subtitle: subtitle, style: .sheet, accessory: { EmptyView() }) {
+        LHScreenHeader(title: title, subtitle: subtitle, style: style, leading: leading, accessory: { EmptyView() }) {
             HStack(spacing: 8) {
                 trailing
                 if let onClose {
@@ -292,14 +298,17 @@ struct LHSheetHeader<Trailing: View>: View {
 }
 
 extension LHSheetHeader where Trailing == EmptyView {
-    init(title: String, subtitle: String? = nil, onClose: (() -> Void)?) {
-        self.init(title: title, subtitle: subtitle, onClose: onClose, trailing: { EmptyView() })
+    init(title: String, subtitle: String? = nil, style: LHHeaderStyle = .sheet, leading: AnyView? = nil,
+         onClose: (() -> Void)?) {
+        self.init(title: title, subtitle: subtitle, style: style, leading: leading, onClose: onClose, trailing: { EmptyView() })
     }
 }
 
 struct LHSheetScreenModifier: ViewModifier {
     let title: String
     var subtitle: String?
+    var style: LHHeaderStyle
+    var leading: AnyView?
     var onClose: (() -> Void)?
     var background: Color
 
@@ -319,7 +328,7 @@ struct LHSheetScreenModifier: ViewModifier {
             .safeAreaInset(edge: .top, spacing: 0) {
                 // Pinned and opaque below AX: scrolled rows never read through the title (§1.20). At AX
                 // the wrapped title would hold half the sheet, so it leaves with the content (§1.20 AX).
-                LHSheetHeader(title: title, subtitle: subtitle, onClose: onClose)
+                LHSheetHeader(title: title, subtitle: subtitle, style: style, leading: leading, onClose: onClose)
                     .background(background)
                     .offset(y: ax ? -max(0, scrolled) : 0)
             }
@@ -327,10 +336,13 @@ struct LHSheetScreenModifier: ViewModifier {
 }
 
 extension View {
-    /// Task sheets (Log time, pickers): the screen supplies a scroll container with no header.
-    func lhSheetScreen(_ title: String, subtitle: String? = nil, onClose: (() -> Void)? = nil,
-                       background: Color) -> some View {
-        modifier(LHSheetScreenModifier(title: title, subtitle: subtitle, onClose: onClose, background: background))
+    /// Sheets: the screen supplies a scroll container with no header. `style` is `.sheet` (Fraunces 28)
+    /// for a task sheet (Log time, pickers) and `.detail` (SF `.title1.semibold`) for a sheet about one
+    /// item (the confirm sheet, whose `leading` is its 56pt tool render).
+    func lhSheetScreen(_ title: String, subtitle: String? = nil, style: LHHeaderStyle = .sheet,
+                       leading: AnyView? = nil, onClose: (() -> Void)? = nil, background: Color) -> some View {
+        modifier(LHSheetScreenModifier(title: title, subtitle: subtitle, style: style, leading: leading,
+                                       onClose: onClose, background: background))
     }
 }
 
