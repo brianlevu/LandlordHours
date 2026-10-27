@@ -1,0 +1,5 @@
+{
+  "log-voice-denied-light-xxl.png": "Log time sheet, voice denied: a note field (104pt, 11.9% of the viewport, under the 12% item cap), a disabled mic button, an explanation, and three suggestion chips. There is no row or card to measure; no tertiary-fill group of row height exists. Checked by eye in r3-final.",
+  "light-ax3-11-toast.png": "Today at AX3 with the hero toast: a toast, the house art, the hours numeral and caption, and a card cut by the tab bar. The only card sits under the translucent tab bar, which the rubric exempts; the toast (about 135pt, 15% of the viewport) is a LHToast, not a row. Checked by eye in r3-final.",
+  "dark-ax3-11-toast.png": "Dark twin of light-ax3-11-toast.png; same layout and the same exemption."
+}

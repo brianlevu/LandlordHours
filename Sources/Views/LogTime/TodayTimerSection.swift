@@ -4,10 +4,10 @@ import SwiftUI
 //
 // Shown only while a timer runs or a draft waits. One generic `DraftCard` serves the running
 // timer, a stopped timer and a recovered one; later it serves receipt and contact drafts too
-// (smart-layer design-implications §1). This replaces the 1.x floating timer banner and the
-// Track tab's "Finish your saved timer" card.
+// (smart-layer design-implications §1). v2: one grouped container on the page (`LHRowGroup(onPage:)`,
+// §1.3a), an SF glyph in a wash tile, a `.secondary` for the action and a `.tertiary` for Discard.
 
-/// One draft: a glyph, a title, one line of meta, a tinted primary and a "Discard" link.
+/// One draft: a glyph, a title, one line of meta, one `.secondary` action and a "Discard" link.
 struct DraftCard: View {
     var symbol: String = "timer"
     let title: String
@@ -16,75 +16,58 @@ struct DraftCard: View {
     let primaryTitle: String
     var primaryIdentifier = "draft.primary"
     var onPrimary: () -> Void
-    var discardTitle: String? = "Discard"
+    var discardTitle: String? = nil
     var onDiscard: (() -> Void)? = nil
     var onOpen: (() -> Void)? = nil
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .title3) private var glyphSize: CGFloat = 44
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: symbol)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(colors.action)
-                    .frame(width: glyphSize, height: glyphSize)
-                    .background(Circle().fill(colors.actionSurface))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundStyle(colors.textPrimary)
-                        .monospacedDigit()
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("draft.title")
-                    Text(meta)
-                        .font(.subheadline)
-                        .foregroundStyle(colors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if moreCount > 0 {
-                        Text("+\(moreCount) more")
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(colors.action)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Capsule().fill(colors.actionSurface))
-                            .accessibilityIdentifier("draft.more")
+        LHRowGroup(onPage: true) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .top, spacing: 12) {
+                    LHRowGlyph(systemImage: symbol)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(title)
+                            .font(.headline)
+                            .foregroundStyle(colors.textPrimary)
+                            .monospacedDigit()
+                            .accessibilityIdentifier("draft.title")
+                        Text(meta)
+                            .font(.subheadline)
+                            .foregroundStyle(colors.textSecondary)
+                        if moreCount > 0 {
+                            LHTag(lt("+\(moreCount) more"), tone: .action)
+                                .accessibilityIdentifier("draft.more")
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture { onOpen?() }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(onOpen == nil ? [] : .isButton)
+                    .accessibilityIdentifier("draft.summary")
+                }
+                let actions = dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+                    : AnyLayout(HStackLayout(spacing: 8))
+                actions {
+                    Button(primaryTitle, action: onPrimary)
+                        .buttonStyle(LHButton.secondary)
+                        .accessibilityIdentifier(primaryIdentifier)
+                    if let discardTitle, let onDiscard {
+                        Button(discardTitle, action: onDiscard)
+                            .buttonStyle(LHButton.destructiveTertiary)
+                            .accessibilityIdentifier("draft.discard")
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture { onOpen?() }
-                .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(onOpen == nil ? [] : .isButton)
-                .accessibilityIdentifier("draft.summary")
             }
-            let actions = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
-                : AnyLayout(HStackLayout(spacing: 16))
-            actions {
-                Button(primaryTitle, action: onPrimary)
-                    .buttonStyle(PropertyTintedButtonStyle())
-                    .accessibilityIdentifier(primaryIdentifier)
-                if let discardTitle, let onDiscard {
-                    Button(discardTitle, action: onDiscard)
-                        .font(.body)
-                        .foregroundStyle(colors.destructive)
-                        .frame(minHeight: 44)
-                        .accessibilityIdentifier("draft.discard")
-                }
-            }
+            .padding(LHRow.insets)
+            .padding(.vertical, 4)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(colors.backgroundSecondary)
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0 : 0.04), radius: 12, y: 4)
-        )
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("draft.card")
     }
@@ -99,24 +82,26 @@ struct TodayTimerSection: View {
         Group {
             if viewModel.isTimerRunning, let start = viewModel.timerStartTime {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
+                    let clock = LogTimeFormat.clock(min(context.date.timeIntervalSince(start), TimerReviewMath.cap))
                     DraftCard(
-                        title: "Timer running\(LogTimeFormat.dot)\(LogTimeFormat.clock(min(context.date.timeIntervalSince(start), TimerReviewMath.cap)))",
-                        meta: "\(viewModel.timerCategory.inboxLabel) at \(propertyName(viewModel.timerPropertyId))\(LogTimeFormat.dot)started \(InboxFormat.clockTime(start))",
-                        primaryTitle: "Stop",
+                        title: lt("Timer running \u{00B7}\u{00A0}\(clock)"),
+                        meta: lt("\(viewModel.timerCategory.inboxLabel) at \(propertyName(viewModel.timerPropertyId)) \u{00B7}\u{00A0}started \(LogTimeFormat.clockTime(start))"),
+                        primaryTitle: lt("Stop"),
                         primaryIdentifier: "today.timer.stop",
                         onPrimary: stop,
-                        discardTitle: nil,
                         onOpen: { open(.timer) }
                     )
                 }
                 .accessibilityIdentifier("today.timer")
             } else if let stopped, viewModel.properties.contains(where: { $0.id == stopped.propertyId }) {
+                let ran = LHFormat.hours(Double(Int(min(stopped.elapsed, TimerReviewMath.cap) / 60)) / 60)
                 DraftCard(
-                    title: "Timer ran \(InboxFormat.hours(Double(Int(min(stopped.elapsed, TimerReviewMath.cap) / 60)) / 60)) at \(propertyName(stopped.propertyId))",
-                    meta: "Started \(InboxFormat.clockTime(stopped.startDate)). Add a note, or log it as it is.",
+                    title: lt("Timer ran \(ran) at \(propertyName(stopped.propertyId))"),
+                    meta: lt("Started \(LogTimeFormat.clockTime(stopped.startDate)). Add a note, or log it as it is."),
                     moreCount: viewModel.staleTimerRecoveries.count,
-                    primaryTitle: stopped.reviewHours > 0 ? "Log \(InboxFormat.hours(stopped.reviewHours))" : "Review",
+                    primaryTitle: stopped.reviewHours > 0 ? lt("Log \(LHFormat.hours(stopped.reviewHours))") : lt("Review"),
                     onPrimary: { logStopped(stopped) },
+                    discardTitle: lt("Discard"),
                     onDiscard: { discardStopped(stopped) },
                     onOpen: { open(.timerReview) }
                 )
@@ -134,12 +119,12 @@ struct TodayTimerSection: View {
     private func recoveryCard(_ recovery: StaleTimerRecovery) -> some View {
         let needsProperty = viewModel.staleTimerRecoveryNeedsProperty(recovery)
         let quick = !recovery.requiresReview && !needsProperty
-        let place = needsProperty ? "" : " at \(propertyName(recovery.propertyId))"
+        let ran = recovery.ranLabel.lowercased()
         return DraftCard(
-            title: "Timer \(recovery.ranLabel.lowercased())\(place)",
+            title: needsProperty ? lt("Timer \(ran)") : lt("Timer \(ran) at \(propertyName(recovery.propertyId))"),
             meta: recoveryMeta(recovery, needsProperty: needsProperty),
             moreCount: viewModel.staleTimerRecoveries.count - 1,
-            primaryTitle: quick ? "Log \(InboxFormat.hours(recovery.suggestedHours))" : "Review",
+            primaryTitle: quick ? lt("Log \(LHFormat.hours(recovery.suggestedHours))") : lt("Review"),
             onPrimary: {
                 if quick {
                     let hours = recovery.suggestedHours
@@ -153,9 +138,10 @@ struct TodayTimerSection: View {
                     open(.recovery(recovery.id))
                 }
             },
+            discardTitle: lt("Discard"),
             onDiscard: {
                 viewModel.discardRecoveredStaleTimer(id: recovery.id)
-                AppToastCenter.shared.show("Timer discarded", kind: .neutral)
+                AppToastCenter.shared.show(lt("Timer discarded"), kind: .neutral)
             },
             onOpen: { open(.recovery(recovery.id)) }
         )
@@ -163,19 +149,19 @@ struct TodayTimerSection: View {
     }
 
     private func recoveryMeta(_ recovery: StaleTimerRecovery, needsProperty: Bool) -> String {
-        let start = "Started \(InboxFormat.longDay(recovery.startTime)), \(InboxFormat.clockTime(recovery.startTime))."
-        if needsProperty { return "\(start) Its rental was deleted, so pick where it goes." }
-        if recovery.wasCapped { return "\(start) We stopped counting at 24h, so check the hours." }
+        let start = lt("Started \(LogTimeFormat.longDay(recovery.startTime)), \(LogTimeFormat.clockTime(recovery.startTime)).")
+        if needsProperty { return lt("\(start) Its rental was deleted, so pick where it goes.") }
+        if recovery.wasCapped { return lt("\(start) We stopped counting at 24h, so check the hours.") }
         switch recovery.reason {
         case .pausedAtSwitch:
-            return "\(start) It stopped when you switched profiles at \(InboxFormat.clockTime(recovery.pausedAt ?? recovery.startTime))."
+            return lt("\(start) It stopped when you switched profiles at \(LogTimeFormat.clockTime(recovery.pausedAt ?? recovery.startTime)).")
         case .forgotten:
-            return "\(start) It was left running, so check the hours."
+            return lt("\(start) It was left running, so check the hours.")
         }
     }
 
     private func propertyName(_ id: UUID?) -> String {
-        viewModel.properties.first { $0.id == id }?.name ?? "your rental"
+        viewModel.properties.first { $0.id == id }?.name ?? lt("your rental")
     }
 
     private func open(_ route: LogSheetRoute) {
@@ -210,6 +196,6 @@ struct TodayTimerSection: View {
 
     private func discardStopped(_ draft: StoppedTimerDraft) {
         StoppedTimerDraftStore.clear()
-        AppToastCenter.shared.show("Timer discarded", kind: .neutral) { StoppedTimerDraftStore.save(draft) }
+        AppToastCenter.shared.show(lt("Timer discarded"), kind: .neutral) { StoppedTimerDraftStore.save(draft) }
     }
 }

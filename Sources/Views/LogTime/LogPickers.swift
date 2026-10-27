@@ -1,31 +1,12 @@
 import SwiftUI
 
-// MARK: - Log time pickers (spec §3c): "Kind of work" and "Which rental?"
+// MARK: - Log time pickers: "Kind of work" and "Which rental?" (the timer's pick rows open these)
+//
+// `LHSheet` chrome (title left, one `.icon` close right), grouped rows, the 56pt tool renders in the
+// picker grid and 36pt in the list (§1.17). The sheet surface is opaque `backgroundSecondary`.
 
-/// The 44pt close button the confirm sheet uses (Cancel/Close pills are retired).
-struct LogSheetCloseButton: View {
-    var identifier = "log.close"
-    var action: () -> Void
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        Button(action: action) {
-            Image(systemName: "xmark")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(colors.textPrimary)
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(colors.backgroundSecondary))
-                .overlay(Circle().strokeBorder(colors.border, lineWidth: 0.5))
-        }
-        .buttonStyle(.lhPressable)
-        .accessibilityLabel("Close")
-        .accessibilityIdentifier(identifier)
-    }
-}
-
-/// "Kind of work": a 3-column grid of the kinds that count, then the investor kinds under
-/// "Doesn't count toward hours" (they can be logged for the record, never counted).
+/// "Kind of work": a grid of the kinds that count, then the investor kinds under "Doesn't count
+/// toward your hours" (they can be logged for the record, never counted).
 struct LogCategoryPicker: View {
     let selected: ActivityCategory?
     var onPick: (ActivityCategory) -> Void
@@ -35,44 +16,32 @@ struct LogCategoryPicker: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var pickTick = 0
 
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
     var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack(alignment: .center) {
-                    Text("Kind of work")
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(colors.textPrimary)
-                        .accessibilityAddTraits(.isHeader)
-                    Spacer()
-                    LogSheetCloseButton(identifier: "picker.close") { dismiss() }
-                }
+        LogSheetChrome(title: lt("Kind of work"), onClose: { dismiss() }) {
+            
+            VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: columns), spacing: 12) {
                     ForEach(LogCategoryGroups.counted, id: \.self) { category in
-                        gridCell(category, colors: colors)
+                        gridCell(category)
                     }
                 }
-                VStack(alignment: .leading, spacing: 10) {
-                    PropertySectionHeader("Doesn\u{2019}t count toward hours")
+                VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+                    LHSectionHeader(lt("Doesn\u{2019}t count toward your hours"))
                     VStack(spacing: 0) {
                         ForEach(Array(LogCategoryGroups.notCounted.enumerated()), id: \.element) { index, category in
-                            notCountedRow(category, colors: colors)
-                            if index < LogCategoryGroups.notCounted.count - 1 {
-                                Rectangle().fill(colors.border.opacity(0.7)).frame(height: 0.5).padding(.leading, 64)
-                            }
+                            notCountedRow(category)
+                            if index < LogCategoryGroups.notCounted.count - 1 { LHDivider(leadingInset: 64) }
                         }
                     }
-                    .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    Text("Investor work. Log it for your records; it never counts toward your hours.")
-                        .font(.footnote)
-                        .foregroundStyle(colors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 4)
+                    .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+                    LHFootnote(lt("Investor work. Log it for your records; it never counts toward your hours."))
                 }
             }
-            .padding(20)
+        } footer: {
+            EmptyView()
         }
-        .background(colors.background.ignoresSafeArea())
         .sensoryFeedback(.impact(weight: .light), trigger: pickTick)
         .accessibilityIdentifier("picker.category")
     }
@@ -88,83 +57,57 @@ struct LogCategoryPicker: View {
         dismiss()
     }
 
-    private func gridCell(_ category: ActivityCategory, colors: AdaptiveColors) -> some View {
+    private func gridCell(_ category: ActivityCategory) -> some View {
         let on = category == selected
         let stacked = dynamicTypeSize.isAccessibilitySize
         let layout = stacked ? AnyLayout(HStackLayout(spacing: 14)) : AnyLayout(VStackLayout(spacing: 8))
+        let shape = RoundedRectangle(cornerRadius: LHMetrics.tileRadius, style: .continuous)
         return Button { pick(category) } label: {
             layout {
                 CategoryToolTile(category: category, size: 56)
                 Text(category.inboxLabel)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
-                    .lineLimit(1)
+                    .lineLimit(stacked ? nil : 1)
                     .minimumScaleFactor(0.85)
                 if stacked { Spacer(minLength: 0) }
             }
             .padding(.horizontal, stacked ? 16 : 6)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, minHeight: 104)
-            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(on ? colors.action : .clear, lineWidth: 2))
-            .overlay(alignment: .topTrailing) {
-                if on {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(colors.onAction, colors.action)
-                        .padding(8)
-                        .accessibilityHidden(true)
-                }
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(colors.backgroundTertiary, in: shape)
+            .overlay(shape.strokeBorder(on ? colors.action : colors.border, lineWidth: on ? 1.5 : LHMetrics.hairline))
+            .animation(AppAnimation.quick, value: on)
+            .contentShape(shape)
         }
-        .buttonStyle(.lhPressable)
+        .buttonStyle(LHButton.press)
         .accessibilityLabel(category.inboxLabel)
         .accessibilityAddTraits(on ? [.isSelected] : [])
         .accessibilityIdentifier("picker.category.\(category.blueprintToolName)")
     }
 
-    private func notCountedRow(_ category: ActivityCategory, colors: AdaptiveColors) -> some View {
+    private func notCountedRow(_ category: ActivityCategory) -> some View {
         let on = category == selected
-        let stacked = dynamicTypeSize.isAccessibilitySize
-        return Button { pick(category) } label: {
-            HStack(spacing: 12) {
-                CategoryToolTile(category: category, size: 36)
-                let labels = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(spacing: 8))
-                labels {
-                    Text(category.inboxLabel)
-                        .font(.body)
-                        .foregroundStyle(colors.textPrimary)
-                    if !stacked { Spacer(minLength: 8) }
-                    Text("Not counted")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(colors.textSecondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(colors.backgroundTertiary))
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                if on {
-                    Image(systemName: "checkmark")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(colors.action)
-                        .accessibilityHidden(true)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .frame(minHeight: 60)
-            .contentShape(Rectangle())
+        return LHRow.Browse(title: category.inboxLabel, meta: lt("Not counted"), showsChevron: false, action: { pick(category) }) {
+            CategoryToolTile(category: category, size: 36)
         }
-        .buttonStyle(.lhPressable)
-        .accessibilityLabel("\(category.inboxLabel), not counted toward hours")
+        .overlay(alignment: .trailing) {
+            if on {
+                Image(systemName: "checkmark")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(colors.action)
+                    .padding(.trailing, 16)
+                    .accessibilityHidden(true)
+            }
+        }
+        .accessibilityLabel(lt("\(category.inboxLabel), not counted toward hours"))
         .accessibilityAddTraits(on ? [.isSelected] : [])
         .accessibilityIdentifier("picker.category.\(category.blueprintToolName)")
     }
 }
 
-/// "Which rental?": 60pt rows with the seal, name and short address. The last row adds a
-/// property; at the free limit it is the `.row` lock (what stays active + one Unlock Pro).
+/// "Which rental?": rows with the seal, name and short address. The last row adds a rental; at the
+/// free limit it is the `.row` lock (what stays active + one Unlock Pro).
 struct LogPropertyPicker: View {
     let properties: [RentalProperty]
     let selected: UUID?
@@ -174,58 +117,35 @@ struct LogPropertyPicker: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var viewModel: AppViewModel
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var paywall: ProPaywallRequest?
     @State private var pickTick = 0
 
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
     var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack(alignment: .center) {
-                    Text("Which rental?")
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(colors.textPrimary)
-                        .accessibilityAddTraits(.isHeader)
-                    Spacer()
-                    LogSheetCloseButton(identifier: "picker.close") { dismiss() }
+        LogSheetChrome(title: lt("Which rental?"), onClose: { dismiss() }) {
+            
+            VStack(spacing: 0) {
+                ForEach(Array(properties.enumerated()), id: \.element.id) { index, property in
+                    row(property, index: index)
+                    LHDivider(leadingInset: 60)
                 }
-                VStack(spacing: 0) {
-                    ForEach(Array(properties.enumerated()), id: \.element.id) { index, property in
-                        row(property, index: index, colors: colors)
-                        Rectangle().fill(colors.border.opacity(0.7)).frame(height: 0.5).padding(.leading, 60)
+                if viewModel.canAddProperty() {
+                    LHRow.Browse(title: lt("Add a rental"), showsChevron: false, action: {
+                        dismiss()
+                        onAddProperty()
+                    }) {
+                        LHRowGlyph(systemImage: "plus")
                     }
-                    if viewModel.canAddProperty() {
-                        Button {
-                            dismiss()
-                            onAddProperty()
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(colors.action)
-                                    .frame(width: 32, height: 32)
-                                    .background(Circle().fill(colors.actionSurface))
-                                Text("Add a property")
-                                    .font(.body)
-                                    .foregroundStyle(colors.action)
-                                Spacer()
-                            }
-                            .padding(.horizontal, 16)
-                            .frame(minHeight: 60)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.lhPressable)
-                        .accessibilityIdentifier("picker.addProperty")
-                    } else {
-                        PropertiesAtLimitRow(firstPropertyName: properties.first?.name) { openPaywall() }
-                    }
+                    .accessibilityIdentifier("picker.addProperty")
+                } else {
+                    PropertiesAtLimitRow(firstPropertyName: properties.first?.name) { openPaywall() }
                 }
-                .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
-            .padding(20)
+            .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous))
+        } footer: {
+            EmptyView()
         }
-        .background(colors.background.ignoresSafeArea())
         .sensoryFeedback(.impact(weight: .light), trigger: pickTick)
         .proPaywall($paywall)
         .accessibilityIdentifier("picker.property")
@@ -239,43 +159,25 @@ struct LogPropertyPicker: View {
         })
     }
 
-    private func row(_ property: RentalProperty, index: Int, colors: AdaptiveColors) -> some View {
+    private func row(_ property: RentalProperty, index: Int) -> some View {
         let on = property.id == selected
-        return Button {
-            pickTick += 1
-            onPick(property.id)
-            dismiss()
-        } label: {
-            HStack(spacing: 12) {
-                PropertySeal(property, in: properties, size: 32)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(property.name)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(colors.textPrimary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                    if !property.address.isEmpty {
-                        Text(property.address)
-                            .font(.subheadline)
-                            .foregroundStyle(colors.textSecondary)
-                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
-                    }
-                }
-                Spacer(minLength: 8)
-                if on {
-                    Image(systemName: "checkmark")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(colors.action)
-                        .accessibilityHidden(true)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .frame(minHeight: 60)
-            .contentShape(Rectangle())
+        return LHRow.Browse(title: property.name, meta: property.address.isEmpty ? nil : property.address, showsChevron: false,
+                            action: {
+                                pickTick += 1
+                                onPick(property.id)
+                                dismiss()
+                            }) {
+            PropertySeal(property, in: properties, size: 32)
         }
-        .buttonStyle(.lhPressable)
-        .accessibilityElement(children: .combine)
+        .overlay(alignment: .trailing) {
+            if on {
+                Image(systemName: "checkmark")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(colors.action)
+                    .padding(.trailing, 16)
+                    .accessibilityHidden(true)
+            }
+        }
         .accessibilityAddTraits(on ? [.isSelected, .isButton] : [.isButton])
         .accessibilityIdentifier("picker.property.\(index)")
     }

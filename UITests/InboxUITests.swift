@@ -382,8 +382,8 @@ final class InboxUITests: XCTestCase {
         let streamed = app.descendants(matching: .any)["today.confirm"]
         XCTAssertTrue(scanning.waitForExistence(timeout: 5) || streamed.waitForExistence(timeout: 5),
                       "Today says the look-back is running, not \"Log your first hour\"")
-        app.tabBars.firstMatch.buttons["Log time"].tap()
-        let close = app.buttons["log.close"]
+        app.buttons["tab.logTime"].tap()
+        let close = app.buttons["sheet.close"]
         XCTAssertTrue(close.waitForExistence(timeout: 5))
         close.tap()
         XCTAssertTrue(app.tabBars.firstMatch.buttons["Log time"].waitForExistence(timeout: 3))

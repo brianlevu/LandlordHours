@@ -435,6 +435,7 @@ struct DashboardView: View {
         if ax { chipRow }
         hero
             .padding(.top, ax ? 0 : 10)   // headroom so the chip clears the roof ridge at "finished"
+            .modifier(TodayToastRoom(enabled: !ax))
             .overlay(alignment: .top) { if !ax { chipRow.padding(.top, 4) } }
         TodayNumberBlock(hours: shownHours, goal: focus?.goal ?? houseGoal.targetHours, year: currentYear,
                          isRecord: isRecord, pace: pace, numeralSize: numeralSize, isPending: hoursPending,
@@ -789,4 +790,22 @@ struct TodayCelebration: Identifiable, Equatable {
     DashboardView(inbox: InboxViewModel(app: nil, storeProvider: { nil }))
         .environmentObject(AppViewModel())
         .environmentObject(GoalManager.shared)
+}
+
+
+/// While a top toast shows over the hero, the art steps down so the capsule never sits on the
+/// chimney or the roof ridge (§6 of the gate rubric: a toast overlapping a roof is a FAIL). The
+/// toast is taller than the chip it replaces; the extra height is made here, then given back.
+/// At accessibility sizes the art already lays out below the chip row, so nothing moves.
+private struct TodayToastRoom: ViewModifier {
+    static var lift: CGFloat { 56 }
+    let enabled: Bool
+    @ObservedObject private var center = LHToastCenter.shared
+
+    func body(content: Content) -> some View {
+        let room: CGFloat = enabled && center.hidesHeroChip ? Self.lift : 0
+        content
+            .padding(.top, room)
+            .lhMotion(AppAnimation.reveal, value: room)
+    }
 }

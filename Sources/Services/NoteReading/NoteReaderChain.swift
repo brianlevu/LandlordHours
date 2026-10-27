@@ -41,6 +41,10 @@ struct NoteReaderChain {
         case cannotRead
         /// Same note as before: the earlier answer, no new model call.
         case cached
+        /// The note changed or Log was tapped: this read was cancelled and its answer dropped.
+        case cancelled
+        /// The whole read ran past `overallCap`: the rules' answer stands.
+        case capped
     }
 
     struct Outcome: Equatable {
@@ -51,6 +55,8 @@ struct NoteReaderChain {
 
     static let defaultOnDeviceTimeout: TimeInterval = 8
     static let defaultPCCTimeout: TimeInterval = 10
+    /// However the tiers add up, one read never holds the sheet's "Reading your note" for longer.
+    static let overallCap: TimeInterval = 20
 
     let onDevice: NoteModelBackend
     let pcc: NoteModelBackend
@@ -59,11 +65,15 @@ struct NoteReaderChain {
     var pccTimeout: TimeInterval
     let cooldown: NoteModelCooldown
     let cache: NoteReadCache
+    /// "Read my notes with Apple's model": off closes both model tiers; the rules still run.
+    let settings: NoteReadingSettings
+    var overallCap: TimeInterval
 
     init(onDevice: NoteModelBackend, pcc: NoteModelBackend, pccGate: PCCGate = PCCGate(),
          onDeviceTimeout: TimeInterval = NoteReaderChain.defaultOnDeviceTimeout,
          pccTimeout: TimeInterval = NoteReaderChain.defaultPCCTimeout,
-         cooldown: NoteModelCooldown = NoteModelCooldown(), cache: NoteReadCache = NoteReadCache()) {
+         cooldown: NoteModelCooldown = NoteModelCooldown(), cache: NoteReadCache = NoteReadCache(),
+         settings: NoteReadingSettings = NoteReadingSettings(), overallCap: TimeInterval = NoteReaderChain.overallCap) {
         self.onDevice = onDevice
         self.pcc = pcc
         self.pccGate = pccGate
@@ -71,6 +81,8 @@ struct NoteReaderChain {
         self.pccTimeout = pccTimeout
         self.cooldown = cooldown
         self.cache = cache
+        self.settings = settings
+        self.overallCap = overallCap
     }
 
     /// Apple's models on this device, behind the user's PCC setting and the remote flag.
@@ -91,11 +103,13 @@ struct NoteReaderChain {
     var hasModel: Bool { onDeviceAvailability().isAvailable || pccAvailability().isAvailable }
 
     func onDeviceAvailability() -> ModelAvailability {
+        if !settings.isEnabled { return .unavailable(.disabledByUser) }
         if cooldown.isCoolingDown(.onDevice) { return .unavailable(.coolingDown) }
         return onDevice.availability
     }
 
     func pccAvailability() -> ModelAvailability {
+        if !settings.isEnabled { return .unavailable(.disabledByUser) }
         let gate = pccGate.availability()
         guard gate.isAvailable else { return gate }
         if cooldown.isCoolingDown(.pcc) { return .unavailable(.coolingDown) }
@@ -107,6 +121,24 @@ struct NoteReaderChain {
     func read(_ request: NoteReadRequest, rules base: NoteReading? = nil,
               onRefine: @escaping @MainActor (NoteReading) -> Void = { _ in }) async -> Outcome {
         let rules = base ?? self.rules(request)
+        let cap = overallCap
+        // The tiers run against a hard stop: past `overallCap` the rules' answer stands and the
+        // tiers are cancelled. A cancelled caller (Log tapped, note edited) gets the same.
+        return await withTaskGroup(of: Outcome?.self) { group in
+            group.addTask { await self.readTiers(request, rules: rules, onRefine: onRefine) }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(max(cap, 0) * 1_000_000_000))
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            if let first { return first }
+            return Outcome(reading: rules, onDevice: .capped, pcc: .capped)
+        }
+    }
+
+    private func readTiers(_ request: NoteReadRequest, rules: NoteReading,
+                           onRefine: @escaping @MainActor (NoteReading) -> Void) async -> Outcome {
         let prompt = NoteModelPrompt(request)
         var result = Outcome(reading: rules, onDevice: .notNeeded, pcc: .notNeeded)
         let key = NoteReadCache.key(request)
@@ -156,6 +188,7 @@ struct NoteReaderChain {
             if let onDeviceReading { cache.store(onDeviceReading, for: key) }
             return result
         }
+        if Task.isCancelled { return result }
         if let onDeviceReading { await onRefine(onDeviceReading) }
         switch await ask(pcc, prompt: prompt, timeout: pccTimeout) {
         case .success(let draft):
@@ -168,7 +201,7 @@ struct NoteReaderChain {
             result.pcc = attempt
             if attempt == .rateLimited { cooldown.rateLimited(.pcc) }
             if attempt == .refused || attempt == .cannotRead { cache.markRulesOnly(key) }
-            if let onDeviceReading, attempt != .timedOut { cache.store(onDeviceReading, for: key) }
+            if let onDeviceReading, attempt != .timedOut, attempt != .cancelled { cache.store(onDeviceReading, for: key) }
         }
         return result
     }
@@ -199,6 +232,7 @@ struct NoteReaderChain {
             group.cancelAll()
             return first
         }
+        if Task.isCancelled { return .failure(.cancelled) }
         switch outcome {
         case .timedOut:
             noteLogger.info("Note reader \(backend.tier.rawValue, privacy: .public) timed out")
@@ -358,6 +392,8 @@ final class NoteReadCache: @unchecked Sendable {
 //   -LHNoteModel thinking     the on-device model never answers (the drafting line stays)
 //   -LHNoteModel partial      on-device answers category and description only
 //   -LHNoteModel unavailable  no model: rules only (the default under -LHMockScenario)
+//   -LHNoteModel swap         answers after 2.4 s with a different kind of work than the rules found
+//   -LHNoteModel off          "Read my notes with Apple's model" is off: rules only, no model asked
 #if DEBUG
 enum NoteReaderDebug {
     /// UI tests and captures (every one launches with -LHMockScenario) are deterministic: no
@@ -375,6 +411,13 @@ enum NoteReaderDebug {
         switch mode {
         case "unavailable":
             return NoteReaderChain(onDevice: UnavailableNoteBackend(tier: .onDevice, reason: .appleIntelligenceNotEnabled), pcc: off, pccGate: closedPCC)
+        case "off":
+            let defaults = UserDefaults(suiteName: "lh.notemodel.off") ?? .standard
+            defaults.set(false, forKey: NoteReadingSettings.enabledKey)
+            return NoteReaderChain(onDevice: ScriptedNoteBackend(delay: 0.8, partial: false), pcc: off, pccGate: closedPCC,
+                                   settings: NoteReadingSettings(defaults: defaults))
+        case "swap":
+            return NoteReaderChain(onDevice: ScriptedNoteBackend(delay: 2.4, partial: false, swapsKind: true), pcc: off, pccGate: closedPCC)
         case "thinking":
             return NoteReaderChain(onDevice: ScriptedNoteBackend(delay: 3600, partial: false), pcc: off, pccGate: closedPCC, onDeviceTimeout: 3600)
         case "partial":
@@ -392,6 +435,8 @@ enum NoteReaderDebug {
     struct ScriptedNoteBackend: NoteModelBackend {
         var delay: TimeInterval
         var partial: Bool
+        /// Answers a different kind of work than the rules found (the "updated from your note" row).
+        var swapsKind = false
         var tier: Suggestion.Tier { .onDevice }
         var availability: ModelAvailability { .available }
 
@@ -413,7 +458,8 @@ enum NoteReaderDebug {
                 return NoteModelDraft(propertyOption: nil, category: rules.category ?? .repairs, hours: nil, datePhrase: nil,
                                       doneBySpouse: false, description: description)
             }
-            return NoteModelDraft(propertyOption: option, category: rules.category, hours: rules.hours,
+            let category = swapsKind ? (rules.category == .renovations ? .repairs : .renovations) : rules.category
+            return NoteModelDraft(propertyOption: option, category: category, hours: rules.hours,
                                   datePhrase: lower.contains("yesterday") ? "yesterday" : nil,
                                   doneBySpouse: false, description: description)
         }
