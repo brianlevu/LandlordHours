@@ -58,7 +58,7 @@ final class TodayConfirmUITests: XCTestCase {
         // The native tab bar tucks away while Today scrolls down (§1.25), taking its buttons out of the
         // tree; bring it back before reading the badge.
         var tries = 0
-        while !inboxTab.exists && tries < 4 { app.swipeDown(); tries += 1 }
+        while !inboxTab.exists && tries < 3 { app.swipeDown(velocity: .fast); tries += 1 }
         let text = (inboxTab.value as? String) ?? ""
         return Int(text.prefix(while: \.isNumber)) ?? 0
     }
@@ -159,11 +159,11 @@ final class TodayConfirmUITests: XCTestCase {
         markNotRentalWork("inspection")
         XCTAssertTrue(markedNotWorkToast.waitForExistence(timeout: 4))
         XCTAssertTrue(waitFor(count, label: "label == 'To confirm · 2'"))
-        XCTAssertEqual(badgeCount(), 2)
         XCTAssertFalse(row("inspection").exists)
-        Thread.sleep(forTimeInterval: 1.0)
         XCTAssertEqual(heroHours(), before, "Not rental work never counts: \(number.label)")
-        // Undo promptly: the toast (the inbox's own) keeps Undo for 5 s.
+        // The badge needs the tab bar, which may have tucked away; Undo must still land inside the
+        // toast's 5 s, so read the badge last and undo straight after.
+        XCTAssertEqual(badgeCount(), 2)
         undo.tap()
         XCTAssertTrue(waitFor(count, label: "label == 'To confirm · 3'"))
         XCTAssertEqual(badgeCount(), 3)
