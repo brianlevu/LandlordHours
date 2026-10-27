@@ -142,6 +142,12 @@ final class EarlierRecordsStore: ObservableObject {
         reload()
     }
 
+    /// Writes the group exactly as given (no merge with the stored copy), atomically.
+    func replace(_ group: ArchivedGroup) throws {
+        try MigrationFiles.writeDurably(JSONEncoder().encode(group), to: groupURL(group.id))
+        reload()
+    }
+
     func setStatus(_ status: GroupStatus, for id: String) throws {
         guard var group = self.group(id) else { return }
         group.status = status

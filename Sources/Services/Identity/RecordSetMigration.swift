@@ -1242,8 +1242,10 @@ final class RecordSetMigration {
             g.entries.removeAll { $0.id.uuidString == name }
             g.properties.removeAll { $0.id.uuidString == name }
             g.categories.removeAll { $0.id.uuidString == name }
-            earlier.removeGroup(groupId)
-            if !g.isEmpty { try? earlier.save(g) }
+            g.unparsedRecords.removeAll { $0.recordName == name }
+            // One durable write of the trimmed group (never delete-then-rewrite: a crash between
+            // the two would lose the rest of the group).
+            if g.isEmpty { earlier.removeGroup(groupId) } else { try? earlier.replace(g) }
         }
 
         if outcome.liveChanged > 0 || outcome.removed > 0 {

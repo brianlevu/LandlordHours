@@ -516,6 +516,21 @@ final class AdversarialReview3Tests: XCTestCase {
         XCTAssertFalse(CloudKitSyncService.isTokenExpired(CKError(.networkFailure)))
     }
 
+    // LOW 8 · a pulled delete of one archived record keeps the rest of the group as it was
+    func testAPulledDeleteOfOneArchivedRecordKeepsTheRestOfTheGroup() async throws {
+        XCTAssertTrue(Fixture.load("D3", into: sandbox))
+        let old = "email-old.profile@example.com"
+        let h = EngineHarness(sandbox, zone: FakeZoneSource())
+        try h.device()
+        _ = await h.cloud()
+        let before = try XCTUnwrap(h.earlier.group(old))
+        let gone = try XCTUnwrap(before.entries.first).id.uuidString
+        h.engine.applyPull(ZoneDelta(changed: [], deleted: [gone: "TimeEntry"], tokenData: nil, incomplete: false))
+        let after = try XCTUnwrap(h.earlier.group(old))
+        XCTAssertEqual(after.entries.count, before.entries.count - 1)
+        XCTAssertEqual(after.status, before.status)
+        XCTAssertEqual(after.pushedAsideNames, before.pushedAsideNames)
+    }
 
 
 
