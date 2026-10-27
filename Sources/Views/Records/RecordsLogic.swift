@@ -42,7 +42,7 @@ enum RecordSourceBadge: String, CaseIterable, Equatable {
         case .timer: return EntrySource.timer.displayName
         case .voice: return EntrySource.voice.displayName
         case .calendarImport: return EntrySource.calendar.displayName
-        case .suggested: return "Suggested"
+        case .suggested: return RR.t("records.source.suggested", "Suggested")
         case .receipt: return EntrySource.receipt.displayName
         case .location: return EntrySource.location.displayName
         case .shortcut: return EntrySource.shortcut.displayName
@@ -102,12 +102,12 @@ enum RecordsLogic {
     static func totalLabel(goal: HouseGoal, tracksSpouseJointly: Bool) -> String {
         switch goal {
         case .reps750:
-            return "All logged hours. The 750h test counts your hours only."
+            return RR.t("records.totalLabel.seven50", "All logged hours. The 750h test counts your hours only.")
         case .mp500, .mp100:
             let target = Int(goal.targetHours)
             return tracksSpouseJointly
-                ? "All logged hours. The \(target)h test counts you and your spouse."
-                : "All logged hours. The \(target)h test counts your hours only."
+                ? RR.t("records.totalLabel.together", "All logged hours. The \(target)h test counts you and your spouse.")
+                : RR.t("records.totalLabel.solo", "All logged hours. The \(target)h test counts your hours only.")
         }
     }
 
@@ -124,6 +124,39 @@ enum RecordsLogic {
         }
         guard !firstLine.isEmpty else { return entry.category.inboxLabel }
         return firstLine.prefix(1).uppercased() + firstLine.dropFirst()
+    }
+
+    /// The row's one meta line: the date, a flag when the hours do not follow the usual count
+    /// ("Spouse", "Doesn't count"), then the rental. Flags sit before the rental so a long rental
+    /// name is what truncates, never the flag.
+    static func meta(for entry: TimeEntry, propertyName: String) -> String {
+        let date = entry.date.formatted(.dateTime.month(.abbreviated).day())
+        var parts = [date]
+        if entry.participant == .spouse { parts.append(RR.t("records.flag.spouse", "Spouse")) }
+        if !entry.countsForREPS { parts.append(RR.t("records.flag.doesntCount", "Doesn\u{2019}t count")) }
+        parts.append(propertyName)
+        return parts.joined(separator: RR.t("records.metaSeparator", " \u{00B7} "))
+    }
+
+    /// "October 2026 · 41h 30m": the month header with its total.
+    static func monthHeader(_ month: Date, hours: Double) -> String {
+        let name = month.formatted(.dateTime.month(.wide).year())
+        let total = LHFormat.hours(hours)
+        return RR.t("records.monthHeader", "\(name)\u{00A0}\u{00B7} \(total)")
+    }
+
+    /// VoiceOver for a row: title, rental, hours, date, source, then the flags.
+    static func spokenRow(_ entry: TimeEntry, propertyName: String) -> String {
+        var parts = [
+            title(for: entry, propertyName: propertyName),
+            propertyName,
+            LHFormat.spokenHours(entry.hours),
+            entry.date.formatted(.dateTime.month(.wide).day()),
+            RecordSourceBadge(entry: entry).title
+        ]
+        if entry.participant == .spouse { parts.append(RR.t("records.flag.spouse", "Spouse")) }
+        if !entry.countsForREPS { parts.append(RR.t("records.flag.doesntCount.spoken", "Doesn\u{2019}t count toward your goal")) }
+        return parts.joined(separator: ", ")
     }
 
     static func filtered(

@@ -89,7 +89,8 @@ struct LHScreenTitle: View {
                         Text(subtitle)
                             .font(.subheadline)
                             .foregroundStyle(colors.textSecondary)
-                            .lineLimit(ax ? nil : (typeSize >= .xLarge ? 2 : 1))
+                            // Wraps from XXL (package G: never a cut at XXL) and at AX (shared lane).
+                            .lineLimit(ax || typeSize >= .xxLarge ? nil : (typeSize >= .xLarge ? 2 : 1))
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .lhWrapsText()
