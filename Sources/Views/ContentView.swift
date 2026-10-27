@@ -472,6 +472,9 @@ struct ContentView: View {
             .accessibilityIdentifier(ShellItem.logTime.accessibilityIdentifier)
         }
         .tabViewStyle(.tabBarOnly)
+        // iOS 26+ drops `Tab`'s `.accessibilityIdentifier` on the floor: the bar's buttons come out
+        // with an empty identifier. Stamp them on the bar's items; the badge and the tab re-stamp.
+        .background(ShellTabBarIdentifierStamp(token: "\(inboxModel.badgeCount)-\(tab)"))
     }
 
     @ViewBuilder
@@ -579,4 +582,55 @@ private struct TabBarMinimizeOnScroll: ViewModifier {
 #Preview {
     ContentView()
         .environmentObject(AppViewModel())
+}
+
+// MARK: - Tab bar identifiers (iOS 26+)
+
+/// SwiftUI's `Tab(...).accessibilityIdentifier(_:)` does not reach the native tab bar's buttons on
+/// iOS 26 and 27 (they report an empty identifier), so UI tests, automation and the house-reveal
+/// log could not find `tab.today` / `tab.inbox`. This finds the shell's `UITabBarController` and
+/// sets each bar item's identifier, matched by the item's title, which the bar button reports.
+struct ShellTabBarIdentifierStamp: UIViewRepresentable {
+    /// Changes whenever the bar may rebuild its items (badge, selection), so the stamp runs again.
+    let token: String
+
+    func makeUIView(context: Context) -> StampView { StampView() }
+    func updateUIView(_ view: StampView, context: Context) { view.stamp() }
+
+    final class StampView: UIView {
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            stamp()
+        }
+
+        func stamp() {
+            isUserInteractionEnabled = false
+            isAccessibilityElement = false
+            DispatchQueue.main.async { [weak self] in
+                guard let window = self?.window else { return }
+                ShellTabBarIdentifiers.apply(in: window)
+            }
+        }
+    }
+}
+
+enum ShellTabBarIdentifiers {
+    static func apply(in window: UIWindow) {
+        guard let bar = tabBarController(from: window.rootViewController) else { return }
+        let byTitle = Dictionary(ShellItem.allCases.map { ($0.title, $0.accessibilityIdentifier) },
+                                 uniquingKeysWith: { first, _ in first })
+        for item in bar.tabBar.items ?? [] {
+            guard let title = item.title, let id = byTitle[title] else { continue }
+            if item.accessibilityIdentifier != id { item.accessibilityIdentifier = id }
+        }
+    }
+
+    private static func tabBarController(from root: UIViewController?) -> UITabBarController? {
+        guard let root else { return nil }
+        if let bar = root as? UITabBarController { return bar }
+        for child in root.children {
+            if let bar = tabBarController(from: child) { return bar }
+        }
+        return nil
+    }
 }
