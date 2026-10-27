@@ -657,6 +657,25 @@ final class AdversarialReview4Tests: XCTestCase {
     // question disappears, and the push is held for good: "Waiting for your answer" with nothing
     // to answer.
 
+    func testAHeldSetDeletedElsewhereLeavesThePushHeldWithNoQuestionToAnswer() async throws {
+        let (h, zone, other, theirs) = try await heldHarness()
+        XCTAssertEqual(h.earlier.pendingGroups.map(\.id), [other])
+        // The owner of that set deletes all of it on their phone.
+        for r in theirs { zone.pendingDeleted[r.recordName] = r.recordType }
+        let delta = try await zone.deltaPull(from: h.engine.steadyToken)
+        XCTAssertEqual(delta.deleted.count, theirs.count)
+        h.engine.applyPull(delta)
+        h.earlier.reload()
+        XCTAssertTrue(h.earlier.pendingGroups.isEmpty, "nothing left to ask about")
+        XCTAssertNil(h.earlier.group(other), "the emptied group is gone from the archive")
+
+        let report = await h.engine.pushLive()
+        let coordinator = IdentityCoordinator(defaults: sandbox.defaults, root: sandbox.root)
+        coordinator.refresh()
+        XCTAssertTrue(!report.held || coordinator.pendingQuestion != nil,
+                      "the push is held (\(sandbox.defaults.string(forKey: IdentityKeys.lastSyncProblem) ?? "-")) and there is no question to answer; the phone never syncs again")
+        XCTAssertNotEqual(h.groups?.group(other)?.status, .pending, "groups.json still says the deleted set is a question")
+    }
 
     // MARK: R4-3 · MEDIUM · A status value this build no longer knows (`spouse`, written by a build
     // between bc38e6a and 5dec00b, or any future status) makes groups.json undecodable as a

@@ -889,6 +889,16 @@ final class RecordSetMigration {
         String(localized: "Waiting for your answer about the other records before syncing.", table: "Identity")
     }
 
+    /// The held set no longer exists: the hold ends with nothing to apply.
+    func dropHold() {
+        defaults.removeObject(forKey: IdentityKeys.householdHeldFor)
+        defaults.removeObject(forKey: IdentityKeys.heldHouseholdCache)
+        if defaults.string(forKey: IdentityKeys.lastSyncProblem) == Self.waitingForAnswer {
+            defaults.removeObject(forKey: IdentityKeys.lastSyncProblem)
+        }
+        onChange?()
+    }
+
     func releaseHousehold() {
         defaults.removeObject(forKey: IdentityKeys.householdHeldFor)
         if defaults.string(forKey: IdentityKeys.lastSyncProblem) == Self.waitingForAnswer {
@@ -1231,7 +1241,17 @@ final class RecordSetMigration {
             g.unparsedRecords.removeAll { $0.recordName == name }
             // One durable write of the trimmed group (never delete-then-rewrite: a crash between
             // the two would lose the rest of the group).
-            if g.isEmpty { earlier.removeGroup(groupId) } else { try? earlier.replace(g) }
+            if g.isEmpty {
+                earlier.removeGroup(groupId)
+                // Nothing left to ask about: never a question in groups.json, never a held push.
+                if var record = groups.group(groupId), record.status == .pending {
+                    record.status = .notNeeded; record.entryCount = 0; record.propertyCount = 0; record.hours = 0
+                    groups.upsert(record)
+                }
+                if defaults.string(forKey: IdentityKeys.householdHeldFor) == groupId { dropHold() }
+            } else {
+                try? earlier.replace(g)
+            }
         }
 
         if outcome.liveChanged > 0 || outcome.removed > 0 {
@@ -1322,7 +1342,12 @@ final class RecordSetMigration {
     @discardableResult
     func pushLive() async -> ZonePushReport {
         if let held = defaults.string(forKey: IdentityKeys.householdHeldFor) {
-            if GroupsFile.load(root: root)?.group(held)?.status == .pending {
+            earlier.reload()
+            if earlier.group(held).map({ $0.isEmpty }) ?? true {
+                // The held set is gone (deleted elsewhere): there is no question to answer, so
+                // sync never stays "waiting".
+                dropHold()
+            } else if GroupsFile.load(root: root)?.group(held)?.status == .pending {
                 // Not synced: the status row says what it is waiting for.
                 defaults.set(Self.waitingForAnswer, forKey: IdentityKeys.lastSyncProblem)
                 onChange?()
