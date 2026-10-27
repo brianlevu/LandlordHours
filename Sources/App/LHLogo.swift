@@ -1,30 +1,20 @@
 import SwiftUI
 
-// MARK: - LandlordHours 2.0 logo — mark B "half drawn, half built"
+// MARK: - Dormer logo (2.2): the V3 mark and "Dormer" in Fraunces
 //
-// Source: design/brand/logo/mark-b.svg (1024 grid, translate(10 -11.5) for optical centring) and
-// design/brand/icon/icon-b-1024.png (the approved app icon). A house elevation on blueprint blue:
-// foundation, left wall, left roof slope and door are built (plaster / terracotta / timber); the
-// right slope, upper right wall and window are still drafting-cyan linework.
-// Brand rules: docs/design/2.0-brand-system.md §5.
-
-// LHMarkGeometry, LHMarkShape and LHMark live in Sources/Shared/LHMark.swift (shared with the
-// widget extension).
+// The mark, its geometry and the icon tile live in Sources/Shared/DormerMark.swift (shared with the
+// widget extension); the generator is design/brand/dormer/make_dormer_icon.py. The 2.0 house mark B
+// (LHMarkShape / LHMark in Sources/Shared/LHMark.swift) is still drawn by the widget surfaces until
+// the rename pass (docs/brand/rename-inventory.md).
 
 // MARK: - App-icon tile (self-contained, any size)
-/// The mark on its blueprint tile — the in-app twin of the app icon. The name is kept from 1.x so
-/// existing call sites (splash, sign-in, onboarding) pick up the new mark.
+/// The Dormer tile: the in-app twin of the app icon. The name is kept from 1.x so existing call
+/// sites (splash, sign-in, onboarding, the engagement lab) pick up the new mark.
 struct WaveHouseIcon: View {
     var size: CGFloat = 80
 
     var body: some View {
-        ZStack {
-            AppColors.brand
-            LHMark(size: size)
-        }
-        .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: size * 0.2237, style: .continuous))
-        .accessibilityHidden(true)
+        DormerTile(size: size)
     }
 }
 
@@ -72,9 +62,9 @@ struct LHCompactLogo: View {
 }
 
 // MARK: - Wordmark (text-only logo)
-/// "Landlord" in ink + "Hours" in the action colour (blueprint in light, cyan in dark), per
-/// logo/wordmark.svg. Fraunces 600 at 28pt and up; below that SF Pro semibold (the brand rule
-/// keeps Fraunces off small text).
+/// "Dormer" in ink (textPrimary per appearance). Fraunces 600 at 28pt and up; below that SF Pro
+/// semibold (the brand rule keeps Fraunces off small text). The name is the brand, so it is not
+/// localized.
 struct LHWordmark: View {
     var fontSize: CGFloat = 28
 
@@ -89,10 +79,10 @@ struct LHWordmark: View {
     }
 
     var body: some View {
-        (Text("Landlord").foregroundColor(colors.textPrimary)
-         + Text("Hours").foregroundColor(colors.action))
+        Text(verbatim: DormerBrand.name)
             .font(font)
-            .accessibilityLabel("LandlordHours")
+            .foregroundColor(colors.textPrimary)
+            .accessibilityLabel(Text(verbatim: DormerBrand.name))
     }
 }
 
@@ -105,7 +95,7 @@ struct LHWordmark: View {
             WaveHouseIcon(size: 64)
             WaveHouseIcon(size: 48)
             LHCompactLogo(size: 32)
-            LHMarkShape().fill(AppColors.brand).frame(width: 48, height: 48)
+            DormerMarkShape(cropped: true).fill(AppColors.brand).frame(width: 48, height: 48)
         }
 
         LHWordmark(fontSize: 34)
