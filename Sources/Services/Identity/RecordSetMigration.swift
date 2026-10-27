@@ -988,7 +988,8 @@ final class RecordSetMigration {
         let tax = live.taxProfile.record(name: IdentityZone.taxProfileName(IdentityZone.household), owner: chosen)
         switch try await source.saveHousehold(goal: goal, tax: tax) {
         case .saved:
-            break
+            // This phone's own pair: its echo in the next delta is not "from another device".
+            tracker.recordServerState([goal.ckRecord(), tax.ckRecord()])
         case .adopted(let server):
             if excluded.contains(server) {
                 // Raced by a set this phone holds apart: keep this phone's id and ask first.
@@ -1222,6 +1223,11 @@ final class RecordSetMigration {
             let cached = loadHouseholdCache()
             rememberHousehold(goal: household.goal.map(GoalSettingsValues.init(record:)) ?? cached?.goal,
                               tax: household.tax.map(TaxProfileValues.init(record:)) ?? cached?.tax)
+            // The set's own pair, written by another device (not this phone's last push, which is
+            // the baseline): onboarding answers made while empty never overwrite it.
+            let fromAnotherDevice = [household.goal, household.tax].compactMap { $0 }
+                .contains { $0.appUserId == unifiedId && !tracker.changedRecords([$0.ckRecord()]).isEmpty }
+            if fromAnotherDevice { defaults.set(true, forKey: IdentityKeys.householdFromCloud) }
         }
         var goalRecord = household.goal, taxRecord = household.tax
         if MergeRules.mirrorBeatsHousehold(mirror: mirror.goal?.modificationDate, household: household.goal?.modificationDate), mirror.goal != nil {

@@ -359,6 +359,39 @@ final class AdversarialReview3Tests: XCTestCase {
     // MARK: R3-3 · a household pair that arrives in the S8b delta (written by another phone between
     // this phone's S5 read and S8) is overwritten by onboarding answers made while empty.
 
+    func testOnboardingAnswersOverwriteAHouseholdThatArrivedInTheDelta() async throws {
+        let zone = FakeZoneSource()
+        let otherPhone = "local-A-other-device"
+        zone.raceHouseholdOwner = otherPhone
+        let h = EngineHarness(sandbox, zone: zone)
+        XCTAssertEqual(try h.device(), .fresh)
+        IdentityKeys.beginOnboarding(liveIsEmpty: true, defaults: sandbox.defaults)
+        var mine = h.live.taxProfile
+        mine.spouseTracking = false
+        mine.taxYear = 2001
+        h.live.applyRemoteSettings(goal: nil, tax: mine)
+        IdentityKeys.markSettingsDirty(tax: true, liveIsEmpty: true, defaults: sandbox.defaults)
+
+        h.engine.crashAt = "S5"
+        let o4 = await h.cloud()
+        XCTAssertEqual(o4, .notReady)
+        XCTAssertEqual(h.step, .cloudInventoried)
+        // The other phone writes the household pair now (it lands in this phone's S8b delta).
+        let theirTax = TaxProfileValues(filingStatus: FilingStatus.marriedJoint.rawValue, spouseTracking: true, taxYear: 2026,
+                                        groupingElection: false, nonREWorkHours: 500, displayName: nil)
+        zone.pendingChanged = [GoalSettingsValues.defaults.record(name: IdentityZone.goalSettingsName(IdentityZone.household), owner: otherPhone),
+                               theirTax.record(name: IdentityZone.taxProfileName(IdentityZone.household), owner: otherPhone)]
+        h.engine.crashAt = nil
+        let o5 = await h.cloud()
+        XCTAssertEqual(o5, .done)
+        XCTAssertEqual(sandbox.defaults.string(forKey: IdentityKeys.unifiedId), otherPhone, "this phone adopted the other phone's id")
+
+        let stored = TaxProfileValues(record: try XCTUnwrap(zone.records[IdentityZone.taxProfileName(IdentityZone.household)]))
+        XCTAssertEqual(stored.spouseTracking, true, "the other phone's household tax profile was overwritten by onboarding answers")
+        XCTAssertEqual(stored.taxYear, 2026, "the other phone's tax year was overwritten (now \(stored.taxYear))")
+        h.engine.finishOnboarding()
+        XCTAssertEqual(h.live.taxProfile.taxYear, 2026, "this phone follows the household after onboarding")
+    }
 
     // MARK: R3-4 · a property delete records no delete-version hash for its cascaded entries, so
     // Put back of those entries from a phone whose clock is behind is ignored by the deleting phone.
