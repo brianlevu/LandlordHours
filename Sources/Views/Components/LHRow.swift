@@ -233,7 +233,11 @@ extension LHRow {
                 .font(.subheadline)
                 .fontDesign(.rounded)
                 .monospacedDigit()
-                .foregroundStyle(colors.textSecondary)
+                // At AX the value is its own line: 4pt more air above it and semibold primary ink, so
+                // "Things you asked us to stop suggesting / None" never reads as one sentence.
+                .fontWeight(ax ? .semibold : nil)
+                .foregroundStyle(ax ? colors.textPrimary : colors.textSecondary)
+                .padding(.top, ax ? 4 : 0)
                 .lineLimit(ax ? nil : 1)
         }
     }
@@ -385,17 +389,38 @@ extension LHRow {
             self._isOn = isOn
         }
 
+        @Environment(\.dynamicTypeSize) private var typeSize
+
         var body: some View {
-            SwiftUI.Toggle(isOn: $isOn) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(label).font(.body).foregroundStyle(colors.textPrimary)
-                    if let subtitle {
-                        Text(subtitle).font(.subheadline).foregroundStyle(colors.textSecondary)
+            if typeSize.isAccessibilitySize {
+                // At AX the switch drops under the words, so the label and subtitle get the whole row
+                // width instead of a 60% column (a 7-line subtitle made one row 54% of the screen, D2).
+                VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(label).font(.body).foregroundStyle(colors.textPrimary)
+                        if let subtitle {
+                            Text(subtitle).font(.subheadline).foregroundStyle(colors.textSecondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    SwiftUI.Toggle(isOn: $isOn) { Text(label) }
+                        .labelsHidden()
+                        .tint(colors.action)
+                }
+                .frame(minHeight: LHMetrics.minTap)
+                .accessibilityElement(children: .combine)
+            } else {
+                SwiftUI.Toggle(isOn: $isOn) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(label).font(.body).foregroundStyle(colors.textPrimary)
+                        if let subtitle {
+                            Text(subtitle).font(.subheadline).foregroundStyle(colors.textSecondary)
+                        }
                     }
                 }
+                .tint(colors.action)
+                .frame(minHeight: LHMetrics.minTap)
             }
-            .tint(colors.action)
-            .frame(minHeight: LHMetrics.minTap)
         }
     }
 }

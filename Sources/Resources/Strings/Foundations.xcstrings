@@ -133,6 +133,30 @@
         }
       }
     },
+    "settings.capture.aiDisclosure.pcc": {
+      "comment": "Settings: auto-capture disclosure when Private Cloud Compute is offered",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple’s on-device model reads your calendar suggestions and Log time notes. If it can’t, Private Cloud Compute may read a note instead (turn that off above). Apple keeps nothing, and we never see it."
+          }
+        }
+      }
+    },
+    "settings.capture.pcc.subtitle": {
+      "comment": "Settings: Private Cloud Compute toggle subtitle",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Used only if your iPhone can’t read a note. Apple keeps nothing, and we never see it."
+          }
+        }
+      }
+    },
     "sheet.close": {
       "comment": "Closes a sheet",
       "extractionState": "manual",

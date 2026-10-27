@@ -24,9 +24,9 @@
   "section-header-mono": 41,
   "tab-shell": 3,
   "hand-card": 18,
-  "chevron": 5
+  "chevron": 4
  },
- "total": 1021,
+ "total": 1020,
  "entries": {
   "alert|Sources/Views/DeleteAllDataView.swift|.alert(\"Couldn\u2019t delete\", isPresented: Binding(": 1,
   "alert|Sources/Views/DeleteAllDataView.swift|.alert(\"Delete everything?\", isPresented: $showVoiceOverConfirm) {": 1,
@@ -769,7 +769,6 @@
   "chevron|Sources/Views/Learn/LearningCenterView.swift|Image(systemName: \"chevron.right\")": 1,
   "chevron|Sources/Views/ProfileManagementViews.swift|Image(systemName: \"chevron.right\")": 1,
   "chevron|Sources/Views/ReportsView.swift|Image(systemName: \"chevron.right\")": 1,
-  "chevron|Sources/Views/SettingsView.swift|Image(systemName: \"chevron.right\")": 1,
   "fixed-size|Sources/Views/Components/LHScreenTitle.swift|.lhWrapsText()": 1
  }
 }

@@ -299,6 +299,8 @@ Inside sheets and forms, in an inner surface (radius 12, `backgroundTertiary`): 
 
 `SettingToggleRow` as is: min 44, label `.body` + optional one-line `.subheadline` subtitle, system `Toggle` tinted `action`. The subtitle says the effect, not the mechanism ("At most two a day, never at night.").
 
+**At AX (2026-10-27):** the switch drops under the label and subtitle, which take the full row width (a 7-line subtitle beside the switch made one row 54% of the viewport against the 45% D2 cap; stacked it is 43.9% **[measured]**). A subtitle is 1–2 short sentences, 20 words or fewer. **Grouped lists on Settings and Records sit on the 20pt gutter** (`.contentMargins(.horizontal, LHMetrics.gutter)` with row insets 0 for page-level rows; measured 20.0pt on all 35 list frames). At AX a value under its label gets 8pt of air and semibold ink, so it never reads as part of the sentence above.
+
 ### 1.7 Text field `LHField`
 
 Single line: inner surface radius 12, height 52, padding 16/14, `.body`. Placeholder in `textTertiary` (#5F6983, 5.5:1), never the system placeholder grey **[measured contrast]**. Focus: 1.5pt `action` stroke, crossfade 0.15. Error: `destructive` stroke + `errorShake` + one `.footnote` line under the field saying what to do. Clear button: 20pt glyph in a 44 frame. Multi-line (Log time note): min 104, same radius; the field is the first thing in the sheet and takes focus on open.

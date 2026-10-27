@@ -140,6 +140,8 @@ struct SettingRow: View {
             .fontDesign(.rounded)
             .monospacedDigit()
             .foregroundStyle(valueColor ?? colors.textSecondary)
+            .fontWeight(ax ? .semibold : nil)
+            .padding(.top, ax ? 4 : 0)
             .multilineTextAlignment(ax ? .leading : .trailing)
     }
 }

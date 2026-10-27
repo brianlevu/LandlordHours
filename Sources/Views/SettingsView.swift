@@ -67,7 +67,7 @@ struct SettingsView: View {
                         BPBackToTodayButton()
                         BPScreenTitle(text: "Settings")
                     }
-                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 4, trailing: 20))
+                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 4, trailing: 0))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 }
@@ -92,7 +92,7 @@ struct SettingsView: View {
                             .accessibilityIdentifier("settings.version")
                     }
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
+                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                 }
 
                 #if DEBUG
@@ -105,6 +105,7 @@ struct SettingsView: View {
             .listSectionSpacing(24)
             .scrollContentBackground(.hidden)
             .contentMargins(.bottom, 104, for: .scrollContent)
+            .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
             .background { LHMobileCanvas() }
             .navigationBarHidden(true)
             .navigationDestination(item: $route) { route in
@@ -201,16 +202,14 @@ struct SettingsView: View {
                             Text(email)
                                 .font(.subheadline)
                                 .foregroundStyle(colors.textSecondary)
-                                .lineLimit(1)
+                                // Never cut at AX: the whole address wraps (owner ruling 2026-10-27).
+                                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                                 .truncationMode(.middle)
                         }
                         planBadge
                     }
-                    Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(colors.textTertiary)
-                        .accessibilityHidden(true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if !dynamicTypeSize.isAccessibilitySize { LHChevron() }
                 }
                 .padding(.vertical, 8)
                 .contentShape(Rectangle())
@@ -500,7 +499,14 @@ struct SettingsView: View {
     #if DEBUG
     private var developerToolsSection: some View {
         Section {
-            DisclosureGroup(isExpanded: $showDeveloperTools) {
+            Button {
+                if reduceMotion { showDeveloperTools.toggle() } else { withAnimation(AppAnimation.smooth) { showDeveloperTools.toggle() } }
+            } label: {
+                SettingRow(symbol: "hammer", title: "Developer tools", subtitle: "Mock data and debug-only Pro controls", showsChevron: true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(showDeveloperTools ? "Expanded" : "Collapsed")
+            if showDeveloperTools {
                 Button {
                     subscriptionManager.unlockPro()
                 } label: {
@@ -528,8 +534,6 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
                 }
-            } label: {
-                SettingRow(symbol: "hammer", title: "Developer tools", subtitle: "Mock data and debug-only Pro controls")
             }
         }
         .listRowBackground(colors.backgroundSecondary)
@@ -621,11 +625,11 @@ private struct AutoCaptureSettingsSection: View {
 
     static var aiDisclosure: String { offersPCC ? aiDisclosureWithPCC : aiDisclosureOnDevice }
 
-    static let aiDisclosureWithPCC = "Calendar suggestions use Apple\u{2019}s on-device model. When you type or say a note in Log time, that model reads it to fill in the form. If it can\u{2019}t, Apple\u{2019}s Private Cloud Compute may read it instead (turn that off above). Apple runs Private Cloud Compute, and it doesn\u{2019}t keep your note. Nothing goes to us or anyone else, and nothing is saved until you tap Log."
+    static let aiDisclosureWithPCC = String(localized: "settings.capture.aiDisclosure.pcc", defaultValue: "Apple\u{2019}s on-device model reads your calendar suggestions and Log time notes. If it can\u{2019}t, Private Cloud Compute may read a note instead (turn that off above). Apple keeps nothing, and we never see it.", table: "Foundations")
 
     static let aiDisclosureOnDevice = "Calendar suggestions and the notes you type or say in Log time are read by Apple\u{2019}s on-device model, on your iPhone, to fill in the form. Nothing goes to us or anyone else, and nothing is saved until you tap Log."
 
-    static let pccSubtitle = "Lets Apple\u{2019}s Private Cloud Compute read a Log time note when your iPhone\u{2019}s model can\u{2019}t. Apple runs it and keeps nothing. Off keeps every note on your iPhone."
+    static let pccSubtitle = String(localized: "settings.capture.pcc.subtitle", defaultValue: "Used only if your iPhone can\u{2019}t read a note. Apple keeps nothing, and we never see it.", table: "Foundations")
 
     var body: some View {
         Section {

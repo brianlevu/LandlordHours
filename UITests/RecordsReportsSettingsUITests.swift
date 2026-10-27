@@ -71,15 +71,15 @@ final class RecordsReportsSettingsUITests: XCTestCase {
         // Below iOS 27 notes stay on the phone and the on-device text shows.
         let expectsPCC = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27
         if expectsPCC {
-            let disclosure = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Private Cloud Compute may read it instead")).firstMatch
+            let disclosure = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Private Cloud Compute may read a note instead")).firstMatch
             XCTAssertTrue(scrollTo(disclosure), "Private Cloud Compute disclosure is shown")
-            XCTAssertTrue(disclosure.label.contains("Apple runs Private Cloud Compute, and it doesn\u{2019}t keep your note"), disclosure.label)
-            XCTAssertTrue(disclosure.label.contains("nothing is saved until you tap Log"), disclosure.label)
+            XCTAssertTrue(disclosure.label.contains("Apple keeps nothing"), disclosure.label)
+            XCTAssertTrue(disclosure.label.contains("we never see it"), disclosure.label)
             XCTAssertTrue(element("settings.capture.pcc").exists, "PCC toggle is offered with the entitlement")
         } else {
             let disclosure = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "on your iPhone, to fill in the form")).firstMatch
             XCTAssertTrue(scrollTo(disclosure), "Apple AI disclosure is shown")
-            XCTAssertTrue(disclosure.label.contains("nothing is saved until you tap Log"), disclosure.label)
+            XCTAssertTrue(disclosure.label.contains("we never see it"), disclosure.label)
             XCTAssertFalse(element("settings.capture.pcc").exists, "no PCC toggle below iOS 27")
         }
         element("settings.capture.muted").tap()

@@ -62,11 +62,11 @@ private struct RecordsScreen: View {
         List {
             Section {
                 header
-                    .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 0, trailing: 20))
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 0, trailing: 0))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                 searchField
-                    .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 0, trailing: 16))
+                    .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 0, trailing: 0))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                 chips
@@ -92,7 +92,7 @@ private struct RecordsScreen: View {
             } else {
                 Section {
                     totalCard
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 }
@@ -118,6 +118,7 @@ private struct RecordsScreen: View {
         .scrollContentBackground(.hidden)
         .scrollDismissesKeyboard(.immediately)
         .contentMargins(.bottom, 104, for: .scrollContent)
+        .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
         .background { LHMobileCanvas() }
         .onAppear {
             guard !appliedInitialFilter else { return }
