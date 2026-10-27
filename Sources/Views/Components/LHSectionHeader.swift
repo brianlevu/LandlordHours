@@ -33,12 +33,21 @@ struct LHSectionHeader: View {
     var onPage = false
     var trailingTitle: String? = nil
     var trailingAction: (() -> Void)? = nil
+    /// Screen anatomy S4: the header is the first thing in a scaffolded `List` (Inbox's "To confirm").
+    /// The system pads a list's first section header; this takes that back so the header's cap line
+    /// sits where a card's edge would (measured on iOS 27; `frame_check.py consistency` holds it).
+    var leadsList = false
 
     @Environment(\.colorScheme) private var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
+    /// The system's extra top padding on an inset-grouped list's first section header (pt, iOS 27.0; the
+    /// same under both header systems).
+    static let firstListHeaderInset: CGFloat = 15.5
+
     init(_ title: String, count: Int? = nil, style: Style = .section, tone: Tone = .normal, onPage: Bool = false,
-         trailingTitle: String? = nil, trailingAction: (() -> Void)? = nil) {
+         trailingTitle: String? = nil, trailingAction: (() -> Void)? = nil, leadsList: Bool = false) {
+        self.leadsList = leadsList
         self.title = title
         self.count = count
         self.style = style
@@ -77,6 +86,7 @@ struct LHSectionHeader: View {
             }
         }
         .frame(minHeight: style == .day ? 28 : 24)
+        .padding(.top, leadsList ? -Self.firstListHeaderInset : 0)
     }
 }
 

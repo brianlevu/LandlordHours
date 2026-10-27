@@ -526,5 +526,77 @@ class MidwordBreaks(unittest.TestCase):
         self.assertEqual(fc.midword_breaks([self.L("Notifica-", 100, x=50, w=200), self.L("tions", 150, x=700, w=200)]), [])
 
 
+
+def make_tab(title_top_pt, content_top_pt, name, subtitle=False, title=True, back_circle=False):
+    """A tab frame: canvas, a 25pt title ink block at title_top_pt (x 20-160pt), optional subtitle line, and a white
+    card from content_top_pt. Optionally a back circle under the title's left edge (header furniture)."""
+    s = 3
+    a = np.zeros((H, W, 3), np.uint8)
+    a[:] = CANVAS
+    if title:
+        t0 = int(title_top_pt * s)
+        a[t0:t0 + 75, 60:480] = INK
+        if back_circle:
+            a[t0 + 60:t0 + 100, 30:150] = (226, 232, 245)
+    if subtitle:
+        s0 = int((title_top_pt + 31) * s)
+        a[s0:s0 + 36, 60:400] = (74, 80, 104)
+    c0 = int(content_top_pt * s)
+    a[c0:c0 + 600, 60:1146] = CARD
+    path = os.path.join(tempfile.mkdtemp(prefix="fc-consist-"), name + ".png")
+    Image.fromarray(a).save(path)
+    return path
+
+
+class Consistency(unittest.TestCase):
+    def test_same_header_passes(self):
+        ms = [fc.header_metrics(make_tab(80, 130, f"t{i}"), 3.0) for i in range(4)]
+        checks, ok = fc.consistency_verdict(ms)
+        self.assertTrue(ok, checks)
+        self.assertAlmostEqual(ms[0]["title_baseline_pt"], 105.0, delta=0.5)
+        self.assertAlmostEqual(ms[0]["gap_pt"], 25.0, delta=0.5)
+
+    def test_baseline_off_by_2pt_fails_s2(self):
+        ms = [fc.header_metrics(make_tab(80, 130, "a"), 3.0), fc.header_metrics(make_tab(82, 132, "b"), 3.0)]
+        checks, ok = fc.consistency_verdict(ms)
+        self.assertFalse(ok)
+        s2 = next(c for c in checks if c["rule"].startswith("S2"))
+        self.assertFalse(s2["pass_"])
+        self.assertAlmostEqual(s2["spread_pt"], 2.0, delta=0.4)
+
+    def test_baseline_within_1pt_passes_s2(self):
+        ms = [fc.header_metrics(make_tab(80, 130, "a"), 3.0), fc.header_metrics(make_tab(80.67, 130.67, "b"), 3.0)]
+        s2 = next(c for c in fc.consistency_verdict(ms)[0] if c["rule"].startswith("S2"))
+        self.assertTrue(s2["pass_"], s2)
+
+    def test_gap_off_by_3pt_fails_s3(self):
+        ms = [fc.header_metrics(make_tab(80, 130, "a"), 3.0), fc.header_metrics(make_tab(80, 133, "b"), 3.0)]
+        checks, ok = fc.consistency_verdict(ms)
+        s3 = next(c for c in checks if c["rule"].startswith("S3"))
+        self.assertFalse(s3["pass_"])
+
+    def test_missing_title_fails_s1(self):
+        ms = [fc.header_metrics(make_tab(80, 130, "a"), 3.0), fc.header_metrics(make_tab(80, 300, "b", title=False), 3.0)]
+        s1 = next(c for c in fc.consistency_verdict(ms)[0] if c["rule"].startswith("S1"))
+        self.assertFalse(s1["pass_"])
+        self.assertEqual(s1["detail"], ["b.png"])
+
+    def test_subtitle_is_header_not_content(self):
+        m = fc.header_metrics(make_tab(80, 160, "sub", subtitle=True), 3.0)
+        self.assertAlmostEqual(m["title_baseline_pt"], 105.0, delta=0.5)
+        self.assertAlmostEqual(m["last_baseline_pt"], 123.0, delta=0.7)  # subtitle bottom
+        self.assertAlmostEqual(m["content_top_pt"], 160.0, delta=0.5)
+
+    def test_back_circle_is_not_content(self):
+        m = fc.header_metrics(make_tab(80, 140, "back", back_circle=True), 3.0)
+        self.assertAlmostEqual(m["content_top_pt"], 140.0, delta=0.5)
+
+    def test_hero_frame_skips_gap_rule(self):
+        ms = [fc.header_metrics(make_tab(80, 130, "a"), 3.0), fc.header_metrics(make_tab(80, 200, "today"), 3.0)]
+        _, ok = fc.consistency_verdict(ms, no_gap={"today.png"})
+        self.assertTrue(ok)
+        _, ok2 = fc.consistency_verdict(ms)
+        self.assertFalse(ok2)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

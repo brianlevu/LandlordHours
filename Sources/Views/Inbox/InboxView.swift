@@ -47,7 +47,8 @@ struct InboxView: View {
                         .background { InboxCanvas() }
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
+            // Screen anatomy: the scaffold owns the title, the top inset and the gap to content.
+            .lhTabScreen(String(localized: "inbox.title", defaultValue: "Inbox", table: "Inbox"))
         }
         .sheet(item: $model.sheetSuggestion) { suggestion in
             SuggestionConfirmSheet(suggestion: suggestion, model: model)
@@ -116,18 +117,14 @@ struct InboxView: View {
 
     private var listBody: some View {
         List {
+            if BackfillJob.showsHeader(backfill.phase) {
             Section {
-                LHScreenTitle(String(localized: "inbox.title", defaultValue: "Inbox", table: "Inbox"))
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 0, trailing: 0))
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                if BackfillJob.showsHeader(backfill.phase) {
                     BackfillProgressHeader(job: backfill, found: model.backfillCount, onRetry: runBackfillAgain)
                         .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         .transition(.opacity)
-                }
+            }
             }
             if model.visible.isEmpty {
                 // A stopped or blocked look-back with nothing found: the header above has the
@@ -163,9 +160,8 @@ struct InboxView: View {
                 if showsBatch { batchFoot }
             } header: {
                 LHSectionHeader(String(localized: "inbox.section.toConfirm", defaultValue: "To confirm", table: "Inbox"),
-                                count: model.badgeCount)
+                                count: model.badgeCount, leadsList: !BackfillJob.showsHeader(backfill.phase))
                     .textCase(nil)
-                    .padding(.top, 4)
                     .accessibilityIdentifier("inbox.section.count")
             }
             }
@@ -173,7 +169,6 @@ struct InboxView: View {
         .listStyle(.insetGrouped)
         .listSectionSpacing(LHMetrics.sectionGap)
         .scrollContentBackground(.hidden)
-        .contentMargins(.top, 0, for: .scrollContent)
         // The 20pt list gutter (shared lane): the card, title and header rows sit on it.
         .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
         .animation(reduceMotion ? AppAnimation.quick : AppAnimation.collapse, value: model.visible.map(\.sourceKey))
@@ -555,8 +550,7 @@ private struct InboxEmptyPage: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
-                LHScreenTitle(String(localized: "inbox.title", defaultValue: "Inbox", table: "Inbox"))
-                    .padding(.top, 8)
+                // The title is the tab scaffold's (InboxView applies `.lhTabScreen`).
                 if let banner { banner }
                 // The frame can be wider than the 20pt gutters allow; it is an overlay so it never
                 // widens the column the title and button size themselves from.

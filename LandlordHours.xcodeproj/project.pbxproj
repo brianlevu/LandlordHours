@@ -322,6 +322,7 @@
 		ED524E075498C222E7573B46 /* LHRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F1E3C866671C47777936C66 /* LHRing.swift */; };
 		EDC9C8F43A795123C6F462A8 /* LogDetailsLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 855B8D6AD730D9D8CC9DE754 /* LogDetailsLine.swift */; };
 		EE3D0D14B7F8A52707C5F97A /* SuggestionRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECB7DFB3F4D68C9B839DB82D /* SuggestionRowView.swift */; };
+		EF21223A16C262FC6C2FFE87 /* LHScreenScaffold.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0978D9BA5F8797000E0D0758 /* LHScreenScaffold.swift */; };
 		EFF3AE658E53DAC47162C5C4 /* LogTimeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C268955DBE2F2924AFB79CBD /* LogTimeUITests.swift */; };
 		F2900FA54CCCEEED52E612B3 /* LogInlineEditors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AAA75C0ABD5FDA065664E0A /* LogInlineEditors.swift */; };
 		F37725A9361671D0ADDE717F /* PaywallCaptureUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E7575580F74476145B81402 /* PaywallCaptureUITests.swift */; };
@@ -400,6 +401,7 @@
 		0829AAA2F9D0B2061DC09D89 /* LHScreenTitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHScreenTitle.swift; sourceTree = "<group>"; };
 		090AC6457EB4FB394F170292 /* InboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxTests.swift; sourceTree = "<group>"; };
 		0914D43BECE24E5CB862706D /* LandlordPurchasesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordPurchasesTests.swift; sourceTree = "<group>"; };
+		0978D9BA5F8797000E0D0758 /* LHScreenScaffold.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHScreenScaffold.swift; sourceTree = "<group>"; };
 		09FEE56F85496C99FB9A3F46 /* CalibrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationTests.swift; sourceTree = "<group>"; };
 		0A003429C65E153356A99393 /* BlueprintList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlueprintList.swift; sourceTree = "<group>"; };
 		0A098406B491E959C7B4D8B8 /* ClassifierV2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassifierV2Tests.swift; sourceTree = "<group>"; };
@@ -1202,6 +1204,7 @@
 				CC2CED96F43035EF20D3ED8C /* LHPage.swift */,
 				2F1E3C866671C47777936C66 /* LHRing.swift */,
 				A8516330DDCA2B7CC2050B26 /* LHRow.swift */,
+				0978D9BA5F8797000E0D0758 /* LHScreenScaffold.swift */,
 				0829AAA2F9D0B2061DC09D89 /* LHScreenTitle.swift */,
 				25592AA9D045230F14E3390A /* LHSectionHeader.swift */,
 				4E78224ED686BF6782F6BDE8 /* LHSegmented.swift */,
@@ -1712,6 +1715,7 @@
 				C34D8830DD340E36A0EA74AB /* LHPage.swift in Sources */,
 				ED524E075498C222E7573B46 /* LHRing.swift in Sources */,
 				ACD02C124F516712249AAFEA /* LHRow.swift in Sources */,
+				EF21223A16C262FC6C2FFE87 /* LHScreenScaffold.swift in Sources */,
 				6C0042D8C950EC83B4E71239 /* LHScreenTitle.swift in Sources */,
 				F87FAB49553E4595D4C1D27A /* LHSectionHeader.swift in Sources */,
 				BD9C362BDD43E6E640C51BA9 /* LHSegmented.swift in Sources */,

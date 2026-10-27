@@ -35,6 +35,7 @@ Brian's locked decisions (2026-10-24): the house is the hero (a rendered diorama
 | 25 | Adaptive layout (2026-10-24) | bands A/B/C, iPad sidebar, `NavigationSplitView`, `Table`, `.inspector`; Duo open one column | **one model:** compact (one column) below 800×645pt, two-pane at 800×645 and up or with the Duo held open (house left, workstation right, the same on iPad and the Duo), stacked when the Duo is propped; no sidebar; the bar at the right pane's foot; AD1–AD17 list each change | §1.27 |
 | 26 | Duo unfold | no custom transition on fold | `duoUnfold`: the door swings and the right pane lights from the fold, ≤ 0.80 s, on a hinge event only; token `duoDoor`; new colour `duoNightCardEdge` #3C4675 | §1.27, §B.2, §B.3 |
 | 27 | "All rentals" number | the sum against the largest goal | "N hours across M rentals" and "N of M behind" in every mode, never a goal (**decided 2026-10-24**) | §H.1 H10 |
+| 28 | Screen anatomy (2026-10-27, proposed) | screens placed their own titles (`LHScreenTitle`, `ScreenHeader`, `LongTailHeader`, nav bar) | a third layer, **screen scaffolds** (`.lhTabScreen`, `.lhSheetScreen`, `LHDetailScreen`); one title baseline and one title-to-content gap on every tab, checked across tabs by `frame_check.py consistency` and `standard_lint.py` | §S |
 
 ### Review response (v2 r2, 2026-10-24)
 
@@ -648,6 +649,49 @@ Sources: `~/AgentScratch/landlordhours/2026-10-24/duo-concept-v6/` (README, fram
 | AD21 | Stacked: ≥ 3 To confirm rows | 1 row + "See all N" + On the record today, gap ≤ 20%, "All rentals" included (**relaxed 2026-10-25** to the v7 frame) | ≈ 380pt free in the half against ≈ 406pt for 3 rows + header + foot + On the record |
 
 ---
+
+## S. Screen anatomy: tokens → components → screen scaffolds (proposed amendment, 2026-10-27)
+
+**Why.** The 2.2 TestFlight build passed every per-screen gate and still felt "pushed together from different pieces" (Brian, 2026-10-27). The standard had tokens (§1.2) and components (§1), but nothing above them, so every package hand-built its own header: `LHScreenTitle` in a list row (Inbox), `ScreenHeader` (Records, Reports), `LongTailHeader` (Settings, Learning, Support, Delete data), a nav-bar button above an inline title (Rentals), a private copy of the sheet header (`LogSheetChrome`), and no title at all (Today). Measured on the same seed (iPhone 17 Pro, iOS 27.0, default text): title baselines at 103, 138, 149 and 182pt and title-to-content gaps from 21 to 60pt across four screens that should be identical. Gates checked each screen alone, so none of them saw it.
+
+**The rule.** The design system has three layers, and a screen is built only from the top one:
+
+1. **Tokens** (§1.2, brand doc §2): colour, type, spacing, radius.
+2. **Components** (§1): rows, cards, headers, buttons.
+3. **Screen scaffolds** (this section): the only way to build a screen's header, top inset, title-to-content gap and gutters. A screen supplies its content; it never places its own title.
+
+| Scaffold | Use | API |
+|---|---|---|
+| `LHTabScreen` | every tab root (Today, Inbox, Records, Rentals) and every collection root (Settings, Reports, All rentals, Learning, Muted) | `.lhTabScreen(title, subtitle:, back: LHBackAction?, onPage:, accessory: { }, trailing: { })` on the screen's `List` or `ScrollView` |
+| `LHSheetScreen` | task sheets (Log time, pickers) and every `LHSheet` | `.lhSheetScreen(title, subtitle:, onClose:, background:)`; `LHSheet` draws `LHSheetHeader` |
+| `LHDetailScreen` | a pushed screen about one item (a rental, a record) | **to build** after the pick: the same header in the §1.14 `.detail` style (SF `.title1.semibold`), back on the title row |
+| `LHHeaderAction` | the one trailing action (or the accessory's control) | `LHHeaderAction(symbol:label:identifier:action:)` or `(title:identifier:action:)` |
+
+Code: `Sources/Views/Components/LHScreenScaffold.swift`. Both header systems the owner is choosing between implement the same API (`LHHeaderSystem.native` / `.custom`), so the pick changes one file.
+
+**Measurable rules** (iPhone 402×874, default text, light and dark; `frame_check.py consistency` measures S1–S3 on one frame per tab):
+
+| # | Rule | Number | Kind |
+|---|---|---|---|
+| S1 | Every tab root and collection root has a title in the screen-title style (Fraunces 34/500); Today included ("Today", rental chip as the accessory) | present on every frame | measured + grep |
+| S2 | Title baseline identical on every tab root below AX | spread ≤ 1pt (Option 2 measured 0.0pt at default and XXL; 104.3pt on iPhone 17 Pro) | measured |
+| S3 | First content (card edge, field, or a section header's text) sits the same distance under the header's **last baseline** (title, or subtitle when there is one) | spread ≤ 2pt; target 25.7pt (Option 2: 24.7–25.7 at default, 25–27 at XXL). Hero screens (Today) are held to S1/S2 only: the art has no top edge | measured |
+| S4 | The header owns the top inset and the gaps: no literal `.padding(.top, N)` / `.contentMargins(.top, N)` in a tab root; no `.navigationTitle`, `.toolbar(.hidden, for: .navigationBar)`, `LHScreenTitle(`, `ScreenHeader(` or `LongTailHeader(` outside `LHScreenScaffold.swift` | 0 new | grep (`standard_lint.py`: `hand-header`, `tab-top-padding`, `tab-scaffold`) |
+| S5 | At most one trailing action, on the title row (Option 2) or in the bar (Option 1); it never makes the title row taller below AX (row 44pt) | ≤ 1; row 44 | grep + measured |
+| S6 | A list that opens on a section header uses `LHSectionHeader(…, leadsList: true)`, which takes back the system's 15.5pt first-header padding so its text starts where a card would | S3 holds | measured |
+| S7 | Sheets: the same title face and size as the tabs; close on the title row; first content on the S3 gap | one sheet header (`LHSheetHeader`) | grep + measured |
+
+**Section rhythm (unchanged, now owned by the scaffold):** gutter 20, section gap 24 (`listSectionSpacing`), header → content 8 (§1.15). Today's "To confirm" now sits a full section gap (24) under the pace line; it was 8, which is why it crowded the pace sentence.
+
+**Today, the number block (amends §H.8):** the numeral and its goal read as one phrase on the 20pt gutter ("88 of 100 hours", numeral Fraunces 84, goal `.title3.medium` `textSecondary`, last-baseline aligned), the pace sentence under it, left-aligned like every title and section header. H1 is taken from the height left under the header (`LHScreenAnatomy.heroHeaderAllowance` = 200pt), so the two rows and the "See all" foot stay above the bar (D3b).
+
+**Build plan once the owner picks** (screens that move onto a scaffold; today's `standard_lint` baseline lists each call site):
+
+| Done on `design/system-consistency` (both options) | Still to move |
+|---|---|
+| Today (`DashboardView`), Inbox (`InboxView`, list and empty state), Records (`HistoryView`, tab root and pushed), Rentals gallery (`PropertiesView`), Settings root (`SettingsView`), Log time (`LogSheetChrome`), every `LHSheet` header | Reports (`ReportsView`, `ScreenHeader`), Settings sub-screens ×2 (`SettingsView` 733/862 `LongTailHeader`), Learning centre + article (`LearningCenterView`), Contact support, Delete all data, Capture setup ×2 (`CaptureSetupFlow`), rental page (`RentalPage`, → `LHDetailScreen`), record detail (`TimeEntryDetailView`, → `LHDetailScreen`), iCloud records + Earlier records (`ICloudRecordsSection`, `EarlierRecordsView`, system `.navigationTitle`), the confirm sheet (`SuggestionConfirmSheet`, item header → detail-sheet variant), onboarding steps (§1.24, own scaffold), `BlueprintList` (retired) and the component gallery (DEBUG) |
+
+**Gate:** every hand-off that touches a screen runs `frame_check.py consistency` on one frame per tab (default and XXL) and `standard_lint.py`; a FAIL is a blocker. The gate compares tabs, not a screen alone.
 
 ## 2. Density rules
 

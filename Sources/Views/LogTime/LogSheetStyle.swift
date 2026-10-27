@@ -112,12 +112,10 @@ struct LogSheetChrome<Content: View, Footer: View>: View {
         ScrollView {
             content
                 .padding(.horizontal, LHMetrics.gutter)
-                .padding(.top, 8)
                 .padding(.bottom, 16)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollDismissesKeyboard(.interactively)
-        .safeAreaInset(edge: .top, spacing: 0) { header }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // No footer, no inset: an empty one painted an opaque 32pt block over the list.
             if Footer.self != EmptyView.self {
@@ -129,33 +127,8 @@ struct LogSheetChrome<Content: View, Footer: View>: View {
                     .overlay(alignment: .top) { fade(up: true) }
             }
         }
-    }
-
-    private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(colors.textPrimary)
-                    .accessibilityAddTraits(.isHeader)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(colors.textSecondary)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            Button(action: onClose) { Image(systemName: "xmark") }
-                .buttonStyle(LHButton.icon)
-                .accessibilityLabel(String(localized: "sheet.close", defaultValue: "Close", table: "Foundations"))
-                .accessibilityIdentifier("sheet.close")
-        }
-        .padding(.horizontal, LHMetrics.gutter)
-        .padding(.top, 12)
-        .padding(.bottom, 4)
-        .frame(minHeight: 56)
-        .background(colors.backgroundSecondary)
-        .overlay(alignment: .bottom) { fade(up: false) }
+        // Screen anatomy: the one sheet header (same title face and size as the tabs).
+        .lhSheetScreen(title, subtitle: subtitle, onClose: onClose, background: colors.backgroundSecondary)
     }
 
     /// A short fade where content scrolls under the pinned header or footer, so a line is never

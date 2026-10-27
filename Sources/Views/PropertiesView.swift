@@ -155,11 +155,9 @@ struct PropertiesView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    LHScreenTitle(RentalsText.title, subtitle: subtitle, style: .collection)
-                        .accessibilityIdentifier("properties.title")
                     if viewModel.properties.count > 8 && !isLoading {
                         searchField
-                            .padding(.top, 8)
+                            .padding(.bottom, 16)
                     }
                     Group {
                         if isLoading {
@@ -170,7 +168,6 @@ struct PropertiesView: View {
                             galleryGroup
                         }
                     }
-                    .padding(.top, 16)
                     Color.clear.frame(height: 0).id("properties.bottom")
                 }
                 .padding(.horizontal, LHMetrics.gutter(for: band))
@@ -189,15 +186,12 @@ struct PropertiesView: View {
             .onAppear { handleDebugLaunchSurfaceIfNeeded(proxy: proxy) }
 #endif
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
+        // Screen anatomy: the scaffold owns the title, subtitle, the one trailing action and the gaps.
+        .lhTabScreen(RentalsText.title, subtitle: subtitle, trailing: {
             if !viewModel.properties.isEmpty && !isLoading {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(RentalsText.addRental, action: openAddProperty)
-                        .accessibilityIdentifier("properties.add")
-                }
+                LHHeaderAction(title: RentalsText.addRental, identifier: "properties.add", action: openAddProperty)
             }
-        }
+        })
     }
 
     // MARK: Search

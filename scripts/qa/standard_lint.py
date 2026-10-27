@@ -219,6 +219,43 @@ def r_mono(path, line):
     return False
 
 
+# Screen anatomy (standard "Screen anatomy", S1-S6): the scaffolds are the only way to build a header.
+SCAFFOLD_FILES = {"LHScreenScaffold.swift"}  # where titles, bars and top insets are allowed to be built
+# legacy header builders, retired by the scaffolds; their own definitions are not call sites
+HEADER_DEFS = {"LHScreenTitle.swift", "RecordsHeader.swift", "SettingsStrings.swift", "LHSheet.swift"}
+TAB_ROOTS = {  # file -> the scaffold call it must contain
+    "Sources/Views/DashboardView.swift": ".lhTabScreen(",
+    "Sources/Views/Inbox/InboxView.swift": ".lhTabScreen(",
+    "Sources/Views/HistoryView.swift": ".lhTabScreen(",
+    "Sources/Views/PropertiesView.swift": ".lhTabScreen(",
+    "Sources/Views/SettingsView.swift": ".lhTabScreen(",
+    "Sources/Views/LogTime/LogSheetStyle.swift": ".lhSheetScreen(",
+}
+HAND_HEADER = re.compile(r"\b(?:LHScreenTitle|ScreenHeader|LongTailHeader)\(|\.navigationTitle\(|\.navigationBarTitleDisplayMode\(|"
+                         r"\.toolbar\(\s*\.hidden\s*,\s*for:\s*\.navigationBar\s*\)|\.navigationBarHidden\(")
+TOP_PAD_LITERAL = re.compile(r"\.(?:padding|contentMargins)\(\s*\.top\s*,\s*-?\d")
+
+
+def r_hand_header(path, line):
+    if not is_view(path) or base(path) in SCAFFOLD_FILES or line.lstrip().startswith("//"):
+        return False
+    if base(path) in HEADER_DEFS and re.search(r"struct\s+(?:LHScreenTitle|ScreenHeader|LongTailHeader)\b", line):
+        return False
+    return bool(HAND_HEADER.search(line))
+
+
+def r_tab_top_padding(path, line):
+    return path in TAB_ROOTS and not line.lstrip().startswith("//") and bool(TOP_PAD_LITERAL.search(line))
+
+
+def tab_scaffold(rel, lines):
+    """A tab root (or the Log time sheet) that never calls its scaffold: line 1 of the file."""
+    need = TAB_ROOTS.get(rel)
+    if need and not any(need in l for l in lines):
+        return [1]
+    return []
+
+
 RULES = [
     ("system-size", "no .system(size:) outside token files (1.2)", r_system_size),
     ("color-hex", "no Color(hex:) outside token files (1.2)", r_color_hex),
@@ -244,6 +281,13 @@ RULES = [
     ("tab-shell", "root TabView: exactly five Tab( one role: .search, no .glass plus button, no .tint(Color(hex:) (H.7, file rule)", lambda p, l: False),
     ("chevron", "disclosure chevron is LHChevron, not Image(systemName: \"chevron.right\") (1.4)", r_chevron),
     ("hand-card", "no hand-built card around rows: .propertyCard / lhSurfaceCard (1.3a)", r_hand_card),
+    ("hand-header", "no hand-made header: LHScreenTitle( / ScreenHeader( / LongTailHeader( / .navigationTitle( / "
+                    ".navigationBarTitleDisplayMode( / .toolbar(.hidden, for: .navigationBar) / .navigationBarHidden( "
+                    "outside LHScreenScaffold.swift; use .lhTabScreen / .lhSheetScreen (Screen anatomy S1)", r_hand_header),
+    ("tab-top-padding", "no literal .padding(.top, N) / .contentMargins(.top, N) in a tab root: the scaffold owns the "
+                        "top inset and the gaps; use LHMetrics tokens (Screen anatomy S4)", r_tab_top_padding),
+    ("tab-scaffold", "every tab root calls .lhTabScreen( and the Log time chrome calls .lhSheetScreen( (file rule, Screen anatomy S1)",
+     lambda p, l: False),
 ]
 
 
@@ -282,9 +326,11 @@ def scan(root=None):
                 continue
             for i in tab_shell(rel, lines):
                 out.append(dict(rule="tab-shell", file=rel, line=i, text=re.sub(r"\s+", " ", lines[i - 1].strip())[:160]))
+            for i in tab_scaffold(rel, lines):
+                out.append(dict(rule="tab-scaffold", file=rel, line=i, text="missing " + TAB_ROOTS[rel]))
             for i, line in enumerate(lines, 1):
                 for rule, _, fn_ in RULES:
-                    if rule == "tab-shell":
+                    if rule in ("tab-shell", "tab-scaffold"):
                         continue
                     if rule == "dynamic-type-clamp" and (CLAMP_MARKER in line or (i > 1 and CLAMP_MARKER in lines[i - 2])):
                         continue

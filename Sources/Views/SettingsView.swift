@@ -56,18 +56,6 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    LongTailHeader(
-                        title: HS.t("settings.title", "Settings"),
-                        back: (label: HS.t("settings.back", "Back to Today"), identifier: "shell.backToToday", action: {
-                            NotificationCenter.default.post(name: .switchToTab, object: ShellTab.todayIndex)
-                        })
-                    )
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                }
-
                 profileSection
                 planSection
                 AutoCaptureSettingsSection(onOpenMuted: { route = .muted })
@@ -106,7 +94,11 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .contentMargins(.bottom, 104, for: .scrollContent)
             .background { LHCanvas() }
-            .toolbar(.hidden, for: .navigationBar)
+            // Screen anatomy: the scaffold owns the title, the back icon and the gaps.
+            .lhTabScreen(HS.t("settings.title", "Settings"), back: LHBackAction(
+                label: HS.t("settings.back", "Back to Today"), identifier: "shell.backToToday") {
+                    NotificationCenter.default.post(name: .switchToTab, object: ShellTab.todayIndex)
+                })
             .navigationDestination(item: $route) { route in
                 switch route {
                 case .taxProfile: TaxProfileView()

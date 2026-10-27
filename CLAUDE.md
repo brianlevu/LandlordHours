@@ -17,7 +17,7 @@ Every rule in the standard is tagged **[measured]**, **[grep]** or **[judgment]*
 
 **Type.** SF Pro / SF Pro Rounded (numbers, tabular) / SF Mono (drafting labels, 11pt caps) / Fraunces (tab titles and display, ≥ 28pt only). DM Serif Display and DM Sans are retired. Use text styles, not `.system(size:)`.
 
-**Layout.** Gutter 20, section gap 24, header to content 8, card padding 16. Rows live in one grouped container with hairline dividers; a card per list item is a defect.
+**Layout.** Gutter 20, section gap 24, header to content 8, card padding 16. Headers come only from the screen scaffolds (`.lhTabScreen`, `.lhSheetScreen`; standard §S): a screen never places its own title or top inset. Rows live in one grouped container with hairline dividers; a card per list item is a defect.
 
 **Corner radius.** Cards 20 (continuous), inner surfaces 12, stat tiles 16, tags 6, buttons and chips capsule. Nothing else.
 
@@ -35,6 +35,7 @@ Every rule in the standard is tagged **[measured]**, **[grep]** or **[judgment]*
 python3 scripts/qa/frame_check.py density <frames...>   # D1, D2, D4, D6 (+ D3 with --items-present N) on 3x frames
 python3 scripts/qa/standard_lint.py                      # [grep] rules vs scripts/qa/standard_lint_baseline.json; fails on NEW violations
 python3 scripts/qa/standard_lint.py --baseline           # ratchet the baseline down after fixing violations
+python3 scripts/qa/frame_check.py consistency <inbox> <records> <rentals> <settings> --hero <today> --sheet <logtime>  # Screen anatomy S1-S3 across tabs: one title baseline (<=1pt), one header-to-content gap (<=2pt)
 ```
 
 `scripts/qa/gate_rubric.md` is the addendum the `visual-gate` agent applies, including the written anchor-app judgment.

@@ -1313,6 +1313,148 @@ def cmd_breaks(args) -> int:
     return 1 if bad else 0
 
 
+# ---- consistency: one header system across tabs (standard "Screen anatomy", S1-S4) ----
+SAFE_TOP_PT = {874: 62, 956: 62, 852: 59, 932: 59, 844: 47, 926: 47}  # status bar / Dynamic Island inset per height
+TITLE_MIN_PT, TITLE_MAX_PT = 20.0, 48.0   # a large-title glyph band (Fraunces 34 measures ~25-33pt with descenders)
+SHEET_TITLE_MIN_PT = 14.0                  # SF title2 / title1 in sheets (~16-24pt)
+SUBTITLE_GAP_PT = 16.0                     # a short text band starting this close under the title (line-box descent + 2pt) is the subtitle
+INK_MAX_MEAN = 110                         # "dark ink": mean RGB below this (textPrimary #121B33, textSecondary #4A5068)
+FILL_DIFF = 12                             # a pixel differs from the row's edge background by more than this (sum |dRGB|)
+CONSIST_BASELINE_TOL_PT = 1.0
+TRAILING_SLOT_PT = 72.0                   # the right edge kept for one trailing .icon (44pt + gutter)
+TITLE_ZONE_PT = 130.0                     # a screen title starts within this far under the safe area; lower is content (Today's numeral)
+CONSIST_GAP_TOL_PT = 2.0
+
+
+def header_metrics(path, scale=None, kind="tab", search_to=0.55):
+    """Measure the screen header of one frame, in points from the top of the window.
+
+    Returns {frame, scale, safe_top_pt, title_top_pt, title_baseline_pt, title_height_pt, header_end_pt,
+    last_baseline_pt, content_top_pt, gap_pt (content_top - the header's last baseline), bands}. The gap is
+    measured from a baseline, not a glyph bottom, so a descender ("Settings") does not move it. title_* are None when no title band is found
+    (a tab with no screen title, the 2.2 Today, is reported as such and fails the cross-tab check).
+
+    Heuristics (confirm by eye):
+      ink rows     rows with >= 2 dark pixels (mean RGB < 110) between the gutters
+      title band   the heaviest ink band below the safe area whose height is a large title (20-48pt for tabs,
+                   14-48pt for sheets) and which starts within 130pt of the safe area; a band above it (back
+                   button, nav-bar button, rental chip) is skipped, and a big numeral lower down is not a title
+      baseline     the sharpest fall in the band's per-row ink count in its lower 60% (descenders are thin)
+      header end   the bottom of the title band, extended over subtitle bands that start <= 16pt under it
+      content top  the first row after the header end where >= 1% of the row (left of the 72pt trailing slot)
+                   differs from the row's own edge pixel (x = 3pt): a card fill, a field, a chip, or text
+    """
+    im = Image.open(path).convert("RGB")
+    a = np.asarray(im).astype(np.int16)
+    h, w = a.shape[:2]
+    sc = scale or infer_scale(w, h)[0]
+    hpt = round(h / sc)
+    safe = SAFE_TOP_PT.get(hpt, 62 if hpt > 860 else 47)
+    x0, x1 = int(8 * sc), w - int(8 * sc)
+    y0, y1 = int((safe + 2) * sc), int(h * search_to)
+    reg = a[y0:y1, x0:x1]
+    dark = reg.mean(axis=2) < INK_MAX_MEAN
+    counts = dark.sum(axis=1)
+    bands = [(y0 + s, y0 + e) for s, e in runs(counts >= 2, min_len=int(4 * sc), close_gap=int(1.5 * sc))]
+    lo = (SHEET_TITLE_MIN_PT if kind == "sheet" else TITLE_MIN_PT) * sc
+    # The title is the heaviest ink band in the title zone: a nav-bar chip, a back chevron or a share
+    # glyph above or beside it carries far less ink than a 34pt title.
+    cands = [(s, e) for s, e in bands if lo <= e - s <= TITLE_MAX_PT * sc and s <= (safe + TITLE_ZONE_PT) * sc]
+    title = max(cands, key=lambda b: int(counts[b[0] - y0:b[1] - y0].sum())) if cands else None
+    out = {"frame": path, "scale": sc, "safe_top_pt": safe, "kind": kind,
+           "bands_pt": [[round(s / sc, 1), round(e / sc, 1)] for s, e in bands[:12]],
+           "title_top_pt": None, "title_baseline_pt": None, "title_height_pt": None,
+           "header_end_pt": None, "last_baseline_pt": None, "content_top_pt": None, "gap_pt": None}
+    if title is None:
+        return out
+    s, e = title
+    col = np.append(dark[s - y0:e - y0].sum(axis=1).astype(np.int32), 0)  # the band's own end is a drop too
+    start = int((len(col) - 1) * 0.4)
+    drops = col[start:-1] - col[start + 1:]
+    # first row of the steepest fall (a flat-bottomed glyph run ends on the baseline; descenders are thin)
+    base = s + start + int(np.argmax(drops)) if drops.size else e - 1
+    def baseline_of(bs, be):
+        c = np.append(dark[bs - y0:be - y0].sum(axis=1).astype(np.int32), 0)
+        st = int((len(c) - 1) * 0.4)
+        d = c[st:-1] - c[st + 1:]
+        return bs + st + int(np.argmax(d)) + 1 if d.size else be
+
+    header_end = e
+    last_base = base + 1
+    for bs, be in bands:
+        if bs >= header_end and bs - header_end <= SUBTITLE_GAP_PT * sc and be - bs < TITLE_MIN_PT * sc:
+            header_end = be
+            last_base = baseline_of(bs, be)
+    # content: first occupied row after the header end
+    edge = a[:, int(3 * sc)]
+    xr = w - int(TRAILING_SLOT_PT * sc)  # the trailing action's circle hangs below the title band; it is header
+    diff = np.abs(a[header_end:y1 + int(200 * sc), x0:xr] - edge[header_end:y1 + int(200 * sc), None, :]).sum(axis=2)
+    occ = (diff > FILL_DIFF).mean(axis=1) >= 0.01
+    rr = runs(occ, min_len=int(2 * sc))
+    # Header furniture that hangs below the title (a back circle in the leading 72pt) is not content.
+    while rr:
+        cols = np.flatnonzero((diff[rr[0][0]:rr[0][1]] > FILL_DIFF).any(axis=0))
+        if cols.size and (cols.max() + x0) <= TRAILING_SLOT_PT * sc:
+            rr = rr[1:]
+            continue
+        break
+    # A fill that starts right under the last header text is that text's own capsule (the rental
+    # chip, a pill): it belongs to the header, and the content is the next run.
+    if len(rr) > 1 and rr[0][0] <= int(2 * sc):
+        last_base = header_end + rr[0][1]   # a capsule: measure from its bottom edge
+        header_end += rr[0][1]
+        rr = [(a_ - rr[0][1], b_ - rr[0][1]) for a_, b_ in rr[1:]]
+    content = header_end + rr[0][0] if rr else None
+    out.update(title_top_pt=round(s / sc, 1), title_baseline_pt=round((base + 1) / sc, 1),
+               title_height_pt=round((e - s) / sc, 1), header_end_pt=round(header_end / sc, 1),
+               last_baseline_pt=round(last_base / sc, 1),
+               content_top_pt=round(content / sc, 1) if content is not None else None,
+               gap_pt=round((content - last_base) / sc, 1) if content is not None else None)
+    return out
+
+
+def consistency_verdict(metrics, baseline_tol=CONSIST_BASELINE_TOL_PT, gap_tol=CONSIST_GAP_TOL_PT, no_gap=()):
+    """Cross-frame verdict: every frame has a title; title baselines within baseline_tol; content gaps within
+    gap_tol. Frames named in `no_gap` (hero frames: the art has no edge, its top moves with the build stage)
+    are held to S1 and S2 only. Returns (checks, pass_)."""
+    checks = []
+    missing = [os.path.basename(m["frame"]) for m in metrics if m["title_baseline_pt"] is None]
+    checks.append({"rule": "S1 every screen has a title", "pass_": not missing, "detail": missing})
+    bl = [m["title_baseline_pt"] for m in metrics if m["title_baseline_pt"] is not None]
+    spread = (max(bl) - min(bl)) if bl else 0.0
+    checks.append({"rule": f"S2 title baselines within {baseline_tol}pt", "pass_": bool(spread <= baseline_tol + 1e-6),
+                   "detail": {os.path.basename(m["frame"]): m["title_baseline_pt"] for m in metrics}, "spread_pt": round(spread, 1)})
+    gaps = [m["gap_pt"] for m in metrics if m["gap_pt"] is not None and os.path.basename(m["frame"]) not in no_gap]
+    gspread = (max(gaps) - min(gaps)) if gaps else 0.0
+    checks.append({"rule": f"S3 header-to-content gaps within {gap_tol}pt", "pass_": bool(gspread <= gap_tol + 1e-6),
+                   "detail": {os.path.basename(m["frame"]): m["gap_pt"] for m in metrics
+                              if os.path.basename(m["frame"]) not in no_gap}, "spread_pt": round(gspread, 1)})
+    return checks, all(c["pass_"] for c in checks)
+
+
+def cmd_consistency(args) -> int:
+    tabs = [header_metrics(f, args.scale, "tab") for f in list(args.frames) + list(args.hero or [])]
+    sheets = [header_metrics(f, args.scale, "sheet") for f in (args.sheet or [])]
+    hero = {os.path.basename(f) for f in (args.hero or [])}
+    checks, ok = consistency_verdict(tabs, args.baseline_tol, args.gap_tol, hero)
+    result = {"tabs": tabs, "checks": checks}
+    if len(sheets) >= 2:
+        s_checks, s_ok = consistency_verdict(sheets, args.baseline_tol, args.gap_tol)
+        result["sheets"], result["sheet_checks"] = sheets, s_checks
+        ok = ok and s_ok
+    if args.json:
+        with open(args.json, "w") as fh:
+            json.dump(result, fh, indent=2, default=_j)
+    for m in tabs + sheets:
+        print(f"  {m['kind']:5} {os.path.basename(m['frame']):32} title top {m['title_top_pt']} baseline {m['title_baseline_pt']} "
+              f"h {m['title_height_pt']} header end {m['header_end_pt']} content {m['content_top_pt']} gap {m['gap_pt']}")
+    for c in checks + result.get("sheet_checks", []):
+        print(f"{'PASS' if c['pass_'] else 'FAIL':5} {c['rule']}" + (f" (spread {c['spread_pt']}pt)" if "spread_pt" in c else
+                                                                    (f" missing: {c['detail']}" if c["detail"] else "")))
+    print(f"consistency: {'PASS' if ok else 'FAIL'}")
+    return 0 if ok else 1
+
+
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "breaks":
         p = argparse.ArgumentParser(prog="frame_check.py breaks", description="mid-word line breaks via Vision OCR")
@@ -1355,6 +1497,20 @@ def main():
         p.add_argument("--strict", action="store_true", help="REVIEW verdicts (saturation) count as failures")
         p.add_argument("--json")
         return cmd_hero(p.parse_args())
+    if len(sys.argv) > 1 and sys.argv[1] == "consistency":
+        if np is None:
+            sys.exit("consistency mode needs numpy")
+        p = argparse.ArgumentParser(prog="frame_check.py consistency",
+                                    description="one header system across tabs: title baselines and header-to-content gaps")
+        p.add_argument("mode")
+        p.add_argument("frames", nargs="+", help="one frame per tab root, same device, same Dynamic Type")
+        p.add_argument("--sheet", action="append", help="a sheet frame (repeatable); sheets are compared with each other")
+        p.add_argument("--hero", action="append", help="a hero tab frame (Today): held to S1/S2 only, since the art has no top edge")
+        p.add_argument("--scale", type=float)
+        p.add_argument("--baseline-tol", type=float, default=CONSIST_BASELINE_TOL_PT)
+        p.add_argument("--gap-tol", type=float, default=CONSIST_GAP_TOL_PT)
+        p.add_argument("--json")
+        return cmd_consistency(p.parse_args())
     return legacy_main()
 
 

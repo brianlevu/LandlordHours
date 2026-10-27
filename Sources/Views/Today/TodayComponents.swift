@@ -59,25 +59,30 @@ struct TodayNumberBlock: View {
     private var whole: Int { Int(max(0, hours).rounded(.down)) }
 
     var body: some View {
-        VStack(spacing: 2) {
-            Text(isPending ? "—" : "\(whole)")
-                .font(LHFont.heroNumeral(size: numeralSize))
-                .tracking(-2)
-                .foregroundStyle(colors.textPrimary)
-                .contentTransition(.numericText(value: Double(whole)))
-                .animation(reduceMotion ? nil : AppAnimation.count, value: whole)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .accessibilityIdentifier("today.number")
-            Text(isRecord ? TodayText.hoursIn(year) : TodayText.ofHours(Int(goal.rounded())))
-                .font(.body)
-                .foregroundStyle(colors.textSecondary)
+        // Screen anatomy (consistency pass): the number reads as one phrase with its goal beside it,
+        // on the 20pt gutter like every title and section header, instead of a lone centred numeral.
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .lastTextBaseline, spacing: 10) {
+                Text(isPending ? "—" : "\(whole)")
+                    .font(LHFont.heroNumeral(size: numeralSize))
+                    .tracking(-2)
+                    .foregroundStyle(colors.textPrimary)
+                    .contentTransition(.numericText(value: Double(whole)))
+                    .animation(reduceMotion ? nil : AppAnimation.count, value: whole)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .accessibilityIdentifier("today.number")
+                Text(isRecord ? TodayText.hoursIn(year) : TodayText.ofHours(Int(goal.rounded())))
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(colors.textSecondary)
+                    .lineLimit(2)
+                    .lhWrapsText()
+            }
             paceLine
-                .padding(.top, 8)
         }
-        .multilineTextAlignment(.center)
-        .padding(.horizontal, 24)
-        .frame(maxWidth: .infinity)
+        .multilineTextAlignment(.leading)
+        .padding(.horizontal, LHMetrics.gutter)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
         .accessibilityIdentifier("today.numberBlock")
