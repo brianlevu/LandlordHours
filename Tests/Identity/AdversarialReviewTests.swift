@@ -165,6 +165,21 @@ final class AdversarialReviewTests: XCTestCase {
     }
 
 
+    // M4 · a spouse group's id is never this phone's unified id
+    func testASpouseGroupIsNeverTheUnifiedId() async throws {
+        XCTAssertTrue(Fixture.load("D8", into: sandbox))
+        // The spouse's 2.0.x phone pushed more hours than this phone holds.
+        let zone = FakeZoneSource(records: IdentityFixtures.sampleGroup(owner: local, entries: 60, seed: 0xA1))
+        zone.account = .noAccount
+        let h = EngineHarness(sandbox, zone: zone)
+        try h.device()
+        _ = await h.cloud()                                  // iCloud off: no cloud phase yet
+        h.engine.answer(.spouse, group: local)               // answered on the device
+        zone.account = .available
+        let done = await h.cloud()
+        XCTAssertEqual(done, .done)
+        XCTAssertNotEqual(h.engine.unifiedId, local, "this phone's hours would be tagged as the spouse's and swapped on every other phone")
+    }
 
 
 

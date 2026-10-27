@@ -886,7 +886,9 @@ final class RecordSetMigration {
             if groups?.group(owner)?.status.isLive ?? true { zoneCounts[owner, default: 0] += 1 }
         }
         zoneCounts[LegacyInventory.unscopedGroupId] = nil
-        var excluded = Set((groups?.groups ?? []).filter { $0.status == .aside || $0.status == .pending || $0.splitFromDevice }.map(\.id))
+        // A spouse set is excluded too: tagged with its id, this phone's hours would be swapped to
+        // the spouse's on every other phone (R12).
+        var excluded = Set((groups?.groups ?? []).filter { $0.status == .aside || $0.status == .pending || $0.status == .spouse || $0.splitFromDevice }.map(\.id))
         if groups?.groups.contains(where: { $0.splitFromDevice && $0.id == storageId }) == true { excluded.insert(storageId) }
         var chosen = MergeRules.unifiedId(householdOwner: householdOwner, zoneEntryCounts: zoneCounts,
                                           devicePrimary: groups?.primaryId ?? storageId, excluded: excluded)
