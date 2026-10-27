@@ -172,13 +172,19 @@ final class FakeZoneSource: IdentityZoneSource {
             for type in Set(batch.map(\.recordType)) { report.failedTypes[type] = 25 }
             return report
         }
-        for name in names { records[name] = nil; report.deletedNames.insert(name) }
+        for name in names {
+            // Like CloudKit: a delete by any device appears in every other device's next delta.
+            if records[name] != nil { sequence += 1; changeLog.append(LoggedChange(sequence: sequence, record: nil, deletedName: name, deletedType: records[name]?.recordType)) }
+            records[name] = nil; report.deletedNames.insert(name)
+        }
         deletes += names
         for record in batch {
             if failTypes.contains(record.recordType) { report.failedTypes[record.recordType] = 12; continue }
             var stored = record
             stored.modificationDate = Date()
             records[record.recordName] = stored
+            sequence += 1
+            changeLog.append(LoggedChange(sequence: sequence, record: stored, deletedName: nil, deletedType: nil))
             report.savedNames.insert(record.recordName)
         }
         pushes.append(batch)
