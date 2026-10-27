@@ -254,7 +254,7 @@ final class CloudKitSyncService: ObservableObject {
         }
         guard isPushAllowed else {
             if !accountAvailable {
-                syncError = String(localized: "iCloud is off. Turn on iCloud for LandlordHours in Settings to sync.", table: "Identity")
+                syncError = String(localized: "iCloud is off. Turn on iCloud for Dormer in Settings to sync.", table: "Identity")
             } else if syncError == nil {
                 syncError = Self.heldChangesMessage
             }

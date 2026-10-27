@@ -143,7 +143,7 @@ The page under a hero is a vertical gradient, never flat, never a drawn grid.
 
 | Token | Light (dusk) | Dark (night) | Where |
 |---|---|---|---|
-| `pageTop` | `#EAE3D7` at 0 | `#0B1230` at 0 | `BrandHex.duskTop` / `darkNightTop` |
+| `pageTop` | `#EAE3D7` at 0 | `#0B1230` at 0 | `BrandHex.duskTop` / `darkNightTop`; mirrored in the asset catalog as `LaunchBackground` for the launch screen (a test pins the two equal) |
 | `pageMid` | `#D8CFC0` at 0.32 (behind the hero) | `#0B1230` at 0.32 | `duskMid` |
 | `pageBottom` | `#E8E0D3` at 1.0 | `#080C1D` at 1.0 | `duskBottom` / `darkNightBottom` |
 | `spillPool` | `#E9A558` at 0.34 | `#E9A558` at 0.12 | radial ellipse 0.96 × 0.33 of the frame, centred at y = 0.345 × side; opacity × 0.2 when unlit; fades with the windows (0.4 s) |

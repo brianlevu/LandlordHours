@@ -123,7 +123,7 @@
     "Moved to Recently removed. You can put them back.": {},
     "No more sign-in. Everything you tracked is in one place now.": {},
     "No rental": {},
-    "Not enough space to update your records. Free up about %@ and reopen LandlordHours. Nothing has changed yet.": {},
+    "Not enough space to update your records. Free up about %@ and reopen Dormer. Nothing has changed yet.": {},
     "Not in iCloud anymore. Kept until you choose.": {},
     "Not mine, keep them aside": {},
     "Not now": {},
@@ -171,7 +171,7 @@
     "This iPhone uses a different iCloud now. Sync is paused until you choose.": {},
     "Try again": {},
     "Turn on": {},
-    "Turn on iCloud for LandlordHours": {},
+    "Turn on iCloud for Dormer": {},
     "Use this iCloud’s records instead": {},
     "Waiting for your answer": {},
     "Waiting for your answer about the other records before syncing.": {},
@@ -200,7 +200,7 @@
         }
       }
     },
-    "Your hours are only on this iPhone. Turn on iCloud for LandlordHours to keep a copy.": {},
+    "Your hours are only on this iPhone. Turn on iCloud for Dormer to keep a copy.": {},
     "Your name": {},
     "Your records live on this iPhone and in your own iCloud. We never see them. Photos stay on this iPhone.": {},
     "Your records now": {},
@@ -216,7 +216,7 @@
     "iCloud is full.": {},
     "iCloud is full. Your records are safe on this iPhone; free up iCloud space to keep syncing.": {},
     "iCloud is off, so copies saved there can’t be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?": {},
-    "iCloud is off. Turn on iCloud for LandlordHours in Settings to sync.": {},
+    "iCloud is off. Turn on iCloud for Dormer in Settings to sync.": {},
     "iCloud sync is unavailable in this build.": {},
     "never": {}
   },

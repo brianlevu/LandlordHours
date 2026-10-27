@@ -183,7 +183,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "If you’re married, one of you has to pass both tests alone. You can’t add your hours together for this. LandlordHours counts your own hours toward 750 for that reason."
+            "value": "If you’re married, one of you has to pass both tests alone. You can’t add your hours together for this. Dormer counts your own hours toward 750 for that reason."
           }
         }
       }
@@ -513,7 +513,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "When you log time, choose who did the work. LandlordHours counts your own hours toward 750 and adds your spouse’s hours only where the rules allow it."
+            "value": "When you log time, choose who did the work. Dormer counts your own hours toward 750 and adds your spouse’s hours only where the rules allow it."
           }
         }
       }
@@ -601,7 +601,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "LandlordHours keeps a clean record of your hours. Your tax pro decides how the rules apply to you."
+            "value": "Dormer keeps a clean record of your hours. Your tax pro decides how the rules apply to you."
           }
         }
       }

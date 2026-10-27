@@ -83,7 +83,7 @@ final class FreeUserPaywallUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Pay once")).firstMatch.exists,
                       "The card says it's paid once, with the App Store price")
         tap(origin)
-        assertPaywall("settingsUpgrade", headline: "LandlordHours Pro")
+        assertPaywall("settingsUpgrade", headline: "Dormer Pro")
         closeThenPurchase(entryPoint: "Settings > See Pro", origin: origin, continuation: nil)
     }
 

@@ -255,7 +255,7 @@ struct HouseShareCard: View {
                     .font(.headline)
                     .foregroundStyle(colors.textSecondary)
                 Spacer()
-                Text(verbatim: "LandlordHours")
+                Text(verbatim: "Dormer")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(colors.textSecondary)
             }

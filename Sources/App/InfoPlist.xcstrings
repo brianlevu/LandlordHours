@@ -12,6 +12,42 @@
           }
         }
       }
+    },
+    "NSCalendarsFullAccessUsageDescription": {
+      "comment": "Permission prompt shown by iOS. Uses the brand name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dormer reads event titles on your iPhone to suggest rental work, like a plumber visit. Nothing is saved until you confirm it."
+          }
+        }
+      }
+    },
+    "NSMicrophoneUsageDescription": {
+      "comment": "Permission prompt shown by iOS. Uses the brand name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dormer listens only while you’re dictating a note, so you can say what you did instead of typing it. You check the note before anything is saved."
+          }
+        }
+      }
+    },
+    "NSSpeechRecognitionUsageDescription": {
+      "comment": "Permission prompt shown by iOS. Uses the brand name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dormer turns what you say into a written note. You check it and confirm before anything is saved."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

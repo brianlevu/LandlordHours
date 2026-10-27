@@ -22,7 +22,7 @@ enum LandlordHoursIntentDestination: String, AppEnum {
     case reports
     case settings
 
-    static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Place in LandlordHours")
+    static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Place in Dormer")
 
     static var caseDisplayRepresentations: [LandlordHoursIntentDestination: DisplayRepresentation] = [
         .home: "Today",
@@ -60,8 +60,8 @@ enum LandlordHoursIntentDestination: String, AppEnum {
 }
 
 struct OpenLandlordHoursIntent: AppIntent {
-    static var title: LocalizedStringResource = "Open LandlordHours"
-    static var description = IntentDescription("Open LandlordHours to Today, Inbox, Records, Properties or Log time.")
+    static var title: LocalizedStringResource = "Open Dormer"
+    static var description = IntentDescription("Open Dormer to Today, Inbox, Records, Properties or Log time.")
     static var openAppWhenRun = true
 
     @Parameter(title: "Place", default: .track)
@@ -120,7 +120,7 @@ struct ReviewLandlordHoursNextActionIntent: AppIntent {
     static var openAppWhenRun = true
 
     static var parameterSummary: some ParameterSummary {
-        Summary("See what’s waiting in LandlordHours")
+        Summary("See what’s waiting in Dormer")
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
@@ -225,7 +225,7 @@ enum LandlordHoursIntentCopy {
         pendingCount: Int = 0
     ) -> String {
         guard !context.properties.isEmpty else {
-            return "You haven’t added a property yet. Add one in LandlordHours and we’ll start finding your rental work."
+            return "You haven’t added a property yet. Add one in Dormer and we’ll start finding your rental work."
         }
 
         let hours = Int(max(0, snapshot.yearHours).rounded(.down))

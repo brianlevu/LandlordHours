@@ -86,7 +86,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         LHFootnote(HS.cpaFootnote)
                             .accessibilityIdentifier("settings.notTaxAdvice")
-                        Text(HS.f("settings.version", "LandlordHours · %@", AppVersionInfo.display()))
+                        Text(HS.f("settings.version", "Dormer · %@", AppVersionInfo.display()))
                             .font(.footnote)
                             .monospacedDigit()
                             .foregroundStyle(colors.textSecondary)
@@ -282,7 +282,7 @@ struct SettingsView: View {
         return layout {
             VStack(alignment: .leading, spacing: 2) {
                 // The product name never breaks or hyphenates: one line, scaled down if needed.
-                Text(HS.t("settings.proCard.name", "LandlordHours\u{00A0}Pro"))
+                Text(HS.t("settings.proCard.name", "Dormer\u{00A0}Pro"))
                     .font(.headline)
                     .foregroundStyle(colors.textPrimary)
                     .lineLimit(1)
@@ -700,7 +700,7 @@ private struct AutoCaptureSettingsSection: View {
                 calendarOn = false
                 blockedMessage = access == .limited
                     ? HS.t("settings.capture.blocked.limited", "We can add to your calendar but can’t read it yet. Allow Full Access in Settings to get suggestions.")
-                    : HS.t("settings.capture.blocked.off", "Calendar access is off for LandlordHours. Turn it on in iOS Settings.")
+                    : HS.t("settings.capture.blocked.off", "Calendar access is off for Dormer. Turn it on in iOS Settings.")
             }
         }
     }
@@ -722,7 +722,7 @@ private struct AutoCaptureSettingsSection: View {
                 promptsOn = viewModel.eventPromptsEnabled
             } else {
                 promptsOn = false
-                blockedMessage = HS.t("settings.capture.blocked.notify", "Notifications are off for LandlordHours. Turn them on in iOS Settings.")
+                blockedMessage = HS.t("settings.capture.blocked.notify", "Notifications are off for Dormer. Turn them on in iOS Settings.")
             }
         }
     }

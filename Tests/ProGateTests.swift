@@ -89,7 +89,7 @@ final class PaywallCopyTests: XCTestCase {
         XCTAssertEqual(today.planLine, "Turn 212 confirmed hours into a clean record.")
         XCTAssertEqual(today.nextStep, "See your record")
 
-        XCTAssertEqual(PaywallCopy.make(.settings, year: 2026).headline, "LandlordHours Pro")
+        XCTAssertEqual(PaywallCopy.make(.settings, year: 2026).headline, "Dormer Pro")
         XCTAssertEqual(PaywallCopy.make(.settings, year: 2026).nextStep, "Done")
     }
 

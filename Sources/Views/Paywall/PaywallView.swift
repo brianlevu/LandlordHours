@@ -399,7 +399,7 @@ struct PaywallView: View {
     }
 
     private var planName: some View {
-        Text(String(localized: "LandlordHours Pro", table: "ConversionPath"))
+        Text(String(localized: "Dormer Pro", table: "ConversionPath"))
             .font(.headline)
             .foregroundStyle(colors.textPrimary)
     }
@@ -662,7 +662,7 @@ extension PaywallCopy {
                 nextStep: String(localized: "See your record", table: "ConversionPath"))
         case .settings:
             return PaywallCopy(
-                headline: String(localized: "LandlordHours Pro", table: "ConversionPath"),
+                headline: String(localized: "Dormer Pro", table: "ConversionPath"),
                 planLine: String(localized: "Every rental, the PDF and spreadsheet, and the record of where each hour came from.", table: "ConversionPath"),
                 nextStep: String(localized: "Done", table: "ConversionPath"))
         }

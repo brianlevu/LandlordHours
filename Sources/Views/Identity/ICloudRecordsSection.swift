@@ -33,7 +33,7 @@ struct ICloudRecordsSection: View {
                 .listRowInsets(EdgeInsets())
                 .accessibilityIdentifier("settings.icloud.status")
             if identity.status == .off || identity.status == .restricted {
-                LHRow.Browse(title: String(localized: "Turn on iCloud for LandlordHours", table: "Identity"),
+                LHRow.Browse(title: String(localized: "Turn on iCloud for Dormer", table: "Identity"),
                              meta: String(localized: "Opens iPhone Settings", table: "Identity"), systemImage: "gearshape", tint: .neutral) {
                     if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                 }

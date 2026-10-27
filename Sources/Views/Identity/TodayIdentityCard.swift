@@ -85,14 +85,14 @@ struct TodayIdentityCard: View {
     private var text: String {
         switch notice {
         case .iCloudOff:
-            return String(localized: "Your hours are only on this iPhone. Turn on iCloud for LandlordHours to keep a copy.", table: "Identity")
+            return String(localized: "Your hours are only on this iPhone. Turn on iCloud for Dormer to keep a copy.", table: "Identity")
         case .cloudWaiting:
             return String(localized: "Some earlier records may be in iCloud. They’ll be added when iCloud is back.", table: "Identity")
         case .unified:
             return String(localized: "No more sign-in. Everything you tracked is in one place now.", table: "Identity")
         case .needsSpace(let bytes):
             let size = ByteCountFormatter.string(fromByteCount: Int64(max(bytes, 1_000_000)), countStyle: .file)
-            return String(localized: "Not enough space to update your records. Free up about \(size) and reopen LandlordHours. Nothing has changed yet.", table: "Identity")
+            return String(localized: "Not enough space to update your records. Free up about \(size) and reopen Dormer. Nothing has changed yet.", table: "Identity")
         case .settingsKept:
             return String(localized: "We kept the settings from your earlier records. Your setup answers from today are in Settings.", table: "Identity")
         case .bulkWaiting(let hours, let total):

@@ -448,7 +448,7 @@ final class SiriCopyTests: XCTestCase {
         )
         XCTAssertEqual(
             LandlordHoursIntentCopy.summaryDialog(year: 2026, context: context(properties: 0), snapshot: snapshot(hours: 0, required: 0), recommendation: .doNothing),
-            "You haven’t added a property yet. Add one in LandlordHours and we’ll start finding your rental work."
+            "You haven’t added a property yet. Add one in Dormer and we’ll start finding your rental work."
         )
     }
 

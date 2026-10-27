@@ -179,7 +179,7 @@ final class LandlordHoursUITests: XCTestCase {
             ("emptyMainTabs", 1, "Once we know where your rentals are", "empty-properties"),
             ("emptyMainTabs", 2, "Add a property to log this.", "empty-track"),
             ("emptyMainTabs", 3, "Reports", "empty-reports"),
-            ("emptyMainTabs", 4, "LandlordHours\u{00A0}Pro", "empty-settings"),
+            ("emptyMainTabs", 4, "Dormer\u{00A0}Pro", "empty-settings"),
             ("occasional", 0, "Today’s work", "occasional-home"),
             ("occasional", 1, "1 rental ·", "occasional-properties"),
             ("occasional", 2, "Log time", "occasional-track"),
@@ -203,7 +203,7 @@ final class LandlordHoursUITests: XCTestCase {
                     XCTAssertTrue(subtitle.label.hasSuffix("toward 750 this year."), subtitle.label)
                 }
                 attachScreenshot(named: item.attachment)
-                XCTAssertFalse(app.staticTexts["Welcome to LandlordHours"].exists)
+                XCTAssertFalse(app.staticTexts["Welcome to Dormer"].exists)
             }
         }
     }

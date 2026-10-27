@@ -41,11 +41,11 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>LandlordHours reads event titles on your iPhone to suggest rental work, like a plumber visit. Nothing is saved until you confirm it.</string>
+	<string>Dormer reads event titles on your iPhone to suggest rental work, like a plumber visit. Nothing is saved until you confirm it.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>LandlordHours listens only while you’re dictating a note, so you can say what you did instead of typing it. You check the note before anything is saved.</string>
+	<string>Dormer listens only while you’re dictating a note, so you can say what you did instead of typing it. You check the note before anything is saved.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>LandlordHours turns what you say into a written note. You check it and confirm before anything is saved.</string>
+	<string>Dormer turns what you say into a written note. You check it and confirm before anything is saved.</string>
 	<key>RevenueCatAPIKey</key>
 	<string>$(REVENUECAT_API_KEY)</string>
 	<key>UIAppFonts</key>

@@ -425,7 +425,7 @@ enum AuditReportBuilder {
 // MARK: - Shared formatting
 
 enum AuditReportFormat {
-    static let disclaimer = "LandlordHours is a record-keeping tool, not tax advice. Ask a tax professional what your hours mean for you."
+    static let disclaimer = "Dormer is a record-keeping tool, not tax advice. Ask a tax professional what your hours mean for you."
 
     static let suggestionExplanation = "Suggested entries were proposed by the app (for example, from your calendar or a receipt) and added to your record only when you confirmed them."
 

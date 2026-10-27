@@ -171,7 +171,7 @@ struct UnlockProButton: View {
         }
         .buttonStyle(ProUnlockButtonStyle(fullWidth: fullWidth))
         .accessibilityLabel(title)
-        .accessibilityHint("Opens LandlordHours Pro")
+        .accessibilityHint("Opens Dormer Pro")
         .accessibilityIdentifier("lock.unlock")
     }
 }

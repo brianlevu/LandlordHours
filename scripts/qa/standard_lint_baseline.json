@@ -48,7 +48,7 @@
   "banned-word|Sources/Models/TaxProfileModels.swift|return \"750 hours plus the 50% rule (REPS)\"": 1,
   "banned-word|Sources/Models/TaxProfileModels.swift|return \"Track both REPS and STR goals\"": 1,
   "banned-word|Sources/Services/AITimeEntryService.swift|(.legal, [\"legal\", \"lawyer\", \"attorney\", \"court\", \"compliance\", \"permit\",": 1,
-  "banned-word|Sources/Services/AuditReportBuilder.swift|static let disclaimer = \"LandlordHours is a record-keeping tool, not tax advice. Ask a tax professional what your hours mean for you.\"": 1,
+  "banned-word|Sources/Services/AuditReportBuilder.swift|static let disclaimer = \"Dormer is a record-keeping tool, not tax advice. Ask a tax professional what your hours mean for you.\"": 1,
   "banned-word|Sources/Services/AuditReportCSV.swift|\"participant\",": 1,
   "banned-word|Sources/Services/CalendarImportService.swift|} else if t.contains(\"legal\") || t.contains(\"compliance\") || t.contains(\"evict\") {": 1,
   "banned-word|Sources/Services/Capture/Classifier/ClassifierKeywords.swift|.init(\"compliance\", 1.2, .legal),": 1,

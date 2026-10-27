@@ -106,7 +106,7 @@ enum ProGate {
         case .exportPage: return "This is the record your accountant gets."
         case .reportsExport, .settingsExport: return "Export comes with Pro."
         case .propertiesLimit, .inboxLimit: return "Free covers one rental."
-        case .settingsPro: return "LandlordHours Pro"
+        case .settingsPro: return "Dormer Pro"
         case .todayRecord: return "Your \(wholeHours(confirmedHours)) hours, ready to export."
         }
     }
@@ -157,7 +157,7 @@ struct PaywallCopy: Equatable {
                                planLine: "Turn \(hours.map { "\($0) confirmed" } ?? "your confirmed") hours into a clean record.",
                                nextStep: "See your record")
         case .settings:
-            return PaywallCopy(headline: "LandlordHours Pro",
+            return PaywallCopy(headline: "Dormer Pro",
                                planLine: "Every rental, the PDF and spreadsheet, and the record of where each hour came from.",
                                nextStep: "Done")
         }

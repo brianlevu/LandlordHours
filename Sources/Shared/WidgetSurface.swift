@@ -158,7 +158,7 @@ struct WidgetSurfaceDisplay: Equatable {
     var mediumLabel: String {
         switch state {
         case .timer: return "Timer · today"
-        case .noProperty: return "LandlordHours"
+        case .noProperty: return "Dormer"
         default:
             let who = snapshot.goal == .reps750 ? "Your REPS hours" : "Your hours"
             return "\(who) · \(String(snapshot.taxYear))"
@@ -279,7 +279,7 @@ struct WidgetSurfaceDisplay: Equatable {
 
     var accessibilityLabel: String {
         switch state {
-        case .noProperty: return "LandlordHours. Add a rental to start counting."
+        case .noProperty: return "Dormer. Add a rental to start counting."
         case .timer: return "Timer running at \(timerPropertyName)."
         default:
             var parts = ["\(number) of your \(goalNumber) hours."]

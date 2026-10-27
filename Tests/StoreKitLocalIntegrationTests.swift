@@ -29,7 +29,7 @@ final class StoreKitLocalIntegrationTests: XCTestCase {
         let products = try await Product.products(for: [proProductID])
 
         let proProduct = try XCTUnwrap(products.first(where: { $0.id == proProductID }))
-        XCTAssertEqual(proProduct.displayName, "LandlordHours Pro")
+        XCTAssertEqual(proProduct.displayName, "Dormer Pro")
         XCTAssertEqual(proProduct.type, .nonConsumable)
     }
 

@@ -200,7 +200,7 @@ struct EngagementLabView: View {
                 HStack(spacing: 10) {
                     WaveHouseIcon(size: 28)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("LandlordHours")
+                        Text("Dormer")
                             .font(.footnote.weight(.bold)).fontDesign(.rounded)
                             .foregroundStyle(colors.textPrimary)
                         Text("now")
@@ -243,7 +243,7 @@ struct EngagementLabView: View {
                 VStack(alignment: .leading, spacing: 9) {
                     HStack(spacing: 7) {
                         LHCompactLogo(size: 24)
-                        Text("LandlordHours")
+                        Text("Dormer")
                             .font(.footnote.weight(.bold)).fontDesign(.rounded)
                             .foregroundStyle(colors.textPrimary)
                     }
@@ -673,7 +673,7 @@ struct EngagementLabView: View {
     private var siriUserPrompt: String {
         switch recommendation.reason {
         case .noActionNeeded: return "How am I doing?"
-        case .setupProperty: return "Set up LandlordHours"
+        case .setupProperty: return "Set up Dormer"
         case .inactiveLogging: return "Remind me what to log"
         case .timerSafety: return "Stop landlord timer"
         case .calendarDraftsReady: return "Review landlord calendar items"
