@@ -290,6 +290,9 @@ final class RecordSetMigration {
         if !drafts.isEmpty { defaults.set(try? JSONEncoder().encode(drafts.sorted { $0.startTime < $1.startTime }), forKey: draftsKey) }
     }
 
+    /// A set this phone holds apart from its own: still asked about, or kept aside.
+    static func heldApart(_ status: GroupStatus?) -> Bool { status == .pending || status == .aside }
+
     static func syncedBefore(_ group: LegacyGroup) -> Bool {
         !(group.tracker?.fingerprints.isEmpty ?? true) || group.values["cloudkit.zoneChangeToken"] != nil
             || (group.values["cloudkit.migrationDone"] as? Bool) == true
@@ -819,8 +822,12 @@ final class RecordSetMigration {
     private func applySettingsAtMigration(_ snapshot: ZoneSnapshot, groups: GroupsFile) {
         guard let live else { return }
         func find(_ name: String) -> ZoneRecord? { snapshot.records.first { $0.recordName == name } }
-        let householdGoal = find(IdentityZone.goalSettingsName(IdentityZone.household))
-        let householdTax = find(IdentityZone.taxProfileName(IdentityZone.household))
+        var householdGoal = find(IdentityZone.goalSettingsName(IdentityZone.household))
+        var householdTax = find(IdentityZone.taxProfileName(IdentityZone.household))
+        if let owner = (householdGoal ?? householdTax)?.appUserId, Self.heldApart(groups.group(owner)?.status) {
+            // Another set's settings (this phone is asking about it, or keeps it aside): never applied.
+            householdGoal = nil; householdTax = nil
+        }
         // No household pair: the primary group's own pair (Z6: `-default` only when the unscoped
         // group is primary).
         let primary = groups.primaryId ?? storageId
@@ -884,6 +891,16 @@ final class RecordSetMigration {
         var chosen = MergeRules.unifiedId(householdOwner: householdOwner, zoneEntryCounts: zoneCounts,
                                           devicePrimary: groups?.primaryId ?? storageId, excluded: excluded)
         if chosen == LegacyInventory.unscopedGroupId { chosen = IdentityZone.household }
+        if let householdOwner, excluded.contains(householdOwner) {
+            // The household pair is a set this phone holds apart. Never adopt its id or overwrite
+            // its pair; while it is still a question, push nothing of the live set (S9 holds).
+            if groups?.group(householdOwner)?.status == .pending {
+                defaults.set(householdOwner, forKey: IdentityKeys.householdHeldFor)
+            }
+            defaults.set(chosen, forKey: IdentityKeys.unifiedId)
+            defaults.set(true, forKey: IdentityKeys.unifiedIdDecided)
+            return
+        }
         let empty = live.liveEntries.isEmpty && live.liveProperties.isEmpty
         if householdOwner == nil && empty && !defaults.bool(forKey: IdentityKeys.goalDirty) && !defaults.bool(forKey: IdentityKeys.taxDirty) {
             // Empty never dictates: nothing written, the next pull brings whatever another device writes.
@@ -897,8 +914,13 @@ final class RecordSetMigration {
         case .saved:
             break
         case .adopted(let server):
-            // The loser adopts the winner's id before pushing anything (U17).
-            chosen = server
+            if excluded.contains(server) {
+                // Raced by a set this phone holds apart: keep this phone's id and ask first.
+                if groups?.group(server)?.status == .pending { defaults.set(server, forKey: IdentityKeys.householdHeldFor) }
+            } else {
+                // The loser adopts the winner's id before pushing anything (U17).
+                chosen = server
+            }
             Analytics.identitySettingsConflict(adopted: true)
         }
         defaults.set(chosen, forKey: IdentityKeys.unifiedId)
@@ -1092,6 +1114,9 @@ final class RecordSetMigration {
         // Settings: only the household pair and the 2.0 mirror (§3.3). Another set's pair (kept with
         // this iCloud after an account change) is never applied.
         if defaults.bool(forKey: IdentityKeys.householdForeign) { household = (nil, nil) }
+        if let owner = (household.goal ?? household.tax)?.appUserId, owner != unifiedId, Self.heldApart(groups.group(owner)?.status) {
+            household = (nil, nil)
+        }
         var goalRecord = household.goal, taxRecord = household.tax
         if MergeRules.mirrorBeatsHousehold(mirror: mirror.goal?.modificationDate, household: household.goal?.modificationDate), mirror.goal != nil {
             goalRecord = mirror.goal
@@ -1149,6 +1174,10 @@ final class RecordSetMigration {
     /// the others). Held (bulk) records are not pushed until answered.
     @discardableResult
     func pushLive() async -> ZonePushReport {
+        if let held = defaults.string(forKey: IdentityKeys.householdHeldFor) {
+            if GroupsFile.load(root: root)?.group(held)?.status == .pending { return ZonePushReport() }
+            defaults.removeObject(forKey: IdentityKeys.householdHeldFor)
+        }
         let t = tracker
         let held = earlier.bulkHold?.names ?? []
         let all = liveZoneRecords().filter { !held.contains($0.recordName) }

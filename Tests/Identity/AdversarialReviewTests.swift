@@ -50,6 +50,36 @@ final class AdversarialReviewTests: XCTestCase {
 
     // MARK: C · S8 adopts the household owner's id even when that owner is a pending group here
 
+    func testAPendingGroupsIdBecomesTheUnifiedIdAndANewPhoneGetsOneSetWithNoQuestion() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))   // this phone: local-…, 10 entries
+        let other = "email-other.person@example.com"       // phone A migrated first under its own id
+        var records = IdentityFixtures.sampleGroup(owner: other, entries: 20, seed: 0x81)
+        records.append(GoalSettingsValues.defaults.record(name: IdentityZone.goalSettingsName(IdentityZone.household), owner: other))
+        records.append(TaxProfileValues(filingStatus: FilingStatus.marriedJoint.rawValue, spouseTracking: true, taxYear: 2026,
+                                        groupingElection: false, nonREWorkHours: 0, displayName: nil)
+            .record(name: IdentityZone.taxProfileName(IdentityZone.household), owner: other))
+        let zone = FakeZoneSource(records: records)
+        let b = EngineHarness(sandbox, zone: zone)
+        try b.device()
+        let outcome = await b.cloud()
+        XCTAssertEqual(outcome, .done)
+        XCTAssertEqual(b.earlier.pendingGroups.map(\.id), [other], "the other set is asked about on this phone")
+        let mine = Set(legacy(local).entries.map(\.id.uuidString))
+        let tags = Set(mine.compactMap { zone.records[$0]?.appUserId })
+        XCTAssertFalse(tags.contains(other), "this phone's hours were stored under the set it has not been asked about (unified id \(b.engine.unifiedId))")
+
+        // The person answers "Not mine, keep them aside" here. A new phone on the same iCloud:
+        b.engine.answer(.aside, group: other)
+        await b.engine.pushLive()   // the app pushes after every answer (AppViewModel.answerTwoSets → schedulePush)
+        let boxC = IdentitySandbox("new-phone-c")
+        defer { boxC.tearDown() }
+        let c = EngineHarness(boxC, zone: zone)
+        try c.device()
+        let doneC = await c.cloud()
+        XCTAssertEqual(doneC, .done)
+        XCTAssertFalse(c.earlier.pendingGroups.isEmpty, "the new phone must still be asked; it got \(c.entries.count) entries live with no question")
+        XCTAssertEqual(c.entries.count, 10, "only this person's hours live on the new phone")
+    }
 
     // MARK: D · Delete all data after an account change deletes the OTHER account's zone
 

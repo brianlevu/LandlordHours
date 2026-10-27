@@ -41,6 +41,16 @@ extension RecordSetMigration {
             }
         }
         Analytics.mergeQuestionAnswered(answer.rawValue)
+        if defaults.string(forKey: IdentityKeys.householdHeldFor) == id {
+            // The set that owns the household pair is answered: the held push can go.
+            defaults.removeObject(forKey: IdentityKeys.householdHeldFor)
+            if answer == .combine {
+                // One set now: it takes the household's id, so every phone keeps one set.
+                defaults.set(id, forKey: IdentityKeys.unifiedId)
+                defaults.set(true, forKey: IdentityKeys.unifiedIdDecided)
+            }
+            // Spouse or aside: this phone's set keeps its own id and takes the household pair.
+        }
         switch answer {
         case .aside:
             try? earlier.setStatus(.aside, for: id)

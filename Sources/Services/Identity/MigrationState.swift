@@ -81,6 +81,9 @@ enum IdentityKeys {
     /// account change, not combined): never overwritten, never applied; this set's settings
     /// travel in its own mirror pair (`GoalSettings-<unifiedId>`).
     static let householdForeign = "v2.sync.householdForeign"
+    /// The zone's household pair belongs to a set this phone is still asking about (pending). Its
+    /// id is never adopted, and nothing of the live set is pushed, until the question is answered.
+    static let householdHeldFor = "v2.sync.householdHeldFor"
     /// Per-launch/once notices (Today cards).
     static let noticeDone = "v2.notice.p12Shown"
     static let noticeSettingsKept = "v2.notice.p29Pending"

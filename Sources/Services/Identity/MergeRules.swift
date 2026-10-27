@@ -190,7 +190,8 @@ enum MergeRules {
         func allowed(_ id: String) -> Bool {
             !excluded.contains(id) && !id.hasPrefix(IdentityZone.asidePrefix) && !LegacyInventory.isIgnoredId(id)
         }
-        if let householdOwner, !householdOwner.isEmpty { return householdOwner }
+        // Rule 1 too respects `excluded`: a pending/aside set's id is never this phone's.
+        if let householdOwner, !householdOwner.isEmpty, allowed(householdOwner) { return householdOwner }
         let ranked = zoneEntryCounts.filter { $0.value > 0 }.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }
         if let top = ranked.first {
             return allowed(top.key) ? top.key : IdentityZone.household
