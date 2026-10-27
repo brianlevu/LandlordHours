@@ -80,8 +80,6 @@ targets:
         com.apple.developer.icloud-services:
           - CloudKit
         com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)com.openclaw.landlordhours
-        com.apple.developer.applesignin:
-          - Default
         # Private Cloud Compute (Developer Portal capability "Access to models on Private Cloud
         # Compute"). Keep in step with LH_PCC_ENTITLED below.
         com.apple.developer.private-cloud-compute: true
