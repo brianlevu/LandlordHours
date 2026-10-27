@@ -425,7 +425,15 @@ final class RecordSetMigration {
     var storageId: String { IdentityScope.resolve(defaults).scopeId ?? defaults.string(forKey: IdentityKeys.storageId) ?? IdentityZone.household }
     var unifiedId: String { IdentityScope.unifiedId(defaults) ?? storageId }
     var syncRoot: URL { root.appendingPathComponent("Sync", isDirectory: true) }
-    var tracker: SyncChangeTracker { SyncChangeTracker(userId: storageId, baseDirectory: syncRoot) }
+    private var sharedTracker: SyncChangeTracker?
+    /// The record set's push baselines and tombstones: one instance, shared with the sync service.
+    var tracker: SyncChangeTracker {
+        if let sharedTracker, sharedTracker.userId == storageId,
+           sharedTracker.fileURL.path.hasPrefix(syncRoot.path) { return sharedTracker }
+        let made = SyncChangeTracker(userId: storageId, baseDirectory: syncRoot)
+        sharedTracker = made
+        return made
+    }
 
     enum CloudOutcome: Equatable {
         case done

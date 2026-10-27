@@ -268,6 +268,21 @@ final class AdversarialReviewTests: XCTestCase {
         XCTAssertNotEqual(h.engine.unifiedId, local, "this phone's hours would be tagged as the spouse's and swapped on every other phone")
     }
 
+    // M5 · two tracker instances on one file never lose each other's writes
+    func testTwoTrackerInstancesOnOneFileKeepEachOthersWrites() {
+        let a = SyncChangeTracker(userId: "household", baseDirectory: sandbox.syncRoot)
+        let b = SyncChangeTracker(userId: "household", baseDirectory: sandbox.syncRoot)
+        let property = RentalProperty(name: "Elm", address: "1 Elm St", propertyType: .ltr)
+        a.recordServerState([CloudKitSyncService.record(for: property, zoneID: IdentityZone.zoneID, appUserId: "household")])
+        b.addTombstones(["deleted-entry"])
+        let fresh = SyncChangeTracker(userId: "household", baseDirectory: sandbox.syncRoot)
+        XCTAssertTrue(fresh.hasBaseline(for: property.id.uuidString), "the other instance's stale copy overwrote the baseline")
+        XCTAssertEqual(fresh.pendingDeletes, ["deleted-entry"])
+        a.recordServerState([])
+        a.forget(recordNames: ["nothing"])
+        XCTAssertEqual(SyncChangeTracker(userId: "household", baseDirectory: sandbox.syncRoot).pendingDeletes, ["deleted-entry"],
+                       "a stale instance never writes a tombstone away")
+    }
 
     // M3 · an unpushed local edit that a newer remote edit beats is kept in Recently removed
     func testAnUnpushedLocalEditBeatenByANewerRemoteEditIsKept() async throws {

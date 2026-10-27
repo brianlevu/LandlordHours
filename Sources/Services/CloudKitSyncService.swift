@@ -463,6 +463,9 @@ final class CloudKitSyncService: ObservableObject {
 
     /// The active scope's push baselines.
     var changeTracker: SyncChangeTracker? {
+        // One tracker for the record set: the engine's (deletes recorded here and baselines the
+        // engine writes land in the same instance and the same file).
+        if let engine { return engine.tracker }
         guard let appUserId else { return nil }
         if let cachedChangeTracker, cachedChangeTracker.userId == appUserId,
            cachedChangeTracker.fileURL.path.hasPrefix(changeTrackerBaseDirectory.path) {
