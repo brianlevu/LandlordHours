@@ -73,6 +73,14 @@ enum IdentityKeys {
     }
     /// The iCloud account changed (P13); sync paused until answered.
     static let accountChanged = "v2.sync.accountChanged"
+    /// P13 "Keep these records with this iCloud" was answered and its cloud phase hasn't finished:
+    /// nothing already in the new account's zone is treated as this phone's set (every non-empty
+    /// group there is asked about), and no absence there removes anything here.
+    static let accountSwitchKeep = "v2.sync.accountSwitchKeep"
+    /// The zone's household settings pair belongs to another set (kept with this iCloud after an
+    /// account change, not combined): never overwritten, never applied; this set's settings
+    /// travel in its own mirror pair (`GoalSettings-<unifiedId>`).
+    static let householdForeign = "v2.sync.householdForeign"
     /// Per-launch/once notices (Today cards).
     static let noticeDone = "v2.notice.p12Shown"
     static let noticeSettingsKept = "v2.notice.p29Pending"

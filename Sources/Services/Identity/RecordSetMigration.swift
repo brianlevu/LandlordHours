@@ -368,6 +368,37 @@ final class RecordSetMigration {
     }
 
     var step: MigrationStep { IdentityScope.step(defaults) }
+
+    // MARK: Account guard (P13)
+
+    enum AccountCheck: Equatable { case same, changed, unknown }
+
+    /// Set once this run of the app confirmed iCloud is still the account the set was read from.
+    /// Cleared on `CKAccountChanged` (`accountMayHaveChanged`); a relaunch starts unconfirmed.
+    private(set) var accountConfirmed = false
+
+    /// Every pull and push asks this first: iCloud must still be the account the set was read
+    /// from. A different one pauses sync and asks (P13); one we can't learn right now touches
+    /// nothing this round.
+    func confirmAccount() async -> AccountCheck {
+        if defaults.bool(forKey: IdentityKeys.accountChanged) { return .changed }
+        if accountConfirmed { return .same }
+        guard let current = await source.userRecordName() else { return .unknown }
+        if let stored = defaults.string(forKey: IdentityKeys.icloudUserRecordName) {
+            guard stored == current else {
+                defaults.set(true, forKey: IdentityKeys.accountChanged)
+                onChange?()
+                return .changed
+            }
+        } else if step >= .cloudInventoried {
+            // S5 couldn't learn the account; learn it now.
+            defaults.set(current, forKey: IdentityKeys.icloudUserRecordName)
+        }
+        accountConfirmed = true
+        return .same
+    }
+
+    func accountMayHaveChanged() { accountConfirmed = false }
     /// The same scope the rest of the app runs on (a DEBUG scope wins, so a mock never meets the
     /// real record set's baselines).
     var storageId: String { IdentityScope.resolve(defaults).scopeId ?? defaults.string(forKey: IdentityKeys.storageId) ?? IdentityZone.household }
@@ -396,7 +427,7 @@ final class RecordSetMigration {
     func runCloudPhase() async -> CloudOutcome {
         earlier.reload()
         guard step >= .deviceMerged, defaults.string(forKey: IdentityKeys.legacyPrefixId) == nil else { return .notReady }
-        if step == .done { return .done }
+        if step == .done { return await confirmAccount() == .changed ? .accountChanged : .done }
         if defaults.bool(forKey: IdentityKeys.zoneGone) { return .zoneGone }
         if defaults.bool(forKey: IdentityKeys.accountChanged) { return .accountChanged }
         let account = await source.accountState()
@@ -405,6 +436,13 @@ final class RecordSetMigration {
                 defaults.set(true, forKey: IdentityKeys.noticeCloudWaiting)
             }
             return .iCloudOff(account)
+        }
+        // A resumed migration (step ≥ cloudInventoried) skips S5's read, so the account is checked
+        // here on every run, not only when S5 reads.
+        switch await confirmAccount() {
+        case .changed: return .accountChanged
+        case .unknown where defaults.string(forKey: IdentityKeys.icloudUserRecordName) != nil: return .iCloudOff(.couldNotDetermine)
+        default: break
         }
         var stats = CloudStats()
 
@@ -513,6 +551,7 @@ final class RecordSetMigration {
         // S10 — done.
         Self.setStep(.done, defaults)
         defaults.set(true, forKey: IdentityKeys.hasSynced)
+        defaults.removeObject(forKey: IdentityKeys.accountSwitchKeep)
         defaults.removeObject(forKey: IdentityKeys.deltaLoops)
         if defaults.object(forKey: IdentityKeys.noticeDone) == nil, IdentityRecordsSummary.wasUpgrade(root: root) {
             defaults.set(false, forKey: IdentityKeys.noticeDone)
@@ -542,7 +581,10 @@ final class RecordSetMigration {
             if record.isUserRecord { byOwner[owner, default: []].append(record) } else if record.isSettings { settingsOwners.insert(owner) }
         }
         if let untagged = byOwner[LegacyInventory.unscopedGroupId] { stats.untaggedAdopted = untagged.count }
-        let liveOwners = Set([unifiedId, storageId] + groups.groups.filter { $0.status.isLive }.map(\.id))
+        // P13 "Keep with this iCloud": the new account's zone holds someone else's set (or nothing).
+        // No owner there is this phone's by its tag, even "household" or a legacy id it shares.
+        let switching = defaults.bool(forKey: IdentityKeys.accountSwitchKeep)
+        let liveOwners = switching ? Set<String>() : Set([unifiedId, storageId] + groups.groups.filter { $0.status.isLive }.map(\.id))
 
         // Which cloud owner becomes primary when the device set is empty (U6, new phone).
         var cloudPrimary: String?
@@ -607,7 +649,9 @@ final class RecordSetMigration {
             if LegacyInventory.isIgnoredId(owner) { continue }
 
             let existing = groups.group(owner)?.status
-            if liveOwners.contains(owner) || owner == cloudPrimary || existing == .combine || existing == .spouse || existing == .primary {
+            // After an account switch, an answer given for the old account's owner says nothing here.
+            let answered = switching ? nil : existing
+            if liveOwners.contains(owner) || owner == cloudPrimary || answered == .combine || answered == .spouse || answered == .primary {
                 // R2b: same owner id, both non-empty, zero UUID overlap → two groups, asked.
                 let deviceOfOwner = deviceNames.intersection(inventory[owner]?.names ?? [])
                 let ownerDevice = (owner == storageId) ? deviceNames : deviceOfOwner
@@ -664,7 +708,8 @@ final class RecordSetMigration {
         stats.captureDedupe = deduped.losers.count
 
         // R5 / R5c per live legacy profile with baselines.
-        let guards = MergeRules.AbsenceGuards(readComplete: !snapshot.incomplete, zoneExists: snapshot.zoneExists, sameAccount: true)
+        // Baselines from the old account say nothing about the new one's zone (R5 never removes).
+        let guards = MergeRules.AbsenceGuards(readComplete: !snapshot.incomplete, zoneExists: snapshot.zoneExists, sameAccount: !switching)
         var inferred: [RemovedRecord] = []
         var held = Set<String>()
         for (owner, info) in inventory where groups.group(owner)?.status.isLive == true || owner == storageId {
@@ -803,6 +848,10 @@ final class RecordSetMigration {
         guard let live else { return }
         let groups = GroupsFile.load(root: root)
         let householdOwner = snapshot.records.first { $0.recordName == IdentityZone.goalSettingsName(IdentityZone.household) }?.appUserId
+        if defaults.bool(forKey: IdentityKeys.accountSwitchKeep) {
+            try await writeHouseholdAfterAccountSwitch(snapshot, householdOwner: householdOwner, groups: groups)
+            return
+        }
         var zoneCounts: [String: Int] = [:]
         for record in snapshot.records where record.recordType == "TimeEntry" {
             let owner = record.appUserId ?? LegacyInventory.unscopedGroupId
@@ -830,6 +879,35 @@ final class RecordSetMigration {
             // The loser adopts the winner's id before pushing anything (U17).
             chosen = server
             Analytics.identitySettingsConflict(adopted: true)
+        }
+        defaults.set(chosen, forKey: IdentityKeys.unifiedId)
+        defaults.set(true, forKey: IdentityKeys.unifiedIdDecided)
+    }
+
+    /// S8 after P13 "Keep with this iCloud". This phone's set keeps its own id, unless an owner in
+    /// the new zone already uses it (a fresh set is "household" on every account): then it takes
+    /// a new one, so the other set's phones see these records as a set to ask about, never as their
+    /// own. A household pair already there is the other set's: never adopted, never overwritten.
+    private func writeHouseholdAfterAccountSwitch(_ snapshot: ZoneSnapshot, householdOwner: String?, groups: GroupsFile?) async throws {
+        guard let live else { return }
+        var chosen = unifiedId
+        let zoneOwners = Set(snapshot.records.compactMap(\.appUserId))
+        if zoneOwners.contains(chosen) || householdOwner == chosen {
+            chosen = IdentityZone.household + "-" + UUID().uuidString.prefix(8).lowercased()
+        }
+        if householdOwner != nil {
+            defaults.set(true, forKey: IdentityKeys.householdForeign)
+        } else {
+            defaults.removeObject(forKey: IdentityKeys.householdForeign)
+            let empty = live.liveEntries.isEmpty && live.liveProperties.isEmpty
+            if !empty || defaults.bool(forKey: IdentityKeys.goalDirty) || defaults.bool(forKey: IdentityKeys.taxDirty) {
+                let goal = live.goalSettings.record(name: IdentityZone.goalSettingsName(IdentityZone.household), owner: chosen)
+                let tax = live.taxProfile.record(name: IdentityZone.taxProfileName(IdentityZone.household), owner: chosen)
+                if case .adopted = try await source.saveHousehold(goal: goal, tax: tax) {
+                    // Another phone of this account wrote it first: it is that set's.
+                    defaults.set(true, forKey: IdentityKeys.householdForeign)
+                }
+            }
         }
         defaults.set(chosen, forKey: IdentityKeys.unifiedId)
         defaults.set(true, forKey: IdentityKeys.unifiedIdDecided)
@@ -973,7 +1051,9 @@ final class RecordSetMigration {
         }
         try? groups.save(root: root)
 
-        // Settings: only the household pair and the 2.0 mirror (§3.3).
+        // Settings: only the household pair and the 2.0 mirror (§3.3). Another set's pair (kept with
+        // this iCloud after an account change) is never applied.
+        if defaults.bool(forKey: IdentityKeys.householdForeign) { household = (nil, nil) }
         var goalRecord = household.goal, taxRecord = household.tax
         if MergeRules.mirrorBeatsHousehold(mirror: mirror.goal?.modificationDate, household: household.goal?.modificationDate), mirror.goal != nil {
             goalRecord = mirror.goal
@@ -1014,8 +1094,10 @@ final class RecordSetMigration {
         let empty = live.liveEntries.isEmpty && live.liveProperties.isEmpty
         let dirty = defaults.bool(forKey: IdentityKeys.goalDirty) || defaults.bool(forKey: IdentityKeys.taxDirty)
         if !empty || dirty || defaults.bool(forKey: IdentityKeys.hasSynced) {
-            records.append(live.goalSettings.record(name: IdentityZone.goalSettingsName(IdentityZone.household), owner: owner))
-            records.append(live.taxProfile.record(name: IdentityZone.taxProfileName(IdentityZone.household), owner: owner))
+            if !defaults.bool(forKey: IdentityKeys.householdForeign) {
+                records.append(live.goalSettings.record(name: IdentityZone.goalSettingsName(IdentityZone.household), owner: owner))
+                records.append(live.taxProfile.record(name: IdentityZone.taxProfileName(IdentityZone.household), owner: owner))
+            }
             if owner != IdentityZone.household {
                 // 2.0.x devices on this id follow the household through the mirror (§3.2).
                 records.append(live.goalSettings.record(name: IdentityZone.goalSettingsName(owner), owner: owner))

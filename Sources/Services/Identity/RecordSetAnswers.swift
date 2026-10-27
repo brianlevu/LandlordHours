@@ -116,7 +116,7 @@ extension RecordSetMigration {
         guard let group = earlier.group(id) else { return }
         let names = group.entries.map { $0.id.uuidString } + group.properties.map { $0.id.uuidString }
             + group.categories.map { $0.id.uuidString } + group.unparsedRecords.map(\.recordName)
-        if !names.isEmpty, await source.accountState() == .available {
+        if !names.isEmpty, await source.accountState() == .available, await confirmAccount() == .same {
             _ = await source.push([], deletes: names)
         }
         earlier.removeGroup(id)
@@ -170,6 +170,8 @@ extension RecordSetMigration {
         Analytics.zoneGoneAnswered(answer.rawValue)
         switch answer {
         case .keepAndRestore:
+            // Restore only into the account this phone's set came from.
+            guard await confirmAccount() == .same else { onChange?(); return false }
             defaults.removeObject(forKey: IdentityKeys.zoneGone)
             IdentityKeys.forgetZone(defaults)   // the next push may create the zone
             tracker.resetBaselines()
@@ -192,6 +194,14 @@ extension RecordSetMigration {
         tracker.resetBaselines()
         IdentityKeys.forgetZone(defaults)   // another account's zone: this device never saw it
         defaults.removeObject(forKey: IdentityKeys.unifiedIdDecided)
+        defaults.removeObject(forKey: IdentityKeys.householdForeign)
+        accountMayHaveChanged()
+        if answer == .keepWithThisICloud {
+            // Whatever is already in this iCloud is asked about, never merged by its tag (§1.4).
+            defaults.set(true, forKey: IdentityKeys.accountSwitchKeep)
+        } else {
+            defaults.removeObject(forKey: IdentityKeys.accountSwitchKeep)
+        }
         if answer == .useThisICloud, let live {
             // This iPhone's set goes to Earlier records (nothing deleted); the new account's records come in.
             let id = "this-iphone-" + ISO8601DateFormatter().string(from: now()).prefix(10)

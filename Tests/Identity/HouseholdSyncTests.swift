@@ -786,4 +786,91 @@ final class RecordLossRegressionTests: XCTestCase {
         XCTAssertGreaterThan(pushed.modifiedAt, original.modifiedAt,
                              "newer than the old copy, so the other phone takes it instead of pushing its own back forever")
     }
+
+    // MARK: 4 · two iCloud accounts never merge without a question
+
+    /// This phone, on account A: 3 entries in a fresh 2.2 set (unified id "household").
+    private func phoneOnAccountA() async throws -> (EngineHarness, [TimeEntry]) {
+        let zoneA = FakeZoneSource()
+        zoneA.userName = "_accountA"
+        let h = EngineHarness(sandbox, zone: zoneA)
+        XCTAssertEqual(try h.device(), .fresh)
+        let property = RentalProperty(name: "Elm", address: "1 Elm St", propertyType: .ltr)
+        let mine = (0..<3).map { _ in newEntry(property: property) }
+        h.live.replaceLive(entries: mine, properties: [property], categories: [])
+        let outcome = await h.cloud()
+        XCTAssertEqual(outcome, .done)
+        XCTAssertEqual(h.engine.unifiedId, IdentityZone.household)
+        return (h, mine)
+    }
+
+    /// Account B's zone: another person's fresh 2.2 set, also under "household".
+    private func accountBZone() -> FakeZoneSource {
+        let theirs = IdentityFixtures.sampleGroup(owner: IdentityZone.household, entries: 5, seed: 0x71)
+        let zone = FakeZoneSource(records: theirs + [
+            GoalSettingsValues.defaults.record(name: IdentityZone.goalSettingsName(IdentityZone.household), owner: IdentityZone.household),
+            TaxProfileValues(filingStatus: FilingStatus.marriedJoint.rawValue, spouseTracking: true, taxYear: 2026, groupingElection: true,
+                             nonREWorkHours: 40, displayName: "Other").record(name: IdentityZone.taxProfileName(IdentityZone.household),
+                                                                                owner: IdentityZone.household)
+        ])
+        zone.userName = "_accountB"
+        return zone
+    }
+
+    func testAnAccountSwitchWhileTheAppWasClosedPausesAndAsks() async throws {
+        let (_, mine) = try await phoneOnAccountA()
+        let zoneB = accountBZone()
+        let relaunched = EngineHarness(sandbox, zone: zoneB)   // the phone now runs on account B
+        let outcome = await relaunched.cloud()
+        XCTAssertEqual(outcome, .accountChanged, "P13 before anything is read or pushed")
+        XCTAssertTrue(sandbox.defaults.bool(forKey: IdentityKeys.accountChanged))
+        XCTAssertEqual(Set(relaunched.entries.map(\.id)), Set(mine.map(\.id)))
+        XCTAssertTrue(zoneB.pushesForTests.isEmpty, "nothing pushed into the other account")
+    }
+
+    func testTheSteadyPullAfterAnAccountSwitchPausesAndAsks() async throws {
+        let (_, mine) = try await phoneOnAccountA()
+        let zoneB = accountBZone()
+        zoneB.pendingChanged = IdentityFixtures.sampleGroup(owner: IdentityZone.household, entries: 2, seed: 0x72)
+        let relaunched = EngineHarness(sandbox, zone: zoneB)
+        let keys = [IdentityKeys.zoneGone, IdentityKeys.accountChanged, IdentityKeys.hasSynced, UserScope.key("cloudkit.zoneChangeToken")]
+        let saved = keys.map { UserDefaults.standard.object(forKey: $0) }
+        defer { for (key, value) in zip(keys, saved) { UserDefaults.standard.set(value, forKey: key) } }
+        let service = CloudKitSyncService()
+        service.zoneSourceOverride = zoneB
+        service.engine = relaunched.engine
+        service.accountAvailable = true
+        // iCloud availability flipped and start() ran the pull before handleAccountChanged compared users.
+        let pulled = await service.pullChanges()
+        XCTAssertFalse(pulled)
+        XCTAssertEqual(Set(relaunched.entries.map(\.id)), Set(mine.map(\.id)), "the other account's records were not merged")
+        XCTAssertTrue(sandbox.defaults.bool(forKey: IdentityKeys.accountChanged), "P13")
+    }
+
+    func testKeepingRecordsWithANewICloudAsksAboutWhatIsAlreadyThere() async throws {
+        let (_, mine) = try await phoneOnAccountA()
+        let zoneB = accountBZone()
+        let theirNames = Set(zoneB.records.values.filter(\.isUserRecord).map(\.recordName))
+        let theirTax = zoneB.records[IdentityZone.taxProfileName(IdentityZone.household)]
+        let relaunched = EngineHarness(sandbox, zone: zoneB)
+        sandbox.defaults.set(true, forKey: IdentityKeys.accountChanged)       // P13 is showing
+        let outcome = await relaunched.engine.answerAccountChanged(.keepWithThisICloud)
+        relaunched.earlier.reload()
+        XCTAssertEqual(outcome, .done)
+        XCTAssertEqual(Set(relaunched.entries.map(\.id)), Set(mine.map(\.id)), "nothing of the other set merged without a question")
+        let held = Set(relaunched.earlier.pendingGroups.flatMap { $0.entries.map(\.id.uuidString) + $0.properties.map(\.id.uuidString) })
+        XCTAssertEqual(held, theirNames, "the other set waits for an answer")
+        XCTAssertEqual(zoneB.records[IdentityZone.taxProfileName(IdentityZone.household)], theirTax, "their tax profile isn't overwritten")
+        for entry in mine {
+            let tag = try XCTUnwrap(zoneB.records[entry.id.uuidString]?.appUserId, "this phone's hours are kept with this iCloud")
+            XCTAssertNotEqual(tag, IdentityZone.household, "never under the other set's id, where their phones would merge them")
+        }
+        for name in theirNames {
+            XCTAssertEqual(zoneB.records[name]?.appUserId, IdentityZone.household, "their records stay theirs")
+        }
+        // Their phone adds an hour: it waits with their set, it doesn't land in this phone's hours.
+        let more = IdentityFixtures.sampleGroup(owner: IdentityZone.household, entries: 7, seed: 0x71).last!
+        relaunched.engine.applyPull(ZoneDelta(changed: [more], deleted: [:], tokenData: nil, incomplete: false))
+        XCTAssertFalse(relaunched.entries.contains { $0.id.uuidString == more.recordName })
+    }
 }

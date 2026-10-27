@@ -422,6 +422,8 @@ final class CloudKitSyncService: ObservableObject {
         syncError = nil
         defer { isSyncing = false }
         if let engine {
+            // Never push into an iCloud account the set wasn't read from (P13).
+            guard await engine.confirmAccount() == .same else { onIdentityChange?(); return }
             let report = await engine.pushLive()
             if report.zoneGone {
                 _ = engine.handleZoneGone()
@@ -574,6 +576,7 @@ final class CloudKitSyncService: ObservableObject {
     /// one pauses sync and asks (P13). Never pushes into the new account on its own.
     func handleAccountChanged() async {
         initialSyncCompletedFor = nil
+        engine?.accountMayHaveChanged()
         await checkAccountStatus()
         guard accountAvailable else { return }
         if let stored = UserDefaults.standard.string(forKey: IdentityKeys.icloudUserRecordName),
@@ -602,6 +605,13 @@ final class CloudKitSyncService: ObservableObject {
     func pullChanges() async -> Bool {
         guard accountAvailable else { return false }
         guard !UserDefaults.standard.bool(forKey: IdentityKeys.zoneGone), !UserDefaults.standard.bool(forKey: IdentityKeys.accountChanged) else { return false }
+        // Never pull another iCloud account's records into this set (P13). This runs before every
+        // pull, so it also covers start() racing handleAccountChanged and a switch made while the
+        // app was closed.
+        if let engine, await engine.confirmAccount() != .same {
+            onIdentityChange?()
+            return false
+        }
         isSyncing = true
         syncError = nil
         defer { isSyncing = false }
