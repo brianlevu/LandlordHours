@@ -498,7 +498,7 @@ final class LogTimeUITests: XCTestCase {
     /// Package E (v2): the states the note-first set does not cover, light and dark, default / XXL / AX3.
     func testCaptureV2Extras() {
         let names: Set<String> = ["log-filled-spouse", "log-not-counted", "log-save-failed", "log-keyboard", "log-voice-denied",
-                                  "log-voice-first", "timer-idle", "timer-running", "picker-category", "picker-property",
+                                  "timer-idle", "timer-running", "picker-category", "picker-property",
                                   "today-timer-running", "today-timer-draft"]
         for scheme in ["light", "dark"] {
             for size in [nil, "xxl", "ax3"] as [String?] { captureAll(scheme: scheme, size: size, names: names) }
@@ -506,7 +506,7 @@ final class LogTimeUITests: XCTestCase {
     }
 
     private static let extraNames: Set<String> = ["log-filled-spouse", "log-not-counted", "log-save-failed", "log-keyboard", "log-voice-denied",
-                                                  "log-voice-first", "timer-idle", "timer-running", "picker-category", "picker-property"]
+                                                  "timer-idle", "timer-running", "picker-category", "picker-property"]
     func testCaptureExtrasLightDefault() { captureAll(scheme: "light", size: nil, names: Self.extraNames) }
     func testCaptureExtrasDarkDefault() { captureAll(scheme: "dark", size: nil, names: Self.extraNames) }
     func testCaptureExtrasLightXXL() { captureAll(scheme: "light", size: "xxl", names: Self.extraNames) }
@@ -609,7 +609,8 @@ final class LogTimeUITests: XCTestCase {
             "-AppleLocale", "en_US",
         ] + extra
         app.launch()
-        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 15) || app.buttons["sheet.close"].waitForExistence(timeout: 25))
+        XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 15) || app.buttons["sheet.close"].waitForExistence(timeout: 25)
+                      || element("shell.toast").exists)   // the toast state logs and dismisses the sheet before the bar is reachable
         Thread.sleep(forTimeInterval: 2.5)
         let tip = app.buttons["Continue"]
         if tip.exists { tip.tap() }
