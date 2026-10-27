@@ -139,6 +139,36 @@ final class LogV2Model: ObservableObject {
     /// r2: the review came from a stopped timer.
     @Published var fromTimer = false
     private var pendingToast: String?
+
+    // MARK: r3 (Beam / Object)
+    /// Set by the root for the r3 variants: Log plays the house beat before the sheet closes.
+    var r3 = false
+    /// The house beat after Log: windows light (0.40) and, when this log crosses a stage, the next
+    /// stage fades in (stageFade). The sheet closes 0.9 s later.
+    @Published var celebrating = false
+    /// Sample hours this year per rental (goal 100h): Pine 59.5 (framing; 1h crosses into half),
+    /// Oak 30 (frame70), Elm 8 (started).
+    let rentalHours: [UUID: Double] = [LogV2Sample.pine.id: 59.5, LogV2Sample.oak.id: 30, LogV2Sample.elm.id: 8]
+    let goal: Double = 100
+    var hoursBefore: Double { rentalId.flatMap { rentalHours[$0] } ?? 0 }
+    var hoursAfter: Double { hoursBefore + (hours ?? 0) }
+    var stageBefore: CraftStage { CraftStage.stage(hours: hoursBefore, goal: goal) }
+    var stageAfter: CraftStage { CraftStage.stage(hours: hoursAfter, goal: goal) }
+    var crossesStage: Bool { rentalId != nil && (hours ?? 0) > 0 && stageAfter != stageBefore }
+    func stage(for id: UUID) -> CraftStage { CraftStage.stage(hours: rentalHours[id] ?? 0, goal: goal) }
+
+    /// The note read back as one sentence: the duration phrase dropped (the numerals say it),
+    /// first letter capitalised, a full stop. Sandbox heuristic; the plan asks the parser for spans.
+    var readBack: String {
+        let parts = note.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        let kept = parts.filter { NoteDuration.hours(in: $0) == nil && !$0.isEmpty }
+        var text = (kept.isEmpty ? parts : kept).joined(separator: ", ")
+        for tail in [" about", " around", " for"] where text.lowercased().hasSuffix(tail) { text = String(text.dropLast(tail.count)) }
+        guard let first = text.first else { return "" }
+        text = first.uppercased() + text.dropFirst()
+        if !(text.hasSuffix(".") || text.hasSuffix("!") || text.hasSuffix("?")) { text += "." }
+        return text
+    }
     /// Captures and the type video show the system keyboard.
     @Published var wantsKeyboard = false
 
@@ -305,6 +335,15 @@ final class LogV2Model: ObservableObject {
 
     func log() {
         guard canLog else { return }
+        if r3 {
+            pendingToast = "Logged \(LHFormat.hours(hours)) at \(rentalName ?? "")"
+            celebrating = true
+            Task {
+                try? await Task.sleep(for: .milliseconds(1100))
+                stage = .closing
+            }
+            return
+        }
         // r2: the sheet dismisses first; the toast appears after it is gone (no sheet behind it).
         pendingToast = "Logged \(LHFormat.hours(hours)) at \(rentalName ?? "")"
         stage = .closing
@@ -324,6 +363,7 @@ final class LogV2Model: ObservableObject {
 
     func reset() {
         note = ""; transcript = ""; sources = [:]; expanded = nil; hours = nil; rentalId = nil; toast = nil
+        celebrating = false; fromTimer = false; usedVoice = false
         withAnimation(AppAnimation.flow) { stage = .entry }
     }
 
@@ -378,6 +418,10 @@ final class LogV2Model: ObservableObject {
             }
         case "edit":
             note = LogV2Sample.typedNote; read(note); stage = .review; expanded = .hours
+        case "howLong":
+            note = "showing at Oak Street Duplex"; read(note); stage = .review
+        case "celebrate":
+            note = LogV2Sample.typedNote; read(note); stage = .review; celebrating = true
         case "logged":
             note = LogV2Sample.typedNote; read(note); stage = .logged; toast = "Logged 1h at Pine Cabin"
         default: break

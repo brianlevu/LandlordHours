@@ -110,6 +110,8 @@ struct LHCaptureField: View {
     var onMic: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    /// The filled mic grows with the text so the glyph stays inside its circle at AX sizes.
+    @ScaledMetric(relativeTo: .body) private var micSide: CGFloat = 44
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
@@ -200,7 +202,7 @@ struct LHCaptureField: View {
                 Image(systemName: "mic.fill")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(colors.onAction)
-                    .frame(width: LHMetrics.minTap, height: LHMetrics.minTap)
+                    .frame(width: max(LHMetrics.minTap, micSide), height: max(LHMetrics.minTap, micSide))
                     .background(colors.action, in: Circle())
             }
             .buttonStyle(LHButton.press)

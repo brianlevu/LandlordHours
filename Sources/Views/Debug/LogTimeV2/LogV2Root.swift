@@ -13,6 +13,8 @@ struct LogV2Launch {
     let free: Bool
     /// `-LHLogV2R1`: direction A as it was in round 1 (for comparison).
     let r1: Bool
+    /// `-LHLogV2Variant beam|object|r2` (A only; default beam, round 3).
+    let variant: LogV2Variant
     let scheme: ColorScheme
     let typeSize: DynamicTypeSize?
 
@@ -32,6 +34,7 @@ struct LogV2Launch {
         }
         return LogV2Launch(direction: dir, state: value("-LHLogV2State") ?? "entry", play: value("-LHLogV2Play"),
                            free: args.contains("-LHLogV2Free"), r1: args.contains("-LHLogV2R1"),
+                           variant: LogV2Variant(rawValue: value("-LHLogV2Variant") ?? "beam") ?? .beam,
                            scheme: value("-LHColorScheme") == "dark" ? .dark : .light, typeSize: size)
     }()
 }
@@ -44,6 +47,7 @@ struct LogV2Root: View {
     init(launch: LogV2Launch) {
         self.launch = launch
         let m = LogV2Model(direction: launch.direction, isFree: launch.free)
+        m.r3 = launch.direction == .a && !launch.r1 && launch.variant != .r2
         m.apply(state: launch.state)
         _model = StateObject(wrappedValue: m)
     }
@@ -80,7 +84,9 @@ struct LogV2Root: View {
     @ViewBuilder private var sheet: some View {
         switch launch.direction {
         case .a:
-            if launch.r1 { LogV2SheetA(model: model) } else { LogV2SheetA2(model: model) }
+            if launch.r1 { LogV2SheetA(model: model) }
+            else if launch.variant == .r2 { LogV2SheetA2(model: model) }
+            else { LogV2SheetR3(model: model, variant: launch.variant) }
         case .b: LogV2SheetB(model: model)
         }
     }

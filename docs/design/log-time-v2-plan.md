@@ -1,120 +1,163 @@
 # Log time v2 — build plan (design only, awaiting Brian)
 
 2026-10-27 · branch `design/log-time-v2` · sandbox: `Sources/Views/Debug/LogTimeV2/` (DEBUG only).
-Launch: `-LHLogV2 A` (round 2), `-LHLogV2 A -LHLogV2R1` (A as in round 1), `-LHLogV2 B` (round 1, kept for comparison).
-Evidence: `~/AgentScratch/landlordhours/2026-10-27/logtime-v2/` (round 1) and `.../logtime-v2/r2/` (round 2). Critique: `.../logtime-v2/critic.md`.
 
-## Decision so far
+**Launch arguments:**
 
-The independent critic picked **A (one line)**, with B's "Say it" screen as A's listening state. B ("three doors") stays in the sandbox, unchanged, for comparison: it takes 4 taps and starts every log with a choice.
+| Launch | What it shows |
+|---|---|
+| `-LHLogV2 A -LHLogV2Variant beam` | **A1 · Beam** (round 3) |
+| `-LHLogV2 A -LHLogV2Variant object` | **A2 · Object** (round 3) |
+| `-LHLogV2Variant r2` | round 2 |
+| `-LHLogV2 A -LHLogV2R1` | round 1 A |
+| `-LHLogV2 B` | round 1 B |
 
-## A, round 2: the flow
+States: `-LHLogV2State entry|typing|review|question|howLong|listening|timerRunning|timerNote|timerReview|celebrate|logged|manual|freeRental`, plus `-LHLogV2Free`. Videos use `-LHLogV2Play type|voice|timer`.
 
-1. **One calm screen on the app's page colour.** A white "What did you do?" field with a filled 44pt mic. Below it, "Log again" chips (inset at the leading edge, faded at the trailing edge), a "Start a timer" row, and "Enter details yourself" as the one tertiary.
-2. **Type:** 600 ms after the last key, a white card appears under the field.
-3. **Speak:** tapping the mic pushes the "Say it" screen: big live words, a level meter, "Done", "Type instead". Done pops back with the words in the field, then the card.
-4. **The card:**
-   - A header that says where the values came from: "From your note", "From what you said", "From the timer", or "From the timer and your note".
-   - The values as tokens (`LHChip`, wrapping), time first.
-   - One footnote naming every value that was not in the note: "Not in your note: You, Today." or "Pine Cabin (your only rental)".
-   - One open answer at a time. A field with no safe answer opens itself and shows "Needs you".
-   - No chevrons.
-5. **Log:** one primary, "Log 1h". When it is disabled it says why: "Answer 1 question".
-6. **The timer** shows the Live Activity's content order, then "Stop and log", then an optional note, then the same card. The timer logs the minutes it ran (1h 12m in the note step, 1h 12m on the card), never a rounded value.
-7. **Manual:** the same card with nothing assumed for time ("How long?" opens itself).
-8. **Free plan:** opening the Rental token ends its answers with a locked "Add a rental" chip and the line "Free covers one rental. Your hours here stay free." That chip opens the existing `.secondProperty` paywall (`LockEntry.propertiesLimit`). Logging, voice and note reading are never gated.
-9. **Motion:**
-   - Steps push (`.push(from:)`, `flow`); "Done" and "Type instead" push back. Reduce Motion crossfades.
-   - The card arrives with `flow` (opacity + 8pt). Values roll with `countChange`.
-   - After Log the sheet dismisses first, and the toast appears only once it is gone.
+**Evidence:** `~/AgentScratch/landlordhours/2026-10-27/logtime-v2/`
+- round 1 at the root
+- `r2/`
+- `calibration/` (the board Brian tapped)
+- `r3/` (this round)
 
-## Standard amendments (r2: two new components, three small changes)
+## Where we are
 
-**New §1.7a `LHCaptureField` + `LHLevelMeter`.** The Log time note field, LHField's multi-line form:
-- Type and size: `.title3`, inner radius 12, padding 16/14, placeholder `textTertiary`.
-- Empty: min 104. Compact once the card shows: min 56, mic beside the words.
-- On the page surface: `backgroundSecondary` fill (dark: hairline `border`).
-- Mic: a filled `action` circle, 44pt, with an `onAction` `mic.fill`.
-- Listening: `stop.fill` and a 1.5pt `action` stroke.
-- `LHLevelMeter`: five 3pt `action` capsules bound to the mic level (`feedback`); static under Reduce Motion.
-- [measured] mic 44×44. [grep] one per screen.
+- **Round 1:** Brian approved A's flow and rejected its look: "very common, like any typical form… even the default app is better for hours selection".
+- **Calibration:** he picked *bold numerals*, *crafted object* and *editorial calm*, and skipped *soft tactile*.
+- **Round 3:** the same flow in that style, as two variants.
 
-**New §1.28 `LHTimerFace`.**
-- Line 1: a positive 8pt dot and "{Work} at {Rental}" in `.headline`.
-- The elapsed time in `lhHeroNumberFont()` (the existing 56/700 SF Rounded tabular token).
-- "Started 8:28 AM" in `.subheadline` `textSecondary`.
-- It ticks once a second. No `repeatForever`.
+## The flow (unchanged, both variants)
 
-**§1.20 `LHSheet(surface: .page)`.** A focused-entry sheet may sit on `background` (the tinted page) with its header and footer on the same colour, so white rows and cards read the way they do on Today, Rentals and Settings. `LogV2PageSheet` is this parameter, written out in the sandbox. This amends §1.20's "opaque sheet on backgroundSecondary".
+1. **One calm screen on the page colour.**
+   - A white "What did you do?" field with a filled 44pt mic.
+   - "Log again" rows, each led by that rental's house.
+   - "Start a timer".
+   - "Enter details yourself" as the one tertiary.
+2. **Type:** 600 ms after the last key, the record card appears under the field.
+3. **Speak:** the mic pushes "Say it": the live words in Fraunces, a level meter, Done, and "Type instead". Every voice frame and video uses a scripted transcript.
+4. **The record card** (one white card):
+   - Your note read back as one Fraunces sentence ("Fixed the sink at Pine Cabin."), with the duration phrase dropped because the numerals say it.
+   - The duration as the hero numeral.
+   - The rental's own house.
+   - Work, who and day as quiet menus.
+   - One footnote naming everything assumed ("Not in your note: You, Today.").
+5. **Needs you:** only the missing thing asks.
+   - No rental: pick one of your houses.
+   - No time: the numerals show "0 h 00 m" in quiet ink with "How long did it take? · Needs you", and the beam or dial is ready to set.
+   - The Log button says what's missing: "Pick a rental to log" or "Set the time to log".
+6. **Log:** the house beat plays, the sheet closes, and the toast "Logged 1h at Pine Cabin · Undo" shows on Today.
+   - The house beat: the windows light (`windows` 0.40). If this log crosses a stage, the next stage fades in (`stageFade` 0.25).
+   - The toast waits for the sheet to dismiss, which fixes the double sheet.
+7. **Timer:** the timer's face is shaped like the variant (beam filling, or the dial sweeping), then "Stop and log", an optional note, and the same card. The duration is the exact minutes it ran: 1h 12m on the note step and on the card, with the footnote "From the timer: 1h 12m, not rounded."
+8. **Manual:** the same card, with time needed. Hours are never assumed anywhere.
+9. **Free plan:**
+   - Logging, voice and reading are never gated.
+   - The rental menu ends with a locked "Add a rental · Pro" item. It is wired to nothing in the sandbox; it should open the existing second-rental paywall (`LockEntry.propertiesLimit`).
+   - A footnote under the details says "Free covers one rental. Your hours here stay free."
 
-**§1.16 `LHChipStrip(wraps: true)`.** `LHChip` in a wrapping layout (8 gaps) for values and answers inside a card. A non-wrapping strip that bleeds to the screen edge gets a 32pt trailing fade.
+## A1 · Beam vs A2 · Object
 
-**§1.16 value tokens.** Inside the review card a chip shows a value (SF glyph + value). "Selected" means that its answers are open; it never means "on".
+| | A1 · Beam | A2 · Object |
+|---|---|---|
+| Duration | Fraunces hero numeral at 84 ("1 h 00 m"), centred, above a **timber beam on a blueprint ruler**. Drag sideways: timber is built, the dashed drafting line is not yet; 15-minute snaps with a selection haptic. | A **blueprint dial plate** (brand blue, drafting rings, white ticks). One turn is one hour; the white arc is the minutes and the pips are the whole hours; 15-minute detents. The numerals sit inside the plate. |
+| House | 120pt, under the duration, beside "Pine Cabin · 59 → 60 of 100h. The roof goes on." | 108pt beside the sentence, at the top. |
+| Reads like | Flighty and Wise: one number owns the screen. | Opal: an object you turn. |
+| Timer | Beam fills as time runs, under the Fraunces numerals and the house. | The dial sweeps. |
 
-`LHReadRow`, `LHReadBack`, `LHAnswerChips` and `LHRowGroup(inSheet:)` from round 1 are dropped.
+## Standard amendments (round 3)
 
-## Consistency check (A, round 2)
+New components (5) and changes to existing ones (3). Everything else is an existing component or token.
+
+**§1.7a `LHCaptureField` + `LHLevelMeter`** (from round 2):
+- The note field: `.title3`, inner radius 12, white on the page.
+- The filled `action` mic: 44pt, growing with Dynamic Type.
+- A listening state: `stop.fill` and a 1.5pt `action` stroke.
+- The meter: five 3pt capsules bound to the mic level.
+
+**§1.28 `LHDurationBeam`** (A1):
+- Height 76.
+- 18pt per 15 minutes; range 0–12h.
+- The reading line is a 3pt `action` capsule.
+- Built part `timber` with `timberInk` grain; unbuilt part a 1pt `drafting` dashed outline.
+- Ticks: `draftingInk` (hour 14pt, quarter 7pt). Hour labels `.caption` `textSecondary`.
+- 12% edge fades.
+- Snaps to 0.25h, with `.sensoryFeedback(.selection)` on each step.
+- `accessibilityAdjustableAction` steps ±15 min.
+- [measured] height 76, tap area full width. [grep] no `repeatForever`.
+
+**§1.29 `LHDurationDial`** (A2):
+- 236pt (220 at AX), `brand` fill on both themes.
+- Drafting cyan rings and ticks (the dark `action` token).
+- Labels 60/15/30/45 in white at 85%.
+- The minutes as a white arc, 6pt with a round cap; a white knob 26pt; one 6pt pip per whole hour.
+- Numerals: the hero numeral at 44 in white.
+- One turn is 60 min; 15-min detents with a selection haptic; adjustable action ±15 min.
+- [measured] white on `brand` 9.06:1.
+
+**§1.30 `LHHouseReadback`:**
+- The rental's real still (`CraftStage.assetName(lit:)`).
+- When this log crosses a stage, the next stage is drafted behind it (its still × `drafting` at 60%).
+- On Log: the lit still fades over the unlit one (`windows` 0.40), and a crossed stage swaps with `stageFade` (opacity + 0.97→1).
+- Dark: the §1.4 night exposure (plus-lighter 0.30 roofed / 0.12 framing).
+- Reduce Motion: crossfades only.
+- It only ever shows the rental's own stage.
+
+**§1.28 `LHTimerFace`** (from round 2): replaced by the variant's own face (beam or dial) plus the "Management at Pine Cabin" line and "Started 8:28 AM · 08s".
+
+**§1.14 amendment: the hero numeral in two places.** `LHFont.heroNumeral` is used for Today's "165" and Log time's duration. Sizes: 84 at default and 54 at AX, as Today uses (44 inside the dial).
+
+**§1.14 amendment: one Fraunces sentence in a task sheet.** The read-back is `LHFont.fraunces(.title)` (28pt, never smaller), and "Say it" shows its live words the same way. It wraps; it never truncates.
+
+**§1.20 `LHSheet(surface: .page)`** (from round 2): the focused sheet on the tinted page, with white cards.
+
+## Consistency check (round 3)
 
 | Used | Standard |
 |---|---|
-| `LHSheet` shape (header 56, title2 + subheadline, `.icon` close, pinned `.primary`, ≤ 1 tertiary, AX policy) on `surface: .page` | §1.20 (+ amendment) |
-| `LHButton.primaryGlass` ("Log 1h", "Answer 1 question" disabled, "Done", "Next", "Stop and log") | §1.13, §1.25 |
-| `LHButton.tertiary` ("Enter details yourself", "Type instead", "Skip the note"), `.destructiveTertiary` ("Discard timer"), `.icon` (close) | §1.13 |
-| `LHRowGroup` + `LHRow.Browse` + `LHRowGlyph` (Start a timer; the timer's rental and work) | §1.4, §1.10 |
-| `LHChip`, `LHChipStrip` (Log again, value tokens, answers) | §1.16 (+ wraps) |
-| `LHSectionHeader` ("Log again"), `LHTag("Needs you", .caution)`, `LHDivider` | §1.15, §1.16, §1.2 |
-| `LHStepper` (time, after a chip), `LHSegmented` (who) | §1.9, §1.8 |
-| Card: `backgroundSecondary`, radius 20, padding 16, dark hairline | §1.10 / `LHRowGroup` |
-| `DraftingLoader(.document)` (reading), `LHToast` success with Undo, `lhHeroNumberFont()` | existing, §1.19, brand §3 |
-| Tokens: `AdaptiveColors`; gutter 20, radii {12, 20, 6, capsule}; `AppAnimation` flow / reveal / feedback / quick / reduced | §1.2, D10, §B.2 |
-| `LHCaptureField` + `LHLevelMeter` | **new §1.7a** |
-| `LHTimerFace` | **new §1.28** |
+| `LHSheet` shape on `surface: .page`: header 56, `.icon` close, pinned `.primary`, ≤ 1 tertiary, AX policy | §1.20 + amendment |
+| `LHButton.primaryGlass`, `.tertiary`, `.destructiveTertiary`, `.icon` | §1.13 |
+| `LHRowGroup`, `LHRow.Browse` with `LHThumb.row` (Log again) and `LHRowGlyph` (Start a timer) | §1.4 |
+| `LHThumb.header` (the rental choices) | §1.4, §H.5 |
+| `LHSectionHeader`, `LHTag("Needs you", .caution)`, `LHDivider`, `LHChevron`-style `chevron.down` in menus | §1.15, §1.16, §1.2 |
+| System `Menu` (work, who, day, rental) | §1.5 (≤ 5 options a menu; work has 8, so build uses a sheet) |
+| Card: white, radius 20, padding 16, dark hairline | §1.10 |
+| `LHFont.heroNumeral`, `LHFont.fraunces(.title)` | §1.14 + amendments |
+| `DraftingLoader(.document)`, `LHToast` success with Undo | existing, §1.19 |
+| Motion: `flow` (push), `windows` 0.40, `stageFade` 0.25, `standard` (numerals), `feedback`, `reduced` | §B.2/§B.3 |
+| Tokens only: `AdaptiveColors`, `AppColors.brand`, `LHMetrics` (gutter 20, radii 12/20/6/capsule) | §1.2, D10 |
+| **New:** `LHCaptureField`, `LHLevelMeter`, `LHDurationBeam`, `LHDurationDial`, `LHHouseReadback` | §1.7a, §1.28–1.30 |
 
-No hex values, no `.system(size:)`, no Fraunces, no tool renders (§1.17). Every SF glyph sits in a `Label`-style slot under its text's font.
+## Builder self-check (round 3)
 
-## Builder self-check (round 2)
+Captured on a slim iPhone 17 Pro simulator, iOS 27.0. 88 frames: 28 per variant and 16 shared (entry, typing, listening and logged are identical in both variants). They cover default and XXL in light and dark, plus AX3 for the review and duration states.
 
-Stopped mid-way on 2026-10-27. Brian approved A's flow but rejected the visual ("looks very common… like any typical form"), so round 2 was halted before its self-check. Its 72 frames are in `r2/frames` (A at default, XXL and AX3, light and dark), unchecked and not re-recorded. Next step: a calibration board (`logtime-v2/calibration/`) before any new SwiftUI.
+- **`frame_check.py`:** 72 unique frames, 3 flagged, 0 duplicates. All 3 were checked by eye and are not text defects:
+  - 2 are house art in the "Log again" rows.
+  - 1 is a row fading under the pinned footer at XXL (§1.20).
+- **`frame_check.py breaks`:** 0 mid-word breaks in 88 frames. No truncation at default or XXL, checked by eye on every review, question, duration and timer frame. Long sentences wrap.
+- **Contrast:** 20 new text pairs (`r3/qa/contrast-r3.txt`), 0 failures. The lowest is the unset dial numerals, white at 60% on `brand`: 4.31:1, which is large text (44pt), so it only needs 3:1. Next lowest are the "Say it" placeholder (4.88) and "Needs you" (5.02).
+- **`frame_check.py density`:** 6 PASS, 26 FAIL, all from two rules:
+  - **D6 (a non-hero card ≤ 20%):** the record card takes 56–63% of the screen, and the timer card 42–50%. This is deliberate: the card is the sheet's hero, like Today's house. Proposed rule: the record card is measured as a hero (H2-style), not as a non-hero card.
+  - **D4 (empty bands ≤ 35%):** the Beam card measures 37–40%, from the air around the numerals. Marginal.
+  - D2 also reads 47% "largest row" on dark Beam frames; the card is being measured as a row.
 
-## Parser changes (NoteReading)
+## Parser changes
 
-1. **Per-field source**, not a number: `enum FieldSource { note(tier), assumed(reason), timer, needed }` on each field. The card's header and its "Not in your note" line come straight from this. A float confidence would be invented; a source is honest and testable.
-2. **Property candidates:** when `mentionedPropertyCount ≥ 2` or the match is weak, return the candidates so the question shows those first.
-3. **Unknown place:** flag a place-like phrase that matches no rental ("the duplex on Elm"). A free user with one rental is then asked, instead of having it silently filed under the only rental.
-4. **No default hours anywhere**, the manual path included (today's sheet pre-sets 1h). Timer hours are the minutes it ran.
-5. **Streaming:** run the rules tier on the partial voice transcript, so the card can start building while you talk.
+1. **Field sources** (`note(tier)`, `assumed(reason)`, `timer`, `needed`). They drive the footnote and "Needs you".
+2. **The span of the duration phrase.** The read-back drops it; the sandbox uses a comma heuristic.
+3. **Property candidates and "unknown place"** for a one-rental free user.
+4. **No default hours anywhere.** Timer hours are the exact minutes.
 
-## Before build (from the critique)
+## Analytics, tests, size
 
-- **AX3:** frames for the main states are in `r2/frames`. The gate still has to review them.
-- **Real-voice spike (1 day, a device):** on-device recognition of rental names ("Oak Street Duplex") in street and car noise. Every voice frame and video here uses a scripted transcript.
-- **Sheet re-present glitch:** fixed in the sandbox (the toast waits for `onDismiss`). It still has to be proved on a device in the real shell.
+- **Analytics:** as in round 2, plus `log_duration_control {beam|dial, drags, final_step}`. That shows whether people use the control or trust the note.
+- **Tests:** as in round 2, plus unit tests for snapping (0.25h), the dial's wrap and accumulation (0–12h), `crossesStage`, and the read-back sentence.
+- **Size:** about 10 working days. The beam or dial (2–3 days with haptics and accessibility) and the house beat (1 day, shared with Today's motion code) add to round 2's 8.
 
-## Analytics (PostHog, all new except the last)
+## Before build
 
-`log_sheet_opened {entry}` · `log_path {type|voice|timer|recent|manual}` · `log_read {tier, filled[], needed[], ms}` · `log_question_answered {field}` · `log_field_corrected {field, from: note|assumed|timer}` · `log_abandoned {stage}` · `entry_logged` gains `{path, corrections, seconds_to_log}`.
-
-Two numbers say whether the design works: the median seconds from open to Log, and the corrections per log on note-filled fields.
-
-## Tests
-
-- **Unit:**
-  - field sources over the NoteReading eval set
-  - no hours → needed (manual included)
-  - a one-rental free user
-  - two rentals named → needed, with candidates
-  - timer minutes are not rounded
-  - the disabled-Log reason count
-- **UI** (XCUITest, sim + iPad): the type path, voice (scripted hook), question, free → paywall → back out, timer start/stop/note/log, and manual. `log.*` identifiers move to `logv2.*`. The old LogTime UI tests are rewritten in the same package, with no weakened assertions.
-- **Visual gate:** every state in light and dark at default, XXL and AX3, plus density and contrast.
-
-## Size
-
-| Package | Work | Size |
-|---|---|---|
-| 0 | `LHCaptureField`, `LHLevelMeter`, `LHTimerFace` into `Views/Components`; `LHSheet(surface:)`, `LHChipStrip(wraps:)`; standard text | S (1 day) |
-| 1 | Parser: FieldSource, candidates, unknown place, no default hours, eval set | M (2 days) |
-| 2 | New LogTimeSheet (A) on the real form, voice, timer, toast; delete the old rows/stepper layout | M–L (3 days) |
-| 3 | Analytics, UI tests, gates; real-voice spike on a device | M (2–3 days) |
-
-About 8–9 working days, with packages 0 and 1 in parallel. The Live Activity and widgets are unchanged.
+- Brian picks A1 or A2.
+- An independent critic reviews `r3/`.
+- **A real-voice spike** on a device, about one day: every voice frame here is scripted.
+- **AX3** for the whole flow. Only the review and duration frames are captured.
+- **The house beat on a device**, inside the real shell.
