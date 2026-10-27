@@ -16,6 +16,9 @@ struct LHField: View {
     var error: String? = nil
     var accessibilityLabel: String? = nil
     var identifier: String? = nil
+    /// Optional two-way focus, so a form can move focus between its fields (Next). The field keeps
+    /// its own `@FocusState`; this binding mirrors it in both directions.
+    var isFocused: Binding<Bool>? = nil
 
     @FocusState private var focused: Bool
     @State private var shakeTrigger = 0
@@ -27,13 +30,14 @@ struct LHField: View {
     static let multilineMinHeight: CGFloat = 104
 
     init(_ placeholder: String, text: Binding<String>, multiline: Bool = false, error: String? = nil,
-         accessibilityLabel: String? = nil, identifier: String? = nil) {
+         accessibilityLabel: String? = nil, identifier: String? = nil, isFocused: Binding<Bool>? = nil) {
         self.placeholder = placeholder
         self._text = text
         self.multiline = multiline
         self.error = error
         self.accessibilityLabel = accessibilityLabel
         self.identifier = identifier
+        self.isFocused = isFocused
     }
 
     private var strokeColor: Color {
@@ -114,6 +118,12 @@ struct LHField: View {
                     .foregroundStyle(colors.destructive)
                     .transition(.opacity)
             }
+        }
+        .onChange(of: isFocused?.wrappedValue ?? false) { _, wanted in
+            if focused != wanted { focused = wanted }
+        }
+        .onChange(of: focused) { _, now in
+            if let isFocused, isFocused.wrappedValue != now { isFocused.wrappedValue = now }
         }
         .onChange(of: error) { old, new in
             if new != nil, new != old { shakeTrigger += 1 }

@@ -180,7 +180,7 @@ final class OnboardingCaptureUITests: XCTestCase {
         tap(app.buttons["onb-link"])
         tap(app.buttons["onb-primary"])
         tap(app.buttons["onb-link"])
-        XCTAssertTrue(app.buttons["today.hero.addProperty"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["today.addRental"].waitForExistence(timeout: 10), "The empty lot carries Add a rental")
         shot("08-today-skip", scheme, suffix)
 
         // Upgraders: What's new.

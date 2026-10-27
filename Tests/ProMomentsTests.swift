@@ -346,17 +346,11 @@ final class PaywallContextTests: XCTestCase {
         }
         copy += PaywallCopy.benefits.flatMap { [$0.title, $0.line] }
         for entry in LockEntry.allCases { copy += [ProGate.lockLine(entry), ProGate.keepsLine(entry)] }
-        copy.append(NotTaxAdviceNote.text)
-        for line in copy where line != NotTaxAdviceNote.text {
+        for line in copy {
             for word in banned {
                 XCTAssertFalse(line.lowercased().contains(word), "Overclaim '\(word)' in: \(line)")
             }
         }
-    }
-
-    func testNotTaxAdviceWording() {
-        XCTAssertEqual(NotTaxAdviceNote.text,
-                       "LandlordHours keeps your records. It doesn’t give tax advice. Ask a tax professional what your hours mean for you.")
     }
 
     func testOnboardingHasNoPaywallStep() {

@@ -259,8 +259,8 @@ final class LandlordHoursUITests: XCTestCase {
     func testFirstTimeActivationFlowAddsPropertyAndLogsFirstHour() {
         launch(scenario: "emptyMainTabs", tab: 0)
 
-        // 2.0: an owner with no property sees the empty lot; its "Add property" is the one action.
-        let addProperty = app.buttons["today.hero.addProperty"].firstMatch
+        // 2.2: an owner with no property sees the empty lot; its "Add a rental" is the one action.
+        let addProperty = app.buttons["today.addRental"].firstMatch
         XCTAssertTrue(addProperty.waitForExistence(timeout: 8))
         XCTAssertFalse(app.staticTexts["Finish setting up"].exists, "Setup card follows the first property")
         let propertyName = app.textFields["property.name"]
@@ -289,10 +289,8 @@ final class LandlordHoursUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Oak Street Duplex"].waitForExistence(timeout: 5))
 
-        app.buttons["tab.today"].tap()
-        let firstHourTile = app.buttons["home.activation.firstHour"]
-        scrollToElement(firstHourTile)
-        tapWhenHittable(firstHourTile, scrollIfNeeded: true)
+        // 2.2: the setup card is gone; "Log time" in the tab bar is the one way to the first hour.
+        app.buttons["tab.logTime"].tap()
 
         let noteEditor = app.descendants(matching: .any)["log.note"].firstMatch
         XCTAssertTrue(noteEditor.waitForExistence(timeout: 5))
@@ -310,6 +308,42 @@ final class LandlordHoursUITests: XCTestCase {
 
         XCTAssertFalse(app.staticTexts["Finish setting up"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["home.activation.firstHour"].exists)
+    }
+
+    func testAddRentalNextMovesFocusFromNameToAddress() {
+        launch(scenario: "emptyMainTabs", tab: 0)
+        let addProperty = app.buttons["today.addRental"].firstMatch
+        XCTAssertTrue(addProperty.waitForExistence(timeout: 8))
+        let propertyName = app.textFields["property.name"]
+        for _ in 0..<3 where !propertyName.exists {
+            tapWhenHittable(addProperty, scrollIfNeeded: true)
+            _ = propertyName.waitForExistence(timeout: 3)
+        }
+        XCTAssertTrue(propertyName.waitForExistence(timeout: 5))
+        propertyName.tap()
+        propertyName.typeText("Oak Street Duplex")
+
+        let address = app.textFields["property.address"]
+        XCTAssertTrue(address.waitForExistence(timeout: 5))
+        XCTAssertFalse(address.value(forKey: "hasKeyboardFocus") as? Bool ?? false, "Address starts unfocused")
+        let next = app.keyboards.buttons.matching(NSPredicate(format: "label ==[c] %@", "next")).firstMatch
+        // iOS 27 labels the return key in lower case ("next"); match without case.
+        XCTAssertTrue(next.waitForExistence(timeout: 5), "Name field shows a Next return key")
+        next.tap()
+
+        let focused = NSPredicate(format: "hasKeyboardFocus == true")
+        expectation(for: focused, evaluatedWith: address)
+        waitForExpectations(timeout: 5)
+        XCTAssertFalse(propertyName.value(forKey: "hasKeyboardFocus") as? Bool ?? true, "Name gave up focus")
+
+        address.typeText("123 Main Street")
+        XCTAssertEqual(address.value as? String, "123 Main Street")
+        // The last field's Done/Return dismisses the keyboard focus.
+        let done = app.keyboards.buttons.matching(NSPredicate(format: "label ==[c] %@", "done")).firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 3), "Address field shows a Done return key")
+        done.tap()
+        expectation(for: NSPredicate(format: "hasKeyboardFocus == false"), evaluatedWith: address)
+        waitForExpectations(timeout: 5)
     }
 
     func testAttachmentPhotoSurvivesForceQuitAndRelaunch() {

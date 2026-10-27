@@ -357,7 +357,7 @@ final class AuditReportBuilderTests: XCTestCase {
         let pdf = AuditReportPDFRenderer().render(report)
         let document = PDFDocument(data: pdf)
         XCTAssertEqual(document?.pageCount, 1)
-        XCTAssertTrue(document?.string?.contains("No time entries were logged for 2026") == true)
+        XCTAssertTrue(document?.string?.contains("No hours were logged for 2026") == true)
     }
 }
 
@@ -653,8 +653,8 @@ final class AuditReportPDFTests: XCTestCase {
         let pdf = AuditReportPDFRenderer(attachmentData: { images[$0.id] }).render(report)
         let text = try XCTUnwrap(PDFDocument(data: pdf)?.string)
         XCTAssertTrue(text.contains("financing"), "\"fi\" ligature must extract as text")
-        XCTAssertTrue(text.contains("Tax Profile"))
-        XCTAssertFalse(text.contains("Tax Pro le"))
+        XCTAssertTrue(text.contains("Filing and goal"))
+        XCTAssertFalse(text.contains("Fil ng"))
     }
 
     func testMaterialParticipationNoteStaysWithItsTable() throws {
@@ -663,15 +663,15 @@ final class AuditReportPDFTests: XCTestCase {
         let pages = (0..<document.pageCount).map { document.page(at: $0)?.string ?? "" }
         let notePage = try XCTUnwrap(pages.firstIndex { $0.contains("The 100-hour test also requires") })
         XCTAssertTrue(pages[notePage].contains("500-hour test"), "note must share a page with the material participation table")
-        XCTAssertTrue(pages[notePage].contains("Material participation by property"), "small tables move whole instead of splitting")
+        XCTAssertTrue(pages[notePage].contains("500-hour and 100-hour tests by property"), "small tables move whole instead of splitting")
     }
 
     func testPDFShowsProvenanceColumnsAndSourceAppendix() throws {
         let (report, images) = Self.sampleReport()
         let document = try XCTUnwrap(PDFDocument(data: AuditReportPDFRenderer(attachmentData: { images[$0.id] }).render(report)))
         let all = document.string ?? ""
-        for expected in ["Detected", "Confirmed", "Calendar suggestion", "Calendar import", "Receipt", "Other",
-                         "Appendix: where entries came from", AuditReportFormat.suggestionExplanation, "days later"] {
+        for expected in ["Suggested", "Confirmed", "Calendar suggestion", "Calendar import", "Receipt", "Other",
+                         "Appendix: where records came from", AuditReportFormat.suggestionExplanation, "days later"] {
             XCTAssertTrue(all.contains(expected), "missing \(expected)")
         }
         for banned in ["audit-proof", "audit proof", "score", "%"] {
@@ -693,8 +693,8 @@ final class AuditReportPDFTests: XCTestCase {
             XCTAssertTrue(text.contains("not tax advice"), "page \(index + 1) disclaimer")
         }
         let all = document.string ?? ""
-        for expected in ["REPS hours by participant", "Hours by property", "Hours by category", "Hours by participant",
-                         "Time entries (chronological)", "Appendix: photos and receipts", "Oak Street Duplex", "Pine Cabin",
+        for expected in ["Hours toward 750, by person", "Hours by rental", "Hours by category", "Hours by person",
+                         "Records, by date", "Appendix: photos and receipts", "Oak Street Duplex", "Pine Cabin",
                          "water-heater-receipt.jpg", "Calendar", "Timer", "Voice", "E46"] {
             XCTAssertTrue(all.contains(expected), "missing \(expected)")
         }

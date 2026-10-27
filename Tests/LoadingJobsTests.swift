@@ -239,7 +239,7 @@ final class ExportJobTests: XCTestCase {
         job.start(report: report(), year: 2026)
         await job.waitUntilDone()
         XCTAssertEqual(job.state, .failed(year: 2026, message: ExportJob.failureMessage))
-        XCTAssertEqual(job.failureMessage(for: 2026), "Could not create the report. Please try again.")
+        XCTAssertEqual(job.failureMessage(for: 2026), "Couldn’t create the record. Try again.")
         XCTAssertEqual(job.banner, .failed, "Closed sheet: the failure shows in the banner slot")
         XCTAssertNil(job.takeReadyForSharing(), "Nothing to share after a failure")
         job.dismissBanner()

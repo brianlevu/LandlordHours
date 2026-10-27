@@ -135,7 +135,8 @@ struct PropertiesView: View {
 
     @ViewBuilder private var rootContent: some View {
         if let id = singleRentalID {
-            PropertyDetailView(propertyId: id, onEdit: { property in editor = .edit(property) })
+            PropertyDetailView(propertyId: id, onEdit: { property in editor = .edit(property) },
+                               onUnlockAtLimit: atLimit ? { openPaywall() } : nil)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button(RentalsText.addRental, action: openAddProperty)

@@ -24,6 +24,10 @@ import CoreLocation
 struct PropertyDetailView: View {
     let propertyId: UUID
     var onEdit: (RentalProperty) -> Void
+    /// Set only when this page IS the Rentals tab (exactly one rental) and a free owner is at the
+    /// limit: the page then ends with the same `.row` lock the gallery shows, so the one place a
+    /// free owner meets the rental limit still says what stays free before the paywall.
+    var onUnlockAtLimit: (() -> Void)?
 
     @EnvironmentObject var viewModel: AppViewModel
     @ObservedObject private var goalManager = GoalManager.shared
@@ -121,6 +125,13 @@ struct PropertyDetailView: View {
                     RentalBody(property: property)
                         .padding(.horizontal, LHMetrics.gutter)
                         .padding(.top, LHMetrics.sectionGap)
+                    if let onUnlockAtLimit {
+                        LHRowGroup {
+                            PropertiesAtLimitRow(firstPropertyName: property.name, onUnlock: onUnlockAtLimit)
+                        }
+                        .padding(.horizontal, LHMetrics.gutter)
+                        .padding(.top, LHMetrics.sectionGap)
+                    }
                     Color.clear.frame(height: 24).id("property.end")
                 }
                 .frame(maxWidth: band == .a ? .infinity : LHMetrics.readingColumn)
