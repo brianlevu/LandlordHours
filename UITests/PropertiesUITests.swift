@@ -229,6 +229,53 @@ final class PropertiesUITests: XCTestCase {
         }
     }
 
+    /// The free single-rental page scrolled to its end (the lock row), a Pro page without it, and the
+    /// Add rental form with the keyboard after Next: light and dark at default, XXL and AX3.
+    func testCaptureConversionLockRow() {
+        for scheme in ["light", "dark"] {
+            for size in [nil, "xxl", "ax3"] as [String?] {
+                var sizeArgs: [String] = []
+                if size == "xxl" { sizeArgs = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXL"] }
+                if size == "ax3" { sizeArgs = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL"] }
+                let suffix = "-\(scheme)\(size.map { "-\($0)" } ?? "")"
+
+                app.terminate()
+                launch(seed: "limit", scheme: scheme, extra: sizeArgs)
+                XCTAssertTrue(app.descendants(matching: .any)["property.hero"].waitForExistence(timeout: 15))
+                let lock = app.descendants(matching: .any)["lock.properties_limit"].firstMatch
+                var swipes = 0
+                while !(lock.exists && lock.buttons["lock.unlock"].isHittable) && swipes < 14 { app.swipeUp(); swipes += 1 }
+                XCTAssertTrue(lock.exists, "free page ends with the lock row\(suffix)")
+                for _ in 0..<3 { app.swipeUp(velocity: .fast) }
+                Thread.sleep(forTimeInterval: 1.0)
+                capture("lockrow-free-bottom" + suffix)
+
+                app.terminate()
+                launch(seed: "layouts1", scheme: scheme, extra: ["-LHPropertiesGoal", "mp100"] + sizeArgs)
+                XCTAssertTrue(app.descendants(matching: .any)["property.hero"].waitForExistence(timeout: 15))
+                for _ in 0..<14 { app.swipeUp(velocity: .fast) }
+                Thread.sleep(forTimeInterval: 1.0)
+                XCTAssertFalse(lock.exists, "Pro: no lock row\(suffix)")
+                capture("lockrow-pro-bottom" + suffix)
+
+                app.terminate()
+                launch(seed: "four", scheme: scheme, extra: ["-LHOpenAddProperty"] + sizeArgs)
+                let name = app.textFields["property.name"]
+                XCTAssertTrue(name.waitForExistence(timeout: 15))
+                name.tap()
+                name.typeText("Oak Street Duplex")
+                let next = app.keyboards.buttons.matching(NSPredicate(format: "label ==[c] %@", "next")).firstMatch
+                XCTAssertTrue(next.waitForExistence(timeout: 5))
+                next.tap()
+                let focused = NSPredicate(format: "hasKeyboardFocus == true")
+                expectation(for: focused, evaluatedWith: app.textFields["property.address"])
+                waitForExpectations(timeout: 5)
+                Thread.sleep(forTimeInterval: 1.0)
+                capture("addrental-after-next" + suffix)
+            }
+        }
+    }
+
     func testCaptureLightDefault() { captureAll(scheme: "light", size: nil) }
     func testCaptureDarkDefault() { captureAll(scheme: "dark", size: nil) }
     func testCaptureLightXXL() { captureAll(scheme: "light", size: "xxl") }

@@ -38,6 +38,15 @@ struct PropertyEditSheet: View {
     @State private var pickedAddress: String?
     @State private var nameError: String?
     @State private var loaded = false
+    private enum FormField { case name, address }
+    /// Which text field has the keyboard; Next on the name moves it to the address.
+    @State private var focusedField: FormField?
+    private func focusBinding(_ field: FormField) -> Binding<Bool> {
+        Binding(get: { focusedField == field },
+                set: { on in
+                    if on { focusedField = field } else if focusedField == field { focusedField = nil }
+                })
+    }
     /// How far the form has scrolled up under the sheet's title (content points).
     @State private var scrolledUnderHeader: CGFloat = 0
 
@@ -135,16 +144,20 @@ struct PropertyEditSheet: View {
             VStack(alignment: .leading, spacing: 8) {
                 fieldLabel(RentalsText.name)
                 LHField(RentalsText.namePlaceholder, text: $name, error: nameError,
-                        accessibilityLabel: RentalsText.name, identifier: "property.name")
+                        accessibilityLabel: RentalsText.name, identifier: "property.name",
+                        isFocused: focusBinding(.name))
                     .textInputAutocapitalization(.words)
                     .submitLabel(.next)
+                    .onSubmit { focusedField = .address }
             }
             VStack(alignment: .leading, spacing: 8) {
                 fieldLabel(RentalsText.address)
                 LHField(RentalsText.addressPlaceholder, text: $address,
-                        accessibilityLabel: RentalsText.address, identifier: "property.address")
+                        accessibilityLabel: RentalsText.address, identifier: "property.address",
+                        isFocused: focusBinding(.address))
                     .textInputAutocapitalization(.words)
                     .submitLabel(.done)
+                    .onSubmit { focusedField = nil }
                     .onChange(of: address) { _, value in
                         if value == pickedAddress { return }
                         pickedAddress = nil
