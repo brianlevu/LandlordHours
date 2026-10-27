@@ -329,6 +329,8 @@ enum IdentityFixtures {
         case "zoneGone":
             // Synced before; the zone was then deleted on another device (U37).
             defaults.set(true, forKey: IdentityKeys.hasSynced)
+            // A phone that synced learned whose iCloud it is at S5.
+            defaults.set(source.userName, forKey: IdentityKeys.icloudUserRecordName)
             RecordSetMigration.setStep(.done, defaults)
             source.zoneExists = false
         case "bulk":
