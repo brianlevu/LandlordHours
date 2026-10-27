@@ -191,16 +191,25 @@ final class PropertiesUITests: XCTestCase {
         }
     }
 
-    /// All five stages at once (the `stages` seed), every window unlit then every window lit, dark and
-    /// light: the frames the tile-art contrast measure reads (standard §1.4 tile recipe).
+    /// All five stages (the `stages` seed), every window unlit then every window lit, dark and light:
+    /// the frames the tile-art contrast measure reads (standard §1.4 tile recipe). The top frame shows
+    /// started, frame70, framing and half; the `-bottom` frame is scrolled to the end so `complete`
+    /// (tile 4) is fully in view.
     func testCaptureGalleryStages() {
         for scheme in ["dark", "light"] {
             for (state, lit) in [("unlit", ""), ("lit", "0,1,2,3,4")] {
-                app.terminate()
-                launch(seed: "stages", scheme: scheme, extra: lit.isEmpty ? [] : ["-LHPropertiesLitToday", lit])
-                XCTAssertTrue(app.descendants(matching: .any)["properties.tile.4"].firstMatch.waitForExistence(timeout: 15))
-                Thread.sleep(forTimeInterval: 1.5)
-                capture("stages-\(state)-\(scheme)")
+                for bottom in [false, true] {
+                    app.terminate()
+                    let extra = (lit.isEmpty ? [] : ["-LHPropertiesLitToday", lit]) + (bottom ? ["-LHPropertiesScrollBottom"] : [])
+                    launch(seed: "stages", scheme: scheme, extra: extra)
+                    let last = app.descendants(matching: .any)["properties.tile.4"].firstMatch
+                    XCTAssertTrue(last.waitForExistence(timeout: 15))
+                    Thread.sleep(forTimeInterval: 1.5)
+                    if bottom {
+                        XCTAssertTrue(last.isHittable, "complete (tile 4) is scrolled into view")
+                    }
+                    capture("stages-\(state)-\(scheme)\(bottom ? "-bottom" : "")")
+                }
             }
         }
     }

@@ -165,25 +165,32 @@ def make_tile(name, top=800, h=720):
 
 
 class RentalsGalleryCarveOut(unittest.TestCase):
-    """Standard 1.4 exception: Rentals gallery tiles are exempt from D6 (card share)."""
+    """Standard 1.4 exception: with --rentals-gallery, tiles are capped at 38% instead of D6's 20%."""
 
     def test_tall_card_fails_d6_on_an_ordinary_frame(self):
         self.assertTrue(failed(run(make_tile("rentals-x.png")), "D6 card"))
 
-    def test_same_card_is_exempt_on_a_gallery_frame(self):
-        res = run(make_tile("gallery-3-dark.png"))
-        self.assertFalse(failed(res, "D6"))
-        self.assertTrue([c for c in res["checks"] if c["rule"].startswith("D6 exempt")])
-
-    def test_flag_forces_the_carve_out_and_single_rental_frame_keeps_d6(self):
+    def test_flag_lifts_the_card_cap_to_the_tile_cap(self):
         res = fc.analyse(make_tile("anything.png"), "default", 3.0, 0.88, None, rentals_gallery=True)
         self.assertFalse(failed(res, "D6"))
-        self.assertTrue(failed(run(make_tile("gallery-1-dark.png")), "D6 card"))
+        self.assertTrue([c for c in res["checks"] if c["rule"].startswith("D6 Rentals tile") and c["pass_"]])
 
-    def test_gallery_name_pattern(self):
-        for n, want in [("gallery-3-dark.png", True), ("gallery-8-bottom-light-ax3.png", True),
-                        ("gallery-12-dark.png", True), ("gallery-1-dark.png", False), ("rentals-gallery.png", False)]:
-            self.assertEqual(fc.is_rentals_gallery("/x/" + n), want, n)
+    def test_gallery_file_name_alone_does_not_trigger_the_carve_out(self):
+        for n in ["gallery-3-dark.png", "gallery-8-bottom-light-ax3.png", "gallery-12-dark.png"]:
+            self.assertTrue(failed(run(make_tile(n)), "D6 card"), n)
+
+    def test_flag_still_fails_a_tile_over_38_percent(self):
+        res = fc.analyse(make_tile("big.png", top=600, h=1100), "default", 3.0, 0.88, None, rentals_gallery=True)
+        self.assertTrue(failed(res, "D6 Rentals tile"))
+
+    def test_cli_flag_reaches_the_check(self):
+        import subprocess
+        path = make_tile("gallery-3-dark.png")
+        script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frame_check.py")
+        plain = subprocess.run([sys.executable, script, "density", path], capture_output=True, text=True)
+        flagged = subprocess.run([sys.executable, script, "density", "--rentals-gallery", path], capture_output=True, text=True)
+        self.assertNotEqual(plain.returncode, 0, plain.stdout)
+        self.assertIn("D6 Rentals tile", flagged.stdout + flagged.stderr)
 
 
 class DayHeaders(unittest.TestCase):

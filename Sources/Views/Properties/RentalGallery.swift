@@ -43,6 +43,18 @@ struct RentalTileHouse: View {
                             .frame(width: side, height: side)
                             .brightness(dark ? Self.nightLift(stage) : 0)
                             .position(center)
+                        if dark {
+                            // Night exposure: the unlit still added onto itself (plus-lighter), so the
+                            // house's own pixels brighten in proportion and its shadows stay dark.
+                            Image(stage.assetName(lit: false))
+                                .resizable()
+                                .interpolation(.high)
+                                .scaledToFit()
+                                .frame(width: side, height: side)
+                                .opacity(Self.nightExposure(stage))
+                                .blendMode(.plusLighter)
+                                .position(center)
+                        }
                     }
                 }
             }
@@ -53,10 +65,17 @@ struct RentalTileHouse: View {
 extension RentalTileHouse {
     /// Night only (standard §H.4 `backlight`, the Today night page's recipe at the tile's art side):
     /// a cool light behind the lot, 0.50 → 0 inside 0.88 × side, plus a rim ellipse 0.34 → 0, both
-    /// times `strength`, so an unlit roofed house reads against the tile. Light mode draws none.
-    /// Roofed stages take 1.4 × (an unlit roof measured 1.68:1 on the tile with none, 2.98 with it);
-    /// the framing stages draw none: their pale wood already reads (2.5-2.7:1 unlit) and any glow behind it only lowers that.
-    static func backlightStrength(_ stage: CraftStage) -> Double { stage.isFraming ? 0 : 1.4 }
+    /// times `strength`. Roofed stages take the hero's 1.0; the framing stages draw none (any glow
+    /// behind pale wood only lowers its contrast). Light mode draws none. The glow lights the tile
+    /// around the house, not the house, so readability comes from `nightExposure`, not from here.
+    static func backlightStrength(_ stage: CraftStage) -> Double { stage.isFraming ? 0 : 1.0 }
+
+    /// Night only: the share of the unlit still added back onto the house (plus-lighter), an
+    /// exposure lift of the house's own pixels. The unlit still is used in both states, so walls
+    /// match lit and unlit and the lit windows keep their glow. Captured p99 art contrast on the
+    /// #141C3F tile went from 2.10–2.12 (roofed, unlit) and 2.48–2.52 (framing) to ≥ 2.55
+    /// (standard §1.4, gate rubric §6). Light mode adds none.
+    static func nightExposure(_ stage: CraftStage) -> Double { stage.isFraming ? 0.12 : 0.30 }
 
     @ViewBuilder fileprivate func backlight(side: CGFloat, strength k: Double) -> some View {
         if dark, k > 0 {
