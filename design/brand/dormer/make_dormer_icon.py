@@ -166,8 +166,19 @@ def svg(body, bg=None):
             f'width="{GRID}" height="{GRID}">{rect}{body}</svg>\n')
 
 
-def mark_svg(color="#FFFFFF"):
-    return svg(f'<path d="{path_d()}" fill="{color}" fill-rule="evenodd"/>')
+def mark_svg(color="#FFFFFF", bottom=None):
+    """The mark. With `bottom`, a top-to-bottom gradient colour -> bottom (the raised finish)."""
+    if bottom is None:
+        return svg(f'<path d="{path_d()}" fill="{color}" fill-rule="evenodd"/>')
+    defs = (f'<defs><linearGradient id="raised" x1="0" y1="0" x2="0" y2="1">'
+            f'<stop offset="0" stop-color="{color}"/><stop offset="1" stop-color="{bottom}"/>'
+            f'</linearGradient></defs>')
+    return svg(f'{defs}<path d="{path_d()}" fill="url(#raised)" fill-rule="evenodd"/>')
+
+
+RAISED_WHITE_BOTTOM = "#E3E7F0"   # white -> very light grey, same family
+RAISED_CYAN_BOTTOM = "#7FC3EE"
+SHADOW_OPACITY = 0.8
 
 
 # ---------------------------------------------------------------- colour
@@ -208,7 +219,7 @@ def shift(a, dx, dy):
     return out
 
 
-def embossed(px, stops, mark_hex, shadow_hex, emboss=1.0):
+def embossed(px, stops, mark_hex, shadow_hex, emboss=1.0, bottom_hex=None):
     """The approved 'soft emboss' look (gen/embossed-1.png), rendered from the vector.
 
     Only for the iOS 18-25 fallback, where the system adds no glass. One soft key light from the
@@ -216,10 +227,11 @@ def embossed(px, stops, mark_hex, shadow_hex, emboss=1.0):
     faint shade on the bottom-right ones. Kept shallow so it reads as a few millimetres of relief.
     """
     k = px / 1024
+    bottom_hex = bottom_hex or mark_hex
     m = np.asarray(mask(px), dtype=np.float64) / 255
     base = gradient(px, stops)
     # contact shadow: soft, short, straight down
-    sh = shift(blur(m, 14 * k), 0, int(round(9 * k))) * 0.42 * emboss
+    sh = shift(blur(m, 14 * k), 0, int(round(9 * k))) * 0.55 * emboss
     sh = sh * (1 - m)
     base = base * (1 - sh[..., None]) + hx(shadow_hex) * sh[..., None]
     # relief: gradient of a blurred mask, lit from the upper left
@@ -227,7 +239,9 @@ def embossed(px, stops, mark_hex, shadow_hex, emboss=1.0):
     gy, gx = np.gradient(b)
     light = (-gx * -1 + -gy * -1) / math.sqrt(2)          # dot(normal, toward-light)
     light = light / (np.abs(light).max() + 1e-9)
-    mark = np.repeat(hx(mark_hex)[None, None, :], px, 0).repeat(px, 1)
+    top, bot = hx(mark_hex), hx(bottom_hex)
+    t = (np.arange(px) / (px - 1))[:, None, None]
+    mark = (top * (1 - t) + bot * t) * np.ones((px, px, 3))
     shade = np.clip(-light, 0, 1)[..., None]
     mark = mark * (1 - 0.13 * emboss * shade)
     # a whisper of body shading so the slab is not a flat sticker: 2% darker toward bottom right
@@ -278,9 +292,9 @@ def write_icon_doc(dest):
     gradient_img(DARK_STOPS).save(os.path.join(A, "ground-dark.png"))
     Image.new("RGB", (GRID, GRID), (0, 0, 0)).save(os.path.join(A, "ground-tinted.png"))
     with open(os.path.join(A, "mark.svg"), "w") as f:
-        f.write(mark_svg(MARK_WHITE))
+        f.write(mark_svg(MARK_WHITE, RAISED_WHITE_BOTTOM))
     with open(os.path.join(A, "mark-dark.svg"), "w") as f:
-        f.write(mark_svg(CYAN))
+        f.write(mark_svg(CYAN, RAISED_CYAN_BOTTOM))
     _ = gsvg  # kept for reference; see note above
 
     def layer(name, light, dark, tinted_name, glass):
@@ -304,7 +318,7 @@ def write_icon_doc(dest):
                 "name": "Mark",
                 "layers": [layer("mark", "mark.svg", "mark-dark.svg", "mark.svg", True)],
                 "specular": True,
-                "shadow": {"kind": "neutral", "opacity": 0.5},
+                "shadow": {"kind": "neutral", "opacity": SHADOW_OPACITY},
                 "translucency": {"enabled": False, "value": 0.0},
             },
             {
@@ -410,10 +424,10 @@ def main():
     write_icon_doc(os.path.join(ROOT, "AppIcon.icon"))
 
     ai = os.path.join(ROOT, "Assets.xcassets", "AppIcon.appiconset")
-    embossed(1024, LIGHT_STOPS, "#FBFCFE", "#0A1A55").save(os.path.join(ai, "AppIcon.png"))
-    embossed(1024, DARK_STOPS, CYAN, "#000000", emboss=0.8).save(os.path.join(ai, "AppIcon-Dark.png"))
+    embossed(1024, LIGHT_STOPS, "#FFFFFF", "#0A1A55", bottom_hex=RAISED_WHITE_BOTTOM).save(os.path.join(ai, "AppIcon.png"))
+    embossed(1024, DARK_STOPS, CYAN, "#000000", emboss=0.8, bottom_hex=RAISED_CYAN_BOTTOM).save(os.path.join(ai, "AppIcon-Dark.png"))
     tinted(1024).save(os.path.join(ai, "AppIcon-Tinted.png"))
-    embossed(1024, LIGHT_STOPS, "#FBFCFE", "#0A1A55").save(
+    embossed(1024, LIGHT_STOPS, "#FFFFFF", "#0A1A55", bottom_hex=RAISED_WHITE_BOTTOM).save(
         os.path.join(ROOT, "Assets.xcassets", "onb-appicon.imageset", "onb-appicon.png"))
 
     lm = os.path.join(ROOT, "Assets.xcassets", "LaunchMark.imageset")
