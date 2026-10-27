@@ -199,6 +199,39 @@
         }
       }
     },
+    "delete.otherAccount.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This iPhone is signed in to a different iCloud account now. Nothing in that iCloud will be deleted. Delete from this iPhone only?"
+          }
+        }
+      }
+    },
+    "delete.otherAccount.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Different iCloud account"
+          }
+        }
+      }
+    },
+    "delete.otherDevices": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete on your other devices too, or they will offer to put the records back."
+          }
+        }
+      }
+    },
     "delete.photos.many": {
       "extractionState": "manual",
       "localizations": {
@@ -1354,17 +1387,6 @@
         }
       }
     },
-    "pdf.suggested": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Suggested"
-          }
-        }
-      }
-    },
     "pdf.each.item.lists.its.reference.the": {
       "extractionState": "manual",
       "localizations": {
@@ -1431,6 +1453,50 @@
         }
       }
     },
+    "pdf.h750.counts": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Counts toward 750"
+          }
+        }
+      }
+    },
+    "pdf.h750.counts.hours": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hours toward 750"
+          }
+        }
+      }
+    },
+    "pdf.h750.hours.by.person": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hours toward 750, by person"
+          }
+        }
+      }
+    },
+    "pdf.h750.is.tested.for.each.spouse": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The 750-hour test is checked for each spouse separately; spouse hours are not combined for the 750-hour test. Investor-level tasks (investing, financing, purchase negotiation) are excluded. Non-real-estate work hours come from Filing and goal in the app; spouse work hours aren’t tracked in the app yet, so the spouse’s more-than-half test is not evaluated."
+          }
+        }
+      }
+    },
     "pdf.hours": {
       "extractionState": "manual",
       "localizations": {
@@ -1475,17 +1541,6 @@
         }
       }
     },
-    "pdf.hours.in.investor.level.activities.not": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Investor hours (don’t count)"
-          }
-        }
-      }
-    },
     "pdf.hours.in.h750.counts.activities": {
       "extractionState": "manual",
       "localizations": {
@@ -1493,6 +1548,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hours that count toward 750"
+          }
+        }
+      }
+    },
+    "pdf.hours.in.investor.level.activities.not": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Investor hours (don’t count)"
           }
         }
       }
@@ -1794,50 +1860,6 @@
         }
       }
     },
-    "pdf.h750.counts": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Counts toward 750"
-          }
-        }
-      }
-    },
-    "pdf.h750.counts.hours": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hours toward 750"
-          }
-        }
-      }
-    },
-    "pdf.h750.hours.by.person": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hours toward 750, by person"
-          }
-        }
-      }
-    },
-    "pdf.h750.is.tested.for.each.spouse": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The 750-hour test is checked for each spouse separately; spouse hours are not combined for the 750-hour test. Investor-level tasks (investing, financing, purchase negotiation) are excluded. Non-real-estate work hours come from Filing and goal in the app; spouse work hours aren’t tracked in the app yet, so the spouse’s more-than-half test is not evaluated."
-          }
-        }
-      }
-    },
     "pdf.result": {
       "extractionState": "manual",
       "localizations": {
@@ -1878,6 +1900,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Spouse hours"
+          }
+        }
+      }
+    },
+    "pdf.suggested": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suggested"
           }
         }
       }

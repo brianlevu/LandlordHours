@@ -34,7 +34,7 @@ final class StoreKitLocalIntegrationTests: XCTestCase {
     }
 
     private func resetScopedStoreKitState() {
-        UserDefaults.standard.set(testUserID, forKey: "emailUserId")
+        IdentityScope.debugOverride = testUserID
         UserDefaults.standard.set("storekit-local-test@example.com", forKey: "emailUserEmail")
         UserDefaults.standard.set("StoreKit Test", forKey: "emailUserName")
         UserDefaults.standard.set(LoginType.email.rawValue, forKey: "loginType")

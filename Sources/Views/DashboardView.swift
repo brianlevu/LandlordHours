@@ -454,6 +454,13 @@ struct DashboardView: View {
     }
 
     @ViewBuilder private var belowHero: some View {
+        // Package K's notice slot (one card, under the hero): K decides when and what.
+        if let notice = viewModel.todayNotice {
+            TodayIdentityCard(notice: notice)
+                .padding(.horizontal, LHMetrics.gutter)
+                .padding(.top, 12)
+                .transition(.opacity)
+        }
         TodayTimerSlot()
             .padding(.horizontal, LHMetrics.gutter)
             .padding(.top, 12)

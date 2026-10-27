@@ -30,8 +30,9 @@ final class SyncChangeTracker {
         var pendingDeletes: [String]?
     }
 
-    /// Fields rewritten on every build of the record (single-record settings stamp
-    /// `modifiedAt = Date()`), so they can't tell a change apart.
+    /// Fields rewritten on every build of the record (1.x/2.0 settings stamped
+    /// `modifiedAt = Date()`), so they can't tell a change apart. 2.2 settings records carry no
+    /// `modifiedAt`; the exclusion stays so 2.0.x records compare equal.
     nonisolated static let volatileKeysByType: [String: Set<String>] = [
         "GoalSettings": ["modifiedAt"],
         "TaxProfile": ["modifiedAt"]
@@ -39,7 +40,11 @@ final class SyncChangeTracker {
 
     let userId: String
     let fileURL: URL
-    private(set) var contents: Contents
+    /// Read from disk before every use: the engine, the sync service and the answers each make
+    /// their own instance for the same file, and a stale in-memory copy written back would erase
+    /// another instance's tombstones or baselines.
+    private var stored: Contents
+    var contents: Contents { reload(); return stored }
 
     nonisolated static var defaultBaseDirectory: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -56,19 +61,23 @@ final class SyncChangeTracker {
         self.userId = userId
         self.fileURL = SuggestionStore.directory(forUserId: userId, baseDirectory: baseDirectory)
             .appendingPathComponent("pushed-fingerprints.json")
-        if let data = try? Data(contentsOf: fileURL),
-           let decoded = try? JSONDecoder().decode(Contents.self, from: data) {
-            contents = decoded
+        stored = Contents()
+        reload()
+    }
+
+    private func reload() {
+        if let data = try? Data(contentsOf: fileURL), let decoded = try? JSONDecoder().decode(Contents.self, from: data) {
+            stored = decoded
         } else {
-            contents = Contents()
+            stored = Contents()
         }
     }
 
     // MARK: Fingerprints
 
     /// Stable fingerprint of a record's fields (record type and every non-volatile key).
-    nonisolated static func fingerprint(_ record: CKRecord) -> String {
-        let volatile = volatileKeysByType[record.recordType] ?? []
+    nonisolated static func fingerprint(_ record: CKRecord, excluding extra: Set<String> = []) -> String {
+        let volatile = (volatileKeysByType[record.recordType] ?? []).union(extra)
         var parts = ["type=\(record.recordType)"]
         for key in record.allKeys().sorted() where !volatile.contains(key) {
             parts.append("\(key)=\(encode(record[key]))")
@@ -94,7 +103,8 @@ final class SyncChangeTracker {
 
     /// Records whose content differs from the known server baseline (or have none).
     func changedRecords(_ records: [CKRecord]) -> [CKRecord] {
-        records.filter { contents.fingerprints[$0.recordID.recordName] != Self.fingerprint($0) }
+        let fingerprints = contents.fingerprints
+        return records.filter { fingerprints[$0.recordID.recordName] != Self.fingerprint($0) }
     }
 
     func hasBaseline(for recordName: String) -> Bool { contents.fingerprints[recordName] != nil }
@@ -104,10 +114,11 @@ final class SyncChangeTracker {
     /// The server now holds exactly these records (after a successful push, or as pulled).
     func recordServerState(_ records: [CKRecord]) {
         guard !records.isEmpty else { return }
+        reload()
         // A record deleted locally meanwhile keeps no baseline; its tombstone is pushed next.
-        let tombstoned = Set(pendingDeletes)
+        let tombstoned = Set(stored.pendingDeletes ?? [])
         for record in records where !tombstoned.contains(record.recordID.recordName) {
-            contents.fingerprints[record.recordID.recordName] = Self.fingerprint(record)
+            stored.fingerprints[record.recordID.recordName] = Self.fingerprint(record)
         }
         save()
     }
@@ -115,14 +126,16 @@ final class SyncChangeTracker {
     /// Records deleted locally or on the server: no baseline any more.
     func forget(recordNames: [String]) {
         guard !recordNames.isEmpty else { return }
-        for name in recordNames { contents.fingerprints[name] = nil }
+        reload()
+        for name in recordNames { stored.fingerprints[name] = nil }
         save()
     }
 
     /// Account change or zone deleted: every local record is re-uploaded on the next push.
     /// Tombstones stay (a local delete must still reach iCloud).
     func resetBaselines() {
-        contents.fingerprints = [:]
+        reload()
+        stored.fingerprints = [:]
         save()
     }
 
@@ -131,21 +144,25 @@ final class SyncChangeTracker {
     var pendingDeletes: [String] { contents.pendingDeletes ?? [] }
 
     func addTombstones(_ recordNames: [String]) {
-        var set = pendingDeletes
+        reload()
+        let before = stored.pendingDeletes ?? []
+        var set = before
         for name in recordNames where !set.contains(name) { set.append(name) }
-        guard set != pendingDeletes else { return }
-        contents.pendingDeletes = set
+        guard set != before else { return }
+        stored.pendingDeletes = set
         save()
     }
 
     /// iCloud confirmed these deletes.
     func clearTombstones(_ recordNames: [String]) {
+        reload()
         let remove = Set(recordNames)
-        let remaining = pendingDeletes.filter { !remove.contains($0) }
-        guard remaining.count != pendingDeletes.count else { return }
-        contents.pendingDeletes = remaining.isEmpty ? nil : remaining
+        let before = stored.pendingDeletes ?? []
+        let remaining = before.filter { !remove.contains($0) }
+        guard remaining.count != before.count else { return }
+        stored.pendingDeletes = remaining.isEmpty ? nil : remaining
         // The server no longer holds them: a record re-created with the same id is new.
-        for name in remove { contents.fingerprints[name] = nil }
+        for name in remove { stored.fingerprints[name] = nil }
         save()
     }
 
@@ -156,14 +173,14 @@ final class SyncChangeTracker {
 
     /// Profile data deleted from iCloud: the next push starts from scratch.
     func reset() {
-        contents = Contents()
+        stored = Contents()
         try? FileManager.default.removeItem(at: fileURL)
     }
 
     private func save() {
         do {
             try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let data = try JSONEncoder().encode(contents)
+            let data = try JSONEncoder().encode(stored)
             try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         } catch {
             trackerLogger.error("Could not save sync baselines: \(error.localizedDescription, privacy: .public)")

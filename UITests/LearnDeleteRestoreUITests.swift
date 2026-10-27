@@ -77,19 +77,7 @@ final class LearnDeleteRestoreUITests: XCTestCase {
         XCTAssertTrue(app.buttons["onb-start"].waitForExistence(timeout: 150), "After deleting, the app is back at Welcome")
     }
 
-    func testRestoreAsksBeforeOpeningAndCloseKeepsYourRecords() {
-        launch(["-LHSeedLegacyEmailProfile", "-LHInitialTab", "4", "-LHOpenRestoreSheet"])
-        let row = app.buttons["restore.profile.email-old.profile@example.com"]
-        XCTAssertTrue(row.waitForExistence(timeout: 20))
-        XCTAssertTrue(app.staticTexts["Your other records"].exists)
-        row.tap()
-        let alert = app.alerts["Open these records?"]
-        XCTAssertTrue(alert.waitForExistence(timeout: 5))
-        alert.buttons["Cancel"].tap()
-        XCTAssertTrue(row.exists, "Cancel leaves the sheet as it was")
-        app.buttons["restore.close"].tap()
-        XCTAssertTrue(row.waitForNonExistence(timeout: 5))
-    }
+    // Restore (2.0 profiles) is gone in 2.2: Earlier records replace it (IdentityJourneyUITests).
 
     // MARK: Capture
 
@@ -156,16 +144,6 @@ final class LearnDeleteRestoreUITests: XCTestCase {
             XCTAssertTrue(alert.waitForExistence(timeout: 20))
             XCTAssertTrue(alert.staticTexts["Couldn’t reach iCloud. Your data hasn’t been deleted. Try again when you’re online."].exists)
             settleAndCapture("delete-failed-\(suffix)")
-        }
-
-        if wants("restore") {
-            launch(["-LHSeedLegacyEmailProfile", "-LHInitialTab", "4", "-LHOpenRestoreSheet"], scheme: scheme, size: size)
-            let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "restore.profile.")).firstMatch
-            XCTAssertTrue(row.waitForExistence(timeout: 20))
-            settleAndCapture("restore-\(suffix)")
-            row.tap()
-            XCTAssertTrue(app.alerts["Open these records?"].waitForExistence(timeout: 5))
-            settleAndCapture("restore-confirm-\(suffix)")
         }
 
         if wants("whatsnew") {

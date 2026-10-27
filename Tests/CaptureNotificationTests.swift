@@ -1033,10 +1033,10 @@ final class SyncPushChangedOnlyTests: CaptureTestCase {
     func testFailedAccountDeleteUnblocksPushing() async {
         let (viewModel, service, _) = makeModel()
         // iCloud can't be reached (the same on a simulator and on a signed-in device).
-        service.accountDeleteOverride = .init(accountAvailable: { false }, fetchRecordIDs: { _ in [] }, deleteBatch: { _ in })
+        service.zoneDeleteOverride = { throw CloudKitSyncService.AccountDeleteICloudUnreachableError() }
+        _ = viewModel
         do {
-            try await service.deleteCurrentUserRecords(properties: viewModel.properties, entries: viewModel.timeEntries,
-                                                       categories: [], userId: profileId)
+            try await service.deleteEverythingInICloud()
             XCTFail("Expected iCloud to be unavailable in tests")
         } catch {}
         XCTAssertFalse(service.pushesBlocked, "The data stayed, so syncing can resume")

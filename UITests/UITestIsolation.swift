@@ -106,11 +106,6 @@ enum UITestIsolation {
 }
 
 extension UITestIsolation {
-    /// Package K (identity) removes Sign in with Apple, profiles and Restore and rewrites these
-    /// journeys. Until it lands they are skipped by name, not repaired against screens K deletes.
-    static func skipUntilPackageK() throws {
-        throw XCTSkip("Skipped for package K (identity): Sign in with Apple, profiles and Restore are being removed; K rewrites this journey.")
-    }
     /// The 2.0 goal step: two plain answers (what you rent out, who does real estate as a main
     /// job); the suggested target is then already selected. Ids: rental-short|long|both and
     /// pro-me|spouse|none. Ends on the target cards.

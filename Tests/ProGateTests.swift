@@ -542,7 +542,7 @@ final class ProPurchaseStoreKitTests: XCTestCase {
     }
 
     private func resetScoped() {
-        UserDefaults.standard.set(testUserID, forKey: "emailUserId")
+        IdentityScope.debugOverride = testUserID
         UserDefaults.standard.set(LoginType.email.rawValue, forKey: "loginType")
         UserDefaults.standard.removeObject(forKey: UserScope.key("isProUser"))
         UserDefaults.standard.removeObject(forKey: UserScope.key("hasPurchasedPro"))

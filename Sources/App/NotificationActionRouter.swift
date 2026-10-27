@@ -142,8 +142,10 @@ final class NotificationActionRouter {
     // MARK: Capture actions
 
     private func handleCapture(_ request: NotificationActionRequest) async -> (Outcome, Bool) {
-        guard let profileId = NotificationPayload.profileId(in: request.userInfo),
-              profileId == UserScope.userId else {
+        // Package K (U35): a notification scheduled under a legacy id that was merged into the
+        // record set lands in it; it is handled under the live id.
+        guard let payloadId = NotificationPayload.profileId(in: request.userInfo),
+              IdentityScope.isLiveProfileId(payloadId), let profileId = UserScope.userId else {
             return (.rejectedWrongProfile, false)
         }
         guard let key = request.userInfo[NotificationPayload.sourceKeyKey] as? String else {

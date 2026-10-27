@@ -1,0 +1,224 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "%@ at %@, last on %@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ at %2$@, last on %3$@."
+          }
+        }
+      }
+    },
+    "%@ at %@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ at %2$@."
+          }
+        }
+      }
+    },
+    "%@ of %@ aren’t in iCloud anymore. Nothing has been deleted here.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ of %2$@ aren’t in iCloud anymore. Nothing has been deleted here."
+          }
+        }
+      }
+    },
+    "%@ of %@ on this iPhone are no longer in iCloud. They may have been removed on another device, or iCloud data was reset.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ of %2$@ on this iPhone are no longer in iCloud. They may have been removed on another device, or iCloud data was reset."
+          }
+        }
+      }
+    },
+    "%@ waiting for your answer about iCloud": {},
+    "%@ you can put back": {},
+    "%@ · %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "%@ · Kept aside": {},
+    "%@ · Only custom categories": {},
+    "%@. %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@. %2$@"
+          }
+        }
+      }
+    },
+    "%lld hours": {},
+    "%lld records in iCloud couldn’t be read": {},
+    "%lld rentals": {},
+    "%lld waiting for your answer": {},
+    "1 hour": {},
+    "1 record in iCloud couldn’t be read": {},
+    "1 rental": {},
+    "1 waiting for your answer": {},
+    "A different iCloud": {},
+    "Add to my records": {},
+    "Advanced": {},
+    "Answer now": {},
+    "Are both yours?": {},
+    "Back": {},
+    "Cancel": {},
+    "Can’t be used for sync": {},
+    "Changed on another device after you edited it here.": {},
+    "Changed on another device after you edited it here. Your version is kept until %@.": {},
+    "Checking iCloud for earlier records…": {},
+    "Choose": {},
+    "Combined. %@ added.": {},
+    "Continue": {},
+    "Couldn’t reach iCloud. Your data hasn’t been deleted. Try again when you’re online.": {},
+    "Couldn’t search iCloud": {},
+    "Couldn’t sync": {},
+    "Decide later": {},
+    "Delete": {},
+    "Delete all data": {},
+    "Delete from this iPhone?": {},
+    "Delete here too": {},
+    "Delete on your other devices too, or they will offer to put the records back.": {},
+    "Delete these records?": {},
+    "Deleted on this iPhone.": {},
+    "Deleted on this iPhone. Kept until %@.": {},
+    "Earlier records": {},
+    "Earlier records in iCloud may be missing here.": {},
+    "Edit your name": {},
+    "Every record in iCloud could be read": {},
+    "Every record on this iPhone goes. This can’t be undone.": {},
+    "Everything on this iPhone": {},
+    "Everything you tracked is in one place.": {},
+    "Export the update backup": {},
+    "From %@. Your earlier settings were kept.": {},
+    "In iCloud": {},
+    "Keep": {},
+    "Keep %@ aside? Nothing is deleted. You’ll find them under Earlier records.": {},
+    "Keep and put back in iCloud": {},
+    "Keep aside": {},
+    "Keep them aside": {},
+    "Keep them on this iPhone and in iCloud": {},
+    "Keep them with this iCloud": {},
+    "Keep this iPhone’s copy and put it back in iCloud, or delete it here too?": {},
+    "Kept aside under Earlier records.": {},
+    "Last synced: %@.": {},
+    "Most of your records aren’t in iCloud anymore.": {},
+    "Moved to Recently removed. You can put them back.": {},
+    "No more sign-in. Everything you tracked is in one place now.": {},
+    "No rental": {},
+    "Not enough space to update your records. Free up about %@ and reopen LandlordHours. Nothing has changed yet.": {},
+    "Not in iCloud anymore. Kept until you choose.": {},
+    "Not mine, keep them aside": {},
+    "Not now": {},
+    "Not synced yet": {},
+    "Nothing has been deleted here.": {},
+    "Nothing is deleted whichever you pick.": {},
+    "Nothing waiting": {},
+    "Off": {},
+    "On": {},
+    "On this iPhone": {},
+    "On this iPhone and in iCloud": {},
+    "On your reports": {},
+    "Only on this iPhone": {},
+    "Opens iPhone Settings": {},
+    "Optional": {},
+    "Put back": {},
+    "Put back all": {},
+    "Recently removed": {},
+    "Records deleted in iCloud": {},
+    "Records from an earlier version, another device or another sign-in. Add them to yours, or delete them. Nothing changes until you choose.": {},
+    "Remove them from this iPhone": {},
+    "Removed on another device.": {},
+    "Removed on another device. Kept until %@.": {},
+    "Safe on this iPhone": {},
+    "Save": {},
+    "See them": {},
+    "See what changed": {},
+    "Send and get the latest": {},
+    "Settings only, no hours": {},
+    "Setup answers not used": {},
+    "Shown on your reports as “Prepared for”.": {},
+    "Some earlier records may be in iCloud. They’ll be added when iCloud is back.": {},
+    "Some records couldn’t be saved to iCloud. They’ll be tried again.": {},
+    "Sync now": {},
+    "Synced %@": {},
+    "Synced just now": {},
+    "Syncing…": {},
+    "They go from iCloud and this iPhone. This can’t be undone.": {},
+    "They’re kept and will be tried again.": {},
+    "This iPhone and your iCloud": {},
+    "This iPhone is now signed in to a different iCloud account.": {},
+    "This iPhone is signed in to a different iCloud account. Nothing in that iCloud was deleted.": {},
+    "This iPhone is signed in to a different iCloud account. Nothing there will be deleted. Delete from this iPhone only?": {},
+    "This iPhone isn’t signed in to iCloud.": {},
+    "This iPhone uses a different iCloud now. Sync is paused until you choose.": {},
+    "Try again": {},
+    "Turn on": {},
+    "Turn on iCloud for LandlordHours": {},
+    "Use this iCloud’s records instead": {},
+    "Waiting for your answer": {},
+    "Waiting for your answer about the other records before syncing.": {},
+    "We found %@ from an earlier version. They’re already here.": {},
+    "We found more records. Set %lld of %lld.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "We found more records. Set %1$lld of %2$lld."
+          }
+        }
+      }
+    },
+    "We found two sets of records.": {},
+    "We kept the settings from your earlier records. Your setup answers from today are in Settings.": {},
+    "What this iPhone held before": {},
+    "Yes, combine them": {},
+    "Your %@ at %@ are still on this iPhone. What should happen to them?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Your %1$@ at %2$@ are still on this iPhone. What should happen to them?"
+          }
+        }
+      }
+    },
+    "Your hours are only on this iPhone. Turn on iCloud for LandlordHours to keep a copy.": {},
+    "Your name": {},
+    "Your records live on this iPhone and in your own iCloud. We never see them. Photos stay on this iPhone.": {},
+    "Your records now": {},
+    "Your records stay on your iPhone and in your iCloud.": {},
+    "Your records were deleted from iCloud on another device.": {},
+    "iCloud": {},
+    "iCloud & records": {},
+    "iCloud didn’t answer (network).": {},
+    "iCloud didn’t answer for 1 record.": {},
+    "iCloud didn’t answer for every record.": {},
+    "iCloud didn’t answer.": {},
+    "iCloud is busy. We’ll try again.": {},
+    "iCloud is full.": {},
+    "iCloud is full. Your records are safe on this iPhone; free up iCloud space to keep syncing.": {},
+    "iCloud is off, so copies saved there can’t be removed now. Delete from this iPhone anyway, or turn on iCloud and retry?": {},
+    "iCloud is off. Turn on iCloud for LandlordHours in Settings to sync.": {},
+    "iCloud sync is unavailable in this build.": {},
+    "never": {}
+  },
+  "version": "1.0"
+}

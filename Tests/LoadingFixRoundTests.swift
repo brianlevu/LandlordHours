@@ -334,7 +334,7 @@ final class InitialSyncSwitchMidPullTests: CaptureTestCase {
         let first = Task { await service.start() }
         try? await Task.sleep(nanoseconds: 30_000_000)          // A's pull is in flight
         let profileB = "local-switch-\(UUID().uuidString.prefix(6))"
-        UserDefaults.standard.set(profileB, forKey: ProfileKeys.localProfileId)
+        IdentityScope.debugOverride = profileB
         defer { AppViewModel.clearScopedAccountData(for: profileB) }
 
         await service.start()                                     // B's request
@@ -351,7 +351,7 @@ final class InitialSyncSwitchMidPullTests: CaptureTestCase {
         app.startInitialSync(showsPlaceholder: false)
         try? await Task.sleep(nanoseconds: 30_000_000)
         let profileB = "local-switch-\(UUID().uuidString.prefix(6))"
-        UserDefaults.standard.set(profileB, forKey: ProfileKeys.localProfileId)
+        IdentityScope.debugOverride = profileB
         defer { AppViewModel.clearScopedAccountData(for: profileB) }
         let second = app.startInitialSync(showsPlaceholder: false)
 

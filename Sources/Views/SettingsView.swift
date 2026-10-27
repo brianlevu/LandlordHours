@@ -17,24 +17,16 @@ struct SettingsView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @EnvironmentObject var categoryManager: CategoryManager
     @StateObject private var subscriptionManager = SubscriptionManager.shared
-    @StateObject private var appleSignIn = AppleSignInManager.shared
     @StateObject private var appearanceManager = AppearanceManager.shared
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
-    @State private var showingProfileEdit = false
+    @State private var showingProfileEdit = false   // package K: opens "Your name" (YourNameSheet)
     @State private var paywall: ProPaywallRequest?
     @State private var showExport = false
-    @State private var userName = ""
-    @State private var userEmail = ""
-    @State private var profileImage: Data?
     @State private var restoreStatusMessage: String?
-    @State private var restorableProfiles: [DiscoveredProfile] = []
-    @State private var restoreCloudProblem = false
-    @State private var restoreRetrying = false
-    @State private var showRestoreSheet = false
     @State private var route: SettingsRoute?
     /// Backs the "Share anonymous usage stats" toggle. Stores whether the user opted OUT (default
     /// `false`, i.e. shared/opted-in by default) directly against `Analytics.optOutKey` so this
@@ -58,7 +50,7 @@ struct SettingsView: View {
     }
 
     private var displayName: String {
-        appleSignIn.fullName ?? (viewModel.userName.isEmpty ? HS.t("settings.profile.placeholder", "Your name") : viewModel.userName)
+        viewModel.userName.isEmpty ? HS.t("settings.profile.placeholder", "Your name") : viewModel.userName
     }
 
     var body: some View {
@@ -84,7 +76,8 @@ struct SettingsView: View {
                 appSection
                 privacySection
                 supportSection
-                SettingsAccountSection(onDeleteData: { route = .deleteData })
+                // Package K: iCloud & records replaces Account, Switch profile, Sign out, Restore.
+                ICloudRecordsSection(viewModel: viewModel, onOpen: { route = $0 })
 
                 // A section footer, not a clear row: a row at the end of an inset-grouped list is
                 // clipped by the section's corner mask, which cut the first glyph of each line.
@@ -104,9 +97,7 @@ struct SettingsView: View {
                 }
 
                 #if DEBUG
-                if AdminAccess.isCurrentUserAdmin {
-                    developerToolsSection
-                }
+                developerToolsSection
                 #endif
             }
             .listStyle(.insetGrouped)
@@ -123,33 +114,16 @@ struct SettingsView: View {
                 case .contactSupport: ContactSupportView()
                 case .muted: MutedSuggestionsView()
                 case .deleteData: DeleteAllDataView()
+                case .icloud: ICloudRecordsView()
+                case .earlierRecords: EarlierRecordsView()
                 }
             }
             .sheet(isPresented: $showingProfileEdit) {
-                ProfileEditView(userName: $userName, userEmail: $userEmail, profileImage: $profileImage)
+                YourNameSheet().environmentObject(viewModel)
             }
             .proPaywall($paywall)
             .sheet(isPresented: $showExport) {
                 ExportPDFView(year: Calendar.current.component(.year, from: Date()))
-            }
-            .sheet(isPresented: $showRestoreSheet) {
-                ProfileRestoreSheet(
-                    profiles: restorableProfiles, context: .settings,
-                    cloudProblem: restoreCloudProblem, isRetrying: restoreRetrying,
-                    onRetry: {
-                        Task {
-                            restoreRetrying = true
-                            let found = await viewModel.discoverRestorable()
-                            restorableProfiles = found.profiles
-                            restoreCloudProblem = found.cloudProblem
-                            restoreRetrying = false
-                        }
-                    }
-                ) { profile in
-                    showRestoreSheet = false
-                    viewModel.switchToProfile(profile)
-                    Task { restorableProfiles = await viewModel.discoverRestorableProfiles() }
-                }
             }
             .task(id: viewModel.isSignedIn) {
                 #if DEBUG
@@ -174,14 +148,6 @@ struct SettingsView: View {
                         Self.didApplyDebugRoute = true
                         route = .muted
                     }
-                }
-                #endif
-                let found = await viewModel.discoverRestorable()
-                restorableProfiles = found.profiles
-                restoreCloudProblem = found.cloudProblem
-                #if DEBUG
-                if ProcessInfo.processInfo.arguments.contains("-LHOpenRestoreSheet"), !restorableProfiles.isEmpty {
-                    showRestoreSheet = true
                 }
                 #endif
             }
@@ -209,26 +175,15 @@ struct SettingsView: View {
     private var profileSection: some View {
         Section {
             Button {
-                userName = appleSignIn.fullName ?? viewModel.userName
-                userEmail = appleSignIn.email ?? ""
-                profileImage = appleSignIn.profileImageData
                 showingProfileEdit = true
             } label: {
                 HStack(spacing: 14) {
-                    ProfileAvatar(name: displayName, imageData: profileImage ?? appleSignIn.profileImageData, size: 56)
+                    // Package K: no photo and no email (§2.4); the name is "Your name".
+                    ProfileAvatar(name: displayName, imageData: nil, size: 56)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(displayName)
                             .font(.headline)
                             .foregroundStyle(colors.textPrimary)
-                        if let email = appleSignIn.email, !email.isEmpty {
-                            // At AX sizes a break point before the @ keeps the domain whole.
-                            Text(dynamicTypeSize.isAccessibilitySize ? email.replacingOccurrences(of: "@", with: "\u{200B}@") : email)
-                                .font(.subheadline)
-                                .foregroundStyle(colors.textSecondary)
-                                // Never cut at AX: the whole address wraps (owner ruling 2026-10-27).
-                                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-                                .truncationMode(.middle)
-                        }
                         planBadge
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -241,7 +196,7 @@ struct SettingsView: View {
             }
             .buttonStyle(LHButton.press)
             .longTailRow(separatorInset: LHRow.insets.leading)
-            .accessibilityHint(HS.t("settings.profile.hint", "Edit your name, email and photo"))
+            .accessibilityHint(String(localized: "Edit your name", table: "Identity"))
             .accessibilityIdentifier("settings.profile")
         }
     }
@@ -312,18 +267,6 @@ struct SettingsView: View {
             .longTailRow()
             .accessibilityIdentifier("settings.restorePurchase")
 
-            if !restorableProfiles.isEmpty {
-                LHRow.Browse(
-                    title: HS.t("settings.restoreOther.title", "Restore other data"),
-                    meta: restorableProfiles.count == 1
-                        ? HS.t("settings.restoreOther.one", "1 earlier profile found")
-                        : HS.f("settings.restoreOther.many", "%lld earlier profiles found", restorableProfiles.count),
-                    systemImage: "clock.arrow.circlepath", tint: .neutral,
-                    action: { showRestoreSheet = true }
-                )
-                .longTailRow()
-                .accessibilityIdentifier("settings.restoreOtherData")
-            }
         } header: {
             header(HS.t("settings.section.plan", "Plan"))
         }
@@ -402,13 +345,6 @@ struct SettingsView: View {
                     .accessibilityIdentifier("settings.exportReports")
             }
 
-            LHRow.Browse(title: HS.t("settings.sync.title", "Sync now"),
-                         meta: syncSubtitle ?? HS.t("settings.sync.meta", "Back up to iCloud"),
-                         systemImage: syncNeedsAttention ? "exclamationmark.icloud" : "icloud",
-                         tint: syncNeedsAttention ? .caution : .neutral, showsChevron: false,
-                         action: { viewModel.syncNow() })
-                .longTailRow()
-                .accessibilityIdentifier("settings.syncNow")
         } header: {
             header(HS.t("settings.section.records", "Records"))
         } footer: {
@@ -485,23 +421,6 @@ struct SettingsView: View {
     }
 
     // MARK: Helpers
-
-    private var syncNeedsAttention: Bool {
-        !viewModel.syncService.isSyncing && !viewModel.syncService.isRunningInitialSync
-            && (!viewModel.syncService.accountAvailable || viewModel.syncService.syncError != nil)
-    }
-
-    private var syncSubtitle: String? {
-        if viewModel.syncService.isSyncing || viewModel.syncService.isRunningInitialSync { return HS.t("settings.sync.running", "Syncing…") }
-        if !viewModel.syncService.accountAvailable { return HS.t("settings.sync.off", "iCloud is off. Records stay here.") }
-        if viewModel.syncService.syncError != nil { return HS.t("settings.sync.failed", "Couldn’t sync just now.") }
-        if let date = viewModel.syncService.lastSyncDate {
-            let formatter = RelativeDateTimeFormatter()
-            formatter.unitsStyle = .short
-            return HS.f("settings.sync.last", "Last sync: %@", formatter.localizedString(for: date, relativeTo: Date()))
-        }
-        return nil
-    }
 
     #if DEBUG
     // Developer tools are DEBUG-only and never user-facing: plain strings, not in the catalog.
@@ -634,7 +553,7 @@ struct ProfileAvatar: View {
 /// Settings' pushed screens. Buttons + one destination (not NavigationLinks in the List), so
 /// each row is a plain button for VoiceOver and UI tests, with its own chevron.
 enum SettingsRoute: Hashable {
-    case taxProfile, learningCenter, contactSupport, muted, deleteData
+    case taxProfile, learningCenter, contactSupport, muted, deleteData, icloud, earlierRecords
 }
 
 private struct AutoCaptureSettingsSection: View {
@@ -1204,70 +1123,6 @@ struct TaxProfileView: View {
             .buttonStyle(LHButton.primary)
             .disabled(newPropertyName.trimmingCharacters(in: .whitespaces).isEmpty)
             .accessibilityIdentifier("taxProfile.addRental.save")
-        }
-        .lhSheetPresentation()
-    }
-}
-
-// MARK: - Profile Edit View
-//
-// Package K replaces this with "Your name" in Settings › iCloud & records and removes the sign-in
-// it edits. Until then it keeps its fields and gets the sheet chrome.
-
-struct ProfileEditView: View {
-    @Binding var userName: String
-    @Binding var userEmail: String
-    @Binding var profileImage: Data?
-    @StateObject private var appleSignIn = AppleSignInManager.shared
-    @Environment(\.dismiss) var dismiss
-    @Environment(\.colorScheme) var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
-    @State private var selectedPhotoItem: PhotosPickerItem?
-
-    var body: some View {
-        LHSheet(HS.t("profile.title", "Your details"), onClose: { dismiss() }) {
-            VStack(spacing: 16) {
-                VStack(spacing: 8) {
-                    ProfileAvatar(name: userName.isEmpty ? HS.t("settings.profile.placeholder", "Your name") : userName,
-                                  imageData: profileImage ?? appleSignIn.profileImageData, size: 96)
-                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        Text(HS.t("profile.photo", "Change photo"))
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(colors.action)
-                            .frame(minHeight: LHMetrics.minTap)
-                    }
-                    .onChange(of: selectedPhotoItem) { _, newValue in
-                        Task {
-                            if let data = try? await newValue?.loadTransferable(type: Data.self) {
-                                profileImage = data
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    LHField(HS.t("settings.profile.placeholder", "Your name"), text: $userName)
-                    LHField(HS.t("profile.email", "your@email.com"), text: $userEmail)
-                        .keyboardType(.emailAddress)
-                        .textContentType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                    Text(HS.t("profile.footer", "Shown on your export so your CPA knows whose record it is."))
-                        .font(.footnote)
-                        .foregroundStyle(colors.textSecondary)
-                }
-            }
-        } footer: {
-            Button(HS.t("common.save", "Save")) {
-                AppleSignInManager.shared.updateProfile(
-                    name: userName.isEmpty ? nil : userName,
-                    email: userEmail.isEmpty ? nil : userEmail,
-                    imageData: profileImage
-                )
-                dismiss()
-            }
-            .buttonStyle(LHButton.primary)
-            .accessibilityIdentifier("profile.save")
         }
         .lhSheetPresentation()
     }

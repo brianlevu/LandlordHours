@@ -4,17 +4,15 @@ import SwiftUI
 //
 // A pushed page that says exactly what goes, then a destructive-outline capsule the person holds
 // for 1.5s. Letting go snaps back in 200ms. VoiceOver gets a custom action that asks with a standard
-// alert, the one place the app uses `.alert` for an irreversible act (standard §1.21: a title of six
-// words or fewer, verbs for buttons, the destructive role set). Cancel is always on screen.
-// Deletion runs through `AppViewModel.deleteAccountAndData` (App Review 5.1.1(v)); the iCloud-off
-// question is the second alert, and a failure shows as a line on the page, not an "OK" alert.
-// Afterwards the app is signed out, so the root shows Welcome. Package K changes the two call
-// sites (`isAppleProfile`, `deleteAccountAndData`); the page does not change.
+// alert (standard §1.21: a title of six words or fewer, verbs for buttons, the destructive role set).
+// Cancel is always on screen. Deletion runs through `AppViewModel.deleteAllData` (App Review
+// 5.1.1(v)); the iCloud-off and different-iCloud questions are alerts, and a failure shows as a line
+// on the page, not an "OK" alert. Afterwards the app is a new install (package K: the whole iCloud
+// zone goes), so the root shows Welcome.
 
 struct DeleteAllDataView: View {
     @EnvironmentObject private var viewModel: AppViewModel
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
-    @ObservedObject private var signInManager = AppleSignInManager.shared
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
@@ -24,10 +22,12 @@ struct DeleteAllDataView: View {
     @State private var showExport = false
     @State private var showVoiceOverConfirm = false
     @State private var showICloudOffPrompt = false
+    @State private var showOtherAccountPrompt = false
     @State private var isDeleting = HoldToDeleteButton.debugShowsDeleting
     @State private var deleteError: String? = Self.debugFailure
 
-    private var isAppleProfile: Bool { signInManager.loginType == .apple }
+    /// Package K: there is no account any more (Sign in with Apple is removed in 2.2).
+    private var isAppleProfile: Bool { false }
 
     private var photoCount: Int {
         viewModel.timeEntries.reduce(0) { $0 + $1.attachments.filter { $0.mimeType.hasPrefix("image") }.count }
@@ -64,6 +64,8 @@ struct DeleteAllDataView: View {
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("delete.items")
 
+                Text(HS.t("delete.otherDevices", "Delete on your other devices too, or they will offer to put the records back."))
+                    .font(.subheadline).foregroundStyle(colors.textSecondary)
                 Text(HS.t("delete.undone", "This can’t be undone."))
                     .font(.body.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
@@ -127,6 +129,12 @@ struct DeleteAllDataView: View {
         } message: {
             Text(HS.t("delete.icloud.message", "Copies saved in iCloud can’t be removed right now. Delete from this iPhone anyway, or turn on iCloud and try again."))
         }
+        .alert(HS.t("delete.otherAccount.title", "Different iCloud account"), isPresented: $showOtherAccountPrompt) {
+            Button(HS.t("delete.alert.keep", "Keep"), role: .cancel) { }
+            Button(HS.t("delete.icloud.delete", "Delete from this iPhone"), role: .destructive) { runDelete(allowLocalOnly: true) }
+        } message: {
+            Text(HS.t("delete.otherAccount.message", "This iPhone is signed in to a different iCloud account now. Nothing in that iCloud will be deleted. Delete from this iPhone only?"))
+        }
     }
 
     // MARK: Counted items (one key per plural form so each reads right in every language)
@@ -174,9 +182,11 @@ struct DeleteAllDataView: View {
             isDeleting = true
             defer { isDeleting = false }
             do {
-                try await viewModel.deleteAccountAndData(allowLocalOnly: allowLocalOnly)
+                try await viewModel.deleteAllData(allowLocalOnly: allowLocalOnly)
             } catch AppViewModel.ProfileDeletionError.iCloudUnavailable {
                 showICloudOffPrompt = true
+            } catch AppViewModel.ProfileDeletionError.otherICloudAccount {
+                showOtherAccountPrompt = true
             } catch {
                 deleteError = error.localizedDescription
             }
