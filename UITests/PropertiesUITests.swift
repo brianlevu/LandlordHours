@@ -266,7 +266,9 @@ final class PropertiesUITests: XCTestCase {
                 name.typeText("Oak Street Duplex")
                 let next = app.keyboards.buttons.matching(NSPredicate(format: "label ==[c] %@", "next")).firstMatch
                 XCTAssertTrue(next.waitForExistence(timeout: 5))
-                next.tap()
+                // The slim simulator's keyboard key can refuse "scroll to visible"; Return is the same
+                // submit (Next), so the focus check below still proves the move to the address.
+                if next.isHittable { next.tap() } else { name.typeText("\n") }
                 let focused = NSPredicate(format: "hasKeyboardFocus == true")
                 expectation(for: focused, evaluatedWith: app.textFields["property.address"])
                 waitForExpectations(timeout: 5)
