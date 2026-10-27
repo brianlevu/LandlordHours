@@ -45,7 +45,10 @@ extension RecordSetMigration {
         case .aside:
             try? earlier.setStatus(.aside, for: id)
         case .combine, .spouse:
-            let incoming = answer == .spouse ? MergeRules.swapParticipants(group.entries) : group.entries
+            let liveIds = Set(live.liveEntries.map(\.id))
+            let incoming = answer == .spouse
+                ? group.entries.flatMap { e in liveIds.contains(e.id) ? MergeRules.swapParticipants([e]) : MergeRules.swapParticipants([e], editedAt: at) }
+                : group.entries
             let e = MergeRules.unionReporting(live.liveEntries, incoming)
             let p = MergeRules.unionReporting(live.liveProperties, group.properties)
             let c = MergeRules.unionReporting(live.liveCategories, group.categories)

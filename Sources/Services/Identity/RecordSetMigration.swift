@@ -892,7 +892,8 @@ final class RecordSetMigration {
             case .live, .liveAsSpouse:
                 let spouse: Bool = { if case .liveAsSpouse = MergeRules.route(record, context: context) { return true }; return false }()
                 guard record.isParseable else {
-                    earlier.route(unparsed: [record], to: record.appUserId ?? unifiedId, status: .combine, source: .iCloud, now: now())
+                    // Never downgrades a spouse group's status (Undo stays possible).
+                    earlier.route(unparsed: [record], to: record.appUserId ?? unifiedId, status: spouse ? .spouse : .combine, source: .iCloud, now: now())
                     outcome.unparsed += 1
                     continue
                 }
@@ -912,9 +913,10 @@ final class RecordSetMigration {
                 pulledForBaseline.append(record)
                 outcome.liveChanged += 1
             case .archive(let id):
+                let held = earlier.group(id)?.status ?? groups.group(id)?.status
                 earlier.route(entries: record.entry.map { [$0] } ?? [], properties: record.property.map { [$0] } ?? [],
                               categories: record.category.map { [$0] } ?? [], unparsed: record.isParseable ? [] : [record],
-                              to: id, status: groups.group(id)?.status == .pending ? .pending : .aside, source: .iCloud, now: now())
+                              to: id, status: held == .pending ? .pending : (held == .spouse ? .spouse : .aside), source: .iCloud, now: now())
                 outcome.archived += 1
             case .newGroup(let owner):
                 guard !LegacyInventory.isIgnoredId(owner) else { continue }

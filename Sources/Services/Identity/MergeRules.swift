@@ -95,6 +95,17 @@ enum MergeRules {
         }
     }
 
+    /// The spouse answer is an edit the person made: the swapped copies are stamped `at`, so they
+    /// beat the pre-answer copy another device still holds (equal times would keep each device's
+    /// own copy and push it back forever).
+    static func swapParticipants(_ entries: [TimeEntry], editedAt at: Date) -> [TimeEntry] {
+        swapParticipants(entries).map { entry in
+            var e = entry
+            e.modifiedAt = max(entry.modifiedAt, at)
+            return e
+        }
+    }
+
     // MARK: R5 / R5c — synced, then absent from a complete read
 
     enum AbsenceOutcome: Equatable {
@@ -234,10 +245,17 @@ enum MergeRules {
     static func route(_ record: ZoneRecord, context: RoutingContext) -> Route {
         let name = record.recordName
         if context.deletedNames.contains(name) || context.tombstones.contains(name) { return .ignore }
+        let owner = record.appUserId ?? LegacyInventory.unscopedGroupId
+        // R12 before R20: a copy tagged with a spouse group's own id comes from the spouse's 2.0.x
+        // device, written from their side (participant Self). It is swapped on arrival even when the
+        // record is already live here, or the spouse's hours silently turn back into the owner's.
+        if owner != context.unifiedId, context.groups?.group(owner)?.status == .spouse,
+           context.liveNames.contains(name) || (context.archiveMembership[name] ?? owner) == owner {
+            return .liveAsSpouse
+        }
         // R20: membership by UUID beats the incoming tag.
         if context.liveNames.contains(name) { return .live }
         if let group = context.archiveMembership[name] { return .archive(group) }
-        let owner = record.appUserId ?? LegacyInventory.unscopedGroupId
         if owner == context.unifiedId { return .live }
         if owner.hasPrefix(IdentityZone.asidePrefix) { return .archive(String(owner.dropFirst(IdentityZone.asidePrefix.count))) }
         if let group = context.groups?.group(owner) {

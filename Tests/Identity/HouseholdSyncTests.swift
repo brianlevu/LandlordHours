@@ -744,4 +744,46 @@ final class RecordLossRegressionTests: XCTestCase {
         XCTAssertEqual(back.hours, target.hours + 1.5, "the edit made while it was the spouse's survives Undo")
         XCTAssertEqual(back.participant, target.participant)
     }
+
+    // MARK: 3 · spouse tagging never flips back
+
+    func testSpouseTagSurvivesAnEditFromTheSpouses20Device() async throws {
+        XCTAssertTrue(Fixture.load("D8", into: sandbox))
+        let h = EngineHarness(sandbox, zone: FakeZoneSource())
+        try h.device()
+        _ = await h.cloud()
+        let group = try XCTUnwrap(h.earlier.group(local))
+        h.engine.answer(.spouse, group: local)
+        await h.engine.pushLive()
+        // The spouse's 2.0.x phone still sees these as its own (participant Self) and edits one.
+        var edited = try XCTUnwrap(group.entries.first)
+        edited.hours += 2
+        edited.modifiedAt = Date().addingTimeInterval(120)
+        let record = ZoneRecord(CloudKitSyncService.record(for: edited, zoneID: IdentityZone.zoneID, appUserId: local))
+        h.engine.applyPull(ZoneDelta(changed: [record], deleted: [:], tokenData: nil, incomplete: false))
+        let now = try XCTUnwrap(h.entries.first { $0.id == edited.id })
+        XCTAssertEqual(now.hours, edited.hours, "the edit arrives")
+        XCTAssertNotEqual(now.participant, edited.participant, "still the spouse's hours here")
+    }
+
+    func testSpouseAnswerWinsOverAnotherDevicesOlderSelfCopyAndConverges() async throws {
+        XCTAssertTrue(Fixture.load("D8", into: sandbox))
+        let zone = FakeZoneSource()
+        let h = EngineHarness(sandbox, zone: zone)
+        try h.device()
+        _ = await h.cloud()
+        let group = try XCTUnwrap(h.earlier.group(local))
+        let original = try XCTUnwrap(group.entries.first)
+        h.engine.answer(.spouse, group: local)
+        // Another 2.2 phone on this iCloud still holds the pre-answer copy and pushes it.
+        let theirs = ZoneRecord(CloudKitSyncService.record(for: original, zoneID: IdentityZone.zoneID, appUserId: h.engine.unifiedId))
+        h.engine.applyPull(ZoneDelta(changed: [theirs], deleted: [:], tokenData: nil, incomplete: false))
+        let mine = try XCTUnwrap(h.entries.first { $0.id == original.id })
+        XCTAssertNotEqual(mine.participant, original.participant, "the answer stands")
+        await h.engine.pushLive()
+        let pushed = try XCTUnwrap(zone.records[original.id.uuidString]?.entry)
+        XCTAssertNotEqual(pushed.participant, original.participant)
+        XCTAssertGreaterThan(pushed.modifiedAt, original.modifiedAt,
+                             "newer than the old copy, so the other phone takes it instead of pushing its own back forever")
+    }
 }
