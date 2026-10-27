@@ -498,6 +498,14 @@ final class AdversarialReview3Tests: XCTestCase {
         return (h, zone, other)
     }
 
+    // MEDIUM 7 · a held push never reads as synced
+    func testAHeldPushSaysItIsWaitingForAnAnswer() async throws {
+        let (h, _, _) = try await heldHarness()
+        let report = await h.engine.pushLive()
+        XCTAssertTrue(report.held, "the push is held, not done")
+        XCTAssertEqual(sandbox.defaults.string(forKey: IdentityKeys.lastSyncProblem),
+                       String(localized: "Waiting for your answer about the other records before syncing.", table: "Identity"))
+    }
 
     // MEDIUM 6 · changeTokenExpired inside a partialFailure is recognised
     func testAChangeTokenExpiredInsideAPartialFailureIsRecognised() {

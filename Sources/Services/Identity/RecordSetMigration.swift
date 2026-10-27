@@ -911,8 +911,15 @@ final class RecordSetMigration {
     /// The hold ends (the set that owns the household pair was answered). Before anything is
     /// pushed, the usual settings precedence (v4 §3.3) runs against that pair: clean local
     /// settings take the household's, so the next push never writes this phone's over it.
+    static var waitingForAnswer: String {
+        String(localized: "Waiting for your answer about the other records before syncing.", table: "Identity")
+    }
+
     func releaseHousehold() {
         defaults.removeObject(forKey: IdentityKeys.householdHeldFor)
+        if defaults.string(forKey: IdentityKeys.lastSyncProblem) == Self.waitingForAnswer {
+            defaults.removeObject(forKey: IdentityKeys.lastSyncProblem)
+        }
         defer { defaults.removeObject(forKey: IdentityKeys.heldHouseholdCache) }
         guard let live, let data = defaults.data(forKey: IdentityKeys.heldHouseholdCache),
               let held = try? JSONDecoder().decode(HouseholdCache.self, from: data) else { return }
@@ -1327,8 +1334,13 @@ final class RecordSetMigration {
     @discardableResult
     func pushLive() async -> ZonePushReport {
         if let held = defaults.string(forKey: IdentityKeys.householdHeldFor) {
-            if GroupsFile.load(root: root)?.group(held)?.status == .pending { return ZonePushReport() }
-            defaults.removeObject(forKey: IdentityKeys.householdHeldFor)
+            if GroupsFile.load(root: root)?.group(held)?.status == .pending {
+                // Not synced: the status row says what it is waiting for.
+                defaults.set(Self.waitingForAnswer, forKey: IdentityKeys.lastSyncProblem)
+                onChange?()
+                return ZonePushReport(held: true)
+            }
+            releaseHousehold()
         }
         let t = tracker
         let held = earlier.bulkHold?.names ?? []

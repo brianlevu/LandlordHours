@@ -192,6 +192,8 @@ struct ZonePushReport: Equatable {
     var deletedNames: Set<String> = []
     var quotaExceeded = false
     var zoneGone = false
+    /// Nothing was pushed: the live set waits for an answer (`IdentityKeys.householdHeldFor`).
+    var held = false
 }
 
 enum ZoneSourceError: Error, Equatable {

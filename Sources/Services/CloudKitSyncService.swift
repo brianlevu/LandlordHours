@@ -428,6 +428,11 @@ final class CloudKitSyncService: ObservableObject {
             let task = Task { @MainActor in await engine.pushLive() }
             enginePushTask = task
             let report = await task.value
+            if report.held {
+                // Held for the two-sets answer: never reads as synced.
+                onIdentityChange?()
+                return
+            }
             if report.zoneGone {
                 _ = engine.handleZoneGone()
                 onIdentityChange?()
