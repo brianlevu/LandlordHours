@@ -36,7 +36,7 @@
       "specular": true,
       "shadow": {
         "kind": "neutral",
-        "opacity": 0.5
+        "opacity": 0.8
       },
       "translucency": {
         "enabled": false,
