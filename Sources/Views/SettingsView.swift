@@ -396,12 +396,9 @@ struct SettingsView: View {
             })
             .longTailRow()
         } header: {
+            // No footer: "Your records live on this iPhone and in your own iCloud" is said once, under
+            // iCloud & records (package K); here it repeated word for word two sections above it.
             header(HS.t("settings.section.privacy", "Data and privacy"))
-        } footer: {
-            Text(HS.t("settings.privacy.footer", "Your records live on this iPhone and in your own iCloud. We never see them."))
-                .font(.footnote)
-                .foregroundStyle(colors.textSecondary)
-                .accessibilityIdentifier("settings.analyticsOptOutCaption")
         }
     }
 

@@ -167,6 +167,9 @@ extension LHRow {
         var meta: String? = nil
         var value: String? = nil
         var showsChevron = true
+        /// The meta is a sentence the person needs whole (an answer's explanation, what an export
+        /// holds): it wraps at every size instead of taking one line. Labels and dates keep the cap.
+        var wrapsMeta = false
         var action: (() -> Void)? = nil
         @ViewBuilder var leading: Leading
 
@@ -175,11 +178,12 @@ extension LHRow {
         private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
         init(title: String, meta: String? = nil, value: String? = nil, showsChevron: Bool = true,
-             action: (() -> Void)? = nil, @ViewBuilder leading: () -> Leading) {
+             wrapsMeta: Bool = false, action: (() -> Void)? = nil, @ViewBuilder leading: () -> Leading) {
             self.title = title
             self.meta = meta
             self.value = value
             self.showsChevron = showsChevron
+            self.wrapsMeta = wrapsMeta
             self.action = action
             self.leading = leading()
         }
@@ -209,7 +213,7 @@ extension LHRow {
                         Text(meta)
                             .font(.subheadline)
                             .foregroundStyle(colors.textSecondary)
-                            .lineLimit(ax ? nil : (typeSize >= .xxLarge ? 2 : 1))
+                            .lineLimit(ax || wrapsMeta ? nil : (typeSize >= .xxLarge ? 2 : 1))
                     }
                     // At AX the value drops under the label so it never narrows it ("sug-/gesting").
                     if ax, let value { valueText(value) }
@@ -246,8 +250,8 @@ extension LHRow {
 extension LHRow.Browse where Leading == LHRowGlyph {
     /// A browse row with an SF glyph in a 36 wash tile.
     init(title: String, meta: String? = nil, value: String? = nil, systemImage: String, tint: LHRowGlyph.Tint = .action,
-         showsChevron: Bool = true, action: (() -> Void)? = nil) {
-        self.init(title: title, meta: meta, value: value, showsChevron: showsChevron, action: action) {
+         showsChevron: Bool = true, wrapsMeta: Bool = false, action: (() -> Void)? = nil) {
+        self.init(title: title, meta: meta, value: value, showsChevron: showsChevron, wrapsMeta: wrapsMeta, action: action) {
             LHRowGlyph(systemImage: systemImage, tint: tint)
         }
     }

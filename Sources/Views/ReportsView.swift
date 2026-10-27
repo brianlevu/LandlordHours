@@ -309,6 +309,7 @@ struct ReportsView: View {
                 value: answer == nil ? RR.t("reports.participation.answer", "Answer") : RR.t("reports.participation.change", "Change"),
                 systemImage: symbol,
                 tint: tint,
+                wrapsMeta: true,
                 action: { showingParticipationSheet = true }
             )
         }
@@ -469,6 +470,7 @@ struct ReportsView: View {
             title: pdfTitle,
             meta: RR.t("reports.export.meta", "The PDF and the spreadsheet, with where each hour came from."),
             systemImage: "doc.richtext",
+            wrapsMeta: true,
             action: ProGate.isExportLocked(isPro: subscriptionManager.isPro) ? nil : exportAction
         )
     }
@@ -772,6 +774,7 @@ struct ParticipationConfirmationSheet: View {
             meta: subtitle,
             value: isSelected ? RR.t("reports.sheet.selected", "Chosen") : nil,
             showsChevron: false,
+            wrapsMeta: true,
             action: action
         ) {
             LHRowGlyph(systemImage: symbol, tint: tint)
