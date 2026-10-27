@@ -11,7 +11,7 @@ struct LogMicLevelRing: View {
 
     var body: some View {
         Circle()
-            .strokeBorder(AdaptiveColors(colorScheme: colorScheme).drafting, lineWidth: 2)
+            .strokeBorder(AdaptiveColors(colorScheme: colorScheme).draftingInk, lineWidth: 2)
             .padding(-4)
             .scaleEffect(1 + (reduceMotion ? 0 : min(max(level, 0), 1)) * 0.18)
             .animation(reduceMotion ? nil : AppAnimation.feedback, value: level)

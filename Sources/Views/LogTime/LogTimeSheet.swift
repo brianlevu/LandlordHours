@@ -389,7 +389,7 @@ struct LogTimeSheet: View {
             if let saveError {
                 Label(saveError, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote)
-                    .foregroundStyle(colors.cautionText)
+                    .foregroundStyle(colors.destructive)
                     .multilineTextAlignment(.center)
                     .padding(.bottom, 4)
                     .accessibilityIdentifier("log.saveError")

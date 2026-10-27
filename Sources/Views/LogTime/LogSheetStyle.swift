@@ -119,11 +119,15 @@ struct LogSheetChrome<Content: View, Footer: View>: View {
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .top, spacing: 0) { header }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 4) { footer }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 16)
-                .background(colors.backgroundSecondary.ignoresSafeArea(edges: .bottom))
+            // No footer, no inset: an empty one painted an opaque 32pt block over the list.
+            if Footer.self != EmptyView.self {
+                VStack(spacing: 4) { footer }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 16)
+                    .background(colors.backgroundSecondary.ignoresSafeArea(edges: .bottom))
+                    .overlay(alignment: .top) { fade(up: true) }
+            }
         }
     }
 
@@ -151,5 +155,17 @@ struct LogSheetChrome<Content: View, Footer: View>: View {
         .padding(.bottom, 4)
         .frame(minHeight: 56)
         .background(colors.backgroundSecondary)
+        .overlay(alignment: .bottom) { fade(up: false) }
+    }
+
+    /// A short fade where content scrolls under the pinned header or footer, so a line is never
+    /// cut flat mid-glyph (Reminders and Things fade here too).
+    private func fade(up: Bool) -> some View {
+        LinearGradient(colors: [colors.backgroundSecondary.opacity(0), colors.backgroundSecondary],
+                       startPoint: up ? .top : .bottom, endPoint: up ? .bottom : .top)
+            .frame(height: 14)
+            .offset(y: up ? -14 : 14)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 }
