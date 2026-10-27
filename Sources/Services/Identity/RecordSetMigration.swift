@@ -539,8 +539,7 @@ final class RecordSetMigration {
         // S8b — every change since S5, before anything is pushed.
         if step < .deltaPulled {
             do {
-                var delta = try await source.deltaPull(from: defaults.data(forKey: IdentityKeys.migrationZoneToken))
-                holdUnseenSet(&delta)
+                let delta = try await source.deltaPull(from: defaults.data(forKey: IdentityKeys.migrationZoneToken))
                 _ = applyPull(delta)
                 // Applied first; the token moves only past a complete delta, so a record CloudKit
                 // couldn't hand over comes again on the next pull.
@@ -875,35 +874,6 @@ final class RecordSetMigration {
 
     struct HouseholdCache: Codable { var goal: GoalSettingsValues?; var tax: TaxProfileValues? }
 
-    /// Two sets migrating at once: the id S8 adopted belongs to records this phone doesn't hold.
-    /// Those records become a held set (asked about), this phone keeps its own id, and nothing
-    /// of the live set is pushed until the question is answered (as with a pending household).
-    private func holdUnseenSet(_ delta: inout ZoneDelta) {
-        guard let owner = defaults.string(forKey: IdentityKeys.adoptedUnseen) else { return }
-        defaults.removeObject(forKey: IdentityKeys.adoptedUnseen)
-        let own = defaults.string(forKey: IdentityKeys.adoptedFrom) ?? storageId
-        defaults.removeObject(forKey: IdentityKeys.adoptedFrom)
-        guard let live else { return }
-        let liveNames = Set(live.liveEntries.map { $0.id.uuidString } + live.liveProperties.map { $0.id.uuidString }
-                            + live.liveCategories.map { $0.id.uuidString })
-        let theirs = delta.changed.filter { $0.isUserRecord && $0.appUserId == owner && !liveNames.contains($0.recordName) }
-        guard theirs.contains(where: { $0.recordType == "TimeEntry" || $0.recordType == "Property" }) else { return }
-        defaults.set(own, forKey: IdentityKeys.unifiedId)
-        defaults.set(owner, forKey: IdentityKeys.householdHeldFor)
-        holdHousehold(from: delta.changed.filter { $0.appUserId == owner })
-        var groups = GroupsFile.load(root: root) ?? GroupsFile(createdAt: now(), primaryId: storageId, groups: [])
-        earlier.route(entries: theirs.compactMap(\.entry), properties: theirs.compactMap(\.property),
-                      categories: theirs.compactMap(\.category), unparsed: theirs.filter { !$0.isParseable },
-                      to: owner, status: .pending, source: .iCloud, now: now())
-        let entries = theirs.compactMap(\.entry)
-        groups.upsert(GroupRecord(id: owner, status: .pending, source: .iCloud, entryCount: entries.count,
-                                  propertyCount: theirs.compactMap(\.property).count, hours: entries.reduce(0) { $0 + $1.hours },
-                                  lastEntryDate: entries.map(\.date).max()))
-        try? groups.save(root: root)
-        let held = Set(theirs.map(\.recordName))
-        delta.changed.removeAll { held.contains($0.recordName) }
-    }
-
     /// Keeps the held household pair's values (from a read or a delta) for when the hold ends.
     func holdHousehold(from records: [ZoneRecord]) {
         let goal = records.first { $0.recordName == IdentityZone.goalSettingsName(IdentityZone.household) }.map(GoalSettingsValues.init(record:))
@@ -1004,9 +974,23 @@ final class RecordSetMigration {
         zoneCounts[LegacyInventory.unscopedGroupId] = nil
         var excluded = Set((groups?.groups ?? []).filter { $0.status == .aside || $0.status == .pending || $0.splitFromDevice }.map(\.id))
         if groups?.groups.contains(where: { $0.splitFromDevice && $0.id == storageId }) == true { excluded.insert(storageId) }
-        var chosen = MergeRules.unifiedId(householdOwner: householdOwner, zoneEntryCounts: zoneCounts,
+        let empty = live.liveEntries.isEmpty && live.liveProperties.isEmpty
+        // An id is adopted only for records this phone has seen. A household pair whose owner has
+        // no records in the zone yet (another phone between S8 and S9, or after a failed push) says
+        // nothing about whose they will be: with records here, keep this phone's own id, leave that
+        // pair alone, and let each phone ask about the other's records when they arrive.
+        let userOwners = Set(snapshot.records.filter(\.isUserRecord).compactMap(\.appUserId))
+        let unseenPair = householdOwner.map { !userOwners.contains($0) && !excluded.contains($0) && !empty } ?? false
+        if unseenPair, let householdOwner { excluded.insert(householdOwner) }
+        var chosen = MergeRules.unifiedId(householdOwner: unseenPair ? nil : householdOwner, zoneEntryCounts: zoneCounts,
                                           devicePrimary: groups?.primaryId ?? storageId, excluded: excluded)
         if chosen == LegacyInventory.unscopedGroupId { chosen = IdentityZone.household }
+        if unseenPair {
+            defaults.set(true, forKey: IdentityKeys.householdForeign)
+            defaults.set(chosen, forKey: IdentityKeys.unifiedId)
+            defaults.set(true, forKey: IdentityKeys.unifiedIdDecided)
+            return
+        }
         if let householdOwner, excluded.contains(householdOwner) {
             // The household pair is a set this phone holds apart. Never adopt its id or overwrite
             // its pair; while it is still a question, push nothing of the live set (S9 holds).
@@ -1018,7 +1002,6 @@ final class RecordSetMigration {
             defaults.set(true, forKey: IdentityKeys.unifiedIdDecided)
             return
         }
-        let empty = live.liveEntries.isEmpty && live.liveProperties.isEmpty
         if householdOwner == nil && empty && !defaults.bool(forKey: IdentityKeys.goalDirty) && !defaults.bool(forKey: IdentityKeys.taxDirty) {
             // Empty never dictates: nothing written, the next pull brings whatever another device writes.
             defaults.set(chosen, forKey: IdentityKeys.unifiedId)
@@ -1035,15 +1018,14 @@ final class RecordSetMigration {
             if excluded.contains(server) {
                 // Raced by a set this phone holds apart: keep this phone's id and ask first.
                 if groups?.group(server)?.status == .pending { defaults.set(server, forKey: IdentityKeys.householdHeldFor) }
+            } else if !empty && !userOwners.contains(server) {
+                // Another phone wrote the pair first, and none of its records were in the zone at
+                // S5: it may be another person's set migrating in the same minute. Keep this
+                // phone's id and leave that pair alone; its records, when they arrive, are a set
+                // to ask about (a new owner), and this phone's are the same on that phone.
+                defaults.set(true, forKey: IdentityKeys.householdForeign)
             } else {
-                // The loser adopts the winner's id before pushing anything (U17). If S5 never saw
-                // that owner and this phone has records, it may be another set that migrated in
-                // the same minute: S8b looks at what it brings before anything merges.
-                let seen = Set(snapshot.records.compactMap(\.appUserId))
-                if !seen.contains(server), !empty {
-                    defaults.set(server, forKey: IdentityKeys.adoptedUnseen)
-                    defaults.set(chosen, forKey: IdentityKeys.adoptedFrom)
-                }
+                // The loser adopts the winner's id before pushing anything (U17).
                 chosen = server
             }
             Analytics.identitySettingsConflict(adopted: true)

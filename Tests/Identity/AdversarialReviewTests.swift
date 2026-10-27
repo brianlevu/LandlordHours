@@ -577,3 +577,90 @@ final class AdversarialReview3Tests: XCTestCase {
         XCTAssertNil(sandbox.defaults.string(forKey: IdentityKeys.icloudUserRecordName))
     }
 }
+
+// MARK: - Fourth adversarial pass (c84a2b4). Each test is a loss, silent-merge or stuck-hold path
+// the reviewer expects to FAIL on this commit; a pass means the path is closed.
+@MainActor
+final class AdversarialReview4Tests: XCTestCase {
+    private var sandbox: IdentitySandbox!
+    private let local = "local-6F1E2D3C-0000-4000-8000-0000000C0A01"
+
+    override func setUp() {
+        super.setUp()
+        TestScope.unpin()
+        RecordLedger.lastChecks = [:]
+        sandbox = IdentitySandbox()
+    }
+
+    override func tearDown() {
+        sandbox.tearDown()
+        super.tearDown()
+    }
+
+    private func heldHarness() async throws -> (EngineHarness, FakeZoneSource, String, [ZoneRecord]) {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let other = "email-other.person@example.com"
+        let theirs = IdentityFixtures.sampleGroup(owner: other, entries: 20, seed: 0x91)
+        var records = theirs
+        records.append(GoalSettingsValues.defaults.record(name: IdentityZone.goalSettingsName(IdentityZone.household), owner: other))
+        records.append(TaxProfileValues(filingStatus: FilingStatus.marriedJoint.rawValue, spouseTracking: true, taxYear: 2019,
+                                        groupingElection: true, nonREWorkHours: 1234.5, displayName: "Other")
+            .record(name: IdentityZone.taxProfileName(IdentityZone.household), owner: other))
+        let zone = FakeZoneSource(records: records)
+        let h = EngineHarness(sandbox, zone: zone)
+        try h.device()
+        let done = await h.cloud()
+        XCTAssertEqual(done, .done)
+        XCTAssertEqual(sandbox.defaults.string(forKey: IdentityKeys.householdHeldFor), other)
+        return (h, zone, other, theirs)
+    }
+
+    // MARK: R4-1 · HIGH · A wrote its household pair but its records are not in iCloud yet (between
+    // S8 and S9: seconds normally, indefinitely after a failed push). B, another set on the same
+    // iCloud, reads the zone then: the pair's owner has no user records, so B adopts A's id by
+    // rule 1 and pushes its own set under it; A's S8b then takes B's hours as its own. Two
+    // people's hours become one set on both phones with no question.
+
+    func testASetThatMigratesWhileAnotherPhonesPushIsOutstandingIsMergedWithNoQuestion() async throws {
+        let zone = FakeZoneSource()
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))        // A: local-…, 10 entries
+        let a = EngineHarness(sandbox, zone: zone)
+        try a.device()
+        a.engine.crashAt = "S8"                                   // household written, nothing pushed
+        let o1 = await a.cloud()
+        XCTAssertEqual(o1, .notReady)
+        XCTAssertNotNil(zone.records[IdentityZone.goalSettingsName(IdentityZone.household)])
+        XCTAssertTrue(zone.records.values.allSatisfy { !$0.isUserRecord }, "A has pushed no records yet")
+
+        let boxB = IdentitySandbox("outstanding-push-phone-b")
+        defer { boxB.tearDown() }
+        XCTAssertTrue(Fixture.load("D2", into: boxB))            // B: email-…, 97 entries, another person
+        let b = EngineHarness(boxB, zone: zone)
+        try b.device()
+        let o2 = await b.cloud()
+        XCTAssertEqual(o2, .done)
+        let bNames = Set(b.entries.map(\.id.uuidString))
+        XCTAssertTrue(b.engine.unifiedId != local || !b.earlier.pendingGroups.isEmpty,
+                      "B adopted A's id (\(b.engine.unifiedId)) with no question, knowing nothing of A's records")
+
+        a.engine.crashAt = nil
+        let o3 = await a.cloud()
+        XCTAssertEqual(o3, .done)
+        let bLiveOnA = Set(a.entries.map(\.id.uuidString)).intersection(bNames)
+        XCTAssertTrue(bLiveOnA.isEmpty || !a.earlier.pendingGroups.isEmpty,
+                      "B's \(bLiveOnA.count) entries joined A's set with no question (A now has \(a.entries.count) entries)")
+    }
+
+    // MARK: R4-2 · HIGH · The household hold releases only when groups.json stops saying `pending`,
+    // but the question is shown only while the archive group is non-empty. When every record of
+    // the held set is deleted on the other phone, the archive group is emptied and removed, the
+    // question disappears, and the push is held for good: "Waiting for your answer" with nothing
+    // to answer.
+
+
+    // MARK: R4-3 · MEDIUM · A status value this build no longer knows (`spouse`, written by a build
+    // between bc38e6a and 5dec00b, or any future status) makes groups.json undecodable as a
+    // whole: every answer in it is forgotten, and the next pull writes a fresh file over it. An
+    // archive group with that status silently disappears from Earlier records.
+
+}

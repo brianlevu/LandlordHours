@@ -136,7 +136,21 @@ final class HouseholdSyncTests: XCTestCase {
 
     // MARK: U17 · two devices migrate at once
 
-    func testU17TheLoserAdoptsTheWinnersId() async throws {
+    func testU17AnEmptyPhoneAdoptsTheWinnersId() async throws {
+        let zone = FakeZoneSource()
+        zone.raceHouseholdOwner = "local-A-other-device"
+        let h = EngineHarness(sandbox, zone: zone)
+        XCTAssertEqual(try h.device(), .fresh)
+        sandbox.defaults.set(true, forKey: IdentityKeys.goalDirty)   // onboarding answers: S8 writes
+        let outcome5 = await h.cloud()
+        XCTAssertEqual(outcome5, .done)
+        XCTAssertEqual(sandbox.defaults.string(forKey: IdentityKeys.unifiedId), "local-A-other-device", "nothing here to keep apart")
+    }
+
+    /// Fourth adversarial pass: a phone with records never adopts an id whose records it hasn't
+    /// seen (the winner may be another person's set between its S8 and S9). It keeps its own id
+    /// and leaves the winner's pair alone; each phone asks about the other's records.
+    func testU17APhoneWithRecordsKeepsItsIdWhenTheWinnersRecordsAreUnseen() async throws {
         XCTAssertTrue(Fixture.load("D5", into: sandbox))
         let zone = FakeZoneSource()
         zone.raceHouseholdOwner = "local-A-other-device"
@@ -144,9 +158,11 @@ final class HouseholdSyncTests: XCTestCase {
         try h.device()
         let outcome5 = await h.cloud()
         XCTAssertEqual(outcome5, .done)
-        XCTAssertEqual(sandbox.defaults.string(forKey: IdentityKeys.unifiedId), "local-A-other-device")
+        XCTAssertEqual(sandbox.defaults.string(forKey: IdentityKeys.unifiedId), local)
+        XCTAssertEqual(zone.records[IdentityZone.goalSettingsName(IdentityZone.household)]?.appUserId, "local-A-other-device",
+                       "the winner's pair is not overwritten")
         let tags = Set(h.zone.pushesFlat.filter(\.isUserRecord).compactMap(\.appUserId))
-        XCTAssertEqual(tags, ["local-A-other-device"], "nothing is pushed under the losing id")
+        XCTAssertEqual(tags, [local], "this phone's records go under its own id")
     }
 
     // MARK: U18 · a delete on a 2.0 device between S5 and the push
