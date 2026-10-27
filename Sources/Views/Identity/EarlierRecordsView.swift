@@ -234,6 +234,9 @@ struct RecentlyRemovedView: View {
                 ?? String(localized: "Deleted on this iPhone.", table: "Identity")
         case .inferredAbsent, .bulkRemoved:
             return String(localized: "Not in iCloud anymore. Kept until you choose.", table: "Identity")
+        case .replacedByNewer:
+            return item.keepUntil.map { String(localized: "Changed on another device after you edited it here. Your version is kept until \(IdentityCopy.shortDate($0)).", table: "Identity") }
+                ?? String(localized: "Changed on another device after you edited it here.", table: "Identity")
         }
     }
 }

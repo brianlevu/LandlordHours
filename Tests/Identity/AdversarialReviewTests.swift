@@ -269,6 +269,25 @@ final class AdversarialReviewTests: XCTestCase {
     }
 
 
+    // M3 · an unpushed local edit that a newer remote edit beats is kept in Recently removed
+    func testAnUnpushedLocalEditBeatenByANewerRemoteEditIsKept() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let h = EngineHarness(sandbox, zone: FakeZoneSource())
+        try h.device()
+        _ = await h.cloud()
+        var live = h.entries
+        let original = live[0]
+        live[0].notes = "local edit, not pushed yet"
+        live[0].modifiedAt = original.modifiedAt.addingTimeInterval(30)
+        h.live.replaceLive(entries: live, properties: h.properties, categories: h.live.liveCategories)
+        var theirs = original
+        theirs.hours += 2
+        theirs.modifiedAt = original.modifiedAt.addingTimeInterval(60)
+        let record = ZoneRecord(CloudKitSyncService.record(for: theirs, zoneID: IdentityZone.zoneID, appUserId: h.engine.unifiedId))
+        h.engine.applyPull(ZoneDelta(changed: [record], deleted: [:], tokenData: nil, incomplete: false))
+        XCTAssertEqual(h.entries.first { $0.id == original.id }?.hours, theirs.hours, "the newer edit wins")
+        XCTAssertTrue(h.earlier.removed.contains { $0.entry?.notes == "local edit, not pushed yet" }, "the losing local edit is kept")
+    }
 
 
     // Low · unified id rule 2 skips an excluded owner to the next candidate

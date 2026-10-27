@@ -49,6 +49,9 @@ enum RemovalReason: String, Codable {
     case bulkRemoved
     /// The person deleted it on this device before the update (R3 tombstone): 30 days.
     case deletedHere
+    /// An edit made on this iPhone and not yet in iCloud, beaten by a newer edit from another
+    /// device (last writer wins): the older version is kept 30 days, with Put back.
+    case replacedByNewer
 
     var isInferred: Bool { self == .inferredAbsent || self == .bulkRemoved }
 }

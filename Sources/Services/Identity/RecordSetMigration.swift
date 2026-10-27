@@ -1,4 +1,5 @@
 import Foundation
+import CloudKit
 import os.log
 
 private let migrationLogger = Logger(subsystem: "com.openclaw.landlordhours", category: "RecordSetMigration")
@@ -1009,6 +1010,10 @@ final class RecordSetMigration {
         var mirror: (goal: ZoneRecord?, tax: ZoneRecord?) = (nil, nil)
         var putBackElsewhere = Set<String>()
         var movedOut = Set<String>()
+        // Last writer wins, but an edit made here and never pushed is not dropped (Recently removed).
+        var replaced: [RemovedRecord] = []
+        let baselineTracker = tracker
+        func isUnpushed(_ record: CKRecord) -> Bool { !baselineTracker.changedRecords([record]).isEmpty }
 
         for record in delta.changed {
             if record.isSettings {
@@ -1041,15 +1046,37 @@ final class RecordSetMigration {
                         outcome.dedupedByKey += 1
                         if entry.modifiedAt > match.modifiedAt, let i = entries.firstIndex(where: { $0.id == match.id }),
                            let adopted = MergeRules.adoptEdit(entry, into: match) {
+                            if isUnpushed(CloudKitSyncService.record(for: match, zoneID: IdentityZone.zoneID, appUserId: unifiedId)) {
+                                replaced.append(RemovedRecord(name: match.id.uuidString, reason: .replacedByNewer, removedAt: now(),
+                                                              keepUntil: now().addingTimeInterval(EarlierRecordsStore.userDeleteRetention), entry: match))
+                            }
                             entries[i] = adopted
                             outcome.liveChanged += 1
                         }
                         continue
                     }
+                    if let local = entries.first(where: { $0.id == entry.id }), entry.modifiedAt > local.modifiedAt,
+                       local.ledgerVersion != entry.ledgerVersion,
+                       isUnpushed(CloudKitSyncService.record(for: local, zoneID: IdentityZone.zoneID, appUserId: unifiedId)) {
+                        replaced.append(RemovedRecord(name: local.id.uuidString, reason: .replacedByNewer, removedAt: now(),
+                                                      keepUntil: now().addingTimeInterval(EarlierRecordsStore.userDeleteRetention), entry: local))
+                    }
                     entries = MergeRules.union(entries, [entry])
                 } else if let property = record.property {
+                    if let local = properties.first(where: { $0.id == property.id }), property.modifiedAt > local.modifiedAt,
+                       local.ledgerVersion != property.ledgerVersion,
+                       isUnpushed(CloudKitSyncService.record(for: local, zoneID: IdentityZone.zoneID, appUserId: unifiedId)) {
+                        replaced.append(RemovedRecord(name: local.id.uuidString, reason: .replacedByNewer, removedAt: now(),
+                                                      keepUntil: now().addingTimeInterval(EarlierRecordsStore.userDeleteRetention), property: local))
+                    }
                     properties = MergeRules.union(properties, [property])
                 } else if let category = record.category {
+                    if let local = categories.first(where: { $0.id == category.id }), category.modifiedAt > local.modifiedAt,
+                       local.ledgerVersion != category.ledgerVersion,
+                       isUnpushed(CloudKitSyncService.record(for: local, zoneID: IdentityZone.zoneID, appUserId: unifiedId)) {
+                        replaced.append(RemovedRecord(name: local.id.uuidString, reason: .replacedByNewer, removedAt: now(),
+                                                      keepUntil: now().addingTimeInterval(EarlierRecordsStore.userDeleteRetention), category: local))
+                    }
                     categories = MergeRules.union(categories, [category])
                 }
                 pulledForBaseline.append(record)
@@ -1131,6 +1158,7 @@ final class RecordSetMigration {
         }
         // Not live any more: no baseline, so nothing of them is pushed from here.
         if !movedOut.isEmpty { tracker.forget(recordNames: Array(movedOut)) }
+        if !replaced.isEmpty { earlier.remove(replaced) }
         if !putBackElsewhere.isEmpty {
             // Put back on another device: live here again, so it leaves Recently removed and R11.
             earlier.takeRemoved(putBackElsewhere)
