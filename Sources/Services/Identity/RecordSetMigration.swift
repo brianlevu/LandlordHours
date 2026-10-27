@@ -397,8 +397,11 @@ final class RecordSetMigration {
                 return .changed
             }
         } else if step >= .cloudInventoried {
-            // S5 couldn't learn the account; learn it now.
-            defaults.set(current, forKey: IdentityKeys.icloudUserRecordName)
+            // The set was read without knowing whose iCloud it was: never learn the current
+            // account as if it were that one. Ask (P13).
+            defaults.set(true, forKey: IdentityKeys.accountChanged)
+            onChange?()
+            return .changed
         }
         accountConfirmed = true
         return .same
@@ -474,8 +477,9 @@ final class RecordSetMigration {
         if step >= .cloudInventoried, let saved = ZoneSnapshot.load(root: root) {
             snapshot = saved
         } else {
-            let userName = await source.userRecordName()
-            if let stored = defaults.string(forKey: IdentityKeys.icloudUserRecordName), let userName, stored != userName {
+            // Never read or merge without knowing whose iCloud this is (the account guard needs it).
+            guard let userName = await source.userRecordName() else { return .iCloudOff(.couldNotDetermine) }
+            if let stored = defaults.string(forKey: IdentityKeys.icloudUserRecordName), stored != userName {
                 defaults.set(true, forKey: IdentityKeys.accountChanged)
                 onChange?()
                 return .accountChanged
@@ -491,7 +495,7 @@ final class RecordSetMigration {
             snapshot.userRecordName = userName
             try? snapshot.save(root: root)
             if snapshot.zoneExists { defaults.set(true, forKey: IdentityKeys.zoneSeen) }
-            if let userName { defaults.set(userName, forKey: IdentityKeys.icloudUserRecordName) }
+            defaults.set(userName, forKey: IdentityKeys.icloudUserRecordName)
             defaults.set(snapshot.tokenData, forKey: IdentityKeys.migrationZoneToken)
             defaults.removeObject(forKey: IdentityKeys.lastSyncProblem)
             defaults.removeObject(forKey: IdentityKeys.noticeCloudWaiting)

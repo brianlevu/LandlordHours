@@ -532,6 +532,48 @@ final class AdversarialReview3Tests: XCTestCase {
         XCTAssertEqual(after.pushedAsideNames, before.pushedAsideNames)
     }
 
+    // LOW 9 · an expired token is kept until the whole read that replaces it succeeds
+    func testAnExpiredTokenIsKeptWhenTheRecoveryReadFails() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let zone = FakeZoneSource()
+        let h = EngineHarness(sandbox, zone: zone)
+        try h.device()
+        _ = await h.cloud()
+        let before = try XCTUnwrap(h.engine.steadyToken)
+        let service = CloudKitSyncService()
+        service.zoneSourceOverride = zone
+        service.engine = h.engine
+        service.accountAvailable = true
+        zone.tokenExpiredOnDelta = 1
+        zone.failRead = true
+        let ok = await service.pullChanges()
+        XCTAssertFalse(ok)
+        XCTAssertEqual(h.engine.steadyToken, before, "no token at all would refetch from nothing; keep it until a read succeeds")
+    }
 
+    // LOW 9 · S5 never runs without knowing the iCloud user, and a set read without one asks
+    func testS5WaitsForTheICloudUser() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let zone = FakeZoneSource()
+        zone.userName = nil
+        let h = EngineHarness(sandbox, zone: zone)
+        try h.device()
+        let outcome = await h.cloud()
+        XCTAssertEqual(outcome, .iCloudOff(.couldNotDetermine))
+        XCTAssertEqual(h.step, .deviceMerged, "nothing read or merged without knowing whose iCloud this is")
+    }
 
+    func testASetReadWithoutAUserAsksInsteadOfLearningANewAccount() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let zone = FakeZoneSource()
+        let h = EngineHarness(sandbox, zone: zone)
+        try h.device()
+        _ = await h.cloud()
+        sandbox.defaults.removeObject(forKey: IdentityKeys.icloudUserRecordName)   // as left by an S5 with no user
+        zone.userName = "_someoneElse"
+        let relaunched = EngineHarness(sandbox, zone: zone)
+        let outcome = await relaunched.cloud()
+        XCTAssertEqual(outcome, .accountChanged, "unknown first account: ask (P13), never learn the current one")
+        XCTAssertNil(sandbox.defaults.string(forKey: IdentityKeys.icloudUserRecordName))
+    }
 }

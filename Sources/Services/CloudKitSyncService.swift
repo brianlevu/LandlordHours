@@ -683,7 +683,8 @@ final class CloudKitSyncService: ObservableObject {
     }
 
     private func recoverFromExpiredToken() async -> Bool {
-        saveZoneToken(nil)
+        // The old token stays until a whole read replaces it (a failed read keeps it, and the
+        // next pull tries the recovery again).
         let snapshot = await zoneSource.readWholeZone()
         guard !snapshot.incomplete else {
             syncError = snapshot.problem
