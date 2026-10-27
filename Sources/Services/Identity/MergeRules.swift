@@ -193,9 +193,8 @@ enum MergeRules {
         // Rule 1 too respects `excluded`: a pending/aside set's id is never this phone's.
         if let householdOwner, !householdOwner.isEmpty, allowed(householdOwner) { return householdOwner }
         let ranked = zoneEntryCounts.filter { $0.value > 0 }.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }
-        if let top = ranked.first {
-            return allowed(top.key) ? top.key : IdentityZone.household
-        }
+        // Rule 2: the first allowed owner, not "household" because the top one is excluded.
+        if let top = ranked.first(where: { allowed($0.key) }) { return top.key }
         if let devicePrimary, devicePrimary != LegacyInventory.unscopedGroupId {
             return allowed(devicePrimary) ? devicePrimary : IdentityZone.household
         }

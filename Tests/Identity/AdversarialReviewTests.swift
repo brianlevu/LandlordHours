@@ -169,4 +169,10 @@ final class AdversarialReviewTests: XCTestCase {
 
 
 
+    // Low · unified id rule 2 skips an excluded owner to the next candidate
+    func testUnifiedIdRule2FallsToTheNextAllowedOwner() {
+        let id = MergeRules.unifiedId(householdOwner: nil, zoneEntryCounts: ["email-pending": 20, "email-mine": 5],
+                                      devicePrimary: "local-x", excluded: ["email-pending"])
+        XCTAssertEqual(id, "email-mine")
+    }
 }
