@@ -581,6 +581,18 @@ final class CloudKitSyncService: ObservableObject {
         return false
     }
 
+    /// The change token expired, alone or inside a partialFailure (as isZoneGone): the pull must
+    /// restart from a whole read, or sync stops for good.
+    nonisolated static func isTokenExpired(_ error: Error) -> Bool {
+        guard let ckError = error as? CKError else { return false }
+        if ckError.code == .changeTokenExpired { return true }
+        if ckError.code == .partialFailure {
+            let codes = ckError.partialErrorsByItemID?.values.compactMap { ($0 as? CKError)?.code } ?? []
+            return codes.contains(.changeTokenExpired)
+        }
+        return false
+    }
+
     /// Forgets what this device believed the server holds (every local record is re-uploaded).
     func resetSyncBaselines() {
         changeTracker?.resetBaselines()
@@ -1076,7 +1088,7 @@ extension CloudKitSyncService: IdentityZoneSource {
         do {
             let result = try await withRetryReturning { try await self.fetchZone(database: database, token: Self.unarchive(token)) }
             return ZoneDelta(changed: result.records, deleted: result.deleted, tokenData: result.token, incomplete: result.incomplete)
-        } catch let error as CKError where error.code == .changeTokenExpired {
+        } catch let error as CKError where Self.isTokenExpired(error) {
             throw ZoneSourceError.tokenExpired
         } catch let error as CKError where Self.isZoneGone(error) {
             throw ZoneSourceError.zoneGone
@@ -1126,7 +1138,7 @@ extension CloudKitSyncService: IdentityZoneSource {
             op.fetchRecordZoneChangesResultBlock = { result in
                 switch result {
                 case .success:
-                    if let zoneError = zoneError as? CKError, Self.isZoneGone(zoneError) || zoneError.code == .changeTokenExpired {
+                    if let zoneError = zoneError as? CKError, Self.isZoneGone(zoneError) || Self.isTokenExpired(zoneError) {
                         continuation.resume(throwing: zoneError)
                     } else {
                         continuation.resume(returning: fetch)

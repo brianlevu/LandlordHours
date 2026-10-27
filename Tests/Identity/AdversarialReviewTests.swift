@@ -499,6 +499,14 @@ final class AdversarialReview3Tests: XCTestCase {
     }
 
 
+    // MEDIUM 6 · changeTokenExpired inside a partialFailure is recognised
+    func testAChangeTokenExpiredInsideAPartialFailureIsRecognised() {
+        let inner = CKError(.changeTokenExpired)
+        let wrapped = CKError(.partialFailure, userInfo: [CKPartialErrorsByItemIDKey: [IdentityZone.zoneID: inner]])
+        XCTAssertTrue(CloudKitSyncService.isTokenExpired(inner))
+        XCTAssertTrue(CloudKitSyncService.isTokenExpired(wrapped), "a wrapped expiry must restart from a whole read, or sync stops for good")
+        XCTAssertFalse(CloudKitSyncService.isTokenExpired(CKError(.networkFailure)))
+    }
 
 
 
