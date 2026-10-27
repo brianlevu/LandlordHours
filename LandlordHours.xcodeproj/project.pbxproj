@@ -281,6 +281,7 @@
 		FD1915E10564E5F4022DAE85 /* RentalPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B67FB6A28B23FCA3936ACEB1 /* RentalPage.swift */; };
 		FDD3B102E7A6EF978ED26ADB /* CraftHouseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E98F3220D6538A3E026AF2 /* CraftHouseView.swift */; };
 		FDFADD9A3B0AC288AD87E888 /* OnboardingFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB0388B49984CE37ED41B888 /* OnboardingFlow.swift */; };
+		FE6303BC027E261D8025D1A4 /* LogV2R4Beam.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96C34FD7BAD9F46042C289BB /* LogV2R4Beam.swift */; };
 		FEF2ADF1DF06A3C6BA058BE9 /* ProMomentsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6252BC3F79F79B6164763816 /* ProMomentsTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -477,6 +478,7 @@
 		94B6C5116CF19BD791DC038D /* DormerBrandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DormerBrandTests.swift; sourceTree = "<group>"; };
 		95834A15C18661C7066155C1 /* LandlordHoursTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LandlordHoursTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		965D319F27D7A4A2332D47B2 /* LandlordHoursAppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordHoursAppIntents.swift; sourceTree = "<group>"; };
+		96C34FD7BAD9F46042C289BB /* LogV2R4Beam.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogV2R4Beam.swift; sourceTree = "<group>"; };
 		988C76EAD03340B1FA9162E3 /* ProfileManagementViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileManagementViews.swift; sourceTree = "<group>"; };
 		989D9BBB74E6C1D18F9C2C94 /* calibration.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = calibration.json; sourceTree = "<group>"; };
 		992994028B8E0F68D1C27592 /* InboxDebugSeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxDebugSeed.swift; sourceTree = "<group>"; };
@@ -629,6 +631,7 @@
 				C6BB8B5E87E98676DD666CC5 /* LogV2Model.swift */,
 				11F242B17789652E92C1806E /* LogV2R3Components.swift */,
 				36A2DB4F2A0B247D73E665FD /* LogV2R3Sheet.swift */,
+				96C34FD7BAD9F46042C289BB /* LogV2R4Beam.swift */,
 				874B0485B4696BD75DCC7BD4 /* LogV2Root.swift */,
 			);
 			path = LogTimeV2;
@@ -1475,6 +1478,7 @@
 				5B87D8B0A0CB99B3C1CAF9DC /* LogV2Model.swift in Sources */,
 				A9E440835DFFEC10958EF924 /* LogV2R3Components.swift in Sources */,
 				B41309B2A361D93A64596018 /* LogV2R3Sheet.swift in Sources */,
+				FE6303BC027E261D8025D1A4 /* LogV2R4Beam.swift in Sources */,
 				EABD36D54D398CDB3074F833 /* LogV2Root.swift in Sources */,
 				F7592DE1A4DA7F5A9B32BA03 /* MilestoneCelebrationView.swift in Sources */,
 				58BD4A141A6B09D86C26766B /* ModelAvailability.swift in Sources */,

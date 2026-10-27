@@ -265,8 +265,23 @@ final class LogV2Model: ObservableObject {
 
     /// A: the card builds while you type (600 ms after the last key, like today's sheet).
     private var liveTask: Task<Void, Never>?
+    /// r4: the card is built when the note is done (keyboard Done, focus leaves, or voice Done), so
+    /// the field can grow into it; no live swap under the user's fingers.
+    var liveParse = true
+    /// r4: how long the house moment holds after Log before the sheet closes.
+    var beatMilliseconds = 1100
+
+    /// r4: read now and show the card (the field grows into it).
+    func submitNow() {
+        let text = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.count >= 3 else { return }
+        read(text)
+        forward = true
+        withAnimation(AppAnimation.flow) { stage = .review }
+    }
+
     func noteChangedLive() {
-        guard direction == .a, stage == .entry || stage == .review else { return }
+        guard liveParse, direction == .a, stage == .entry || stage == .review else { return }
         liveTask?.cancel()
         let text = note.trimmingCharacters(in: .whitespacesAndNewlines)
         if text.count < 6 {
@@ -339,7 +354,7 @@ final class LogV2Model: ObservableObject {
             pendingToast = "Logged \(LHFormat.hours(hours)) at \(rentalName ?? "")"
             celebrating = true
             Task {
-                try? await Task.sleep(for: .milliseconds(1100))
+                try? await Task.sleep(for: .milliseconds(beatMilliseconds))
                 stage = .closing
             }
             return

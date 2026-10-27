@@ -26,6 +26,54 @@ States: `-LHLogV2State entry|typing|review|question|howLong|listening|timerRunni
 - **Calibration:** he picked *bold numerals*, *crafted object* and *editorial calm*, and skipped *soft tactile*.
 - **Round 3:** the same flow in that style, as two variants.
 
+## Round 4: A1 Beam, Brian's pick (Object dropped)
+
+Launch with `-LHLogV2 A -LHLogV2Variant beam`. Round 3's Beam is `beamR3`; Object stays reachable as `object`, with no more work on it. Evidence is in `logtime-v2/r4/`.
+
+These are the round-3 critic's fixes:
+1. **The ruler.**
+   - Centred under the numerals, the card's full inner width, clipped to the card with 10% edge fades.
+   - 24pt per 15 minutes, so 1h is 96pt.
+   - The reading line (3pt `action` capsule with a small pointer) spans only the ticks and the beam. The hour labels sit below it and are never covered.
+   - **Presets:** `LHChip` 30m · 1h · 2h · 4h under the ruler, as Opal has them. The selected chip follows the ruler.
+2. **The note is shown once.** While typing, it is the field. When the note is done (keyboard Done, focus leaving the field, "Next", a "Log again" row, or voice Done), the field grows into the record card and the note becomes the Fraunces sentence, with a pencil. Tapping the sentence shrinks the card back into the field. There is no live swap while typing.
+3. **One continuous move.** The white surface is one `matchedGeometryEffect` from field to card (`flow`), and the "Log again" rows move down and out. No crossfade over text.
+4. **The house moment.**
+   - After Log, the rental's house steps forward (matched move) to 78% of the sheet's width, at most 340pt.
+   - The windows light (`windows` 0.40, after a 0.25s delay). If the log crosses a stage, the next stage fades in (`stageFade`).
+   - The line under it: Fraunces "Logged 1h at Pine Cabin." plus "The roof goes on."
+   - It holds 1.9s, then the sheet closes and the toast shows.
+   - Houses are the production `RentalTileHouse` (the §1.4 Rentals tile recipe: night exposure, plus the `backlight` glow on roofed stages in dark).
+5. **"Which rental?"** collapses the duration to its numerals (56pt, no ruler or presets) until a house is picked. The free-plan line sits right under the sentence.
+
+### Amendment: the record card is a HERO, with limits (ruling 2026-10-27)
+
+The record card is the Log time sheet's one object, as the house is on Today. It is measured as a hero, not under D6's 20% cap for non-hero cards, and only while all of these hold:
+- **H-L1 [measured]:** the numerals, the duration control (ruler and presets) and the pinned Log button are fully above the fold at default and XXL. "Which rental?" counts as the control while it is open.
+- **H-L2 [grep + judgment]:** the hero holds no duplicate note. The note shows once, as the field or as the sentence, never both.
+- **H-L3 [measured]:** D4's empty-band rule still applies inside the card, at 35% or less.
+- **H-L4 [measured]:** at AX3 the card may scroll, but the duration control must be reachable with one scroll (one viewport height) from the top.
+- The house moment after Log is a transient full-sheet state. It is not measured by D6 or D4, it lasts 2.5s at most, and it never plays out of sight (§B.1 "reveal on return").
+
+### Round 4 self-check (`r4/qa/`)
+
+48 frames on a slim iPhone 17 Pro simulator, iOS 27.0: 11 states at default and XXL in light and dark, plus AX3 for the review and duration states.
+
+- **AA:** `frame_check.py` flagged 4 frames, all false positives checked by eye:
+  - house art in the "Log again" rows (2)
+  - rows fading under the pinned footer at XXL and AX3 (2), as §1.20 intends
+  - The round-3 table (20 pairs, lowest 4.31:1 on large text) still holds; round 4 added no new ink.
+- **Breaks and truncation:** 0 mid-word breaks in 48 frames. No truncation at default or XXL, checked by eye.
+- **H-L3, empty band (D4 ≤ 35%):** every card passes. Default 27.2–35.0% (the highest are the needs-time and needs-rental states at 35.0%, right at the limit); XXL 24.4–31.8%.
+- **H-L1, above the fold:** measured on the dark frames, where the chip fill separates from the card; the layout is identical in light, which I checked by eye. Presets bottom vs Log top:
+  - default: 443.7 / 468.0 / 491.7pt against 774pt
+  - XXL: up to 591pt against 774pt
+  - so the numerals, ruler and presets are always above the pinned Log button.
+  - When "Which rental?" is open, the house choices and the collapsed numerals sit above the fold.
+- **H-L4, AX3:** in the review state the ruler and presets are in the first viewport. In the needs-time state the numerals start at the bottom edge and are reachable with one scroll.
+- **House moment:** about 270×294pt, 65–69% of the width and 33–34% of the height, a bounding box of 22–23% of the screen. Round 3's card house was about 4%.
+- **D6 (non-hero card ≤ 20%):** fails on every card state (record card 61–70%, timer card about 50%). This is waived for the record card by the hero ruling above. The timer card is not covered by the ruling and is listed as open.
+
 ## The flow (unchanged, both variants)
 
 1. **One calm screen on the page colour.**
@@ -74,7 +122,7 @@ New components (5) and changes to existing ones (3). Everything else is an exist
 - A listening state: `stop.fill` and a 1.5pt `action` stroke.
 - The meter: five 3pt capsules bound to the mic level.
 
-**§1.28 `LHDurationBeam`** (A1):
+**§1.28 `LHDurationBeam`** (A1; round 4 values: 24pt per quarter, height 80, clipped to the card, reading line 52 over ticks and beam only, presets below):
 - Height 76.
 - 18pt per 15 minutes; range 0–12h.
 - The reading line is a 3pt `action` capsule.

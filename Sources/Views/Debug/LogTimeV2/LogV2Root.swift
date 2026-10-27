@@ -48,6 +48,7 @@ struct LogV2Root: View {
         self.launch = launch
         let m = LogV2Model(direction: launch.direction, isFree: launch.free)
         m.r3 = launch.direction == .a && !launch.r1 && launch.variant != .r2
+        if m.r3 && launch.variant == .beam { m.liveParse = false; m.beatMilliseconds = 1900 }
         m.apply(state: launch.state)
         _model = StateObject(wrappedValue: m)
     }
@@ -86,7 +87,8 @@ struct LogV2Root: View {
         case .a:
             if launch.r1 { LogV2SheetA(model: model) }
             else if launch.variant == .r2 { LogV2SheetA2(model: model) }
-            else { LogV2SheetR3(model: model, variant: launch.variant) }
+            else if launch.variant == .beam { LogV2SheetR4Beam(model: model) }
+            else { LogV2SheetR3(model: model, variant: launch.variant == .beamR3 ? .beam : launch.variant) }
         case .b: LogV2SheetB(model: model)
         }
     }

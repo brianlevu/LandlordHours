@@ -13,7 +13,7 @@ import SwiftUI
 // (windows 0.40, stageFade 0.25 when the log crosses a stage), then the sheet closes and the toast
 // shows. Steps push.
 
-enum LogV2Variant: String { case beam, object, r2 }
+enum LogV2Variant: String { case beam, beamR3, object, r2 }
 
 struct LogV2SheetR3: View {
     @ObservedObject var model: LogV2Model
@@ -119,7 +119,7 @@ struct LogV2SheetR3: View {
 
     private var recordCard: some View {
         VStack(spacing: 20) {
-            if variant == .beam { beamComposition } else { objectComposition }
+            if variant == .object { objectComposition } else { beamComposition }
         }
         .padding(.horizontal, LHMetrics.cardPadding)
         .padding(.vertical, 20)
@@ -136,7 +136,7 @@ struct LogV2SheetR3: View {
 
     private var house: some View {
         LHHouseReadback(before: model.stageBefore, after: model.stageAfter, crosses: model.crossesStage,
-                        celebrating: model.celebrating, size: variant == .beam ? 120 : 108)
+                        celebrating: model.celebrating, size: variant == .object ? 108 : 120)
             .opacity(model.rentalId == nil ? 0.35 : 1)
     }
 
@@ -410,10 +410,10 @@ struct LogV2SheetR3: View {
                 Circle().fill(colors.positive).frame(width: 8, height: 8).accessibilityHidden(true)
                 Text("Management at Pine Cabin").font(.headline).foregroundStyle(colors.textPrimary)
             }
-            if variant == .beam {
+            if variant != .object {
                 LHThumb(stage: model.stage(for: LogV2Sample.pine.id), lit: false, size: 120)
                 LHDurationNumerals(hours: (h * 60).rounded(.down) / 60, size: 84)
-                LHDurationBeam(hours: h, interactive: false).padding(.horizontal, -LHMetrics.cardPadding)
+                LHDurationBeam(hours: h, interactive: false)
             } else {
                 LHDurationDial(hours: (h * 60).rounded(.down) / 60, interactive: false, side: ax ? 220 : 260)
             }

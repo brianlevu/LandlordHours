@@ -72,13 +72,16 @@ struct LHDurationBeam: View {
     var interactive = true
     var onChange: (Double) -> Void = { _ in }
 
-    static let pointsPerQuarter: CGFloat = 18
+    /// r4: 24pt per 15 min (1h = 96pt), so at common values the ruler fills the card on both sides.
+    static let pointsPerQuarter: CGFloat = 24
     static let maxHours: Double = 12
 
     @State private var dragStart: Double?
     @Environment(\.colorScheme) private var colorScheme
-    @ScaledMetric(relativeTo: .caption) private var labelGap: CGFloat = 16
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    // Vertical layout: ticks 4–18, beam 20–46, reading line 0–50, labels centred at 64.
+    private static let beamY: CGFloat = 20, beamH: CGFloat = 26, labelY: CGFloat = 64
 
     var body: some View {
         GeometryReader { geo in
@@ -87,15 +90,13 @@ struct LHDurationBeam: View {
             let origin = cx - CGFloat(hours) * perHour
             ZStack(alignment: .topLeading) {
                 Canvas { ctx, size in
-                    let beamY: CGFloat = 20, beamH: CGFloat = 26
-                    let full = CGRect(x: origin, y: beamY, width: CGFloat(Self.maxHours) * perHour, height: beamH)
+                    let full = CGRect(x: origin, y: Self.beamY, width: CGFloat(Self.maxHours) * perHour, height: Self.beamH)
                     ctx.stroke(Path(roundedRect: full, cornerRadius: 6), with: .color(colors.drafting),
                                style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                    let built = CGRect(x: origin, y: beamY, width: CGFloat(hours) * perHour, height: beamH)
+                    let built = CGRect(x: origin, y: Self.beamY, width: CGFloat(hours) * perHour, height: Self.beamH)
                     if built.width > 0 {
                         ctx.fill(Path(roundedRect: built, cornerRadius: 6), with: .color(colors.timber))
-                        // Grain: two hairlines in the timber ink.
-                        for gy in [beamY + 9, beamY + 17] {
+                        for gy in [Self.beamY + 9, Self.beamY + 17] {
                             var p = Path(); p.move(to: CGPoint(x: built.minX + 6, y: gy)); p.addLine(to: CGPoint(x: built.maxX - 6, y: gy))
                             ctx.stroke(p, with: .color(colors.timberInk.opacity(0.28)), lineWidth: 1)
                         }
@@ -104,19 +105,26 @@ struct LHDurationBeam: View {
                         let x = origin + CGFloat(q) * Self.pointsPerQuarter
                         guard x > -20, x < size.width + 20 else { continue }
                         let hour = q % 4 == 0
-                        var p = Path(); p.move(to: CGPoint(x: x, y: beamY - (hour ? 14 : 7))); p.addLine(to: CGPoint(x: x, y: beamY - 2))
+                        var p = Path(); p.move(to: CGPoint(x: x, y: Self.beamY - (hour ? 16 : 8))); p.addLine(to: CGPoint(x: x, y: Self.beamY - 2))
                         ctx.stroke(p, with: .color(colors.draftingInk.opacity(hour ? 1 : 0.6)), lineWidth: hour ? 1.5 : 1)
-                        if hour {
-                            ctx.draw(Text(q == 0 ? "0" : "\(q / 4)h").font(.caption).foregroundStyle(colors.textSecondary),
-                                     at: CGPoint(x: x, y: beamY + beamH + labelGap * 0.7), anchor: .center)
+                        if hour || q % 2 == 0 {
+                            let label = q == 0 ? "0" : (hour ? "\(q / 4)h" : "")
+                            if !label.isEmpty {
+                                ctx.draw(Text(label).font(.caption).foregroundStyle(colors.textSecondary),
+                                         at: CGPoint(x: x, y: Self.labelY), anchor: .center)
+                            }
                         }
                     }
                 }
-                // The reading line: where the beam ends.
-                Capsule().fill(colors.action).frame(width: 3, height: 50).position(x: cx, y: 33)
+                // The reading line spans the ticks and the beam only; the labels stay clear of it.
+                Capsule().fill(colors.action).frame(width: 3, height: 52).position(x: cx, y: 26)
+                Image(systemName: "arrowtriangle.down.fill").font(.caption2).foregroundStyle(colors.action)
+                    .position(x: cx, y: 0).accessibilityHidden(true)
             }
-            .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.12),
-                                         .init(color: .black, location: 0.88), .init(color: .clear, location: 1)],
+            .frame(width: geo.size.width, height: geo.size.height)
+            .clipped()
+            .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.1),
+                                         .init(color: .black, location: 0.9), .init(color: .clear, location: 1)],
                                  startPoint: .leading, endPoint: .trailing))
         }
         .frame(height: 76)
