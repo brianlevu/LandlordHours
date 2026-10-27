@@ -237,6 +237,7 @@
 		BC8F6E92451777ADF3C1AE40 /* ColorContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1240689FADA6EC9A0D1883B /* ColorContrastTests.swift */; };
 		BC94A64B1D9B8278878B6C77 /* HouseholdSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C4DFA2FD964612229E33148 /* HouseholdSyncTests.swift */; };
 		BD9C362BDD43E6E640C51BA9 /* LHSegmented.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E78224ED686BF6782F6BDE8 /* LHSegmented.swift */; };
+		BE4FAA4140F11E46EBABF0F0 /* AdversarialReviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDF337A9496CAA9D6CBCC05B /* AdversarialReviewTests.swift */; };
 		BFF6F8AE069FE01CE9E5414F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE13F908989158FDAB28BF57 /* Models.swift */; };
 		C033DAA5B2F3EB1B50CDA1CE /* LandlordHoursApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9CB28BC741E54912DBB35F /* LandlordHoursApp.swift */; };
 		C06093217332D8EA86BAE520 /* ZoneSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B63AA2FA53D5C52FB3370B59 /* ZoneSnapshot.swift */; };
@@ -618,6 +619,7 @@
 		DBE81FD800D7C2747504BEC0 /* LocalProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalProfile.swift; sourceTree = "<group>"; };
 		DC43B41C69DCEC558B83DE87 /* EndOfEventScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndOfEventScheduler.swift; sourceTree = "<group>"; };
 		DD0C1C4662F46051DF0E5A62 /* InboxCaptureUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxCaptureUITests.swift; sourceTree = "<group>"; };
+		DDF337A9496CAA9D6CBCC05B /* AdversarialReviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdversarialReviewTests.swift; sourceTree = "<group>"; };
 		DE13F908989158FDAB28BF57 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		DEA07735A91C141EB38666AE /* CalendarDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarDetector.swift; sourceTree = "<group>"; };
 		DF218A00D2A08FC44F0C78D3 /* D3-106-signed-out-two.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "D3-106-signed-out-two.plist"; sourceTree = "<group>"; };
@@ -1286,6 +1288,7 @@
 		F746A3A99BABBA53A5A58061 /* Identity */ = {
 			isa = PBXGroup;
 			children = (
+				DDF337A9496CAA9D6CBCC05B /* AdversarialReviewTests.swift */,
 				D5ECD3D2502C8BBFE0641041 /* CloudKitSchemaManifestTests.swift */,
 				8050AE37925D54C7824A075C /* DevelopmentContainerSyncTests.swift */,
 				9C4DFA2FD964612229E33148 /* HouseholdSyncTests.swift */,
@@ -1715,6 +1718,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1539492816642BB459E815B2 /* AccountDeleteTests.swift in Sources */,
+				BE4FAA4140F11E46EBABF0F0 /* AdversarialReviewTests.swift in Sources */,
 				41608B6514C2E6C81B7359F2 /* AuditReportTests.swift in Sources */,
 				1E98FE6A65B4761018872153 /* BrandTypographyTests.swift in Sources */,
 				E57066D892140F0329FFD63C /* CalendarDetectorTests.swift in Sources */,

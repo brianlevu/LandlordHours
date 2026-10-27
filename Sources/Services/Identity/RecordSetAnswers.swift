@@ -182,7 +182,10 @@ extension RecordSetMigration {
             // Restore only into the account this phone's set came from.
             guard await confirmAccount() == .same else { onChange?(); return false }
             defaults.removeObject(forKey: IdentityKeys.zoneGone)
-            IdentityKeys.forgetZone(defaults)   // the next push may create the zone
+            IdentityKeys.forgetZone(defaults)
+            // The person chose to put this iPhone’s copy back: the zone is created for that, here.
+            do { try await source.ensureZone() } catch { onChange?(); return false }
+            defaults.set(true, forKey: IdentityKeys.zoneSeen)
             tracker.resetBaselines()
             let report = await pushLive()
             onChange?()
@@ -225,6 +228,9 @@ extension RecordSetMigration {
         onChange?()
         return await runCloudPhase()
     }
+
+    /// Onboarding finished (or was left).
+    func finishOnboarding() {}
 
     static func trackerContents(_ id: String, root: URL) -> SyncChangeTracker.Contents? {
         let url = SuggestionStore.directory(forUserId: id, baseDirectory: root.appendingPathComponent("Sync", isDirectory: true))

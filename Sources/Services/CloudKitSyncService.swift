@@ -424,7 +424,10 @@ final class CloudKitSyncService: ObservableObject {
         if let engine {
             // Never push into an iCloud account the set wasn't read from (P13).
             guard await engine.confirmAccount() == .same else { onIdentityChange?(); return }
-            let report = await engine.pushLive()
+            guard !pushesBlocked else { return }
+            let task = Task { @MainActor in await engine.pushLive() }
+            enginePushTask = task
+            let report = await task.value
             if report.zoneGone {
                 _ = engine.handleZoneGone()
                 onIdentityChange?()
@@ -510,7 +513,13 @@ final class CloudKitSyncService: ObservableObject {
         initialSyncCompletedFor = nil
         hasHeldPush = false
         await pushChain?.value
+        // The engine's pushes and the cloud phase push too: wait for both.
+        await enginePushTask?.value
+        await initialSyncTask?.value
     }
+
+    /// The engine push in flight (`performPushAll`), awaited by `quiescePushes`.
+    private var enginePushTask: Task<ZonePushReport, Never>?
 
     private func pushChangedRecordsNow(
         save: ([CKRecord]) async throws -> Void,
@@ -1132,10 +1141,9 @@ extension CloudKitSyncService: IdentityZoneSource {
         } catch let error as CKError {
             if let owner = Self.serverRecords(in: error).compactMap({ $0["appUserId"] as? String }).first { return .adopted(owner) }
             guard Self.isZoneGone(error) else { throw error }
-            // A zone this device knew was deleted elsewhere: ask (P31), never recreate it.
-            if IdentityKeys.knowsZone(.standard) { throw ZoneSourceError.zoneGone }
-            try await createZone()
-            try await modify(database: database, save: records, policy: .ifServerRecordUnchanged, atomic: false)
+            // Only the cloud phase creates the zone (`ensureZone`, before S8): gone now means
+            // deleted meanwhile. Ask (P31), never recreate.
+            throw ZoneSourceError.zoneGone
         }
         if let after = try await fetchOptional(goalID, database: database), let owner = after["appUserId"] as? String, owner != goal.appUserId {
             return .adopted(owner)
@@ -1173,7 +1181,7 @@ extension CloudKitSyncService: IdentityZoneSource {
             } catch {
                 if Self.isZoneGone(error) {
                     if IdentityKeys.knowsZone(.standard) { report.zoneGone = true; return report }
-                    // A zone this device never saw holds nothing to delete; the saves below create it.
+                    // A zone this device never saw holds nothing to delete.
                     report.deletedNames = Set(deletes)
                 } else {
                     logger.error("Delete push failed: \(error.localizedDescription)")
@@ -1184,22 +1192,9 @@ extension CloudKitSyncService: IdentityZoneSource {
         report.savedNames = saved.savedNames
         report.failedTypes = saved.failedTypes
         report.quotaExceeded = saved.quotaExceeded
-        if saved.zoneGone {
-            if IdentityKeys.knowsZone(.standard) {
-                report.zoneGone = true
-            } else {
-                // First sync on this account: the zone simply doesn't exist yet.
-                do {
-                    try await createZone()
-                    let retry = await saveRecordsPerType(records.map { $0.ckRecord(zoneID: zoneID) })
-                    report.savedNames = retry.savedNames
-                    report.failedTypes = retry.failedTypes
-                    report.quotaExceeded = retry.quotaExceeded
-                } catch {
-                    report.failedTypes["zone"] = (error as? CKError)?.code.rawValue ?? -1
-                }
-            }
-        }
+        // A push never creates the zone, whatever it knows: only the cloud phase does
+        // (`ensureZone`), so a push in flight when Delete all data runs can't bring it back.
+        if saved.zoneGone { report.zoneGone = true }
         if !report.savedNames.isEmpty { UserDefaults.standard.set(true, forKey: IdentityKeys.hasSynced) }
         return report
     }

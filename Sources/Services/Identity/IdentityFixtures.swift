@@ -26,6 +26,8 @@ final class FakeZoneSource: IdentityZoneSource {
     var failRead = false
     var incompleteRead = false
     var readDelay: Duration = .zero
+    /// A push's request reaches iCloud this much later (the zone is checked then, as on the server).
+    var pushDelay: Duration = .zero
     var tokenExpiredOnDelta = 0
     var quotaExceeded = false
     var failTypes: Set<String> = []
@@ -139,12 +141,8 @@ final class FakeZoneSource: IdentityZoneSource {
     }
 
     func saveHousehold(goal: ZoneRecord, tax: ZoneRecord) async throws -> HouseholdSaveResult {
-        // Like the live source: a save into a missing zone creates it, unless this device knew
-        // the zone (deleted elsewhere: asked, never recreated).
-        if !zoneExists {
-            if IdentityKeys.knowsZone(defaults) { throw ZoneSourceError.zoneGone }
-            zoneExists = true
-        }
+        // Like the live source: only ensureZone creates the zone; a missing one is zone-gone.
+        if !zoneExists { throw ZoneSourceError.zoneGone }
         if let raceHouseholdOwner, records[goal.recordName] == nil {
             records[goal.recordName] = goal.retagged(raceHouseholdOwner)
             records[tax.recordName] = tax.retagged(raceHouseholdOwner)
@@ -159,13 +157,15 @@ final class FakeZoneSource: IdentityZoneSource {
 
     func push(_ batch: [ZoneRecord], deletes names: [String]) async -> ZonePushReport {
         var report = ZonePushReport()
+        if pushDelay > .zero { try? await Task.sleep(for: pushDelay) }
         if !zoneExists {
-            // Like the live source: a device that knew the zone never recreates it; a zone it
-            // never saw has nothing to delete, and the first save creates it.
+            // The live order of checks: deletes first (a zone this device knew is gone → ask; one
+            // it never saw has nothing to delete), then the saves fail as zone-gone. A push never
+            // creates the zone; only ensureZone does.
             if IdentityKeys.knowsZone(defaults) { report.zoneGone = true; return report }
             report.deletedNames = Set(names)
-            guard !batch.isEmpty else { return report }
-            zoneExists = true
+            if !batch.isEmpty { report.zoneGone = true }
+            return report
         }
         if quotaExceeded {
             report.quotaExceeded = true
