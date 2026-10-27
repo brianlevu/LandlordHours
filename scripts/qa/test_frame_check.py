@@ -500,5 +500,31 @@ class HeroMode(unittest.TestCase):
         self.assertEqual(fc.window_delta(dim, unlit, boxes)["verdict"], "FAIL")
 
 
+
+class MidwordBreaks(unittest.TestCase):
+    @staticmethod
+    def L(text, y, x=100, w=600, h=40):
+        return dict(text=text, x=x, y=y, w=w, h=h)
+
+    def test_hyphen_break_is_caught(self):
+        hits = fc.midword_breaks([self.L("Notifica-", 100), self.L("tions", 150)])
+        self.assertEqual([(a, b) for a, b, _ in hits], [("Notifica-", "tions")])
+
+    def test_clean_wrap_is_not_flagged(self):
+        self.assertEqual(fc.midword_breaks([self.L("Material", 100), self.L("participation", 150)]), [])
+
+    def test_hyphen_before_capital_or_digit_is_not_a_break(self):
+        self.assertEqual(fc.midword_breaks([self.L("Self-", 100), self.L("Employed", 150)]), [])
+
+    def test_short_compound_prefix_is_not_a_break(self):
+        self.assertEqual(fc.midword_breaks([self.L("Apple's on-", 100), self.L("device model", 150)]), [])
+
+    def test_far_apart_lines_are_not_joined(self):
+        self.assertEqual(fc.midword_breaks([self.L("Notifica-", 100), self.L("tions", 900)]), [])
+
+    def test_other_column_is_not_joined(self):
+        self.assertEqual(fc.midword_breaks([self.L("Notifica-", 100, x=50, w=200), self.L("tions", 150, x=700, w=200)]), [])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

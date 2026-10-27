@@ -193,42 +193,52 @@ extension LHRow {
             }
         }
 
+        private var ax: Bool { typeSize.isAccessibilitySize }
+
+        /// Owner ruling 2026-10-27: below AX the title wraps to 2 lines (D7); at AX it never truncates.
+        /// The meta takes a second line from XXL so a date is never cut; at AX it is unlimited.
         private var content: some View {
-            HStack(spacing: 12) {
+            HStack(alignment: ax ? .top : .center, spacing: 12) {
                 leading
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: ax ? 4 : 2) {
                     Text(title)
                         .font(.body)
                         .foregroundStyle(colors.textPrimary)
-                        .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
+                        .lineLimit(ax ? nil : 2)
                     if let meta {
                         Text(meta)
                             .font(.subheadline)
                             .foregroundStyle(colors.textSecondary)
-                            .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
+                            .lineLimit(ax ? nil : (typeSize >= .xxLarge ? 2 : 1))
                     }
+                    // At AX the value drops under the label so it never narrows it ("sug-/gesting").
+                    if ax, let value { valueText(value) }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                if let value {
-                    Text(value)
-                        .font(.subheadline)
-                        .fontDesign(.rounded)
-                        .monospacedDigit()
-                        .foregroundStyle(colors.textSecondary)
-                        .lineLimit(1)
-                        .layoutPriority(1)
-                }
-                if showsChevron {
-                    Image(systemName: "chevron.right")
-                        .font(.footnote)
-                        .foregroundStyle(colors.textTertiary)
-                        .accessibilityHidden(true)
+                if !ax, let value { valueText(value).layoutPriority(1) }
+                // At AX the chevron is dropped: it frees about 23pt (chevron + 12 gap) for the label,
+                // which is what made "Notifica-/tions" break mid-word (Brian, 2026-10-27).
+                if showsChevron && !ax {
+                    LHChevron()
                 }
             }
             .padding(LHRow.insets)
             .frame(minHeight: LHMetrics.rowMinHeight)
             .contentShape(Rectangle())
             .accessibilityElement(children: .combine)
+        }
+
+        private func valueText(_ value: String) -> some View {
+            Text(value)
+                .font(.subheadline)
+                .fontDesign(.rounded)
+                .monospacedDigit()
+                // At AX the value is its own line: 4pt more air above it and semibold primary ink, so
+                // "Things you asked us to stop suggesting / None" never reads as one sentence.
+                .fontWeight(ax ? .semibold : nil)
+                .foregroundStyle(ax ? colors.textPrimary : colors.textSecondary)
+                .padding(.top, ax ? 4 : 0)
+                .lineLimit(ax ? nil : 1)
         }
     }
 }
@@ -243,10 +253,25 @@ extension LHRow.Browse where Leading == LHRowGlyph {
     }
 }
 
+/// The one disclosure chevron (standard §1.4): `chevron.right`, `.footnote.semibold`, the `chevron`
+/// token (`textSecondary`, 7.5:1 light / 8.9:1 dark; a UI glyph needs 3:1). Never `textTertiary`, never a
+/// system grey: the stock List disclosure measured 1.72:1 (#C5C5C7 on white). Hidden from VoiceOver.
+struct LHChevron: View {
+    var systemName = "chevron.right"
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(AdaptiveColors(colorScheme: colorScheme).chevron)
+            .accessibilityHidden(true)
+    }
+}
+
 /// An SF glyph in a 36pt wash tile (radius 12): the browse row's leading slot outside Records and
 /// Rentals.
 struct LHRowGlyph: View {
-    enum Tint: Equatable { case action, positive, caution, informational, neutral }
+    enum Tint: Equatable { case action, positive, caution, informational, neutral, destructive }
     let systemImage: String
     var tint: Tint = .action
 
@@ -261,6 +286,7 @@ struct LHRowGlyph: View {
         case .caution: return (colors.caution, colors.cautionSurface)
         case .informational: return (colors.informational, colors.informationalSurface)
         case .neutral: return (colors.textSecondary, colors.backgroundTertiary)
+        case .destructive: return (colors.destructive, colors.destructiveSurface)
         }
     }
 
@@ -328,9 +354,9 @@ extension LHRow {
                         .multilineTextAlignment(.trailing)
                     switch accessory {
                     case .disclosure:
-                        Image(systemName: "chevron.right").font(.footnote).foregroundStyle(colors.textTertiary)
+                        LHChevron()
                     case .menu:
-                        Image(systemName: "chevron.up.chevron.down").font(.footnote).foregroundStyle(colors.textTertiary)
+                        LHChevron(systemName: "chevron.up.chevron.down")
                     case .none:
                         EmptyView()
                     }
@@ -363,17 +389,38 @@ extension LHRow {
             self._isOn = isOn
         }
 
+        @Environment(\.dynamicTypeSize) private var typeSize
+
         var body: some View {
-            SwiftUI.Toggle(isOn: $isOn) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(label).font(.body).foregroundStyle(colors.textPrimary)
-                    if let subtitle {
-                        Text(subtitle).font(.subheadline).foregroundStyle(colors.textSecondary)
+            if typeSize.isAccessibilitySize {
+                // At AX the switch drops under the words, so the label and subtitle get the whole row
+                // width instead of a 60% column (a 7-line subtitle made one row 54% of the screen, D2).
+                VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(label).font(.body).foregroundStyle(colors.textPrimary)
+                        if let subtitle {
+                            Text(subtitle).font(.subheadline).foregroundStyle(colors.textSecondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    SwiftUI.Toggle(isOn: $isOn) { Text(label) }
+                        .labelsHidden()
+                        .tint(colors.action)
+                }
+                .frame(minHeight: LHMetrics.minTap)
+                .accessibilityElement(children: .combine)
+            } else {
+                SwiftUI.Toggle(isOn: $isOn) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(label).font(.body).foregroundStyle(colors.textPrimary)
+                        if let subtitle {
+                            Text(subtitle).font(.subheadline).foregroundStyle(colors.textSecondary)
+                        }
                     }
                 }
+                .tint(colors.action)
+                .frame(minHeight: LHMetrics.minTap)
             }
-            .tint(colors.action)
-            .frame(minHeight: LHMetrics.minTap)
         }
     }
 }

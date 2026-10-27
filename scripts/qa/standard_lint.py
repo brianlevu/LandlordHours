@@ -148,8 +148,27 @@ def r_alert(path, line):
     return bool(re.search(r"\.alert\(", line))
 
 
+FIXED_SIZE_WRAPPER_DEF = ("Sources/Views/Components/AppDesignSystem.swift", "fixedSize(horizontal: false, vertical: true)")
+
+
 def r_fixed_size(path, line):
-    return ".fixedSize(" in line and not line.lstrip().startswith("//")
+    """Every fixedSize site is a review item: a raw `.fixedSize(` or a call of its sanctioned wrapper
+    `.lhWrapsText()` (AppDesignSystem). A bare `fixedSize(` (no leading dot, e.g. inside a new wrapper
+    or an extension) is caught too; the one exemption is the wrapper's own body, matched exactly, so a
+    second wrapper cannot hide a fixedSize from the count."""
+    if line.lstrip().startswith("//"):
+        return False
+    if (path, line.strip()) == FIXED_SIZE_WRAPPER_DEF:
+        return False
+    return bool(re.search(r"(?<![\w])fixedSize\(", line)) or ".lhWrapsText(" in line
+
+
+def r_chevron(path, line):
+    """One disclosure chevron: LHChevron (LHRow.swift). A hand-drawn `chevron.right` image has its own ink
+    and size, which is how a 1.72:1 grey got in (1.4)."""
+    if base(path) in ("LHRow.swift", "LHIcons.swift") or line.lstrip().startswith("//"):
+        return False
+    return bool(re.search(r'Image\(systemName:\s*"chevron\.right"', line))
 
 
 def r_hand_card(path, line):
@@ -215,7 +234,7 @@ RULES = [
     ("onappear-animation", ".onAppear { withAnimation only in emptyStateEntrance / milestone (B.1)", r_onappear_anim),
     ("radius", "corner radii in {6, 12, 16, 20, capsule} (D10)", r_radius),
     ("alert", ".alert( only for irreversible destructive acts (1.21)", r_alert),
-    ("fixed-size", "fixedSize at AX only; review each (2)", r_fixed_size),
+    ("fixed-size", "fixedSize / lhWrapsText: vertical-only wrap at AX; every call site is reviewed (2)", r_fixed_size),
     ("craft-image", "Image(\"craft_ / Image(stage.rawValue only in CraftHouseView and LHThumb (H.3)", r_craft_image),
     ("hero-card", "no RoundedRectangle background/clip or LHCard in House/ or the Today root (H.1)", r_hero_card),
     ("blueprint-retired", "BlueprintGrid, InboxBlueprintPaper, TapeMeasure, StampView, kraft, vellum, HouseHeroView retired (H.8; baselined until the Today package merges)", r_blueprint_retired),
@@ -223,6 +242,7 @@ RULES = [
     ("page-ink", "page files: foregroundStyle only textPrimary/textSecondary/action/behind/positiveOnPage/ink; others are findings for the gate (H.4)", r_page_ink),
     ("section-header-mono", "LHSectionHeader takes no .monospaced; design: .monospaced only in PDF/ and ReportsView (C)", r_mono),
     ("tab-shell", "root TabView: exactly five Tab( one role: .search, no .glass plus button, no .tint(Color(hex:) (H.7, file rule)", lambda p, l: False),
+    ("chevron", "disclosure chevron is LHChevron, not Image(systemName: \"chevron.right\") (1.4)", r_chevron),
     ("hand-card", "no hand-built card around rows: .propertyCard / lhSurfaceCard (1.3a)", r_hand_card),
 ]
 

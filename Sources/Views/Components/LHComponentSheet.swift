@@ -7,7 +7,8 @@ import SwiftUI
 //
 // Page 1 buttons, tags, chips, headers, titles · 2 rows · 3 fields, segmented, stepper, cards,
 // tiles, ring · 4 the hero (CraftHouseView) on the page, chip, dots, thumbnails · 5 empty states and
-// the sheet scaffold. Strings here are fixtures for the board, not product copy.
+// the sheet scaffold · 6 a full-height LHSheet with a long title and a secondary and tertiary
+// choice (the AX footer policy, §1.20). Strings here are fixtures for the board, not product copy.
 
 enum LHComponentSheetLaunch {
     static var isRequested: Bool { ProcessInfo.processInfo.arguments.contains("-LHComponentSheet") }
@@ -16,7 +17,7 @@ enum LHComponentSheetLaunch {
         let args = ProcessInfo.processInfo.arguments
         guard let i = args.firstIndex(of: "-LHComponentSheet"), args.indices.contains(i + 1),
               let n = Int(args[i + 1]) else { return 1 }
-        return min(max(n, 1), 5)
+        return min(max(n, 1), 6)
     }
 
     /// `-LHComponentStage <stage>` and `-LHComponentLit 0|1` for the hero page.
@@ -51,6 +52,8 @@ struct LHComponentSheet: View {
         Group {
             if page == 4 {
                 heroPage
+            } else if page == 6 {
+                policySheet
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
@@ -222,6 +225,29 @@ struct LHComponentSheet: View {
             }
             .background { LHPage() }
         }
+    }
+
+    // MARK: Page 6
+
+    /// One full-height sheet: a title long enough to wrap, a body taller than the screen at AX, a
+    /// primary, and a secondary and tertiary choice. Below AX all three sit in the pinned bar; at AX
+    /// only the primary does and the other two scroll with the body (§1.20).
+    private var policySheet: some View {
+        LHSheet(fx("Log time for the cabin you rent out to guests"), subtitle: fx("Today, Thu Oct 22"), onClose: {}) {
+            VStack(alignment: .leading, spacing: 12) {
+                LHField(fx("What did you do?"), text: $note, multiline: true)
+                LHRow.Value(fx("Rental"), value: fx("Pine Cabin"), action: {})
+                LHRow.Value(fx("Category"), value: fx("Repairs and maintenance"), action: {})
+                LHRow.Value(fx("Who did the work"), value: fx("Me"), action: {})
+                LHRow.Toggle(fx("Count it toward your yearly goal"), subtitle: fx("Only hours you confirm are counted."), isOn: $toggle)
+            }
+        } primary: {
+            Button(fx("Log 1h 30m")) {}.buttonStyle(LHButton.primary)
+        } secondary: {
+            Button(fx("Save as a draft")) {}.buttonStyle(LHButton.secondary).frame(maxWidth: .infinity)
+            Button(fx("Discard this entry")) {}.buttonStyle(LHButton.tertiary).frame(maxWidth: .infinity)
+        }
+        .background(AdaptiveColors(colorScheme: colorScheme).backgroundSecondary)
     }
 
     // MARK: Page 5

@@ -78,16 +78,21 @@ struct LHScreenTitle: View {
                     Text(title)
                         .font(titleFont)
                         .foregroundStyle(colors.textPrimary)
-                        // A collection title is one or two words; at AX it shrinks before it would
-                        // break a word (Fraunces 34 at AX3 is wider than the screen for "Components").
-                        .lineLimit(style == .collection ? 1 : nil)
+                        // Below AX a collection title is one line that shrinks before it breaks a word
+                        // (D7: title <= 2 lines). At AX it never truncates: it wraps to as many lines as
+                        // it needs (owner ruling 2026-10-27, "never cut text off" beats the line cap);
+                        // the scale floor only keeps a single long word whole.
+                        .lineLimit(ax ? nil : (style == .collection ? 1 : 2))
                         .minimumScaleFactor(style == .collection ? 0.6 : 1)
                         .accessibilityAddTraits(.isHeader)
                     if let subtitle {
                         Text(subtitle)
                             .font(.subheadline)
                             .foregroundStyle(colors.textSecondary)
-                            .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
+                            .lineLimit(ax ? nil : (typeSize >= .xLarge ? 2 : 1))
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .lhWrapsText()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

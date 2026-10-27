@@ -94,3 +94,83 @@ final class Polish2CaptureUITests: XCTestCase {
         }
     }
 }
+
+/// Shared-component AX frames (fix/shared-ax): Settings, Records and the LHSheet policy page at default,
+/// XXL and AX3, light and dark. `TEST_RUNNER_LH_CAPTURE_DIR=<dir>` writes `<screen>-<size>-<scheme>.png`;
+/// `TEST_RUNNER_LH_CAPTURE_SIZES=default,xxl,ax3` and `..._SCHEMES=light,dark` narrow the set.
+final class SharedAxCaptureUITests: XCTestCase {
+    private var app: XCUIApplication!
+
+    private static let allSizes: [(tag: String, category: String?)] = [
+        ("default", nil), ("xxl", "UICTContentSizeCategoryXXL"), ("ax3", "UICTContentSizeCategoryAccessibilityXL")
+    ]
+
+    private static func list(_ key: String, _ all: [String]) -> [String] {
+        guard let v = ProcessInfo.processInfo.environment[key], !v.isEmpty else { return all }
+        return v.split(separator: ",").map(String.init)
+    }
+
+    override func setUp() {
+        super.setUp()
+        continueAfterFailure = true
+        app = XCUIApplication()
+    }
+
+    func testCaptureSettingsRecordsAndSheet() {
+        let sizes = Self.list("LH_CAPTURE_SIZES", Self.allSizes.map(\.tag))
+        let schemes = Self.list("LH_CAPTURE_SCHEMES", ["light", "dark"])
+        for (tag, category) in Self.allSizes where sizes.contains(tag) {
+            for scheme in schemes {
+                // Settings, with its scroll pages.
+                launch(scheme: scheme, category: category, tab: 4, extra: [])
+                XCTAssertTrue(element("settings.profile").waitForExistence(timeout: 25))
+                capture("settings-\(tag)-\(scheme)")
+                for page in 2...5 {
+                    if element("settings.version").exists && element("settings.version").isHittable { break }
+                    app.swipeUp()
+                    capture("settings-\(tag)-\(scheme)-p\(page)", wait: 0.9)
+                }
+                // Records: browse rows with dates.
+                launch(scheme: scheme, category: category, tab: 6, extra: [])
+                Thread.sleep(forTimeInterval: 2.0)
+                capture("records-\(tag)-\(scheme)")
+                // The sheet policy page (long title, primary pinned, secondary/tertiary).
+                launch(scheme: scheme, category: category, tab: 4, extra: ["-LHComponentSheet", "6"])
+                XCTAssertTrue(element("lh.componentSheet.6").waitForExistence(timeout: 25))
+                capture("sheet-\(tag)-\(scheme)")
+                if tag == "ax3" {
+                    app.swipeUp()
+                    capture("sheet-\(tag)-\(scheme)-p2", wait: 0.9)
+                    app.swipeUp()
+                    capture("sheet-\(tag)-\(scheme)-p3", wait: 0.9)
+                }
+            }
+        }
+    }
+
+    private func launch(scheme: String, category: String?, tab: Int, extra: [String]) {
+        app.terminate()
+        var args = [UITestIsolation.resetProfilesArgument, "-LHMockScenario", "frequent",
+                    "-LHInitialTab", "\(tab)", "-LHColorScheme", scheme,
+                    "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        if let category { args += ["-UIPreferredContentSizeCategoryName", category] }
+        app.launchArguments = args + extra
+        app.launch()
+    }
+
+    private func element(_ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any)[identifier].firstMatch
+    }
+
+    private func capture(_ name: String, wait: TimeInterval = 1.5) {
+        Thread.sleep(forTimeInterval: wait)
+        let screenshot = XCUIScreen.main.screenshot()
+        let shot = XCTAttachment(screenshot: screenshot)
+        shot.name = name
+        shot.lifetime = .keepAlways
+        add(shot)
+        if let dir = ProcessInfo.processInfo.environment["LH_CAPTURE_DIR"], !dir.isEmpty {
+            try? screenshot.pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).png"))
+        }
+    }
+}
