@@ -1,10 +1,12 @@
 import SwiftUI
 import MessageUI
 
-/// Contact support: a plain grouped form, one action, and what helps us answer fast.
+/// Contact support: one form on the plain page, one pinned `LHButton.primary`, and what helps us
+/// answer fast. Standard v2 (package H): `LHScreenTitle`, `LHField`, no list chrome.
 struct ContactSupportView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     @State private var subject: String = ""
     @State private var message: String = ""
@@ -18,63 +20,67 @@ struct ContactSupportView: View {
     }
 
     var body: some View {
-        List {
-            Section {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Get help")
-                        .lhDisplayFont(.largeTitle)
-                        .foregroundStyle(colors.textPrimary)
-                        .accessibilityAddTraits(.isHeader)
-                    Text("Questions about tracking, exports or setup? Write to Brian, who builds LandlordHours. You’ll hear back by email.")
-                        .font(.subheadline)
+        ScrollView {
+            VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
+                LongTailHeader(
+                    title: HS.t("support.title", "Get help"),
+                    subtitle: HS.t("support.subtitle", "Write to Brian. You’ll hear back by email."),
+                    style: .detail,
+                    back: (label: HS.t("common.back", "Back"), identifier: "support.back", action: { dismiss() })
+                )
+
+                VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+                    LHSectionHeader(HS.t("support.section", "Your message"))
+                    VStack(spacing: 12) {
+                        LHField(HS.t("support.subject", "Subject"), text: $subject,
+                                accessibilityLabel: HS.t("support.subject", "Subject"), identifier: "support.subject")
+                        LHField(HS.t("support.message.placeholder", "What happened, and what did you expect?"), text: $message,
+                                multiline: true, accessibilityLabel: HS.t("support.message", "Message"), identifier: "support.message")
+                    }
+                    Text(HS.t("support.hint", "It helps to include what you tapped, a screenshot, and your iOS version."))
+                        .font(.footnote)
                         .foregroundStyle(colors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 4)
                 }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
-            }
 
-            Section {
-                TextField("", text: $subject, prompt: Text("Subject").foregroundStyle(colors.textTertiary))
-                    .foregroundStyle(colors.textPrimary)
-                    .accessibilityLabel("Subject")
-                    .accessibilityIdentifier("support.subject")
-                TextField("", text: $message, prompt: Text("What happened, and what did you expect?").foregroundStyle(colors.textTertiary), axis: .vertical)
-                    .lineLimit(5...12)
-                    .foregroundStyle(colors.textPrimary)
-                    .accessibilityLabel("Message")
-                    .accessibilityIdentifier("support.message")
-            } header: {
-                BPSectionHeader(title: "Your message")
+                // At accessibility sizes the button is too tall to pin: it ends the content.
+                if typeSize.isAccessibilitySize { sendButton }
             }
-            .listRowBackground(colors.backgroundSecondary)
-
-            Section {
-                Button(action: sendSupportEmail) {
-                    Label("Send email", systemImage: "paperplane")
-                }
-                .buttonStyle(InboxPrimaryButtonStyle())
-                .disabled(!canSend)
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets())
-                .accessibilityIdentifier("support.send")
-            } footer: {
-                Text("It helps to include what you tapped, a screenshot, and your iOS version.")
-                    .font(.footnote)
-                    .foregroundStyle(colors.textSecondary)
+            .frame(maxWidth: LHMetrics.readingColumn, alignment: .leading)
+            .padding(.horizontal, LHMetrics.gutter)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background { LHCanvas() }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !typeSize.isAccessibilitySize {
+                sendButton
+                    .padding(.horizontal, 16)
                     .padding(.top, 8)
+                    .padding(.bottom, 16)
+                    .frame(maxWidth: .infinity)
+                    .background(colors.background)
             }
         }
-        .listStyle(.insetGrouped)
-        .scrollContentBackground(.hidden)
-        .scrollDismissesKeyboard(.interactively)
-        .background(colors.background.ignoresSafeArea())
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
         .hidesAppTabBar()
         .sheet(isPresented: $showingMailComposer) {
             MailComposeView(subject: subject, body: message, to: supportEmail)
         }
         .accessibilityIdentifier("support.screen")
+    }
+
+    private var sendButton: some View {
+        Button {
+            sendSupportEmail()
+        } label: {
+            Label(HS.t("support.send", "Send email"), systemImage: "paperplane")
+        }
+        .buttonStyle(LHButton.primary)
+        .disabled(!canSend)
+        .accessibilityIdentifier("support.send")
     }
 
     private func sendSupportEmail() {

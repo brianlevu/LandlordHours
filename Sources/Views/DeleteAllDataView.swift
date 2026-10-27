@@ -1,13 +1,15 @@
 import SwiftUI
 
-// MARK: - Delete all data (2.0)
+// MARK: - Delete all data (v2)
 //
-// Sandbox `S2DeleteAll` (spec §5, frames delete-hold / delete-hold-mid): a pushed page that says
-// exactly what goes, then a destructive-outline capsule the person holds for 1.5s. Letting go
-// snaps back in 200ms. VoiceOver gets a custom action that asks with a standard alert. Cancel is
-// always on screen. Deletion runs through `AppViewModel.deleteAccountAndData` (App Review
-// 5.1.1(v)); its iCloud-off and failure alerts are kept as the error states. Afterwards the app
-// is signed out, so the root shows Welcome.
+// A pushed page that says exactly what goes, then a destructive-outline capsule the person holds
+// for 1.5s. Letting go snaps back in 200ms. VoiceOver gets a custom action that asks with a standard
+// alert, the one place the app uses `.alert` for an irreversible act (standard §1.21: a title of six
+// words or fewer, verbs for buttons, the destructive role set). Cancel is always on screen.
+// Deletion runs through `AppViewModel.deleteAccountAndData` (App Review 5.1.1(v)); the iCloud-off
+// question is the second alert, and a failure shows as a line on the page, not an "OK" alert.
+// Afterwards the app is signed out, so the root shows Welcome. Package K changes the two call
+// sites (`isAppleProfile`, `deleteAccountAndData`); the page does not change.
 
 struct DeleteAllDataView: View {
     @EnvironmentObject private var viewModel: AppViewModel
@@ -23,7 +25,6 @@ struct DeleteAllDataView: View {
     @State private var showVoiceOverConfirm = false
     @State private var showICloudOffPrompt = false
     @State private var isDeleting = HoldToDeleteButton.debugShowsDeleting
-    @ScaledMetric(relativeTo: .body) private var iconColumn: CGFloat = 24
     @State private var deleteError: String? = Self.debugFailure
 
     private var isAppleProfile: Bool { signInManager.loginType == .apple }
@@ -34,139 +35,125 @@ struct DeleteAllDataView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                Text("This removes everything from this iPhone and iCloud:")
+            VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
+                LongTailHeader(
+                    title: isAppleProfile
+                        ? HS.t("delete.title.account", "Delete account and data")
+                        : HS.t("delete.title", "Delete all data"),
+                    style: .detail,
+                    back: (label: HS.t("common.back", "Back"), identifier: "delete.back", action: { dismiss() })
+                )
+
+                Text(HS.t("delete.subtitle", "This removes everything from this iPhone and iCloud:"))
                     .font(.body)
                     .foregroundStyle(colors.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
 
-                VStack(spacing: 0) {
-                    item("house") { propertiesText }
-                    PropertyInsetDivider(leading: 28 + iconColumn)
-                    item("list.bullet.rectangle") { entriesText }
-                    PropertyInsetDivider(leading: 28 + iconColumn)
-                    item("photo") { photosText }
-                    PropertyInsetDivider(leading: 28 + iconColumn)
-                    item("target") { Text("Your goal and tax details") }
+                LHRowGroup {
+                    item("house", propertiesText)
+                    LHDivider(leadingInset: LHRow.browseDividerInset)
+                    item("list.bullet.rectangle", entriesText)
+                    LHDivider(leadingInset: LHRow.browseDividerInset)
+                    item("photo", photosText)
+                    LHDivider(leadingInset: LHRow.browseDividerInset)
+                    item("target", HS.t("delete.item.goal", "Your goal and filing details"))
                     if isAppleProfile {
-                        PropertyInsetDivider(leading: 28 + iconColumn)
-                        item("person.crop.circle") { Text("Your account") }
+                        LHDivider(leadingInset: LHRow.browseDividerInset)
+                        item("person.crop.circle", HS.t("delete.item.account", "Your account"))
                     }
                 }
-                .propertyCard()
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("delete.items")
 
-                Text("This can’t be undone.")
+                Text(HS.t("delete.undone", "This can’t be undone."))
                     .font(.body.weight(.semibold))
                     .foregroundStyle(colors.textPrimary)
 
                 if subscriptionManager.isPro {
                     Button { showExport = true } label: {
-                        Label("Export a copy first", systemImage: "square.and.arrow.up")
-                            .frame(maxWidth: .infinity)
+                        Label(HS.t("delete.export", "Export a copy first"), systemImage: "square.and.arrow.up")
                     }
-                    .buttonStyle(PropertyTintedButtonStyle())
+                    .buttonStyle(LHButton.secondary)
                     .disabled(isDeleting)
                     .accessibilityIdentifier("delete.export")
                 }
 
-                HoldToDeleteButton(isDeleting: isDeleting, onComplete: { runDelete(allowLocalOnly: false) }) {
-                    showVoiceOverConfirm = true
+                if let deleteError {
+                    Label(deleteError, systemImage: "exclamationmark.triangle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(colors.destructive)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("delete.error")
                 }
-                .padding(.top, 8)
 
                 VStack(spacing: 4) {
-                    Text("Hold for a moment to confirm.")
-                        .font(.footnote)
-                        .foregroundStyle(colors.textSecondary)
-                        .multilineTextAlignment(.center)
-                    Button { dismiss() } label: {
-                        Text("Cancel")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(colors.action)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .contentShape(Rectangle())
+                    HoldToDeleteButton(isDeleting: isDeleting, onComplete: { runDelete(allowLocalOnly: false) }) {
+                        showVoiceOverConfirm = true
                     }
-                    .buttonStyle(.lhPressable)
-                    .accessibilityIdentifier("delete.cancel")
+                    .padding(.bottom, 4)
+                    if !isDeleting {
+                        Text(HS.t("delete.hold.hint", "Hold for a moment to confirm."))
+                            .font(.footnote)
+                            .foregroundStyle(colors.textSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    Button(HS.t("delete.cancel", "Cancel")) { dismiss() }
+                        .buttonStyle(LHButton.tertiary)
+                        .accessibilityIdentifier("delete.cancel")
                 }
                 .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: 600, alignment: .leading)
-            .padding(.horizontal, 20)
+            .frame(maxWidth: LHMetrics.readingColumn, alignment: .leading)
+            .padding(.horizontal, LHMetrics.gutter)
             .padding(.top, 8)
             .padding(.bottom, 48)
             .frame(maxWidth: .infinity)
         }
-        .background(colors.background.ignoresSafeArea())
-        // Solid canvas bar: scrolled content (the blueprint hero) never meets the clock.
-        .toolbarBackground(colors.background, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .navigationTitle(isAppleProfile ? "Delete account and data" : "Delete all data")
-        .navigationBarTitleDisplayMode(.inline)
+        .background { LHCanvas() }
+        .toolbar(.hidden, for: .navigationBar)
         .hidesAppTabBar()
         .accessibilityIdentifier("delete.screen")
         .sheet(isPresented: $showExport) {
             ExportPDFView(year: Calendar.current.component(.year, from: Date()))
         }
-        .alert("Delete everything?", isPresented: $showVoiceOverConfirm) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) { runDelete(allowLocalOnly: false) }
+        .alert(HS.t("delete.alert.title", "Delete everything?"), isPresented: $showVoiceOverConfirm) {
+            Button(HS.t("delete.alert.keep", "Keep"), role: .cancel) { }
+            Button(HS.t("delete.alert.delete", "Delete"), role: .destructive) { runDelete(allowLocalOnly: false) }
         } message: {
-            Text("This removes everything from this iPhone and iCloud. This can’t be undone.")
+            Text(HS.t("delete.alert.message", "This removes everything from this iPhone and iCloud. This can’t be undone."))
         }
-        .alert("iCloud is off", isPresented: $showICloudOffPrompt) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete from this iPhone", role: .destructive) { runDelete(allowLocalOnly: true) }
+        .alert(HS.t("delete.icloud.title", "iCloud is off"), isPresented: $showICloudOffPrompt) {
+            Button(HS.t("delete.alert.keep", "Keep"), role: .cancel) { }
+            Button(HS.t("delete.icloud.delete", "Delete from this iPhone"), role: .destructive) { runDelete(allowLocalOnly: true) }
         } message: {
-            Text("Copies saved in iCloud can’t be removed right now. Delete from this iPhone anyway, or turn on iCloud and try again.")
-        }
-        .alert("Couldn’t delete", isPresented: Binding(
-            get: { deleteError != nil },
-            set: { if !$0 { deleteError = nil } }
-        )) {
-            Button("OK", role: .cancel) { deleteError = nil }
-        } message: {
-            Text(deleteError ?? "")
+            Text(HS.t("delete.icloud.message", "Copies saved in iCloud can’t be removed right now. Delete from this iPhone anyway, or turn on iCloud and try again."))
         }
     }
 
-    // MARK: Counted items (Text literals so each plural reads right and goes through the catalog)
+    // MARK: Counted items (one key per plural form so each reads right in every language)
 
-    @ViewBuilder private var propertiesText: some View {
+    private var propertiesText: String {
         let n = viewModel.properties.count
-        if n == 0 { Text("No properties") } else if n == 1 { Text("1 property") } else { Text("\(n) properties") }
+        if n == 0 { return HS.t("delete.rentals.zero", "No rentals") }
+        if n == 1 { return HS.t("delete.rentals.one", "1 rental") }
+        return HS.f("delete.rentals.many", "%lld rentals", n)
     }
 
-    @ViewBuilder private var entriesText: some View {
+    private var entriesText: String {
         let n = viewModel.timeEntries.count
-        if n == 0 { Text("No entries") } else if n == 1 { Text("1 entry") } else { Text("\(n) entries") }
+        if n == 0 { return HS.t("delete.records.zero", "No records") }
+        if n == 1 { return HS.t("delete.records.one", "1 record") }
+        return HS.f("delete.records.many", "%lld records", n)
     }
 
-    @ViewBuilder private var photosText: some View {
+    private var photosText: String {
         let n = photoCount
-        if n == 0 { Text("No receipt photos") } else if n == 1 { Text("1 receipt photo") } else { Text("\(n) receipt photos") }
+        if n == 0 { return HS.t("delete.photos.zero", "No receipt photos") }
+        if n == 1 { return HS.t("delete.photos.one", "1 receipt photo") }
+        return HS.f("delete.photos.many", "%lld receipt photos", n)
     }
 
-    private func item<Label: View>(_ symbol: String, @ViewBuilder label: () -> Label) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: symbol)
-                .font(.body)
-                .foregroundStyle(colors.textSecondary)
-                .frame(width: iconColumn)
-                .accessibilityHidden(true)
-            label()
-                .font(.body)
-                .foregroundStyle(colors.textPrimary)
-                .monospacedDigit()
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(minHeight: 52)
-        .accessibilityElement(children: .combine)
+    private func item(_ symbol: String, _ text: String) -> some View {
+        LHRow.Browse(title: text, systemImage: symbol, tint: .neutral, showsChevron: false)
     }
 
     /// DEBUG: `-LHDeleteFailurePreview` opens on the honest failure (iCloud lost mid-delete) for
@@ -182,6 +169,7 @@ struct DeleteAllDataView: View {
 
     private func runDelete(allowLocalOnly: Bool) {
         guard !isDeleting else { return }
+        deleteError = nil
         Task {
             isDeleting = true
             defer { isDeleting = false }
@@ -223,7 +211,7 @@ struct HoldToDeleteButton: View {
     var body: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
         let label = Group {
-            if isDeleting { Text("Deleting…") } else { Text("Hold to delete everything") }
+            if isDeleting { Text(HS.t("delete.hold.deleting", "Deleting…")) } else { Text(HS.t("delete.hold.label", "Hold to delete everything")) }
         }
         .font(.body.weight(.semibold))
         .lineLimit(2)
@@ -281,8 +269,8 @@ struct HoldToDeleteButton: View {
         .sensoryFeedback(.impact(flexibility: .rigid), trigger: startTick)
         .sensoryFeedback(.impact(flexibility: .rigid, intensity: 1), trigger: doneTick)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Delete everything"))
-        .accessibilityHint(Text("Hold for a moment to confirm."))
+        .accessibilityLabel(Text(HS.t("delete.hold.a11y", "Delete everything")))
+        .accessibilityHint(Text(HS.t("delete.hold.hint", "Hold for a moment to confirm.")))
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { onAccessibilityConfirm() }
         .accessibilityIdentifier("delete.hold")

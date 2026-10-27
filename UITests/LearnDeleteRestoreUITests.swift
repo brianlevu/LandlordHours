@@ -70,7 +70,7 @@ final class LearnDeleteRestoreUITests: XCTestCase {
         // The simulator usually has no iCloud account: the kept iCloud-off alert is the next step.
         let iCloudOff = app.alerts["iCloud is off"]
         if iCloudOff.waitForExistence(timeout: 8) {
-            XCTAssertTrue(iCloudOff.buttons["Cancel"].exists, "Cancel stays available at every step")
+            XCTAssertTrue(iCloudOff.buttons["Keep"].exists, "Keep (cancel) stays available at every step")
             iCloudOff.buttons["Delete from this iPhone"].tap()
         }
         // On a device signed in to iCloud this deletes real records in batches: give it time.

@@ -78,7 +78,7 @@ final class LandlordHoursUITests: XCTestCase {
         // tapping before the button is hittable lands on the splash overlay.
         // The accessibility tree reports the button hittable while the splash still
         // covers it, so retry the tap until the export sheet actually opens.
-        let exportTitle = app.staticTexts["Export report"]
+        let exportTitle = app.staticTexts["Export the record"]
         for _ in 0..<5 where !exportTitle.exists {
             let exportButton = app.buttons["Export report"]
             if exportButton.waitForExistence(timeout: 3), exportButton.isHittable {
@@ -88,7 +88,7 @@ final class LandlordHoursUITests: XCTestCase {
         }
 
         let generateButton = app.buttons["export.generatePDF"]
-        assertVisibleText("Export report", timeout: 5)
+        assertVisibleText("Export the record", timeout: 5)
         scrollToElement(generateButton)
         generateButton.tap()
 
@@ -145,7 +145,7 @@ final class LandlordHoursUITests: XCTestCase {
         if tabBar.exists, taxProfile.frame.maxY > tabBar.frame.minY - 8 { app.swipeUp() }
         taxProfile.tap()
 
-        XCTAssertTrue(app.staticTexts["Tax profile"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Filing and goal"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["tab.logTime"].isHittable)
     }
 
@@ -157,17 +157,17 @@ final class LandlordHoursUITests: XCTestCase {
         launch(scenario: "frequent", tab: 4)
 
         assertVisibleText("Settings", timeout: 12)
-        scrollToElement(app.buttons["Dark appearance"])
-        app.buttons["Dark appearance"].tap()
+        scrollToElement(app.buttons["Dark"])
+        app.buttons["Dark"].tap()
 
-        XCTAssertTrue(app.staticTexts["Saved: dark mode"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Dark"].isSelected, "Dark is the chosen appearance")
 
         app.terminate()
         launch(scenario: "frequent", tab: 4)
 
         XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 8))
-        scrollToElement(app.staticTexts["Saved: dark mode"])
-        XCTAssertTrue(app.staticTexts["Saved: dark mode"].exists)
+        scrollToElement(app.buttons["Dark"])
+        XCTAssertTrue(app.buttons["Dark"].isSelected, "The choice survives a relaunch")
     }
 
     func testMainTabVisualSmokeMatrix() {

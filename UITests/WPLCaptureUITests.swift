@@ -128,7 +128,7 @@ final class WPLCaptureUITests: XCTestCase {
         generate.tap()
         Thread.sleep(forTimeInterval: 1.4)
         still("export-generating-\(scheme)")
-        app.buttons["export.close"].firstMatch.tap()
+        app.buttons["sheet.close"].firstMatch.tap()
         let banner = app.buttons["export.readyBanner"]
         XCTAssertTrue(banner.waitForExistence(timeout: 10), "Ready banner after leaving the sheet")
         Thread.sleep(forTimeInterval: 1.4)

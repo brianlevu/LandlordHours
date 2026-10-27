@@ -183,10 +183,7 @@ private struct ProfileCandidateRow: View {
 
             Spacer(minLength: 0)
 
-            Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(colors.textTertiary)
-                .accessibilityHidden(true)
+            LHChevron()
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -251,6 +248,7 @@ struct SettingsAccountSection: View {
                     SettingRow(symbol: "rectangle.portrait.and.arrow.right", title: "Sign out")
                 }
                 .buttonStyle(.plain)
+                .longTailRow()
                 .accessibilityIdentifier("settings.signOut")
             } else {
                 Button {
@@ -259,6 +257,7 @@ struct SettingsAccountSection: View {
                     SettingRow(symbol: "arrow.left.arrow.right", title: "Switch profile", subtitle: "Open other data or start fresh")
                 }
                 .buttonStyle(.plain)
+                .longTailRow()
                 .accessibilityIdentifier("settings.switchProfile")
                 .sheet(isPresented: $showSwitchConfirm) {
                     ProfileSwitchConfirmSheet(
@@ -287,6 +286,7 @@ struct SettingsAccountSection: View {
                 )
             }
             .buttonStyle(.plain)
+            .longTailRow()
             .accessibilityIdentifier("settings.deleteData")
         } header: {
             BPSectionHeader(title: "Account")

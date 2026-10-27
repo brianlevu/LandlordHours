@@ -1,112 +1,69 @@
 import SwiftUI
 
-// MARK: - Learning center (2.0)
+// MARK: - Learning center (v2)
 //
-// Sandbox `S2Learn` (spec §5 Learn, frames learn-* / learn-article-*): a Fraunces title, the
-// blueprint hero with the house at its roof stage, "Start here" with mono numerals, "All topics"
-// as a plain list. No photos, no badges, no icons beyond chevrons. Words come from the `Learn`
-// String Catalog via `LearnLibrary`.
+// Standard v2 (package H): a plain page with no house. `LHScreenTitle` (collection root, back icon),
+// one `LHCard.Summary` header with no eyebrow, "Start here" and "All topics" as 56pt `LHRow.Browse`
+// rows in one grouped container, the disclaimer last. Words come from the `Learn` String Catalog
+// via `LearnLibrary`; the chrome strings come from `Settings.xcstrings` via `HS`.
 
 struct LearningCenterView: View {
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.dismiss) private var dismiss
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var openedArticle: LearnArticle? = Self.launchArticle
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 32) {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Learning center")
-                        .lhDisplayFont(.largeTitle)
-                        .foregroundStyle(colors.textPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityAddTraits(.isHeader)
-                    hero
+            VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
+                VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+                    LongTailHeader(
+                        title: HS.t("learnList.title", "Learning center"),
+                        back: (label: HS.t("common.back", "Back"), identifier: "learn.back", action: { dismiss() })
+                    )
+                    LHCard.Summary(
+                        value: HS.f("learnList.count", "%lld short reads", LearnLibrary.shared.count),
+                        label: LearnLibrary.line("learn.hero.line")
+                    )
+                    .accessibilityIdentifier("learn.hero")
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
-                    LearnSectionHeader("Start here")
-                    VStack(spacing: 0) {
-                        let start = LearnLibrary.startHere
-                        ForEach(Array(start.enumerated()), id: \.element.id) { index, article in
-                            Button { openedArticle = article } label: { StartRow(article: article) }
-                                .buttonStyle(.lhPressable)
-                                .accessibilityIdentifier("learn.row.\(article.id)")
-                            if index < start.count - 1 { PropertyInsetDivider(leading: 54) }
-                        }
-                    }
-                    .propertyCard()
-                }
+                section(HS.t("learnList.start", "Start here"), articles: LearnLibrary.startHere, numbered: true)
+                section(HS.t("learnList.all", "All topics"), articles: LearnLibrary.allTopics, numbered: false)
 
-                VStack(alignment: .leading, spacing: 10) {
-                    LearnSectionHeader("All topics")
-                    VStack(spacing: 0) {
-                        let all = LearnLibrary.allTopics
-                        ForEach(Array(all.enumerated()), id: \.element.id) { index, article in
-                            Button { openedArticle = article } label: { TopicRow(article: article) }
-                                .buttonStyle(.lhPressable)
-                                .accessibilityIdentifier("learn.row.\(article.id)")
-                            if index < all.count - 1 { PropertyInsetDivider() }
-                        }
-                    }
-                    .propertyCard()
-                }
-
-                Text(LearnLibrary.line("learn.disclaimer"))
-                    .font(.footnote)
-                    .foregroundStyle(colors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 4)
+                LHFootnote(LearnLibrary.line("learn.disclaimer"))
             }
-            .frame(maxWidth: 600, alignment: .leading)
-            .padding(.horizontal, 20)
+            .frame(maxWidth: LHMetrics.readingColumn, alignment: .leading)
+            .padding(.horizontal, LHMetrics.gutter)
             .padding(.top, 8)
             .padding(.bottom, 48)
             .frame(maxWidth: .infinity)
         }
-        .background(colors.background.ignoresSafeArea())
-        // Solid canvas bar: scrolled content (the blueprint hero) never meets the clock.
-        .toolbarBackground(colors.background, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
+        .background { LHCanvas() }
+        .toolbar(.hidden, for: .navigationBar)
         .hidesAppTabBar()
         .navigationDestination(item: $openedArticle) { LearnArticleView(article: $0) }
         .accessibilityIdentifier("learn.screen")
     }
 
-    /// Blueprint paper with the house at its roof stage. At accessibility sizes the house drops
-    /// out so the words get the whole card.
-    private var hero: some View {
-        let showsHouse = !dynamicTypeSize.isAccessibilitySize
-        return ZStack(alignment: .topLeading) {
-            InboxBlueprintPaper(cornerRadius: 24)
-            if showsHouse {
-                HouseArtView(keyframe: .k12_roof, canvas: .blueprintHero)
-                    .frame(width: 150, height: 150)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                    .padding(.trailing, 2)
+    private func section(_ title: String, articles: [LearnArticle], numbered: Bool) -> some View {
+        VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
+            LHSectionHeader(title)
+            LHRowGroup {
+                ForEach(Array(articles.enumerated()), id: \.element.id) { index, article in
+                    LHRow.Browse(title: article.title, action: { openedArticle = article }) {
+                        if numbered {
+                            LearnNumberTile(number: article.number)
+                        } else {
+                            LHRowGlyph(systemImage: "book", tint: .neutral)
+                        }
+                    }
+                    .accessibilityIdentifier("learn.row.\(article.id)")
+                    if index < articles.count - 1 { LHDivider(leadingInset: LHRow.browseDividerInset) }
+                }
             }
-            VStack(alignment: .leading, spacing: 6) {
-                Text(LearnLibrary.line("learn.hero.eyebrow"))
-                    .font(AppTypography.drafting)
-                    .textCase(.uppercase)
-                    .tracking(1.3)
-                    .foregroundStyle(HouseTokens.drafting)
-                Text(LearnLibrary.line("learn.hero.line"))
-                    .font(.headline)
-                    .foregroundStyle(Color.white)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: showsHouse ? 190 : .infinity, alignment: .leading)
-            .padding(20)
         }
-        .frame(minHeight: 150)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("learn.hero")
     }
 
     private static var launchArticle: LearnArticle? {
@@ -120,90 +77,25 @@ struct LearningCenterView: View {
     }
 }
 
-// MARK: - Rows
+// MARK: - Number tile
 
-private struct StartRow: View {
-    let article: LearnArticle
+/// The reading order of "Start here": a 36pt wash tile holding the number, the same grid as a glyph
+/// tile. Rounded semibold, tabular.
+private struct LearnNumberTile: View {
+    let number: Int
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .body) private var side: CGFloat = 36
 
     var body: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
-        let numeral = Text(verbatim: String(format: "%02d", article.number))
-            .font(.system(.footnote, design: .monospaced, weight: .medium))
-            .foregroundStyle(colors.draftingInk)
-        let title = Text(article.title)
+        Text(String(number))
             .font(.body.weight(.semibold))
-            .foregroundStyle(colors.textPrimary)
-            .multilineTextAlignment(.leading)
-            .fixedSize(horizontal: false, vertical: true)
-        HStack(spacing: 14) {
-            // At accessibility sizes the numeral sits above the title so the title keeps the width.
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 4) { numeral; title }
-            } else {
-                numeral.frame(minWidth: 24, alignment: .leading)
-                title
-            }
-            Spacer(minLength: 8)
-            LearnChevron()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .frame(minHeight: 60)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-    }
-}
-
-private struct TopicRow: View {
-    let article: LearnArticle
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        HStack(spacing: 12) {
-            Text(article.title)
-                .font(.body)
-                .foregroundStyle(colors.textPrimary)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 8)
-            LearnChevron()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .frame(minHeight: 52)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-    }
-}
-
-private struct LearnChevron: View {
-    @Environment(\.colorScheme) private var colorScheme
-    var body: some View {
-        Image(systemName: "chevron.right")
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(AdaptiveColors(colorScheme: colorScheme).textTertiary)
+            .fontDesign(.rounded)
+            .monospacedDigit()
+            .foregroundStyle(colors.action)
+            .frame(width: side, height: side)
+            .background(colors.actionSurface, in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
             .accessibilityHidden(true)
-    }
-}
-
-/// The one section header style: 13 semibold caps, +0.3 tracking, secondary text.
-struct LearnSectionHeader: View {
-    let title: LocalizedStringKey
-    @Environment(\.colorScheme) private var colorScheme
-
-    init(_ title: LocalizedStringKey) { self.title = title }
-
-    var body: some View {
-        Text(title)
-            .font(.footnote.weight(.semibold))
-            .textCase(.uppercase)
-            .tracking(0.3)
-            .foregroundStyle(AdaptiveColors(colorScheme: colorScheme).textSecondary)
-            .padding(.horizontal, 4)
-            .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -212,22 +104,18 @@ struct LearnSectionHeader: View {
 struct LearnArticleView: View {
     let article: LearnArticle
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dismiss) private var dismiss
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                eyebrow
-                    .font(AppTypography.drafting)
-                    .textCase(.uppercase)
-                    .tracking(1.3)
-                    .foregroundStyle(colors.draftingInk)
-                Text(article.title)
-                    .lhDisplayFont(.title)
-                    .foregroundStyle(colors.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityIdentifier("learn.article.title")
+                LongTailHeader(
+                    title: article.title,
+                    style: .detail,
+                    back: (label: HS.t("common.back", "Back"), identifier: "learn.article.back", action: { dismiss() })
+                )
+                .accessibilityIdentifier("learn.article.title")
                 ForEach(Array(article.paragraphs.enumerated()), id: \.offset) { _, paragraph in
                     Text(paragraph)
                         .font(.body)
@@ -235,11 +123,8 @@ struct LearnArticleView: View {
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Rectangle()
-                    .fill(colors.border)
-                    .frame(height: 0.5)
+                LHDivider()
                     .padding(.top, 8)
-                    .accessibilityHidden(true)
                 Text(LearnLibrary.line("learn.disclaimer"))
                     .font(.footnote)
                     .foregroundStyle(colors.textSecondary)
@@ -249,27 +134,15 @@ struct LearnArticleView: View {
                     .foregroundStyle(colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: 600, alignment: .leading)
-            .padding(.horizontal, 20)
+            .frame(maxWidth: LHMetrics.readingColumn, alignment: .leading)
+            .padding(.horizontal, LHMetrics.gutter)
             .padding(.top, 8)
             .padding(.bottom, 48)
             .frame(maxWidth: .infinity)
         }
-        .background(colors.background.ignoresSafeArea())
-        // Solid canvas bar: scrolled content (the blueprint hero) never meets the clock.
-        .toolbarBackground(colors.background, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
+        .background { LHCanvas() }
+        .toolbar(.hidden, for: .navigationBar)
         .hidesAppTabBar()
         .accessibilityIdentifier("learn.article.\(article.id)")
-    }
-
-    @ViewBuilder private var eyebrow: some View {
-        let numeral = String(format: "%02d", article.number)
-        switch article.group {
-        case .start: Text("\(numeral) · Start here")
-        case .all: Text("All topics")
-        }
     }
 }

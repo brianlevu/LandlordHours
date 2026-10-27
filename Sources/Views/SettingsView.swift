@@ -3,10 +3,12 @@ import PhotosUI
 
 // MARK: - Settings
 //
-// Flighty's plain inset-grouped list on the Blueprint canvas: who you are and your plan on top,
-// then Auto-capture (what the app may read, and the promise that nothing counts until you
-// confirm), tax setup, records, the app, data and privacy, support, and the account exits.
-// docs/design/2.0-hifi-reference-spec.md §j.
+// Standard v2 (package H): one inset-grouped `List` on the plain canvas (no house here; the page is
+// dusk only on screens that carry the hero). `LHScreenTitle` with a back to Today, an `LHSectionHeader`
+// per group, `LHRow.Browse` / `.Toggle` for rows, the Pro card on `LHButton.secondary`, the
+// appearance choice on `LHSegmented`. Words come from `Settings.xcstrings` through `HS`.
+// The profile and account rows stay as they are: package K replaces them with Settings › iCloud &
+// records and package H then deletes the old section (identity plan §4.3).
 
 struct SettingsView: View {
     #if DEBUG
@@ -34,7 +36,7 @@ struct SettingsView: View {
     @State private var restoreRetrying = false
     @State private var showRestoreSheet = false
     @State private var route: SettingsRoute?
-    /// Backs the "Share anonymous usage data" toggle. Stores whether the user opted OUT (default
+    /// Backs the "Share anonymous usage stats" toggle. Stores whether the user opted OUT (default
     /// `false`, i.e. shared/opted-in by default) directly against `Analytics.optOutKey` so this
     /// view and `Analytics` always read the same UserDefaults value.
     @AppStorage(Analytics.optOutKey) private var analyticsOptedOut = false
@@ -56,20 +58,22 @@ struct SettingsView: View {
     }
 
     private var displayName: String {
-        appleSignIn.fullName ?? (viewModel.userName.isEmpty ? "Your name" : viewModel.userName)
+        appleSignIn.fullName ?? (viewModel.userName.isEmpty ? HS.t("settings.profile.placeholder", "Your name") : viewModel.userName)
     }
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    VStack(alignment: .leading, spacing: 4) {
-                        BPBackToTodayButton()
-                        BPScreenTitle(text: "Settings")
-                    }
-                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 4, trailing: 0))
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
+                    LongTailHeader(
+                        title: HS.t("settings.title", "Settings"),
+                        back: (label: HS.t("settings.back", "Back to Today"), identifier: "shell.backToToday", action: {
+                            NotificationCenter.default.post(name: .switchToTab, object: ShellTab.todayIndex)
+                        })
+                    )
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                 }
 
                 profileSection
@@ -82,17 +86,21 @@ struct SettingsView: View {
                 supportSection
                 SettingsAccountSection(onDeleteData: { route = .deleteData })
 
+                // A section footer, not a clear row: a row at the end of an inset-grouped list is
+                // clipped by the section's corner mask, which cut the first glyph of each line.
                 Section {
+                } footer: {
                     VStack(alignment: .leading, spacing: 12) {
-                        NotTaxAdviceNote()
-                        Text("LandlordHours · \(AppVersionInfo.display())")
+                        LHFootnote(HS.cpaFootnote)
+                            .accessibilityIdentifier("settings.notTaxAdvice")
+                        Text(HS.f("settings.version", "LandlordHours · %@", AppVersionInfo.display()))
                             .font(.footnote)
                             .monospacedDigit()
                             .foregroundStyle(colors.textSecondary)
                             .accessibilityIdentifier("settings.version")
                     }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                    .textCase(nil)
+                    .padding(.top, 4)
                 }
 
                 #if DEBUG
@@ -102,12 +110,12 @@ struct SettingsView: View {
                 #endif
             }
             .listStyle(.insetGrouped)
-            .listSectionSpacing(24)
+            .listSectionSpacing(LHMetrics.sectionGap)
+            .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
             .scrollContentBackground(.hidden)
             .contentMargins(.bottom, 104, for: .scrollContent)
-            .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
-            .background { LHMobileCanvas() }
-            .navigationBarHidden(true)
+            .background { LHCanvas() }
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(item: $route) { route in
                 switch route {
                 case .taxProfile: TaxProfileView()
@@ -149,12 +157,22 @@ struct SettingsView: View {
                 // a signed-in device. `.task` re-runs when Settings reappears after a pop, so the
                 // page opens once per launch.
                 if !Self.didApplyDebugRoute {
-                    if ProcessInfo.processInfo.arguments.contains("-LHOpenDeleteData") {
+                    let args = ProcessInfo.processInfo.arguments
+                    if args.contains("-LHOpenDeleteData") {
                         Self.didApplyDebugRoute = true
                         route = .deleteData
-                    } else if ProcessInfo.processInfo.arguments.contains("-LHOpenLearningCenterFromSettings") {
+                    } else if args.contains("-LHOpenLearningCenterFromSettings") {
                         Self.didApplyDebugRoute = true
                         route = .learningCenter
+                    } else if args.contains("-LHOpenFilingFromSettings") {
+                        Self.didApplyDebugRoute = true
+                        route = .taxProfile
+                    } else if args.contains("-LHOpenSupportFromSettings") {
+                        Self.didApplyDebugRoute = true
+                        route = .contactSupport
+                    } else if args.contains("-LHOpenMutedFromSettings") {
+                        Self.didApplyDebugRoute = true
+                        route = .muted
                     }
                 }
                 #endif
@@ -182,6 +200,10 @@ struct SettingsView: View {
         .accessibilityIdentifier("settings.screen")
     }
 
+    private func header(_ title: String) -> some View {
+        LHSectionHeader(title).textCase(nil)
+    }
+
     // MARK: Profile
 
     private var profileSection: some View {
@@ -199,7 +221,8 @@ struct SettingsView: View {
                             .font(.headline)
                             .foregroundStyle(colors.textPrimary)
                         if let email = appleSignIn.email, !email.isEmpty {
-                            Text(email)
+                            // At AX sizes a break point before the @ keeps the domain whole.
+                            Text(dynamicTypeSize.isAccessibilitySize ? email.replacingOccurrences(of: "@", with: "\u{200B}@") : email)
                                 .font(.subheadline)
                                 .foregroundStyle(colors.textSecondary)
                                 // Never cut at AX: the whole address wraps (owner ruling 2026-10-27).
@@ -211,137 +234,134 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     if !dynamicTypeSize.isAccessibilitySize { LHChevron() }
                 }
+                .padding(.horizontal, LHRow.insets.leading)
                 .padding(.vertical, 8)
+                .frame(minHeight: LHMetrics.rowMinHeight)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .accessibilityHint("Edit your name, email and photo")
+            .buttonStyle(LHButton.press)
+            .longTailRow(separatorInset: LHRow.insets.leading)
+            .accessibilityHint(HS.t("settings.profile.hint", "Edit your name, email and photo"))
             .accessibilityIdentifier("settings.profile")
         }
-        .listRowBackground(colors.backgroundSecondary)
     }
 
     private var planBadge: some View {
         let isPro = subscriptionManager.isPro
-        return Text(isPro ? "Pro · Paid once" : "Free plan")
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(isPro ? colors.positive : colors.textSecondary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 3)
-            .background(Capsule().fill(isPro ? colors.positiveSurface : colors.backgroundTertiary))
+        return LHTag(isPro ? HS.t("settings.plan.pro", "Pro · Paid once") : HS.t("settings.plan.free", "Free plan"),
+                     tone: isPro ? .positive : .neutral)
     }
 
     // MARK: Plan
 
+    @ViewBuilder
     private var planSection: some View {
+        if ProGate.isLocked(.settingsPro, isPro: subscriptionManager.isPro) {
+            Section {
+                proCard
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+            }
+        }
         Section {
             if ProGate.isLocked(.settingsPro, isPro: subscriptionManager.isPro) {
-                proCard
                 LockedPreview(
                     size: .row,
                     entry: .settingsExport,
                     line: ProGate.lockLine(.settingsExport),
                     keeps: ProGate.keepsLine(.settingsExport),
-                    rowInset: 0,
+                    rowInset: LHRow.insets.leading,
                     onUnlock: {
                         paywall = ProPaywallRequest(context: .export, entry: .settingsExport, onUnlocked: { showExport = true })
                     }
                 ) {
-                    SettingRow(symbol: "square.and.arrow.up", title: "Export reports", subtitle: "PDF and CSV for your accountant", showsChevron: true)
-                        .padding(.vertical, 8)
+                    LHRow.Browse(title: HS.t("settings.export.title", "Export the record"),
+                                 meta: HS.t("settings.export.meta", "PDF and CSV for your CPA"),
+                                 systemImage: "square.and.arrow.up", tint: .neutral)
                 }
+                .longTailRow()
             } else {
-                SettingRow(
-                    symbol: "checkmark.seal",
-                    title: "Pro is active",
-                    subtitle: "Paid once. Exports and every rental are unlocked."
-                )
-                .accessibilityIdentifier("settings.proActive")
+                LHRow.Browse(title: HS.t("settings.pro.active.title", "Pro is active"),
+                             meta: HS.t("settings.pro.active.meta", "Paid once. Everything is unlocked."),
+                             systemImage: "checkmark.seal", tint: .positive, showsChevron: false)
+                    .longTailRow()
+                    .accessibilityIdentifier("settings.proActive")
             }
 
-            Button {
-                Task {
-                    restoreStatusMessage = nil
-                    await subscriptionManager.restorePurchases()
-                    restoreStatusMessage = subscriptionManager.hasPurchased
-                        ? String(localized: "Your Pro purchase has been restored.")
-                        : (subscriptionManager.restoreFailureMessage ?? subscriptionManager.purchaseError ?? String(localized: "No previous purchase was found."))
+            LHRow.Browse(
+                title: subscriptionManager.isLoading
+                    ? HS.t("settings.restore.loading", "Restoring purchase…")
+                    : HS.t("settings.restore.title", "Restore purchase"),
+                meta: subscriptionManager.isLoading ? nil : restoreStatusMessage,
+                systemImage: "arrow.clockwise", tint: .neutral, showsChevron: false,
+                action: {
+                    Task {
+                        restoreStatusMessage = nil
+                        await subscriptionManager.restorePurchases()
+                        // The result shows inline under the row (not a system alert, whose message
+                        // text iOS draws below AA); the row stays tappable to try again.
+                        restoreStatusMessage = subscriptionManager.hasPurchased
+                            ? HS.t("settings.restore.done", "Your Pro purchase is back.")
+                            : (subscriptionManager.restoreFailureMessage ?? subscriptionManager.purchaseError
+                                ?? HS.t("settings.restore.none", "No earlier purchase found."))
+                    }
                 }
-            } label: {
-                // The result shows inline under the row (not a system alert, whose message text
-                // iOS draws below AA); the row stays tappable to try again.
-                SettingRow(
-                    symbol: "arrow.clockwise",
-                    title: subscriptionManager.isLoading ? "Restoring purchase…" : "Restore purchase",
-                    subtitle: subscriptionManager.isLoading ? nil : restoreStatusMessage
-                )
-            }
-            .buttonStyle(.plain)
+            )
             .disabled(subscriptionManager.isLoading)
+            .longTailRow()
             .accessibilityIdentifier("settings.restorePurchase")
 
             if !restorableProfiles.isEmpty {
-                Button {
-                    showRestoreSheet = true
-                } label: {
-                    SettingRow(
-                        symbol: "clock.arrow.circlepath",
-                        title: "Restore other data",
-                        subtitle: restorableProfiles.count == 1
-                            ? "1 earlier profile on this iPhone or in iCloud"
-                            : "\(restorableProfiles.count) earlier profiles on this iPhone or in iCloud",
-                        showsChevron: true
-                    )
-                }
-                .buttonStyle(.plain)
+                LHRow.Browse(
+                    title: HS.t("settings.restoreOther.title", "Restore other data"),
+                    meta: restorableProfiles.count == 1
+                        ? HS.t("settings.restoreOther.one", "1 earlier profile found")
+                        : HS.f("settings.restoreOther.many", "%lld earlier profiles found", restorableProfiles.count),
+                    systemImage: "clock.arrow.circlepath", tint: .neutral,
+                    action: { showRestoreSheet = true }
+                )
+                .longTailRow()
                 .accessibilityIdentifier("settings.restoreOtherData")
             }
         } header: {
-            BPSectionHeader(title: "Plan")
+            header(HS.t("settings.section.plan", "Plan"))
         }
-        .listRowBackground(colors.backgroundSecondary)
     }
 
-    /// Not a lock: a plain card at the top of the plan section (redesign-specs §1b).
+    /// Not a lock: a plain card above the plan rows (redesign-specs §1b). Radius 20, one
+    /// `LHButton.secondary`. At accessibility sizes the button drops under the text.
     private var proCard: some View {
-        // At accessibility sizes the button drops under the text so "See Pro" never truncates.
         let layout = dynamicTypeSize.isAccessibilitySize
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
-            : AnyLayout(HStackLayout(spacing: 14))
+            : AnyLayout(HStackLayout(spacing: 12))
+        let shape = RoundedRectangle(cornerRadius: LHMetrics.cardRadius, style: .continuous)
         return layout {
-            Image(systemName: "house.fill")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Color.white)
-                .frame(width: 44, height: 44)
-                .background(InboxBlueprintPaper(cornerRadius: 12))
-                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 // The product name never breaks or hyphenates: one line, scaled down if needed.
-                Text("LandlordHours\u{00A0}Pro")
+                Text(HS.t("settings.proCard.name", "LandlordHours\u{00A0}Pro"))
                     .font(.headline)
                     .foregroundStyle(colors.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                Group {
-                    if let price = subscriptionManager.proDisplayPrice {
-                        Text("Pay once, \(price)")
-                    } else {
-                        Text("Pay once")
-                    }
-                }
-                .font(.subheadline)
-                .foregroundStyle(colors.textSecondary)
+                Text(subscriptionManager.proDisplayPrice.map { HS.f("settings.proCard.price", "Pay once, %@", $0) }
+                     ?? HS.t("settings.proCard.payOnce", "Pay once"))
+                    .font(.subheadline)
+                    .foregroundStyle(colors.textSecondary)
             }
             .fixedSize(horizontal: false, vertical: true)
             if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
-            Button("See Pro") {
+            Button(HS.t("settings.proCard.action", "See Pro")) {
                 paywall = ProPaywallRequest(context: .settings, entry: .settingsPro)
             }
-            .buttonStyle(ProTintedButtonStyle())
+            .buttonStyle(LHButton.secondary)
             .fixedSize()
             .accessibilityIdentifier("settings.proCard")
         }
-        .padding(.vertical, 6)
+        .padding(LHMetrics.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(colors.backgroundSecondary, in: shape)
+        .overlay { if colorScheme == .dark { shape.strokeBorder(colors.border, lineWidth: LHMetrics.hairline) } }
         .accessibilityElement(children: .contain)
         .onAppear { Analytics.lockPreviewShown(entry: .settingsPro) }
     }
@@ -350,25 +370,22 @@ struct SettingsView: View {
 
     private var taxSection: some View {
         Section {
-            Button {
-                route = .taxProfile
-            } label: {
-                SettingRow(symbol: "doc.text", title: "Tax profile", subtitle: "Filing, goal, spouse hours, the 50% rule", showsChevron: true)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("settings.taxProfile")
+            LHRow.Browse(title: HS.t("settings.filing.title", "Filing and goal"),
+                         meta: HS.t("settings.filing.meta", "Who files and your goal"),
+                         systemImage: "doc.text", tint: .neutral,
+                         action: { route = .taxProfile })
+                .longTailRow()
+                .accessibilityIdentifier("settings.taxProfile")
 
-            Button {
-                route = .learningCenter
-            } label: {
-                SettingRow(symbol: "book", title: "Learning center", subtitle: "REPS, rentals and records, in plain words", showsChevron: true)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("settings.learningCenter")
+            LHRow.Browse(title: HS.t("settings.learn.title", "Learning center"),
+                         meta: HS.t("settings.learn.meta", "The 750 hours, in plain words"),
+                         systemImage: "book", tint: .neutral,
+                         action: { route = .learningCenter })
+                .longTailRow()
+                .accessibilityIdentifier("settings.learningCenter")
         } header: {
-            BPSectionHeader(title: "Tax setup")
+            header(HS.t("settings.section.tax", "Tax setup"))
         }
-        .listRowBackground(colors.backgroundSecondary)
     }
 
     // MARK: Records
@@ -377,35 +394,29 @@ struct SettingsView: View {
         Section {
             // Free users get Export as the `.row` lock under the Pro card (WP-P): one route each.
             if !ProGate.isExportLocked(isPro: subscriptionManager.isPro) {
-                Button {
-                    showExport = true
-                } label: {
-                    SettingRow(symbol: "square.and.arrow.up", title: "Export reports", subtitle: "PDF and CSV for your accountant", showsChevron: true)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("settings.exportReports")
+                LHRow.Browse(title: HS.t("settings.export.title", "Export the record"),
+                             meta: HS.t("settings.export.meta", "PDF and CSV for your CPA"),
+                             systemImage: "square.and.arrow.up", tint: .neutral,
+                             action: { showExport = true })
+                    .longTailRow()
+                    .accessibilityIdentifier("settings.exportReports")
             }
 
-            Button {
-                viewModel.syncNow()
-            } label: {
-                SettingRow(
-                    symbol: syncNeedsAttention ? "exclamationmark.icloud" : "icloud",
-                    title: "Sync now",
-                    subtitle: syncSubtitle ?? "Back up your records to iCloud"
-                )
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("settings.syncNow")
+            LHRow.Browse(title: HS.t("settings.sync.title", "Sync now"),
+                         meta: syncSubtitle ?? HS.t("settings.sync.meta", "Back up to iCloud"),
+                         systemImage: syncNeedsAttention ? "exclamationmark.icloud" : "icloud",
+                         tint: syncNeedsAttention ? .caution : .neutral, showsChevron: false,
+                         action: { viewModel.syncNow() })
+                .longTailRow()
+                .accessibilityIdentifier("settings.syncNow")
         } header: {
-            BPSectionHeader(title: "Records")
+            header(HS.t("settings.section.records", "Records"))
         } footer: {
-            Text("Photos attached to records stay on this iPhone. They aren’t included in iCloud sync.")
+            Text(HS.t("settings.photos.footer", "Photos attached to records stay on this iPhone. They aren’t included in iCloud sync."))
                 .font(.footnote)
                 .foregroundStyle(colors.textSecondary)
                 .accessibilityIdentifier("settings.photoStorageDisclosure")
         }
-        .listRowBackground(colors.backgroundSecondary)
     }
 
     // MARK: App
@@ -413,68 +424,64 @@ struct SettingsView: View {
     private var appSection: some View {
         Section {
             AppearancePreferenceRow(appearanceManager: appearanceManager)
+                .longTailRow(separatorInset: LHRow.insets.leading)
                 .accessibilityIdentifier("settings.appearance")
 
-            Button {
+            LHRow.Browse(title: HS.t("settings.notifications.title", "Notifications"),
+                         meta: HS.t("settings.notifications.meta", "Opens iOS Settings"),
+                         systemImage: "bell", tint: .neutral,
+                         action: {
                 if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
-            } label: {
-                SettingRow(symbol: "bell", title: "Notification permission", subtitle: "Opens iOS Settings", showsChevron: true)
-            }
-            .buttonStyle(.plain)
+            })
+            .longTailRow()
         } header: {
-            BPSectionHeader(title: "App")
+            header(HS.t("settings.section.app", "App"))
         }
-        .listRowBackground(colors.backgroundSecondary)
     }
 
     // MARK: Data and privacy
 
     private var privacySection: some View {
         Section {
-            SettingToggleRow(
-                symbol: "chart.bar.xaxis",
-                title: "Share anonymous usage data",
-                subtitle: "Signals like \u{201C}a record was saved\u{201D}. Never your notes, properties or personal data.",
-                isOn: shareAnalyticsBinding
-            )
-            .accessibilityIdentifier("settings.analyticsOptOut")
+            LHRow.Toggle(HS.t("settings.stats.title", "Share anonymous usage stats"),
+                         subtitle: HS.t("settings.stats.subtitle", "Like “a record was saved”. Never your notes or rentals."),
+                         isOn: shareAnalyticsBinding)
+                .longTailRow(separatorInset: LHRow.insets.leading, toggle: true)
+                .accessibilityIdentifier("settings.analyticsOptOut")
 
-            Button {
+            LHRow.Browse(title: HS.t("settings.terms.title", "Terms and privacy"),
+                         systemImage: "hand.raised", tint: .neutral,
+                         action: {
                 if let url = URL(string: "https://www.altaiventures.co/landlord-hours/terms") {
                     UIApplication.shared.open(url)
                 }
-            } label: {
-                SettingRow(symbol: "hand.raised", title: "Terms and privacy", showsChevron: true)
-            }
-            .buttonStyle(.plain)
+            })
+            .longTailRow()
         } header: {
-            BPSectionHeader(title: "Data and privacy")
+            header(HS.t("settings.section.privacy", "Data and privacy"))
         } footer: {
-            Text("Your records live on this iPhone and in your own iCloud. We never see them.")
+            Text(HS.t("settings.privacy.footer", "Your records live on this iPhone and in your own iCloud. We never see them."))
                 .font(.footnote)
                 .foregroundStyle(colors.textSecondary)
                 .accessibilityIdentifier("settings.analyticsOptOutCaption")
         }
-        .listRowBackground(colors.backgroundSecondary)
     }
 
     // MARK: Support
 
     private var supportSection: some View {
         Section {
-            Button {
-                route = .contactSupport
-            } label: {
-                SettingRow(symbol: "envelope", title: "Contact support", subtitle: "Questions about tracking, exports or setup", showsChevron: true)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("settings.contactSupport")
+            LHRow.Browse(title: HS.t("settings.support.title", "Contact support"),
+                         meta: HS.t("settings.support.meta", "Hours, the record or setup"),
+                         systemImage: "envelope", tint: .neutral,
+                         action: { route = .contactSupport })
+                .longTailRow()
+                .accessibilityIdentifier("settings.contactSupport")
         } header: {
-            BPSectionHeader(title: "Support")
+            header(HS.t("settings.section.support", "Support"))
         }
-        .listRowBackground(colors.backgroundSecondary)
     }
 
     // MARK: Helpers
@@ -485,18 +492,19 @@ struct SettingsView: View {
     }
 
     private var syncSubtitle: String? {
-        if viewModel.syncService.isSyncing || viewModel.syncService.isRunningInitialSync { return "Syncing…" }
-        if !viewModel.syncService.accountAvailable { return "iCloud sync is off. Your records are safe on this iPhone." }
-        if viewModel.syncService.syncError != nil { return "Couldn’t sync just now. Your records are safe on this iPhone." }
+        if viewModel.syncService.isSyncing || viewModel.syncService.isRunningInitialSync { return HS.t("settings.sync.running", "Syncing…") }
+        if !viewModel.syncService.accountAvailable { return HS.t("settings.sync.off", "iCloud is off. Records stay here.") }
+        if viewModel.syncService.syncError != nil { return HS.t("settings.sync.failed", "Couldn’t sync just now.") }
         if let date = viewModel.syncService.lastSyncDate {
             let formatter = RelativeDateTimeFormatter()
             formatter.unitsStyle = .short
-            return "Last sync: \(formatter.localizedString(for: date, relativeTo: Date()))"
+            return HS.f("settings.sync.last", "Last sync: %@", formatter.localizedString(for: date, relativeTo: Date()))
         }
         return nil
     }
 
     #if DEBUG
+    // Developer tools are DEBUG-only and never user-facing: plain strings, not in the catalog.
     private var developerToolsSection: some View {
         Section {
             Button {
@@ -510,16 +518,18 @@ struct SettingsView: View {
                 Button {
                     subscriptionManager.unlockPro()
                 } label: {
-                    SettingRow(symbol: "checkmark.seal", title: subscriptionManager.hasPurchased ? "Pro unlocked for this build" : "Unlock Pro for testing")
+                    LHRow.Browse(title: subscriptionManager.hasPurchased ? "Pro unlocked for this build" : "Unlock Pro for testing",
+                                 systemImage: "checkmark.seal", tint: .neutral, showsChevron: false)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(LHButton.press)
 
                 Button {
                     showEngagementLab = true
                 } label: {
-                    SettingRow(symbol: "bell.badge", title: "Engagement Lab", subtitle: "Notifications, widgets, Live Activities and Siri", showsChevron: true)
+                    LHRow.Browse(title: "Engagement Lab", meta: "Notifications, widgets, Live Activities and Siri",
+                                 systemImage: "bell.badge", tint: .neutral)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(LHButton.press)
                 .accessibilityIdentifier("settings.engagementLab")
 
                 ForEach(AppViewModel.MockDataScenario.allCases) { scenario in
@@ -530,15 +540,45 @@ struct SettingsView: View {
                             withAnimation(AppAnimation.smooth) { viewModel.applyMockScenario(scenario) }
                         }
                     } label: {
-                        SettingRow(symbol: "tray.and.arrow.down", title: scenario.title, subtitle: scenario.subtitle, value: "Seed", valueColor: colors.action)
+                        LHRow.Browse(title: scenario.title, meta: scenario.subtitle, value: "Seed",
+                                     systemImage: "tray.and.arrow.down", tint: .neutral, showsChevron: false)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(LHButton.press)
                 }
             }
         }
         .listRowBackground(colors.backgroundSecondary)
     }
     #endif
+}
+
+// MARK: - List row chrome
+
+/// A row in an inset-grouped Settings list: the row draws its own 16pt insets and 56pt floor, so the
+/// list adds none. `separatorInset` is where the hairline starts (64 under a 36pt glyph tile).
+private struct SettingsRowChrome: ViewModifier {
+    var separatorInset: CGFloat
+    var toggle: Bool
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        let colors = AdaptiveColors(colorScheme: colorScheme)
+        content
+            .padding(.horizontal, toggle ? LHRow.insets.leading : 0)
+            .padding(.vertical, toggle ? LHRow.insets.top : 0)
+            .frame(minHeight: toggle ? LHMetrics.rowMinHeight : nil)
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(colors.backgroundSecondary)
+            .listRowSeparatorTint(colors.border)
+            .alignmentGuide(.listRowSeparatorLeading) { _ in separatorInset }
+    }
+}
+
+extension View {
+    /// Settings list row chrome (package H). Browse rows keep the default 64pt divider inset.
+    func longTailRow(separatorInset: CGFloat = LHRow.browseDividerInset, toggle: Bool = false) -> some View {
+        modifier(SettingsRowChrome(separatorInset: separatorInset, toggle: toggle))
+    }
 }
 
 // MARK: - Avatar
@@ -552,7 +592,7 @@ struct ProfileAvatar: View {
     private var initials: String {
         let parts = name.split(separator: " ").prefix(2)
         let letters = parts.compactMap(\.first).map { String($0).uppercased() }.joined()
-        return letters.isEmpty || name == "Your name" ? "" : letters
+        return letters.isEmpty || name == HS.t("settings.profile.placeholder", "Your name") ? "" : letters
     }
 
     var body: some View {
@@ -567,11 +607,15 @@ struct ProfileAvatar: View {
                     Circle().fill(colors.actionSurface)
                     if initials.isEmpty {
                         Image(systemName: "person.fill")
-                            .font(.system(size: size * 0.4))
+                            .font(.title3)
                             .foregroundStyle(colors.action)
                     } else {
                         Text(initials)
-                            .font(.system(size: size * 0.36, weight: .semibold, design: .rounded))
+                            .font(.headline)
+                            .fontDesign(.rounded)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                            .padding(.horizontal, 4)
                             .foregroundStyle(colors.action)
                     }
                 }
@@ -627,54 +671,49 @@ private struct AutoCaptureSettingsSection: View {
 
     static let aiDisclosureWithPCC = String(localized: "settings.capture.aiDisclosure.pcc", defaultValue: "Apple\u{2019}s on-device model reads your calendar suggestions and Log time notes. If it can\u{2019}t, Private Cloud Compute may read a note instead (turn that off above). Apple keeps nothing, and we never see it.", table: "Foundations")
 
-    static let aiDisclosureOnDevice = "Calendar suggestions and the notes you type or say in Log time are read by Apple\u{2019}s on-device model, on your iPhone, to fill in the form. Nothing goes to us or anyone else, and nothing is saved until you tap Log."
+    static var aiDisclosureOnDevice: String {
+        HS.t("settings.capture.disclosure.device", "Calendar suggestions and the notes you type or say in Log time are read by Apple’s on-device model, on your iPhone, to fill in the form. Nothing goes to us or anyone else, and nothing is saved until you tap Log.")
+    }
 
     static let pccSubtitle = String(localized: "settings.capture.pcc.subtitle", defaultValue: "Used only if your iPhone can\u{2019}t read a note. Apple keeps nothing, and we never see it.", table: "Foundations")
 
     var body: some View {
         Section {
-            SettingToggleRow(
-                symbol: "calendar",
-                title: "Calendar",
-                subtitle: "Suggest work from your events. Titles are read on your iPhone.",
-                isOn: Binding(get: { calendarOn }, set: { setCalendar($0) })
-            )
-            .disabled(isAsking)
-            .accessibilityIdentifier("settings.capture.calendar")
+            LHRow.Toggle(HS.t("settings.capture.calendar.title", "Calendar"),
+                         subtitle: HS.t("settings.capture.calendar.subtitle", "Spot work in your events. Titles are read on your iPhone."),
+                         isOn: Binding(get: { calendarOn }, set: { setCalendar($0) }))
+                .disabled(isAsking)
+                .longTailRow(separatorInset: LHRow.insets.leading, toggle: true)
+                .accessibilityIdentifier("settings.capture.calendar")
 
-            SettingToggleRow(
-                symbol: "bell.badge",
-                title: "Ask when an event ends",
-                subtitle: calendarOn ? "At most twice a day, never after 9 pm." : "Turn on Calendar first.",
-                isOn: Binding(get: { promptsOn }, set: { setPrompts($0) })
-            )
-            .disabled(!calendarOn || isAsking || UserScope.userId == nil)
-            .accessibilityIdentifier("settings.capture.prompts")
+            LHRow.Toggle(HS.t("settings.capture.prompts.title", "Ask when an event ends"),
+                         subtitle: calendarOn
+                            ? HS.t("settings.capture.prompts.on", "At most twice a day, never after 9 pm.")
+                            : HS.t("settings.capture.prompts.off", "Turn on Calendar first."),
+                         isOn: Binding(get: { promptsOn }, set: { setPrompts($0) }))
+                .disabled(!calendarOn || isAsking || UserScope.userId == nil)
+                .longTailRow(separatorInset: LHRow.insets.leading, toggle: true)
+                .accessibilityIdentifier("settings.capture.prompts")
 
             if Self.offersPCC {
-                SettingToggleRow(
-                    symbol: "lock.icloud",
-                    title: "Private Cloud Compute",
-                    subtitle: Self.pccSubtitle,
-                    isOn: Binding(get: { pccOn }, set: { on in
-                        pccOn = on
-                        PCCSettings().isEnabled = on
-                    })
-                )
-                .accessibilityIdentifier("settings.capture.pcc")
+                LHRow.Toggle(HS.t("settings.capture.pcc.title", "Private Cloud Compute"),
+                             subtitle: Self.pccSubtitle,
+                             isOn: Binding(get: { pccOn }, set: { on in
+                                pccOn = on
+                                PCCSettings().isEnabled = on
+                             }))
+                    .longTailRow(separatorInset: LHRow.insets.leading, toggle: true)
+                    .accessibilityIdentifier("settings.capture.pcc")
             }
 
-            Button(action: onOpenMuted) {
-                SettingRow(
-                    symbol: "speaker.slash",
-                    title: "Muted",
-                    subtitle: "Things you asked us to stop suggesting",
-                    value: muteCount == 0 ? "None" : "\(muteCount)",
-                    showsChevron: true
-                )
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("settings.capture.muted")
+            LHRow.Browse(title: HS.t("settings.capture.muted.title", "Muted"),
+                         meta: muteCount == 0
+                            ? HS.t("settings.capture.muted.none", "Nothing muted")
+                            : HS.f("settings.capture.muted.count", "%lld muted", muteCount),
+                         systemImage: "speaker.slash", tint: .neutral,
+                         action: onOpenMuted)
+                .longTailRow()
+                .accessibilityIdentifier("settings.capture.muted")
 
             if let blockedMessage {
                 Button {
@@ -684,24 +723,27 @@ private struct AutoCaptureSettingsSection: View {
                         .font(.subheadline)
                         .foregroundStyle(colors.caution)
                         .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, LHRow.insets.leading)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, minHeight: LHMetrics.minTap, alignment: .leading)
                 }
-                .buttonStyle(.plain)
-                .accessibilityHint("Opens iOS Settings")
+                .buttonStyle(LHButton.press)
+                .longTailRow(separatorInset: LHRow.insets.leading)
+                .accessibilityHint(HS.t("settings.capture.blocked.hint", "Opens iOS Settings"))
                 .accessibilityIdentifier("settings.capture.blocked")
             }
         } header: {
-            BPSectionHeader(title: "Auto-capture")
+            LHSectionHeader(HS.t("settings.section.capture", "Auto-capture")).textCase(nil)
         } footer: {
-            // Both sentences share one text column beside the shield, so the second one no
-            // longer starts back under the glyph.
+            // Both sentences share one text column beside the shield.
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "checkmark.shield")
-                    .foregroundStyle(colors.draftingInk)
+                    .foregroundStyle(colors.textSecondary)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(Self.aiDisclosure)
                         .accessibilityIdentifier("settings.capture.aiDisclosure")
-                    Text("Nothing goes in your record until you confirm it.")
+                    Text(HS.nothingCounts)
                 }
                 .fixedSize(horizontal: false, vertical: true)
             }
@@ -709,7 +751,6 @@ private struct AutoCaptureSettingsSection: View {
             .foregroundStyle(colors.textSecondary)
             .accessibilityElement(children: .combine)
         }
-        .listRowBackground(colors.backgroundSecondary)
         .onAppear(perform: reload)
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { reload() }
@@ -742,8 +783,8 @@ private struct AutoCaptureSettingsSection: View {
             } else {
                 calendarOn = false
                 blockedMessage = access == .limited
-                    ? "LandlordHours can only add events. Allow Full Access in iOS Settings to get suggestions."
-                    : "Calendar access is off for LandlordHours. Turn it on in iOS Settings."
+                    ? HS.t("settings.capture.blocked.limited", "We can add to your calendar but can’t read it yet. Allow Full Access in Settings to get suggestions.")
+                    : HS.t("settings.capture.blocked.off", "Calendar access is off for LandlordHours. Turn it on in iOS Settings.")
             }
         }
     }
@@ -765,7 +806,7 @@ private struct AutoCaptureSettingsSection: View {
                 promptsOn = viewModel.eventPromptsEnabled
             } else {
                 promptsOn = false
-                blockedMessage = "Notifications are off for LandlordHours. Turn them on in iOS Settings."
+                blockedMessage = HS.t("settings.capture.blocked.notify", "Notifications are off for LandlordHours. Turn them on in iOS Settings.")
             }
         }
     }
@@ -774,47 +815,62 @@ private struct AutoCaptureSettingsSection: View {
 /// The mute rules the user set from the Inbox ("stop suggesting things like this").
 struct MutedSuggestionsView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dismiss) private var dismiss
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     @State private var rules: [CaptureMuteRule] = []
 
     var body: some View {
         List {
+            Section {
+                LongTailHeader(
+                    title: HS.t("muted.title", "Muted"),
+                    back: (label: HS.t("common.back", "Back"), identifier: "muted.back", action: { dismiss() })
+                )
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
             if rules.isEmpty {
                 Section {
-                    BPEmptyState(
-                        symbol: "speaker.slash",
-                        title: "Nothing muted",
-                        message: "When you tell the Inbox to stop suggesting something, it shows up here."
+                    LHEmptyState(
+                        systemImage: "speaker.slash",
+                        tone: .action,
+                        headline: HS.t("muted.empty.headline", "Nothing muted"),
+                        message: HS.t("muted.empty.message", "Muted things show up here.")
                     )
-                    .padding(.vertical, 32)
                     .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                 }
             } else {
                 Section {
                     ForEach(rules) { rule in
-                        SettingRow(
-                            symbol: rule.match == .titleContains ? "text.magnifyingglass" : "calendar",
-                            title: rule.match == .titleContains ? "Titles with \u{201C}\(rule.value)\u{201D}" : "Events from one calendar",
-                            subtitle: "Muted \(rule.createdAt.formatted(.dateTime.month(.abbreviated).day().year()))"
+                        LHRow.Browse(
+                            title: rule.match == .titleContains
+                                ? HS.f("muted.rule.title", "Titles with “%@”", rule.value)
+                                : HS.t("muted.rule.calendar", "Events from one calendar"),
+                            meta: HS.f("muted.rule.date", "Muted %@", rule.createdAt.formatted(.dateTime.month(.abbreviated).day().year())),
+                            systemImage: rule.match == .titleContains ? "text.magnifyingglass" : "calendar",
+                            tint: .neutral, showsChevron: false
                         )
+                        .longTailRow()
                         .swipeActions {
-                            Button("Unmute", role: .destructive) { remove(rule) }
+                            Button(HS.t("muted.unmute", "Unmute"), role: .destructive) { remove(rule) }
                         }
-                        .accessibilityAction(named: "Unmute") { remove(rule) }
+                        .accessibilityAction(named: HS.t("muted.unmute", "Unmute")) { remove(rule) }
                     }
                 } footer: {
-                    Text("Swipe left to unmute. Muted things are never suggested again until you unmute them.")
+                    Text(HS.t("muted.footer", "Swipe left to unmute. Muted things are never suggested again until you unmute them."))
                         .font(.footnote)
                         .foregroundStyle(colors.textSecondary)
                 }
-                .listRowBackground(colors.backgroundSecondary)
             }
         }
         .listStyle(.insetGrouped)
+        .listSectionSpacing(LHMetrics.sectionGap)
+            .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
         .scrollContentBackground(.hidden)
-        .background(colors.background.ignoresSafeArea())
-        .navigationTitle("Muted")
-        .navigationBarTitleDisplayMode(.inline)
+        .background { LHCanvas() }
+        .toolbar(.hidden, for: .navigationBar)
         .hidesAppTabBar()
         .onAppear { rules = AppModelHost.shared.suggestionStore?.muteRules ?? [] }
         .accessibilityIdentifier("settings.muted.screen")
@@ -829,110 +885,51 @@ struct MutedSuggestionsView: View {
 
 // MARK: - Appearance
 
+/// Auto / Light / Dark on `LHSegmented`. The choice is the state, so there is no "Saved" line.
 private struct AppearancePreferenceRow: View {
     @ObservedObject var appearanceManager: AppearanceManager
 
     @Environment(\.colorScheme) var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var savedTick = 0
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SettingRow(symbol: "circle.lefthalf.filled", title: "Appearance", subtitle: "Follow your iPhone or pick a theme")
-            HStack(spacing: 8) {
-                ForEach(AppAppearancePreference.allCases) { preference in
-                    appearanceButton(preference)
-                }
-            }
-            Label(appearanceManager.preference.confirmationText, systemImage: "checkmark.circle.fill")
-                .font(.footnote)
-                .foregroundStyle(colors.textSecondary)
-                .labelStyle(SavedLabelStyle(tint: colors.positive))
-        }
-        .padding(.vertical, 6)
-        .sensoryFeedback(.selection, trigger: savedTick)
+    private var options: [LHSegmented<AppAppearancePreference>.Option] {
+        [.init(.system, HS.t("settings.appearance.auto", "Auto")),
+         .init(.light, HS.t("settings.appearance.light", "Light")),
+         .init(.dark, HS.t("settings.appearance.dark", "Dark"))]
     }
-
-    private func appearanceButton(_ preference: AppAppearancePreference) -> some View {
-        let isSelected = appearanceManager.preference == preference
-        return Button {
-            guard appearanceManager.preference != preference else { return }
-            if reduceMotion {
-                appearanceManager.preference = preference
-            } else {
-                withAnimation(AppAnimation.quick) { appearanceManager.preference = preference }
-            }
-            savedTick += 1
-        } label: {
-            Label(preference.displayName, systemImage: symbol(for: preference))
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .foregroundStyle(isSelected ? colors.onAction : colors.textPrimary)
-                .frame(maxWidth: .infinity, minHeight: 40)
-                .background(Capsule().fill(isSelected ? colors.action : colors.backgroundTertiary))
-                .overlay(Capsule().strokeBorder(isSelected ? Color.clear : colors.border, lineWidth: 1))
-        }
-        .buttonStyle(.lhPressable)
-        .accessibilityLabel("\(preference.displayName) appearance")
-        .accessibilityHint(preference.subtitle)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    private func symbol(for preference: AppAppearancePreference) -> String {
-        switch preference {
-        case .system: return "iphone"
-        case .light: return "sun.max"
-        case .dark: return "moon"
-        }
-    }
-}
-
-private struct SavedLabelStyle: LabelStyle {
-    let tint: Color
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 6) {
-            configuration.icon.foregroundStyle(tint)
-            configuration.title
-        }
-    }
-}
-
-// MARK: - Not tax advice
-
-/// Plain disclaimer at the foot of Settings. The PDF export carries its own version.
-struct NotTaxAdviceNote: View {
-    static let text = "LandlordHours keeps your records. It doesn’t give tax advice. Ask a tax professional what your hours mean for you."
-
-    @Environment(\.colorScheme) private var colorScheme
-    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "info.circle")
-                .font(.footnote)
-                .foregroundStyle(colors.textSecondary)
-                .padding(.top, 1)
-                .accessibilityHidden(true)
-            Text(Self.text)
-                .font(.footnote)
-                .foregroundStyle(colors.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(HS.t("settings.appearance.title", "Appearance"))
+                    .font(.body)
+                    .foregroundStyle(colors.textPrimary)
+                Text(HS.t("settings.appearance.subtitle", "Follow your iPhone or pick a theme"))
+                    .font(.subheadline)
+                    .foregroundStyle(colors.textSecondary)
+            }
+            LHSegmented(options, selection: Binding(
+                get: { appearanceManager.preference },
+                set: { appearanceManager.preference = $0 }
+            ), accessibilityLabel: HS.t("settings.appearance.title", "Appearance"))
         }
+        .padding(.horizontal, LHRow.insets.leading)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("settings.notTaxAdvice")
     }
 }
 
-// MARK: - Tax Profile View
+// MARK: - Filing and goal
 
+/// "Tax profile" in 2.0. The few facts that decide which hours count toward the goal: who files,
+/// the goal, the year, the other-work hours behind the more-than-half test, the 100-hour question.
 struct TaxProfileView: View {
     @EnvironmentObject var viewModel: AppViewModel
     @ObservedObject private var taxProfile = TaxProfileManager.shared
     @ObservedObject private var goalManager = GoalManager.shared
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     @State private var showWorkHoursInput = false
@@ -945,176 +942,170 @@ struct TaxProfileView: View {
 
     private var participationAnswerLabel: String {
         switch taxProfile.noOneParticipatedMore(forYear: taxProfile.taxYear) {
-        case .none: return "Not answered"
-        case .some(true): return "No one did more"
-        case .some(false): return "Someone did more"
+        case .none: return HS.t("filing.hundred.unanswered", "Not answered")
+        case .some(true): return HS.t("filing.hundred.noOne", "No one did more")
+        case .some(false): return HS.t("filing.hundred.someone", "Someone did more")
         }
     }
 
     var body: some View {
         List {
             Section {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Tax profile")
-                        .lhDisplayFont(.largeTitle)
-                        .foregroundStyle(colors.textPrimary)
-                        .accessibilityAddTraits(.isHeader)
-                    Text("The few facts that decide which hours count.")
-                        .font(.subheadline)
-                        .foregroundStyle(colors.textSecondary)
-                }
+                LongTailHeader(
+                    title: HS.t("filing.title", "Filing and goal"),
+                    subtitle: HS.t("filing.subtitle", "The few facts that decide which hours count."),
+                    back: (label: HS.t("common.back", "Back"), identifier: "filing.back", action: { dismiss() })
+                )
+                .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
+                .listRowSeparator(.hidden)
             }
 
             Section {
-                Picker(selection: $taxProfile.filingStatus) {
-                    ForEach(FilingStatus.allCases, id: \.self) { status in
-                        Text(status.rawValue).tag(status)
+                Menu {
+                    Picker(HS.t("filing.status", "Filing status"), selection: $taxProfile.filingStatus) {
+                        ForEach(FilingStatus.allCases, id: \.self) { status in
+                            Text(status.rawValue).tag(status)
+                        }
                     }
                 } label: {
-                    SettingRow(symbol: "person.text.rectangle", title: "Filing status")
+                    valueRow(HS.t("filing.status", "Filing status"), value: taxProfile.filingStatus.rawValue)
                 }
-                .tint(colors.action)
+                .longTailRow(separatorInset: LHRow.insets.leading)
+                .accessibilityIdentifier("taxProfile.filingStatus")
 
-                SettingToggleRow(
-                    symbol: "person.2",
-                    title: "Spouse hours",
-                    subtitle: "Track your spouse’s hours too. They count together for material participation, never for your 750.",
-                    isOn: $taxProfile.spouseTracking
-                )
-                .accessibilityIdentifier("taxProfile.spouseTracking")
+                LHRow.Toggle(HS.t("filing.spouse.title", "Spouse hours"),
+                             subtitle: HS.t("filing.spouse.subtitle", "Track your spouse’s hours too. For the 750, one of you has to get there alone."),
+                             isOn: $taxProfile.spouseTracking)
+                    .longTailRow(separatorInset: LHRow.insets.leading, toggle: true)
+                    .accessibilityIdentifier("taxProfile.spouseTracking")
             } header: {
-                BPSectionHeader(title: "You")
+                header(HS.t("filing.section.you", "You"))
             }
-            .listRowBackground(colors.backgroundSecondary)
 
             Section {
-                // The same four goals as onboarding (2.0 adds material participation at 500h).
-                Picker(selection: Binding(
-                    get: { goalManager.goalChoice },
-                    set: { goalManager.setGoalChoice($0) }
-                )) {
-                    ForEach(GoalChoice.allCases) { choice in
-                        Text(choice.title).tag(choice)
+                // The same four goals as onboarding (2.0 adds the 500-hour test).
+                Menu {
+                    Picker(HS.t("filing.goal", "Goal"), selection: Binding(
+                        get: { goalManager.goalChoice },
+                        set: { goalManager.setGoalChoice($0) }
+                    )) {
+                        ForEach(GoalChoice.allCases) { choice in
+                            Text(choice.title).tag(choice)
+                        }
                     }
                 } label: {
-                    SettingRow(symbol: "flag", title: "Goal")
+                    valueRow(HS.t("filing.goal", "Goal"), value: goalManager.goalChoice.title)
                 }
-                .tint(colors.action)
+                .longTailRow(separatorInset: LHRow.insets.leading)
+                .accessibilityIdentifier("taxProfile.goal")
 
-                Picker(selection: $taxProfile.taxYear) {
-                    ForEach(2024...2030, id: \.self) { year in
-                        Text(String(year)).tag(year)
+                Menu {
+                    Picker(HS.t("filing.year", "Tax year"), selection: $taxProfile.taxYear) {
+                        ForEach(2024...2030, id: \.self) { year in
+                            Text(String(year)).tag(year)
+                        }
                     }
                 } label: {
-                    SettingRow(symbol: "calendar", title: "Tax year")
+                    valueRow(HS.t("filing.year", "Tax year"), value: String(taxProfile.taxYear))
                 }
-                .tint(colors.action)
+                .longTailRow(separatorInset: LHRow.insets.leading)
+                .accessibilityIdentifier("taxProfile.year")
 
-                SettingToggleRow(
-                    symbol: "square.stack.3d.up",
-                    title: "Grouping election",
-                    subtitle: "Treat all your rentals as one activity for material participation.",
-                    isOn: $taxProfile.groupingElection
-                )
+                LHRow.Toggle(HS.t("filing.group.title", "Group your rentals"),
+                             subtitle: HS.t("filing.group.subtitle", "Count all your rentals together."),
+                             isOn: $taxProfile.groupingElection)
+                    .longTailRow(separatorInset: LHRow.insets.leading, toggle: true)
+                    .accessibilityIdentifier("taxProfile.grouping")
             } header: {
-                BPSectionHeader(title: "Goal")
+                header(HS.t("filing.section.goal", "Goal"))
+            } footer: {
+                // Line 3 of the standard's worst-lines table: the plain sentence, then the CPA's name for it.
+                Text(HS.t("filing.group.footer", "Your CPA may call this a grouping election."))
+                    .font(.footnote)
+                    .foregroundStyle(colors.textSecondary)
             }
-            .listRowBackground(colors.backgroundSecondary)
 
             Section {
                 Button {
                     workHoursText = taxProfile.nonREWorkHours > 0 ? String(Int(taxProfile.nonREWorkHours)) : ""
                     showWorkHoursInput = true
                 } label: {
-                    SettingRow(
-                        symbol: "briefcase",
-                        title: "Other work hours",
-                        subtitle: "W-2 or other job hours this year",
-                        value: taxProfile.nonREWorkHours > 0 ? "\(Int(taxProfile.nonREWorkHours))h" : "Not set",
-                        valueColor: taxProfile.nonREWorkHours > 0 ? nil : colors.caution,
-                        showsChevron: true
-                    )
+                    LongTailValueRow(label: HS.t("filing.other.title", "Other work hours"),
+                                     value: taxProfile.nonREWorkHours > 0
+                                        ? HS.f("filing.other.hours", "%lldh", Int(taxProfile.nonREWorkHours))
+                                        : HS.t("filing.other.unset", "Not set"),
+                                     accessory: .disclosure)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(LHButton.press)
+                .longTailRow(separatorInset: LHRow.insets.leading)
                 .accessibilityIdentifier("taxProfile.otherWorkHours")
             } header: {
-                BPSectionHeader(title: "50% rule")
+                header(HS.t("filing.section.half", "More than half"))
             } footer: {
-                Text("For REPS, your real estate hours must be more than half of all the hours you worked this year.")
+                Text(HS.t("filing.half.footer", "For the 750, your rental hours have to be more than half of all the hours you worked this year. Add W-2 or other job hours here."))
                     .font(.footnote)
                     .foregroundStyle(colors.textSecondary)
             }
-            .listRowBackground(colors.backgroundSecondary)
 
             Section {
-                Button {
-                    showParticipationConfirmation = true
-                } label: {
-                    SettingRow(symbol: "checkmark.circle", title: "100-hour test", subtitle: "Did anyone else do more?", value: participationAnswerLabel, showsChevron: true)
+                Button { showParticipationConfirmation = true } label: {
+                    LongTailValueRow(label: HS.t("filing.hundred.title", "Did anyone else do more?"),
+                                     value: participationAnswerLabel, accessory: .disclosure)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(LHButton.press)
+                    .longTailRow(separatorInset: LHRow.insets.leading)
+                    .accessibilityIdentifier("taxProfile.hundred")
             } header: {
-                BPSectionHeader(title: "Material participation")
+                header(HS.t("filing.section.hundred", "The 100-hour test"))
             } footer: {
-                Text("Test 3 needs more than 100 hours and no one else, like a manager or contractor, putting in more time than you.")
+                Text(HS.t("filing.hundred.footer", "It needs more than 100 hours, and no one else, like a manager or contractor, putting in more than you."))
                     .font(.footnote)
                     .foregroundStyle(colors.textSecondary)
             }
-            .listRowBackground(colors.backgroundSecondary)
 
             Section {
                 if viewModel.properties.isEmpty {
-                    Text("No properties yet")
+                    Text(HS.t("filing.rentals.empty", "No rentals yet"))
                         .font(.body)
                         .foregroundStyle(colors.textSecondary)
+                        .padding(.horizontal, LHRow.insets.leading)
+                        .frame(maxWidth: .infinity, minHeight: LHMetrics.rowMinHeight, alignment: .leading)
+                        .longTailRow(separatorInset: LHRow.insets.leading)
                 } else {
                     ForEach(viewModel.properties) { property in
-                        HStack(spacing: 14) {
-                            Image(systemName: "house")
-                                .font(.system(size: 19))
-                                .foregroundStyle(colors.textSecondary)
-                                .frame(width: 28)
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(property.name)
-                                    .font(.body)
-                                    .foregroundStyle(colors.textPrimary)
-                                if !property.shortAddress.isEmpty {
-                                    Text(property.shortAddress)
-                                        .font(.subheadline)
-                                        .foregroundStyle(colors.textSecondary)
-                                }
-                            }
-                            Spacer(minLength: 8)
-                            Text(property.propertyType.rawValue)
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(colors.textSecondary)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .overlay(Capsule().strokeBorder(colors.border, lineWidth: 1))
-                        }
-                        .padding(.vertical, 4)
-                        .accessibilityElement(children: .combine)
+                        LHRow.Browse(
+                            title: property.name,
+                            meta: property.shortAddress.isEmpty ? nil : property.shortAddress,
+                            value: property.propertyType.rawValue,
+                            systemImage: "house", tint: .neutral, showsChevron: false
+                        )
+                        .longTailRow()
                     }
                 }
                 Button {
                     showAddProperty = true
                 } label: {
-                    Label("Add property", systemImage: "plus")
+                    Label(HS.t("filing.rentals.add", "Add a rental"), systemImage: "plus")
+                        .font(.body)
                         .foregroundStyle(colors.action)
-                        .frame(minHeight: 36)
+                        .padding(.horizontal, LHRow.insets.leading)
+                        .frame(maxWidth: .infinity, minHeight: LHMetrics.rowMinHeight, alignment: .leading)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(LHButton.press)
+                .longTailRow(separatorInset: LHRow.insets.leading)
+                .accessibilityIdentifier("taxProfile.addRental")
             } header: {
-                BPSectionHeader(title: "Properties")
+                header(HS.t("filing.section.rentals", "Your rentals"), count: viewModel.properties.count)
             }
-            .listRowBackground(colors.backgroundSecondary)
         }
         .listStyle(.insetGrouped)
+        .listSectionSpacing(LHMetrics.sectionGap)
+            .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
         .scrollContentBackground(.hidden)
-        .background(colors.background.ignoresSafeArea())
-        .navigationBarTitleDisplayMode(.inline)
+        .background { LHCanvas() }
+        .toolbar(.hidden, for: .navigationBar)
         .hidesAppTabBar()
         .sheet(isPresented: $showWorkHoursInput) { workHoursSheet }
         .sheet(isPresented: $showAddProperty) { addPropertySheet }
@@ -1129,96 +1120,99 @@ struct TaxProfileView: View {
         .accessibilityIdentifier("taxProfile.screen")
     }
 
+    private func header(_ title: String, count: Int? = nil) -> some View {
+        LHSectionHeader(title, count: count).textCase(nil)
+    }
+
+    /// A label and its value as a `Menu` label.
+    private func valueRow(_ label: String, value: String) -> some View {
+        LongTailValueRow(label: label, value: value, accessory: .menu)
+    }
+
     private var workHoursSheet: some View {
-        NavigationStack {
-            VStack(spacing: 20) {
-                Text("Hours you worked outside real estate this year, like a W-2 job.")
+        LHSheet(HS.t("filing.other.title", "Other work hours"), onClose: { showWorkHoursInput = false }) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(HS.t("filing.other.sheet", "Hours you worked outside real estate this year, like a W-2 job."))
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
-                    .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-
-                TextField("Hours", text: $workHoursText)
+                LHField(HS.t("filing.other.field", "Hours"), text: $workHoursText,
+                        accessibilityLabel: HS.t("filing.other.title", "Other work hours"),
+                        identifier: "taxProfile.otherWorkHours.field")
                     .keyboardType(.numberPad)
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                    .monospacedDigit()
-                    .multilineTextAlignment(.center)
-                    .padding()
-                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(colors.backgroundSecondary))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(colors.border, lineWidth: 1))
-                    .accessibilityLabel("Other work hours")
-
-                Button("Save") {
-                    if let hours = Double(workHoursText) {
-                        taxProfile.nonREWorkHours = hours
-                    }
-                    showWorkHoursInput = false
-                }
-                .buttonStyle(InboxPrimaryButtonStyle())
             }
-            .padding(24)
-            .background(colors.background.ignoresSafeArea())
-            .navigationTitle("Other work hours")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { showWorkHoursInput = false }
-                        .foregroundStyle(colors.action)
+        } footer: {
+            Button(HS.t("common.save", "Save")) {
+                if let hours = Double(workHoursText) {
+                    taxProfile.nonREWorkHours = hours
                 }
+                showWorkHoursInput = false
             }
+            .buttonStyle(LHButton.primary)
+            .accessibilityIdentifier("taxProfile.otherWorkHours.save")
         }
-        .presentationDetents([.height(360), .large])
+        .lhSheetPresentation()
     }
 
     private var addPropertySheet: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Picker("Type", selection: $newPropertyType) {
-                        ForEach([PropertyType.ltr, PropertyType.str], id: \.self) { type in
-                            Text(type.fullName).tag(type)
+        LHSheet(HS.t("filing.add.title", "Add a rental"), onClose: { showAddProperty = false }) {
+            VStack(alignment: .leading, spacing: 16) {
+                if typeSize.isAccessibilitySize {
+                    // Two long labels do not fit one capsule track at AX sizes: stack them.
+                    VStack(spacing: 8) {
+                        ForEach([PropertyType.ltr, PropertyType.str], id: \.self) { kind in
+                            Button { newPropertyType = kind } label: {
+                                HStack {
+                                    Text(kind.fullName)
+                                        .font(.body)
+                                        .foregroundStyle(colors.textPrimary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    if newPropertyType == kind {
+                                        Image(systemName: "checkmark").foregroundStyle(colors.action)
+                                    }
+                                }
+                                .padding(LHRow.insets)
+                                .frame(minHeight: LHMetrics.minTap)
+                                .background(newPropertyType == kind ? colors.primarySurface : colors.backgroundTertiary,
+                                            in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(newPropertyType == kind ? .isSelected : [])
                         }
                     }
-                    .pickerStyle(.segmented)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets())
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel(HS.t("filing.add.type", "Type"))
+                } else {
+                    LHSegmented(
+                        [.init(PropertyType.ltr, PropertyType.ltr.fullName), .init(PropertyType.str, PropertyType.str.fullName)],
+                        selection: $newPropertyType,
+                        accessibilityLabel: HS.t("filing.add.type", "Type")
+                    )
                 }
-                Section {
-                    TextField("Property name", text: $newPropertyName)
-                    TextField("Address", text: $newPropertyAddress)
-                }
-                .listRowBackground(colors.backgroundSecondary)
-                Section {
-                    Button("Add property") {
-                        guard !newPropertyName.isEmpty else { return }
-                        viewModel.addProperty(name: newPropertyName, address: newPropertyAddress, type: newPropertyType)
-                        newPropertyName = ""
-                        newPropertyAddress = ""
-                        newPropertyType = .ltr
-                        showAddProperty = false
-                    }
-                    .buttonStyle(InboxPrimaryButtonStyle())
-                    .disabled(newPropertyName.trimmingCharacters(in: .whitespaces).isEmpty)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets())
-                }
+                LHField(HS.t("filing.add.name", "Rental name"), text: $newPropertyName)
+                LHField(HS.t("filing.add.address", "Address"), text: $newPropertyAddress)
             }
-            .scrollContentBackground(.hidden)
-            .background(colors.background.ignoresSafeArea())
-            .navigationTitle("Add property")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { showAddProperty = false }
-                        .foregroundStyle(colors.action)
-                }
+        } footer: {
+            Button(HS.t("filing.add.action", "Add rental")) {
+                guard !newPropertyName.isEmpty else { return }
+                viewModel.addProperty(name: newPropertyName, address: newPropertyAddress, type: newPropertyType)
+                newPropertyName = ""
+                newPropertyAddress = ""
+                newPropertyType = .ltr
+                showAddProperty = false
             }
+            .buttonStyle(LHButton.primary)
+            .disabled(newPropertyName.trimmingCharacters(in: .whitespaces).isEmpty)
+            .accessibilityIdentifier("taxProfile.addRental.save")
         }
-        .presentationDetents([.medium, .large])
+        .lhSheetPresentation()
     }
 }
 
 // MARK: - Profile Edit View
+//
+// Package K replaces this with "Your name" in Settings › iCloud & records and removes the sign-in
+// it edits. Until then it keeps its fields and gets the sheet chrome.
 
 struct ProfileEditView: View {
     @Binding var userName: String
@@ -1231,66 +1225,51 @@ struct ProfileEditView: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    VStack(spacing: 12) {
-                        ProfileAvatar(name: userName.isEmpty ? "Your name" : userName, imageData: profileImage ?? appleSignIn.profileImageData, size: 96)
-                        PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                            Text("Change photo")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(colors.action)
-                        }
-                        .onChange(of: selectedPhotoItem) { _, newValue in
-                            Task {
-                                if let data = try? await newValue?.loadTransferable(type: Data.self) {
-                                    profileImage = data
-                                }
+        LHSheet(HS.t("profile.title", "Your details"), onClose: { dismiss() }) {
+            VStack(spacing: 16) {
+                VStack(spacing: 8) {
+                    ProfileAvatar(name: userName.isEmpty ? HS.t("settings.profile.placeholder", "Your name") : userName,
+                                  imageData: profileImage ?? appleSignIn.profileImageData, size: 96)
+                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                        Text(HS.t("profile.photo", "Change photo"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(colors.action)
+                            .frame(minHeight: LHMetrics.minTap)
+                    }
+                    .onChange(of: selectedPhotoItem) { _, newValue in
+                        Task {
+                            if let data = try? await newValue?.loadTransferable(type: Data.self) {
+                                profileImage = data
                             }
                         }
                     }
-                    .frame(maxWidth: .infinity)
-                    .listRowBackground(Color.clear)
                 }
-                Section {
-                    TextField("Your name", text: $userName)
-                        .textContentType(.name)
-                    TextField("your@email.com", text: $userEmail)
-                        .textContentType(.emailAddress)
+                .frame(maxWidth: .infinity)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    LHField(HS.t("settings.profile.placeholder", "Your name"), text: $userName)
+                    LHField(HS.t("profile.email", "your@email.com"), text: $userEmail)
                         .keyboardType(.emailAddress)
+                        .textContentType(.emailAddress)
                         .textInputAutocapitalization(.never)
-                } header: {
-                    BPSectionHeader(title: "Name and email")
-                } footer: {
-                    Text("Shown on your export so your accountant knows whose record it is.")
+                    Text(HS.t("profile.footer", "Shown on your export so your CPA knows whose record it is."))
                         .font(.footnote)
                         .foregroundStyle(colors.textSecondary)
                 }
-                .listRowBackground(colors.backgroundSecondary)
             }
-            .scrollContentBackground(.hidden)
-            .background(colors.background.ignoresSafeArea())
-            .navigationTitle("Profile")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundStyle(colors.action)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        AppleSignInManager.shared.updateProfile(
-                            name: userName.isEmpty ? nil : userName,
-                            email: userEmail.isEmpty ? nil : userEmail,
-                            imageData: profileImage
-                        )
-                        dismiss()
-                    }
-                    .fontWeight(.semibold)
-                    .foregroundStyle(colors.action)
-                }
+        } footer: {
+            Button(HS.t("common.save", "Save")) {
+                AppleSignInManager.shared.updateProfile(
+                    name: userName.isEmpty ? nil : userName,
+                    email: userEmail.isEmpty ? nil : userEmail,
+                    imageData: profileImage
+                )
+                dismiss()
             }
+            .buttonStyle(LHButton.primary)
+            .accessibilityIdentifier("profile.save")
         }
+        .lhSheetPresentation()
     }
 }
 

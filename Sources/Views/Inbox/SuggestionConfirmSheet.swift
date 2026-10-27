@@ -371,7 +371,6 @@ struct SuggestionConfirmSheet: View {
                 .foregroundStyle(colors.textSecondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
-                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("confirm.missing")
         }
     }

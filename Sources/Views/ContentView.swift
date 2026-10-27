@@ -473,8 +473,8 @@ struct ContentView: View {
         }
         .tabViewStyle(.tabBarOnly)
         // iOS 26+ drops `Tab`'s `.accessibilityIdentifier` on the floor: the bar's buttons come out
-        // with an empty identifier. Stamp them on the bar's items; the badge and the tab re-stamp.
-        .background(ShellTabBarIdentifierStamp(token: "\(inboxModel.badgeCount)-\(tab)"))
+        // with an empty identifier. Set them on the bar's items; badge and tab changes set them again.
+        .background(ShellTabBarIdentifierTagger(token: "\(inboxModel.badgeCount)-\(tab)"))
     }
 
     @ViewBuilder
@@ -590,20 +590,20 @@ private struct TabBarMinimizeOnScroll: ViewModifier {
 /// iOS 26 and 27 (they report an empty identifier), so UI tests, automation and the house-reveal
 /// log could not find `tab.today` / `tab.inbox`. This finds the shell's `UITabBarController` and
 /// sets each bar item's identifier, matched by the item's title, which the bar button reports.
-struct ShellTabBarIdentifierStamp: UIViewRepresentable {
-    /// Changes whenever the bar may rebuild its items (badge, selection), so the stamp runs again.
+struct ShellTabBarIdentifierTagger: UIViewRepresentable {
+    /// Changes whenever the bar may rebuild its items (badge, selection), so the identifiers are set again.
     let token: String
 
-    func makeUIView(context: Context) -> StampView { StampView() }
-    func updateUIView(_ view: StampView, context: Context) { view.stamp() }
+    func makeUIView(context: Context) -> TaggerView { TaggerView() }
+    func updateUIView(_ view: TaggerView, context: Context) { view.applyIdentifiers() }
 
-    final class StampView: UIView {
+    final class TaggerView: UIView {
         override func didMoveToWindow() {
             super.didMoveToWindow()
-            stamp()
+            applyIdentifiers()
         }
 
-        func stamp() {
+        func applyIdentifiers() {
             isUserInteractionEnabled = false
             isAccessibilityElement = false
             DispatchQueue.main.async { [weak self] in

@@ -44,16 +44,30 @@ struct LHField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: multiline ? .top : .center, spacing: 8) {
-                SwiftUI.TextField(text: $text, prompt: Text(placeholder).foregroundStyle(colors.textTertiary),
-                          axis: multiline ? .vertical : .horizontal) {
-                    Text(accessibilityLabel ?? placeholder)
+                ZStack(alignment: .topLeading) {
+                    // A vertical-axis field draws its prompt on one line and cuts it with an ellipsis, so a
+                    // multiline field draws its own placeholder, wrapping at every text size.
+                    if multiline && text.isEmpty {
+                        Text(placeholder)
+                            .font(.body)
+                            .foregroundStyle(colors.textTertiary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .lineLimit(nil)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
+                    SwiftUI.TextField(text: $text,
+                                      prompt: multiline ? Text(verbatim: "") : Text(placeholder).foregroundStyle(colors.textTertiary),
+                                      axis: multiline ? .vertical : .horizontal) {
+                        Text(accessibilityLabel ?? placeholder)
+                    }
+                    .lineLimit(multiline ? 3 : 1, reservesSpace: multiline)
+                    .modifier(OptionalIdentifier(identifier: identifier))
                 }
                 .font(.body)
                 .foregroundStyle(colors.textPrimary)
                 .tint(colors.action)
                 .focused($focused)
-                .lineLimit(multiline ? 3 : 1, reservesSpace: multiline)
-                .modifier(OptionalIdentifier(identifier: identifier))
                 if !text.isEmpty && !multiline {
                     Button {
                         text = ""
