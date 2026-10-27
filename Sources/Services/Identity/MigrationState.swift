@@ -56,6 +56,21 @@ enum IdentityKeys {
     static let zoneGone = "v2.sync.zoneGone"
     /// This device has completed at least one sync with the zone (zone-gone guard).
     static let hasSynced = "v2.sync.hasSynced"
+    /// This device has seen the zone exist (read it at S5, or created it). With `hasSynced`, the
+    /// zone-gone guard: a zone this device knew that disappears is asked about (P31), never
+    /// recreated; a zone it never saw (fresh install, after Delete all data) is created.
+    static let zoneSeen = "v2.sync.zoneSeen"
+
+    /// The zone-gone guard (§1.4 review fix 1).
+    static func knowsZone(_ defaults: UserDefaults) -> Bool {
+        defaults.bool(forKey: hasSynced) || defaults.bool(forKey: zoneSeen)
+    }
+
+    /// Forgets the zone (P31 "Keep this iPhone's copy", P13): the next push may create it.
+    static func forgetZone(_ defaults: UserDefaults) {
+        defaults.removeObject(forKey: hasSynced)
+        defaults.removeObject(forKey: zoneSeen)
+    }
     /// The iCloud account changed (P13); sync paused until answered.
     static let accountChanged = "v2.sync.accountChanged"
     /// Per-launch/once notices (Today cards).

@@ -429,6 +429,7 @@ final class RecordSetMigration {
             }
             snapshot.userRecordName = userName
             try? snapshot.save(root: root)
+            if snapshot.zoneExists { defaults.set(true, forKey: IdentityKeys.zoneSeen) }
             if let userName { defaults.set(userName, forKey: IdentityKeys.icloudUserRecordName) }
             defaults.set(snapshot.tokenData, forKey: IdentityKeys.migrationZoneToken)
             defaults.removeObject(forKey: IdentityKeys.lastSyncProblem)
@@ -444,10 +445,25 @@ final class RecordSetMigration {
             Self.setStep(.cloudMerged, defaults)
         }
 
+        // The zone didn't exist at S5: a fresh install or a phone after Delete all data creates it
+        // now, so S8b can pull and S9 can push. A zone this device knew is never recreated (P31).
+        if step < .deltaPulled, !snapshot.zoneExists {
+            do {
+                try await source.ensureZone()
+            } catch ZoneSourceError.zoneGone {
+                return handleZoneGone()
+            } catch {
+                return .pushFailed(String(describing: error))
+            }
+            defaults.set(true, forKey: IdentityKeys.zoneSeen)
+        }
+
         // S8 — the unified id and the household pair.
         if step < .householdWritten {
             do {
                 try await writeHousehold(snapshot)
+            } catch ZoneSourceError.zoneGone {
+                return handleZoneGone()
             } catch {
                 return .pushFailed(String(describing: error))
             }
@@ -472,6 +488,9 @@ final class RecordSetMigration {
                 }
                 stats.deltaAbandoned = true
                 Analytics.identityDeltaAbandoned()
+            } catch ZoneSourceError.zoneGone {
+                // The zone S5 read (or S8 created) was deleted on another device meanwhile.
+                return handleZoneGone()
             } catch {
                 return .pushFailed(String(describing: error))
             }
@@ -1074,13 +1093,13 @@ final class RecordSetMigration {
     // MARK: Zone gone (P31) — never recreate on our own
 
     func handleZoneGone() -> CloudOutcome {
-        if defaults.bool(forKey: IdentityKeys.hasSynced) {
+        if IdentityKeys.knowsZone(defaults) {
             defaults.set(true, forKey: IdentityKeys.zoneGone)
             Analytics.zoneGonePromptShown()
             onChange?()
             return .zoneGone
         }
-        // Never synced: the zone simply doesn't exist yet. The source creates it on the next push.
+        // Never seen: the zone simply doesn't exist yet. The source creates it on the next push.
         return .pushFailed("zone_missing")
     }
 }

@@ -1080,6 +1080,18 @@ extension CloudKitSyncService: IdentityZoneSource {
         }
     }
 
+    /// Creates the zone on a fresh install or after Delete all data. A zone this device knew
+    /// (`IdentityKeys.knowsZone`) that is gone is never recreated here: P31 asks.
+    func ensureZone() async throws {
+        guard let database else { throw ZoneSourceError.unavailable("no CloudKit") }
+        do {
+            _ = try await database.recordZone(for: zoneID)
+        } catch let error as CKError where Self.isZoneGone(error) {
+            if IdentityKeys.knowsZone(.standard) { throw ZoneSourceError.zoneGone }
+            try await createZone()
+        }
+    }
+
     /// S8: the household pair. Measured on the Development container (iPad mini 5, 2026-10-25):
     /// `.ifServerRecordUnchanged` on a freshly built record does not refuse to overwrite one that
     /// exists, so the first writer is found by reading. Read: a pair exists → adopt its
@@ -1098,6 +1110,8 @@ extension CloudKitSyncService: IdentityZoneSource {
         } catch let error as CKError {
             if let owner = Self.serverRecords(in: error).compactMap({ $0["appUserId"] as? String }).first { return .adopted(owner) }
             guard Self.isZoneGone(error) else { throw error }
+            // A zone this device knew was deleted elsewhere: ask (P31), never recreate it.
+            if IdentityKeys.knowsZone(.standard) { throw ZoneSourceError.zoneGone }
             try await createZone()
             try await modify(database: database, save: records, policy: .ifServerRecordUnchanged, atomic: false)
         }
@@ -1135,8 +1149,13 @@ extension CloudKitSyncService: IdentityZoneSource {
                 try await withRetry { try await self.batchDelete(deletes.map { CKRecord.ID(recordName: $0, zoneID: self.zoneID) }) }
                 report.deletedNames = Set(deletes)
             } catch {
-                if Self.isZoneGone(error) { report.zoneGone = true; return report }
-                logger.error("Delete push failed: \(error.localizedDescription)")
+                if Self.isZoneGone(error) {
+                    if IdentityKeys.knowsZone(.standard) { report.zoneGone = true; return report }
+                    // A zone this device never saw holds nothing to delete; the saves below create it.
+                    report.deletedNames = Set(deletes)
+                } else {
+                    logger.error("Delete push failed: \(error.localizedDescription)")
+                }
             }
         }
         let saved = await saveRecordsPerType(records.map { $0.ckRecord(zoneID: zoneID) })
@@ -1144,7 +1163,7 @@ extension CloudKitSyncService: IdentityZoneSource {
         report.failedTypes = saved.failedTypes
         report.quotaExceeded = saved.quotaExceeded
         if saved.zoneGone {
-            if UserDefaults.standard.bool(forKey: IdentityKeys.hasSynced) {
+            if IdentityKeys.knowsZone(.standard) {
                 report.zoneGone = true
             } else {
                 // First sync on this account: the zone simply doesn't exist yet.

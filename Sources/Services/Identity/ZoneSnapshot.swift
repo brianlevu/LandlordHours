@@ -206,6 +206,10 @@ protocol IdentityZoneSource: AnyObject {
     func userRecordName() async -> String?
     func readWholeZone() async -> ZoneSnapshot
     func deltaPull(from token: Data?) async throws -> ZoneDelta
+    /// Creates the zone when this device never saw it (a fresh install, a phone after Delete all
+    /// data). Throws `ZoneSourceError.zoneGone` when a zone it knew is gone: never recreated on
+    /// its own (P31). No-op when the zone exists.
+    func ensureZone() async throws
     /// Saves the household pair with `.ifServerRecordUnchanged`.
     func saveHousehold(goal: ZoneRecord, tax: ZoneRecord) async throws -> HouseholdSaveResult
     /// Saves per record type (one failing type never blocks the others) and deletes.

@@ -155,7 +155,7 @@ extension RecordSetMigration {
         switch answer {
         case .keepAndRestore:
             defaults.removeObject(forKey: IdentityKeys.zoneGone)
-            defaults.set(false, forKey: IdentityKeys.hasSynced)   // the next push may create the zone
+            IdentityKeys.forgetZone(defaults)   // the next push may create the zone
             tracker.resetBaselines()
             let report = await pushLive()
             onChange?()
@@ -174,7 +174,7 @@ extension RecordSetMigration {
         defaults.removeObject(forKey: IdentityKeys.accountChanged)
         if let newUser { defaults.set(newUser, forKey: IdentityKeys.icloudUserRecordName) }
         tracker.resetBaselines()
-        defaults.removeObject(forKey: IdentityKeys.hasSynced)
+        IdentityKeys.forgetZone(defaults)   // another account's zone: this device never saw it
         defaults.removeObject(forKey: IdentityKeys.unifiedIdDecided)
         if answer == .useThisICloud, let live {
             // This iPhone's set goes to Earlier records (nothing deleted); the new account's records come in.

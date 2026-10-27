@@ -582,3 +582,107 @@ final class HouseholdSyncTests: XCTestCase {
         }
     }
 }
+
+// MARK: - Record-loss regressions (adversarial reviews of v2/k at dc864f1 and ff35d00)
+//
+// Each test reproduces one path by which a tax hour could be lost or silently changed, through
+// the same fake zone the engine uses, with the fake behaving like CloudKit where it matters: a
+// zone that doesn't exist yet, a change token that only covers what it covers, and a record the
+// delta fails to fetch.
+
+@MainActor
+final class RecordLossRegressionTests: XCTestCase {
+    private var sandbox: IdentitySandbox!
+    private let local = "local-6F1E2D3C-0000-4000-8000-0000000C0A01"
+
+    override func setUp() {
+        super.setUp()
+        TestScope.unpin()
+        RecordLedger.lastChecks = [:]
+        sandbox = IdentitySandbox()
+    }
+
+    override func tearDown() {
+        sandbox.tearDown()
+        super.tearDown()
+    }
+
+    private func newEntry(hours: Double = 3, property: RentalProperty) -> TimeEntry {
+        TimeEntry(propertyId: property.id, participant: .selfParticipant, category: .management, hours: hours,
+                  date: Date(), notes: "")
+    }
+
+    /// What `AppViewModel.wipeEverythingLocal` leaves behind (Delete all data, P31 "Delete here too").
+    private func wipeLikeDeleteAll(_ h: EngineHarness) {
+        for key in sandbox.defaults.dictionaryRepresentation().keys where key.hasPrefix("u.") || key.hasPrefix(IdentityKeys.prefix) {
+            sandbox.defaults.removeObject(forKey: key)
+        }
+        for folder in IdentityFolder.allCases {
+            try? FileManager.default.removeItem(at: sandbox.root.appendingPathComponent(folder.rawValue, isDirectory: true))
+        }
+        h.earlier.deleteEverything()
+        RecordSetMigration.adoptIds(storage: IdentityZone.household, unified: IdentityZone.household, defaults: sandbox.defaults)
+        RecordSetMigration.setStep(.deviceMerged, sandbox.defaults)
+    }
+
+    // MARK: 1 · a fresh install, or a phone after Delete all data, syncs
+
+    func testAFreshInstallWithNoZoneCreatesItOnTheFirstSyncAndSyncs() async throws {
+        let zone = IdentityFixtures.fakeZone("noZone", defaults: sandbox.defaults)
+        let h = EngineHarness(sandbox, zone: zone)
+        XCTAssertEqual(try h.device(), .fresh)
+        let outcome = await h.cloud()
+        XCTAssertEqual(outcome, .done, "the cloud phase finishes on an account with no zone yet")
+        XCTAssertTrue(zone.zoneExists, "the first sync creates the zone")
+        XCTAssertFalse(sandbox.defaults.bool(forKey: IdentityKeys.zoneGone), "never 'deleted on another device'")
+
+        // The first entry after onboarding reaches iCloud, and the next pull works.
+        let property = RentalProperty(name: "Elm", address: "1 Elm St", propertyType: .ltr)
+        let entry = newEntry(property: property)
+        h.live.replaceLive(entries: [entry], properties: [property], categories: [])
+        let report = await h.engine.pushLive()
+        XCTAssertFalse(report.zoneGone)
+        XCTAssertNotNil(zone.records[entry.id.uuidString], "the hour is in iCloud")
+        _ = try await zone.deltaPull(from: nil)
+        XCTAssertFalse(sandbox.defaults.bool(forKey: IdentityKeys.zoneGone))
+    }
+
+    func testAPhoneAfterDeleteAllDataSyncsAgain() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let zone = FakeZoneSource()
+        let h = EngineHarness(sandbox, zone: zone)
+        try h.device()
+        let first = await h.cloud()
+        XCTAssertEqual(first, .done)
+        // Delete all data: the whole zone, then everything on the phone.
+        try await zone.deleteZone()
+        wipeLikeDeleteAll(h)
+        let again = await h.cloud()
+        XCTAssertEqual(again, .done, "a new start syncs like a new install")
+        XCTAssertTrue(zone.zoneExists)
+        let property = RentalProperty(name: "Oak", address: "2 Oak St", propertyType: .ltr)
+        let entry = newEntry(property: property)
+        h.live.replaceLive(entries: [entry], properties: [property], categories: [])
+        let report = await h.engine.pushLive()
+        XCTAssertFalse(report.zoneGone)
+        XCTAssertNotNil(zone.records[entry.id.uuidString])
+    }
+
+    func testAZoneThisPhoneReadThenDeletedElsewhereIsAskedAboutNeverRecreated() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let device = (Fixture.entries(sandbox.defaults, key: "u.\(local).LandlordHours.entries"),
+                      Fixture.properties(sandbox.defaults, key: "u.\(local).LandlordHours.properties"))
+        let zone = FakeZoneSource(records: Fixture.zoneRecords(entries: device.0, properties: device.1, owner: local))
+        let h = EngineHarness(sandbox, zone: zone)
+        try h.device()
+        h.engine.crashAt = "S7"
+        _ = await h.cloud()                          // S5 read the zone
+        zone.simulateZoneDeletedElsewhere()          // Delete all data on another phone
+        h.engine.crashAt = nil
+        let outcome = await h.cloud()
+        XCTAssertEqual(outcome, .zoneGone, "P31: asked, not recreated")
+        XCTAssertFalse(zone.zoneExists, "the deleted zone stays deleted")
+        XCTAssertTrue(zone.records.isEmpty, "nothing re-uploaded")
+        XCTAssertEqual(h.entries.count, 10, "this phone's copy is kept")
+    }
+}

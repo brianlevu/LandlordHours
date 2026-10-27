@@ -7,7 +7,8 @@ import Foundation
 //                              (D2–D9). The UI test passes the captured plist itself in the
 //                              environment (`LH_UPGRADE_FIXTURE_B64`, base64), so the same run works
 //                              on a simulator and on an iPad; unit tests load it from their bundle.
-// `-LHFakeZone <case>`         replaces iCloud with an in-memory zone: empty, email (the D2 group
+// `-LHFakeZone <case>`         replaces iCloud with an in-memory zone: empty, noZone (no zone yet:
+//                              a fresh install or after Delete all data), email (the D2 group
 //                              in iCloud), cloudOnly (a new phone), twoSets, bulk, slow, fail,
 //                              zoneGone, accountChanged, quota, restricted, off.
 // `-LHCrashAt <step>`          stops the migration after a step (S2, S4, S5, S7, S8, S8b, S9).
@@ -40,6 +41,17 @@ final class FakeZoneSource: IdentityZoneSource {
     private(set) var deletes: [String] = []
     private(set) var zoneDeleted = false
     private(set) var readCount = 0
+    private(set) var zonesCreated = 0
+    private(set) var deltaPullCount = 0
+    /// The last delta pull had no token, so it fetched the whole zone.
+    private(set) var lastDeltaWasWholeZone = false
+    /// Records a delta pull fails to fetch once (CloudKit's per-record `recordWasChangedBlock` failure).
+    var failOnceInDelta: Set<String> = []
+    /// The zone's change log: a token is the last sequence it covers, so a pull from an older token
+    /// sees a change again and a pull from a newer one never does (as CloudKit).
+    private struct LoggedChange { var sequence: Int; var record: ZoneRecord?; var deletedName: String?; var deletedType: String? }
+    private var changeLog: [LoggedChange] = []
+    private(set) var sequence = 0
 
     init(records: [ZoneRecord] = []) {
         for r in records { self.records[r.recordName] = r }
@@ -58,13 +70,10 @@ final class FakeZoneSource: IdentityZoneSource {
             return s
         }
         guard zoneExists else { return ZoneSnapshot.empty(zoneExists: false) }
-        var all = Array(records.values) + pendingChanged
-        for r in pendingChanged { records[r.recordName] = r }
-        for (name, _) in pendingDeleted { records[name] = nil }
-        all = Array(records.values)
-        pendingChanged = []; pendingDeleted = [:]
+        absorbPending()
+        let all = Array(records.values)
         var snapshot = ZoneSnapshot(readAt: Date(), presentNames: Set(all.map(\.recordName)), records: all.sorted { $0.recordName < $1.recordName },
-                                    incomplete: incompleteRead, zoneExists: true, tokenData: Data("t\(readCount)".utf8))
+                                    incomplete: incompleteRead, zoneExists: true, tokenData: Self.token(sequence))
         if incompleteRead { snapshot.problem = String(localized: "iCloud didn’t answer for 1 record.", table: "Identity") }
         return snapshot
     }
@@ -72,15 +81,70 @@ final class FakeZoneSource: IdentityZoneSource {
     func deltaPull(from token: Data?) async throws -> ZoneDelta {
         if tokenExpiredOnDelta > 0 { tokenExpiredOnDelta -= 1; throw ZoneSourceError.tokenExpired }
         guard zoneExists else { throw ZoneSourceError.zoneGone }
-        let changed = pendingChanged
-        let deleted = pendingDeleted
-        for r in changed { records[r.recordName] = r }
-        for (name, _) in deleted { records[name] = nil }
+        absorbPending()
+        var changed: [String: ZoneRecord] = [:]
+        var deleted: [String: String] = [:]
+        if let since = Self.sequence(of: token) {
+            // Like CloudKit: everything after the token, latest change per record.
+            for change in changeLog where change.sequence > since {
+                if let record = change.record {
+                    changed[record.recordName] = record; deleted[record.recordName] = nil
+                } else if let name = change.deletedName {
+                    deleted[name] = change.deletedType ?? "TimeEntry"; changed[name] = nil
+                }
+            }
+        } else {
+            // No token: the whole zone, no deletes.
+            changed = records
+        }
+        var incomplete = false
+        for name in failOnceInDelta where changed[name] != nil {
+            // recordWasChangedBlock failed for it: left out, the delta is incomplete, the token still moves.
+            changed[name] = nil
+            failOnceInDelta.remove(name)
+            incomplete = true
+        }
+        deltaPullCount += 1
+        lastDeltaWasWholeZone = Self.sequence(of: token) == nil
+        return ZoneDelta(changed: changed.values.sorted { $0.recordName < $1.recordName }, deleted: deleted,
+                         tokenData: Self.token(sequence), incomplete: incomplete)
+    }
+
+    /// Moves "another device" changes into the zone and the change log.
+    private func absorbPending() {
+        for r in pendingChanged {
+            sequence += 1
+            changeLog.append(LoggedChange(sequence: sequence, record: r, deletedName: nil, deletedType: nil))
+            records[r.recordName] = r
+        }
+        for (name, type) in pendingDeleted.sorted(by: { $0.key < $1.key }) {
+            sequence += 1
+            changeLog.append(LoggedChange(sequence: sequence, record: nil, deletedName: name, deletedType: type))
+            records[name] = nil
+        }
         pendingChanged = []; pendingDeleted = [:]
-        return ZoneDelta(changed: changed, deleted: deleted, tokenData: Data("d\(readCount)".utf8), incomplete: false)
+    }
+
+    static func token(_ sequence: Int) -> Data { Data("s\(sequence)".utf8) }
+    static func sequence(of token: Data?) -> Int? {
+        guard let token, let text = String(data: token, encoding: .utf8), text.hasPrefix("s") else { return nil }
+        return Int(text.dropFirst())
+    }
+
+    func ensureZone() async throws {
+        guard !zoneExists else { return }
+        if IdentityKeys.knowsZone(defaults) { throw ZoneSourceError.zoneGone }
+        zoneExists = true
+        zonesCreated += 1
     }
 
     func saveHousehold(goal: ZoneRecord, tax: ZoneRecord) async throws -> HouseholdSaveResult {
+        // Like the live source: a save into a missing zone creates it, unless this device knew
+        // the zone (deleted elsewhere: asked, never recreated).
+        if !zoneExists {
+            if IdentityKeys.knowsZone(defaults) { throw ZoneSourceError.zoneGone }
+            zoneExists = true
+        }
         if let raceHouseholdOwner, records[goal.recordName] == nil {
             records[goal.recordName] = goal.retagged(raceHouseholdOwner)
             records[tax.recordName] = tax.retagged(raceHouseholdOwner)
@@ -96,9 +160,11 @@ final class FakeZoneSource: IdentityZoneSource {
     func push(_ batch: [ZoneRecord], deletes names: [String]) async -> ZonePushReport {
         var report = ZonePushReport()
         if !zoneExists {
-            // Like the live source: a device that synced before never recreates a deleted zone; a
-            // first sync on an account creates it.
-            if defaults.bool(forKey: IdentityKeys.hasSynced) { report.zoneGone = true; return report }
+            // Like the live source: a device that knew the zone never recreates it; a zone it
+            // never saw has nothing to delete, and the first save creates it.
+            if IdentityKeys.knowsZone(defaults) { report.zoneGone = true; return report }
+            report.deletedNames = Set(names)
+            guard !batch.isEmpty else { return report }
             zoneExists = true
         }
         if quotaExceeded {
@@ -235,6 +301,9 @@ enum IdentityFixtures {
         let source = FakeZoneSource()
         switch name {
         case "off": source.account = .noAccount
+        case "noZone":
+            // A fresh install, or a phone after Delete all data: iCloud is on, the zone doesn't exist.
+            source.zoneExists = false
         case "restricted": source.account = .restricted
         case "fail": source.failRead = true
         case "slow":
