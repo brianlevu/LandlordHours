@@ -333,6 +333,28 @@ final class AdversarialReview3Tests: XCTestCase {
     // MARK: R3-2 · "Combine" while the household pair is held for that set pushes this phone's
     // settings over the other phone's household pair (its tax settings silently change).
 
+    func testCombineWhileHeldOverwritesTheOtherSetsHouseholdPair() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let other = "email-other.person@example.com"
+        var records = IdentityFixtures.sampleGroup(owner: other, entries: 20, seed: 0x71)
+        let theirTax = TaxProfileValues(filingStatus: FilingStatus.marriedJoint.rawValue, spouseTracking: true, taxYear: 2019,
+                                        groupingElection: true, nonREWorkHours: 1234.5, displayName: "Other")
+        records.append(GoalSettingsValues.defaults.record(name: IdentityZone.goalSettingsName(IdentityZone.household), owner: other))
+        records.append(theirTax.record(name: IdentityZone.taxProfileName(IdentityZone.household), owner: other))
+        let zone = FakeZoneSource(records: records)
+        let h = EngineHarness(sandbox, zone: zone)
+        try h.device()
+        let o3 = await h.cloud()
+        XCTAssertEqual(o3, .done)
+        XCTAssertEqual(sandbox.defaults.string(forKey: IdentityKeys.householdHeldFor), other, "the household pair is held for the pending set")
+        XCTAssertNotEqual(h.live.taxProfile.nonREWorkHours, theirTax.nonREWorkHours, "this phone's own settings differ")
+
+        h.engine.answer(.combine, group: other)
+        await h.engine.pushLive()
+        let stored = TaxProfileValues(record: try XCTUnwrap(zone.records[IdentityZone.taxProfileName(IdentityZone.household)]))
+        XCTAssertEqual(stored.nonREWorkHours, theirTax.nonREWorkHours, "the other phone's non-RE hours were overwritten (now \(stored.nonREWorkHours))")
+        XCTAssertEqual(stored.taxYear, theirTax.taxYear, "the other phone's tax year was overwritten (now \(stored.taxYear))")
+    }
 
     // MARK: R3-3 · a household pair that arrives in the S8b delta (written by another phone between
     // this phone's S5 read and S8) is overwritten by onboarding answers made while empty.

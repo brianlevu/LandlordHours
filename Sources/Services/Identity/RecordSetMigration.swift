@@ -870,6 +870,44 @@ final class RecordSetMigration {
 
     struct HouseholdCache: Codable { var goal: GoalSettingsValues?; var tax: TaxProfileValues? }
 
+    /// Keeps the held household pair's values (from a read or a delta) for when the hold ends.
+    func holdHousehold(from records: [ZoneRecord]) {
+        let goal = records.first { $0.recordName == IdentityZone.goalSettingsName(IdentityZone.household) }.map(GoalSettingsValues.init(record:))
+        let tax = records.first { $0.recordName == IdentityZone.taxProfileName(IdentityZone.household) }.map(TaxProfileValues.init(record:))
+        guard goal != nil || tax != nil else { return }
+        defaults.set(try? JSONEncoder().encode(HouseholdCache(goal: goal, tax: tax)), forKey: IdentityKeys.heldHouseholdCache)
+    }
+
+    /// The hold ends (the set that owns the household pair was answered). Before anything is
+    /// pushed, the usual settings precedence (v4 §3.3) runs against that pair: clean local
+    /// settings take the household's, so the next push never writes this phone's over it.
+    func releaseHousehold() {
+        defaults.removeObject(forKey: IdentityKeys.householdHeldFor)
+        defer { defaults.removeObject(forKey: IdentityKeys.heldHouseholdCache) }
+        guard let live, let data = defaults.data(forKey: IdentityKeys.heldHouseholdCache),
+              let held = try? JSONDecoder().decode(HouseholdCache.self, from: data) else { return }
+        let winner = MergeRules.settingsWinner(
+            householdExists: true,
+            localDirty: defaults.bool(forKey: IdentityKeys.goalDirty) || defaults.bool(forKey: IdentityKeys.taxDirty),
+            dirtyWhileEmpty: dirtyWhileEmpty,
+            liveIsEmpty: live.liveEntries.isEmpty && live.liveProperties.isEmpty,
+            groupSettingsExist: false)
+        switch winner {
+        case .household, .householdDiscardingLocal, .group:
+            if winner == .householdDiscardingLocal {
+                let report = DiscardedSettings(goal: live.goalSettings, tax: live.taxProfile, at: now())
+                defaults.set(try? JSONEncoder().encode(report), forKey: IdentityKeys.discardedOnboardingAnswers)
+                defaults.set(true, forKey: IdentityKeys.noticeSettingsKept)
+            }
+            var tax = held.tax
+            if tax?.displayName == nil { tax?.displayName = live.taxProfile.displayName }
+            live.applyRemoteSettings(goal: held.goal, tax: tax)
+            clearDirty()
+        case .local, .nothing:
+            break
+        }
+    }
+
     private func rememberHousehold(goal: GoalSettingsValues?, tax: TaxProfileValues?) {
         defaults.set(try? JSONEncoder().encode(HouseholdCache(goal: goal, tax: tax)), forKey: IdentityKeys.householdCache)
     }
@@ -933,6 +971,7 @@ final class RecordSetMigration {
             // its pair; while it is still a question, push nothing of the live set (S9 holds).
             if groups?.group(householdOwner)?.status == .pending {
                 defaults.set(householdOwner, forKey: IdentityKeys.householdHeldFor)
+                holdHousehold(from: snapshot.records)
             }
             defaults.set(chosen, forKey: IdentityKeys.unifiedId)
             defaults.set(true, forKey: IdentityKeys.unifiedIdDecided)

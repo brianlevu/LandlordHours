@@ -111,6 +111,8 @@ enum IdentityKeys {
     /// The zone's household pair belongs to a set this phone is still asking about (pending). Its
     /// id is never adopted, and nothing of the live set is pushed, until the question is answered.
     static let householdHeldFor = "v2.sync.householdHeldFor"
+    /// The held household pair's values (as read), for the settings precedence when the hold ends.
+    static let heldHouseholdCache = "v2.sync.heldHouseholdCache"
     /// Per-launch/once notices (Today cards).
     static let noticeDone = "v2.notice.p12Shown"
     static let noticeSettingsKept = "v2.notice.p29Pending"
