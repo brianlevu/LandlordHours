@@ -15,17 +15,20 @@ struct LHSheet<Content: View, Footer: View>: View {
     let title: String
     var subtitle: String? = nil
     var onClose: (() -> Void)? = nil
+    /// False drops the pinned bar (and its padding) when the footer is conditional, e.g. at accessibility sizes.
+    var showsFooter: Bool = true
     @ViewBuilder var content: Content
     @ViewBuilder var footer: Footer
 
     @Environment(\.colorScheme) private var colorScheme
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
-    init(_ title: String, subtitle: String? = nil, onClose: (() -> Void)? = nil,
+    init(_ title: String, subtitle: String? = nil, onClose: (() -> Void)? = nil, showsFooter: Bool = true,
          @ViewBuilder content: () -> Content, @ViewBuilder footer: () -> Footer) {
         self.title = title
         self.subtitle = subtitle
         self.onClose = onClose
+        self.showsFooter = showsFooter
         self.content = content()
         self.footer = footer()
     }
@@ -40,7 +43,7 @@ struct LHSheet<Content: View, Footer: View>: View {
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .top, spacing: 0) { header }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if Footer.self != EmptyView.self {
+            if showsFooter, Footer.self != EmptyView.self {
                 // Opaque, so scrolled rows never read through the pinned action (§1.20).
                 VStack(spacing: 4) { footer }
                     .padding(.horizontal, 16)

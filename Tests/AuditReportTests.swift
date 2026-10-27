@@ -663,14 +663,14 @@ final class AuditReportPDFTests: XCTestCase {
         let pages = (0..<document.pageCount).map { document.page(at: $0)?.string ?? "" }
         let notePage = try XCTUnwrap(pages.firstIndex { $0.contains("The 100-hour test also requires") })
         XCTAssertTrue(pages[notePage].contains("500-hour test"), "note must share a page with the material participation table")
-        XCTAssertTrue(pages[notePage].contains("Material participation by property"), "small tables move whole instead of splitting")
+        XCTAssertTrue(pages[notePage].contains("500-hour and 100-hour tests by property"), "small tables move whole instead of splitting")
     }
 
     func testPDFShowsProvenanceColumnsAndSourceAppendix() throws {
         let (report, images) = Self.sampleReport()
         let document = try XCTUnwrap(PDFDocument(data: AuditReportPDFRenderer(attachmentData: { images[$0.id] }).render(report)))
         let all = document.string ?? ""
-        for expected in ["Detected", "Confirmed", "Calendar suggestion", "Calendar import", "Receipt", "Other",
+        for expected in ["Suggested", "Confirmed", "Calendar suggestion", "Calendar import", "Receipt", "Other",
                          "Appendix: where records came from", AuditReportFormat.suggestionExplanation, "days later"] {
             XCTAssertTrue(all.contains(expected), "missing \(expected)")
         }

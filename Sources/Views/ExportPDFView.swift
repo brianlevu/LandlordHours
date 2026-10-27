@@ -55,7 +55,8 @@ struct ExportPDFView: View {
         LHSheet(
             HS.t("export.title", "Export the record"),
             subtitle: HS.t("export.subtitle", "A PDF for your CPA and a CSV of every record."),
-            onClose: { dismiss() }
+            onClose: { dismiss() },
+            showsFooter: !isLocked && !typeSize.isAccessibilitySize
         ) {
             LockedPreview(
                 size: .page,
@@ -89,17 +90,9 @@ struct ExportPDFView: View {
                 }
             }
             .padding(.top, 8)
-        }
-        // Pinned `.primary` on its own surface so scrolled content never reads through it (§1.20).
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !isLocked && !typeSize.isAccessibilitySize {
-                VStack(spacing: 4) { actions }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 16)
-                    .frame(maxWidth: .infinity)
-                    .background(colors.backgroundSecondary)
-            }
+        } footer: {
+            // Pinned `.primary` on its own opaque surface so scrolled content never reads through it (§1.20).
+            actions
         }
         .lhSheetPresentation(.focused)
         .hidesAppTabBar()
@@ -138,6 +131,10 @@ struct ExportPDFView: View {
 
     // MARK: Preview
 
+    /// From XXL up the page thumbnail shows the top of the page in a shorter frame, so the summary rows
+    /// stay whole above the pinned action instead of sliding under it.
+    private var shortPreview: Bool { !isLocked && typeSize >= .xxLarge }
+
     private var pagePreview: some View {
         let page = RoundedRectangle(cornerRadius: LHMetrics.tagRadius, style: .continuous)
         return ZStack {
@@ -145,10 +142,23 @@ struct ExportPDFView: View {
                 .fill(Color.white)
                 .shadow(color: .black.opacity(colorScheme == .dark ? 0.5 : 0.08), radius: 16, y: 4)
             if let preview, previewYear == year {
-                Image(uiImage: preview)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFit()
+                // The clear base sets the size (the frame's aspect ratio); the image only fills it, so a
+                // short frame crops the page's bottom instead of growing back to the page's height.
+                Color.clear
+                    .overlay(alignment: .top) {
+                        Image(uiImage: preview)
+                            .resizable()
+                            .interpolation(.high)
+                            .aspectRatio(contentMode: shortPreview ? .fill : .fit)
+                    }
+                    .overlay(alignment: .bottom) {
+                        // A short frame cuts the page mid-line, so it fades out instead of ending on a sliced row.
+                        if shortPreview {
+                            LinearGradient(colors: [Color.white.opacity(0), Color.white], startPoint: .top, endPoint: .bottom)
+                                .frame(height: 36)
+                                .allowsHitTesting(false)
+                        }
+                    }
                     .clipShape(page)
                     .transition(.opacity)
             } else {
@@ -167,7 +177,7 @@ struct ExportPDFView: View {
                 .environment(\.colorScheme, .light)
             }
         }
-        .aspectRatio(isLocked ? 11 / 6 : 11 / 8.5, contentMode: .fit)
+        .aspectRatio(isLocked || shortPreview ? 11 / 6 : 11 / 8.5, contentMode: .fit)
         .frame(maxWidth: 420)
         .frame(maxWidth: .infinity)
         .animation(reduceMotion ? nil : AppAnimation.reveal, value: previewYear)

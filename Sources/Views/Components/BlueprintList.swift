@@ -107,14 +107,21 @@ struct SettingRow: View {
         if typeSize.isAccessibilitySize { axLegacyFace } else { regularLegacyFace }
     }
 
-    /// At accessibility sizes the glyph and chevron share a top line so the text gets the whole
-    /// row width (a narrow column hyphenates mid-word).
+    /// At accessibility sizes the glyph stays inline and the label wraps beside it (Apple's Settings);
+    /// the value drops under the subtitle so it never narrows the label.
     private var axLegacyFace: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                LHRowGlyph(systemImage: symbol, tint: isDestructive ? .caution : .neutral)
-                Spacer(minLength: 0)
+        return HStack(alignment: .top, spacing: 12) {
+            LHRowGlyph(systemImage: symbol, tint: isDestructive ? .destructive : .neutral)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.body)
+                    .foregroundStyle(isDestructive ? colors.destructive : colors.textPrimary)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(colors.textSecondary)
+                }
                 if let value {
                     Text(value)
                         .font(.subheadline)
@@ -122,22 +129,14 @@ struct SettingRow: View {
                         .monospacedDigit()
                         .foregroundStyle(valueColor ?? colors.textSecondary)
                 }
-                if showsChevron {
-                    Image(systemName: "chevron.right")
-                        .font(.footnote)
-                        .foregroundStyle(colors.textTertiary)
-                        .accessibilityHidden(true)
-                }
             }
-            Text(title)
-                .font(.body)
-                .foregroundStyle(isDestructive ? colors.destructive : colors.textPrimary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if let subtitle {
-                Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(colors.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.footnote)
+                    .foregroundStyle(colors.textTertiary)
+                    .padding(.top, 6)
+                    .accessibilityHidden(true)
             }
         }
         .padding(LHRow.insets)
@@ -149,7 +148,7 @@ struct SettingRow: View {
     private var regularLegacyFace: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
         return HStack(alignment: subtitle == nil ? .center : .top, spacing: 12) {
-            LHRowGlyph(systemImage: symbol, tint: isDestructive ? .caution : .neutral)
+            LHRowGlyph(systemImage: symbol, tint: isDestructive ? .destructive : .neutral)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.body)

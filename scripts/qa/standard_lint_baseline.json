@@ -28,8 +28,6 @@
  "total": 1015,
  "entries": {
   "alert|Sources/Views/DeleteAllDataView.swift|.alert(\"Couldn\u2019t delete\", isPresented: Binding(": 1,
-  "alert|Sources/Views/DeleteAllDataView.swift|.alert(\"Delete everything?\", isPresented: $showVoiceOverConfirm) {": 1,
-  "alert|Sources/Views/DeleteAllDataView.swift|.alert(\"iCloud is off\", isPresented: $showICloudOffPrompt) {": 1,
   "alert|Sources/Views/HistoryView.swift|.alert(\"Delete this record?\", isPresented: Binding(": 1,
   "alert|Sources/Views/Onboarding/OnboardingView.swift|.alert(\"Sign In Failed\", isPresented: $signInError) {": 1,
   "alert|Sources/Views/ProfileManagementViews.swift|.alert(\"Open these records?\", isPresented: Binding(": 1,
@@ -763,6 +761,8 @@
   "system-size|Sources/Widget/WidgetSurfaceViews.swift|self.font(.system(size: size, weight: .medium, design: .monospaced))": 1,
   "tab-shell|Sources/Views/Debug/DirA/DirAToday.swift|TabView(selection: $tab) {": 1,
   "tab-shell|Sources/Views/Debug/HomeProto/HomeProtoViews.swift|TabView {": 1,
-  "tab-shell|Sources/Views/Debug/StdProto/StdProtoToday.swift|TabView(selection: $tab) {": 1
+  "tab-shell|Sources/Views/Debug/StdProto/StdProtoToday.swift|TabView(selection: $tab) {": 1,
+  "alert|Sources/Views/DeleteAllDataView.swift|.alert(HS.t(\"delete.alert.title\", \"Delete everything?\"), isPresented: $showVoiceOverConfirm) {": 1,
+  "alert|Sources/Views/DeleteAllDataView.swift|.alert(HS.t(\"delete.icloud.title\", \"iCloud is off\"), isPresented: $showICloudOffPrompt) {": 1
  }
 }

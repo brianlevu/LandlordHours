@@ -197,13 +197,20 @@ extension LHRow {
             if typeSize.isAccessibilitySize { axContent } else { regularContent }
         }
 
-        /// At accessibility sizes the leading glyph and chevron share a top line so the title and
-        /// meta get the whole row width; a narrow title column hyphenates mid-word (rubric §2).
+        /// At accessibility sizes the glyph stays inline beside the text (as in Apple's Settings) and
+        /// the label wraps beside it; the value drops under the meta so it never narrows the label.
         private var axContent: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 12) {
-                    leading
-                    Spacer(minLength: 0)
+            HStack(alignment: .top, spacing: 12) {
+                leading
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.body)
+                        .foregroundStyle(colors.textPrimary)
+                    if let meta {
+                        Text(meta)
+                            .font(.subheadline)
+                            .foregroundStyle(colors.textSecondary)
+                    }
                     if let value {
                         Text(value)
                             .font(.subheadline)
@@ -211,22 +218,14 @@ extension LHRow {
                             .monospacedDigit()
                             .foregroundStyle(colors.textSecondary)
                     }
-                    if showsChevron {
-                        Image(systemName: "chevron.right")
-                            .font(.footnote)
-                            .foregroundStyle(colors.textTertiary)
-                            .accessibilityHidden(true)
-                    }
                 }
-                Text(title)
-                    .font(.body)
-                    .foregroundStyle(colors.textPrimary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if let meta {
-                    Text(meta)
-                        .font(.subheadline)
-                        .foregroundStyle(colors.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if showsChevron {
+                    Image(systemName: "chevron.right")
+                        .font(.footnote)
+                        .foregroundStyle(colors.textTertiary)
+                        .padding(.top, 6)
+                        .accessibilityHidden(true)
                 }
             }
             .padding(LHRow.insets)
@@ -288,7 +287,7 @@ extension LHRow.Browse where Leading == LHRowGlyph {
 /// An SF glyph in a 36pt wash tile (radius 12): the browse row's leading slot outside Records and
 /// Rentals.
 struct LHRowGlyph: View {
-    enum Tint: Equatable { case action, positive, caution, informational, neutral }
+    enum Tint: Equatable { case action, positive, caution, informational, neutral, destructive }
     let systemImage: String
     var tint: Tint = .action
 
@@ -303,6 +302,7 @@ struct LHRowGlyph: View {
         case .caution: return (colors.caution, colors.cautionSurface)
         case .informational: return (colors.informational, colors.informationalSurface)
         case .neutral: return (colors.textSecondary, colors.backgroundTertiary)
+        case .destructive: return (colors.destructive, colors.destructiveSurface)
         }
     }
 

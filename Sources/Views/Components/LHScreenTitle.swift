@@ -87,7 +87,10 @@ struct LHScreenTitle: View {
                         Text(subtitle)
                             .font(.subheadline)
                             .foregroundStyle(colors.textSecondary)
-                            .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
+                            .lineLimit(typeSize >= .xLarge ? 4 : 1)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .lhWrapsText()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

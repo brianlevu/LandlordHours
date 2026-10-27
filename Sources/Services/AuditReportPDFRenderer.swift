@@ -187,7 +187,7 @@ private final class Composer {
                 Column(title: L("pdf.result", "Result"), width: 210),
             ],
             rows: rows,
-            trailingNote: L("pdf.h750.is.tested.for.each.spouse", "REPS is tested for each spouse separately; spouse hours are not combined for the 750-hour test. Investor-level tasks (investing, financing, purchase negotiation) are excluded. Non-real-estate work hours come from Filing and goal in the app; spouse work hours aren’t tracked in the app yet, so the spouse’s more-than-half test is not evaluated.")
+            trailingNote: L("pdf.h750.is.tested.for.each.spouse", "The 750-hour test is checked for each spouse separately; spouse hours are not combined for the 750-hour test. Investor-level tasks (investing, financing, purchase negotiation) are excluded. Non-real-estate work hours come from Filing and goal in the app; spouse work hours aren’t tracked in the app yet, so the spouse’s more-than-half test is not evaluated.")
         )
 
         if !report.materialParticipation.isEmpty {
@@ -202,7 +202,7 @@ private final class Composer {
                 ]
             }
             table(
-                title: report.groupingElection ? L("pdf.material.part.grouped.activity", "Material participation (grouped activity)") : L("pdf.material.part.by.property", "Material participation by property"),
+                title: report.groupingElection ? L("pdf.material.part.grouped.activity", "500-hour and 100-hour tests (grouped activity)") : L("pdf.material.part.by.property", "500-hour and 100-hour tests by property"),
                 columns: [
                     Column(title: L("pdf.activity", "Activity"), width: 200),
                     Column(title: L("pdf.counts.hours.excl.investor", "Hours that count (no investor hours)"), width: 100, alignment: .right),
@@ -211,7 +211,7 @@ private final class Composer {
                     Column(title: L("pdf.result", "Result"), width: 230),
                 ],
                 rows: mpRows,
-                trailingNote: L("pdf.counts.hours.leave.out.investor.level", "Countable hours leave out investor-level tasks, so they can be lower than the totals in the Hours by rental table. The 100-hour test also requires that no other individual participated more. LandlordHours only marks it met after you confirm that in the app.")
+                trailingNote: L("pdf.counts.hours.leave.out.investor.level", "Hours that count leave out investor-level tasks, so they can be lower than the totals in the Hours by rental table. The 100-hour test also requires that no other individual participated more. LandlordHours only marks it met after you confirm that in the app.")
             )
         }
         y += 10
@@ -272,7 +272,7 @@ private final class Composer {
         guard !report.isEmpty else { return }
         newPage()
         sectionTitle(L("pdf.time.entries.chronological", "Records, by date"))
-        note(L("pdf.logged.when.the.entry.was.saved", "Logged = when the entry was saved in the app. Last edited appears only when the entry was changed after it was logged. Detected and Confirmed appear only for entries the app suggested; other entries show Logged only. Attachments refer to the photo appendix."))
+        note(L("pdf.logged.when.the.entry.was.saved", "Logged = when the entry was saved in the app. Last edited appears only when the entry was changed after it was logged. Suggested and Confirmed appear only for entries the app suggested; other entries show Logged only. Attachments refer to the photo appendix."))
         y += 4
 
         let maxDescription = 900
@@ -309,7 +309,7 @@ private final class Composer {
                 Column(title: L("pdf.logged", "Logged"), width: 56),
                 Column(title: L("pdf.last.edited", "Last edited"), width: 56),
                 Column(title: L("pdf.source", "Source"), width: 56),
-                Column(title: L("pdf.detected", "Detected"), width: 56),
+                Column(title: L("pdf.suggested", "Suggested"), width: 56),
                 Column(title: L("pdf.confirmed", "Confirmed"), width: 62),
                 Column(title: L("pdf.attach", "Attach."), width: 36),
             ],

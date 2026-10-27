@@ -91,6 +91,7 @@ struct LongTailValueRow: View {
                 .font(.body)
                 .foregroundStyle(colors.textPrimary)
                 .frame(maxWidth: typeSize.isAccessibilitySize ? .infinity : nil, alignment: .leading)
+                .lhWrapsText()
             if !typeSize.isAccessibilitySize { Spacer(minLength: 8) }
             HStack(spacing: 6) {
                 Text(value)

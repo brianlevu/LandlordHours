@@ -774,6 +774,46 @@ def analyse(path: str, dt: str, scale: float, fold_frac: float, items_present: i
             fields.append(c)
         else:
             cards.append(c)
+    # 4b. rows that sit directly on a sheet's own fill (a sheet with grouped value rows and no inner
+    # card): the canvas probe matches the sheet, so no card is found. Find the hairline dividers
+    # across the page and treat the rows they separate as one list container (judged per row).
+    if not cards:
+        hx0, hx1 = int(40 * scale), W - int(10 * scale)
+        yy0, yy1 = top_skip, fold
+        hair = []
+        off_ = 4
+        for y in range(max(yy0, off_), min(yy1, H - off_)):
+            seg = lab[y, hx0:hx1]
+            if ((np.linalg.norm(seg - lab[y - off_, hx0:hx1], axis=1) > 2.5).mean() >= 0.6
+                    and (np.linalg.norm(seg - lab[y + off_, hx0:hx1], axis=1) > 2.5).mean() >= 0.6
+                    and (np.hypot(seg[:, 1], seg[:, 2]) > 38).mean() < 0.03
+                    # a row divider runs out to the row inset (~20pt from the edge); a document thumbnail's
+                    # table rule stops short of it
+                    and (np.linalg.norm(lab[y, W - int(26 * scale):W - int(22 * scale)]
+                                        - lab[y - off_, W - int(26 * scale):W - int(22 * scale)], axis=1) > 2.5).mean() >= 0.9):
+                hair.append(y)
+        lines = [(a0 + a1) // 2 for (a0, a1) in runs(np.isin(np.arange(H), hair), close_gap=1) if a1 - a0 <= 4]
+        # longest chain of ADJACENT dividers whose spacing is a plausible row height (44-130pt); a
+        # document thumbnail's table rules sit 8-25pt apart and break the chain
+        best, chain = [], []
+        for yv in lines:
+            if chain and 44 * scale <= yv - chain[-1] <= 130 * scale:
+                chain.append(yv)
+            else:
+                chain = [yv]
+            if len(chain) > len(best):
+                best = list(chain)
+        if len(best) >= 2:
+            sp = int(np.median(np.diff(best)))
+            cy0, cy1 = max(best[0] - sp, top_skip), min(best[-1] + sp, fold)
+            fill_mid = lab[(cy0 + cy1) // 2, 6]
+            # the dividers stop at the row inset, so the container spans the first divider's extent
+            hy = best[0]
+            dx = np.flatnonzero(np.linalg.norm(lab[hy, :] - lab[hy - off_, :], axis=1) > 2.5)
+            dx = dx[dx >= int(8 * scale)]
+            cx0, cx1 = (int(dx[0]), min(int(dx[-1]) + int(10 * scale), W)) if dx.size else (0, W)
+            cards.append(dict(y0=int(cy0), y1=int(cy1), x0=cx0, x1=cx1, canvas=canvas0, fill=fill_mid,
+                              blue=False, hero=False, page_edge=False, sheet_rows=True))
     canvas = canvas0
 
     # v2 hero: the house art is not a card (D6) and not a row (D2/D4); a card enclosing it is a defect

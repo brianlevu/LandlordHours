@@ -221,7 +221,8 @@ struct SettingsView: View {
                             .font(.headline)
                             .foregroundStyle(colors.textPrimary)
                         if let email = appleSignIn.email, !email.isEmpty {
-                            Text(email)
+                            // At AX sizes a break point before the @ keeps the domain whole.
+                            Text(dynamicTypeSize.isAccessibilitySize ? email.replacingOccurrences(of: "@", with: "\u{200B}@") : email)
                                 .font(.subheadline)
                                 .foregroundStyle(colors.textSecondary)
                                 .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)

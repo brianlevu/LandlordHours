@@ -121,3 +121,13 @@ extension ButtonStyle where Self == LHPressableButtonStyle {
 
 // Loading: no skeletons or spinners. Use `DraftingLoader` / `PlaceholderBar`
 // (Components/DraftingLoader.swift) for the one thing that waits on data.
+
+// MARK: - Wrapping text
+
+extension View {
+    /// Lets a text wrap to the lines it needs instead of being cut to the height a sibling proposes
+    /// (an ellipsis in a row or a clipped second line). Vertical only: the width stays flexible.
+    func lhWrapsText() -> some View {
+        fixedSize(horizontal: false, vertical: true)
+    }
+}
