@@ -746,7 +746,9 @@ final class CloudKitSyncService: ObservableObject {
             switch await engine.confirmAccount() {
             case .same: break
             case .changed: throw OtherICloudAccountError()
-            case .unknown: throw AccountDeleteICloudUnreachableError()
+            case .unknown:
+                // Can't tell who is signed in: refuse only when there is an account to compare.
+                if engine.defaults.string(forKey: IdentityKeys.icloudUserRecordName) != nil { throw AccountDeleteICloudUnreachableError() }
             }
         }
         isDeletingAccount = true
