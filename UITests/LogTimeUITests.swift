@@ -369,13 +369,15 @@ final class LogTimeUITests: XCTestCase {
         var then: String? = nil
         /// Scrolled fully into view instead of `waitFor` (e.g. the Date row below the description).
         var scrollTo: String? = nil
+        /// Taps the Spouse segment of the Who control and asserts it is selected before the capture.
+        var selectSpouse = false
     }
 
     private let shots: [Shot] = [
         Shot(name: "log-empty", seed: "four", extra: ["-LHOpenLog", "empty"], waitFor: "log.note"),
         Shot(name: "log-typed", seed: "four", extra: ["-LHOpenLog", "typed"], waitFor: "log.note"),
         Shot(name: "log-filled", seed: "four", extra: ["-LHOpenLog", "filled"], waitFor: "log.fill.caption"),
-        Shot(name: "log-filled-spouse", seed: "four", extra: ["-LHOpenLog", "filled", "-LHLogSpouse"], waitFor: "log.who", scrollTo: "log.who"),
+        Shot(name: "log-filled-spouse", seed: "four", extra: ["-LHOpenLog", "filled", "-LHLogSpouse"], waitFor: "log.who", scrollTo: "log.who", selectSpouse: true),
         Shot(name: "log-quick", seed: "limit", extra: ["-LHOpenLog", "quick"], waitFor: "log.note"),
         Shot(name: "log-invalid", seed: "four", extra: ["-LHOpenLog", "invalid"], waitFor: "log.save"),
         Shot(name: "log-keyboard", seed: "four", extra: ["-LHOpenLog", "keyboard"], waitFor: "log.done", settle: 2),
@@ -521,6 +523,15 @@ final class LogTimeUITests: XCTestCase {
         }
     }
 
+    /// Final fix round: the disabled mic (log-voice-denied), the empty note's placeholder at every size
+    /// (log-empty), and the Who control with Spouse selected, light and dark, default / XXL / AX3.
+    func testCaptureEFinal() {
+        let names: Set<String> = ["log-empty", "log-voice-denied", "log-filled-spouse"]
+        for scheme in ["light", "dark"] {
+            for size in [nil, "xxl", "ax3"] as [String?] { captureAll(scheme: scheme, size: size, names: names) }
+        }
+    }
+
     func testCapturePaneProbe() {
         for scheme in ["light", "dark"] { captureAll(scheme: scheme, size: nil, names: ["pane-probe"]) }
     }
@@ -597,6 +608,13 @@ final class LogTimeUITests: XCTestCase {
                     Thread.sleep(forTimeInterval: 0.5)
                     tries += 1
                 }
+            }
+            if shot.selectSpouse {
+                let spouse = element("log.who").buttons["Spouse"]
+                XCTAssertTrue(spouse.waitForExistence(timeout: 6), "\(shot.name): Spouse segment")
+                spouse.tap()
+                Thread.sleep(forTimeInterval: 0.6)
+                XCTAssertTrue(spouse.isSelected, "\(shot.name): Spouse is the selected segment")
             }
             Thread.sleep(forTimeInterval: shot.settle)
             capture("\(shot.name)-\(scheme)\(size.map { "-\($0)" } ?? "")")

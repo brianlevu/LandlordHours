@@ -22,10 +22,15 @@ struct LogTextField: View {
     var onSubmit: (() -> Void)? = nil
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+    /// At AX sizes the system prompt truncates with an ellipsis whatever the line limit (owner
+    /// ruling 2026-10-27: text never truncates at AX), so the placeholder is drawn as wrapping text.
+    private var wrapsPlaceholder: Bool { multiline && typeSize.isAccessibilitySize }
 
-    var body: some View {
-        SwiftUI.TextField(text: $text, prompt: Text(placeholder).foregroundStyle(colors.textTertiary),
+    private var textField: some View {
+        SwiftUI.TextField(text: $text,
+                          prompt: wrapsPlaceholder ? Text("") : Text(placeholder).foregroundStyle(colors.textTertiary),
                           axis: multiline ? .vertical : .horizontal) {
             Text(label)
         }
@@ -39,6 +44,22 @@ struct LogTextField: View {
         .accessibilityLabel(label)
         .accessibilityHint(placeholder)
         .accessibilityIdentifier(identifier)
+    }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            if wrapsPlaceholder && text.isEmpty {
+                // Sizes the ZStack, so the field grows to hold the whole placeholder.
+                Text(placeholder)
+                    .font(.body)
+                    .foregroundStyle(colors.textTertiary)
+                    .lineLimit(nil)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+            textField
+        }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, minHeight: multiline && !compact ? LHField.multilineMinHeight : LHField.height,
@@ -91,16 +112,24 @@ extension LogTimeSheet {
 
     var micButton: some View {
         let denied = voice.permissionDenied
-        return Button(action: micTapped) {
-            ZStack {
-                if isListening {
-                    LogMicLevelRing(level: voice.inputLevel)
+        return Group {
+            if denied {
+                // Disabled = no opacity dim (§1.13): `textTertiary` ink on the icon circle. The button
+                // stays tappable so the tap can drop the keyboard over the "Open Settings" line.
+                Button(action: micTapped) { LogDeniedMicLabel() }
+                    .buttonStyle(.plain)
+            } else {
+                Button(action: micTapped) {
+                    ZStack {
+                        if isListening {
+                            LogMicLevelRing(level: voice.inputLevel)
+                        }
+                        Image(systemName: isListening ? "stop.fill" : "mic")
+                    }
                 }
-                Image(systemName: isListening ? "stop.fill" : "mic")
+                .buttonStyle(LHButton.icon)
             }
         }
-        .buttonStyle(LHButton.icon)
-        .opacity(denied ? 0.4 : 1)
         .accessibilityLabel(isListening ? lt("Stop listening") : lt("Talk instead of type"))
         .accessibilityHint(denied ? lt("Microphone is off in Settings") : "")
         .accessibilityIdentifier("log.mic")
@@ -193,5 +222,23 @@ extension LogTimeSheet {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("log.voice.denied")
+    }
+}
+
+/// The mic circle when the microphone is off in Settings: the `.icon` button's geometry with the
+/// disabled ink (`textTertiary` on `backgroundTertiary`, no opacity).
+private struct LogDeniedMicLabel: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @ScaledMetric(relativeTo: .body) private var iconSide: CGFloat = LHButton.Metrics.controlHeight
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        Image(systemName: "mic")
+            .font(.body.weight(.semibold))
+            .imageScale(.medium)
+            .foregroundStyle(colors.textTertiary)
+            .frame(width: max(iconSide, LHButton.Metrics.controlHeight), height: max(iconSide, LHButton.Metrics.controlHeight))
+            .background(colors.backgroundTertiary, in: Circle())
+            .contentShape(Circle())
     }
 }
