@@ -218,16 +218,7 @@ final class PaywallCaptureUITests: XCTestCase {
                 XCTAssertTrue(app.descendants(matching: .any)["inbox.toast"].waitForExistence(timeout: 5), "toast")
                 Thread.sleep(forTimeInterval: 0.6)
                 save("limit-toast-\(suffix)")
-                // Then "Not rental work" from the same at-limit sheet.
-                Thread.sleep(forTimeInterval: 5.5)
-                app.buttons["inbox.row.cal:debug-limit-showing"].tap()
-                let notWork = app.buttons["confirm.dismiss"]
-                tries = 0
-                while !notWork.isHittable && tries < 6 { app.swipeUp(velocity: .slow); tries += 1 }
-                notWork.tap()
-                XCTAssertTrue(app.staticTexts["Marked not rental work"].waitForExistence(timeout: 5), "rental-work toast")
-                Thread.sleep(forTimeInterval: 0.6)
-                save("limit-toast-notwork-\(suffix)")
+                // The at-limit sheet has one tertiary ("Keep it in my inbox", §1.20); "Not work" is the row swipe.
 
                 launch(scenario: "emptyMainTabs", scheme: scheme, size: size, extra: ["-LHSeedSuggestions", "limit-waiting"])
                 tapButton("Inbox")

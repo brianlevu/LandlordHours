@@ -1,14 +1,25 @@
 import SwiftUI
 
-/// Confirm sheet for one suggestion (Flighty header + status band, Skyscanner stepper, Brick
-/// value rows). The only place a not-sure, already-logged or hour-less item can be logged.
+// MARK: - The confirm sheet (standard §1.20 focused sheet, §1.5, §1.8, §1.9; plan package D)
+//
+// The only place a not-sure, already-logged or hour-less item can be logged. An opaque `.large`
+// sheet on `backgroundSecondary` (Brian, 2026-10-23), no house. Header: the 56 category tool, the
+// title ("Plumber at Pine Cabin"), "Calendar · Thu Oct 22", one `.icon` close. Then at most one
+// notice (not sure / might be logged / needs hours), the hours in an `LHStepper`, `LHRow.Value`
+// rows (Property, Category, Date), `LHSegmented` for Me / Spouse, the note in an `LHField`. The
+// `.primary` "Log 2h" is pinned (Liquid Glass on iOS 26+) under one `.tertiary` "Not rental work".
+// At the free plan's limit the footer says what is locked and offers "Unlock Pro" under one
+// `.tertiary` "Keep it in my inbox" (§1.20: one tertiary; "Not work" stays on the row's swipe).
+// AX footer policy (owner ruling 2026-10-27): at accessibility sizes only the primary is pinned,
+// with a 24pt fade above it; the previewing line leads the scroll and the tertiary choices scroll
+// after the content, so nothing is clipped under the bar.
+
 struct SuggestionConfirmSheet: View {
     let suggestion: Suggestion
     @ObservedObject var model: InboxViewModel
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var hours: Double
     @State private var propertyId: UUID?
@@ -16,8 +27,7 @@ struct SuggestionConfirmSheet: View {
     @State private var participant: Participant = .selfParticipant
     @State private var notes: String
     @State private var showMuteOptions = false
-    @State private var stepTick = 0
-    /// WP-P: the free plan is full and this item is at a new rental.
+    /// The free plan is full and this item is at a new rental.
     @State private var showRentalPicker = false
     @State private var paywall: ProPaywallRequest?
     @ObservedObject private var subscriptionManager = SubscriptionManager.shared
@@ -57,61 +67,48 @@ struct SuggestionConfirmSheet: View {
     /// Free plan full, item at a new rental, and the user hasn't said it was at their rental.
     private var atLimit: Bool { model.needsNewRental(suggestion) && !model.properties.contains { $0.id == propertyId } }
     private var limitedToPicker: Bool { model.needsNewRental(suggestion) }
+    private var propertyName: String? { model.properties.first(where: { $0.id == propertyId })?.name }
+    private var ax: Bool { dynamicTypeSize.isAccessibilitySize }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                header
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
-                statusBand
-                    .padding(.horizontal, 16)
-                    .padding(.top, 20)
-                hoursCard
-                    .padding(.horizontal, 16)
-                    .padding(.top, 24)
+            VStack(alignment: .leading, spacing: 16) {
+                // Accessibility sizes: the header is too tall to pin, so it scrolls with the sheet.
+                if ax { header.padding(.horizontal, -LHMetrics.gutter) }
+                // At accessibility sizes the free plan's previewing line leads the scroll; the
+                // unlock stays pinned and the back-out scrolls after the content (§1.20 AX policy).
+                if ax && atLimit { limitExplanation }
+                notice
+                hoursBlock
                 valueRows
-                    .padding(.horizontal, 16)
-                    .padding(.top, 20)
-                notesField
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                if limitActionsInline {
-                    // Accessibility sizes: the explanation and the two ways out scroll with the
-                    // sheet; only "Unlock Pro" stays pinned, so the Property row stays reachable.
-                    limitExplanation
-                        .padding(.horizontal, 20)
-                        .padding(.top, 20)
-                    limitWaysOut
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
-                }
+                if model.showsSpousePicker { whoBlock }
+                // One line: the note is a few words, and a 104pt field around one line is 50% empty (D4).
+                LHField(confirmText(.notePlaceholder), text: $notes, multiline: false,
+                        accessibilityLabel: confirmText(.noteLabel), identifier: "confirm.notes")
                 secondaryActions
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
-                    .padding(.bottom, 16)
+                if ax { axScrollingChoices }
             }
+            .padding(.horizontal, LHMetrics.gutter)
+            .padding(.top, 8)
+            .padding(.bottom, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
-        // Log and "Not rental work" stay pinned above the home indicator, so the decline is
-        // always visible, however long the sheet is (not-sure items carry an extra band).
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            pinnedActions
-        }
-        .background(colors.background)
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .sensoryFeedback(.selection, trigger: stepTick)
-        .confirmationDialog("Don’t suggest events like this", isPresented: $showMuteOptions, titleVisibility: .visible) {
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .top, spacing: 0) { if !ax { header } }
+        .safeAreaInset(edge: .bottom, spacing: 0) { footer }
+        .background(colors.backgroundSecondary)
+        .lhSheetPresentation(.focused)
+        .confirmationDialog(confirmText(.muteTitle), isPresented: $showMuteOptions, titleVisibility: .visible) {
             if let rule = InboxLogic.muteRule(forTitleOf: suggestion) {
-                Button("Events named \u{201C}\(suggestion.title)\u{201D}") { mute(rule) }
+                Button(String(localized: "confirm.mute.named", defaultValue: "Events named \u{201C}\(suggestion.title)\u{201D}", table: "Inbox")) { mute(rule) }
             }
             if let rule = InboxLogic.muteRule(forCalendarOf: suggestion) {
-                Button("Everything from this calendar") { mute(rule) }
+                Button(confirmText(.muteCalendar)) { mute(rule) }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(confirmText(.cancel), role: .cancel) {}
         } message: {
-            Text("We stop suggesting them. Hours you already logged stay.")
+            Text(confirmText(.muteMessage))
         }
         .sheet(isPresented: $showRentalPicker) {
             LimitRentalPicker(
@@ -122,14 +119,14 @@ struct SuggestionConfirmSheet: View {
             )
             // Accessibility sizes open full height so the locked row's "Unlock Pro" is reachable.
             .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large])
-            .presentationBackground(colors.background)
+            .presentationDragIndicator(.visible)
         }
         .proPaywall($paywall)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("confirm.sheet")
     }
 
-    // MARK: Free plan at its limit (WP-P)
+    // MARK: Free plan at its limit
 
     /// The paywall about adding a rental. After a purchase the sheet closes and Add Property
     /// opens; the item stays in the inbox, ready to log at the new rental.
@@ -146,324 +143,194 @@ struct SuggestionConfirmSheet: View {
     // MARK: Header
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: InboxFormat.kindSymbol(suggestion.kind))
-                .font(.system(size: 20, weight: .regular))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(colors.informational)
-                .frame(width: 44, height: 44)
-                .background(colors.informationalSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(InboxFormat.kindLabel(suggestion.kind)) · \(InboxFormat.longDay(suggestion.start))")
-                    .font(.footnote.weight(.semibold))
-                    .textCase(.uppercase)
-                    .tracking(0.3)
-                    .foregroundStyle(colors.textSecondary)
-                titleText
-                    .font(.title2)
-                    .foregroundStyle(colors.textPrimary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityAddTraits(.isHeader)
-            }
-            Spacer(minLength: 8)
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(colors.textPrimary)
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(colors.backgroundSecondary))
-                    .overlay(Circle().strokeBorder(colors.border, lineWidth: 0.5))
-            }
-            .buttonStyle(.lhPressable)
-            .accessibilityLabel("Close")
-            .accessibilityIdentifier("confirm.close")
-        }
-    }
-
-    private var titleText: Text {
-        let noun = Text(suggestion.title).fontWeight(.semibold)
-        guard let name = model.properties.first(where: { $0.id == propertyId })?.name else { return noun }
-        return Text("\(noun) at \(Text(name).fontWeight(.semibold))")
-    }
-
-    // MARK: Status band
-
-    @ViewBuilder private var statusBand: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if badges.needsHours {
-                band(
-                    title: Text("How long did it take?"),
-                    body: "We can’t tell the hours from this, so add them below.",
-                    wash: colors.cautionSurface
-                )
-            } else if let scheduled = suggestion.proposedHours {
-                band(
-                    title: Text("Scheduled \(Text(InboxFormat.hours(scheduled)).fontWeight(.bold))"),
-                    body: scheduleSentence,
-                    wash: colors.backgroundTertiary
-                )
-            }
-            if badges.notSure {
-                band(
-                    title: Text("Not sure this is rental work"),
-                    body: "Log it only if it was work on a rental.",
-                    wash: colors.cautionSurface
-                )
-                .accessibilityIdentifier("confirm.notSure")
-            }
-            if badges.mightAlreadyBeLogged {
-                band(
-                    title: Text("Might already be logged"),
-                    body: "You have hours around this time. Check Records so it isn’t counted twice.",
-                    wash: colors.informationalSurface
-                )
-                .accessibilityIdentifier("confirm.mightAlreadyBeLogged")
-            }
-        }
-    }
-
-    private var scheduleSentence: String {
-        guard let end = suggestion.end else { return "Change it if the work ran long or short." }
-        return "Your calendar had this from \(InboxFormat.clockTime(suggestion.start)) to \(InboxFormat.clockTime(end)). Change it if the work ran long or short."
-    }
-
-    private func band(title: Text, body: String, wash: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            title
-                .font(.headline)
+        let title = VStack(alignment: .leading, spacing: 2) {
+            Text(InboxFormat.rowTitle(suggestion, propertyName: propertyName))
+                .font(.title2.weight(.semibold))
                 .foregroundStyle(colors.textPrimary)
-            Text(body)
+                .lineLimit(ax ? nil : 2)
+                .accessibilityAddTraits(.isHeader)
+            Text(String(localized: "confirm.subtitle", defaultValue: "\(InboxFormat.kindLabel(suggestion.kind)) · \(InboxFormat.longDay(suggestion.start))", table: "Inbox"))
                 .font(.subheadline)
                 .foregroundStyle(colors.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(ax ? nil : 1)
+                // At the free plan's limit at accessibility sizes the previewing line and the
+                // unlock take the room; the date is on the Date row below.
+                .opacity(ax && atLimit ? 0 : 1)
+                .frame(maxHeight: ax && atLimit ? 0 : nil)
+                .accessibilityHidden(ax && atLimit)
         }
-        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(wash, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .accessibilityElement(children: .combine)
+        let close = Button { dismiss() } label: { Image(systemName: "xmark") }
+            .buttonStyle(LHButton.icon)
+            .accessibilityLabel(String(localized: "sheet.close", defaultValue: "Close", table: "Foundations"))
+            .accessibilityIdentifier("confirm.close")
+        return Group {
+            if ax {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .center) {
+                        CategoryToolTile(category: category, size: 56)
+                        Spacer(minLength: 0)
+                        close
+                    }
+                    title
+                }
+            } else {
+                HStack(alignment: .center, spacing: 12) {
+                    CategoryToolTile(category: category, size: 56)
+                    title
+                    close
+                }
+            }
+        }
+        .padding(.horizontal, LHMetrics.gutter)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .frame(minHeight: 56)
+        .background(colors.backgroundSecondary)
+    }
+
+    // MARK: Notice
+
+    /// At most one: the most important thing to know before logging.
+    @ViewBuilder private var notice: some View {
+        if badges.mightAlreadyBeLogged {
+            ConfirmNotice(symbol: "exclamationmark.circle", tone: .informational,
+                          title: confirmText(.mightTitle), message: confirmText(.mightBody))
+                .accessibilityIdentifier("confirm.mightAlreadyBeLogged")
+        } else if badges.notSure {
+            ConfirmNotice(symbol: "questionmark.circle", tone: .caution,
+                          title: confirmText(.notSureTitle), message: confirmText(.notSureBody))
+                .accessibilityIdentifier("confirm.notSure")
+        } else if badges.needsHours {
+            ConfirmNotice(symbol: "clock", tone: .caution, title: confirmText(.needsHoursTitle), message: confirmText(.needsHoursBody))
+                .accessibilityIdentifier("confirm.needsHours")
+        }
     }
 
     // MARK: Hours
 
-    private var hoursCard: some View {
-        let minutes = Int((hours * 60).rounded())
-        return VStack(alignment: .leading, spacing: 10) {
-            Text("How long were you working?")
-                .font(.subheadline.weight(.medium))
+    private var hoursBlock: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(confirmText(.hoursLabel))
+                .font(.subheadline)
                 .foregroundStyle(colors.textSecondary)
-            HStack(spacing: 12) {
-                stepButton(symbol: "minus", enabled: hours > 0) {
-                    hours = max(0, hours - Self.step)
-                }
-                .accessibilityLabel("Less time")
-                .accessibilityIdentifier("confirm.hours.minus")
+            HStack {
                 Spacer(minLength: 0)
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text("\(minutes / 60)")
-                        .font(.system(size: 40, weight: .semibold, design: .rounded))
-                        .contentTransition(.numericText(value: Double(minutes / 60)))
-                    Text("h").font(.title3).foregroundStyle(colors.textSecondary)
-                    Text(String(format: "%02d", minutes % 60))
-                        .font(.system(size: 40, weight: .semibold, design: .rounded))
-                        .contentTransition(.numericText(value: Double(minutes % 60)))
-                        .padding(.leading, 6)
-                    Text("m").font(.title3).foregroundStyle(colors.textSecondary)
-                }
-                .monospacedDigit()
-                .foregroundStyle(hours > 0 ? colors.textPrimary : colors.textTertiary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Hours")
-                .accessibilityValue(InboxFormat.spokenHours(hours))
-                .accessibilityAdjustableAction { direction in
-                    switch direction {
-                    case .increment: hours = min(Self.maxHours, hours + Self.step)
-                    case .decrement: hours = max(0, hours - Self.step)
-                    @unknown default: break
-                    }
-                }
-                .accessibilityIdentifier("confirm.hours.value")
+                LHStepper(hours: $hours, step: Self.step, range: 0...Self.maxHours, label: confirmText(.hoursA11y))
+                    .accessibilityIdentifier("confirm.hours.value")
                 Spacer(minLength: 0)
-                stepButton(symbol: "plus", enabled: hours < Self.maxHours) {
-                    hours = min(Self.maxHours, hours + Self.step)
-                }
-                .accessibilityLabel("More time")
-                .accessibilityIdentifier("confirm.hours.plus")
             }
-            .padding(16)
-            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            if !badges.needsHours, let scheduled = scheduleSentence {
+                Text(scheduled)
+                    .font(.footnote)
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
-    private func stepButton(symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button {
-            if reduceMotion { action() } else { withAnimation(.spring(response: 0.28, dampingFraction: 0.9)) { action() } }
-            stepTick += 1
-        } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(enabled ? colors.textPrimary : colors.textTertiary)
-                .frame(width: 44, height: 44)
-                .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(colors.border, lineWidth: 0.5))
-        }
-        .buttonStyle(.lhPressable)
-        .disabled(!enabled)
+    private var scheduleSentence: String? {
+        guard suggestion.proposedHours != nil, let end = suggestion.end else { return nil }
+        return String(localized: "confirm.schedule",
+                      defaultValue: "Your calendar had this from \(InboxFormat.clockTime(suggestion.start)) to \(InboxFormat.clockTime(end)). Change it if the work ran long or short.",
+                      table: "Inbox")
     }
 
     // MARK: Values
 
     private var valueRows: some View {
-        VStack(spacing: 0) {
-            valueRow("Property") {
-                if limitedToPicker {
-                    Button { showRentalPicker = true } label: {
-                        menuLabel(model.properties.first(where: { $0.id == propertyId })?.name ?? "Choose", isPlaceholder: propertyId == nil)
-                    }
-                    .buttonStyle(.plain)
+        VStack(spacing: 8) {
+            if limitedToPicker {
+                LHRow.Value(confirmText(.property), value: propertyName ?? confirmText(.choose)) { showRentalPicker = true }
                     .accessibilityIdentifier("confirm.property")
-                } else {
+            } else {
                 Menu {
                     ForEach(model.properties) { property in
                         Button(property.name) { propertyId = property.id }
                     }
                 } label: {
-                    menuLabel(model.properties.first(where: { $0.id == propertyId })?.name ?? "Choose", isPlaceholder: propertyId == nil)
+                    LHRow.Value(confirmText(.property), value: propertyName ?? confirmText(.choose), accessory: .menu)
                 }
                 .accessibilityIdentifier("confirm.property")
-                }
             }
-            if model.showsSpousePicker {
-                divider
-                valueRow("Who") {
-                    whoPicker
-                        .accessibilityIdentifier("confirm.who")
-                }
-            }
-            divider
-            valueRow("Category") {
-                Menu {
-                    ForEach(ActivityCategory.allCases, id: \.self) { option in
-                        Button {
-                            category = option
-                        } label: {
-                            Label(option.inboxLabel, image: "bp_tool_\(option.blueprintToolName)_36")
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        if category != nil { CategoryToolTile(category: category, size: 28) }
-                        menuLabel(category?.inboxLabel ?? "Choose", isPlaceholder: category == nil)
+            Menu {
+                ForEach(ActivityCategory.allCases, id: \.self) { option in
+                    Button {
+                        category = option
+                    } label: {
+                        Label(option.inboxLabel, image: "bp_tool_\(option.blueprintToolName)_36")
                     }
                 }
-                .accessibilityIdentifier("confirm.category")
+            } label: {
+                LHRow.Value(confirmText(.category), value: category?.inboxLabel ?? confirmText(.choose), accessory: .menu)
             }
-            divider
-            valueRow("Date") {
-                Text(InboxFormat.longDay(suggestion.start))
-                    .foregroundStyle(colors.textPrimary)
-            }
+            .accessibilityIdentifier("confirm.category")
+            LHRow.Value(confirmText(.date), value: InboxFormat.longDay(suggestion.start), accessory: .none)
         }
-        .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    /// Me / Spouse on brand tokens (the system segmented control renders grey on iOS 27).
-    private var whoPicker: some View {
-        HStack(spacing: 2) {
-            ForEach([Participant.selfParticipant, .spouse], id: \.self) { option in
-                let selected = participant == option
-                Button {
-                    if reduceMotion { participant = option } else { withAnimation(AppAnimation.quick) { participant = option } }
-                } label: {
-                    Text(option == .spouse ? "Spouse" : "Me")
-                        .font(.subheadline.weight(selected ? .semibold : .regular))
-                        .foregroundStyle(selected ? colors.onAction : colors.textPrimary)
-                        .frame(minWidth: 72, minHeight: 32)
-                        .background(Capsule().fill(selected ? colors.action : Color.clear))
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(option == .spouse ? "Spouse" : "Me")
-                .accessibilityAddTraits(selected ? [.isSelected] : [])
-            }
-        }
-        .padding(3)
-        .background(Capsule().fill(colors.backgroundTertiary))
-        .overlay(Capsule().strokeBorder(colors.border, lineWidth: 1))
-        .accessibilityElement(children: .contain)
-    }
-
-    private var divider: some View {
-        Rectangle().fill(colors.border.opacity(0.7)).frame(height: 0.5).padding(.leading, 16)
-    }
-
-    private func valueRow<Trailing: View>(_ label: String, @ViewBuilder trailing: () -> Trailing) -> some View {
-        // Accessibility sizes: the value drops under its label so "Choose" never truncates.
-        let stacked = dynamicTypeSize.isAccessibilitySize
-        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(spacing: 12))
-        return layout {
-            Text(label).foregroundStyle(colors.textSecondary)
-            if !stacked { Spacer(minLength: 8) }
-            trailing()
-        }
-        .padding(.vertical, stacked ? 8 : 0)
-        .font(.body)
-        .padding(.horizontal, 16)
-        .frame(minHeight: 52)
-    }
-
-    private func menuLabel(_ text: String, isPlaceholder: Bool) -> some View {
-        HStack(spacing: 4) {
-            Text(text)
-                .foregroundStyle(isPlaceholder ? colors.caution : colors.action)
-                .lineLimit(1)
-            Image(systemName: "chevron.up.chevron.down")
-                .font(.footnote.weight(.semibold))
+    private var whoBlock: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(confirmText(.who))
+                .font(.subheadline)
                 .foregroundStyle(colors.textSecondary)
+            LHSegmented(
+                [.init(Participant.selfParticipant, confirmText(.me)), .init(Participant.spouse, confirmText(.spouse))],
+                selection: $participant,
+                accessibilityLabel: confirmText(.who)
+            )
+            .accessibilityIdentifier("confirm.who")
         }
-        .frame(minHeight: 44)
-    }
-
-    private var notesField: some View {
-        TextField("Add a note (optional)", text: $notes, axis: .vertical)
-            .lineLimit(1...4)
-            .font(.body)
-            .foregroundStyle(colors.textPrimary)
-            .padding(16)
-            .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .accessibilityLabel("Notes")
-            .accessibilityIdentifier("confirm.notes")
     }
 
     // MARK: Footer
 
-    private var limitActionsInline: Bool { atLimit && dynamicTypeSize.isAccessibilitySize }
-
-    @ViewBuilder private var pinnedActions: some View {
-        if limitActionsInline {
-            pinnedFooter { unlockButton }
-        } else if atLimit {
-            limitActions
-        } else {
-            regularActions
+    /// Pinned at every size. Below AX: the previewing line or the missing reason, the one tertiary,
+    /// then the primary. At AX: the primary alone, with the §1.20 fade above it.
+    @ViewBuilder private var footer: some View {
+        VStack(spacing: 4) {
+            if atLimit {
+                if !ax { limitExplanation; keepButton }
+                unlockButton
+            } else {
+                if !ax { missingLine; notWorkSheetButton }
+                logButton
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 16)
+        .frame(maxWidth: .infinity)
+        .background(
+            colors.backgroundSecondary
+                .overlay(alignment: .top) {
+                    if !ax { Rectangle().fill(colors.border).frame(height: LHMetrics.hairline) }
+                }
+                .ignoresSafeArea(edges: .bottom)
+        )
+        .overlay(alignment: .top) {
+            if ax {
+                LinearGradient(colors: [colors.backgroundSecondary.opacity(0), colors.backgroundSecondary],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(height: LHSheet<EmptyView, EmptyView, EmptyView>.footerFadeHeight)
+                    .offset(y: -LHSheet<EmptyView, EmptyView, EmptyView>.footerFadeHeight)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
         }
     }
 
-    /// The free plan is full: say what's locked and what stays, one "Unlock Pro", and two ways
-    /// out that lose nothing.
-    private var limitActions: some View {
-        pinnedFooter {
-            VStack(spacing: 10) {
-                limitExplanation
-                unlockButton
-                limitWaysOut
+    /// AX only: the choices that are pinned below AX scroll with the body, after the content.
+    @ViewBuilder private var axScrollingChoices: some View {
+        VStack(spacing: 4) {
+            if atLimit {
+                keepButton
+            } else {
+                missingLine
+                notWorkSheetButton
             }
         }
+        .frame(maxWidth: .infinity)
     }
 
     private var limitExplanation: some View {
@@ -484,107 +351,67 @@ struct SuggestionConfirmSheet: View {
     }
 
     private var unlockButton: some View {
-        UnlockProButton(entry: .inboxLimit, title: "Unlock Pro to add a rental", fullWidth: true, action: openPaywall)
+        UnlockProButton(entry: .inboxLimit, title: confirmText(.unlockRental), fullWidth: true, action: openPaywall)
             .accessibilityIdentifier("confirm.unlockPro")
     }
 
-    private var limitWaysOut: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 24) { keepButton; notWorkButton }
-            VStack(spacing: 0) { keepButton; notWorkButton }
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func pinnedFooter<C: View>(@ViewBuilder _ content: () -> C) -> some View {
-        content()
-            .padding(.horizontal, 20)
-            .padding(.top, 14)
-            .padding(.bottom, 4)
-            .background(
-                colors.background
-                    .overlay(alignment: .top) { Rectangle().fill(colors.border).frame(height: 0.5) }
-                    .ignoresSafeArea(edges: .bottom)
-            )
-    }
-
     private var keepButton: some View {
-        Button("Keep it in my inbox") {
+        Button(confirmText(.keep)) {
             model.keepForPro(suggestion)
             dismiss()
         }
-        .font(.body)
-        .foregroundStyle(colors.action)
-        .frame(minHeight: 44)
+        .buttonStyle(LHButton.tertiary)
         .accessibilityIdentifier("confirm.keepForPro")
     }
 
-    private var notWorkButton: some View {
-        Button("Not rental work") {
+    @ViewBuilder private var missingLine: some View {
+        if let reason = missingReason {
+            Text(reason)
+                .font(.footnote)
+                .foregroundStyle(colors.textSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("confirm.missing")
+        }
+    }
+
+    private var notWorkSheetButton: some View {
+        Button(confirmText(.notWork)) {
             model.dismiss(suggestion)
             dismiss()
         }
-        .font(.body)
-        .foregroundStyle(colors.textSecondary)
-        .frame(minHeight: 44)
+        .buttonStyle(LHButton.destructiveTertiary)
         .accessibilityIdentifier("confirm.dismiss")
     }
 
-    private var regularActions: some View {
-        VStack(spacing: 4) {
-            if let reason = missingReason {
-                Text(reason)
-                    .font(.footnote)
-                    .foregroundStyle(colors.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .padding(.bottom, 4)
-                    .accessibilityIdentifier("confirm.missing")
-            }
-            Button {
-                let result = model.log(suggestion, edits: edits)
-                if result.entryId != nil {
-                    dismiss()
-                } else if case .needsInput(let missing) = result, missing.contains(.plan) {
-                    openPaywall()
-                }
-            } label: {
-                Text(hours > 0 ? "Log \(InboxFormat.hours(hours))" : "Log")
-                    .contentTransition(.numericText(value: hours))
-            }
-            .buttonStyle(InboxPrimaryButtonStyle())
-            .disabled(!missing.isEmpty)
-            .accessibilityIdentifier("confirm.log")
-
-            Button("Not rental work") {
-                model.dismiss(suggestion)
+    private var logButton: some View {
+        Button {
+            let result = model.log(suggestion, edits: edits)
+            if result.entryId != nil {
                 dismiss()
+            } else if case .needsInput(let missing) = result, missing.contains(.plan) {
+                openPaywall()
             }
-            .font(.body)
-            .foregroundStyle(colors.destructive)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .accessibilityIdentifier("confirm.dismiss")
+        } label: {
+            Text(hours > 0
+                 ? String(localized: "confirm.log.hours", defaultValue: "Log \(InboxFormat.hours(hours))", table: "Inbox")
+                 : String(localized: "confirm.log", defaultValue: "Log", table: "Inbox"))
+                .contentTransition(.numericText(value: hours))
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
-        .background(
-            colors.background
-                .overlay(alignment: .top) { Rectangle().fill(colors.border).frame(height: 0.5) }
-                .ignoresSafeArea(edges: .bottom)
-        )
+        .buttonStyle(LHButton.primaryGlass)
+        .disabled(!missing.isEmpty)
+        .accessibilityIdentifier("confirm.log")
     }
 
     private var secondaryActions: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 0) {
             if InboxLogic.muteRule(forTitleOf: suggestion) != nil || InboxLogic.muteRule(forCalendarOf: suggestion) != nil {
-                Button("Don’t suggest events like this") { showMuteOptions = true }
-                    .font(.subheadline)
-                    .foregroundStyle(colors.action)
-                    .frame(minHeight: 44)
+                Button(confirmText(.muteTitle)) { showMuteOptions = true }
+                    .buttonStyle(LHButton.tertiary)
                     .accessibilityIdentifier("confirm.mute")
             }
-            Text("Nothing counts until you log it.")
+            Text(confirmText(.nothingCounts))
                 .font(.footnote)
                 .foregroundStyle(colors.textSecondary)
         }
@@ -595,10 +422,10 @@ struct SuggestionConfirmSheet: View {
         let missing = missing
         guard !missing.isEmpty else { return nil }
         var parts: [String] = []
-        if missing.contains(.hours) { parts.append("the hours") }
-        if missing.contains(.property) { parts.append(model.properties.isEmpty ? "a property (add one in Properties)" : "a property") }
-        if missing.contains(.category) { parts.append("a category") }
-        return "Add \(ListFormatter.localizedString(byJoining: parts)) to log this."
+        if missing.contains(.hours) { parts.append(confirmText(.partHours)) }
+        if missing.contains(.property) { parts.append(model.properties.isEmpty ? confirmText(.partPropertyAdd) : confirmText(.partProperty)) }
+        if missing.contains(.category) { parts.append(confirmText(.partCategory)) }
+        return String(localized: "confirm.missing", defaultValue: "Add \(ListFormatter.localizedString(byJoining: parts)) to log this.", table: "Inbox")
     }
 
     private func mute(_ rule: CaptureMuteRule) {
@@ -606,6 +433,91 @@ struct SuggestionConfirmSheet: View {
         dismiss()
     }
 }
+
+// MARK: - Notice
+
+/// One line of "know this before you log it": a glyph in the intent ink, a `.subheadline.semibold`
+/// title in `textPrimary` (intent inks fail AA as small text on their own wash), and one sentence.
+/// Inner surface (radius 12) on the intent's wash.
+private struct ConfirmNotice: View {
+    enum Tone { case caution, informational }
+
+    let symbol: String
+    let tone: Tone
+    let title: String
+    let message: String
+
+    @Environment(\.colorScheme) private var colorScheme
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: symbol)
+                .font(.body)
+                .foregroundStyle(tone == .caution ? colors.caution : colors.informational)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(colors.textPrimary)
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundStyle(colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(LHMetrics.cardPadding)
+        .background(tone == .caution ? colors.cautionSurface : colors.informationalSurface,
+                    in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Strings
+
+private enum ConfirmText {
+    case notePlaceholder, noteLabel, muteTitle, muteCalendar, cancel, muteMessage
+    case mightTitle, mightBody, notSureTitle, notSureBody, needsHoursTitle, needsHoursBody
+    case hoursLabel, hoursA11y, property, category, date, choose, who, me, spouse
+    case unlockRental, keep, notWork, nothingCounts, partHours, partProperty, partPropertyAdd, partCategory
+}
+
+private func confirmText(_ key: ConfirmText) -> String {
+    switch key {
+    case .notePlaceholder: return String(localized: "confirm.note.placeholder", defaultValue: "Add a note (optional)", table: "Inbox")
+    case .noteLabel: return String(localized: "confirm.note.label", defaultValue: "Notes", table: "Inbox")
+    case .muteTitle: return String(localized: "confirm.mute", defaultValue: "Don’t suggest events like this", table: "Inbox")
+    case .muteCalendar: return String(localized: "confirm.mute.calendar", defaultValue: "Everything from this calendar", table: "Inbox")
+    case .cancel: return String(localized: "confirm.cancel", defaultValue: "Cancel", table: "Inbox")
+    case .muteMessage: return String(localized: "confirm.mute.message", defaultValue: "We stop suggesting them. Hours you already logged stay.", table: "Inbox")
+    case .mightTitle: return String(localized: "confirm.might.title", defaultValue: "Might already be logged", table: "Inbox")
+    case .mightBody: return String(localized: "confirm.might.body", defaultValue: "You have hours around this time. Check Records so it isn’t counted twice.", table: "Inbox")
+    case .notSureTitle: return String(localized: "confirm.notSure.title", defaultValue: "Not sure this is rental work", table: "Inbox")
+    case .notSureBody: return String(localized: "confirm.notSure.body", defaultValue: "Log it only if it was work on a rental.", table: "Inbox")
+    case .needsHoursTitle: return String(localized: "confirm.needsHours.title", defaultValue: "How long did it take?", table: "Inbox")
+    case .needsHoursBody: return String(localized: "confirm.needsHours.body", defaultValue: "We can’t tell the hours from this, so add them below.", table: "Inbox")
+    case .hoursLabel: return String(localized: "confirm.hours.label", defaultValue: "How long were you working?", table: "Inbox")
+    case .hoursA11y: return String(localized: "confirm.hours.a11y", defaultValue: "Hours", table: "Inbox")
+    case .property: return String(localized: "confirm.property", defaultValue: "Property", table: "Inbox")
+    case .category: return String(localized: "confirm.category", defaultValue: "Category", table: "Inbox")
+    case .date: return String(localized: "confirm.date", defaultValue: "Date", table: "Inbox")
+    case .choose: return String(localized: "confirm.choose", defaultValue: "Choose", table: "Inbox")
+    case .who: return String(localized: "confirm.who", defaultValue: "Who did the work", table: "Inbox")
+    case .me: return String(localized: "confirm.me", defaultValue: "Me", table: "Inbox")
+    case .spouse: return String(localized: "confirm.spouse", defaultValue: "Spouse", table: "Inbox")
+    case .unlockRental: return String(localized: "confirm.unlockRental", defaultValue: "Unlock Pro to add a rental", table: "Inbox")
+    case .keep: return String(localized: "confirm.keep", defaultValue: "Keep it in my inbox", table: "Inbox")
+    case .notWork: return String(localized: "inbox.row.notWork", defaultValue: "Not rental work", table: "Inbox")
+    case .nothingCounts: return String(localized: "confirm.nothingCounts", defaultValue: "Nothing counts until you log it.", table: "Inbox")
+    case .partHours: return String(localized: "confirm.part.hours", defaultValue: "the hours", table: "Inbox")
+    case .partProperty: return String(localized: "confirm.part.property", defaultValue: "a property", table: "Inbox")
+    case .partPropertyAdd: return String(localized: "confirm.part.propertyAdd", defaultValue: "a property (add one in Rentals)", table: "Inbox")
+    case .partCategory: return String(localized: "confirm.part.category", defaultValue: "a category", table: "Inbox")
+    }
+}
+
+// MARK: - Which rental?
 
 /// "Which rental?" while the free plan is full: the user's rental, then the `.row` lock for a new
 /// one. Picking the rental they have logs it there; "Unlock Pro" opens the paywall.
@@ -619,80 +531,57 @@ struct LimitRentalPicker: View {
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack {
-                    Text("Which rental?").font(.title2.weight(.semibold)).foregroundStyle(colors.textPrimary)
-                        .accessibilityAddTraits(.isHeader)
-                    Spacer()
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(colors.textPrimary)
-                            .frame(width: 44, height: 44)
-                            .background(Circle().fill(colors.backgroundSecondary))
-                            .overlay(Circle().strokeBorder(colors.border, lineWidth: 0.5))
-                    }
-                    .buttonStyle(.lhPressable)
-                    .accessibilityLabel("Close")
-                }
-                VStack(spacing: 0) {
-                    ForEach(properties) { property in
-                        Button { onPick(property.id) } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "house.fill")
-                                    .font(.system(size: 15))
-                                    .foregroundStyle(colors.action)
-                                    .frame(width: 32, height: 32)
-                                    .background(Circle().fill(colors.actionSurface))
-                                    .accessibilityHidden(true)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(property.name).font(.body.weight(.semibold)).foregroundStyle(colors.textPrimary)
-                                    if !property.address.isEmpty {
-                                        Text(property.address).font(.subheadline).foregroundStyle(colors.textSecondary).lineLimit(1)
-                                    }
-                                }
-                                Spacer()
+        LHSheet(String(localized: "limitPicker.title", defaultValue: "Which rental?", table: "Inbox"), onClose: { dismiss() }) {
+            LHRowGroup {
+                ForEach(properties) { property in
+                    Button { onPick(property.id) } label: {
+                        LHRow.Browse(title: property.name, meta: property.address.isEmpty ? nil : property.address,
+                                     showsChevron: false, leading: { LHRowGlyph(systemImage: "house", tint: .action) })
+                            .overlay(alignment: .trailing) {
                                 if property.id == selected {
-                                    Image(systemName: "checkmark").foregroundStyle(colors.action).accessibilityHidden(true)
+                                    Image(systemName: "checkmark")
+                                        .font(.body.weight(.semibold))
+                                        .foregroundStyle(colors.action)
+                                        .padding(.trailing, 16)
+                                        .accessibilityHidden(true)
                                 }
                             }
-                            .padding(.horizontal, 16)
-                            .frame(minHeight: 60)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(property.id == selected ? .isSelected : [])
-                        .accessibilityIdentifier("limitPicker.property")
-                        Rectangle().fill(colors.border.opacity(0.7)).frame(height: 0.5).padding(.leading, 60)
                     }
-                    LockedPreview(
-                        size: .row,
-                        entry: .inboxLimit,
-                        line: ProGate.lockLine(.inboxLimit),
-                        keeps: ProGate.keepsLine(.inboxLimit, firstPropertyName: properties.first?.name),
-                        onUnlock: onUnlock
-                    ) {
-                        HStack(spacing: 12) {
-                            Circle()
-                                .strokeBorder(colors.textSecondary, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                                .frame(width: 32, height: 32)
-                                .overlay(Image(systemName: "plus").font(.system(size: 13, weight: .semibold)).foregroundStyle(colors.textSecondary))
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Add a new rental").font(.body.weight(.semibold)).foregroundStyle(colors.textPrimary)
-                                Text("From your calendar").font(.subheadline).foregroundStyle(colors.textSecondary)
-                            }
-                            Spacer()
-                        }
-                        .padding(.horizontal, 16)
-                        .frame(minHeight: 60)
-                    }
+                    .buttonStyle(LHButton.press)
+                    .accessibilityAddTraits(property.id == selected ? .isSelected : [])
+                    .accessibilityIdentifier("limitPicker.property")
+                    LHDivider(leadingInset: LHRow.browseDividerInset)
                 }
-                .background(colors.backgroundSecondary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                LockedPreview(
+                    size: .row,
+                    entry: .inboxLimit,
+                    line: ProGate.lockLine(.inboxLimit),
+                    keeps: ProGate.keepsLine(.inboxLimit, firstPropertyName: properties.first?.name),
+                    onUnlock: onUnlock
+                ) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "plus")
+                            .font(.body)
+                            .foregroundStyle(colors.textSecondary)
+                            .frame(width: 36, height: 36)
+                            .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(String(localized: "limitPicker.new", defaultValue: "Add a new rental", table: "Inbox"))
+                                .font(.body)
+                                .foregroundStyle(colors.textPrimary)
+                            Text(String(localized: "limitPicker.newMeta", defaultValue: "From your calendar", table: "Inbox"))
+                                .font(.subheadline)
+                                .foregroundStyle(colors.textSecondary)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(LHRow.insets)
+                    .frame(minHeight: LHMetrics.rowMinHeight)
+                }
             }
-            .padding(20)
         }
-        .background(colors.background.ignoresSafeArea())
+        .background(colors.backgroundSecondary)
         .accessibilityIdentifier("limitPicker")
     }
 }

@@ -1,178 +1,124 @@
 import SwiftUI
 
-/// Flighty result-row anatomy in the Blueprint world: big hours on the left, the category tool,
-/// then source line, bold-noun title, and the category or badges.
+// MARK: - The Inbox row (standard §1.3)
+//
+// One `LHRow.Action` fed from a suggestion: a 22pt control in a 44 frame, the title ("Plumber at
+// Pine Cabin"), one meta line (source glyph, time range, one tag) and the hours at the trailing
+// edge. No tool render, no pill, no date (the day header above carries it). Swipes are the
+// caller's system `.swipeActions`; the row tap opens the confirm sheet.
+
 struct SuggestionRowView: View {
     let suggestion: Suggestion
     let propertyName: String?
     let badges: SuggestionBadges
-    var now: Date = InboxClock.now()
-    /// WP-P: the free plan is full and this item is at a new rental.
+    /// The free plan is full and this item is at a new rental.
     var limit: InboxRowLimit = .none
+    /// Whether the control confirms at once (`canQuickLog`) or opens the sheet.
+    var quick = false
+    /// `rowConfirm`: the control has filled and the row is about to leave.
+    var confirmed = false
+    var now: Date = InboxClock.now()
+    var onControl: () -> Void = {}
+    var onOpen: (() -> Void)? = nil
+    var onNotWork: (() -> Void)? = nil
 
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
+    private var hours: Double? { badges.needsHours ? nil : suggestion.proposedHours }
+
     var body: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 10) {
-                        hoursColumn
-                        CategoryToolTile(category: suggestion.proposedCategory, size: 36)
-                    }
-                    textColumn
-                }
-            } else {
-                HStack(alignment: .center, spacing: 10) {
-                    hoursColumn.frame(width: 52)
-                    CategoryToolTile(category: suggestion.proposedCategory, size: 36)
-                    textColumn
-                }
-            }
+        LHRow.Action(
+            title: InboxFormat.rowTitle(suggestion, propertyName: propertyName),
+            sourceSymbol: InboxFormat.kindSymbol(suggestion.kind),
+            meta: InboxFormat.rowMeta(suggestion),
+            tag: shownTag,
+            hours: hours,
+            control: confirmed ? .confirmed : .open,
+            controlLabel: Self.controlLabel(quick: quick, hours: hours),
+            onControl: onControl,
+            onOpen: onOpen,
+            identifier: "inbox.row.\(suggestion.sourceKey)"
+        )
+        .accessibilityLabel(Self.accessibilityLabel(for: suggestion, propertyName: propertyName, badges: badges, now: now, limit: limit))
+        .accessibilityHint(String(localized: "inbox.row.hint", defaultValue: "Opens the details to confirm", table: "Inbox"))
+        .accessibilityAddTraits(.isButton)
+        .modifier(NotWorkAction(action: onNotWork))
+    }
+
+    /// At accessibility sizes the row stacks title, time, tag and hours, and one item took a third of
+    /// the screen (D2 asks for 30%). A plain category tag is the least needed of them, so it drops
+    /// there; a status tag ("Needs hours", "Not sure", "Might be logged") stays.
+    private var shownTag: LHTag? {
+        let hasStatus = limit != .none || badges.mightAlreadyBeLogged || badges.needsHours || badges.notSure
+        if typeSize.isAccessibilitySize && !hasStatus { return nil }
+        return Self.tag(suggestion, badges: badges, limit: limit, colors: colors)
+    }
+
+    static func controlLabel(quick: Bool, hours: Double?) -> String {
+        guard quick else {
+            return String(localized: "inbox.row.review", defaultValue: "Review and confirm", table: "Inbox")
         }
-        .multilineTextAlignment(.leading)
-        .padding(.vertical, 12)
-        .frame(minHeight: 76)
-        .contentShape(Rectangle())
+        return String(localized: "inbox.row.confirmHours", defaultValue: "Confirm \(InboxFormat.spokenHours(hours ?? 0))", table: "Inbox")
     }
 
-    @ViewBuilder private var hoursColumn: some View {
-        if let hours = suggestion.proposedHours, hours > 0, !badges.needsHours {
-            let minutes = Int((hours * 60).rounded())
-            let h = minutes / 60
-            let m = minutes % 60
-            VStack(spacing: 0) {
-                if h > 0 {
-                    Text("\(h)h")
-                        .font(.system(.title2, design: .rounded, weight: .bold))
-                        .foregroundStyle(colors.textPrimary)
-                }
-                if m > 0 {
-                    Text("\(m)m")
-                        .font(.system(h > 0 ? .callout : .title2, design: .rounded, weight: h > 0 ? .semibold : .bold))
-                        .foregroundStyle(h > 0 ? colors.textSecondary : colors.textPrimary)
-                }
-            }
-            .monospacedDigit()
-            .lineLimit(1)
-            .minimumScaleFactor(0.7)
-        } else {
-            Text("—")
-                .font(.system(.title2, design: .rounded, weight: .semibold))
-                .foregroundStyle(colors.textSecondary)
-        }
-    }
-
-    private var textColumn: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(alignment: .firstTextBaseline, spacing: 5) {
-                Image(systemName: InboxFormat.kindSymbol(suggestion.kind))
-                    // Scales with Dynamic Type (AX3: it sat tiny beside 2-line labels).
-                    .font(.caption2.weight(.semibold))
-                    .imageScale(.medium)
-                Text(InboxFormat.sourceLine(suggestion, now: now))
-                    .lineLimit(dynamicTypeSize >= .xxLarge ? 3 : 2)   // end times wrap, never "6:…"
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .font(.subheadline)
-            .foregroundStyle(colors.textSecondary)
-
-            title
-                .font(.body)
-                .foregroundStyle(colors.textPrimary)
-                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)   // AX: the whole title wraps
-                .fixedSize(horizontal: false, vertical: true)
-
-            detailLine
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var title: Text {
-        let noun = Text(suggestion.title).fontWeight(.semibold)
-        guard let propertyName else { return noun }
-        return Text("\(noun) at \(Text(propertyName).fontWeight(.semibold))")
-    }
-
-    /// The classifier's category on every row; status words (not sure, might be logged, needs
-    /// hours) follow it. A missing property is asked for on Confirm, not flagged with a chip.
-    @ViewBuilder private var detailLine: some View {
+    /// One tag: a status word replaces the category. A missing property is asked for on the sheet,
+    /// not flagged here.
+    static func tag(_ suggestion: Suggestion, badges: SuggestionBadges, limit: InboxRowLimit, colors: AdaptiveColors) -> LHTag? {
         switch limit {
         case .waiting:
-            Label(InboxProLimit.waitingLabel, systemImage: "clock")
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(colors.textSecondary)
-                .accessibilityIdentifier("inbox.row.waitingOnPro")
+            return LHTag(String(localized: "inbox.tag.waitingOnPro", defaultValue: "Waiting on Pro", table: "Inbox"), tone: .neutral)
         case .newPlace:
-            if let category = suggestion.proposedCategory {
-                Text(category.inboxLabel)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(category.inboxInk(colors))
-            }
-            FlowBadges(items: [(InboxProLimit.newPlaceLabel, .info)] + badgeItems)
+            return LHTag(String(localized: "inbox.tag.newPlace", defaultValue: "New place", table: "Inbox"), tone: .informational)
         case .none:
-            regularDetailLine
+            break
         }
+        if badges.mightAlreadyBeLogged {
+            return LHTag(String(localized: "inbox.tag.mightBeLogged", defaultValue: "Might be logged", table: "Inbox"), tone: .informational)
+        }
+        if badges.needsHours {
+            return LHTag(String(localized: "inbox.tag.needsHours", defaultValue: "Needs hours", table: "Inbox"), tone: .caution)
+        }
+        if badges.notSure {
+            return LHTag(String(localized: "inbox.tag.notSure", defaultValue: "Not sure", table: "Inbox"), tone: .neutral)
+        }
+        guard let category = suggestion.proposedCategory else { return nil }
+        return LHTag(category.inboxLabel, tone: .custom(ink: colors.categoryInk(category), wash: colors.categoryWash(category)))
     }
 
-    @ViewBuilder private var regularDetailLine: some View {
-        if let category = suggestion.proposedCategory {
-            Text(category.inboxLabel)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(category.inboxInk(colors))
-        }
-        if badges.notSure || badges.mightAlreadyBeLogged || badges.needsHours {
-            FlowBadges(items: badgeItems)
-        }
-    }
-
-    private var badgeItems: [(String, InboxBadge.Tone)] {
-        var items: [(String, InboxBadge.Tone)] = []
-        if badges.notSure { items.append(("Not sure", .caution)) }
-        if badges.mightAlreadyBeLogged { items.append(("Might already be logged", .info)) }
-        if badges.needsHours { items.append(("Needs hours", .caution)) }
-        return items
-    }
-
-    /// VoiceOver sentence for the whole row.
+    /// VoiceOver sentence for the whole row: "Plumber at Pine Cabin, Calendar, 12 to 2, Repairs, 2 hours".
     static func accessibilityLabel(for suggestion: Suggestion, propertyName: String?, badges: SuggestionBadges, now: Date,
                                    limit: InboxRowLimit = .none) -> String {
-        var parts: [String] = []
-        if let hours = suggestion.proposedHours, hours > 0, !badges.needsHours {
-            parts.append(InboxFormat.spokenHours(hours))
-        } else {
-            parts.append("Hours needed")
-        }
-        parts.append(propertyName.map { "\(suggestion.title) at \($0)" } ?? suggestion.title)
+        var parts: [String] = [InboxFormat.rowTitle(suggestion, propertyName: propertyName)]
         parts.append(InboxFormat.sourceLine(suggestion, now: now).replacingOccurrences(of: "–", with: " to "))
         if let category = suggestion.proposedCategory { parts.append(category.inboxLabel) }
         if badges.notSure { parts.append(ConfidenceBand.notSureLabel) }
-        if badges.mightAlreadyBeLogged { parts.append("Might already be logged") }
+        if badges.mightAlreadyBeLogged {
+            parts.append(String(localized: "inbox.a11y.mightBeLogged", defaultValue: "Might already be logged", table: "Inbox"))
+        }
         switch limit {
         case .waiting: parts.append(InboxProLimit.waitingLabel)
         case .newPlace: parts.append(InboxProLimit.newPlaceLabel)
         case .none: break
         }
-        return parts.joined(separator: ". ")
+        if let hours = suggestion.proposedHours, hours > 0, !badges.needsHours {
+            parts.append(InboxFormat.spokenHours(hours))
+        } else {
+            parts.append(String(localized: "inbox.a11y.hoursNeeded", defaultValue: "Hours needed", table: "Inbox"))
+        }
+        return parts.joined(separator: ", ")
     }
 }
 
-/// Badges that wrap onto a second line instead of truncating.
-private struct FlowBadges: View {
-    let items: [(String, InboxBadge.Tone)]
-
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 6) {
-                ForEach(items, id: \.0) { InboxBadge(text: $0.0, tone: $0.1) }
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(items, id: \.0) { InboxBadge(text: $0.0, tone: $0.1) }
-            }
+private struct NotWorkAction: ViewModifier {
+    let action: (() -> Void)?
+    func body(content: Content) -> some View {
+        if let action {
+            content.accessibilityAction(named: Text(String(localized: "inbox.row.notWork", defaultValue: "Not rental work", table: "Inbox")), action)
+        } else {
+            content
         }
-        .padding(.top, 2)
     }
 }
 
@@ -181,6 +127,6 @@ enum InboxRowLimit: Equatable {
     case none
     /// At a rental the user doesn't have: "New place".
     case newPlace
-    /// Kept for later: "Waiting on Pro" (a clock, textSecondary).
+    /// Kept for later: "Waiting on Pro".
     case waiting
 }

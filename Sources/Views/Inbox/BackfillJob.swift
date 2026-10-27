@@ -68,7 +68,10 @@ final class BackfillJob: ObservableObject {
     /// The Inbox shows its empty state only when no look-back header has something to say
     /// (a stopped or blocked look-back keeps Run again / Settings even with nothing found).
     static func showsEmptyState(visibleIsEmpty: Bool, phase: Phase) -> Bool {
-        visibleIsEmpty && !showsHeader(phase)
+        // The house page (§H.5) also carries a stopped or blocked look-back as a banner; only a
+        // running scan keeps the list, whose header owns the progress and the Cancel.
+        if case .scanning = phase { return false }
+        return visibleIsEmpty
     }
 
     static func showsHeader(_ phase: Phase) -> Bool {

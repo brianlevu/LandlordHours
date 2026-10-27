@@ -7,6 +7,13 @@ extension Notification.Name {
     static let captureSuggestionsDidChange = Notification.Name("LandlordHours.captureSuggestionsDidChange")
 }
 
+/// One entry saved by a batch confirm.
+struct InboxLoggedItem: Equatable {
+    var suggestion: Suggestion
+    var entryId: UUID
+    var hours: Double
+}
+
 /// A row action that has ALREADY been saved and can still be undone for a few seconds.
 /// Saving first means a crash, a watchdog kill or a force-quit inside the Undo window loses
 /// nothing; Undo reverses the write through the normal delete path.
@@ -14,12 +21,15 @@ enum InboxUndoableAction: Equatable {
     /// A new entry was saved for this suggestion.
     case logged(Suggestion, entryId: UUID, hours: Double)
     case dismissed(Suggestion)
+    /// "Confirm N likely": one toast, one Undo for all of them.
+    case loggedBatch([InboxLoggedItem])
     /// The rule and every suggestion key it hid.
     case muted(Suggestion, CaptureMuteRule, hiddenKeys: Set<String>)
 
     var suggestion: Suggestion {
         switch self {
         case .logged(let s, _, _), .dismissed(let s), .muted(let s, _, _): return s
+        case .loggedBatch(let items): return items[0].suggestion
         }
     }
 }
@@ -103,10 +113,15 @@ final class InboxViewModel: ObservableObject {
 
     var sections: [InboxSection] { InboxLogic.sections(suggestions, now: now(), calendar: calendar) }
 
+    /// The rows "Confirm N likely" would log (§1.3 Batch): sure, complete, nothing looks already logged.
+    var likelyToConfirm: [Suggestion] {
+        InboxLogic.likely(visible, propertyIds: Set(properties.map(\.id)))
+    }
+
     /// Tab badge: what still needs the user.
     var badgeCount: Int { visible.count }
 
-    /// Pending backfill items (the blueprint banner).
+    /// Pending backfill items (the "from your last 90 days" row).
     var backfillCount: Int { visible.filter(\.isBackfill).count }
 
     var properties: [RentalProperty] { app?.properties ?? [] }
@@ -142,7 +157,7 @@ final class InboxViewModel: ObservableObject {
         if sheetSuggestion?.sourceKey == suggestion.sourceKey { sheetSuggestion = nil }
         waitList.add(suggestion.sourceKey)
         changed()
-        present(InboxToast(message: "Kept in your inbox", kind: .neutral, undo: nil))
+        present(InboxToast(message: String(localized: "inbox.toast.kept", defaultValue: "Kept in your inbox", table: "Inbox"), kind: .neutral, undo: nil))
     }
 
     /// The paywall about adding a rental, opened from the Inbox.
@@ -180,15 +195,47 @@ final class InboxViewModel: ObservableObject {
     /// "might already be logged" at tap time against current entries.
     @discardableResult
     func swipeLog(_ suggestion: Suggestion) -> InboxSwipeOutcome {
-        var current = latest(suggestion)
-        if let entries = app?.timeEntries {
-            current.mightAlreadyBeLogged = CaptureReconciler.mightAlreadyBeLogged(current, in: entries, calendar: calendar)
-        }
+        let current = refreshed(suggestion)
         guard canQuickLog(current) else {
             sheetSuggestion = current
             return .needsSheet
         }
         return save(current, edits: SuggestionEdits()).entryId != nil ? .logged : .failed
+    }
+
+    /// "Confirm N likely" (§1.3 Batch): logs every row that is sure and complete, with one toast
+    /// "Logged 3" and one Undo. Rows that need a decision (or now look already logged) stay.
+    /// Returns how many were saved.
+    @discardableResult
+    func confirmLikely() -> Int {
+        guard let store, let app else {
+            showProblem(Self.noProfileMessage)
+            return 0
+        }
+        var saved: [InboxLoggedItem] = []
+        for candidate in likelyToConfirm {
+            let current = refreshed(candidate)
+            guard canQuickLog(current), !badges(for: current).notSure else { continue }
+            if case .created(let entryId) = app.confirm(current, edits: SuggestionEdits(), store: store) {
+                waitList.remove(current.sourceKey)
+                saved.append(InboxLoggedItem(suggestion: current, entryId: entryId, hours: current.proposedHours ?? 0))
+            }
+        }
+        guard !saved.isEmpty else { return 0 }
+        let message = saved.count == 1
+            ? String(localized: "inbox.toast.logged", defaultValue: "Logged \(InboxFormat.hours(saved[0].hours))", table: "Inbox")
+            : String(localized: "inbox.toast.loggedMany", defaultValue: "Logged \(saved.count)", table: "Inbox")
+        finish(InboxToast(message: message, kind: .success, undo: .loggedBatch(saved)))
+        return saved.count
+    }
+
+    /// The suggestion as it is now, with "might already be logged" re-checked against current entries.
+    private func refreshed(_ suggestion: Suggestion) -> Suggestion {
+        var current = latest(suggestion)
+        if let entries = app?.timeEntries {
+            current.mightAlreadyBeLogged = CaptureReconciler.mightAlreadyBeLogged(current, in: entries, calendar: calendar)
+        }
+        return current
     }
 
     /// The confirm sheet's "Log Xh". Returns what happened: `.created` / `.alreadyRecorded` mean
@@ -211,7 +258,8 @@ final class InboxViewModel: ObservableObject {
         guard let store else { return showProblem(Self.noProfileMessage) }
         store.dismiss(key: current.sourceKey, reason: .notLandlordWork)
         waitList.remove(current.sourceKey)
-        finish(InboxToast(message: "Marked not rental work", kind: .neutral, undo: .dismissed(current)))
+        finish(InboxToast(message: String(localized: "inbox.toast.notWork", defaultValue: "Marked not rental work", table: "Inbox"),
+                          kind: .neutral, undo: .dismissed(current)))
     }
 
     /// "Don't suggest events like this": hides every matching pending item.
@@ -223,7 +271,8 @@ final class InboxViewModel: ObservableObject {
         hidden.insert(current.sourceKey)
         store.addMuteRule(rule)
         store.dismiss(key: current.sourceKey, reason: .muted)
-        finish(InboxToast(message: "We won’t suggest events like this", kind: .neutral,
+        finish(InboxToast(message: String(localized: "inbox.toast.muted", defaultValue: "We won’t suggest events like this", table: "Inbox"),
+                          kind: .neutral,
                           undo: .muted(current, rule, hiddenKeys: hidden)))
     }
 
@@ -239,6 +288,13 @@ final class InboxViewModel: ObservableObject {
                 app.deleteTimeEntry(entry)
             }
             store.restorePending(keys: [suggestion.sourceKey])
+        case .loggedBatch(let items):
+            for item in items {
+                if let app, let entry = app.timeEntries.first(where: { $0.id == item.entryId }) {
+                    app.deleteTimeEntry(entry)
+                }
+            }
+            store.restorePending(keys: Set(items.map(\.suggestion.sourceKey)))
         case .dismissed(let suggestion):
             store.restorePending(keys: [suggestion.sourceKey])
         case .muted(_, let rule, let hiddenKeys):
@@ -264,7 +320,9 @@ final class InboxViewModel: ObservableObject {
         return missing
     }
 
-    static let noProfileMessage = "Couldn’t save. Sign in to a profile and try again."
+    static var noProfileMessage: String {
+        String(localized: "inbox.problem.noProfile", defaultValue: "Couldn’t save. Sign in to a profile and try again.", table: "Inbox")
+    }
 
     // MARK: Private
 
@@ -281,11 +339,11 @@ final class InboxViewModel: ObservableObject {
         case .created(let entryId):
             waitList.remove(suggestion.sourceKey)
             let hours = edits.hours ?? suggestion.proposedHours ?? 0
-            finish(InboxToast(message: "Logged \(InboxFormat.hours(hours))", kind: .success,
+            finish(InboxToast(message: String(localized: "inbox.toast.logged", defaultValue: "Logged \(InboxFormat.hours(hours))", table: "Inbox"), kind: .success,
                               undo: .logged(suggestion, entryId: entryId, hours: hours)))
         case .alreadyRecorded:
             waitList.remove(suggestion.sourceKey)
-            finish(InboxToast(message: "Already in your records", kind: .neutral, undo: nil))
+            finish(InboxToast(message: String(localized: "inbox.toast.already", defaultValue: "Already in your records", table: "Inbox"), kind: .neutral, undo: nil))
         case .needsInput(let missing):
             reload()
             showProblem(Self.message(for: missing))
@@ -301,10 +359,16 @@ final class InboxViewModel: ObservableObject {
 
     static func message(for missing: Set<CaptureConfirmField>) -> String {
         if missing.contains(.profile) { return noProfileMessage }
-        if missing.contains(.plan) { return "Not saved. This one needs Pro." }
-        if missing.contains(.property) { return "Not saved. Pick a property for this one." }
-        if missing.contains(.hours) { return "Not saved. Add the hours for this one." }
-        return "Not saved. Add a category for this one."
+        if missing.contains(.plan) {
+            return String(localized: "inbox.problem.needsPro", defaultValue: "Not saved. This one needs Pro.", table: "Inbox")
+        }
+        if missing.contains(.property) {
+            return String(localized: "inbox.problem.needsProperty", defaultValue: "Not saved. Pick a property for this one.", table: "Inbox")
+        }
+        if missing.contains(.hours) {
+            return String(localized: "inbox.problem.needsHours", defaultValue: "Not saved. Add the hours for this one.", table: "Inbox")
+        }
+        return String(localized: "inbox.problem.needsCategory", defaultValue: "Not saved. Add a category for this one.", table: "Inbox")
     }
 
     private func latest(_ suggestion: Suggestion) -> Suggestion {
