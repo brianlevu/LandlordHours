@@ -34,6 +34,30 @@ struct ArchivedGroup: Codable, Equatable, Identifiable {
         lhs.id == rhs.id && lhs.status == rhs.status && lhs.entries.map(\.id) == rhs.entries.map(\.id)
             && lhs.properties.map(\.id) == rhs.properties.map(\.id) && lhs.pushedAsideNames == rhs.pushedAsideNames
     }
+
+    init(id: String, status: GroupStatus, source: GroupSource, entries: [TimeEntry], properties: [RentalProperty],
+         categories: [CustomCategory], unparsedRecords: [ZoneRecord] = [], createdAt: Date,
+         pushedAsideNames: Set<String> = [], settingsOnly: Bool = false) {
+        self.id = id; self.status = status; self.source = source; self.entries = entries; self.properties = properties
+        self.categories = categories; self.unparsedRecords = unparsedRecords; self.createdAt = createdAt
+        self.pushedAsideNames = pushedAsideNames; self.settingsOnly = settingsOnly
+    }
+
+    /// A status this build doesn't know reads as `aside` here: the records stay listed in Earlier
+    /// records, never merged and never lost because one value is unfamiliar.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        status = GroupStatus(rawValue: try c.decode(String.self, forKey: .status)) ?? .aside
+        source = try c.decode(GroupSource.self, forKey: .source)
+        entries = try c.decode([TimeEntry].self, forKey: .entries)
+        properties = try c.decode([RentalProperty].self, forKey: .properties)
+        categories = try c.decode([CustomCategory].self, forKey: .categories)
+        unparsedRecords = try c.decodeIfPresent([ZoneRecord].self, forKey: .unparsedRecords) ?? []
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        pushedAsideNames = try c.decodeIfPresent(Set<String>.self, forKey: .pushedAsideNames) ?? []
+        settingsOnly = try c.decodeIfPresent(Bool.self, forKey: .settingsOnly) ?? false
+    }
 }
 
 enum RemovalReason: String, Codable {

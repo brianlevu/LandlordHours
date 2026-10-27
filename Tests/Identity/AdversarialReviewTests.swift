@@ -682,4 +682,30 @@ final class AdversarialReview4Tests: XCTestCase {
     // whole: every answer in it is forgotten, and the next pull writes a fresh file over it. An
     // archive group with that status silently disappears from Earlier records.
 
+    func testAnUnknownGroupStatusForgetsEveryAnswerAndOverwritesGroupsJSON() async throws {
+        let (h, _, other, _) = try await heldHarness()
+        h.engine.answer(.aside, group: other)
+        let url = MigrationFiles.groupsURL(root: sandbox.root)
+        var text = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertTrue(text.contains("\"status\":\"aside\""))
+        text = text.replacingOccurrences(of: "\"status\":\"aside\"", with: "\"status\":\"spouse\"")
+        try text.write(to: url, atomically: true, encoding: .utf8)
+
+        let loaded = GroupsFile.load(root: sandbox.root)
+        XCTAssertNotNil(loaded, "one unknown status makes the whole groups.json unreadable")
+        XCTAssertEqual(loaded?.group(local)?.status, .primary, "the primary answer is lost with it")
+
+        h.engine.applyPull(ZoneDelta(changed: [], deleted: [:], tokenData: nil, incomplete: false))
+        let after = GroupsFile.load(root: sandbox.root)
+        XCTAssertNotNil(after?.group(other), "the next pull rewrote groups.json without the other set's answer")
+        XCTAssertEqual(after?.primaryId, local, "the primary id is gone from the rewritten file (\(after?.primaryId ?? "nil"))")
+
+        // The same for an archive group file.
+        let archiveURL = SuggestionStore.directory(forUserId: other, baseDirectory: MigrationFiles.archiveDirectory(root: sandbox.root)).appendingPathExtension("json")
+        var archive = try String(contentsOf: archiveURL, encoding: .utf8)
+        archive = archive.replacingOccurrences(of: "\"status\":\"aside\"", with: "\"status\":\"spouse\"")
+        try archive.write(to: archiveURL, atomically: true, encoding: .utf8)
+        h.earlier.reload()
+        XCTAssertNotNil(h.earlier.group(other), "the archive group vanished from Earlier records (its file is still on disk)")
+    }
 }

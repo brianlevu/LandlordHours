@@ -177,6 +177,14 @@ enum GroupStatus: String, Codable {
     case aside
 
     var isLive: Bool { self == .primary || self == .combine }
+
+    /// A status this build doesn't know (one an older or newer build wrote) reads as `pending` in
+    /// groups.json: asked again, never merged, never dropped. One unknown value never makes the
+    /// whole file unreadable. (Archive files read it as `aside`; see `ArchivedGroup`.)
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = GroupStatus(rawValue: raw) ?? .pending
+    }
 }
 
 enum GroupSource: String, Codable { case device, iCloud, both }
@@ -216,7 +224,14 @@ struct GroupsFile: Codable, Equatable {
     }
 
     func save(root: URL) throws {
-        try MigrationFiles.writeDurably(try JSONEncoder.identity.encode(self), to: MigrationFiles.groupsURL(root: root))
+        let url = MigrationFiles.groupsURL(root: root)
+        // Never write over a groups.json this build can't read: the answers in it are kept aside.
+        if let existing = try? Data(contentsOf: url), (try? JSONDecoder.identity.decode(GroupsFile.self, from: existing)) == nil {
+            let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+            let keep = url.deletingLastPathComponent().appendingPathComponent("groups.unreadable-\(stamp).json")
+            try MigrationFiles.writeDurably(existing, to: keep)
+        }
+        try MigrationFiles.writeDurably(try JSONEncoder.identity.encode(self), to: url)
     }
 }
 
