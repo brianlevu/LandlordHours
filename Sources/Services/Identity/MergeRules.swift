@@ -77,6 +77,19 @@ enum MergeRules {
         return live.first { $0.id != entry.id && $0.sourceKey == key }
     }
 
+    /// R19 on pull, newer side: the live entry takes the pulled edit's content and keeps its own
+    /// id and its photos (attachments never sync), so a newer edit made on the other device is
+    /// never dropped.
+    static func adoptEdit(_ pulled: TimeEntry, into live: TimeEntry) -> TimeEntry? {
+        guard let data = try? JSONEncoder().encode(pulled),
+              var object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        object["id"] = live.id.uuidString
+        guard let rewritten = try? JSONSerialization.data(withJSONObject: object),
+              var adopted = try? JSONDecoder().decode(TimeEntry.self, from: rewritten), adopted.id == live.id else { return nil }
+        adopted.attachments = live.attachments
+        return adopted
+    }
+
     // MARK: R3 — tombstones
 
     static func applyTombstones<T: IdentityRecord>(_ records: [T], names: Set<String>) -> (kept: [T], removed: [T]) {

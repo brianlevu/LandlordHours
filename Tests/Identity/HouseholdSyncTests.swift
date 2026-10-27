@@ -999,6 +999,28 @@ final class RecordLossRegressionTests: XCTestCase {
         b.engine.applyPull(ZoneDelta(changed: [restored], deleted: [:], tokenData: nil, incomplete: false))
         XCTAssertTrue(b.entries.contains { $0.id == target.id }, "the put-back hours reach the phone that deleted them")
     }
+
+    /// R19 on pull: a newer edit to the same calendar event from a 2.0.x phone (its own capture id)
+    /// was dropped with no copy anywhere.
+    func testANewerEditOfTheSameCalendarEventIsKeptNotDropped() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let h = EngineHarness(sandbox, zone: FakeZoneSource())
+        try h.device()
+        _ = await h.cloud()
+        var live = h.entries
+        live[0].sourceKey = "cal:event-42"
+        h.live.replaceLive(entries: live, properties: h.properties, categories: h.live.liveCategories)
+        var theirs = TimeEntry(propertyId: live[0].propertyId, participant: live[0].participant, category: live[0].category,
+                               hours: live[0].hours + 2, date: live[0].date, notes: "fixed on the old phone")
+        theirs.sourceKey = "cal:event-42"
+        theirs.modifiedAt = live[0].modifiedAt.addingTimeInterval(3600)
+        let record = ZoneRecord(CloudKitSyncService.record(for: theirs, zoneID: IdentityZone.zoneID, appUserId: local))
+        h.engine.applyPull(ZoneDelta(changed: [record], deleted: [:], tokenData: nil, incomplete: false))
+        let event = h.entries.filter { $0.sourceKey == "cal:event-42" }
+        XCTAssertEqual(event.count, 1, "still one entry for one event")
+        XCTAssertEqual(event.first?.hours, theirs.hours, "the newer edit is kept")
+        XCTAssertEqual(event.first?.notes, theirs.notes)
+    }
 }
 
 /// A live set that notes the steady-state token each time the pull writes the live set.

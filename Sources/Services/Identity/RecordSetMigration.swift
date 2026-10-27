@@ -993,9 +993,15 @@ final class RecordSetMigration {
                 }
                 if var entry = record.entry {
                     if spouse { entry = MergeRules.swapParticipants([entry])[0] }
-                    if MergeRules.liveMatch(forPulled: entry, in: entries) != nil {
-                        // R19: the same calendar event under another id; never a second entry.
+                    if let match = MergeRules.liveMatch(forPulled: entry, in: entries) {
+                        // R19: the same calendar event under another id; never a second entry. A
+                        // newer edit made there lands on the live entry instead of being dropped.
                         outcome.dedupedByKey += 1
+                        if entry.modifiedAt > match.modifiedAt, let i = entries.firstIndex(where: { $0.id == match.id }),
+                           let adopted = MergeRules.adoptEdit(entry, into: match) {
+                            entries[i] = adopted
+                            outcome.liveChanged += 1
+                        }
                         continue
                     }
                     entries = MergeRules.union(entries, [entry])
