@@ -65,6 +65,36 @@ extension EnvironmentValues {
     }
 }
 
+private struct PaneWindowHeightKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
+extension EnvironmentValues {
+    /// The window's height in a two-pane or stacked window (0 in compact). The bar floats at the
+    /// window's foot, so a pane's content may reach `paneWindowHeight - PaneMetrics.barClearance`
+    /// at rest whatever the hosted safe area says (`PaneReach`).
+    var paneWindowHeight: CGFloat {
+        get { self[PaneWindowHeightKey.self] }
+        set { self[PaneWindowHeightKey.self] = newValue }
+    }
+}
+
+/// How far a work pane's content column may reach at rest: the visible height less 12pt of air,
+/// and never past the top of the floating bar. The hosted safe area does not always include the
+/// floating bar (a 1000 x 645 window measured a card 14pt into the glass, gate J r2), so the
+/// window's own foot is the second bound.
+enum PaneReach {
+    static let air: CGFloat = 12
+
+    static func room(visible: CGFloat, columnTop: CGFloat, windowHeight: CGFloat) -> CGFloat {
+        var room = visible - air
+        if windowHeight > 0 {
+            room = min(room, windowHeight - PaneMetrics.barClearance - air + 2 - columnTop)
+        }
+        return max(0, room)
+    }
+}
+
 // MARK: - What the right pane shows over its tab's root
 
 /// The right pane's own stack: the tab's root, or a detail / Log time opened over it in place.

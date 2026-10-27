@@ -28,6 +28,8 @@ struct HousePane: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @SceneStorage("today.focus") private var rememberedFocus = ""
     @State private var slideEdge: Edge = .trailing
+    /// The scrolling column's hero and number block height (the shelf starts below the fold).
+    @State private var leadHeight: CGFloat = 0
 
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     private var ax: Bool { typeSize.isAccessibilitySize }
@@ -130,29 +132,36 @@ struct HousePane: View {
 
     /// Not even the floor fits (AX on a short pane, the propped Duo at AX): the whole column
     /// scrolls, starting at the top. The hero, the number and the pace sentence are read first and
-    /// whole; nothing is faded or blurred at either edge.
+    /// whole; nothing is faded or blurred at either edge. The shelf starts below the fold, never
+    /// half in view, so no label is cut at rest; the scroll indicator flashes once to say there is
+    /// more (gate J r2, Brian's open question 3).
     @ViewBuilder private func scrolling(_ shelf: HouseShelf, _ shown: HouseShelfItem?) -> some View {
         let side = heroSides(shelf, shown).last ?? heroSide
-        ScrollView {
-            VStack(spacing: 0) {
-                if stacked {
-                    heroRow(shelf, shown, side: side)
-                } else {
-                    hero(shelf, shown, side: side)
-                    numberBlock(shelf, shown)
-                        .padding(.top, numberLift(shown, side: side))
+        GeometryReader { g in
+            ScrollView {
+                VStack(spacing: 0) {
+                    VStack(spacing: 0) {
+                        if stacked {
+                            heroRow(shelf, shown, side: side)
+                        } else {
+                            hero(shelf, shown, side: side)
+                            numberBlock(shelf, shown)
+                                .padding(.top, numberLift(shown, side: side))
+                        }
+                    }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { leadHeight = $0 }
+                    shelfView(shelf)
+                        .padding(.top, max(ax ? 12 : 16, g.size.height - leadHeight + 8))
                 }
-                shelfView(shelf)
-                    .padding(.top, ax ? 12 : 16)
+                .padding(.bottom, 12)
+                .frame(maxWidth: PaneMetrics.contentCap)
+                .frame(maxWidth: .infinity)
             }
-            .padding(.bottom, 12)
-            .frame(maxWidth: PaneMetrics.contentCap)
-            .frame(maxWidth: .infinity)
+            .scrollIndicators(.automatic)
+            .scrollIndicatorsFlash(onAppear: true)
+            .scrollBounceBehavior(.basedOnSize)
+            .modifier(NoScrollEdgeEffect())
         }
-        .scrollIndicators(.automatic)
-        .scrollIndicatorsFlash(onAppear: true)
-        .scrollBounceBehavior(.basedOnSize)
-        .modifier(NoScrollEdgeEffect())
     }
 
     /// Stacked: the hero beside the number block.

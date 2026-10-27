@@ -134,6 +134,8 @@ struct WorkPaneEnvironment: ViewModifier {
     var foldInset: CGFloat = 0
     /// The gutter inside the pane (16 on the Duo and under 440, else 24).
     var gutter: CGFloat = 16
+    /// The window's height (two-pane and stacked), so the pane knows where the bar floats.
+    var windowHeight: CGFloat = 0
 
     func body(content: Content) -> some View {
         content
@@ -147,6 +149,7 @@ struct WorkPaneEnvironment: ViewModifier {
             .environment(\.layoutBand, band)
             .environment(\.paneFoldInset, foldInset)
             .environment(\.paneGutter, gutter)
+            .environment(\.paneWindowHeight, windowHeight)
             .environment(\.paneLogRental, context == .pane ? selection.selectedRentalID : nil)
             .environment(\.dynamicTypeSize, typeSize)
             .environment(\.colorScheme, colorScheme)

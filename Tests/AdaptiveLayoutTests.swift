@@ -128,6 +128,51 @@ final class AdaptiveLayoutTests: XCTestCase {
         XCTAssertEqual(OnTheRecordCard.fitCount(ends: [:], candidates: 2, top: 100, room: 400), 0)
     }
 
+    // MARK: Whole cards above the bar at rest (gate J r2)
+
+    /// Header 60, then rows of 63 (ends 123, 186, ...); feet 44; record 100.
+    private func plan(_ n: Int, hidden: Int = 0, filtered: Bool, room: CGFloat) -> PaneConfirmFit.Plan {
+        var ends: [Int: CGFloat] = [0: 60]
+        for i in stride(from: 1, through: max(n, 1), by: 1) { ends[i] = 60 + CGFloat(i) * 63 }
+        return PaneConfirmFit.plan(ends: ends, count: n, hidden: hidden, seeAll: 44, moreElsewhere: 44,
+                                   record: 100, filtered: filtered, room: room)
+    }
+
+    func testConfirmFitShowsEverythingWhenItFits() {
+        // 8 + 60 + 5 x 63 + 44 (more elsewhere) + 10 + 100 = 537
+        XCTAssertEqual(plan(5, hidden: 3, filtered: true, room: 537), .init(rows: 5, showsRecord: true))
+        XCTAssertEqual(plan(5, hidden: 0, filtered: false, room: 600), .init(rows: 5, showsRecord: true))
+    }
+
+    func testConfirmFitAllRentalsRunsRowsToTheBar() {
+        // 8 rows on "All rentals" in a short pane: whole rows and "See all", never a row under the bar.
+        // 8 + 60 + k x 63 + 44 <= 420 -> k = 4; the record no longer fits under them.
+        XCTAssertEqual(plan(8, filtered: false, room: 420), .init(rows: 4, showsRecord: false))
+        // More room goes to more rows first (DU4: rows run to the bar).
+        XCTAssertEqual(plan(8, filtered: false, room: 8 + 60 + 4 * 63 + 44 + 10 + 100), .init(rows: 5, showsRecord: false))
+        // A short list: every row, then the record.
+        XCTAssertEqual(plan(3, filtered: false, room: 600), .init(rows: 3, showsRecord: true))
+    }
+
+    func testConfirmFitFilteredKeepsThreeRowsAndTheRecord() {
+        // 5 rows of Pine Cabin, room for 3 rows + "See all" + the record: DU4 filtered.
+        let room: CGFloat = 8 + 60 + 3 * 63 + 44 + 10 + 100
+        XCTAssertEqual(plan(5, hidden: 3, filtered: true, room: room), .init(rows: 3, showsRecord: true))
+        // Below that, rows win and the record waits.
+        XCTAssertEqual(plan(5, hidden: 3, filtered: true, room: room - 20), .init(rows: 4, showsRecord: false))
+    }
+
+    func testConfirmFitAXOneRowAtLeastAndUnmeasuredShowsAll() {
+        // One AX row taller than the pane: one row, it scrolls.
+        var ends: [Int: CGFloat] = [0: 120]
+        for i in 1...3 { ends[i] = 120 + CGFloat(i) * 400 }
+        XCTAssertEqual(PaneConfirmFit.plan(ends: ends, count: 3, hidden: 0, seeAll: 60, moreElsewhere: 90, record: 200,
+                                           filtered: false, room: 380), .init(rows: 1, showsRecord: false))
+        // Before the off-screen measure lands: the old behaviour, every row.
+        XCTAssertEqual(PaneConfirmFit.plan(ends: [:], count: 6, hidden: 0, seeAll: nil, moreElsewhere: nil, record: nil,
+                                           filtered: false, room: 400), .init(rows: 6, showsRecord: true))
+    }
+
     func testEarlierElsewhereOnlyForOneRentalAndBeforeToday() {
         let pine = UUID(), oak = UUID()
         let cal = Calendar(identifier: .gregorian)

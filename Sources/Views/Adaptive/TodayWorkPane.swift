@@ -94,6 +94,7 @@ struct TodayWorkPane: View {
     @Environment(\.layoutMode) private var mode
     @Environment(\.paneFoldInset) private var foldInset
     @Environment(\.paneGutter) private var gutter
+    @Environment(\.paneWindowHeight) private var windowHeight
     @ObservedObject private var backfill = BackfillJob.shared
     @State private var confirming: Set<String> = []
     /// To confirm laid out off-screen at the card's width: 0 the header, 1...n each row's bottom,
@@ -182,7 +183,7 @@ struct TodayWorkPane: View {
         let hidden = PaneConfirmFilter.hiddenCount(visible, rentalID: rentalID)
         let measureKey = EarlierMeasure.key(items.map(\.id), typeSize: typeSize) ^ hidden
         return GeometryReader { g in
-            let room = max(0, g.size.height - Self.bottomMargin)
+            let room = PaneReach.room(visible: g.size.height, columnTop: g.frame(in: .global).minY, windowHeight: windowHeight)
             let plan: PaneConfirmFit.Plan = (stacked || state != .rows)
                 ? PaneConfirmFit.Plan(rows: items.count, showsRecord: true)
                 : PaneConfirmFit.plan(ends: confirmMeasure.key == measureKey ? confirmMeasure.ends : [:], count: items.count,
@@ -397,7 +398,8 @@ struct TodayWorkPane: View {
             .padding(.horizontal, gutter)
             .accessibilityIdentifier("pane.back")
             GeometryReader { g in
-                let room = g.size.height
+                let room = PaneReach.room(visible: g.size.height + PaneReach.air, columnTop: g.frame(in: .global).minY,
+                                          windowHeight: windowHeight)
                 // The card hugs its content, Log pinned right under it, never stretched into an
                 // empty band (D4); a long item, or a keyboard, makes it scroll inside.
                 let card = detailIdeal > 0 ? min(detailIdeal, room) : room
