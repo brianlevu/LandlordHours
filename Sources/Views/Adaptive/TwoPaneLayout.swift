@@ -150,7 +150,7 @@ struct TwoPaneLayout<Work: View>: View {
         // re-resolve the split, or the layout re-renders forever.
         let measured = CGSize(width: (raw.size.width * 2).rounded() / 2, height: (raw.size.height * 2).rounded() / 2)
         let probe = GeometryProbe(size: AdaptiveDebug.capturedSize(for: measured) ?? measured, division: raw.division)
-        let inset = (raw.topInset * 2).rounded() / 2
+        let inset = AdaptiveDebug.capturedTopInset(for: measured) ?? (raw.topInset * 2).rounded() / 2
         if inset != topInset { topInset = inset }
         systemDivision = probe.division != nil
         let division = probe.division ?? AdaptiveDebug.capturedDivision(for: probe.size)

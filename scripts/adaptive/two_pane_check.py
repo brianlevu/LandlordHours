@@ -17,6 +17,7 @@ Measures, per frame:
        card's height: <= 35% (an empty card interior is not "card", it is a hole; gate J 1.2)
   DU15 (round 2) the timber plank is found in the house pane and leaves >= 40pt of label room
        ("All rentals") above the pane foot, at every type size
+  BAR (round 3) no card surface in the bar's rows of the work pane at rest (a card under the glass).
   EDGE (round 2) no text edge in the last 2pt of the house pane (a line cut by the pane's clip) or
        in the window's top safe inset of a stacked frame (the numeral under the status bar);
        needs "insets" in the sidecar (renderer round 2)
@@ -200,6 +201,18 @@ def check(png, scale=None):
         band = longest(kinds)
         out[f"WALL_{label}_pct"] = round(100 * band / p[3], 1)
     out["WALL"] = "PASS" if max(out["WALL_house_pct"], out["WALL_work_pct"]) <= 20 else "FAIL"
+    # BAR (round 3): no card runs under the floating bar at rest. EDGE only looked at rows; a card,
+    # a foot or a button under the bar's rows (the capsule and the wall beside it) is a cut too.
+    if bar:
+        bx, by, bw, bh = bar
+        strip = img[int(by * s):int(min(H / s, by + bh) * s), int((work[0] + 4) * s):int((work[0] + work[2] - 4) * s)]
+        if strip.size:
+            cardish = (np.abs(strip.astype(int) - CARD[theme]).max(axis=2) < 8).mean(axis=1)
+            rows = int((cardish > 0.15).sum())
+        else:
+            rows = 0
+        out["BAR_card_rows_pt"] = round(rows / s, 1)
+        out["BAR"] = "PASS" if rows / s < 2 else "FAIL"
     # D4 per card in the work pane (above the bar)
     ybot = bar[1] if bar else work[1] + work[3]
     cards = card_holes(img, work[0] + 20, work[0] + work[2] - 20, work[1], ybot, s, theme)

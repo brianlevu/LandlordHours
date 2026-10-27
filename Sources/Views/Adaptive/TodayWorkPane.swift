@@ -46,15 +46,23 @@ enum PaneConfirmFit {
     static let gap: CGFloat = 10
 
     static func plan(ends: [Int: CGFloat], count n: Int, hidden: Int, seeAll: CGFloat?, moreElsewhere: CGFloat?,
-                     record: CGFloat?, filtered: Bool, room: CGFloat) -> Plan {
+                     record: CGFloat?, filtered: Bool, room: CGFloat, maxRows: Int? = nil) -> Plan {
         guard n > 0, let seeAll, let moreElsewhere, let record, room > 0,
-              (0...n).allSatisfy({ ends[$0] != nil }) else { return Plan(rows: n, showsRecord: true) }
+              (0...n).allSatisfy({ ends[$0] != nil }) else { return Plan(rows: min(n, maxRows ?? n), showsRecord: true) }
         func card(_ k: Int) -> CGFloat {
             let foot: CGFloat = k < n ? seeAll : (hidden > 0 ? moreElsewhere : 0)
             return top + (ends[k] ?? 0) + foot
         }
         func fits(_ k: Int, record withRecord: Bool) -> Bool {
             card(k) + (withRecord ? gap + record : 0) <= room
+        }
+        if let maxRows {
+            // Stacked (DU13): one row, "See all N", the record. At AX a row taller than the half
+            // gives way to the header and "See all N": nothing sits under the bar at rest.
+            let k = min(maxRows, n)
+            if fits(k, record: true) { return Plan(rows: k, showsRecord: true) }
+            if fits(k, record: false) { return Plan(rows: k, showsRecord: false) }
+            return Plan(rows: 0, showsRecord: fits(0, record: true))
         }
         if fits(n, record: true) { return Plan(rows: n, showsRecord: true) }
         if filtered {
@@ -184,12 +192,13 @@ struct TodayWorkPane: View {
         let measureKey = EarlierMeasure.key(items.map(\.id), typeSize: typeSize) ^ hidden
         return GeometryReader { g in
             let room = PaneReach.room(visible: g.size.height, columnTop: g.frame(in: .global).minY, windowHeight: windowHeight)
-            let plan: PaneConfirmFit.Plan = (stacked || state != .rows)
+            let plan: PaneConfirmFit.Plan = state != .rows
                 ? PaneConfirmFit.Plan(rows: items.count, showsRecord: true)
                 : PaneConfirmFit.plan(ends: confirmMeasure.key == measureKey ? confirmMeasure.ends : [:], count: items.count,
                                       hidden: hidden, seeAll: footHeight(confirmMeasure.key == measureKey, items.count, 1),
                                       moreElsewhere: footHeight(confirmMeasure.key == measureKey, items.count, 2),
-                                      record: recordBase, filtered: rentalID != nil, room: room)
+                                      record: recordBase, filtered: rentalID != nil, room: room,
+                                      maxRows: stacked ? 1 : nil)
             ScrollView {
                 // Every card sizes to its content (rows never compress to fit, D7) and sits whole
                 // above the bar at rest (`PaneConfirmFit`): To confirm shows the rows that fit with
@@ -211,7 +220,7 @@ struct TodayWorkPane: View {
                 .background(alignment: .topLeading) {
                     // The off-screen measures the fit reads (never shown, never read aloud).
                     VStack(spacing: 0) {
-                        if !stacked, state == .rows, !items.isEmpty {
+                        if state == .rows, !items.isEmpty {
                             confirmCard(items: items, hidden: hidden, total: visible.count, limit: nil, measureKey: measureKey)
                                 .offscreenMeasure()
                                 // A new key is a new measure: every part reports again (a change
@@ -253,8 +262,8 @@ struct TodayWorkPane: View {
     /// reports its parts' bottoms and carries both feet.
     private func confirmCard(items: [Suggestion], hidden: Int, total: Int, limit: Int?, measureKey: Int? = nil) -> some View {
         let measuring = measureKey != nil
-        let cap = stacked ? 1 : (limit ?? items.count)
-        let shown = Array(items.prefix(max(1, cap)))
+        let cap = measuring ? items.count : (limit ?? (stacked ? 1 : items.count))
+        let shown = Array(items.prefix(max(0, cap)))
         let remaining = items.count - confirming.count
         let report: (Int, CGFloat) -> Void = { index, end in confirmMeasure.record(key: measureKey ?? 0, index: index, end: end) }
         return PaneCard {

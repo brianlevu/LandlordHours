@@ -150,8 +150,11 @@ struct HousePane: View {
                         }
                     }
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { leadHeight = $0 }
+                    // The lead sits centred in the pane at rest (the slack split above and below,
+                    // so no band of bare wall passes 20%); the shelf starts just below the fold.
+                    .padding(.top, slack(g.size.height) / 2)
                     shelfView(shelf)
-                        .padding(.top, max(ax ? 12 : 16, g.size.height - leadHeight + 8))
+                        .padding(.top, max(ax ? 12 : 16, slack(g.size.height) / 2 + 8))
                 }
                 .padding(.bottom, 12)
                 .frame(maxWidth: PaneMetrics.contentCap)
@@ -162,6 +165,11 @@ struct HousePane: View {
             .scrollBounceBehavior(.basedOnSize)
             .modifier(NoScrollEdgeEffect())
         }
+    }
+
+    /// The scrolling column's spare height at rest, above and below its lead.
+    private func slack(_ visible: CGFloat) -> CGFloat {
+        leadHeight > 0 ? max(0, visible - leadHeight) : visible
     }
 
     /// Stacked: the hero beside the number block.

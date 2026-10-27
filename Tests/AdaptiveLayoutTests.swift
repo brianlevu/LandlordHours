@@ -162,6 +162,19 @@ final class AdaptiveLayoutTests: XCTestCase {
         XCTAssertEqual(plan(5, hidden: 3, filtered: true, room: room - 20), .init(rows: 4, showsRecord: false))
     }
 
+    func testConfirmFitStackedKeepsOneRowOrGivesWayAtAX() {
+        // Propped (DU13): one row, "See all", the record.
+        let room: CGFloat = 8 + 60 + 63 + 44 + 10 + 100
+        XCTAssertEqual(PaneConfirmFit.plan(ends: [0: 60, 1: 123, 2: 186, 3: 249], count: 3, hidden: 0, seeAll: 44, moreElsewhere: 44,
+                                           record: 100, filtered: true, room: room, maxRows: 1), .init(rows: 1, showsRecord: true))
+        // AX: the row is taller than the half; the header and "See all" stay, nothing under the bar.
+        XCTAssertEqual(PaneConfirmFit.plan(ends: [0: 120, 1: 420, 2: 720], count: 2, hidden: 0, seeAll: 70, moreElsewhere: 90,
+                                           record: 160, filtered: true, room: 300, maxRows: 1), .init(rows: 0, showsRecord: false))
+        // Unmeasured: one row, as before.
+        XCTAssertEqual(PaneConfirmFit.plan(ends: [:], count: 3, hidden: 0, seeAll: nil, moreElsewhere: nil, record: nil,
+                                           filtered: false, room: 300, maxRows: 1), .init(rows: 1, showsRecord: true))
+    }
+
     func testConfirmFitAXOneRowAtLeastAndUnmeasuredShowsAll() {
         // One AX row taller than the pane: one row, it scrolls.
         var ends: [Int: CGFloat] = [0: 120]

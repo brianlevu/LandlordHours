@@ -34,6 +34,19 @@ enum AdaptiveDebug {
         #endif
     }
 
+    /// The capture shot's top inset while an off-screen Duo frame renders. The render window's
+    /// safe area does not settle to the Duo's on a stacked shot (the probe read 62, then 14, then 0
+    /// on the iPhone 17 Pro capture sim, so the propped numeral drew under the 24pt status bar, gate
+    /// J r2); the shot's own inset stands in. nil otherwise and in Release.
+    static func capturedTopInset(for size: CGSize) -> CGFloat? {
+        #if DEBUG
+        guard AdaptiveSnapshotter.division(for: size) != nil else { return nil }
+        return MainActor.assumeIsolated { AdaptiveSnapshotter.duoShotTopInset }
+        #else
+        return nil
+        #endif
+    }
+
     #if DEBUG
     static var args: [String] { ProcessInfo.processInfo.arguments }
     static func value(_ flag: String) -> String? {
@@ -104,6 +117,7 @@ enum AdaptiveSnapshotter {
     /// While a Duo frame renders, the window size that stands for the open or propped Duo.
     /// The Duo shot being rendered (its target size), nil otherwise.
     static var duoShot: CGSize?
+    static var duoShotTopInset: CGFloat?
 
     static let duoOpen = CGSize(width: 951, height: 669)
     static let duoPropped = CGSize(width: 669, height: 951)
@@ -184,6 +198,7 @@ enum AdaptiveSnapshotter {
             let tag = dark ? "dark" : "light"
             for shot in shots {
                 duoShot = shot.duo ? shot.size : nil
+                duoShotTopInset = shot.duo ? shot.insets.top : nil
                 AdaptiveSnapshotSelection.args = shot.args
                 let w = makeWindow(size: shot.size, dark: dark, category: shot.category, insets: shot.insets, scene: scene)
                 // The scene's own insets can move once the window lays out (a status bar or home bar
@@ -198,6 +213,7 @@ enum AdaptiveSnapshotter {
                 w.isHidden = true
                 windows.removeAll { $0 === w }
                 duoShot = nil
+                duoShotTopInset = nil
             }
         }
         try? "done".write(to: dir.appendingPathComponent("DONE"), atomically: true, encoding: .utf8)
