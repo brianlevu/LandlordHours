@@ -177,8 +177,17 @@ final class LogTimeUITests: XCTestCase {
         app.buttons["tab.logTime"].tap()
         let enter = app.buttons["log.enterDetails"]
         XCTAssertTrue(enter.waitForExistence(timeout: 8))
+        // The note takes focus on open, so the keyboard is up. The door must sit above the pinned
+        // footer (the timer link and Log), or a tap on it lands on Log instead.
+        var footerTop = app.buttons["log.save"].frame.minY
+        let timer = app.buttons["log.startTimer"]
+        if timer.exists { footerTop = min(footerTop, timer.frame.minY) }
+        XCTAssertLessThanOrEqual(enter.frame.maxY, footerTop, "Enter details yourself is hidden behind the footer")
         enter.tap()
         XCTAssertTrue(app.buttons["log.property"].waitForExistence(timeout: 4))
+        XCTAssertTrue(element("log.autoFill.on").waitForExistence(timeout: 4), "the door turned auto-fill off for this entry")
+        XCTAssertFalse(app.keyboards.firstMatch.waitForExistence(timeout: 1), "manual entry drops the note keyboard")
+        XCTAssertFalse(app.staticTexts["Pick a rental to log this."].exists, "the tap reached the door, not Log")
         app.buttons["log.property"].tap()
         app.buttons["log.pick.property.1"].tap()
         XCTAssertFalse(saveLabel == "Pick a rental")
