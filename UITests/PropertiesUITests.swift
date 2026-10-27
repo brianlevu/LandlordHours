@@ -46,6 +46,18 @@ final class PropertiesUITests: XCTestCase {
         XCTAssertTrue(hero.waitForExistence(timeout: 12), "one rental: the page, not a gallery")
         XCTAssertFalse(app.descendants(matching: .any)["properties.gallery"].exists)
         XCTAssertTrue(hero.label.contains("Frame going up"), hero.label)
+        // The page ends with the same locked preview the gallery shows, so a free owner reads what
+        // stays free before the paywall (the page IS the tab, so the gallery's lock never shows).
+        let lock = app.descendants(matching: .any)["lock.properties_limit"].firstMatch
+        var swipes = 0
+        while !(lock.exists && lock.buttons["lock.unlock"].isHittable) && swipes < 12 { app.swipeUp(); swipes += 1 }
+        XCTAssertTrue(lock.exists, "one rental on the free plan: the page ends with the locked preview")
+        XCTAssertTrue(lock.descendants(matching: .any)["lock.keeps"].exists, "says what stays free")
+        XCTAssertEqual(lock.buttons["lock.unlock"].label, "Unlock Pro")
+        lock.buttons["lock.unlock"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.secondProperty"].waitForExistence(timeout: 8), "the page's lock opens the rental paywall")
+        XCTAssertTrue(app.buttons["paywall.close"].waitForExistence(timeout: 5))
+        app.buttons["paywall.close"].tap()
         let add = app.buttons["properties.add"].firstMatch
         XCTAssertTrue(add.exists, "Add rental is on the page")
         add.tap()
@@ -61,6 +73,9 @@ final class PropertiesUITests: XCTestCase {
     func testOneRentalAddRentalOpensTheSheetForProAndTwoRentalsMakeAGallery() {
         launch(seed: "layouts1", extra: ["-LHPropertiesGoal", "mp100"])
         XCTAssertTrue(app.descendants(matching: .any)["property.hero"].waitForExistence(timeout: 12))
+        for _ in 0..<6 { app.swipeUp() }
+        XCTAssertFalse(app.descendants(matching: .any)["lock.properties_limit"].exists, "Pro: no lock on the page")
+        for _ in 0..<6 { app.swipeDown() }
         app.buttons["properties.add"].firstMatch.tap()
         let name = app.textFields["property.name"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))

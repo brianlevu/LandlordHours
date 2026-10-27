@@ -259,8 +259,8 @@ final class LandlordHoursUITests: XCTestCase {
     func testFirstTimeActivationFlowAddsPropertyAndLogsFirstHour() {
         launch(scenario: "emptyMainTabs", tab: 0)
 
-        // 2.0: an owner with no property sees the empty lot; its "Add property" is the one action.
-        let addProperty = app.buttons["today.hero.addProperty"].firstMatch
+        // 2.2: an owner with no property sees the empty lot; its "Add a rental" is the one action.
+        let addProperty = app.buttons["today.addRental"].firstMatch
         XCTAssertTrue(addProperty.waitForExistence(timeout: 8))
         XCTAssertFalse(app.staticTexts["Finish setting up"].exists, "Setup card follows the first property")
         let propertyName = app.textFields["property.name"]
