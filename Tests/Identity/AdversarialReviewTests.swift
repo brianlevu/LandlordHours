@@ -400,6 +400,35 @@ final class AdversarialReview3Tests: XCTestCase {
     // MARK: R3-5 · two phones with two different sets migrate in the same minute: the second adopts
     // the first's id at S8 and its delta brings the first set in live, with no question.
 
+    func testTwoSetsMigratingAtOnceAreCombinedWithNoQuestion() async throws {
+        // Phone A: D5 (10 entries under local-…). Phone B: D2 (one 1.0.6 email group, 97 entries).
+        let zone = FakeZoneSource()
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let a = EngineHarness(sandbox, zone: zone)
+        try a.device()
+        let boxB = IdentitySandbox("race-phone-b")
+        defer { boxB.tearDown() }
+        XCTAssertTrue(Fixture.load("D2", into: boxB))
+        let b = EngineHarness(boxB, zone: zone)
+        try b.device()
+        let bOwn = Set(b.entries.map(\.id.uuidString))
+        XCTAssertFalse(bOwn.isEmpty)
+
+        // B reads the (empty) zone first, then A finishes its whole migration, then B goes on.
+        b.engine.crashAt = "S5"
+        let o8 = await b.cloud()
+        XCTAssertEqual(o8, .notReady)
+        let o9 = await a.cloud()
+        XCTAssertEqual(o9, .done)
+        b.engine.crashAt = nil
+        let o10 = await b.cloud()
+        XCTAssertEqual(o10, .done)
+
+        let aNames = Set(a.entries.map(\.id.uuidString))
+        let aLiveOnB = Set(b.entries.map(\.id.uuidString)).intersection(aNames)
+        XCTAssertTrue(aLiveOnB.isEmpty || !b.earlier.pendingGroups.isEmpty,
+                      "A's \(aLiveOnB.count) entries joined B's set with no question (unified id \(b.engine.unifiedId))")
+    }
 
     // MARK: - Added by the fix lane for the third pass
 

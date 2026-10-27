@@ -113,6 +113,10 @@ enum IdentityKeys {
     static let householdHeldFor = "v2.sync.householdHeldFor"
     /// The held household pair's values (as read), for the settings precedence when the hold ends.
     static let heldHouseholdCache = "v2.sync.heldHouseholdCache"
+    /// S8 adopted an owner id S5 never saw while this phone had records (two sets migrating at
+    /// once), and this phone's own id before it. S8b decides: same set, or a question.
+    static let adoptedUnseen = "v2.migration.adoptedUnseen"
+    static let adoptedFrom = "v2.migration.adoptedFrom"
     /// Per-launch/once notices (Today cards).
     static let noticeDone = "v2.notice.p12Shown"
     static let noticeSettingsKept = "v2.notice.p29Pending"
