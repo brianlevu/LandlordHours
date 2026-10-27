@@ -624,12 +624,19 @@ final class CloudKitSyncService: ObservableObject {
                 // v3 §4.10: drop the token, read the whole zone, find deletes with R5's guards.
                 return await recoverFromExpiredToken()
             }
-            saveZoneToken(delta.tokenData)
             remoteUpdateDepth += 1
             defer { remoteUpdateDepth -= 1 }
             if let engine {
                 engine.applyPull(delta)
                 onIdentityChange?()
+            }
+            // The token moves only after the changes are applied (a crash in between re-pulls
+            // them; applying a delta twice changes nothing), and only past a complete delta: a
+            // record CloudKit couldn't hand over comes again on the next pull.
+            if delta.incomplete {
+                logger.error("Pull incomplete: keeping the change token to fetch the missed records again")
+            } else {
+                saveZoneToken(delta.tokenData)
             }
             lastSyncDate = Date()
             UserDefaults.standard.set(true, forKey: IdentityKeys.hasSynced)
@@ -655,8 +662,7 @@ final class CloudKitSyncService: ObservableObject {
             if let engine { _ = engine.handleZoneGone(); onIdentityChange?() }
             return false
         }
-        saveZoneToken(snapshot.tokenData)
-        guard let engine else { return true }
+        guard let engine else { saveZoneToken(snapshot.tokenData); return true }
         // Everything present is a change; synced-and-absent live records are deletes (R5 guards).
         let tracker = engine.tracker
         let liveNames = engine.routingContext().liveNames
@@ -675,6 +681,7 @@ final class CloudKitSyncService: ObservableObject {
         defer { remoteUpdateDepth -= 1 }
         engine.applyPull(ZoneDelta(changed: snapshot.records, deleted: deleted, tokenData: snapshot.tokenData, incomplete: false),
                          deleteReason: .inferredAbsent)
+        saveZoneToken(snapshot.tokenData)   // after the read is applied, never before
         onIdentityChange?()
         lastSyncDate = Date()
         return true
@@ -894,9 +901,14 @@ final class CloudKitSyncService: ObservableObject {
     // MARK: - Change Token Persistence
 
     /// The zone token, kept archived (`CKServerChangeToken`) so the engine stays CloudKit-free.
-    private func loadZoneToken() -> Data? { UserDefaults.standard.data(forKey: zoneTokenKey) }
+    /// The engine's record set owns the token (the migration hands its S8b token over at S10).
+    private func loadZoneToken() -> Data? {
+        if let engine { return engine.steadyToken }
+        return UserDefaults.standard.data(forKey: zoneTokenKey)
+    }
 
     private func saveZoneToken(_ data: Data?) {
+        if let engine { engine.steadyToken = data; return }
         if let data { UserDefaults.standard.set(data, forKey: zoneTokenKey) } else { UserDefaults.standard.removeObject(forKey: zoneTokenKey) }
     }
 

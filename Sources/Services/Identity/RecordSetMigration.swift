@@ -399,6 +399,15 @@ final class RecordSetMigration {
     }
 
     func accountMayHaveChanged() { accountConfirmed = false }
+
+    // MARK: The steady-state change token
+
+    /// Where the steady-state pull keeps its zone change token (the live record set's scope).
+    var steadyTokenKey: String { IdentityScope.resolve(defaults).prefix + "cloudkit.zoneChangeToken" }
+    var steadyToken: Data? {
+        get { defaults.data(forKey: steadyTokenKey) }
+        set { if let newValue { defaults.set(newValue, forKey: steadyTokenKey) } else { defaults.removeObject(forKey: steadyTokenKey) } }
+    }
     /// The same scope the rest of the app runs on (a DEBUG scope wins, so a mock never meets the
     /// real record set's baselines).
     var storageId: String { IdentityScope.resolve(defaults).scopeId ?? defaults.string(forKey: IdentityKeys.storageId) ?? IdentityZone.household }
@@ -514,7 +523,9 @@ final class RecordSetMigration {
             do {
                 let delta = try await source.deltaPull(from: defaults.data(forKey: IdentityKeys.migrationZoneToken))
                 _ = applyPull(delta)
-                defaults.set(delta.tokenData, forKey: IdentityKeys.migrationZoneToken)
+                // Applied first; the token moves only past a complete delta, so a record CloudKit
+                // couldn't hand over comes again on the next pull.
+                if !delta.incomplete { defaults.set(delta.tokenData, forKey: IdentityKeys.migrationZoneToken) }
             } catch ZoneSourceError.tokenExpired {
                 let loops = defaults.integer(forKey: IdentityKeys.deltaLoops)
                 if loops < 3 {
@@ -550,6 +561,8 @@ final class RecordSetMigration {
 
         // S10 — done.
         Self.setStep(.done, defaults)
+        // The steady-state pull goes on from where S8b stopped, not from a whole-zone refetch.
+        if let token = defaults.data(forKey: IdentityKeys.migrationZoneToken) { steadyToken = token }
         defaults.set(true, forKey: IdentityKeys.hasSynced)
         defaults.removeObject(forKey: IdentityKeys.accountSwitchKeep)
         defaults.removeObject(forKey: IdentityKeys.deltaLoops)

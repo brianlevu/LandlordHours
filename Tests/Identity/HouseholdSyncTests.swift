@@ -873,4 +873,109 @@ final class RecordLossRegressionTests: XCTestCase {
         relaunched.engine.applyPull(ZoneDelta(changed: [more], deleted: [:], tokenData: nil, incomplete: false))
         XCTAssertFalse(relaunched.entries.contains { $0.id.uuidString == more.recordName })
     }
+
+    // MARK: 5 · the change token moves only after the changes are applied
+
+    private func serviceWith(_ h: EngineHarness) -> (CloudKitSyncService, () -> Void) {
+        let keys = [IdentityKeys.zoneGone, IdentityKeys.accountChanged, IdentityKeys.hasSynced, UserScope.key("cloudkit.zoneChangeToken")]
+        let saved = keys.map { UserDefaults.standard.object(forKey: $0) }
+        UserDefaults.standard.removeObject(forKey: UserScope.key("cloudkit.zoneChangeToken"))
+        let service = CloudKitSyncService()
+        service.zoneSourceOverride = h.zone
+        service.engine = h.engine
+        service.accountAvailable = true
+        return (service, { for (key, value) in zip(keys, saved) { UserDefaults.standard.set(value, forKey: key) } })
+    }
+
+    func testARecordThePullFailedToFetchArrivesOnTheNextPull() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let h = EngineHarness(sandbox, zone: FakeZoneSource())
+        try h.device()
+        let done = await h.cloud()
+        XCTAssertEqual(done, .done)
+        let (service, restore) = serviceWith(h)
+        defer { restore() }
+        // Prime the steady-state token.
+        let pulledOK = await service.pullChanges()
+        XCTAssertTrue(pulledOK)
+        let pid = try XCTUnwrap(h.properties.first?.id)
+        var added: [ZoneRecord] = []
+        for _ in 0..<3 {
+            let e = TimeEntry(propertyId: pid, participant: .selfParticipant, category: .repairs, hours: 1.25, date: Date(), notes: "")
+            added.append(ZoneRecord(CloudKitSyncService.record(for: e, zoneID: IdentityZone.zoneID, appUserId: h.engine.unifiedId)))
+        }
+        h.zone.pendingChanged = added
+        h.zone.failOnceInDelta = [added[1].recordName]     // CloudKit couldn't hand this one over
+        _ = await service.pullChanges()
+        _ = await service.pullChanges()
+        let names = Set(h.entries.map(\.id.uuidString))
+        XCTAssertTrue(Set(added.map(\.recordName)).isSubset(of: names), "the missed record comes on the next pull")
+        XCTAssertEqual(h.entries.count, 13, "re-applying the same changes adds nothing twice")
+    }
+
+    func testTheTokenIsSavedOnlyAfterTheChangesAreApplied() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let h = EngineHarness(sandbox, zone: FakeZoneSource())
+        try h.device()
+        _ = await h.cloud()
+        let (service, restore) = serviceWith(h)
+        defer { restore() }
+        let pulledOK = await service.pullChanges()
+        XCTAssertTrue(pulledOK)
+        let before = h.engine.steadyToken
+        XCTAssertNotNil(before)
+        let tokenDefaults = sandbox.defaults, tokenKey = h.engine.steadyTokenKey
+        let spy = TokenSpyLiveSet(wrapping: h.live) { tokenDefaults.data(forKey: tokenKey) }
+        let engine = RecordSetMigration(defaults: sandbox.defaults, root: sandbox.root, source: h.zone, live: spy, earlier: h.earlier)
+        service.engine = engine
+        let pid = try XCTUnwrap(h.properties.first?.id)
+        let e = TimeEntry(propertyId: pid, participant: .selfParticipant, category: .repairs, hours: 2, date: Date(), notes: "")
+        h.zone.pendingChanged = [ZoneRecord(CloudKitSyncService.record(for: e, zoneID: IdentityZone.zoneID, appUserId: engine.unifiedId))]
+        let pulledNew = await service.pullChanges()
+        XCTAssertTrue(pulledNew)
+        XCTAssertEqual(spy.tokensSeenAtApply, [before], "the token still covered only the old changes while they were applied")
+        XCTAssertNotEqual(engine.steadyToken, before, "and moved after")
+    }
+
+    func testTheMigrationsDeltaTokenCarriesIntoTheSteadyPullUnlessADeltaWasIncomplete() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let zone = FakeZoneSource()
+        let h = EngineHarness(sandbox, zone: zone)
+        try h.device()
+        h.engine.crashAt = "S8"
+        _ = await h.cloud()
+        let pid = try XCTUnwrap(h.live.liveProperties.first?.id)
+        let e = TimeEntry(propertyId: pid, participant: .selfParticipant, category: .repairs, hours: 4, date: Date(), notes: "")
+        let record = ZoneRecord(CloudKitSyncService.record(for: e, zoneID: IdentityZone.zoneID, appUserId: h.engine.unifiedId))
+        zone.pendingChanged = [record]
+        zone.failOnceInDelta = [record.recordName]      // S8b misses it
+        h.engine.crashAt = nil
+        let outcome = await h.cloud()
+        XCTAssertEqual(outcome, .done)
+        let (service, restore) = serviceWith(h)
+        defer { restore() }
+        let pulledOK = await service.pullChanges()
+        XCTAssertTrue(pulledOK)
+        XCTAssertTrue(h.entries.contains { $0.id == e.id }, "the record S8b missed arrives on the first steady pull")
+        XCTAssertFalse(zone.lastDeltaWasWholeZone, "from the migration's token, not a whole-zone refetch")
+    }
+}
+
+/// A live set that notes the steady-state token each time the pull writes the live set.
+@MainActor
+final class TokenSpyLiveSet: LiveRecordSet {
+    let inner: DefaultsLiveRecordSet
+    let readToken: () -> Data?
+    private(set) var tokensSeenAtApply: [Data?] = []
+    init(wrapping inner: DefaultsLiveRecordSet, readToken: @escaping () -> Data?) { self.inner = inner; self.readToken = readToken }
+    var liveEntries: [TimeEntry] { inner.liveEntries }
+    var liveProperties: [RentalProperty] { inner.liveProperties }
+    var liveCategories: [CustomCategory] { inner.liveCategories }
+    func replaceLive(entries: [TimeEntry], properties: [RentalProperty], categories: [CustomCategory]) {
+        tokensSeenAtApply.append(readToken())
+        inner.replaceLive(entries: entries, properties: properties, categories: categories)
+    }
+    var goalSettings: GoalSettingsValues { inner.goalSettings }
+    var taxProfile: TaxProfileValues { inner.taxProfile }
+    func applyRemoteSettings(goal: GoalSettingsValues?, tax: TaxProfileValues?) { inner.applyRemoteSettings(goal: goal, tax: tax) }
 }
