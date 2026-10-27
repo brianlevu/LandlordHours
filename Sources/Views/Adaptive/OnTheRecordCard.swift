@@ -149,11 +149,9 @@ struct OnTheRecordCard: View {
             // The off-screen measure: every candidate laid out once at the card's width.
             if !earlier.isEmpty {
                 earlierSection(earlier, ownCount: ownCount, measuring: true, key: key)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .offscreenMeasure()
                     .id(key)
                     .coordinateSpace(.named("record.measure"))
-                    .hidden()
-                    .accessibilityHidden(true)
             }
         }
         .accessibilityElement(children: .contain)
@@ -266,5 +264,16 @@ struct MeasureEnd: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+extension View {
+    /// An off-screen measure: laid out at its natural height (never shown, never read aloud), so a
+    /// fit can count whole rows. The one natural-height site in the adaptive panes; nothing shown
+    /// is ever fixed, so nothing can clip at AX.
+    func offscreenMeasure() -> some View {
+        fixedSize(horizontal: false, vertical: true)
+            .hidden()
+            .accessibilityHidden(true)
     }
 }

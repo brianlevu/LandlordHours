@@ -213,18 +213,16 @@ struct TodayWorkPane: View {
                     VStack(spacing: 0) {
                         if !stacked, state == .rows, !items.isEmpty {
                             confirmCard(items: items, hidden: hidden, total: visible.count, limit: nil, measureKey: measureKey)
-                                .fixedSize(horizontal: false, vertical: true)
+                                .offscreenMeasure()
                                 // A new key is a new measure: every part reports again (a change
                                 // reports only what moved, and the reset would lose the rest).
                                 .id(measureKey)
                                 .coordinateSpace(.named(Self.confirmSpace))
                         }
                         OnTheRecordCard(rentalID: rentalID)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .offscreenMeasure()
                             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { recordBase = $0 }
                     }
-                    .hidden()
-                    .accessibilityHidden(true)
                 }
                 .padding(.horizontal, gutter)
                 .padding(.top, PaneConfirmFit.top)
@@ -429,10 +427,8 @@ struct TodayWorkPane: View {
                 .coordinateSpace(.named(OnTheRecordCard.space))
                 .background(alignment: .topLeading) {
                     OnTheRecordCard(rentalID: recordRental)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .offscreenMeasure()
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { detailRecordBase = $0 }
-                        .hidden()
-                        .accessibilityHidden(true)
                 }
             }
             .padding(.horizontal, gutter)
