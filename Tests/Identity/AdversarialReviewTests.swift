@@ -708,4 +708,67 @@ final class AdversarialReview4Tests: XCTestCase {
         h.earlier.reload()
         XCTAssertNotNil(h.earlier.group(other), "the archive group vanished from Earlier records (its file is still on disk)")
     }
+
+    // MARK: Verifier MEDIUM (caf41ea) · a set whose id is "household" always gets its settings to iCloud
+
+    /// The settings record this set's next push carries (household pair, or its mirror).
+    private func pushedTax(_ zone: FakeZoneSource, owner: String) -> TaxProfileValues? {
+        [IdentityZone.taxProfileName(IdentityZone.household), IdentityZone.taxProfileName(owner)]
+            .compactMap { zone.records[$0] }.first { $0.appUserId == owner }.map(TaxProfileValues.init(record:))
+    }
+
+    /// (a) changeTokenExpired on the S8b delta loops back to S5 after S8 wrote this phone's own
+    /// pair: that pair is not another set's.
+    func testItsOwnHouseholdPairReadBackAfterATokenExpiryIsNotForeign() async throws {
+        let zone = FakeZoneSource()
+        zone.tokenExpiredOnDelta = 1
+        let h = EngineHarness(sandbox, zone: zone)
+        XCTAssertEqual(try h.device(), .fresh)
+        let property = RentalProperty(name: "Elm", address: "1 Elm St", propertyType: .ltr)
+        h.live.replaceLive(entries: [TimeEntry(propertyId: property.id, participant: .selfParticipant, category: .management,
+                                               hours: 3, date: Date(), notes: "")], properties: [property], categories: [])
+        let done = await h.cloud()
+        XCTAssertEqual(done, .done)
+        XCTAssertFalse(sandbox.defaults.bool(forKey: IdentityKeys.householdForeign), "its own pair is not another set's")
+        var tax = h.live.taxProfile
+        tax.nonREWorkHours = 777
+        h.live.applyRemoteSettings(goal: nil, tax: tax)
+        IdentityKeys.markSettingsDirty(tax: true, liveIsEmpty: false, defaults: sandbox.defaults)
+        await h.engine.pushLive()
+        XCTAssertEqual(pushedTax(zone, owner: h.engine.unifiedId)?.nonREWorkHours, 777, "the settings reach iCloud")
+    }
+
+    /// (b) P13 "Keep with this iCloud" into a zone whose household pair is another set's: a set
+    /// whose id was "household" still gets its settings to iCloud (its own mirror pair).
+    func testAHouseholdSetKeptBesideAnotherSetsPairStillSyncsItsSettings() async throws {
+        let zoneA = FakeZoneSource()
+        zoneA.userName = "_accountA"
+        let a = EngineHarness(sandbox, zone: zoneA)
+        XCTAssertEqual(try a.device(), .fresh)
+        let property = RentalProperty(name: "Elm", address: "1 Elm St", propertyType: .ltr)
+        a.live.replaceLive(entries: [TimeEntry(propertyId: property.id, participant: .selfParticipant, category: .management,
+                                               hours: 3, date: Date(), notes: "")], properties: [property], categories: [])
+        _ = await a.cloud()
+        XCTAssertEqual(a.engine.unifiedId, IdentityZone.household)
+        let other = "email-b.person@example.com"
+        let theirTax = TaxProfileValues(filingStatus: FilingStatus.marriedJoint.rawValue, spouseTracking: true, taxYear: 2019,
+                                        groupingElection: true, nonREWorkHours: 1234.5, displayName: "B")
+        let zoneB = FakeZoneSource(records: IdentityFixtures.sampleGroup(owner: other, entries: 3, seed: 0xB1) + [
+            GoalSettingsValues.defaults.record(name: IdentityZone.goalSettingsName(IdentityZone.household), owner: other),
+            theirTax.record(name: IdentityZone.taxProfileName(IdentityZone.household), owner: other)])
+        zoneB.userName = "_accountB"
+        let b = EngineHarness(sandbox, zone: zoneB)
+        sandbox.defaults.set(true, forKey: IdentityKeys.accountChanged)
+        let outcome = await b.engine.answerAccountChanged(.keepWithThisICloud)
+        XCTAssertEqual(outcome, .done)
+        XCTAssertNotEqual(b.engine.unifiedId, IdentityZone.household, "a set beside another set's pair has an id with a mirror pair")
+        var tax = b.live.taxProfile
+        tax.nonREWorkHours = 888
+        b.live.applyRemoteSettings(goal: nil, tax: tax)
+        IdentityKeys.markSettingsDirty(tax: true, liveIsEmpty: false, defaults: sandbox.defaults)
+        await b.engine.pushLive()
+        XCTAssertEqual(pushedTax(zoneB, owner: b.engine.unifiedId)?.nonREWorkHours, 888, "the settings reach iCloud")
+        XCTAssertEqual(TaxProfileValues(record: try XCTUnwrap(zoneB.records[IdentityZone.taxProfileName(IdentityZone.household)])).nonREWorkHours,
+                       1234.5, "the other set's pair is untouched")
+    }
 }

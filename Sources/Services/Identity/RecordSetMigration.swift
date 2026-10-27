@@ -990,13 +990,16 @@ final class RecordSetMigration {
         // nothing about whose they will be: with records here, keep this phone's own id, leave that
         // pair alone, and let each phone ask about the other's records when they arrive.
         let userOwners = Set(snapshot.records.filter(\.isUserRecord).compactMap(\.appUserId))
+        // A pair this phone wrote itself (S8 before a changeTokenExpired loop back to S5) is ours.
         let unseenPair = householdOwner.map { !userOwners.contains($0) && !excluded.contains($0) && !empty } ?? false
+            && !wroteHouseholdPair(in: snapshot)
         if unseenPair, let householdOwner { excluded.insert(householdOwner) }
         var chosen = MergeRules.unifiedId(householdOwner: unseenPair ? nil : householdOwner, zoneEntryCounts: zoneCounts,
                                           devicePrimary: groups?.primaryId ?? storageId, excluded: excluded)
         if chosen == LegacyInventory.unscopedGroupId { chosen = IdentityZone.household }
         if unseenPair {
             defaults.set(true, forKey: IdentityKeys.householdForeign)
+            chosen = Self.idBesideAForeignPair(chosen)
             defaults.set(chosen, forKey: IdentityKeys.unifiedId)
             defaults.set(true, forKey: IdentityKeys.unifiedIdDecided)
             return
@@ -1034,6 +1037,7 @@ final class RecordSetMigration {
                 // phone's id and leave that pair alone; its records, when they arrive, are a set
                 // to ask about (a new owner), and this phone's are the same on that phone.
                 defaults.set(true, forKey: IdentityKeys.householdForeign)
+                chosen = Self.idBesideAForeignPair(chosen)
             } else {
                 // The loser adopts the winner's id before pushing anything (U17).
                 chosen = server
@@ -1042,6 +1046,21 @@ final class RecordSetMigration {
         }
         defaults.set(chosen, forKey: IdentityKeys.unifiedId)
         defaults.set(true, forKey: IdentityKeys.unifiedIdDecided)
+    }
+
+    /// With the household pair belonging to another set, this set's settings travel only in its
+    /// mirror pair (`GoalSettings-<id>`). The literal "household" can't have one (its mirror IS the
+    /// household pair), so such a set takes its own id first: settings always reach iCloud.
+    static func idBesideAForeignPair(_ id: String) -> String {
+        id == IdentityZone.household ? IdentityZone.household + "-" + UUID().uuidString.prefix(8).lowercased() : id
+    }
+
+    /// The zone's household pair is the one this phone wrote (its push baseline matches).
+    private func wroteHouseholdPair(in snapshot: ZoneSnapshot) -> Bool {
+        let pair = snapshot.records.filter {
+            $0.recordName == IdentityZone.goalSettingsName(IdentityZone.household) || $0.recordName == IdentityZone.taxProfileName(IdentityZone.household)
+        }
+        return !pair.isEmpty && tracker.changedRecords(pair.map { $0.ckRecord() }).isEmpty
     }
 
     /// S8 after P13 "Keep with this iCloud". This phone's set keeps its own id, unless an owner in
@@ -1057,6 +1076,7 @@ final class RecordSetMigration {
         }
         if householdOwner != nil {
             defaults.set(true, forKey: IdentityKeys.householdForeign)
+            chosen = Self.idBesideAForeignPair(chosen)
         } else {
             defaults.removeObject(forKey: IdentityKeys.householdForeign)
             let empty = live.liveEntries.isEmpty && live.liveProperties.isEmpty
@@ -1066,6 +1086,7 @@ final class RecordSetMigration {
                 if case .adopted = try await source.saveHousehold(goal: goal, tax: tax) {
                     // Another phone of this account wrote it first: it is that set's.
                     defaults.set(true, forKey: IdentityKeys.householdForeign)
+                    chosen = Self.idBesideAForeignPair(chosen)
                 }
             }
         }
