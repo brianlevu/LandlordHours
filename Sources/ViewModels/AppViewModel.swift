@@ -713,7 +713,7 @@ class AppViewModel: ObservableObject {
         timeEntries.removeAll { $0.propertyId == property.id }
         saveData()
         // Tombstones the property AND its entries; the next push sends the deletes.
-        syncService.deletePropertyFromCloud(property, cascadedEntryIds: removedEntries.map(\.id))
+        syncService.deletePropertyFromCloud(property, cascadedEntries: removedEntries)
     }
     
     // MARK: - Time Entry Management

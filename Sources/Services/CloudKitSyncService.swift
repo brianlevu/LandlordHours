@@ -705,9 +705,12 @@ final class CloudKitSyncService: ObservableObject {
 
     /// Records a local property delete (its entries too). Every delete goes through the
     /// serialized push (tombstone → push → clear).
-    func deletePropertyFromCloud(_ property: RentalProperty, cascadedEntryIds: [UUID] = []) {
-        recordLocalDeletes([property.id.uuidString] + cascadedEntryIds.map(\.uuidString),
-                           hashes: [property.id.uuidString: RecordLedger.version(property).hash])
+    func deletePropertyFromCloud(_ property: RentalProperty, cascadedEntries: [TimeEntry] = []) {
+        // Every deleted version is named (R11): a put-back of any of them is recognised by
+        // content on every phone, whatever their clocks say.
+        var hashes = [property.id.uuidString: RecordLedger.version(property).hash]
+        for entry in cascadedEntries { hashes[entry.id.uuidString] = RecordLedger.version(entry).hash }
+        recordLocalDeletes([property.id.uuidString] + cascadedEntries.map(\.id.uuidString), hashes: hashes)
     }
 
     func deleteEntryFromCloud(_ entry: TimeEntry) {

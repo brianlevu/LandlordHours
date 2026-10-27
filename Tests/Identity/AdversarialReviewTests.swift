@@ -396,6 +396,56 @@ final class AdversarialReview3Tests: XCTestCase {
     // MARK: R3-4 · a property delete records no delete-version hash for its cascaded entries, so
     // Put back of those entries from a phone whose clock is behind is ignored by the deleting phone.
 
+    func testPutBackOfCascadeDeletedEntriesFromASlowerClockIsIgnored() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let device = legacy(local)
+        let zone = FakeZoneSource(records: Fixture.zoneRecords(entries: device.entries, properties: device.properties, owner: local))
+        let a = EngineHarness(sandbox, zone: zone)
+        try a.device()
+        let o6 = await a.cloud()
+        XCTAssertEqual(o6, .done)
+        let boxB = IdentitySandbox("cascade-phone-b")
+        defer { boxB.tearDown() }
+        let b = EngineHarness(boxB, zone: zone)
+        try b.device()
+        let o7 = await b.cloud()
+        XCTAssertEqual(o7, .done)
+
+        // After migration, A adds a property with one entry; B pulls it.
+        let property = RentalProperty(name: "Oak", address: "9 Oak St", propertyType: .ltr)
+        let entry = TimeEntry(propertyId: property.id, participant: .selfParticipant, category: .repairs, hours: 4, date: Date(), notes: "fixed roof")
+        a.live.replaceLive(entries: a.entries + [entry], properties: a.properties + [property], categories: a.live.liveCategories)
+        await a.engine.pushLive()
+        let pName = property.id.uuidString, eName = entry.id.uuidString
+        b.engine.applyPull(ZoneDelta(changed: [zone.records[pName]!, zone.records[eName]!], deleted: [:], tokenData: nil, incomplete: false))
+        XCTAssertTrue(b.entries.contains { $0.id == entry.id })
+
+        // B's clock runs 10 minutes ahead of A's.
+        let realNow = Date()
+        b.engine.now = { realNow.addingTimeInterval(600) }
+        a.engine.now = { realNow }
+        // B deletes the property, exactly as AppViewModel.deleteProperty → deletePropertyFromCloud does:
+        // the entries are gone from the live set first, then only the property's hash is given.
+        let cascaded = b.entries.filter { $0.propertyId == property.id }
+        b.live.replaceLive(entries: b.entries.filter { $0.propertyId != property.id },
+                           properties: b.properties.filter { $0.id != property.id }, categories: b.live.liveCategories)
+        let service = CloudKitSyncService()
+        service.changeTrackerBaseDirectory = boxB.syncRoot
+        service.engine = b.engine
+        service.deletePropertyFromCloud(property, cascadedEntries: cascaded)
+        service.stop()
+        await b.engine.pushLive()
+        XCTAssertNil(zone.records[eName])
+
+        a.engine.applyPull(ZoneDelta(changed: [], deleted: [pName: "Property", eName: "TimeEntry"], tokenData: nil, incomplete: false))
+        XCTAssertFalse(a.entries.contains { $0.id == entry.id })
+        a.engine.putBack([pName, eName])
+        await a.engine.pushLive()
+        let restoredP = try XCTUnwrap(zone.records[pName]), restoredE = try XCTUnwrap(zone.records[eName])
+        b.engine.applyPull(ZoneDelta(changed: [restoredP, restoredE], deleted: [:], tokenData: nil, incomplete: false))
+        XCTAssertTrue(b.properties.contains { $0.id == property.id }, "the property comes back on B (it has an exact hash)")
+        XCTAssertTrue(b.entries.contains { $0.id == entry.id }, "its entry never comes back on B: no hash on file, and A's clock is behind")
+    }
 
     // MARK: R3-5 · two phones with two different sets migrate in the same minute: the second adopts
     // the first's id at S8 and its delta brings the first set in live, with no question.
