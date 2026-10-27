@@ -865,9 +865,42 @@ final class RecordSetMigration {
             }
             live.applyRemoteSettings(goal: goal, tax: tax)
             clearDirty()
+            if householdGoal != nil || householdTax != nil {
+                defaults.set(true, forKey: IdentityKeys.householdFromCloud)
+                rememberHousehold(goal: goal, tax: tax)
+            }
         case .local, .nothing:
             break
         }
+    }
+
+    struct HouseholdCache: Codable { var goal: GoalSettingsValues?; var tax: TaxProfileValues? }
+
+    private func rememberHousehold(goal: GoalSettingsValues?, tax: TaxProfileValues?) {
+        defaults.set(try? JSONEncoder().encode(HouseholdCache(goal: goal, tax: tax)), forKey: IdentityKeys.householdCache)
+    }
+
+    private func loadHouseholdCache() -> HouseholdCache? {
+        defaults.data(forKey: IdentityKeys.householdCache).flatMap { try? JSONDecoder().decode(HouseholdCache.self, from: $0) }
+    }
+
+    /// Onboarding finished (or was left). Answers it made after the cloud phase brought another
+    /// device's household in lose to that household, as answers made before it would have (P29):
+    /// the household goes back on this phone and the answers are kept in Advanced.
+    func finishOnboarding() {
+        let pinned = defaults.bool(forKey: IdentityKeys.onboardingStartedEmpty)
+        defaults.removeObject(forKey: IdentityKeys.onboardingStartedEmpty)
+        guard pinned, dirtyWhileEmpty, defaults.bool(forKey: IdentityKeys.householdFromCloud),
+              let live, let cache = loadHouseholdCache() else { return }
+        let report = DiscardedSettings(goal: live.goalSettings, tax: live.taxProfile, at: now())
+        defaults.set(try? JSONEncoder().encode(report), forKey: IdentityKeys.discardedOnboardingAnswers)
+        defaults.set(true, forKey: IdentityKeys.noticeSettingsKept)
+        var tax = cache.tax
+        if tax?.displayName == nil { tax?.displayName = live.taxProfile.displayName }
+        live.applyRemoteSettings(goal: cache.goal, tax: tax)
+        clearDirty()
+        Analytics.settingsEmptyEditDiscarded()
+        onChange?()
     }
 
     private var dirtyWhileEmpty: Bool {
@@ -1180,6 +1213,11 @@ final class RecordSetMigration {
         if let owner = (household.goal ?? household.tax)?.appUserId, owner != unifiedId, Self.heldApart(groups.group(owner)?.status) {
             household = (nil, nil)
         }
+        if household.goal != nil || household.tax != nil {
+            let cached = loadHouseholdCache()
+            rememberHousehold(goal: household.goal.map(GoalSettingsValues.init(record:)) ?? cached?.goal,
+                              tax: household.tax.map(TaxProfileValues.init(record:)) ?? cached?.tax)
+        }
         var goalRecord = household.goal, taxRecord = household.tax
         if MergeRules.mirrorBeatsHousehold(mirror: mirror.goal?.modificationDate, household: household.goal?.modificationDate), mirror.goal != nil {
             goalRecord = mirror.goal
@@ -1219,7 +1257,10 @@ final class RecordSetMigration {
         records += live.liveCategories.map { ZoneRecord(CloudKitSyncService.record(for: $0, zoneID: IdentityZone.zoneID, appUserId: owner)) }
         let empty = live.liveEntries.isEmpty && live.liveProperties.isEmpty
         let dirty = defaults.bool(forKey: IdentityKeys.goalDirty) || defaults.bool(forKey: IdentityKeys.taxDirty)
-        if !empty || dirty || defaults.bool(forKey: IdentityKeys.hasSynced) {
+        // Answers from an onboarding that started empty never overwrite a household another device
+        // wrote (`finishOnboarding` puts the household back and keeps the answers for P29).
+        let heldOnboarding = dirtyWhileEmpty && defaults.bool(forKey: IdentityKeys.householdFromCloud)
+        if (!empty || dirty || defaults.bool(forKey: IdentityKeys.hasSynced)) && !heldOnboarding {
             if !defaults.bool(forKey: IdentityKeys.householdForeign) {
                 records.append(live.goalSettings.record(name: IdentityZone.goalSettingsName(IdentityZone.household), owner: owner))
                 records.append(live.taxProfile.record(name: IdentityZone.taxProfileName(IdentityZone.household), owner: owner))

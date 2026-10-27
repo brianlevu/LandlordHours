@@ -251,6 +251,34 @@ final class AdversarialReviewTests: XCTestCase {
         XCTAssertTrue(zone.records.isEmpty, "nothing re-uploaded")
     }
 
+    // Open item · "Get started" during the iCloud check never overwrites the household
+    func testOnboardingAnswersAfterTheCloudPhaseLandsNeverOverwriteTheHousehold() async throws {
+        let zone = IdentityFixtures.fakeZone("cloudOnly", defaults: sandbox.defaults)
+        let householdTax = TaxProfileValues(filingStatus: FilingStatus.marriedJoint.rawValue, spouseTracking: true, taxYear: 2026,
+                                            groupingElection: true, nonREWorkHours: 0, displayName: nil)
+        zone.records[IdentityZone.taxProfileName(IdentityZone.household)] = householdTax.record(
+            name: IdentityZone.taxProfileName(IdentityZone.household), owner: "email-upgrade.tester@example.com")
+        zone.records[IdentityZone.goalSettingsName(IdentityZone.household)] = GoalSettingsValues.defaults.record(
+            name: IdentityZone.goalSettingsName(IdentityZone.household), owner: "email-upgrade.tester@example.com")
+        let h = EngineHarness(sandbox, zone: zone)
+        XCTAssertEqual(try h.device(), .fresh)
+        // The person taps Get started on an empty phone while iCloud is being checked.
+        IdentityKeys.beginOnboarding(liveIsEmpty: true, defaults: sandbox.defaults)
+        let done = await h.cloud()                          // the cloud phase lands mid-onboarding
+        XCTAssertEqual(done, .done)
+        XCTAssertTrue(h.live.taxProfile.spouseTracking)
+        // A later onboarding step: "Just me".
+        var tax = h.live.taxProfile
+        tax.spouseTracking = false
+        h.live.applyRemoteSettings(goal: nil, tax: tax)
+        IdentityKeys.markSettingsDirty(tax: true, liveIsEmpty: h.entries.isEmpty, defaults: sandbox.defaults)
+        await h.engine.pushLive()
+        let stored = try XCTUnwrap(zone.records[IdentityZone.taxProfileName(IdentityZone.household)])
+        XCTAssertEqual(TaxProfileValues(record: stored).spouseTracking, true, "the household's tax profile is not overwritten on every device")
+        h.engine.finishOnboarding()
+        XCTAssertTrue(h.live.taxProfile.spouseTracking, "this phone follows the household")
+        XCTAssertNotNil(sandbox.defaults.data(forKey: IdentityKeys.discardedOnboardingAnswers), "the answer is kept in Advanced (P29)")
+    }
 
     // M4 · a spouse group's id is never this phone's unified id
     func testASpouseGroupIsNeverTheUnifiedId() async throws {

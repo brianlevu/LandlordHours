@@ -70,6 +70,29 @@ enum IdentityKeys {
         defaults.bool(forKey: hasSynced) || defaults.bool(forKey: zoneSeen)
     }
 
+    /// A user edit to the goal or tax settings (v4 §3.3 precedence flags).
+    /// An answer made during an onboarding that started on an empty phone counts as made "while
+    /// empty" for the whole onboarding, even after the cloud phase brought the household's records
+    /// in mid-way: it never beats the household pair another device wrote.
+    static func markSettingsDirty(tax: Bool, liveIsEmpty: Bool, defaults: UserDefaults) {
+        defaults.set(true, forKey: tax ? taxDirty : goalDirty)
+        if liveIsEmpty || defaults.bool(forKey: onboardingStartedEmpty) {
+            defaults.set(true, forKey: tax ? taxDirtyWhileEmpty : goalDirtyWhileEmpty)
+        }
+    }
+
+    /// Onboarding began (new users). Pins "while empty" when the phone had no records.
+    static func beginOnboarding(liveIsEmpty: Bool, defaults: UserDefaults) {
+        if liveIsEmpty { defaults.set(true, forKey: onboardingStartedEmpty) }
+    }
+
+    /// Set from `beginOnboarding` on an empty phone until `RecordSetMigration.finishOnboarding`.
+    static let onboardingStartedEmpty = "v2.onboarding.startedEmpty"
+    /// The household pair this phone applied came from another device (S5 read or S8 adoption).
+    static let householdFromCloud = "v2.sync.householdFromCloud"
+    /// The household pair's values as last read from iCloud (to restore after onboarding).
+    static let householdCache = "v2.sync.householdCache"
+
     /// Forgets the zone (P31 "Keep this iPhone's copy", P13): the next push may create it.
     static func forgetZone(_ defaults: UserDefaults) {
         defaults.removeObject(forKey: hasSynced)

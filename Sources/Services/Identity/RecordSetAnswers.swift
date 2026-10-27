@@ -255,9 +255,6 @@ extension RecordSetMigration {
         return await runCloudPhase()
     }
 
-    /// Onboarding finished (or was left).
-    func finishOnboarding() {}
-
     static func trackerContents(_ id: String, root: URL) -> SyncChangeTracker.Contents? {
         let url = SuggestionStore.directory(forUserId: id, baseDirectory: root.appendingPathComponent("Sync", isDirectory: true))
             .appendingPathComponent("pushed-fingerprints.json")

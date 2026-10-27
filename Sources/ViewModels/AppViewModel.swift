@@ -211,13 +211,21 @@ class AppViewModel: ObservableObject {
 
     private var isApplyingRemoteSettings = false
 
+    /// New-user onboarding began: on an empty phone its answers count as made "while empty" to
+    /// the end, so a household another device wrote is never overwritten by them (package K).
+    func beginOnboardingAnswers() {
+        IdentityKeys.beginOnboarding(liveIsEmpty: properties.isEmpty && timeEntries.isEmpty, defaults: .standard)
+    }
+
+    /// Onboarding finished or was left: settle its answers against the household.
+    func endOnboardingAnswers() {
+        identity.engine?.finishOnboarding()
+        identity.refresh(sync: syncService)
+    }
+
     private func markSettingsDirty(tax: Bool) {
         guard !isApplyingRemoteSettings else { return }
-        let defaults = UserDefaults.standard
-        defaults.set(true, forKey: tax ? IdentityKeys.taxDirty : IdentityKeys.goalDirty)
-        if properties.isEmpty && timeEntries.isEmpty {
-            defaults.set(true, forKey: tax ? IdentityKeys.taxDirtyWhileEmpty : IdentityKeys.goalDirtyWhileEmpty)
-        }
+        IdentityKeys.markSettingsDirty(tax: tax, liveIsEmpty: properties.isEmpty && timeEntries.isEmpty, defaults: .standard)
     }
 
     /// Starts the profile's initial iCloud sync. With `showsPlaceholder`, Today treats the hours

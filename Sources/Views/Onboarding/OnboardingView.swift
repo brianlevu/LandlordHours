@@ -30,6 +30,7 @@ struct OnboardingView: View {
         .onAppear {
             guard flow == nil else { return }
             viewModel.suppressCelebrations = true
+            viewModel.beginOnboardingAnswers()
             let start = OnbDebugLaunch.startStep
             var services = OnbServices.live(app: viewModel, environment: .current) { completion in
                 finish(completion)
@@ -49,6 +50,7 @@ struct OnboardingView: View {
             viewModel.suppressCelebrations = false
             // Left without finishing (sign-out, profile restore): never hold Today's reveal.
             if OnbBackfill.flowActive { OnbBackfill.flowEnded(foundShown: false) }
+            viewModel.endOnboardingAnswers()
         }
     }
 
@@ -56,6 +58,7 @@ struct OnboardingView: View {
         UserDefaults.standard.set(true, forKey: UserScope.key("hasCompletedOnboarding"))
         // The question the 2.0 What's new asks was answered here.
         CaptureOptIn.markWhatsNewSeen()
+        viewModel.endOnboardingAnswers()
         // Staked led with the found hours: Today never repeats them in a reveal.
         OnbBackfill.flowEnded(foundShown: completion.foundShown)
         CaptureSetupHandoff.openInboxAfterOnboarding = completion.openInbox
