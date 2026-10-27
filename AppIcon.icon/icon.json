@@ -10,18 +10,18 @@
           "name": "mark",
           "image-name-specializations": [
             {
-              "value": "mark.svg"
+              "value": "mark.png"
             },
             {
               "appearance": "dark",
-              "value": "mark-dark.svg"
+              "value": "mark.png"
             },
             {
               "appearance": "tinted",
-              "value": "mark.svg"
+              "value": "mark.png"
             }
           ],
-          "glass": true,
+          "glass": false,
           "hidden": false,
           "opacity": 1,
           "position": {
@@ -35,8 +35,36 @@
       ],
       "specular": true,
       "shadow": {
-        "kind": "neutral",
-        "opacity": 0.8
+        "kind": "none",
+        "opacity": 0.0
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.0
+      }
+    },
+    {
+      "name": "Shadow",
+      "layers": [
+        {
+          "name": "shadow",
+          "image-name": "shadow.png",
+          "glass": false,
+          "hidden": false,
+          "opacity": 1,
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "specular": false,
+      "shadow": {
+        "kind": "none",
+        "opacity": 0.0
       },
       "translucency": {
         "enabled": false,
