@@ -1,0 +1,18 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "CFBundleDisplayName": {
+      "comment": "The name under the app icon on the Home Screen, in Spotlight and in Settings. The brand name: keep it short (≤ 12 characters) so it never truncates.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dormer"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

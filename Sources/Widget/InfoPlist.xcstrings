@@ -1,0 +1,18 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "CFBundleDisplayName": {
+      "comment": "The widget extension's name, shown where iOS lists the app's widgets. Same brand name as the app.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dormer"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
