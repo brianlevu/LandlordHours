@@ -101,38 +101,46 @@ struct SettingRow: View {
         }
     }
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+    private var ax: Bool { typeSize.isAccessibilitySize }
+
+    /// Below AX: label and subtitle left, value and chevron right. At AX the glyph stays inline, the
+    /// label wraps beside it, the value drops under the subtitle and the chevron is dropped, so nothing
+    /// narrows the label (owner ruling 2026-10-27; Apple's Settings does the same).
     private var legacyFace: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
-        return HStack(alignment: subtitle == nil ? .center : .top, spacing: 12) {
-            LHRowGlyph(systemImage: symbol, tint: isDestructive ? .caution : .neutral)
-            VStack(alignment: .leading, spacing: 2) {
+        return HStack(alignment: (subtitle == nil && !ax) ? .center : .top, spacing: 12) {
+            LHRowGlyph(systemImage: symbol, tint: isDestructive ? .destructive : .neutral)
+            VStack(alignment: .leading, spacing: ax ? 4 : 2) {
                 Text(title)
                     .font(.body)
                     .foregroundStyle(isDestructive ? colors.destructive : colors.textPrimary)
+                    .lineLimit(ax ? nil : 2)
                 if let subtitle {
-                    Text(subtitle).font(.subheadline).foregroundStyle(colors.textSecondary)
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(colors.textSecondary)
+                        .lineLimit(ax ? nil : (typeSize >= .xxLarge ? 2 : 1))
                 }
+                if ax, let value { valueText(value, colors) }
             }
-            Spacer(minLength: 8)
-            if let value {
-                Text(value)
-                    .font(.subheadline)
-                    .fontDesign(.rounded)
-                    .monospacedDigit()
-                    .foregroundStyle(valueColor ?? colors.textSecondary)
-                    .multilineTextAlignment(.trailing)
-            }
-            if showsChevron {
-                Image(systemName: "chevron.right")
-                    .font(.footnote)
-                    .foregroundStyle(colors.textTertiary)
-                    .accessibilityHidden(true)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if !ax, let value { valueText(value, colors).layoutPriority(1) }
+            if showsChevron && !ax { LHChevron() }
         }
         .padding(LHRow.insets)
         .frame(minHeight: LHMetrics.rowMinHeight)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+    }
+
+    private func valueText(_ value: String, _ colors: AdaptiveColors) -> some View {
+        Text(value)
+            .font(.subheadline)
+            .fontDesign(.rounded)
+            .monospacedDigit()
+            .foregroundStyle(valueColor ?? colors.textSecondary)
+            .multilineTextAlignment(ax ? .leading : .trailing)
     }
 }
 

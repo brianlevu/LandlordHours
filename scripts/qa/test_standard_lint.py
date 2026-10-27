@@ -45,6 +45,32 @@ class DynamicTypeClamp(unittest.TestCase):
         self.assertNotIn("dynamic-type-clamp", rules(f))
 
 
+class Chevron(unittest.TestCase):
+    def test_hand_drawn_chevron_counts(self):
+        self.assertEqual(rules(scan_text('Image(systemName: "chevron.right")\n')).count("chevron"), 1)
+
+    def test_lhchevron_home_is_exempt(self):
+        f = scan_text('Image(systemName: systemName)\nImage(systemName: "chevron.right")\n', name="Sources/Views/Components/LHRow.swift")
+        self.assertNotIn("chevron", rules(f))
+
+
+class FixedSize(unittest.TestCase):
+    def test_raw_fixed_size_counts(self):
+        self.assertEqual(rules(scan_text("Text(x).fixedSize(horizontal: false, vertical: true)\n")).count("fixed-size"), 1)
+
+    def test_wrapper_call_counts(self):
+        self.assertEqual(rules(scan_text("Text(x).lhWrapsText()\n")).count("fixed-size"), 1)
+
+    def test_second_wrapper_cannot_hide_a_fixed_size(self):
+        f = scan_text("extension View {\n    func other() -> some View {\n        fixedSize(horizontal: false, vertical: true)\n    }\n}\n")
+        self.assertEqual(rules(f).count("fixed-size"), 1)
+
+    def test_the_sanctioned_wrapper_body_is_exempt(self):
+        f = scan_text("extension View {\n    func lhWrapsText() -> some View {\n        fixedSize(horizontal: false, vertical: true)\n    }\n}\n",
+                      name="Sources/Views/Components/AppDesignSystem.swift")
+        self.assertNotIn("fixed-size", rules(f))
+
+
 def fscan(files):
     """files: {relative path: text}"""
     root = tempfile.mkdtemp(prefix="lint-test-")

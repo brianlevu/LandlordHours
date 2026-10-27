@@ -60,14 +60,20 @@ python3 scripts/qa/frame_check.py density <frames...> --json density.json
 | Rule | Limit |
 |---|---|
 | D1 list row height (default Dynamic Type) | 56-88pt, target 64 |
-| D2 one list item's share of the viewport | <= 12% default and XXL, <= 30% AX3 |
+| D2 one list item's share of the viewport | <= 12% default and XXL, **<= 45% AX3** (the standard's number; earlier gates misquoted 30%) |
 | D3 list tab with >= 5 items: complete rows above the fold | >= 5 default, >= 4 XXL |
 | D4 empty bands inside a non-hero card (x and y inset 16pt) | <= 35% of card height |
 | D6 non-hero card share of viewport / hero incl. header | <= 20% / <= 40% |
 
-A grouped list container is judged per row (D1, D2), not as one card (D6). Not covered by the script, so the gate reads them by eye with a pixel measurement: D3b/D3c (Today above the fold, AX compact hero), D7 text lines per row (title <= 2, meta 1), D9 gutter 20 / padding 16 / section gap 24 (the script reports gutter as info), contrast >= 4.5:1 on every text pair including placeholders, disabled and secondary text, and no two differently named state frames byte-identical.
+A grouped list container is judged per row (D1, D2), not as one card (D6). Not covered by the script, so the gate reads them by eye with a pixel measurement: D3b/D3c (Today above the fold, AX compact hero), D7 text lines per row (below AX: title <= 2, meta 1, a second meta line from XXL; **at AX no cap: titles and meta wrap as many lines as they need, never truncate**), D9 gutter 20 / padding 16 / section gap 24 (the script reports gutter as info, but **the 20pt list gutter is binding**: measure the grouped list's left edge on every iPhone frame, 19-21pt, anything else is a BLOCKER), contrast >= 4.5:1 on every text pair including placeholders, disabled and secondary text, and no two differently named state frames byte-identical.
 
-Any `FAIL` line from the script is a BLOCKER. Report the printed numbers, not a paraphrase.
+Any `FAIL` line from the script is a CANDIDATE blocker: **measure it by hand (PIL crop, pixel rows, a ruler on the frame) before citing it**, and cite your own measurement next to the script's number. A script FAIL you did not re-measure is not citable. Report the numbers, not a paraphrase.
+
+```bash
+python3 scripts/qa/frame_check.py breaks <frames...>   # mid-word line breaks ("Notifica-/tions"), Vision OCR; every hit is confirmed on the frame
+```
+
+**Re-gate discipline.** On a re-gate, a frame whose bytes are unchanged since the previous look gets **no new blocker** unless it is tagged **"missed earlier"** and says why the earlier look could not have seen it. A changed frame is judged fully.
 
 ## 2. Component conformance (grep)
 
@@ -75,7 +81,7 @@ Any `FAIL` line from the script is a BLOCKER. Report the printed numbers, not a 
 python3 scripts/qa/standard_lint.py        # must print 0 NEW violations
 ```
 
-Then list, in the hand-off, every row, card, tag, chip, button, header, field, segmented control, stepper, empty state, toast, sheet and alert in the diff by its standard component name (`LHRow.Action`, `LHButton.primary`, and so on). A one-off view where a component exists is a finding. Zero new `.system(size:)`, `Color(hex:)`, `Image("bp_tool_`, Lucide, emoji, `.dynamicTypeSize(` clamps outside the two allowed sites, or hand-built cards around rows. `CategoryToolTile(size:)` is 36 or 56 and never inside Today or Inbox decision rows. Radii are in {6, 12, 16, 20, capsule}. Frames at XXL and AX3 show no clipping, no mid-word break and no truncation at AX.
+Then list, in the hand-off, every row, card, tag, chip, button, header, field, segmented control, stepper, empty state, toast, sheet and alert in the diff by its standard component name (`LHRow.Action`, `LHButton.primary`, and so on). A one-off view where a component exists is a finding. Zero new `.system(size:)`, `Color(hex:)`, `Image("bp_tool_`, Lucide, emoji, `.dynamicTypeSize(` clamps outside the two allowed sites, or hand-built cards around rows. `CategoryToolTile(size:)` is 36 or 56 and never inside Today or Inbox decision rows. Radii are in {6, 12, 16, 20, capsule}. Frames at XXL and AX3 show no clipping, no mid-word break and no truncation at AX. **At AX a sheet pins only its primary button** (opaque footer, ~24pt fade); secondary and tertiary choices scroll with the body, so a second pinned button at AX is a finding. **Titles never truncate at AX**: an ellipsis on a title or subtitle at AX is a BLOCKER, and the 2-line title cap applies below AX only (owner rulings, Brian 2026-10-27). **Disclosure chevrons** are one ink (`textSecondary`, >= 3:1 as a UI glyph; a system-grey chevron at 1.72:1 is a BLOCKER) and are not drawn at AX in `LHRow.Browse` / `SettingRow`.
 
 ## 3. Motion conformance (grep + named motions)
 

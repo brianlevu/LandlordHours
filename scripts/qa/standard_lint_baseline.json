@@ -15,7 +15,7 @@
   "onappear-animation": 1,
   "radius": 68,
   "alert": 11,
-  "fixed-size": 248,
+  "fixed-size": 249,
   "craft-image": 0,
   "hero-card": 7,
   "blueprint-retired": 22,
@@ -23,9 +23,10 @@
   "page-ink": 3,
   "section-header-mono": 41,
   "tab-shell": 3,
-  "hand-card": 18
+  "hand-card": 18,
+  "chevron": 5
  },
- "total": 1015,
+ "total": 1021,
  "entries": {
   "alert|Sources/Views/DeleteAllDataView.swift|.alert(\"Couldn\u2019t delete\", isPresented: Binding(": 1,
   "alert|Sources/Views/DeleteAllDataView.swift|.alert(\"Delete everything?\", isPresented: $showVoiceOverConfirm) {": 1,
@@ -763,6 +764,12 @@
   "system-size|Sources/Widget/WidgetSurfaceViews.swift|self.font(.system(size: size, weight: .medium, design: .monospaced))": 1,
   "tab-shell|Sources/Views/Debug/DirA/DirAToday.swift|TabView(selection: $tab) {": 1,
   "tab-shell|Sources/Views/Debug/HomeProto/HomeProtoViews.swift|TabView {": 1,
-  "tab-shell|Sources/Views/Debug/StdProto/StdProtoToday.swift|TabView(selection: $tab) {": 1
+  "tab-shell|Sources/Views/Debug/StdProto/StdProtoToday.swift|TabView(selection: $tab) {": 1,
+  "chevron|Sources/Views/Inbox/BackfillProgressHeader.swift|Image(systemName: \"chevron.right\")": 1,
+  "chevron|Sources/Views/Learn/LearningCenterView.swift|Image(systemName: \"chevron.right\")": 1,
+  "chevron|Sources/Views/ProfileManagementViews.swift|Image(systemName: \"chevron.right\")": 1,
+  "chevron|Sources/Views/ReportsView.swift|Image(systemName: \"chevron.right\")": 1,
+  "chevron|Sources/Views/SettingsView.swift|Image(systemName: \"chevron.right\")": 1,
+  "fixed-size|Sources/Views/Components/LHScreenTitle.swift|.lhWrapsText()": 1
  }
 }

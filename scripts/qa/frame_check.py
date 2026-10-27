@@ -21,6 +21,13 @@ Suppression (defaults in DEFAULTS, override with --config JSON, disable with --n
 Exit 0 clean, 1 flagged. Python 3 stdlib + Pillow. Heuristics: confirm every flag by eye.
 Tokens come from docs/design/2.0-brand-system.md.
 
+Mode `breaks` (mid-word line breaks, "Notifica-/tions"; needs macOS + swift for Vision OCR):
+  frame_check.py breaks FRAME.png [FRAME2.png ...] [--json out.json]
+  OCRs each frame (scripts/qa/ocr_lines.swift) and flags a line that ends in a letter + hyphen when the next
+  line below it starts with a lowercase letter: the word was cut inside itself. Each hit prints both halves
+  and the frame; a hit is a CANDIDATE, so confirm it on the frame by eye before it is cited (OCR can
+  invent a hyphen). `midword_breaks(lines)` is the pure detector (tested in test_frame_check.py). Exit 1 on a hit.
+
 Mode `density` (the [measured] rules of docs/design/DESIGN-STANDARD.md section 2; needs numpy):
   frame_check.py density FRAME.png [FRAME2.png ...] [--json out.json] [--dt auto|default|xxl|ax]
                          [--scale 3] [--fold 0.88] [--items-present N]
@@ -1215,7 +1222,64 @@ def cmd_density(args) -> int:
     return 1 if n_fail else 0
 
 
+def midword_breaks(lines, max_gap=1.8):
+    """lines: [{text,x,y,w,h}] (px, top-left origin). Returns [(first_half, second_half, y)] for every line that
+    ends in letter+hyphen whose next line below starts with a lowercase letter and sits within max_gap line
+    heights, overlapping horizontally (the same text block). Compound words that end a line ("co-") are
+    rare in this app's copy; a hit is a candidate for the gate to confirm."""
+    ls = sorted((l for l in lines if l.get("text", "").strip()), key=lambda l: (l["y"], l["x"]))
+    hits = []
+    for i, a in enumerate(ls):
+        t = a["text"].rstrip()
+        if not re.search(r"[A-Za-z\u00C0-\u024F]{3,}[-\u2010\u2011]$", t):
+            continue
+        for b in ls[i + 1:]:
+            gap = b["y"] - (a["y"] + a["h"])
+            if gap > max_gap * a["h"]:
+                break
+            if b["y"] <= a["y"] + a["h"] * 0.4:
+                continue  # same row, not the next line
+            overlap = min(a["x"] + a["w"], b["x"] + b["w"]) - max(a["x"], b["x"])
+            if overlap > 0 and re.match(r"[a-z\u00E0-\u024F]", b["text"].lstrip()):
+                hits.append((t, b["text"].strip(), round(a["y"])))
+                break
+    return hits
+
+
+def ocr_frames(frames):
+    here = os.path.dirname(os.path.abspath(__file__))
+    import subprocess
+    r = subprocess.run(["swift", os.path.join(here, "ocr_lines.swift"), *frames], capture_output=True, text=True, timeout=600)
+    if r.returncode != 0:
+        sys.exit("ocr_lines.swift failed: " + r.stderr[-400:])
+    return json.loads(r.stdout)
+
+
+def cmd_breaks(args) -> int:
+    ocr = ocr_frames(args.frames)
+    report, bad = {}, 0
+    for f in args.frames:
+        hits = midword_breaks(ocr.get(f, []))
+        report[f] = [dict(first=a, second=b, y_px=y) for a, b, y in hits]
+        for a, b, y in hits:
+            print(f"BREAK  {os.path.basename(f)}  y={y}px  \"{a}\" / \"{b}\"")
+        bad += bool(hits)
+        if not ocr.get(f):
+            print(f"BLOCKED {os.path.basename(f)}  OCR found no text", file=sys.stderr)
+            bad += 1
+    if args.json:
+        json.dump(report, open(args.json, "w"), indent=2)
+    print(f"breaks: {sum(len(v) for v in report.values())} candidate mid-word break(s) in {len(args.frames)} frame(s)", file=sys.stderr)
+    return 1 if bad else 0
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "breaks":
+        p = argparse.ArgumentParser(prog="frame_check.py breaks", description="mid-word line breaks via Vision OCR")
+        p.add_argument("mode")
+        p.add_argument("frames", nargs="+")
+        p.add_argument("--json")
+        return cmd_breaks(p.parse_args())
     if len(sys.argv) > 1 and sys.argv[1] == "density":
         if np is None:
             sys.exit("density mode needs numpy")

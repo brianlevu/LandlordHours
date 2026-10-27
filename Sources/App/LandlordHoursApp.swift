@@ -416,6 +416,8 @@ struct AdaptiveColors {
     var textPrimary: Color { pick(H.textPrimary, H.darkTextPrimary) }
     var textSecondary: Color { pick(H.textSecondary, H.darkTextSecondary) }
     var textTertiary: Color { pick(H.textTertiary, H.darkTextTertiary) }
+    /// The one disclosure-chevron ink (standard §1.4): `textSecondary`, never a system grey (#C5C5C7 = 1.72:1).
+    var chevron: Color { textSecondary }
     /// Secondary text placed straight on the page canvas (not on a card).
     var textSecondaryOnCanvas: Color { textSecondary }
 
