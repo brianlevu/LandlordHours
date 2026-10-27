@@ -63,10 +63,14 @@ final class RecordsReportsCaptureUITests: XCTestCase {
                 app.swipeDown()
                 app.buttons["entry.edit"].tap()
                 settleAndCapture("record-edit-\(tag)")
-                app.swipeUp()
-                settleAndCapture("record-edit-\(tag)-scrolled1")
-                app.swipeUp()
-                settleAndCapture("record-edit-\(tag)-scrolled2")
+                if size != "default" {  // the default-size sheet fits one page: no scrolled frame to take
+                    app.swipeUp()
+                    settleAndCapture("record-edit-\(tag)-scrolled1")
+                }
+                if size == "ax3" {  // the sheet only scrolls past one page at AX; default and XXL end at scrolled1
+                    app.swipeUp()
+                    settleAndCapture("record-edit-\(tag)-scrolled2")
+                }
             }
         }
     }
@@ -135,6 +139,7 @@ final class RecordsReportsCaptureUITests: XCTestCase {
         shot.lifetime = .keepAlways
         add(shot)
         if let dir = ProcessInfo.processInfo.environment["LH_CAPTURE_DIR"], !dir.isEmpty {
+            try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
             try? screenshot.pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).png"))
         }
     }

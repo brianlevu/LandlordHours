@@ -142,7 +142,7 @@ enum RecordsLogic {
     static func monthHeader(_ month: Date, hours: Double) -> String {
         let name = month.formatted(.dateTime.month(.wide).year())
         let total = LHFormat.hours(hours)
-        return RR.t("records.monthHeader", "\(name) \u{00B7} \(total)")
+        return RR.t("records.monthHeader", "\(name)\u{00A0}\u{00B7} \(total)")
     }
 
     /// VoiceOver for a row: title, rental, hours, date, source, then the flags.

@@ -87,7 +87,7 @@ struct LHScreenTitle: View {
                         Text(subtitle)
                             .font(.subheadline)
                             .foregroundStyle(colors.textSecondary)
-                            .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
+                            .lineLimit(typeSize >= .xxLarge ? nil : 1) // two or more lines from XXL: never a mid-word cut
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

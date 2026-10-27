@@ -319,7 +319,7 @@ struct ReportsView: View {
     // MARK: Breakdowns
 
     private func sectionTitle(_ title: String, total: Double) -> String {
-        RR.t("reports.header.total", "\(title) \u{00B7} \(LHFormat.hours(total))")
+        RR.t("reports.header.total", "\(title)\u{00A0}\u{00B7} \(LHFormat.hours(total))")
     }
 
     private var rentalSection: some View {
