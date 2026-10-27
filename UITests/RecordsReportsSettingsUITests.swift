@@ -109,7 +109,10 @@ final class RecordsReportsSettingsUITests: XCTestCase {
                 if ax3 && variant == "pcc" { settleAndCapture("settings-pcc-toggle-\(suffix)", wait: 1.5) }
                 // Frame 2: the whole disclosure above the tab bar.
                 let disclosure = element("settings.capture.aiDisclosure")
-                let tabBar = app.buttons["tab.today"]
+                // The native tab bar tucks away while the list scrolls down (§1.25), taking its
+                // buttons out of the tree; then its top is the screen's bottom less the bar's height.
+                let tabButton = app.buttons["tab.today"]
+                var barTop: CGFloat { tabButton.exists ? tabButton.frame.minY : app.frame.maxY - 90 }
                 func drag() {
                     app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
                         .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)), withVelocity: .slow, thenHoldForDuration: 0.3)
@@ -117,16 +120,16 @@ final class RecordsReportsSettingsUITests: XCTestCase {
                 // Lazy list: the footer only exists once scrolled near. Stop when it fits above
                 // the tab bar, or its top reaches the top of the screen (AX3: taller than a screen).
                 tries = 0
-                while tries < 16 && (!disclosure.exists || (disclosure.frame.maxY > tabBar.frame.minY - 12 && disclosure.frame.minY > 160)) {
+                while tries < 16 && (!disclosure.exists || (disclosure.frame.maxY > barTop - 12 && disclosure.frame.minY > 160)) {
                     drag()
                     tries += 1
                 }
                 XCTAssertTrue(disclosure.exists, "disclosure \(suffix)")
                 settleAndCapture("settings-ai-disclosure-\(suffix)", wait: 1.5)
-                if disclosure.exists, disclosure.frame.maxY > tabBar.frame.minY - 12 {
+                if disclosure.exists, disclosure.frame.maxY > barTop - 12 {
                     // The rest of a long (AX3) disclosure.
                     tries = 0
-                    while tries < 10 && disclosure.frame.maxY > tabBar.frame.minY - 12 { drag(); tries += 1 }
+                    while tries < 10 && disclosure.frame.maxY > barTop - 12 { drag(); tries += 1 }
                     settleAndCapture("settings-ai-disclosure-\(suffix)-2", wait: 1.5)
                 }
             }

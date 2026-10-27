@@ -53,6 +53,9 @@ struct ContactSupportView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollDismissesKeyboard(.interactively)
+        // On the scroll view only: on the whole screen it overrode the pinned button's "support.send".
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("support.screen")
         .background { LHCanvas() }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !typeSize.isAccessibilitySize {
@@ -69,7 +72,6 @@ struct ContactSupportView: View {
         .sheet(isPresented: $showingMailComposer) {
             MailComposeView(subject: subject, body: message, to: supportEmail)
         }
-        .accessibilityIdentifier("support.screen")
     }
 
     private var sendButton: some View {
