@@ -291,6 +291,8 @@ private struct WidgetNumberBlock: View {
                         .foregroundStyle(ink.secondary)
                         .lineLimit(captionShrinks ? 1 : nil)
                         .minimumScaleFactor(captionShrinks ? 0.6 : 1)
+                        // Wrap to as many lines as the words need, never clamp to one and cut the tail.
+                        .fixedSize(horizontal: false, vertical: !captionShrinks)
                         .layoutPriority(1)
                 }
                 if showsStatus, let status = display.status {
