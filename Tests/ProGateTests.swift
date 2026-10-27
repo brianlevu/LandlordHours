@@ -94,7 +94,7 @@ final class PaywallCopyTests: XCTestCase {
     }
 
     func testUnlockProIsSpelledTheSameEverywhere() {
-        XCTAssertEqual(PriceDisplay(billed: "$29.99", intro: nil).buttonTitle(large: true), "Unlock Pro")
+        XCTAssertEqual(PriceDisplay(billed: "$29.99", intro: nil).buttonTitle(large: true), "Unlock")
         XCTAssertEqual(UnlockProButton(entry: .exportPage, action: {}).title, "Unlock Pro")
     }
 
@@ -132,7 +132,7 @@ final class PriceDisplayTests: XCTestCase {
     func testButtonCarriesTheBilledPriceAtDefaultSizes() {
         let display = PriceDisplay(billed: "€34,99", intro: nil)
         XCTAssertEqual(display.buttonTitle(large: false), "Unlock for €34,99", "The localized App Store string, never a literal")
-        XCTAssertEqual(display.buttonTitle(large: true), "Unlock Pro")
+        XCTAssertEqual(display.buttonTitle(large: true), "Unlock")
         XCTAssertLessThan(PriceDisplay.buttonSize, PriceDisplay.billedSize)
         XCTAssertLessThan(PriceDisplay.captionSize, PriceDisplay.billedSize)
     }

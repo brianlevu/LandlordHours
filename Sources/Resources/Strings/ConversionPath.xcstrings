@@ -71,7 +71,7 @@
     "A nickname is fine. The rest comes later." : {
 
     },
-    "A sample page of the PDF record" : {
+    "Sample page from your PDF" : {
 
     },
     "A short note after a calendar event, so you log it the same day. At most 2 a day, never at night." : {
@@ -196,23 +196,23 @@
     "Free covers one" : {
 
     },
-    "From %lld calendar events in the last 90 days. Confirm the ones that were rental work and they count toward your %lld hours." : {
+    "From %lld calendar events in the last 90 days. Confirm the rental ones and they count toward your %lld hours." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "From %1$lld calendar events in the last 90 days. Confirm the ones that were rental work and they count toward your %2$lld hours."
+            "value" : "From %1$lld calendar events in the last 90 days. Confirm the rental ones and they count toward your %2$lld hours."
           }
         }
       }
     },
-    "From %lld calendar events in the last 90 days. Confirm the ones that were rental work and they go in your record." : {
+    "From %lld calendar events in the last 90 days. Confirm the rental ones and they go in your record." : {
 
     },
-    "From 1 calendar event in the last 90 days. If it was rental work, confirm it and it counts toward your %lld hours." : {
+    "From 1 calendar event in the last 90 days. Confirm it if it was rental work, and it counts toward your %lld hours." : {
 
     },
-    "From 1 calendar event in the last 90 days. If it was rental work, confirm it and it goes in your record." : {
+    "From 1 calendar event in the last 90 days. Confirm it if it was rental work, and it goes in your record." : {
 
     },
     "Get started" : {
@@ -257,7 +257,7 @@
     "LandlordHours Pro" : {
 
     },
-    "Leases of a month or more" : {
+    "A month or longer, on average" : {
 
     },
     "Log 2 hours at %@?" : {
@@ -311,7 +311,7 @@
     "No target" : {
 
     },
-    "No target. Dated hours for your CPA." : {
+    "No target. Just your hours, with dates." : {
 
     },
     "Not now" : {
@@ -483,7 +483,7 @@
     "Turnover clean" : {
 
     },
-    "Unlock Pro" : {
+    "Unlock" : {
 
     },
     "Unlock for %@" : {
@@ -583,7 +583,7 @@
     "Your spouse’s count" : {
 
     },
-    "You’ll also confirm that no one else did more, cleaners and managers included." : {
+    "You’ll also say if a manager or cleaner worked more hours than you." : {
 
     },
     "You’ll each have your own count." : {
@@ -601,7 +601,7 @@
     "now" : {
 
     },
-    "once, yours to keep" : {
+    "one payment, no subscription" : {
 
     },
     "your record" : {

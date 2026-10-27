@@ -131,7 +131,7 @@ struct OnbGoalStep: View {
                     .accessibilityIdentifier("rental-short")
                 LHDivider(leadingInset: LHRow.browseDividerInset)
                 OnbOptionRow(symbol: "key", title: String(localized: "Long-term", table: "ConversionPath"),
-                             meta: String(localized: "Leases of a month or more", table: "ConversionPath"),
+                             meta: String(localized: "A month or longer, on average", table: "ConversionPath"),
                              selected: flow.rental == .longTerm) { flow.answerRental(.longTerm, OnbMotion.morph(reduce)) }
                     .accessibilityIdentifier("rental-long")
                 LHDivider(leadingInset: LHRow.browseDividerInset)

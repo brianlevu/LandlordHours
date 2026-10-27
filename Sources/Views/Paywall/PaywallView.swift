@@ -322,7 +322,7 @@ struct PaywallView: View {
         .animation(AppAnimation.reveal, value: page)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(page?.isSample == true
-                            ? String(localized: "A sample page of the PDF record", table: "ConversionPath")
+                            ? String(localized: "Sample page from your PDF", table: "ConversionPath")
                             : String(localized: "Page 1 of your PDF record", table: "ConversionPath"))
         .accessibilityIdentifier("paywall.page")
     }
@@ -583,7 +583,7 @@ struct PaywallView: View {
     }
 }
 
-/// "$29.99 once, yours to keep" on one baseline; stacked when it doesn't fit. The billed amount is
+/// "$29.99 one payment, no subscription" on one baseline; stacked when it doesn't fit. The billed amount is
 /// `.largeTitle.rounded.bold`, the largest price text on the page (App Review, `PriceDisplay`).
 struct PaywallPriceRow: View {
     let display: PriceDisplay
@@ -610,7 +610,7 @@ struct PaywallPriceRow: View {
     }
 
     private var caption: some View {
-        Text(String(localized: "once, yours to keep", table: "ConversionPath"))
+        Text(String(localized: "one payment, no subscription", table: "ConversionPath"))
             .font(.subheadline)
             .foregroundStyle(colors.textSecondary)
     }
@@ -669,9 +669,9 @@ extension PaywallCopy {
     }
 
     /// The buy button: "Unlock for $29.99" with the App Store's localized price; at large text
-    /// sizes, or before the price arrives, "Unlock Pro".
+    /// sizes, or before the price arrives, "Unlock".
     static func buyTitle(billed: String?, large: Bool) -> String {
-        guard let billed, !large else { return String(localized: "Unlock Pro", table: "ConversionPath") }
+        guard let billed, !large else { return String(localized: "Unlock", table: "ConversionPath") }
         return String(localized: "Unlock for \(billed)", table: "ConversionPath")
     }
 }
