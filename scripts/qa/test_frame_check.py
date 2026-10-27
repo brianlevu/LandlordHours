@@ -151,6 +151,41 @@ class Density(unittest.TestCase):
         self.assertTrue(failed(res, "D2"))
 
 
+def make_tile(name, top=800, h=720):
+    """One tall tile (house art block + two text lines) on the canvas, like a Rentals gallery tile."""
+    img = Image.new("RGB", (W, H), CANVAS)
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle([60, top, 1146, top + h], radius=60, fill=CARD)
+    d.rectangle([200, top + 80, 1000, top + 420], fill=(150, 160, 190))      # art
+    d.rectangle([110, top + h - 220, 700, top + h - 160], fill=INK)          # name
+    d.rectangle([110, top + h - 110, 520, top + h - 60], fill=INK)           # hours
+    path = os.path.join(tempfile.mkdtemp(prefix="fc-test-"), name)
+    img.save(path)
+    return path
+
+
+class RentalsGalleryCarveOut(unittest.TestCase):
+    """Standard 1.4 exception: Rentals gallery tiles are exempt from D6 (card share)."""
+
+    def test_tall_card_fails_d6_on_an_ordinary_frame(self):
+        self.assertTrue(failed(run(make_tile("rentals-x.png")), "D6 card"))
+
+    def test_same_card_is_exempt_on_a_gallery_frame(self):
+        res = run(make_tile("gallery-3-dark.png"))
+        self.assertFalse(failed(res, "D6"))
+        self.assertTrue([c for c in res["checks"] if c["rule"].startswith("D6 exempt")])
+
+    def test_flag_forces_the_carve_out_and_single_rental_frame_keeps_d6(self):
+        res = fc.analyse(make_tile("anything.png"), "default", 3.0, 0.88, None, rentals_gallery=True)
+        self.assertFalse(failed(res, "D6"))
+        self.assertTrue(failed(run(make_tile("gallery-1-dark.png")), "D6 card"))
+
+    def test_gallery_name_pattern(self):
+        for n, want in [("gallery-3-dark.png", True), ("gallery-8-bottom-light-ax3.png", True),
+                        ("gallery-12-dark.png", True), ("gallery-1-dark.png", False), ("rentals-gallery.png", False)]:
+            self.assertEqual(fc.is_rentals_gallery("/x/" + n), want, n)
+
+
 class DayHeaders(unittest.TestCase):
     LAYOUT = ["H", "R", "R", "H", "R", "R"]
 

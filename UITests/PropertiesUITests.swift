@@ -191,6 +191,20 @@ final class PropertiesUITests: XCTestCase {
         }
     }
 
+    /// All five stages at once (the `stages` seed), every window unlit then every window lit, dark and
+    /// light: the frames the tile-art contrast measure reads (standard §1.4 tile recipe).
+    func testCaptureGalleryStages() {
+        for scheme in ["dark", "light"] {
+            for (state, lit) in [("unlit", ""), ("lit", "0,1,2,3,4")] {
+                app.terminate()
+                launch(seed: "stages", scheme: scheme, extra: lit.isEmpty ? [] : ["-LHPropertiesLitToday", lit])
+                XCTAssertTrue(app.descendants(matching: .any)["properties.tile.4"].firstMatch.waitForExistence(timeout: 15))
+                Thread.sleep(forTimeInterval: 1.5)
+                capture("stages-\(state)-\(scheme)")
+            }
+        }
+    }
+
     func testCaptureLightDefault() { captureAll(scheme: "light", size: nil) }
     func testCaptureDarkDefault() { captureAll(scheme: "dark", size: nil) }
     func testCaptureLightXXL() { captureAll(scheme: "light", size: "xxl") }

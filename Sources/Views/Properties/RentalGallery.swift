@@ -15,6 +15,9 @@ struct RentalTileHouse: View {
     let stage: CraftStage
     let lit: Bool
 
+    @Environment(\.colorScheme) private var colorScheme
+    private var dark: Bool { colorScheme == .dark }
+
     /// Measured on the five stills (alpha > 8): art spans x 0.085–0.949 and y 0.05–0.939 of the
     /// square, centred at x 0.5165, ground at y 0.939.
     private static let art = (centerX: 0.5165 as CGFloat, bottom: 0.94 as CGFloat)
@@ -29,17 +32,55 @@ struct RentalTileHouse: View {
             .overlay {
                 GeometryReader { geo in
                     let side = geo.size.width * Self.scale
-                    Image(stage.assetName(lit: lit))
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFit()
-                        .frame(width: side, height: side)
-                        .position(x: geo.size.width / 2 - side * (Self.art.centerX - 0.5),
-                                  y: geo.size.height - side * (Self.art.bottom - 0.5))
+                    let center = CGPoint(x: geo.size.width / 2 - side * (Self.art.centerX - 0.5),
+                                         y: geo.size.height - side * (Self.art.bottom - 0.5))
+                    ZStack {
+                        backlight(side: side, strength: Self.backlightStrength(stage)).position(center)
+                        Image(stage.assetName(lit: lit))
+                            .resizable()
+                            .interpolation(.high)
+                            .scaledToFit()
+                            .frame(width: side, height: side)
+                            .brightness(dark ? Self.nightLift(stage) : 0)
+                            .position(center)
+                    }
                 }
             }
             .accessibilityHidden(true)
     }
+}
+
+extension RentalTileHouse {
+    /// Night only (standard §H.4 `backlight`, the Today night page's recipe at the tile's art side):
+    /// a cool light behind the lot, 0.50 → 0 inside 0.88 × side, plus a rim ellipse 0.34 → 0, both
+    /// times `strength`, so an unlit roofed house reads against the tile. Light mode draws none.
+    /// Roofed stages take 1.4 × (an unlit roof measured 1.68:1 on the tile with none, 2.98 with it);
+    /// the framing stages draw none: their pale wood already reads (2.5-2.7:1 unlit) and any glow behind it only lowers that.
+    static func backlightStrength(_ stage: CraftStage) -> Double { stage.isFraming ? 0 : 1.4 }
+
+    @ViewBuilder fileprivate func backlight(side: CGFloat, strength k: Double) -> some View {
+        if dark, k > 0 {
+            let glow = AdaptiveColors(colorScheme: colorScheme).backlight
+            ZStack {
+                Circle()
+                    .fill(RadialGradient(colors: [glow.opacity(0.50 * k), glow.opacity(0.20 * k), glow.opacity(0)],
+                                         center: .center, startRadius: 0, endRadius: side * 0.44))
+                    .frame(width: side * 0.88, height: side * 0.88)
+                    .offset(y: side * 0.03)
+                Circle()
+                    .fill(RadialGradient(colors: [glow.opacity(0.34 * k), glow.opacity(0)],
+                                         center: .center, startRadius: 0, endRadius: side * 0.46))
+                    .frame(width: side * 0.92, height: side * 0.92)
+                    .scaleEffect(y: 0.34)
+                    .offset(y: side * 0.31)
+            }
+            .frame(width: side, height: side)
+            .accessibilityHidden(true)
+        }
+    }
+
+    /// The hero's night ambient lift for the stages without a moon rim (`CraftHouseView.nightLift`).
+    fileprivate static func nightLift(_ stage: CraftStage) -> Double { CraftHouseView.nightLift(stage) }
 }
 
 struct RentalGallery: View {
