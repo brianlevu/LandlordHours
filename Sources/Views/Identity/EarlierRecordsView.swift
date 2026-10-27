@@ -89,6 +89,8 @@ struct EarlierRecordsView: View {
             }
         }
         .listStyle(.insetGrouped)
+        // The 20pt list gutter (shared lane); the inset-grouped default put the card at 16pt.
+        .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(colors.background)
         .navigationTitle(String(localized: "Earlier records", table: "Identity"))
@@ -195,6 +197,8 @@ struct RecentlyRemovedView: View {
             }
         }
         .listStyle(.insetGrouped)
+        // The 20pt list gutter (shared lane); the inset-grouped default put the card at 16pt.
+        .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(colors.background)
         .navigationTitle(String(localized: "Recently removed", table: "Identity"))
