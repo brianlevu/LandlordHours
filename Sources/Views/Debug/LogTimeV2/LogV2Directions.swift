@@ -182,7 +182,7 @@ struct LogV2SheetA: View {
                     .padding(.horizontal, 4)
             case .reading:
                 LogV2ReadingLine()
-            case .review, .logged:
+            case .review, .logged, .closing:
                 VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
                     Text(model.usedVoice ? "From what you said" : "From what you wrote")
                         .font(.subheadline.weight(.semibold))
@@ -224,7 +224,7 @@ struct LogV2SheetB: View {
         case .entry: doors
         case .typing: typeStep
         case .listening, .reading: sayStep
-        case .review, .logged: checkStep
+        case .review, .logged, .closing: checkStep
         case .timerRunning: LogV2TimerRunning(model: model)
         case .timerNote: LogV2TimerNote(model: model)
         case .manual: LogV2Manual(model: model)

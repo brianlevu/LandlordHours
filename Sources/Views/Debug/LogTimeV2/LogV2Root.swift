@@ -11,6 +11,8 @@ struct LogV2Launch {
     let state: String
     let play: String?
     let free: Bool
+    /// `-LHLogV2R1`: direction A as it was in round 1 (for comparison).
+    let r1: Bool
     let scheme: ColorScheme
     let typeSize: DynamicTypeSize?
 
@@ -29,7 +31,7 @@ struct LogV2Launch {
         default: size = nil
         }
         return LogV2Launch(direction: dir, state: value("-LHLogV2State") ?? "entry", play: value("-LHLogV2Play"),
-                           free: args.contains("-LHLogV2Free"),
+                           free: args.contains("-LHLogV2Free"), r1: args.contains("-LHLogV2R1"),
                            scheme: value("-LHColorScheme") == "dark" ? .dark : .light, typeSize: size)
     }()
 }
@@ -48,9 +50,10 @@ struct LogV2Root: View {
 
     var body: some View {
         backdrop
-            .sheet(isPresented: $showSheet) {
+            .sheet(isPresented: $showSheet, onDismiss: { model.sheetDismissed() }) {
                 sheet
                     .lhSheetPresentation(.focused)
+                    .modifier(LogV2PageBackground(enabled: launch.direction == .a && !launch.r1, scheme: launch.scheme))
                     .preferredColorScheme(launch.scheme)
                     .modifier(LogV2TypeSize(size: launch.typeSize))
             }
@@ -63,7 +66,7 @@ struct LogV2Root: View {
                 }
             }
             .onChange(of: model.stage) { _, stage in
-                if stage == .logged { showSheet = false }
+                if stage == .closing || stage == .logged { showSheet = false }
                 if stage == .entry && !showSheet { showSheet = true }
             }
             .onAppear { if model.stage == .logged { showSheet = false } }
@@ -76,7 +79,8 @@ struct LogV2Root: View {
 
     @ViewBuilder private var sheet: some View {
         switch launch.direction {
-        case .a: LogV2SheetA(model: model)
+        case .a:
+            if launch.r1 { LogV2SheetA(model: model) } else { LogV2SheetA2(model: model) }
         case .b: LogV2SheetB(model: model)
         }
     }
@@ -84,6 +88,15 @@ struct LogV2Root: View {
     /// Stand-in for Today behind the sheet: the canvas, the Fraunces title and a quiet row group.
     private var backdrop: some View {
         LogV2Backdrop(onTap: { model.reset(); showSheet = true })
+    }
+}
+
+/// r2: the A sheet on the tinted page colour (proposed `LHSheetPresentation.focused` on `background`).
+struct LogV2PageBackground: ViewModifier {
+    let enabled: Bool
+    let scheme: ColorScheme
+    func body(content: Content) -> some View {
+        if enabled { content.presentationBackground(AdaptiveColors(colorScheme: scheme).background) } else { content }
     }
 }
 

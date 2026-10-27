@@ -25,6 +25,8 @@ enum LogV2Stage: String, CaseIterable {
     case timerRunning
     case timerNote
     case manual
+    /// The sheet is dismissing after Log; the toast shows once it is gone (r2 glitch fix).
+    case closing
     case logged
 }
 
@@ -132,6 +134,11 @@ final class LogV2Model: ObservableObject {
 
     @Published var toast: String?
     @Published var usedVoice = false
+    /// r2: which way the next step change pushes (A only).
+    @Published var forward = true
+    /// r2: the review came from a stopped timer.
+    @Published var fromTimer = false
+    private var pendingToast: String?
     /// Captures and the type video show the system keyboard.
     @Published var wantsKeyboard = false
 
@@ -246,16 +253,19 @@ final class LogV2Model: ObservableObject {
 
     func startListening() {
         transcript = ""
+        forward = true
         withAnimation(AppAnimation.reveal) { stage = .listening }
     }
 
     func stopListening() {
+        forward = false
         usedVoice = true
         note = transcript
         submitNote()
     }
 
     func startTimer() {
+        forward = true
         timerStart = Date()
         timerFrozen = false
         withAnimation(AppAnimation.flow) { stage = .timerRunning }
@@ -276,9 +286,14 @@ final class LogV2Model: ObservableObject {
     /// time and the day; the note only adds the work and the words.
     func finishTimer() {
         let elapsed = (timerStopped ?? Date()).timeIntervalSince(timerStart)
+        forward = true
+        fromTimer = true
         read(note.isEmpty ? "turnover" : note)
         rentalId = LogV2Sample.pine.id
-        hours = max(0.25, (elapsed / 3600 / 0.25).rounded() * 0.25)
+        // r2 (A): the minutes the timer ran, never rounded, so the note step and the card agree.
+        // B keeps r1's quarter-hour rounding for comparison.
+        hours = direction == .a ? max(1, (elapsed / 60).rounded(.down)) / 60
+                                : max(0.25, (elapsed / 3600 / 0.25).rounded() * 0.25)
         day = LogV2Sample.now
         sources[.rental] = .assumed("From the timer")
         sources[.hours] = .assumed("From the timer")
@@ -290,12 +305,22 @@ final class LogV2Model: ObservableObject {
 
     func log() {
         guard canLog else { return }
-        let text = "Logged \(LHFormat.hours(hours)) at \(rentalName ?? "")"
+        // r2: the sheet dismisses first; the toast appears after it is gone (no sheet behind it).
+        pendingToast = "Logged \(LHFormat.hours(hours)) at \(rentalName ?? "")"
+        stage = .closing
+    }
+
+    /// Called by the root's `onDismiss`.
+    func sheetDismissed() {
+        guard stage == .closing else { return }
         withAnimation(AppAnimation.reveal) {
-            toast = text
+            toast = pendingToast
             stage = .logged
         }
     }
+
+    /// r2: "Answer 1 question" on the disabled Log button.
+    var openQuestions: Int { fieldsShown.filter { sources[$0] == .needed }.count }
 
     func reset() {
         note = ""; transcript = ""; sources = [:]; expanded = nil; hours = nil; rentalId = nil; toast = nil
@@ -323,6 +348,9 @@ final class LogV2Model: ObservableObject {
             note = LogV2Sample.unsureNote; read(note); stage = .review
         case "free":
             note = LogV2Sample.freeNote; read(note); stage = .review
+            if direction == .b { expanded = .rental }
+        case "freeRental":
+            note = LogV2Sample.freeNote; read(note); stage = .review
             expanded = .rental
         case "freeHours":
             note = LogV2Sample.freeNote; read(note); stage = .review
@@ -338,8 +366,16 @@ final class LogV2Model: ObservableObject {
             timerStopped = LogV2Sample.now; timerFrozen = true
             note = LogV2Sample.timerNote; finishTimer(); stage = .review
         case "manual":
-            rentalId = LogV2Sample.pine.id; hours = 1; work = .repairs; stage = .manual
-            sources = [.rental: .edited, .hours: .edited, .work: .edited, .who: .edited, .day: .edited]
+            if direction == .a {
+                // r2: no time is ever assumed, not even here.
+                rentalId = LogV2Sample.pine.id; hours = nil; work = .repairs; stage = .manual
+                sources = [.rental: .assumed("Last used"), .hours: .needed, .work: .assumed("Last used"),
+                           .who: .assumed(""), .day: .assumed("")]
+                expanded = .hours
+            } else {
+                rentalId = LogV2Sample.pine.id; hours = 1; work = .repairs; stage = .manual
+                sources = [.rental: .edited, .hours: .edited, .work: .edited, .who: .edited, .day: .edited]
+            }
         case "edit":
             note = LogV2Sample.typedNote; read(note); stage = .review; expanded = .hours
         case "logged":

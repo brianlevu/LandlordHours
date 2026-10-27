@@ -102,6 +102,10 @@ struct LHCaptureField: View {
     /// Once a card shows under it, the field hugs its text and the mic sits beside the words
     /// (no empty band; D4).
     var compact = false
+    /// r2: on the tinted page the field is a white surface (`backgroundSecondary`), like 2.2's rows.
+    var onPage = false
+    /// r2: the mic is a filled action button (44pt) at rest, as today's sheet has it.
+    var prominentMic = false
     var focus: FocusState<Bool>.Binding
     var onMic: () -> Void
 
@@ -114,7 +118,9 @@ struct LHCaptureField: View {
 
     private var compactBody: some View {
         HStack(alignment: .center, spacing: 8) {
-            TextField(text: $text, axis: .vertical) { Text("What did you do?") }
+            TextField(text: $text, prompt: Text(placeholder).foregroundStyle(colors.textTertiary), axis: .vertical) {
+                Text("What did you do?")
+            }
                 .font(.title3)
                 .foregroundStyle(colors.textPrimary)
                 .tint(colors.action)
@@ -127,12 +133,15 @@ struct LHCaptureField: View {
         .padding(.trailing, 6)
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, minHeight: LHMetrics.rowMinHeight, alignment: .leading)
-        .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
+        .background(fill, in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous)
-                .strokeBorder(focus.wrappedValue ? colors.action : .clear, lineWidth: 1.5)
+                .strokeBorder(focus.wrappedValue ? colors.action : (onPage && colorScheme == .dark ? colors.border : .clear),
+                              lineWidth: focus.wrappedValue ? 1.5 : LHMetrics.hairline)
         )
     }
+
+    private var fill: Color { onPage ? colors.backgroundSecondary : colors.backgroundTertiary }
 
     private var fullBody: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -163,10 +172,11 @@ struct LHCaptureField: View {
         .padding(.top, 14)
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
-        .background(colors.backgroundTertiary, in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
+        .background(fill, in: RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: LHMetrics.innerRadius, style: .continuous)
-                .strokeBorder(focus.wrappedValue || isListening ? colors.action : .clear, lineWidth: 1.5)
+                .strokeBorder(focus.wrappedValue || isListening ? colors.action : (onPage && colorScheme == .dark ? colors.border : .clear),
+                              lineWidth: focus.wrappedValue || isListening ? 1.5 : LHMetrics.hairline)
         )
         .animation(AppAnimation.quick, value: isListening)
         .contentShape(Rectangle())
@@ -184,6 +194,17 @@ struct LHCaptureField: View {
             }
             .buttonStyle(LHButton.press)
             .accessibilityLabel("Stop listening")
+            .accessibilityIdentifier("logv2.mic")
+        } else if prominentMic {
+            Button(action: onMic) {
+                Image(systemName: "mic.fill")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(colors.onAction)
+                    .frame(width: LHMetrics.minTap, height: LHMetrics.minTap)
+                    .background(colors.action, in: Circle())
+            }
+            .buttonStyle(LHButton.press)
+            .accessibilityLabel("Say it instead")
             .accessibilityIdentifier("logv2.mic")
         } else {
             Button(action: onMic) { Image(systemName: "mic.fill") }

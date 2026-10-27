@@ -208,6 +208,7 @@
 		BBEC352A3CCB3B91F191241E /* NoteEvalSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF67C4B070290BFF3024504F /* NoteEvalSupport.swift */; };
 		BC58937504D58DBA10BEB5FE /* LegacyBlueprint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3612BFB5E9C63EC911F605B5 /* LegacyBlueprint.swift */; };
 		BC8F6E92451777ADF3C1AE40 /* ColorContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1240689FADA6EC9A0D1883B /* ColorContrastTests.swift */; };
+		BD9A9ABEC5C0BD0996E22863 /* LogV2DirectionA2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D5CFC73947A9CC79F994BB1 /* LogV2DirectionA2.swift */; };
 		BD9C362BDD43E6E640C51BA9 /* LHSegmented.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E78224ED686BF6782F6BDE8 /* LHSegmented.swift */; };
 		BFF6F8AE069FE01CE9E5414F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE13F908989158FDAB28BF57 /* Models.swift */; };
 		C033DAA5B2F3EB1B50CDA1CE /* LandlordHoursApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F9CB28BC741E54912DBB35F /* LandlordHoursApp.swift */; };
@@ -333,6 +334,7 @@
 		0A003429C65E153356A99393 /* BlueprintList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlueprintList.swift; sourceTree = "<group>"; };
 		0A098406B491E959C7B4D8B8 /* ClassifierV2Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassifierV2Tests.swift; sourceTree = "<group>"; };
 		0CB67517D2CB8DC4D68AEE53 /* InboxLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxLogic.swift; sourceTree = "<group>"; };
+		0D5CFC73947A9CC79F994BB1 /* LogV2DirectionA2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogV2DirectionA2.swift; sourceTree = "<group>"; };
 		0E211AA70DBAA7EE4BED7C4F /* TodayLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayLogic.swift; sourceTree = "<group>"; };
 		0E92A6FC93F7AF06983D1E41 /* DraftingLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftingLoader.swift; sourceTree = "<group>"; };
 		111C91DE9EE369C07CE2F490 /* AuditReportCSV.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditReportCSV.swift; sourceTree = "<group>"; };
@@ -618,6 +620,7 @@
 			isa = PBXGroup;
 			children = (
 				24605FFA7B830382DFBB1FEF /* LogV2Components.swift */,
+				0D5CFC73947A9CC79F994BB1 /* LogV2DirectionA2.swift */,
 				EAFD544C981B7B60A565CD0C /* LogV2Directions.swift */,
 				C6BB8B5E87E98676DD666CC5 /* LogV2Model.swift */,
 				874B0485B4696BD75DCC7BD4 /* LogV2Root.swift */,
@@ -1461,6 +1464,7 @@
 				7A5C510D68D0C7652FC67178 /* LogTimeLogic.swift in Sources */,
 				170DCB2FCEE6FFB6A5EEB29E /* LogTimeSheet.swift in Sources */,
 				7980F9A3E5BB86350F86259C /* LogV2Components.swift in Sources */,
+				BD9A9ABEC5C0BD0996E22863 /* LogV2DirectionA2.swift in Sources */,
 				EBA36D7D138BD63FCE761FE3 /* LogV2Directions.swift in Sources */,
 				5B87D8B0A0CB99B3C1CAF9DC /* LogV2Model.swift in Sources */,
 				EABD36D54D398CDB3074F833 /* LogV2Root.swift in Sources */,
