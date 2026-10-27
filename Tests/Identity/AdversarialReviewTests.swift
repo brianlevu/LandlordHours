@@ -27,6 +27,40 @@ final class AdversarialReviewTests: XCTestCase {
 
     // MARK: A · Undo spouse never reaches a second 2.2 phone that already holds the hours live
 
+    func testUndoSpouseLeavesTheHoursLiveAsSpouseOnASecondPhone() async throws {
+        XCTAssertTrue(Fixture.load("D8", into: sandbox))
+        let zone = FakeZoneSource()
+        let a = EngineHarness(sandbox, zone: zone)
+        try a.device()
+        let doneA = await a.cloud()
+        XCTAssertEqual(doneA, .done)
+        let group = try XCTUnwrap(a.earlier.group(local))
+        let names = Set(group.entries.map(\.id.uuidString))
+        a.engine.answer(.spouse, group: local)
+        await a.engine.pushLive()
+
+        // Phone B, same iCloud, migrates after the answer: the hours arrive live, as the spouse's.
+        let boxB = IdentitySandbox("undo-second-phone")
+        defer { boxB.tearDown() }
+        let b = EngineHarness(boxB, zone: zone)
+        try b.device()
+        let doneB = await b.cloud()
+        XCTAssertEqual(doneB, .done)
+        XCTAssertTrue(names.isSubset(of: Set(b.entries.map(\.id.uuidString))), "B holds them live")
+
+        // A undoes; the retagged copies reach B.
+        a.engine.undoSpouse(group: local)
+        await a.engine.pushLive()
+        let retagged = names.compactMap { zone.records[$0] }
+        XCTAssertEqual(retagged.count, names.count)
+        XCTAssertFalse(Set(retagged.compactMap(\.appUserId)).contains(a.engine.unifiedId), "A retagged them away from the live set")
+        b.engine.applyPull(ZoneDelta(changed: retagged, deleted: [:], tokenData: nil, incomplete: false))
+
+        let stillLive = b.entries.filter { names.contains($0.id.uuidString) }
+        XCTAssertTrue(stillLive.isEmpty, "after Undo on A the hours must not stay live on B (\(stillLive.count) still live)")
+        XCTAssertTrue(stillLive.allSatisfy { $0.participant == .selfParticipant } || stillLive.isEmpty,
+                      "and if they do stay, they are still counted as the spouse's on B")
+    }
 
     // MARK: B · a 2.0.x upgrader that synced before recreates a zone deleted on another phone
 

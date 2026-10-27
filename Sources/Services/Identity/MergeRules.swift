@@ -244,6 +244,9 @@ enum MergeRules {
         case newGroup(String)
         /// R11: deleted after migration; ignore.
         case ignore
+        /// Live here, but a newer copy says it belongs to a set held apart (Undo of a spouse
+        /// answer on another phone): out of the live set, into that group. Never a delete.
+        case moveOut(String)
     }
 
     struct RoutingContext {
@@ -256,6 +259,16 @@ enum MergeRules {
         /// When each of `deletedNames` was deleted. A copy edited after that (Put back on another
         /// device) is not the deleted record coming back from a 1.1 device: it routes normally.
         var deletedAt: [String: Date] = [:]
+        /// `modifiedAt` of each live record (R20 yields only to a newer copy).
+        var liveModifiedAt: [String: Date] = [:]
+    }
+
+    private static func heldApartTarget(_ owner: String, _ context: RoutingContext) -> String? {
+        if owner.hasPrefix(IdentityZone.asidePrefix) { return String(owner.dropFirst(IdentityZone.asidePrefix.count)) }
+        switch context.groups?.group(owner)?.status {
+        case .pending?, .aside?: return owner
+        default: return nil
+        }
     }
 
     static func route(_ record: ZoneRecord, context: RoutingContext) -> Route {
@@ -271,6 +284,12 @@ enum MergeRules {
         if owner != context.unifiedId, context.groups?.group(owner)?.status == .spouse,
            context.liveNames.contains(name) || (context.archiveMembership[name] ?? owner) == owner {
             return .liveAsSpouse
+        }
+        // R20 yields to a NEWER copy tagged aside-<id>, or with the id of a set held apart here:
+        // another phone moved it out of the live set (Undo). Older copies (a 2.0.x re-push) stay R20.
+        if context.liveNames.contains(name), owner != context.unifiedId, let target = heldApartTarget(owner, context),
+           let edited = record.modifiedAt, let liveAt = context.liveModifiedAt[name], edited > liveAt {
+            return .moveOut(target)
         }
         // R20: membership by UUID beats the incoming tag.
         if context.liveNames.contains(name) { return .live }

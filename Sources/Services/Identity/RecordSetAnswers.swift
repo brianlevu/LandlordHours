@@ -97,7 +97,15 @@ extension RecordSetMigration {
         guard let live, var group = earlier.group(id), group.status == .spouse else { return }
         let names = Set(group.entries.map { $0.id.uuidString })
         let current = live.liveEntries.filter { names.contains($0.id.uuidString) }
-        group.entries = MergeRules.union(group.entries, MergeRules.swapParticipants(current))
+        // Undo is an edit made now: the copies other phones hold live are older and give way (R20
+        // yields to a newer held-apart copy), so the hours leave the live set there too.
+        let at = now()
+        let restored = MergeRules.swapParticipants(current).map { entry -> TimeEntry in
+            var e = entry
+            e.modifiedAt = max(entry.modifiedAt.addingTimeInterval(0.001), at)
+            return e
+        }
+        group.entries = MergeRules.union(group.entries, restored)
         group.status = .pending
         group.retagPending = (group.retagPending ?? []).union(Set(current.map { $0.id.uuidString }))
         do {

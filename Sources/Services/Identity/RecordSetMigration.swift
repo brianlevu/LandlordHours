@@ -982,9 +982,14 @@ final class RecordSetMigration {
                             + (live?.liveCategories.map { $0.id.uuidString } ?? []))
         let deletedMap = (defaults.dictionary(forKey: IdentityKeys.deletedRecordNames) as? [String: Date]) ?? [:]
         let deleted = deletedNames()
+        var liveModifiedAt: [String: Date] = [:]
+        for e in live?.liveEntries ?? [] { liveModifiedAt[e.id.uuidString] = e.modifiedAt }
+        for p in live?.liveProperties ?? [] { liveModifiedAt[p.id.uuidString] = p.modifiedAt }
+        for c in live?.liveCategories ?? [] { liveModifiedAt[c.id.uuidString] = c.modifiedAt }
         return MergeRules.RoutingContext(liveNames: liveNames, archiveMembership: membership, unifiedId: unifiedId,
                                          groups: GroupsFile.load(root: root), deletedNames: deleted,
-                                         tombstones: Set(tracker.pendingDeletes), deletedAt: deletedMap.filter { deleted.contains($0.key) })
+                                         tombstones: Set(tracker.pendingDeletes), deletedAt: deletedMap.filter { deleted.contains($0.key) },
+                                         liveModifiedAt: liveModifiedAt)
     }
 
     /// `deleteReason`: `.deletedElsewhere` for delete callbacks (30 days); `.inferredAbsent` for
@@ -1000,6 +1005,7 @@ final class RecordSetMigration {
         var household: (goal: ZoneRecord?, tax: ZoneRecord?) = (nil, nil)
         var mirror: (goal: ZoneRecord?, tax: ZoneRecord?) = (nil, nil)
         var putBackElsewhere = Set<String>()
+        var movedOut = Set<String>()
 
         for record in delta.changed {
             if record.isSettings {
@@ -1051,6 +1057,21 @@ final class RecordSetMigration {
                               categories: record.category.map { [$0] } ?? [], unparsed: record.isParseable ? [] : [record],
                               to: id, status: held == .pending ? .pending : (held == .spouse ? .spouse : .aside), source: .iCloud, now: now())
                 outcome.archived += 1
+            case .moveOut(let id):
+                let name = record.recordName
+                entries.removeAll { $0.id.uuidString == name }
+                properties.removeAll { $0.id.uuidString == name }
+                categories.removeAll { $0.id.uuidString == name }
+                let held = earlier.group(id)?.status ?? groups.group(id)?.status
+                let status: GroupStatus = held == .aside ? .aside : .pending   // asked again unless set aside here
+                earlier.route(entries: record.entry.map { [$0] } ?? [], properties: record.property.map { [$0] } ?? [],
+                              categories: record.category.map { [$0] } ?? [], unparsed: record.isParseable ? [] : [record],
+                              to: id, status: status, source: .iCloud, now: now())
+                if groups.group(id) == nil {
+                    groups.upsert(GroupRecord(id: id, status: status, source: .iCloud, entryCount: 0, propertyCount: 0, hours: 0, lastEntryDate: nil))
+                }
+                movedOut.insert(name)
+                outcome.archived += 1
             case .newGroup(let owner):
                 guard !LegacyInventory.isIgnoredId(owner) else { continue }
                 earlier.route(entries: record.entry.map { [$0] } ?? [], properties: record.property.map { [$0] } ?? [],
@@ -1101,9 +1122,11 @@ final class RecordSetMigration {
             if !g.isEmpty { try? earlier.save(g) }
         }
 
-        if outcome.liveChanged > 0 || outcome.removed > 0 {
+        if outcome.liveChanged > 0 || outcome.removed > 0 || !movedOut.isEmpty {
             live.replaceLive(entries: entries, properties: properties, categories: categories)
         }
+        // Not live any more: no baseline, so nothing of them is pushed from here.
+        if !movedOut.isEmpty { tracker.forget(recordNames: Array(movedOut)) }
         if !putBackElsewhere.isEmpty {
             // Put back on another device: live here again, so it leaves Recently removed and R11.
             earlier.takeRemoved(putBackElsewhere)
