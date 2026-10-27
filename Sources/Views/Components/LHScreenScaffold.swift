@@ -1,123 +1,127 @@
 import SwiftUI
 import UIKit
 
-// MARK: - Screen scaffolds (standard "Screen anatomy", S1–S6)
+// MARK: - Screen scaffolds (standard §S "Screen anatomy")
 //
 // The third layer of the design system: tokens → components → **screen scaffolds**. A screen never
-// builds its own title, top inset, title-to-content gap or gutters; it supplies its content and
-// calls one scaffold:
+// builds its own title, top inset, title-to-content gap or gutters; it supplies its scroll container
+// (a `List` or a `ScrollView`) and calls one scaffold:
 //
-//   .lhTabScreen(title, subtitle:, back:, accessory:, trailing:)   tab roots and collection roots
-//   .lhSheetScreen(title, subtitle:, onClose:)                       task sheets (Log time, pickers)
+//   .lhTabScreen(title, subtitle:, back:, onPage:, accessory:, trailing:)  tab roots, collection roots
+//   .lhDetailScreen(title, subtitle:, back:, trailing:)                    a pushed screen about one item
+//   .lhSheetScreen(title, subtitle:, onClose:, background:)                task sheets; `LHSheet` too
 //
-// The scaffold owns: the title style (Fraunces 34/500 everywhere a title is a place name), the title
-// position (one baseline on every tab, S2), at most one trailing action (S3), the gap from the
-// header to the first content (S4), the 20pt gutter and the section rhythm of a List (S5).
-//
-// Two header systems implement the same API, so the owner can pick one and every screen follows:
-//   .native  Option 1: the system navigation large title, set in Fraunces; trailing and accessory
-//            items live in the nav bar row above the title; the title collapses inline on scroll.
-//   .custom  Option 2: `LHScreenHeader`, a pinned header row: title, optional subtitle or accessory,
-//            one trailing action on the title's row; fixed top inset; it never collapses.
-// DEBUG: `-LHHeaderOption native|custom` picks one for captures. Release ships the picked one.
+// Tabs and details (Things-style, owner's pick 2026-10-27): the header sits at rest on one baseline
+// and scrolls away with the content; once the title has left, a compact bar with the title in
+// `.headline` (and the back and trailing actions) fades in over a material. At rest the layout is
+// identical on every tab: S2 (one baseline) and S3 (one gap under the last header baseline).
+// Sheets: the header is pinned (the task owns the sheet), title Fraunces 28.
 
-enum LHHeaderSystem: String {
-    case native, custom
-
-    static var current: LHHeaderSystem {
-        #if DEBUG
-        let args = ProcessInfo.processInfo.arguments
-        if let i = args.firstIndex(of: "-LHHeaderOption"), args.indices.contains(i + 1),
-           let v = LHHeaderSystem(rawValue: args[i + 1]) {
-            return v
-        }
-        #endif
-        return .custom
-    }
-
-    /// Option 1 sets the large title in Fraunces through the bar's appearance (proposed amendment
-    /// to §1.25: the second allowed appearance line). Installed once, before the first bar draws.
-    static func installNativeAppearanceIfNeeded() {
-        guard current == .native, !didInstall else { return }
-        didInstall = true
-        let ink = UIColor { trait in
-            UIColor(AdaptiveColors(colorScheme: trait.userInterfaceStyle == .dark ? .dark : .light).textPrimary)
-        }
-        let large = UIFontMetrics(forTextStyle: .largeTitle)
-            .scaledFont(for: LHFont.frauncesUIFont(size: LHScreenAnatomy.titleSize, weight: 500, opticalSize: 34))
-        let appearance = UINavigationBarAppearance()
-        appearance.configureWithTransparentBackground()
-        appearance.largeTitleTextAttributes = [.font: large, .foregroundColor: ink]
-        appearance.titleTextAttributes = [.foregroundColor: ink]
-        let scrolled = UINavigationBarAppearance()
-        scrolled.configureWithDefaultBackground()
-        scrolled.largeTitleTextAttributes = appearance.largeTitleTextAttributes
-        scrolled.titleTextAttributes = appearance.titleTextAttributes
-        UINavigationBar.appearance().scrollEdgeAppearance = appearance
-        UINavigationBar.appearance().standardAppearance = scrolled
-        UINavigationBar.appearance().compactAppearance = scrolled
-    }
-
-    private static var didInstall = false
-}
-
-/// The numbers every scaffold uses (standard "Screen anatomy").
+/// The numbers every scaffold uses (standard §S).
 enum LHScreenAnatomy {
-    /// One title size for tab roots, collection roots and task sheets.
+    /// Tab roots and collection roots.
     static let titleSize: CGFloat = 34
-    /// Option 2: the title row's top, under the safe area (tabs) or the grabber (sheets).
+    /// Task sheets (Fraunces' floor is 28).
+    static let sheetTitleSize: CGFloat = 28
+    /// The title row's top, under the safe area (tabs, details) or the grabber (sheets).
     static let headerTopInset: CGFloat = 8
     static let sheetHeaderTopInset: CGFloat = 16
-    /// The title row's height: a 44pt trailing action centres on it, so the title never moves.
+    /// The title row's height: a 44pt action centres on it, so the title never moves.
     static let titleRowHeight: CGFloat = 44
-    /// From the last line of the header (title or subtitle) to the first content.
+    /// From the header's bottom padding edge to the first content (the scroll content's top margin).
     static let headerToContent: CGFloat = 16
     /// Height a hero screen gives up to the header (title row + accessory row) when it sizes its art
     /// from the window (§H.1 H1 is a share of the height left under the header).
     static let heroHeaderAllowance: CGFloat = 200
+    /// The compact bar shows once the content has scrolled this far (the title row has left).
+    static var compactThreshold: CGFloat { headerTopInset + titleRowHeight - 8 }
 }
 
-// MARK: - LHScreenHeader (Option 2, and the sheet header in both options' fallbacks)
+/// A back action for a pushed screen. A struct, not a bare closure, so a trailing `{ … }` after
+/// `.lhTabScreen(…)` can never bind to it by accident.
+struct LHBackAction {
+    var label: String? = nil
+    var identifier: String? = nil
+    let action: () -> Void
+}
+
+// MARK: - The header
+
+enum LHHeaderStyle: Equatable {
+    /// Tab roots and collection roots: Fraunces 34/500.
+    case collection
+    /// A pushed screen about one item: SF `.title1.semibold` (§1.14).
+    case detail
+    /// Task sheets: Fraunces 28/500.
+    case sheet
+
+    var font: Font {
+        switch self {
+        case .collection: return LHFont.screenTitle(size: LHScreenAnatomy.titleSize)
+        case .detail: return .title.weight(.semibold)
+        case .sheet: return LHFont.screenTitle(size: LHScreenAnatomy.sheetTitleSize)
+        }
+    }
+
+    /// The title's UIFont, for the baseline compensation (S3 is measured from the last baseline).
+    var uiFont: UIFont {
+        switch self {
+        case .collection, .sheet:
+            let size = self == .sheet ? LHScreenAnatomy.sheetTitleSize : LHScreenAnatomy.titleSize
+            return UIFontMetrics(forTextStyle: .largeTitle)
+                .scaledFont(for: LHFont.frauncesUIFont(size: size, weight: 500, opticalSize: size))
+        case .detail:
+            return UIFont.preferredFont(forTextStyle: .title1)
+        }
+    }
+}
+
+/// What kind of trailing action the header holds: a label action moves under the title at AX sizes
+/// (a symbol stays on the title row).
+private struct LHHeaderActionKindKey: PreferenceKey {
+    static let defaultValue: LHHeaderAction.Kind? = nil
+    static func reduce(value: inout LHHeaderAction.Kind?, nextValue: () -> LHHeaderAction.Kind?) {
+        value = value ?? nextValue()
+    }
+}
 
 struct LHScreenHeader<Accessory: View, Trailing: View>: View {
-    enum Placement { case tab, sheet }
-
     let title: String
     var subtitle: String? = nil
-    var placement: Placement = .tab
-    var back: (() -> Void)? = nil
-    var backLabel: String? = nil
-    var backIdentifier: String? = nil
+    var style: LHHeaderStyle = .collection
+    var back: LHBackAction? = nil
     @ViewBuilder var accessory: Accessory
     @ViewBuilder var trailing: Trailing
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var trailingKind: LHHeaderAction.Kind?
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
     private var ax: Bool { typeSize.isAccessibilitySize }
+    /// At AX sizes a label action ("Add rental") takes its own row under the title.
+    private var trailingBelow: Bool { ax && trailingKind == .label }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .center, spacing: 8) {
                 if let back {
-                    Button(action: back) { Image(systemName: "chevron.backward") }
-                        .buttonStyle(LHButton.icon)
+                    LHHeaderBackButton(back: back)
                         .frame(maxHeight: ax ? nil : LHScreenAnatomy.titleRowHeight)
                         .padding(.leading, -8)
-                        .accessibilityLabel(backLabel ?? String(localized: "title.back", defaultValue: "Back", table: "Foundations"))
-                        .accessibilityIdentifier(backIdentifier ?? "screen.back")
                 }
                 Text(title)
-                    .font(LHFont.screenTitle(size: LHScreenAnatomy.titleSize))
+                    .font(style.font)
                     .foregroundStyle(colors.textPrimary)
-                    .lineLimit(ax ? nil : 1)
-                    .minimumScaleFactor(0.6)
+                    .lineLimit(ax ? nil : (style == .detail ? 2 : 1))
+                    .minimumScaleFactor(style == .detail ? 1 : 0.6)
                     .accessibilityAddTraits(.isHeader)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                // S2: an action that grows with Dynamic Type never makes the row taller, so the
-                // title's baseline holds at every size below AX.
-                trailing
-                    .frame(maxHeight: ax ? nil : LHScreenAnatomy.titleRowHeight)
+                if !trailingBelow {
+                    // S5: an action that grows with Dynamic Type never makes the row taller, so the
+                    // title's baseline holds at every size below AX.
+                    trailing
+                        .frame(maxHeight: ax ? nil : LHScreenAnatomy.titleRowHeight)
+                }
             }
             .frame(minHeight: LHScreenAnatomy.titleRowHeight)
             if let subtitle {
@@ -129,121 +133,115 @@ struct LHScreenHeader<Accessory: View, Trailing: View>: View {
             }
             accessory
                 .frame(maxWidth: .infinity, alignment: .leading)
+            if trailingBelow {
+                trailing
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
+        .onPreferenceChange(LHHeaderActionKindKey.self) { trailingKind = $0 }
+        // A container, so a screen-level `.accessibilityIdentifier("….screen")` names the header, not
+        // every control in it (the back and trailing actions keep their own identifiers).
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("screen.header")
         .padding(.horizontal, LHMetrics.gutter)
-        .padding(.top, placement == .tab ? LHScreenAnatomy.headerTopInset : LHScreenAnatomy.sheetHeaderTopInset)
+        .padding(.top, style == .sheet ? LHScreenAnatomy.sheetHeaderTopInset : LHScreenAnatomy.headerTopInset)
         .padding(.bottom, 8 + baselineCompensation)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// S4 is measured from the header's last baseline. A subtitle's line hangs less below its baseline
-    /// than the 34pt title's, so the header adds the difference and the content starts at the same
-    /// distance under the last baseline whether or not there is a subtitle.
+    /// S3 is measured from the header's last baseline. A subtitle's line hangs less below its baseline
+    /// than the title's, so the header adds the difference: the content starts the same distance under
+    /// the last baseline whether or not there is a subtitle.
     private var baselineCompensation: CGFloat {
-        guard subtitle != nil, Accessory.self == EmptyView.self else { return 0 }
-        let title = UIFontMetrics(forTextStyle: .largeTitle)
-            .scaledFont(for: LHFont.frauncesUIFont(size: LHScreenAnatomy.titleSize, weight: 500, opticalSize: 34))
+        guard subtitle != nil, Accessory.self == EmptyView.self, !trailingBelow else { return 0 }
         let sub = UIFont.preferredFont(forTextStyle: .subheadline)
-        return max(0, abs(title.descender) - abs(sub.descender))
+        return max(0, abs(style.uiFont.descender) - abs(sub.descender))
     }
 }
 
-// MARK: - Tab screen
+struct LHHeaderBackButton: View {
+    let back: LHBackAction
 
-struct LHTabScreenModifier<Accessory: View, Trailing: View>: ViewModifier {
+    var body: some View {
+        Button(action: back.action) { Image(systemName: "chevron.backward") }
+            .buttonStyle(LHButton.icon)
+            .accessibilityLabel(back.label ?? String(localized: "title.back", defaultValue: "Back", table: "Foundations"))
+            .accessibilityIdentifier(back.identifier ?? "screen.back")
+    }
+}
+
+// MARK: - Tab and detail screens (scroll-away header + compact bar)
+
+struct LHScrollingScreenModifier<Accessory: View, Trailing: View>: ViewModifier {
     let title: String
     var subtitle: String?
-    var back: (() -> Void)?
-    var backLabel: String?
-    var backIdentifier: String?
-    /// Hero screens (Today) sit on the page gradient: the pinned header stays clear.
+    var style: LHHeaderStyle
+    var back: LHBackAction?
+    /// Hero screens (Today) sit on the page gradient.
     var onPage: Bool
     @ViewBuilder var accessory: Accessory
     @ViewBuilder var trailing: Trailing
 
+    @State private var scrolled: CGFloat = 0
     @Environment(\.colorScheme) private var colorScheme
-
-    init(title: String, subtitle: String?, back: (() -> Void)?, backLabel: String?, backIdentifier: String?, onPage: Bool,
-         @ViewBuilder accessory: () -> Accessory, @ViewBuilder trailing: () -> Trailing) {
-        self.title = title
-        self.subtitle = subtitle
-        self.back = back
-        self.backLabel = backLabel
-        self.backIdentifier = backIdentifier
-        self.onPage = onPage
-        self.accessory = accessory()
-        self.trailing = trailing()
-        LHHeaderSystem.installNativeAppearanceIfNeeded()
-    }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+    private var compact: Bool { scrolled > LHScreenAnatomy.compactThreshold }
 
     func body(content: Content) -> some View {
-        switch LHHeaderSystem.current {
-        case .native: native(content)
-        case .custom: custom(content)
-        }
-    }
-
-    @ViewBuilder private func native(_ content: Content) -> some View {
         content
-            .contentMargins(.top, LHScreenAnatomy.headerToContent, for: .scrollContent)
-            .environment(\.defaultMinListHeaderHeight, 0)
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.large)
-            .modifier(LHNavigationSubtitle(subtitle: subtitle))
-            .navigationBarBackButtonHidden(back != nil)
-            .toolbar(.visible, for: .navigationBar)
-            .toolbar {
-                if let back {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button(action: back) { Image(systemName: "chevron.backward") }
-                            .accessibilityLabel(backLabel ?? String(localized: "title.back", defaultValue: "Back", table: "Foundations"))
-                            .accessibilityIdentifier(backIdentifier ?? "screen.back")
-                    }
-                }
-                if Accessory.self != EmptyView.self {
-                    ToolbarItem(placement: .topBarLeading) { accessory }
-                }
-                if Trailing.self != EmptyView.self {
-                    ToolbarItem(placement: .topBarTrailing) { trailing }
-                }
-            }
-    }
-
-    @ViewBuilder private func custom(_ content: Content) -> some View {
-        let header = LHScreenHeader(title: title, subtitle: subtitle, placement: .tab, back: back,
-                                    backLabel: backLabel, backIdentifier: backIdentifier,
-                                    accessory: { accessory }, trailing: { trailing })
-        let base = content
             .contentMargins(.top, LHScreenAnatomy.headerToContent - 8, for: .scrollContent)
             .environment(\.defaultMinListHeaderHeight, 0)
             .toolbar(.hidden, for: .navigationBar)
-        if #available(iOS 26, *) {
-            base.safeAreaBar(edge: .top, spacing: 0) { header }
-        } else {
-            base.safeAreaInset(edge: .top, spacing: 0) {
-                header.background(onPage ? AnyShapeStyle(.clear) : AnyShapeStyle(.bar))
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top
+            } action: { _, value in
+                scrolled = value
             }
-        }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                // The header moves with the content (it is in the safe-area inset, the content scrolls
+                // under it), so it reads as part of the page and leaves with it.
+                LHScreenHeader(title: title, subtitle: subtitle, style: style, back: back,
+                               accessory: { accessory }, trailing: { trailing })
+                    .offset(y: -max(0, scrolled))
+                    .opacity(compact ? 0 : 1)
+                    .allowsHitTesting(!compact)
+                    .accessibilityHidden(compact)
+            }
+            .overlay(alignment: .top) {
+                if compact {
+                    compactBar
+                        .transition(.opacity)
+                }
+            }
+            .animation(reduceMotion ? nil : AppAnimation.quick, value: compact)
     }
-}
 
-private struct LHNavigationSubtitle: ViewModifier {
-    let subtitle: String?
-    func body(content: Content) -> some View {
-        if let subtitle, #available(iOS 26, *) {
-            content.navigationSubtitle(subtitle)
-        } else {
-            content
+    /// The compact bar: back, the title in `.headline`, the trailing action, on the bar material
+    /// (glass on iOS 26+), with a hairline under it.
+    private var compactBar: some View {
+        HStack(spacing: 8) {
+            if let back { LHHeaderBackButton(back: back) } else { Color.clear.frame(width: LHMetrics.minTap, height: 1) }
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(colors.textPrimary)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("screen.compactTitle")
+            ZStack { Color.clear.frame(width: LHMetrics.minTap, height: 1); trailing }
+                .frame(maxHeight: LHScreenAnatomy.titleRowHeight)
         }
+        .padding(.horizontal, LHMetrics.gutter - 8)
+        .frame(height: LHScreenAnatomy.titleRowHeight)
+        .frame(maxWidth: .infinity)
+        .background {
+            Rectangle().fill(.bar)
+                .overlay(alignment: .bottom) { colors.border.frame(height: LHMetrics.hairline) }
+                .ignoresSafeArea(edges: .top)
+        }
+        .accessibilityElement(children: .contain)
     }
-}
-
-/// A back action for a pushed collection root. A struct, not a bare closure, so a trailing
-/// `{ … }` after `.lhTabScreen(…)` can never bind to it by accident.
-struct LHBackAction {
-    var label: String? = nil
-    var identifier: String? = nil
-    let action: () -> Void
 }
 
 extension View {
@@ -254,30 +252,48 @@ extension View {
         @ViewBuilder accessory: () -> Accessory = { EmptyView() },
         @ViewBuilder trailing: () -> Trailing = { EmptyView() }
     ) -> some View {
-        modifier(LHTabScreenModifier(title: title, subtitle: subtitle, back: back?.action, backLabel: back?.label,
-                                     backIdentifier: back?.identifier, onPage: onPage,
-                                     accessory: accessory, trailing: trailing))
+        modifier(LHScrollingScreenModifier(title: title, subtitle: subtitle, style: .collection, back: back,
+                                           onPage: onPage, accessory: accessory, trailing: trailing))
+    }
+
+    /// A pushed screen about one item (a rental, a record): the same rhythm, SF `.title1.semibold`.
+    func lhDetailScreen<Accessory: View, Trailing: View>(
+        _ title: String, subtitle: String? = nil, back: LHBackAction? = nil, onPage: Bool = false,
+        @ViewBuilder accessory: () -> Accessory = { EmptyView() },
+        @ViewBuilder trailing: () -> Trailing = { EmptyView() }
+    ) -> some View {
+        modifier(LHScrollingScreenModifier(title: title, subtitle: subtitle, style: .detail, back: back,
+                                           onPage: onPage, accessory: accessory, trailing: trailing))
     }
 }
 
-// MARK: - Sheet header (task sheets)
+// MARK: - Sheets
 
-/// The one sheet header: the same title face and size as the tabs, close at the trailing edge of the
-/// title row. `.native` hosts it in a navigation bar (large title); `.custom` pins `LHScreenHeader`.
-struct LHSheetHeader: View {
+/// The one sheet header: Fraunces 28, close at the trailing edge of the title row.
+struct LHSheetHeader<Trailing: View>: View {
     let title: String
     var subtitle: String? = nil
     var onClose: (() -> Void)?
+    @ViewBuilder var trailing: Trailing
 
     var body: some View {
-        LHScreenHeader(title: title, subtitle: subtitle, placement: .sheet, accessory: { EmptyView() }) {
-            if let onClose {
-                Button(action: onClose) { Image(systemName: "xmark") }
-                    .buttonStyle(LHButton.icon)
-                    .accessibilityLabel(String(localized: "sheet.close", defaultValue: "Close", table: "Foundations"))
-                    .accessibilityIdentifier("sheet.close")
+        LHScreenHeader(title: title, subtitle: subtitle, style: .sheet, accessory: { EmptyView() }) {
+            HStack(spacing: 8) {
+                trailing
+                if let onClose {
+                    Button(action: onClose) { Image(systemName: "xmark") }
+                        .buttonStyle(LHButton.icon)
+                        .accessibilityLabel(String(localized: "sheet.close", defaultValue: "Close", table: "Foundations"))
+                        .accessibilityIdentifier("sheet.close")
+                }
             }
         }
+    }
+}
+
+extension LHSheetHeader where Trailing == EmptyView {
+    init(title: String, subtitle: String? = nil, onClose: (() -> Void)?) {
+        self.init(title: title, subtitle: subtitle, onClose: onClose, trailing: { EmptyView() })
     }
 }
 
@@ -287,42 +303,26 @@ struct LHSheetScreenModifier: ViewModifier {
     var onClose: (() -> Void)?
     var background: Color
 
-    init(title: String, subtitle: String?, onClose: (() -> Void)?, background: Color) {
-        self.title = title
-        self.subtitle = subtitle
-        self.onClose = onClose
-        self.background = background
-        LHHeaderSystem.installNativeAppearanceIfNeeded()
-    }
+    @State private var scrolled: CGFloat = 0
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     func body(content: Content) -> some View {
-        switch LHHeaderSystem.current {
-        case .native:
-            NavigationStack {
-                content
-                    .contentMargins(.top, LHScreenAnatomy.headerToContent, for: .scrollContent)
-                    .navigationTitle(title)
-                    .navigationBarTitleDisplayMode(.large)
-                    .modifier(LHNavigationSubtitle(subtitle: subtitle))
-                    .toolbar {
-                        if let onClose {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                Button(action: onClose) { Image(systemName: "xmark") }
-                                    .accessibilityLabel(String(localized: "sheet.close", defaultValue: "Close", table: "Foundations"))
-                                    .accessibilityIdentifier("sheet.close")
-                            }
-                        }
-                    }
-                    .background(background.ignoresSafeArea())
+        let ax = typeSize.isAccessibilitySize
+        content
+            .contentMargins(.top, LHScreenAnatomy.headerToContent - 8, for: .scrollContent)
+            .environment(\.defaultMinListHeaderHeight, 0)
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top
+            } action: { _, value in
+                scrolled = value
             }
-        case .custom:
-            content
-                .contentMargins(.top, LHScreenAnatomy.headerToContent - 8, for: .scrollContent)
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    LHSheetHeader(title: title, subtitle: subtitle, onClose: onClose)
-                        .background(background)
-                }
-        }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                // Pinned and opaque below AX: scrolled rows never read through the title (§1.20). At AX
+                // the wrapped title would hold half the sheet, so it leaves with the content (§1.20 AX).
+                LHSheetHeader(title: title, subtitle: subtitle, onClose: onClose)
+                    .background(background)
+                    .offset(y: ax ? -max(0, scrolled) : 0)
+            }
     }
 }
 
@@ -334,16 +334,16 @@ extension View {
     }
 }
 
-// MARK: - The one header action (S3)
+// MARK: - The one header action (S5)
 
-/// The single action a header may carry (the trailing slot), or the accessory's control. It draws
-/// itself per header system: in the system bar (`.native`) it is a plain button and the bar gives
-/// it the glass capsule; on the custom title row it is `LHButton.icon` (a symbol) or
-/// `LHButton.tertiary` (a short label). Never a "+": the create action is the fifth tab (§1.25).
+/// The single action a header may carry: `LHButton.icon` for a symbol, `LHButton.tertiary` for a
+/// short label. A label action moves under the title at AX sizes. Never a "+": the create action is
+/// the fifth tab (§1.25).
 struct LHHeaderAction: View {
-    enum Content { case symbol(String), label(String) }
+    enum Kind: Equatable { case symbol, label }
+    private enum Content { case symbol(String), label(String) }
 
-    let content: Content
+    private let content: Content
     let accessibilityLabel: String
     var identifier: String? = nil
     let action: () -> Void
@@ -363,18 +363,19 @@ struct LHHeaderAction: View {
     }
 
     var body: some View {
-        let button = Button(action: action) {
-            switch content {
-            case .symbol(let name): Image(systemName: name)
-            case .label(let title): Text(title)
-            }
-        }
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityIdentifier(identifier ?? "")
-        switch (LHHeaderSystem.current, content) {
-        case (.native, _): button
-        case (.custom, .symbol): button.buttonStyle(LHButton.icon)
-        case (.custom, .label): button.buttonStyle(LHButton.tertiary)
+        switch content {
+        case .symbol(let name):
+            Button(action: action) { Image(systemName: name) }
+                .buttonStyle(LHButton.icon)
+                .accessibilityLabel(accessibilityLabel)
+                .accessibilityIdentifier(identifier ?? "")
+                .preference(key: LHHeaderActionKindKey.self, value: .symbol)
+        case .label(let title):
+            Button(title, action: action)
+                .buttonStyle(LHButton.tertiary)
+                .accessibilityIdentifier(identifier ?? "")
+                .preference(key: LHHeaderActionKindKey.self, value: .label)
         }
     }
 }
+

@@ -346,13 +346,24 @@ struct LogTimeSheet: View {
         } else if !showVoiceIntro {
             // The details line and the manual door sit right under the note: the note is focused on
             // open, and with the keyboard up the pinned footer covers everything below the recents.
+            // The recents come first: with the keyboard up they are the fastest way to log, and they
+            // must stay above the pinned primary (owner's pick 2026-10-27).
+            if !recents.isEmpty && !isFirstRun && !isListening { recentsView.opacity(exiting ? 0 : 1).transition(.identity) }
             VStack(alignment: .leading, spacing: 0) {
                 detailsLine
                 enterDetailsButton
             }
             .opacity(exiting ? 0 : 1)
             .transition(.identity)
-            if !recents.isEmpty && !isFirstRun && !isListening { recentsView.opacity(exiting ? 0 : 1).transition(.identity) }
+        }
+        // Only the primary is pinned (§1.20, owner's pick 2026-10-27): the timer link scrolls with the
+        // body, after the recents, so the keyboard never pushes the recents under a pinned link.
+        if showsTimerButton {
+            Button(action: openTimer) { Label(lt("Start a timer instead"), systemImage: "timer") }
+                .buttonStyle(LHButton.tertiary)
+                .frame(maxWidth: .infinity)
+                .accessibilityHint(lt("Starts a timer instead of logging time you already did."))
+                .accessibilityIdentifier("log.startTimer")
         }
     }
 
@@ -407,11 +418,6 @@ struct LogTimeSheet: View {
                 Button(lt("Discard"), action: discardReview)
                     .buttonStyle(LHButton.destructiveTertiary)
                     .accessibilityIdentifier("log.discard")
-            } else if showsTimerButton {
-                Button(action: openTimer) { Label(lt("Start a timer instead"), systemImage: "timer") }
-                    .buttonStyle(LHButton.tertiary)
-                    .accessibilityHint(lt("Starts a timer instead of logging time you already did."))
-                    .accessibilityIdentifier("log.startTimer")
             }
             Button(action: primaryTapped) {
                 ZStack {

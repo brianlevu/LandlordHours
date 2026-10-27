@@ -332,7 +332,15 @@ struct DashboardView: View {
             // Screen anatomy: Today has a title like every tab. The rental picker is the header's
             // accessory (under the title, or in the bar for Option 1); the account menu is its one action.
             .lhTabScreen(String(localized: "today.title", defaultValue: "Today", table: "Today"), onPage: true, accessory: {
-                LHToastChipSlot { switcher }.dynamicTypeSize(...DynamicTypeSize.accessibility2)
+                // The rental chip, with the page dots beside it (they left the house base, where they
+                // overlapped the lot): one row that says which rental and where it sits in the swipe.
+                HStack(spacing: 12) {
+                    LHToastChipSlot { switcher }.dynamicTypeSize(...DynamicTypeSize.accessibility2)
+                    if focuses.count > 1 && !ax {
+                        LHPageDots(count: focuses.count, current: focusIndex)
+                            .accessibilityHidden(true)
+                    }
+                }
             }, trailing: {
                 accountMenu
             })
@@ -499,16 +507,7 @@ struct DashboardView: View {
                 // words, never breaks inside one ("Santa Ray…" at AX3 and "Schoolhous…" were FAILs, §H.8).
                 ViewThatFits(in: .horizontal) {
                     ForEach(TodayChipName.candidates(focus.name), id: \.self) { name in
-                        if LHHeaderSystem.current == .native {
-                            // In the system bar the bar draws the capsule.
-                            HStack(spacing: 4) {
-                                Text(name).font(.subheadline.weight(.semibold)).lineLimit(1)
-                                if pages.count > 1 { Image(systemName: "chevron.down").font(.caption) }
-                            }
-                            .foregroundStyle(colors.textPrimary)
-                        } else {
-                            LHHeroChip(name, showsChevron: pages.count > 1)
-                        }
+                        LHHeroChip(name, showsChevron: pages.count > 1)
                     }
                 }
                 .frame(maxWidth: max(160, min(window.width > 0 ? window.width : 402, 402) - 2 * (LHMetrics.gutter + LHMetrics.minTap)),
@@ -536,18 +535,14 @@ struct DashboardView: View {
                 Label(String(localized: "today.account.settings", defaultValue: "Settings", table: "Today"), systemImage: "gearshape")
             }
         } label: {
-            if LHHeaderSystem.current == .native {
-                Image(systemName: "person.crop.circle")
-            } else {
-                Image(systemName: "person.crop.circle")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(colors.textSecondary)
-                    .frame(width: 36, height: 36)
-                    .background(colors.heroChipFill, in: Circle())
-                    .overlay(Circle().strokeBorder(colors.heroChipHairline, lineWidth: 0.5))
-                    .frame(width: LHMetrics.minTap, height: LHMetrics.minTap)
-                    .contentShape(Circle())
-            }
+            Image(systemName: "person.crop.circle")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(colors.textSecondary)
+                .frame(width: 36, height: 36)
+                .background(colors.heroChipFill, in: Circle())
+                .overlay(Circle().strokeBorder(colors.heroChipHairline, lineWidth: 0.5))
+                .frame(width: LHMetrics.minTap, height: LHMetrics.minTap)
+                .contentShape(Circle())
         }
         .accessibilityLabel(String(localized: "today.account.label", defaultValue: "Reports and settings", table: "Today"))
         .accessibilityIdentifier("today.account")
@@ -576,10 +571,6 @@ struct DashboardView: View {
             .frame(maxWidth: .infinity)
             .clipped()
             .accessibilityIdentifier("today.hero")
-            if pages.count > 1 && !ax {
-                LHPageDots(count: pages.count, current: focusIndex)
-                    .padding(.top, -48)
-            }
         }
     }
 

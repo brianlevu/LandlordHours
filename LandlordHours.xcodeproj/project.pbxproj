@@ -90,6 +90,7 @@
 		41608B6514C2E6C81B7359F2 /* AuditReportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA55F7A788AAB40693166F60 /* AuditReportTests.swift */; };
 		419FFD77F3F65250D39D2867 /* CategoryToolTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B814AF623B0F8FBA1ADFD8 /* CategoryToolTile.swift */; };
 		41D5547191C590C8DB391022 /* CalendarCaptureCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCE30070327091F72B0D4F65 /* CalendarCaptureCoordinator.swift */; };
+		4413C041996C93956840912F /* ScreenAnatomyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 778AABBED9DA54CA097A797C /* ScreenAnatomyUITests.swift */; };
 		452A3671C41118A6CF4C5852 /* RecordSetMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A94E06F9C4D45829B670559 /* RecordSetMigration.swift */; };
 		45D553A54774103360D71EBB /* D5-201-local.plist in Resources */ = {isa = PBXBuildFile; fileRef = 9FAD7B9F5229A82FBCEB04CA /* D5-201-local.plist */; };
 		45D7BE7A4D5B74209895E617 /* HouseRevealTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3481944DA03AF4F158A280AF /* HouseRevealTests.swift */; };
@@ -541,6 +542,7 @@
 		74E7F35CA9ADFE290A5D0420 /* LandlordHours.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = LandlordHours.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		754B9E894A2C95D4E5C635B0 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		75598601544E6898E955D9D4 /* NotificationCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationCopy.swift; sourceTree = "<group>"; };
+		778AABBED9DA54CA097A797C /* ScreenAnatomyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenAnatomyUITests.swift; sourceTree = "<group>"; };
 		784A3D1CE78DE44A9084B54D /* NoteReaderEvalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteReaderEvalTests.swift; sourceTree = "<group>"; };
 		7A6155D766135551C32EC91A /* CaptureActionSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureActionSupport.swift; sourceTree = "<group>"; };
 		7AF03B848DF513B27E2CE363 /* LogPickers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogPickers.swift; sourceTree = "<group>"; };
@@ -1169,6 +1171,7 @@
 				65CD50959762385E221A6599 /* PropertyAliasUITests.swift */,
 				CC8D77D86EF7D09160EF0F0A /* RecordsReportsCaptureUITests.swift */,
 				86FFABF3A26D5A7309D8551B /* RecordsReportsSettingsUITests.swift */,
+				778AABBED9DA54CA097A797C /* ScreenAnatomyUITests.swift */,
 				B060A1E563DBB7AB0A5385B7 /* SettingsLongTailCaptureUITests.swift */,
 				1D6A18BDE3378CA9EE7B92F5 /* ShellTabUITests.swift */,
 				287714393B454D0826EED824 /* SurfacesNotificationUITests.swift */,
@@ -1915,6 +1918,7 @@
 				37D64D0788DE8C34351A264C /* PropertyAliasUITests.swift in Sources */,
 				FC6D6E7D90E9FA8838B7C4C7 /* RecordsReportsCaptureUITests.swift in Sources */,
 				93B7E693B037558B0A327A0F /* RecordsReportsSettingsUITests.swift in Sources */,
+				4413C041996C93956840912F /* ScreenAnatomyUITests.swift in Sources */,
 				3DD86D113BDCA55AE315AB5B /* SettingsLongTailCaptureUITests.swift in Sources */,
 				0195F855BE57E7B48A7BB71E /* ShellTabUITests.swift in Sources */,
 				E67AFF710ABAE5BB2F541BCC /* SurfacesNotificationUITests.swift in Sources */,

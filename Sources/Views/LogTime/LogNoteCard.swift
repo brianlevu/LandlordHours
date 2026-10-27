@@ -79,6 +79,9 @@ extension LogTimeSheet {
     var notePlaceholder: String {
         if isReviewing { return lt("What did you work on?") }
         if isFirstRun { return lt("What did you do? Try \u{201C}fixed the sink, 1 hour\u{201D}") }
+        // At AX the prompt wraps instead of truncating, so it is the short question: the example
+        // filled four lines and pushed the field under the pinned primary (owner's pick 2026-10-27).
+        if isAX && !manual { return lt("What did you do?") }
         return manual
             ? lt("What did you do? (optional)")
             : lt("What did you do? Try \u{201C}fixed the sink at Pine Cabin, 1 hour\u{201D}")

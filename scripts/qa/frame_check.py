@@ -1315,7 +1315,7 @@ def cmd_breaks(args) -> int:
 
 # ---- consistency: one header system across tabs (standard "Screen anatomy", S1-S4) ----
 SAFE_TOP_PT = {874: 62, 956: 62, 852: 59, 932: 59, 844: 47, 926: 47}  # status bar / Dynamic Island inset per height
-TITLE_MIN_PT, TITLE_MAX_PT = 20.0, 48.0   # a large-title glyph band (Fraunces 34 measures ~25-33pt with descenders)
+TITLE_MIN_PT, TITLE_MAX_PT = 20.0, 96.0   # a large-title glyph band (Fraunces 34: ~25-33pt with descenders at default; ~60-80pt at AX3)
 SHEET_TITLE_MIN_PT = 14.0                  # SF title2 / title1 in sheets (~16-24pt)
 SUBTITLE_GAP_PT = 16.0                     # a short text band starting this close under the title (line-box descent + 2pt) is the subtitle
 INK_MAX_MEAN = 110                         # "dark ink": mean RGB below this (textPrimary #121B33, textSecondary #4A5068)
@@ -1336,7 +1336,7 @@ def header_metrics(path, scale=None, kind="tab", search_to=0.55):
 
     Heuristics (confirm by eye):
       ink rows     rows with >= 2 dark pixels (mean RGB < 110) between the gutters
-      title band   the heaviest ink band below the safe area whose height is a large title (20-48pt for tabs,
+      title band   the tallest ink band (heavier ink breaks a tie) below the safe area whose height is a large title (20-48pt for tabs,
                    14-48pt for sheets) and which starts within 130pt of the safe area; a band above it (back
                    button, nav-bar button, rental chip) is skipped, and a big numeral lower down is not a title
       baseline     the sharpest fall in the band's per-row ink count in its lower 60% (descenders are thin)
@@ -1357,10 +1357,25 @@ def header_metrics(path, scale=None, kind="tab", search_to=0.55):
     counts = dark.sum(axis=1)
     bands = [(y0 + s, y0 + e) for s, e in runs(counts >= 2, min_len=int(4 * sc), close_gap=int(1.5 * sc))]
     lo = (SHEET_TITLE_MIN_PT if kind == "sheet" else TITLE_MIN_PT) * sc
-    # The title is the heaviest ink band in the title zone: a nav-bar chip, a back chevron or a share
-    # glyph above or beside it carries far less ink than a 34pt title.
-    cands = [(s, e) for s, e in bands if lo <= e - s <= TITLE_MAX_PT * sc and s <= (safe + TITLE_ZONE_PT) * sc]
-    title = max(cands, key=lambda b: int(counts[b[0] - y0:b[1] - y0].sum())) if cands else None
+    # The title is the tallest ink band in the title zone (the largest type on the screen), heavier ink
+    # breaking a tie within 2pt: a chip, a back chevron, a share glyph or a section header ("To confirm
+    # · 8", long but smaller) is shorter than the screen title at every Dynamic Type size.
+    edge_col = a[:, int(3 * sc)]
+
+    def on_canvas(b):
+        """A title sits on the page, not inside a card: most of the band differs from a card fill."""
+        mid = (b[0] + b[1]) // 2
+        row = a[mid, x0:x1]
+        fill = (np.abs(row - edge_col[mid][None, :]).sum(axis=1) > FILL_DIFF) & (row.mean(axis=1) >= INK_MAX_MEAN)
+        return fill.mean() < 0.5   # pixels that are neither the page nor ink: a card or field behind the text
+
+    cands = [(s, e) for s, e in bands if lo <= e - s <= TITLE_MAX_PT * sc and s <= (safe + TITLE_ZONE_PT) * sc
+             and on_canvas((s, e))]
+    title = None
+    if cands:
+        tallest = max(e - s for s, e in cands)
+        near = [b for b in cands if (b[1] - b[0]) >= tallest - 2 * sc]
+        title = max(near, key=lambda b: int(counts[b[0] - y0:b[1] - y0].sum()))
     out = {"frame": path, "scale": sc, "safe_top_pt": safe, "kind": kind,
            "bands_pt": [[round(s / sc, 1), round(e / sc, 1)] for s, e in bands[:12]],
            "title_top_pt": None, "title_baseline_pt": None, "title_height_pt": None,

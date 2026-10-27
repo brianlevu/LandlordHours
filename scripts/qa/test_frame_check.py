@@ -598,5 +598,24 @@ class Consistency(unittest.TestCase):
         _, ok2 = fc.consistency_verdict(ms)
         self.assertFalse(ok2)
 
+
+class ConsistencyAX(unittest.TestCase):
+    def test_title_after_back_chevron_at_ax3_is_found(self):
+        """Settings at AX3: a back chevron leads the row and the title is ~66pt of ink (was read as 'no title')."""
+        s = 3
+        a = np.zeros((H, W, 3), np.uint8)
+        a[:] = CANVAS
+        t0 = 80 * s
+        a[t0 + 10 * s:t0 + 52 * s, 20 * s:64 * s] = (226, 232, 245)       # the back circle
+        a[t0 + 22 * s:t0 + 40 * s, 36 * s:46 * s] = INK                   # the chevron
+        a[t0:t0 + 66 * s, 76 * s:330 * s] = INK                           # the AX3 title glyphs
+        a[(80 + 100) * s:(80 + 300) * s, 60:1146] = CARD
+        path = os.path.join(tempfile.mkdtemp(prefix="fc-ax-"), "settings-ax3.png")
+        Image.fromarray(a).save(path)
+        m = fc.header_metrics(path, 3.0)
+        self.assertIsNotNone(m["title_baseline_pt"], "the title after the chevron must be found")
+        self.assertAlmostEqual(m["title_baseline_pt"], 146.0, delta=0.7)
+        self.assertAlmostEqual(m["content_top_pt"], 180.0, delta=0.5)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

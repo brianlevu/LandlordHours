@@ -19,13 +19,20 @@ extension LogTimeSheet {
                     }
                 }
             } else {
-                LogChipFlow(spacing: 8) {
-                    ForEach(recents) { recent in
-                        LHChip(LogRecents.title(recent, properties: properties), isSelected: false) { useRecent(recent) }
-                            .accessibilityLabel(LogRecents.title(recent, properties: properties))
-                            .accessibilityIdentifier("log.recent")
+                // One strip (§1.16), edge to edge with its own 20pt inner gutter, so the recents keep one
+                // row above the keyboard (owner's pick 2026-10-27: the fastest way to log stays visible).
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(recents) { recent in
+                            LHChip(LogRecents.title(recent, properties: properties), isSelected: false) { useRecent(recent) }
+                                .accessibilityLabel(LogRecents.title(recent, properties: properties))
+                                .accessibilityIdentifier("log.recent")
+                        }
                     }
+                    .padding(.horizontal, LHMetrics.gutter)
                 }
+                .scrollIndicators(.hidden)
+                .padding(.horizontal, -LHMetrics.gutter)
             }
         }
         .accessibilityElement(children: .contain)
