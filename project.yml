@@ -1,6 +1,12 @@
 name: LandlordHours
 options:
   bundleIdPrefix: com.openclaw
+  fileTypes:
+    # AppIcon.icon is an Icon Composer document: a folder Xcode treats as ONE file (actool input
+    # type folder.iconcomposer.icon). Without this XcodeGen walks into the package, adds icon.json
+    # and each layer as loose resources, and actool never sees the icon (XcodeGen #1556).
+    icon:
+      file: true
   deploymentTarget:
     # Minimum OS for 2.1: iOS 18.0 (DESIGN-STANDARD §1.25, Brian 2026-10-23). Liquid Glass APIs sit
     # behind #available(iOS 26, *) with the system-material fallback on 18–25.
@@ -46,7 +52,16 @@ targets:
           # (Widget/WidgetSurfaceViews.swift) and house art also build into the app for the DEBUG
           # capture board (WidgetCaptureBoard).
           - "Widget/LandlordHoursWidget.swift"
+          # The widget's own InfoPlist strings (CFBundleDisplayName) build only in the extension;
+          # the app has Sources/App/InfoPlist.xcstrings.
+          - "Widget/InfoPlist.xcstrings"
       - path: Assets.xcassets
+      # Dormer app icon (2.2): this Icon Composer document (Liquid Glass; default, dark and tinted
+      # authored). It wins over the same-named AppIcon set in Assets.xcassets: actool flattens the
+      # .icon itself for iOS 18-25 (verified 2026-10-27 with a solid-red probe set: the red never
+      # reached the build). The AppIcon set holds the embossed 1024s rendered from the same vector;
+      # it is what ships if this line is removed. Generator: design/brand/dormer/make_dormer_icon.py.
+      - path: AppIcon.icon
     dependencies:
       - target: LandlordHoursWidget
       - package: LucideIcons

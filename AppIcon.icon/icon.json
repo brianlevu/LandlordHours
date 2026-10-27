@@ -1,0 +1,92 @@
+{
+  "fill": {
+    "solid": "extended-srgb:0.11765,0.24706,0.65098,1.00000"
+  },
+  "groups": [
+    {
+      "name": "Mark",
+      "layers": [
+        {
+          "name": "mark",
+          "image-name-specializations": [
+            {
+              "value": "mark.svg"
+            },
+            {
+              "appearance": "dark",
+              "value": "mark-dark.svg"
+            },
+            {
+              "appearance": "tinted",
+              "value": "mark.svg"
+            }
+          ],
+          "glass": true,
+          "hidden": false,
+          "opacity": 1,
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "specular": true,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.0
+      }
+    },
+    {
+      "name": "Ground",
+      "layers": [
+        {
+          "name": "ground",
+          "image-name-specializations": [
+            {
+              "value": "ground-light.png"
+            },
+            {
+              "appearance": "dark",
+              "value": "ground-dark.png"
+            },
+            {
+              "appearance": "tinted",
+              "value": "ground-tinted.png"
+            }
+          ],
+          "glass": false,
+          "hidden": false,
+          "opacity": 1,
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "specular": false,
+      "shadow": {
+        "kind": "none",
+        "opacity": 0.0
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.0
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": [
+      "iOS"
+    ]
+  }
+}
