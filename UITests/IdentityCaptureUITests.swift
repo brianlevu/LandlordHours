@@ -16,7 +16,6 @@ final class IdentityCaptureUITests: IdentityJourneyUITests {
     override func testReturning106UserOpensOnTodayWithTheirRecords() {}
     override func testReturning201AppleUserOpensOnTodayWithNoSignIn() {}
     override func testTwoSetsAskOnceCombineAddsTheHours() {}
-    override func testTwoSetsSpouseAnswerThenUndo() {}
     override func testTwoSetsAsideIsListedAndCanBeAddedLater() {}
     override func testDecideLaterKeepsTheSetHeldAndListed() {}
     override func testNewPhoneChecksICloudThenContinues() {}
@@ -60,13 +59,10 @@ final class IdentityCaptureUITests: IdentityJourneyUITests {
         XCTAssertTrue(element("welcome.records.found").waitForExistence(timeout: 20))
         shoot("welcome-found-\(s)")
 
-        // The two-sets question and its two second steps.
+        // The two-sets question and its second step.
         launch(fixture: "D8-201-two-local", zone: "empty", scheme: scheme, size: size)
         XCTAssertTrue(element("identity.mergeQuestion").waitForExistence(timeout: 25))
         shoot("merge-ask-\(s)")
-        tap(app.buttons["identity.merge.spouse"])
-        shoot("merge-spouse-\(s)")
-        tap(app.buttons["identity.merge.back"])
         tap(app.buttons["identity.merge.aside"])
         shoot("merge-aside-\(s)")
 

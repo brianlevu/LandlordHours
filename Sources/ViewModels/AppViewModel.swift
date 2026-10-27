@@ -2075,12 +2075,6 @@ extension AppViewModel {
         reloadAfterIdentityChange()
     }
 
-    func undoSpouse(group id: String) {
-        identity.undoSpouse(group: id)
-        syncService.schedulePush()
-        reloadAfterIdentityChange()
-    }
-
     func putBack(_ names: Set<String>) {
         identity.putBack(names)
         syncService.schedulePush()

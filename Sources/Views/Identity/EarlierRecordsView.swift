@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Earlier records: the safety net (P14–P19, P26, P30)
 //
 // Everything the merge could not place on its own: a held set waiting for an answer, a set kept
-// aside, a set added as the spouse's (Undo for 30 days), records removed elsewhere or inferred
+// aside, records removed elsewhere or inferred
 // (Put back), records waiting on the bulk answer. Rows carry no buttons (§1.1): the row opens a
 // dialog with its actions. A failed iCloud search is shown here, never hidden (diagnosis §7.1).
 
@@ -129,11 +129,6 @@ struct EarlierRecordsView: View {
         case .pending:
             meta = String(localized: "Waiting for your answer", table: "Identity")
             glyph = "questionmark.circle"
-        case .spouse:
-            let until = viewModel.identity.groups?.group(group.id)?.undoUntil
-            meta = until.map { String(localized: "Added as your spouse’s hours · Undo until \(IdentityCopy.shortDate($0))", table: "Identity") }
-                ?? String(localized: "Added as your spouse’s hours", table: "Identity")
-            glyph = "person.2"
         case .notNeeded:
             meta = String(localized: "\(IdentityCopy.groupSource(group.source)) · Only custom categories", table: "Identity")
             glyph = "tag"
@@ -153,8 +148,6 @@ struct EarlierRecordsView: View {
 
     @ViewBuilder private func actions(for group: ArchivedGroup) -> some View {
         switch group.status {
-        case .spouse:
-            Button(String(localized: "Undo", table: "Identity")) { viewModel.undoSpouse(group: group.id) }
         default:
             Button(String(localized: "Add to my records", table: "Identity")) {
                 // This page asks; the app-level host stays quiet so one sheet shows, after the

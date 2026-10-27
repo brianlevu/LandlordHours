@@ -174,10 +174,9 @@ enum GroupStatus: String, Codable {
     /// Waiting for the two-sets answer (held: on device, in iCloud, never merged, never deleted).
     case pending
     case combine
-    case spouse
     case aside
 
-    var isLive: Bool { self == .primary || self == .combine || self == .spouse }
+    var isLive: Bool { self == .primary || self == .combine }
 }
 
 enum GroupSource: String, Codable { case device, iCloud, both }
@@ -195,8 +194,6 @@ struct GroupRecord: Codable, Equatable, Identifiable {
     /// R2b: same owner id on device and in iCloud, both non-empty, zero UUID overlap.
     var splitFromDevice: Bool = false
     var answeredAt: Date?
-    /// Spouse undo window ends (30 days after the answer).
-    var undoUntil: Date?
 }
 
 struct GroupsFile: Codable, Equatable {

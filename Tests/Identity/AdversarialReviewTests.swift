@@ -1,4 +1,5 @@
 import XCTest
+import CloudKit
 @testable import LandlordHours
 
 /// Adversarial review of d3bb9e2 (fix/k-engine). Each test is a loss or silent-change path the
@@ -23,43 +24,6 @@ final class AdversarialReviewTests: XCTestCase {
     private func legacy(_ id: String, _ box: IdentitySandbox? = nil) -> (entries: [TimeEntry], properties: [RentalProperty]) {
         let d = (box ?? sandbox).defaults
         return (Fixture.entries(d, key: "u.\(id).LandlordHours.entries"), Fixture.properties(d, key: "u.\(id).LandlordHours.properties"))
-    }
-
-    // MARK: A · Undo spouse never reaches a second 2.2 phone that already holds the hours live
-
-    func testUndoSpouseLeavesTheHoursLiveAsSpouseOnASecondPhone() async throws {
-        XCTAssertTrue(Fixture.load("D8", into: sandbox))
-        let zone = FakeZoneSource()
-        let a = EngineHarness(sandbox, zone: zone)
-        try a.device()
-        let doneA = await a.cloud()
-        XCTAssertEqual(doneA, .done)
-        let group = try XCTUnwrap(a.earlier.group(local))
-        let names = Set(group.entries.map(\.id.uuidString))
-        a.engine.answer(.spouse, group: local)
-        await a.engine.pushLive()
-
-        // Phone B, same iCloud, migrates after the answer: the hours arrive live, as the spouse's.
-        let boxB = IdentitySandbox("undo-second-phone")
-        defer { boxB.tearDown() }
-        let b = EngineHarness(boxB, zone: zone)
-        try b.device()
-        let doneB = await b.cloud()
-        XCTAssertEqual(doneB, .done)
-        XCTAssertTrue(names.isSubset(of: Set(b.entries.map(\.id.uuidString))), "B holds them live")
-
-        // A undoes; the retagged copies reach B.
-        a.engine.undoSpouse(group: local)
-        await a.engine.pushLive()
-        let retagged = names.compactMap { zone.records[$0] }
-        XCTAssertEqual(retagged.count, names.count)
-        XCTAssertFalse(Set(retagged.compactMap(\.appUserId)).contains(a.engine.unifiedId), "A retagged them away from the live set")
-        b.engine.applyPull(ZoneDelta(changed: retagged, deleted: [:], tokenData: nil, incomplete: false))
-
-        let stillLive = b.entries.filter { names.contains($0.id.uuidString) }
-        XCTAssertTrue(stillLive.isEmpty, "after Undo on A the hours must not stay live on B (\(stillLive.count) still live)")
-        XCTAssertTrue(stillLive.allSatisfy { $0.participant == .selfParticipant } || stillLive.isEmpty,
-                      "and if they do stay, they are still counted as the spouse's on B")
     }
 
     // MARK: B · a 2.0.x upgrader that synced before recreates a zone deleted on another phone
@@ -280,22 +244,6 @@ final class AdversarialReviewTests: XCTestCase {
         XCTAssertNotNil(sandbox.defaults.data(forKey: IdentityKeys.discardedOnboardingAnswers), "the answer is kept in Advanced (P29)")
     }
 
-    // M4 · a spouse group's id is never this phone's unified id
-    func testASpouseGroupIsNeverTheUnifiedId() async throws {
-        XCTAssertTrue(Fixture.load("D8", into: sandbox))
-        // The spouse's 2.0.x phone pushed more hours than this phone holds.
-        let zone = FakeZoneSource(records: IdentityFixtures.sampleGroup(owner: local, entries: 60, seed: 0xA1))
-        zone.account = .noAccount
-        let h = EngineHarness(sandbox, zone: zone)
-        try h.device()
-        _ = await h.cloud()                                  // iCloud off: no cloud phase yet
-        h.engine.answer(.spouse, group: local)               // answered on the device
-        zone.account = .available
-        let done = await h.cloud()
-        XCTAssertEqual(done, .done)
-        XCTAssertNotEqual(h.engine.unifiedId, local, "this phone's hours would be tagged as the spouse's and swapped on every other phone")
-    }
-
     // M5 · two tracker instances on one file never lose each other's writes
     func testTwoTrackerInstancesOnOneFileKeepEachOthersWrites() {
         let a = SyncChangeTracker(userId: "household", baseDirectory: sandbox.syncRoot)
@@ -355,4 +303,70 @@ final class AdversarialReviewTests: XCTestCase {
                                       devicePrimary: "local-x", excluded: ["email-pending"])
         XCTAssertEqual(id, "email-mine")
     }
+}
+
+// MARK: - Third adversarial pass (ab73ad3). Each test is a loss or silent-change path the reviewer
+// expects to FAIL on this commit; a pass means the path is closed.
+@MainActor
+final class AdversarialReview3Tests: XCTestCase {
+    private var sandbox: IdentitySandbox!
+    private let local = "local-6F1E2D3C-0000-4000-8000-0000000C0A01"
+    private let spouseId = "email-spouse.person@example.com"
+
+    override func setUp() {
+        super.setUp()
+        TestScope.unpin()
+        RecordLedger.lastChecks = [:]
+        sandbox = IdentitySandbox()
+    }
+
+    override func tearDown() {
+        sandbox.tearDown()
+        super.tearDown()
+    }
+
+    private func legacy(_ id: String) -> (entries: [TimeEntry], properties: [RentalProperty]) {
+        (Fixture.entries(sandbox.defaults, key: "u.\(id).LandlordHours.entries"),
+         Fixture.properties(sandbox.defaults, key: "u.\(id).LandlordHours.properties"))
+    }
+
+    // MARK: R3-2 · "Combine" while the household pair is held for that set pushes this phone's
+    // settings over the other phone's household pair (its tax settings silently change).
+
+
+    // MARK: R3-3 · a household pair that arrives in the S8b delta (written by another phone between
+    // this phone's S5 read and S8) is overwritten by onboarding answers made while empty.
+
+
+    // MARK: R3-4 · a property delete records no delete-version hash for its cascaded entries, so
+    // Put back of those entries from a phone whose clock is behind is ignored by the deleting phone.
+
+
+    // MARK: R3-5 · two phones with two different sets migrate in the same minute: the second adopts
+    // the first's id at S8 and its delta brings the first set in live, with no question.
+
+
+    // MARK: - Added by the fix lane for the third pass
+
+    private func heldHarness() async throws -> (EngineHarness, FakeZoneSource, String) {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let other = "email-other.person@example.com"
+        var records = IdentityFixtures.sampleGroup(owner: other, entries: 20, seed: 0x71)
+        records.append(GoalSettingsValues.defaults.record(name: IdentityZone.goalSettingsName(IdentityZone.household), owner: other))
+        records.append(TaxProfileValues(filingStatus: FilingStatus.marriedJoint.rawValue, spouseTracking: true, taxYear: 2019,
+                                        groupingElection: true, nonREWorkHours: 1234.5, displayName: "Other")
+            .record(name: IdentityZone.taxProfileName(IdentityZone.household), owner: other))
+        let zone = FakeZoneSource(records: records)
+        let h = EngineHarness(sandbox, zone: zone)
+        try h.device()
+        let done = await h.cloud()
+        XCTAssertEqual(done, .done)
+        return (h, zone, other)
+    }
+
+
+
+
+
+
 }

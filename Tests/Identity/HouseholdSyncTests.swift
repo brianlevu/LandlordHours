@@ -401,26 +401,7 @@ final class HouseholdSyncTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: losers.path), "the loser is recorded with the backup")
     }
 
-    // MARK: Spouse and aside answers (P5 / P6 / P17)
-
-    func testSpouseAnswerSwapsParticipantsAndUndoWalksItBack() async throws {
-        XCTAssertTrue(Fixture.load("D8", into: sandbox))
-        let h = EngineHarness(sandbox, zone: FakeZoneSource())
-        try h.device()
-        _ = await h.cloud()
-        let before = h.entries.count
-        let group = try XCTUnwrap(h.earlier.group(local))
-        h.engine.answer(.spouse, group: local)
-        XCTAssertEqual(h.entries.count, before + group.entries.count)
-        let moved = h.entries.filter { e in group.entries.contains { $0.id == e.id } }
-        XCTAssertTrue(zip(moved.sorted { $0.id.uuidString < $1.id.uuidString }, group.entries.sorted { $0.id.uuidString < $1.id.uuidString })
-            .allSatisfy { $0.participant != $1.participant }, "Self↔Spouse")
-        XCTAssertTrue(h.live.taxProfile.spouseTracking)
-        XCTAssertNotNil(h.groups?.group(local)?.undoUntil)
-        h.engine.undoSpouse(group: local)
-        XCTAssertEqual(h.entries.count, before)
-        XCTAssertEqual(h.earlier.pendingGroups.map(\.id), [local], "waiting for an answer again")
-    }
+    // MARK: Aside answer (P6)
 
     func testAsideIsPushedUnderAsidePrefixNeverTheUnifiedId() async throws {
         XCTAssertTrue(Fixture.load("D3", into: sandbox))
@@ -686,105 +667,37 @@ final class RecordLossRegressionTests: XCTestCase {
         XCTAssertEqual(h.entries.count, 10, "this phone's copy is kept")
     }
 
-    // MARK: 2 · Undo spouse deletes nothing from iCloud
+    // MARK: 3 · an entry logged as the spouse's keeps its participant across devices
 
-    func testUndoSpouseKeepsEveryHourInICloudAndRestoresThePriorState() async throws {
-        XCTAssertTrue(Fixture.load("D8", into: sandbox))
-        let zone = FakeZoneSource()
-        let h = EngineHarness(sandbox, zone: zone)
-        try h.device()
-        let done = await h.cloud()
-        XCTAssertEqual(done, .done)
-        let group = try XCTUnwrap(h.earlier.group(local))
-        let names = Set(group.entries.map(\.id.uuidString))
-        XCTAssertFalse(names.isEmpty)
-        h.engine.answer(.spouse, group: local)
-        await h.engine.pushLive()                    // the spouse's hours reach iCloud as the household's
-        XCTAssertTrue(names.isSubset(of: Set(zone.records.keys)))
-
-        h.engine.undoSpouse(group: local)
-        await h.engine.pushLive()
-        XCTAssertTrue(Set(zone.deletes).isDisjoint(with: names), "Undo deletes nothing in iCloud")
-        XCTAssertTrue(names.isSubset(of: Set(zone.records.keys)), "every spouse hour is still in iCloud")
-        let tags = Set(names.compactMap { zone.records[$0]?.appUserId })
-        XCTAssertFalse(tags.contains(h.engine.unifiedId), "no longer live under the household's id")
-        for original in group.entries {
-            XCTAssertEqual(zone.records[original.id.uuidString]?.entry?.participant, original.participant, "participants as before")
-        }
-        XCTAssertEqual(h.earlier.pendingGroups.map(\.id), [local], "waiting for an answer again")
-        XCTAssertEqual(Set(try XCTUnwrap(h.earlier.group(local)).entries.map(\.id.uuidString)), names)
-
-        // A new phone on the same iCloud gets every hour back, held, not merged.
-        let box = IdentitySandbox("undo-new-phone")
+    func testASpouseLoggedEntryKeepsItsParticipantAcrossDevicesAndMerges() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let device = (Fixture.entries(sandbox.defaults, key: "u.\(local).LandlordHours.entries"),
+                      Fixture.properties(sandbox.defaults, key: "u.\(local).LandlordHours.properties"))
+        let zone = FakeZoneSource(records: Fixture.zoneRecords(entries: device.0, properties: device.1, owner: local))
+        let a = EngineHarness(sandbox, zone: zone)
+        try a.device()
+        _ = await a.cloud()
+        let pid = try XCTUnwrap(a.properties.first?.id)
+        let theirs = TimeEntry(propertyId: pid, participant: .spouse, category: .management, hours: 2.5, date: Date(), notes: "spouse showed the unit")
+        a.live.replaceLive(entries: a.entries + [theirs], properties: a.properties, categories: a.live.liveCategories)
+        await a.engine.pushLive()
+        // A new phone reads the whole zone; an edit on that phone comes back to this one.
+        let box = IdentitySandbox("spouse-entry-phone-b")
         defer { box.tearDown() }
-        let phone = EngineHarness(box, zone: zone)
-        try phone.device()
-        let outcome = await phone.cloud()
-        XCTAssertEqual(outcome, .done)
-        XCTAssertTrue(Set(phone.entries.map(\.id.uuidString)).isDisjoint(with: names), "not live on the new phone")
-        let held = Set(phone.earlier.groups.flatMap { $0.entries.map(\.id.uuidString) })
-        XCTAssertTrue(names.isSubset(of: held), "every hour is in Earlier records on the new phone")
-    }
-
-    func testUndoSpouseKeepsAnEditMadeAfterTheAnswer() async throws {
-        XCTAssertTrue(Fixture.load("D8", into: sandbox))
-        let h = EngineHarness(sandbox, zone: FakeZoneSource())
-        try h.device()
-        _ = await h.cloud()
-        let group = try XCTUnwrap(h.earlier.group(local))
-        h.engine.answer(.spouse, group: local)
-        let target = try XCTUnwrap(group.entries.first)
-        var live = h.entries
-        let i = try XCTUnwrap(live.firstIndex { $0.id == target.id })
-        live[i].hours += 1.5
-        live[i].modifiedAt = Date().addingTimeInterval(60)
-        h.live.replaceLive(entries: live, properties: h.properties, categories: h.live.liveCategories)
-        h.engine.undoSpouse(group: local)
-        let back = try XCTUnwrap(h.earlier.group(local)?.entries.first { $0.id == target.id })
-        XCTAssertEqual(back.hours, target.hours + 1.5, "the edit made while it was the spouse's survives Undo")
-        XCTAssertEqual(back.participant, target.participant)
-    }
-
-    // MARK: 3 · spouse tagging never flips back
-
-    func testSpouseTagSurvivesAnEditFromTheSpouses20Device() async throws {
-        XCTAssertTrue(Fixture.load("D8", into: sandbox))
-        let h = EngineHarness(sandbox, zone: FakeZoneSource())
-        try h.device()
-        _ = await h.cloud()
-        let group = try XCTUnwrap(h.earlier.group(local))
-        h.engine.answer(.spouse, group: local)
-        await h.engine.pushLive()
-        // The spouse's 2.0.x phone still sees these as its own (participant Self) and edits one.
-        var edited = try XCTUnwrap(group.entries.first)
-        edited.hours += 2
-        edited.modifiedAt = Date().addingTimeInterval(120)
-        let record = ZoneRecord(CloudKitSyncService.record(for: edited, zoneID: IdentityZone.zoneID, appUserId: local))
-        h.engine.applyPull(ZoneDelta(changed: [record], deleted: [:], tokenData: nil, incomplete: false))
-        let now = try XCTUnwrap(h.entries.first { $0.id == edited.id })
-        XCTAssertEqual(now.hours, edited.hours, "the edit arrives")
-        XCTAssertNotEqual(now.participant, edited.participant, "still the spouse's hours here")
-    }
-
-    func testSpouseAnswerWinsOverAnotherDevicesOlderSelfCopyAndConverges() async throws {
-        XCTAssertTrue(Fixture.load("D8", into: sandbox))
-        let zone = FakeZoneSource()
-        let h = EngineHarness(sandbox, zone: zone)
-        try h.device()
-        _ = await h.cloud()
-        let group = try XCTUnwrap(h.earlier.group(local))
-        let original = try XCTUnwrap(group.entries.first)
-        h.engine.answer(.spouse, group: local)
-        // Another 2.2 phone on this iCloud still holds the pre-answer copy and pushes it.
-        let theirs = ZoneRecord(CloudKitSyncService.record(for: original, zoneID: IdentityZone.zoneID, appUserId: h.engine.unifiedId))
-        h.engine.applyPull(ZoneDelta(changed: [theirs], deleted: [:], tokenData: nil, incomplete: false))
-        let mine = try XCTUnwrap(h.entries.first { $0.id == original.id })
-        XCTAssertNotEqual(mine.participant, original.participant, "the answer stands")
-        await h.engine.pushLive()
-        let pushed = try XCTUnwrap(zone.records[original.id.uuidString]?.entry)
-        XCTAssertNotEqual(pushed.participant, original.participant)
-        XCTAssertGreaterThan(pushed.modifiedAt, original.modifiedAt,
-                             "newer than the old copy, so the other phone takes it instead of pushing its own back forever")
+        let b = EngineHarness(box, zone: zone)
+        try b.device()
+        _ = await b.cloud()
+        var onB = try XCTUnwrap(b.entries.first { $0.id == theirs.id })
+        XCTAssertEqual(onB.participant, .spouse, "the spouse's hours arrive as the spouse's")
+        onB.hours = 3
+        onB.modifiedAt = Date().addingTimeInterval(60)
+        b.live.replaceLive(entries: b.entries.map { $0.id == onB.id ? onB : $0 }, properties: b.properties, categories: b.live.liveCategories)
+        await b.engine.pushLive()
+        let record = try XCTUnwrap(zone.records[theirs.id.uuidString])
+        a.engine.applyPull(ZoneDelta(changed: [record], deleted: [:], tokenData: nil, incomplete: false))
+        let back = try XCTUnwrap(a.entries.first { $0.id == theirs.id })
+        XCTAssertEqual(back.hours, 3)
+        XCTAssertEqual(back.participant, .spouse, "an edit elsewhere never turns the spouse's hours into yours")
     }
 
     // MARK: 4 · two iCloud accounts never merge without a question

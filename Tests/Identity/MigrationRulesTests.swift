@@ -169,7 +169,6 @@ final class MigrationRulesTests: XCTestCase {
     func testRoutingMembershipBeatsTheIncomingTag() {
         var groups = GroupsFile(createdAt: Date(), primaryId: "email-x", groups: [])
         groups.upsert(GroupRecord(id: "local-old", status: .aside, source: .device, entryCount: 1, propertyCount: 0, hours: 1, lastEntryDate: nil))
-        groups.upsert(GroupRecord(id: "local-sp", status: .spouse, source: .device, entryCount: 1, propertyCount: 0, hours: 1, lastEntryDate: nil))
         let context = MergeRules.RoutingContext(liveNames: ["live-1"], archiveMembership: ["arch-1": "local-old"], unifiedId: "email-x",
                                                 groups: groups, deletedNames: ["gone-1"], tombstones: ["tomb-1"])
         func rec(_ name: String, _ owner: String?) -> ZoneRecord {
@@ -180,18 +179,12 @@ final class MigrationRulesTests: XCTestCase {
         XCTAssertEqual(MergeRules.route(rec("n1", "email-x"), context: context), .live)
         XCTAssertEqual(MergeRules.route(rec("n2", "aside-local-old"), context: context), .archive("local-old"))
         XCTAssertEqual(MergeRules.route(rec("n3", "local-old"), context: context), .archive("local-old"))
-        XCTAssertEqual(MergeRules.route(rec("n4", "local-sp"), context: context), .liveAsSpouse)
         XCTAssertEqual(MergeRules.route(rec("n5", "001234.new"), context: context), .newGroup("001234.new"))
         XCTAssertEqual(MergeRules.route(rec("gone-1", "email-x"), context: context), .ignore, "R11")
         XCTAssertEqual(MergeRules.route(rec("tomb-1", "email-x"), context: context), .ignore)
     }
 
-    // MARK: R9 / R13 / R14
-
-    func testR9SpouseSwapsBothWays() {
-        let swapped = MergeRules.swapParticipants([entry(idA), entry(idB, participant: .spouse)])
-        XCTAssertEqual(swapped.map(\.participant), [.spouse, .selfParticipant])
-    }
+    // MARK: R13 / R14
 
     func testIgnoredDebugIdsAreNeverGroups() {
         XCTAssertTrue(LegacyInventory.isIgnoredId("debug-frequent"))

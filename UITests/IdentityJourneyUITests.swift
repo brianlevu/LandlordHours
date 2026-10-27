@@ -119,18 +119,6 @@ class IdentityJourneyUITests: XCTestCase {
         XCTAssertTrue(todayShown)
     }
 
-    func testTwoSetsSpouseAnswerThenUndo() {
-        launch(fixture: "D8-201-two-local", zone: "empty")
-        tap(app.buttons["identity.merge.spouse"], timeout: 25)
-        tap(app.buttons["identity.merge.confirmSpouse"])
-        XCTAssertTrue(element("identity.mergeQuestion").waitForNonExistence(timeout: 8))
-        openSettings()
-        tap(reveal("settings.earlierRecords"))
-        tap(element("earlier.group.spouse"))
-        tap(app.buttons["Undo"])
-        XCTAssertTrue(element("earlier.group.pending").waitForExistence(timeout: 8), "back to waiting for an answer")
-    }
-
     func testTwoSetsAsideIsListedAndCanBeAddedLater() {
         launch(fixture: "D8-201-two-local", zone: "empty")
         tap(app.buttons["identity.merge.aside"], timeout: 25)

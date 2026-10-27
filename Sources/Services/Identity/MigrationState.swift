@@ -186,7 +186,7 @@ enum IdentityScope {
         return defaults.string(forKey: IdentityKeys.unifiedId) ?? resolve(defaults).scopeId
     }
 
-    /// True for the scope id and for every legacy id merged into the live set (combined, spouse,
+    /// True for the scope id and for every legacy id merged into the live set (combined
     /// or the primary). A notification or queued "Log it" made under one of them lands here.
     static func isLiveProfileId(_ id: String, defaults: UserDefaults = .standard) -> Bool {
         if id == resolve(defaults).scopeId { return true }
@@ -206,7 +206,7 @@ enum MigrationFiles {
     static func archiveDirectory(root: URL) -> URL { root.appendingPathComponent(IdentityFolder.archive.rawValue, isDirectory: true) }
     static func groupsURL(root: URL) -> URL { migrationDirectory(root: root).appendingPathComponent("groups.json") }
 
-    /// Ids listed in groups.json as merged into the live set (primary, combine, spouse).
+    /// Ids listed in groups.json as merged into the live set (primary, combine).
     static func liveLegacyIds(defaults: UserDefaults = .standard, root: URL = defaultRoot) -> Set<String> {
         guard let groups = GroupsFile.load(root: root) else { return [] }
         return Set(groups.groups.filter { $0.status.isLive }.map(\.id))

@@ -12,7 +12,6 @@ extension Analytics {
         capture("records_unified", properties: [
             "groups": list.filter { $0.entryCount > 0 || $0.propertyCount > 0 }.count,
             "combined": list.filter { $0.status == .combine }.count,
-            "spouse": list.filter { $0.status == .spouse }.count,
             "aside": list.filter { $0.status == .aside }.count,
             "pending": list.filter { $0.status == .pending }.count,
             "settings_only": list.filter(\.settingsOnly).count,

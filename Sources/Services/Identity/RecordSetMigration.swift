@@ -152,8 +152,7 @@ final class RecordSetMigration {
             groupsFile.upsert(GroupRecord(id: group.id, status: status, source: .device, entryCount: group.entries.count,
                                           propertyCount: group.properties.count, hours: group.totalHours,
                                           lastEntryDate: group.lastEntryDate,
-                                          answeredAt: previous?.group(group.id)?.answeredAt,
-                                          undoUntil: previous?.group(group.id)?.undoUntil))
+                                          answeredAt: previous?.group(group.id)?.answeredAt))
         }
         try groupsFile.save(root: root)
         setStep(.groupsResolved, defaults)
@@ -171,11 +170,7 @@ final class RecordSetMigration {
         var losers: [RecordVersion] = []
         let ordered = live.sorted { ($0.id == primary?.id ? 0 : 1, $0.id) < ($1.id == primary?.id ? 0 : 1, $1.id) }
         for group in ordered {
-            let isSpouse = groupsFile.group(group.id)?.status == .spouse
-            let groupEntries = isSpouse ? MergeRules.swapParticipants(group.entries) : group.entries
-            // The spouse answer rewrites each entry's participant; the original version is in the backup.
-            if isSpouse { losers += group.entries.map(\.ledgerVersion) }
-            let e = MergeRules.unionReporting(entries, groupEntries)
+            let e = MergeRules.unionReporting(entries, group.entries)
             let p = MergeRules.unionReporting(properties, group.properties)
             let c = MergeRules.unionReporting(categories, group.categories)
             entries = e.merged; properties = p.merged; categories = c.merged
@@ -228,7 +223,7 @@ final class RecordSetMigration {
                  defaults: defaults)
 
         // The invariant, device side. Each inventory version is hashed once; a live entry reuses
-        // its source's hash unless its id had more than one version or the spouse answer changed it.
+        // its source's hash unless its id had more than one version.
         var versionsById: [UUID: [RecordVersion]] = [:]
         var before = Set<RecordVersion>()
         for g in inventory.groups {
@@ -239,10 +234,9 @@ final class RecordSetMigration {
             }
             before.formUnion(g.properties.map(\.ledgerVersion) + g.categories.map(\.ledgerVersion))
         }
-        let spouseIds = Set(live.filter { groupsFile.group($0.id)?.status == .spouse }.flatMap { $0.entries.map(\.id) })
         var places = RecordLedger.Places()
         places.live = Set(entries.map { e -> RecordVersion in
-            if !spouseIds.contains(e.id), let known = versionsById[e.id], known.count == 1 { return known[0] }
+            if let known = versionsById[e.id], known.count == 1 { return known[0] }
             return e.ledgerVersion
         }).union(RecordLedger.versions(entries: [], properties: properties, categories: categories))
         places.archived = earlier.archivedVersions
@@ -642,9 +636,9 @@ final class RecordSetMigration {
         let tombstones = Set(tracker.pendingDeletes)
         let deleted = deletedNames()
 
-        func absorb(_ records: [ZoneRecord], spouse: Bool) {
+        func absorb(_ records: [ZoneRecord]) {
             let parsedEntries = records.compactMap(\.entry).filter { !tombstones.contains($0.id.uuidString) && !deleted.contains($0.id.uuidString) }
-            let pulled = MergeRules.keepingLocalAttachments(spouse ? MergeRules.swapParticipants(parsedEntries) : parsedEntries, from: entries)
+            let pulled = MergeRules.keepingLocalAttachments(parsedEntries, from: entries)
             let e = MergeRules.unionReporting(entries, pulled)
             let p = MergeRules.unionReporting(properties, records.compactMap(\.property).filter { !tombstones.contains($0.id.uuidString) && !deleted.contains($0.id.uuidString) })
             let c = MergeRules.unionReporting(categories, records.compactMap(\.category).filter { !tombstones.contains($0.id.uuidString) && !deleted.contains($0.id.uuidString) })
@@ -685,7 +679,7 @@ final class RecordSetMigration {
             let existing = groups.group(owner)?.status
             // After an account switch, an answer given for the old account's owner says nothing here.
             let answered = switching ? nil : existing
-            if liveOwners.contains(owner) || owner == cloudPrimary || answered == .combine || answered == .spouse || answered == .primary {
+            if liveOwners.contains(owner) || owner == cloudPrimary || answered == .combine || answered == .primary {
                 // R2b: same owner id, both non-empty, zero UUID overlap → two groups, asked.
                 let deviceOfOwner = deviceNames.intersection(inventory[owner]?.names ?? [])
                 let ownerDevice = (owner == storageId) ? deviceNames : deviceOfOwner
@@ -699,11 +693,11 @@ final class RecordSetMigration {
                                   source: .iCloud, now: now())
                     continue
                 }
-                absorb(records, spouse: existing == .spouse)
+                absorb(records)
                 if !unparsed.isEmpty {
-                    earlier.route(unparsed: unparsed, to: owner, status: existing == .spouse ? .spouse : .combine, source: .iCloud, now: now())
+                    earlier.route(unparsed: unparsed, to: owner, status: .combine, source: .iCloud, now: now())
                 }
-                groups.upsert(record(existing == .spouse ? .spouse : (owner == cloudPrimary || existing == .primary ? .primary : (existing ?? .combine))))
+                groups.upsert(record(owner == cloudPrimary || existing == .primary ? .primary : (existing ?? .combine)))
                 if owner == cloudPrimary { groups.primaryId = groups.primaryId ?? owner }
                 continue
             }
@@ -929,9 +923,7 @@ final class RecordSetMigration {
             if groups?.group(owner)?.status.isLive ?? true { zoneCounts[owner, default: 0] += 1 }
         }
         zoneCounts[LegacyInventory.unscopedGroupId] = nil
-        // A spouse set is excluded too: tagged with its id, this phone's hours would be swapped to
-        // the spouse's on every other phone (R12).
-        var excluded = Set((groups?.groups ?? []).filter { $0.status == .aside || $0.status == .pending || $0.status == .spouse || $0.splitFromDevice }.map(\.id))
+        var excluded = Set((groups?.groups ?? []).filter { $0.status == .aside || $0.status == .pending || $0.splitFromDevice }.map(\.id))
         if groups?.groups.contains(where: { $0.splitFromDevice && $0.id == storageId }) == true { excluded.insert(storageId) }
         var chosen = MergeRules.unifiedId(householdOwner: householdOwner, zoneEntryCounts: zoneCounts,
                                           devicePrimary: groups?.primaryId ?? storageId, excluded: excluded)
@@ -1026,15 +1018,10 @@ final class RecordSetMigration {
         let hashes = (defaults.dictionary(forKey: IdentityKeys.deletedRecordHashes) as? [String: String]) ?? [:]
         let deletedMap = (defaults.dictionary(forKey: IdentityKeys.deletedRecordNames) as? [String: Date]) ?? [:]
         let deleted = deletedNames()
-        var liveModifiedAt: [String: Date] = [:]
-        for e in live?.liveEntries ?? [] { liveModifiedAt[e.id.uuidString] = e.modifiedAt }
-        for p in live?.liveProperties ?? [] { liveModifiedAt[p.id.uuidString] = p.modifiedAt }
-        for c in live?.liveCategories ?? [] { liveModifiedAt[c.id.uuidString] = c.modifiedAt }
         return MergeRules.RoutingContext(liveNames: liveNames, archiveMembership: membership, unifiedId: unifiedId,
                                          groups: GroupsFile.load(root: root), deletedNames: deleted,
                                          tombstones: Set(tracker.pendingDeletes), deletedHashes: hashes.filter { deleted.contains($0.key) },
-                                         deletedAt: deletedMap.filter { deleted.contains($0.key) },
-                                         liveModifiedAt: liveModifiedAt)
+                                         deletedAt: deletedMap.filter { deleted.contains($0.key) })
     }
 
     /// `deleteReason`: `.deletedElsewhere` for delete callbacks (30 days); `.inferredAbsent` for
@@ -1050,7 +1037,6 @@ final class RecordSetMigration {
         var household: (goal: ZoneRecord?, tax: ZoneRecord?) = (nil, nil)
         var mirror: (goal: ZoneRecord?, tax: ZoneRecord?) = (nil, nil)
         var putBackElsewhere = Set<String>()
-        var movedOut = Set<String>()
         // Last writer wins, but an edit made here and never pushed is not dropped (Recently removed).
         var replaced: [RemovedRecord] = []
         let baselineTracker = tracker
@@ -1070,16 +1056,13 @@ final class RecordSetMigration {
             switch MergeRules.route(record, context: context) {
             case .ignore:
                 continue
-            case .live, .liveAsSpouse:
-                let spouse: Bool = { if case .liveAsSpouse = MergeRules.route(record, context: context) { return true }; return false }()
+            case .live:
                 guard record.isParseable else {
-                    // Never downgrades a spouse group's status (Undo stays possible).
-                    earlier.route(unparsed: [record], to: record.appUserId ?? unifiedId, status: spouse ? .spouse : .combine, source: .iCloud, now: now())
+                    earlier.route(unparsed: [record], to: record.appUserId ?? unifiedId, status: .combine, source: .iCloud, now: now())
                     outcome.unparsed += 1
                     continue
                 }
                 if var entry = record.entry {
-                    if spouse { entry = MergeRules.swapParticipants([entry])[0] }
                     entry = MergeRules.keepingLocalAttachments([entry], from: entries)[0]
                     if let match = MergeRules.liveMatch(forPulled: entry, in: entries) {
                         // R19: the same calendar event under another id; never a second entry. A
@@ -1127,22 +1110,7 @@ final class RecordSetMigration {
                 let held = earlier.group(id)?.status ?? groups.group(id)?.status
                 earlier.route(entries: record.entry.map { [$0] } ?? [], properties: record.property.map { [$0] } ?? [],
                               categories: record.category.map { [$0] } ?? [], unparsed: record.isParseable ? [] : [record],
-                              to: id, status: held == .pending ? .pending : (held == .spouse ? .spouse : .aside), source: .iCloud, now: now())
-                outcome.archived += 1
-            case .moveOut(let id):
-                let name = record.recordName
-                entries.removeAll { $0.id.uuidString == name }
-                properties.removeAll { $0.id.uuidString == name }
-                categories.removeAll { $0.id.uuidString == name }
-                let held = earlier.group(id)?.status ?? groups.group(id)?.status
-                let status: GroupStatus = held == .aside ? .aside : .pending   // asked again unless set aside here
-                earlier.route(entries: record.entry.map { [$0] } ?? [], properties: record.property.map { [$0] } ?? [],
-                              categories: record.category.map { [$0] } ?? [], unparsed: record.isParseable ? [] : [record],
-                              to: id, status: status, source: .iCloud, now: now())
-                if groups.group(id) == nil {
-                    groups.upsert(GroupRecord(id: id, status: status, source: .iCloud, entryCount: 0, propertyCount: 0, hours: 0, lastEntryDate: nil))
-                }
-                movedOut.insert(name)
+                              to: id, status: held == .pending ? .pending : .aside, source: .iCloud, now: now())
                 outcome.archived += 1
             case .newGroup(let owner):
                 guard !LegacyInventory.isIgnoredId(owner) else { continue }
@@ -1194,11 +1162,9 @@ final class RecordSetMigration {
             if !g.isEmpty { try? earlier.save(g) }
         }
 
-        if outcome.liveChanged > 0 || outcome.removed > 0 || !movedOut.isEmpty {
+        if outcome.liveChanged > 0 || outcome.removed > 0 {
             live.replaceLive(entries: entries, properties: properties, categories: categories)
         }
-        // Not live any more: no baseline, so nothing of them is pushed from here.
-        if !movedOut.isEmpty { tracker.forget(recordNames: Array(movedOut)) }
         if !replaced.isEmpty { earlier.remove(replaced) }
         if !putBackElsewhere.isEmpty {
             // Put back on another device: live here again, so it leaves Recently removed and R11.
@@ -1288,9 +1254,7 @@ final class RecordSetMigration {
         t.cancelTombstones(for: Set(all.map(\.recordName)))
         let deletes = t.pendingDeletes
         let changed = t.changedRecords(all.map { $0.ckRecord() }).map(ZoneRecord.init)
-        guard !changed.isEmpty || !deletes.isEmpty else {
-            return await pushRetags()
-        }
+        guard !changed.isEmpty || !deletes.isEmpty else { return ZonePushReport() }
         let report = await source.push(changed, deletes: deletes)
         t.clearTombstones(Array(report.deletedNames))
         t.recordServerState(changed.filter { report.savedNames.contains($0.recordName) }.map { $0.ckRecord() })
@@ -1307,36 +1271,7 @@ final class RecordSetMigration {
         } else if report.failedTypes.isEmpty {
             defaults.removeObject(forKey: IdentityKeys.lastSyncProblem)
         }
-        if !report.zoneGone { _ = await pushRetags() }
         return report
-    }
-
-    /// Undo of a spouse answer: the group's iCloud copies go back under its own tag (its legacy
-    /// id, or `aside-<id>` for a set that was only ever on this device), so they leave the live
-    /// set everywhere without a single delete.
-    @discardableResult
-    func pushRetags() async -> ZonePushReport {
-        var last = ZonePushReport()
-        for group in earlier.groups where !(group.retagPending ?? []).isEmpty && (group.status == .pending || group.status == .aside) {
-            let pending = group.retagPending ?? []
-            let owner = group.source == .device ? IdentityZone.asidePrefix + group.id : group.id
-            var records = group.properties.filter { pending.contains($0.id.uuidString) }
-                .map { ZoneRecord(CloudKitSyncService.record(for: $0, zoneID: IdentityZone.zoneID, appUserId: owner)) }
-            records += group.entries.filter { pending.contains($0.id.uuidString) }
-                .map { ZoneRecord(CloudKitSyncService.record(for: $0, zoneID: IdentityZone.zoneID, appUserId: owner)) }
-            records += group.categories.filter { pending.contains($0.id.uuidString) }
-                .map { ZoneRecord(CloudKitSyncService.record(for: $0, zoneID: IdentityZone.zoneID, appUserId: owner)) }
-            let found = Set(records.map(\.recordName))
-            if !pending.subtracting(found).isEmpty {
-                // Names no longer in the group (combined again, deleted): nothing to put back.
-                earlier.markRetagged(pending.subtracting(found), group: group.id, asideTagged: false)
-            }
-            guard !records.isEmpty else { continue }
-            last = await source.push(records, deletes: [])
-            if last.zoneGone { return last }
-            earlier.markRetagged(last.savedNames, group: group.id, asideTagged: owner.hasPrefix(IdentityZone.asidePrefix))
-        }
-        return last
     }
 
     /// Device-only records of archive groups go to iCloud once, under `aside-<id>` (R10).

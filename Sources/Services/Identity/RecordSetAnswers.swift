@@ -1,14 +1,13 @@
 import Foundation
 
-// MARK: - The person's answers: two sets, spouse, aside, put back, bulk, zone gone, account
+// MARK: - The person's answers: two sets, aside, put back, bulk, zone gone, account
 //
 // Every answer is recorded in groups.json before any merge write (§3.3), and every one can be
-// walked back: combine → the backup; spouse → Undo for 30 days; aside → "Add to my records";
-// removed → Put back.
+// walked back: combine → the backup; aside → "Add to my records"; removed → Put back.
+// ("These are my spouse's hours" is held out of 2.2.)
 
 enum TwoSetsAnswer: String, Codable {
     case combine
-    case spouse
     case aside
 }
 
@@ -35,9 +34,8 @@ extension RecordSetMigration {
         updateGroup(id) { r in
             r.answeredAt = at
             switch answer {
-            case .combine: r.status = .combine; r.undoUntil = nil
-            case .spouse: r.status = .spouse; r.undoUntil = at.addingTimeInterval(EarlierRecordsStore.spouseUndoWindow)
-            case .aside: r.status = .aside; r.undoUntil = nil
+            case .combine: r.status = .combine
+            case .aside: r.status = .aside
             }
         }
         Analytics.mergeQuestionAnswered(answer.rawValue)
@@ -49,17 +47,13 @@ extension RecordSetMigration {
                 defaults.set(id, forKey: IdentityKeys.unifiedId)
                 defaults.set(true, forKey: IdentityKeys.unifiedIdDecided)
             }
-            // Spouse or aside: this phone's set keeps its own id and takes the household pair.
+            // Aside: this phone's set keeps its own id and takes the household pair.
         }
         switch answer {
         case .aside:
             try? earlier.setStatus(.aside, for: id)
-        case .combine, .spouse:
-            let liveIds = Set(live.liveEntries.map(\.id))
-            let incoming = answer == .spouse
-                ? group.entries.flatMap { e in liveIds.contains(e.id) ? MergeRules.swapParticipants([e]) : MergeRules.swapParticipants([e], editedAt: at) }
-                : group.entries
-            let e = MergeRules.unionReporting(live.liveEntries, incoming)
+        case .combine:
+            let e = MergeRules.unionReporting(live.liveEntries, group.entries)
             let p = MergeRules.unionReporting(live.liveProperties, group.properties)
             let c = MergeRules.unionReporting(live.liveCategories, group.categories)
             let deduped = MergeRules.dedupeBySourceKey(e.merged)
@@ -72,53 +66,9 @@ extension RecordSetMigration {
                 tracker.addTombstones(deletes)
             }
             Self.rekeyQueuedActions(from: [id], to: storageId, defaults: defaults)
-            if answer == .spouse {
-                // Kept for Undo (P17); the group's own settings are discarded (R9).
-                try? earlier.setStatus(.spouse, for: id)
-                var tax = live.taxProfile
-                tax.spouseTracking = true
-                live.applyRemoteSettings(goal: nil, tax: tax)
-                defaults.set(true, forKey: IdentityKeys.taxDirty)
-            } else {
-                earlier.removeGroup(id)
-            }
+            earlier.removeGroup(id)
             // The combined records have no baseline under the unified id: the next push sends them.
         }
-        onChange?()
-    }
-
-    /// P17 "Undo": the spouse group's entries leave the live set and wait for an answer again.
-    /// Nothing is deleted, here or in iCloud: the hours go back to the group as they are now
-    /// (edits made since the answer included, participants swapped back), and their iCloud
-    /// copies go back under the group's own tag on the next push (`pushRetags`), so every other
-    /// device and a new phone still hold them.
-    func undoSpouse(group id: String) {
-        earlier.reload()
-        guard let live, var group = earlier.group(id), group.status == .spouse else { return }
-        let names = Set(group.entries.map { $0.id.uuidString })
-        let current = live.liveEntries.filter { names.contains($0.id.uuidString) }
-        // Undo is an edit made now: the copies other phones hold live are older and give way (R20
-        // yields to a newer held-apart copy), so the hours leave the live set there too.
-        let at = now()
-        let restored = MergeRules.swapParticipants(current).map { entry -> TimeEntry in
-            var e = entry
-            e.modifiedAt = max(entry.modifiedAt.addingTimeInterval(0.001), at)
-            return e
-        }
-        group.entries = MergeRules.union(group.entries, restored)
-        group.status = .pending
-        group.retagPending = (group.retagPending ?? []).union(Set(current.map { $0.id.uuidString }))
-        do {
-            try earlier.save(group)
-        } catch {
-            // The archive copy couldn't be written: keep them live rather than risk them.
-            return
-        }
-        live.replaceLive(entries: live.liveEntries.filter { !names.contains($0.id.uuidString) },
-                         properties: live.liveProperties, categories: live.liveCategories)
-        // Not live any more: no baseline, and never a tombstone.
-        tracker.forget(recordNames: Array(names))
-        updateGroup(id) { $0.status = .pending; $0.undoUntil = nil; $0.answeredAt = nil }
         onChange?()
     }
 

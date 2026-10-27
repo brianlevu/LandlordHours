@@ -108,27 +108,6 @@ enum MergeRules {
         return (kept, removed)
     }
 
-    // MARK: R9 / R12 — spouse
-
-    static func swapParticipants(_ entries: [TimeEntry]) -> [TimeEntry] {
-        entries.map { entry in
-            var e = entry
-            e.participant = entry.participant == .selfParticipant ? .spouse : .selfParticipant
-            return e
-        }
-    }
-
-    /// The spouse answer is an edit the person made: the swapped copies are stamped `at`, so they
-    /// beat the pre-answer copy another device still holds (equal times would keep each device's
-    /// own copy and push it back forever).
-    static func swapParticipants(_ entries: [TimeEntry], editedAt at: Date) -> [TimeEntry] {
-        swapParticipants(entries).map { entry in
-            var e = entry
-            e.modifiedAt = max(entry.modifiedAt, at)
-            return e
-        }
-    }
-
     // MARK: R5 / R5c — synced, then absent from a complete read
 
     enum AbsenceOutcome: Equatable {
@@ -247,16 +226,11 @@ enum MergeRules {
 
     enum Route: Equatable {
         case live
-        /// Spouse group (R12): re-tag participants on arrival, then live.
-        case liveAsSpouse
         case archive(String)
         /// An owner the device never saw: a new group, held and asked about.
         case newGroup(String)
         /// R11: deleted after migration; ignore.
         case ignore
-        /// Live here, but a newer copy says it belongs to a set held apart (Undo of a spouse
-        /// answer on another phone): out of the live set, into that group. Never a delete.
-        case moveOut(String)
     }
 
     struct RoutingContext {
@@ -270,16 +244,6 @@ enum MergeRules {
         var deletedHashes: [String: String] = [:]
         /// When each of `deletedNames` was deleted (fallback when no hash is on file).
         var deletedAt: [String: Date] = [:]
-        /// `modifiedAt` of each live record (R20 yields only to a newer copy).
-        var liveModifiedAt: [String: Date] = [:]
-    }
-
-    private static func heldApartTarget(_ owner: String, _ context: RoutingContext) -> String? {
-        if owner.hasPrefix(IdentityZone.asidePrefix) { return String(owner.dropFirst(IdentityZone.asidePrefix.count)) }
-        switch context.groups?.group(owner)?.status {
-        case .pending?, .aside?: return owner
-        default: return nil
-        }
     }
 
     static func route(_ record: ZoneRecord, context: RoutingContext) -> Route {
@@ -296,19 +260,6 @@ enum MergeRules {
                 guard let at = context.deletedAt[name], let edited = record.modifiedAt, edited > at else { return .ignore }
             }
         }
-        // R12 before R20: a copy tagged with a spouse group's own id comes from the spouse's 2.0.x
-        // device, written from their side (participant Self). It is swapped on arrival even when the
-        // record is already live here, or the spouse's hours silently turn back into the owner's.
-        if owner != context.unifiedId, context.groups?.group(owner)?.status == .spouse,
-           context.liveNames.contains(name) || (context.archiveMembership[name] ?? owner) == owner {
-            return .liveAsSpouse
-        }
-        // R20 yields to a NEWER copy tagged aside-<id>, or with the id of a set held apart here:
-        // another phone moved it out of the live set (Undo). Older copies (a 2.0.x re-push) stay R20.
-        if context.liveNames.contains(name), owner != context.unifiedId, let target = heldApartTarget(owner, context),
-           let edited = record.modifiedAt, let liveAt = context.liveModifiedAt[name], edited > liveAt {
-            return .moveOut(target)
-        }
         // R20: membership by UUID beats the incoming tag.
         if context.liveNames.contains(name) { return .live }
         if let group = context.archiveMembership[name] { return .archive(group) }
@@ -317,7 +268,6 @@ enum MergeRules {
         if let group = context.groups?.group(owner) {
             switch group.status {
             case .primary, .combine: return .live
-            case .spouse: return .liveAsSpouse
             case .aside, .pending: return .archive(owner)
             case .notNeeded: return .newGroup(owner)
             }

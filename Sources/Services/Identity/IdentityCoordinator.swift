@@ -218,7 +218,6 @@ final class IdentityCoordinator: ObservableObject {
     // MARK: Answers (forwarded to the engine)
 
     func answer(_ answer: TwoSetsAnswer, group id: String) { engine?.answer(answer, group: id); questionDeferred = false; refresh() }
-    func undoSpouse(group id: String) { engine?.undoSpouse(group: id); refresh() }
     func reconsider(group id: String) { engine?.reconsider(group: id); refresh() }
     func deleteGroup(_ id: String) async { await engine?.deleteGroup(id); refresh() }
     func putBack(_ names: Set<String>) { engine?.putBack(names); refresh() }

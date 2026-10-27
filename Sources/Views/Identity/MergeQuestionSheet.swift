@@ -5,7 +5,8 @@ import SwiftUI
 // Anchor: iOS Settings › iCloud › Contacts "Merge". Whenever two or more non-empty sets exist,
 // once per held set, largest first. Swipe down = decide later: the set stays held, listed under
 // Earlier records, never merged, never deleted. The REPS test is per person, so there is no size
-// threshold. Spouse and aside are reversible, so they get a second step, not an alert (§1.21).
+// threshold. Aside is reversible, so it gets a second step, not an alert (§1.21). The spouse
+// answer is held out of 2.2.
 
 struct MergeQuestionSheet: View {
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -18,7 +19,7 @@ struct MergeQuestionSheet: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var step: Step = .ask
 
-    enum Step: Equatable { case ask, spouse, aside }
+    enum Step: Equatable { case ask, aside }
 
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
@@ -27,7 +28,6 @@ struct MergeQuestionSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 switch step {
                 case .ask: ask
-                case .spouse: confirm(String(localized: "Add \(IdentityCopy.hours(group.hours)) as your spouse’s? Their hours count with yours for the 500-hour test. They stay separate for the 750. You can undo this for 30 days.", table: "Identity"))
                 case .aside: confirm(String(localized: "Keep \(IdentityCopy.hours(group.hours)) aside? Nothing is deleted. You’ll find them under Earlier records.", table: "Identity"))
                 }
                 // The other answers scroll with the words; only the one `.primary` is pinned, so a
@@ -52,7 +52,6 @@ struct MergeQuestionSheet: View {
             return total > 1
                 ? String(localized: "We found more records. Set \(index) of \(total).", table: "Identity")
                 : String(localized: "We found two sets of records.", table: "Identity")
-        case .spouse: return String(localized: "Your spouse’s hours", table: "Identity")
         case .aside: return String(localized: "Keep them aside", table: "Identity")
         }
     }
@@ -98,13 +97,10 @@ struct MergeQuestionSheet: View {
     @ViewBuilder private var secondaryActions: some View {
         switch step {
         case .ask:
-            Button(String(localized: "These are my spouse’s hours", table: "Identity")) { step = .spouse }
-                .buttonStyle(LHButton.tertiary)
-                .accessibilityIdentifier("identity.merge.spouse")
             Button(String(localized: "Not mine, keep them aside", table: "Identity")) { step = .aside }
                 .buttonStyle(LHButton.tertiary)
                 .accessibilityIdentifier("identity.merge.aside")
-        case .spouse, .aside:
+        case .aside:
             Button(String(localized: "Back", table: "Identity")) { step = .ask }
                 .buttonStyle(LHButton.tertiary)
                 .accessibilityIdentifier("identity.merge.back")
@@ -117,10 +113,6 @@ struct MergeQuestionSheet: View {
             Button(String(localized: "Yes, combine them", table: "Identity")) { finish(.combine) }
                 .buttonStyle(LHButton.primary)
                 .accessibilityIdentifier("identity.merge.combine")
-        case .spouse:
-            Button(String(localized: "Add as your spouse’s hours", table: "Identity")) { finish(.spouse) }
-                .buttonStyle(LHButton.primary)
-                .accessibilityIdentifier("identity.merge.confirmSpouse")
         case .aside:
             Button(String(localized: "Keep aside", table: "Identity")) { finish(.aside) }
                 .buttonStyle(LHButton.primary)
@@ -133,8 +125,6 @@ struct MergeQuestionSheet: View {
         switch answer {
         case .combine:
             LHToastCenter.shared.show(.success, String(localized: "Combined. \(IdentityCopy.hours(group.hours)) added.", table: "Identity"))
-        case .spouse:
-            LHToastCenter.shared.show(.success, String(localized: "Added as your spouse’s hours.", table: "Identity"))
         case .aside:
             LHToastCenter.shared.show(.success, String(localized: "Kept aside under Earlier records.", table: "Identity"))
         }
