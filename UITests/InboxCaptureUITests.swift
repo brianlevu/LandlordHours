@@ -16,6 +16,79 @@ final class InboxCaptureUITests: XCTestCase {
     func testCaptureLight() { capture(scheme: "light") }
     func testCaptureDark() { capture(scheme: "dark") }
 
+    /// Integration frames: the Inbox and its confirm sheet at default and XXL, light and dark,
+    /// written as PNGs to `TEST_RUNNER_LH_CAPTURE_DIR` (`inbox-<size>-<scheme>.png`).
+    func testCaptureSizesToDirectory() {
+        guard let dir = ProcessInfo.processInfo.environment["LH_CAPTURE_DIR"], !dir.isEmpty else {
+            XCTFail("Set TEST_RUNNER_LH_CAPTURE_DIR"); return
+        }
+        let out = URL(fileURLWithPath: dir)
+        try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+        func write(_ name: String) {
+            Thread.sleep(forTimeInterval: 1.2)
+            try? XCUIScreen.main.screenshot().pngRepresentation.write(to: out.appendingPathComponent("\(name).png"))
+        }
+        for (size, category) in [("default", nil), ("xxl", "UICTContentSizeCategoryXXL")] as [(String, String?)] {
+            for scheme in ["light", "dark"] {
+                let sizeArgs = category.map { ["-UIPreferredContentSizeCategoryName", $0] } ?? []
+                launch(seed: "inbox", scheme: scheme, extra: sizeArgs)
+                let showing = app.descendants(matching: .any)["inbox.row.cal:debug-showing"]
+                XCTAssertTrue(showing.waitForExistence(timeout: 20))
+                write("inbox-\(size)-\(scheme)")
+                app.swipeUp()
+                write("inbox-\(size)-\(scheme)-scrolled")
+                app.swipeDown(); app.swipeDown()
+                Thread.sleep(forTimeInterval: 1.0)
+                showing.tap()
+                if app.buttons["confirm.log"].waitForExistence(timeout: 5) {
+                    write("inbox-confirm-sheet-\(size)-\(scheme)")
+                    app.swipeUp()
+                    write("inbox-confirm-sheet-\(size)-\(scheme)-scrolled")
+                } else {
+                    XCTFail("confirm sheet \(size) \(scheme)")
+                }
+            }
+        }
+    }
+
+    /// The free-limit confirm sheet (conversion path) at default, XXL and AX3, light and dark:
+    /// `limit-sheet-<size>-<scheme>.png` plus a scrolled frame, to `TEST_RUNNER_LH_CAPTURE_DIR`.
+    func testCaptureFreeLimitSheetToDirectory() {
+        guard let dir = ProcessInfo.processInfo.environment["LH_CAPTURE_DIR"], !dir.isEmpty else {
+            XCTFail("Set TEST_RUNNER_LH_CAPTURE_DIR"); return
+        }
+        let out = URL(fileURLWithPath: dir)
+        try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+        func write(_ name: String) {
+            Thread.sleep(forTimeInterval: 1.2)
+            try? XCUIScreen.main.screenshot().pngRepresentation.write(to: out.appendingPathComponent("\(name).png"))
+        }
+        let sizes: [(String, String?)] = [("default", nil), ("xxl", "UICTContentSizeCategoryXXL"),
+                                          ("ax3", "UICTContentSizeCategoryAccessibilityXL")]
+        for (size, category) in sizes {
+            for scheme in ["light", "dark"] {
+                let sizeArgs = category.map { ["-UIPreferredContentSizeCategoryName", $0] } ?? []
+                launch(seed: "limit", scheme: scheme, extra: sizeArgs)
+                let row = app.buttons["inbox.row.cal:debug-limit-showing"]
+                XCTAssertTrue(row.waitForExistence(timeout: 20), "limit row \(size) \(scheme)")
+                Thread.sleep(forTimeInterval: 1.0)
+                row.tap()
+                let unlock = app.buttons["confirm.unlockPro"]
+                XCTAssertTrue(unlock.waitForExistence(timeout: 5), "pinned Unlock Pro \(size) \(scheme)")
+                write("limit-sheet-\(size)-\(scheme)")
+                // The back-out: pinned above the primary below AX, after the content at AX.
+                let keep = app.buttons["confirm.keepForPro"]
+                var swipes = 0
+                while !(keep.exists && keep.isHittable) && swipes < 8 {
+                    app.descendants(matching: .any)["confirm.sheet"].firstMatch.swipeUp(velocity: .slow); swipes += 1
+                }
+                XCTAssertTrue(keep.isHittable, "Keep it in my inbox reachable \(size) \(scheme)")
+                XCTAssertTrue(unlock.isHittable, "Unlock Pro stays pinned \(size) \(scheme)")
+                if swipes > 0 { write("limit-sheet-\(size)-\(scheme)-scrolled") }
+            }
+        }
+    }
+
     /// Swipe-right log + Undo, then swipe-left dismiss, for the 30 fps video. The run script
     /// records the simulator and trims to the VIDEO_MARK lines, so the clip starts on the inbox.
     func testRecordSwipeLogUndo() {

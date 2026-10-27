@@ -118,12 +118,12 @@ struct InboxView: View {
         List {
             Section {
                 LHScreenTitle(String(localized: "inbox.title", defaultValue: "Inbox", table: "Inbox"))
-                    .listRowInsets(EdgeInsets(top: 8, leading: LHMetrics.gutter, bottom: 0, trailing: LHMetrics.gutter))
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 0, trailing: 0))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                 if BackfillJob.showsHeader(backfill.phase) {
                     BackfillProgressHeader(job: backfill, found: model.backfillCount, onRetry: runBackfillAgain)
-                        .listRowInsets(EdgeInsets(top: 4, leading: LHMetrics.gutter, bottom: 4, trailing: LHMetrics.gutter))
+                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         .transition(.opacity)
@@ -146,7 +146,7 @@ struct InboxView: View {
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 32)
-                    .listRowInsets(EdgeInsets(top: 0, leading: LHMetrics.gutter, bottom: 0, trailing: LHMetrics.gutter))
+                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     .accessibilityElement(children: .combine)
@@ -174,6 +174,8 @@ struct InboxView: View {
         .listSectionSpacing(LHMetrics.sectionGap)
         .scrollContentBackground(.hidden)
         .contentMargins(.top, 0, for: .scrollContent)
+        // The 20pt list gutter (shared lane): the card, title and header rows sit on it.
+        .contentMargins(.horizontal, LHMetrics.gutter, for: .scrollContent)
         .animation(reduceMotion ? AppAnimation.quick : AppAnimation.collapse, value: model.visible.map(\.sourceKey))
         .onScrollGeometryChange(for: Bool.self) { geometry in
             // The foot is the last row: it is on screen once the content's end is.
