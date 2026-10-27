@@ -635,7 +635,8 @@ final class RecordSetMigration {
 
         func absorb(_ records: [ZoneRecord], spouse: Bool) {
             let parsedEntries = records.compactMap(\.entry).filter { !tombstones.contains($0.id.uuidString) && !deleted.contains($0.id.uuidString) }
-            let e = MergeRules.unionReporting(entries, spouse ? MergeRules.swapParticipants(parsedEntries) : parsedEntries)
+            let pulled = MergeRules.keepingLocalAttachments(spouse ? MergeRules.swapParticipants(parsedEntries) : parsedEntries, from: entries)
+            let e = MergeRules.unionReporting(entries, pulled)
             let p = MergeRules.unionReporting(properties, records.compactMap(\.property).filter { !tombstones.contains($0.id.uuidString) && !deleted.contains($0.id.uuidString) })
             let c = MergeRules.unionReporting(categories, records.compactMap(\.category).filter { !tombstones.contains($0.id.uuidString) && !deleted.contains($0.id.uuidString) })
             entries = e.merged; properties = p.merged; categories = c.merged
@@ -1031,6 +1032,7 @@ final class RecordSetMigration {
                 }
                 if var entry = record.entry {
                     if spouse { entry = MergeRules.swapParticipants([entry])[0] }
+                    entry = MergeRules.keepingLocalAttachments([entry], from: entries)[0]
                     if let match = MergeRules.liveMatch(forPulled: entry, in: entries) {
                         // R19: the same calendar event under another id; never a second entry. A
                         // newer edit made there lands on the live entry instead of being dropped.

@@ -50,6 +50,16 @@ enum MergeRules {
 
     static func union<T: IdentityRecord>(_ base: [T], _ incoming: [T]) -> [T] { unionReporting(base, incoming).merged }
 
+    /// Photos never sync, so a pulled entry has none: it keeps this iPhone's (as `adoptEdit` does).
+    static func keepingLocalAttachments(_ pulled: [TimeEntry], from local: [TimeEntry]) -> [TimeEntry] {
+        let byId = Dictionary(local.map { ($0.id, $0.attachments) }, uniquingKeysWith: { a, _ in a })
+        return pulled.map { entry in
+            var e = entry
+            if e.attachments.isEmpty, let mine = byId[e.id], !mine.isEmpty { e.attachments = mine }
+            return e
+        }
+    }
+
     // MARK: R19 — one calendar event, one entry
 
     /// Entries sharing a `sourceKey` are one entry: the newer `modifiedAt` wins; the loser goes to

@@ -157,6 +157,26 @@ final class AdversarialReviewTests: XCTestCase {
 
     // MARK: E · a remote edit drops the live entry's photos
 
+    func testARemoteEditOfAnEntryDropsItsPhotos() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let h = EngineHarness(sandbox, zone: FakeZoneSource())
+        try h.device()
+        let done = await h.cloud()
+        XCTAssertEqual(done, .done)
+        var live = h.entries
+        live[0].attachments = [TimeAttachment(filename: "receipt.jpg", data: Data([1, 2, 3]), mimeType: "image/jpeg")]
+        h.live.replaceLive(entries: live, properties: h.properties, categories: h.live.liveCategories)
+        XCTAssertEqual(h.entries[0].attachments.count, 1)
+        var theirs = live[0]
+        theirs.attachments = []
+        theirs.hours += 1
+        theirs.modifiedAt = live[0].modifiedAt.addingTimeInterval(60)
+        let record = ZoneRecord(CloudKitSyncService.record(for: theirs, zoneID: IdentityZone.zoneID, appUserId: h.engine.unifiedId))
+        h.engine.applyPull(ZoneDelta(changed: [record], deleted: [:], tokenData: nil, incomplete: false))
+        let after = try XCTUnwrap(h.entries.first { $0.id == live[0].id })
+        XCTAssertEqual(after.hours, theirs.hours, "the edit arrives")
+        XCTAssertEqual(after.attachments.count, 1, "photos stay on this iPhone (they are never synced, so the pulled copy has none)")
+    }
 
     // MARK: F · Put back on a phone whose clock is behind the deleting phone is ignored there
 
