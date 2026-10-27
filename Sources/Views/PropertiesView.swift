@@ -177,6 +177,9 @@ struct PropertiesView: View {
                 .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.hidden)
+            // A hard edge under the bar, as on the rental page: tiles scrolling up never read
+            // through the "Add rental" button.
+            .modifier(HardTopScrollEdge())
             .scrollDismissesKeyboard(.immediately)
             // Clear of the floating tab bar when scrolled to the end (same inset as Records, Settings).
             .contentMargins(.bottom, 104, for: .scrollContent)

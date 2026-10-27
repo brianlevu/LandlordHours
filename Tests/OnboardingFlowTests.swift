@@ -678,7 +678,7 @@ final class GoalFirstMessagingTests: XCTestCase {
         XCTAssertEqual(OnbCopy.foundHeadline(OnbFound(count: 1, hours: 1)), "1 hour found. 0 counted.")
         XCTAssertEqual(OnbCopy.foundHeadline(OnbFound(count: 1, hours: 0.75)), "45 minutes found. 0 counted.")
         XCTAssertEqual(OnbCopy.foundBody(count: 14, goal: .mp100),
-                       "From 14 calendar events in the last 90 days. Confirm the ones that were rental work and they count toward your 100 hours.")
+                       "From 14 calendar events in the last 90 days. Confirm the rental ones and they count toward your 100 hours.")
         XCTAssertTrue(OnbCopy.foundBody(count: 1, goal: .mp500).hasPrefix("From 1 calendar event "))
         XCTAssertTrue(OnbCopy.foundBody(count: 3, goal: .record).hasSuffix("go in your record."))
         XCTAssertEqual(OnbCopy.setUpHeadline(goal: .mp100), "You’re set up for 100 hours.")

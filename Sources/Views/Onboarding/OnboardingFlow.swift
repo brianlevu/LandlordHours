@@ -140,8 +140,8 @@ enum OnbGoalCopy {
             default: return String(localized: "Counts the rental hours you log here. Other real-estate work isn’t tracked yet.", table: "ConversionPath")
             }
         case .mp500: return String(localized: "Counts the hours you put in yourself. No comparison with anyone else.", table: "ConversionPath")
-        case .mp100: return String(localized: "You’ll also confirm that no one else did more, cleaners and managers included.", table: "ConversionPath")
-        case .record: return String(localized: "No target. Dated hours for your CPA.", table: "ConversionPath")
+        case .mp100: return String(localized: "You’ll also say if a manager or cleaner worked more hours than you.", table: "ConversionPath")
+        case .record: return String(localized: "No target. Just your hours, with dates.", table: "ConversionPath")
         }
     }
 
@@ -367,10 +367,10 @@ enum OnbCopy {
     /// The line under the found headline: where the hours came from and what confirming does.
     static func foundBody(count: Int, goal: OnbGoal?) -> String {
         switch (count == 1, goal?.targetHours) {
-        case (true, let h?): return String(localized: "From 1 calendar event in the last 90 days. If it was rental work, confirm it and it counts toward your \(h) hours.", table: "ConversionPath")
-        case (false, let h?): return String(localized: "From \(count) calendar events in the last 90 days. Confirm the ones that were rental work and they count toward your \(h) hours.", table: "ConversionPath")
-        case (true, nil): return String(localized: "From 1 calendar event in the last 90 days. If it was rental work, confirm it and it goes in your record.", table: "ConversionPath")
-        case (false, nil): return String(localized: "From \(count) calendar events in the last 90 days. Confirm the ones that were rental work and they go in your record.", table: "ConversionPath")
+        case (true, let h?): return String(localized: "From 1 calendar event in the last 90 days. Confirm it if it was rental work, and it counts toward your \(h) hours.", table: "ConversionPath")
+        case (false, let h?): return String(localized: "From \(count) calendar events in the last 90 days. Confirm the rental ones and they count toward your \(h) hours.", table: "ConversionPath")
+        case (true, nil): return String(localized: "From 1 calendar event in the last 90 days. Confirm it if it was rental work, and it goes in your record.", table: "ConversionPath")
+        case (false, nil): return String(localized: "From \(count) calendar events in the last 90 days. Confirm the rental ones and they go in your record.", table: "ConversionPath")
         }
     }
 

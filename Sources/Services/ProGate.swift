@@ -193,10 +193,10 @@ struct PriceDisplay: Equatable {
     static let captionSize: CGFloat = 15
     static let buttonSize: CGFloat = 17
     static let introSize: CGFloat = 13
-    static let caption = "once, yours to keep"
+    static let caption = "one payment, no subscription"
 
-    /// The buy button's label. At large text sizes it drops the price ("Unlock Pro").
-    func buttonTitle(large: Bool) -> String { large ? "Unlock Pro" : "Unlock for \(billed)" }
+    /// The buy button's label. At large text sizes it drops the price ("Unlock").
+    func buttonTitle(large: Bool) -> String { large ? "Unlock" : "Unlock for \(billed)" }
 
     /// Everything on the page that mentions money, top to bottom.
     func elements(large: Bool) -> [Element] {

@@ -140,8 +140,8 @@ final class ConversionPathTests: XCTestCase {
 
     func testBuyTitleUsesTheStorePriceAndDropsItAtLargeSizes() {
         XCTAssertEqual(PaywallCopy.buyTitle(billed: "$29.99", large: false), "Unlock for $29.99")
-        XCTAssertEqual(PaywallCopy.buyTitle(billed: "$29.99", large: true), "Unlock Pro")
-        XCTAssertEqual(PaywallCopy.buyTitle(billed: nil, large: false), "Unlock Pro")
+        XCTAssertEqual(PaywallCopy.buyTitle(billed: "$29.99", large: true), "Unlock")
+        XCTAssertEqual(PaywallCopy.buyTitle(billed: nil, large: false), "Unlock")
     }
 
     func testOnboardingHouseFitsItsFrameAtEveryStage() {
