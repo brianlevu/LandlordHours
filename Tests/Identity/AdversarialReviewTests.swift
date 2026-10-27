@@ -304,6 +304,22 @@ final class AdversarialReviewTests: XCTestCase {
         XCTAssertTrue(h.earlier.removed.contains { $0.entry?.notes == "local edit, not pushed yet" }, "the losing local edit is kept")
     }
 
+    // Low · an offline group delete still reaches iCloud
+    func testADeleteOfAnEarlierGroupMadeOfflineReachesICloudLater() async throws {
+        XCTAssertTrue(Fixture.load("D3", into: sandbox))
+        let old = "email-old.profile@example.com"
+        let zone = FakeZoneSource()
+        let h = EngineHarness(sandbox, zone: zone)
+        try h.device()
+        _ = await h.cloud()
+        let names = Set(try XCTUnwrap(h.earlier.group(old)).entries.map(\.id.uuidString))
+        XCTAssertTrue(names.isSubset(of: Set(zone.records.keys)), "the aside copies are in iCloud")
+        zone.account = .noAccount
+        await h.engine.deleteGroup(old)
+        zone.account = .available
+        await h.engine.pushLive()
+        XCTAssertTrue(names.isDisjoint(with: Set(zone.records.keys)), "the delete reaches iCloud once it is back")
+    }
 
     // Low · unified id rule 2 skips an excluded owner to the next candidate
     func testUnifiedIdRule2FallsToTheNextAllowedOwner() {

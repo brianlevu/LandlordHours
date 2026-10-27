@@ -134,8 +134,17 @@ extension RecordSetMigration {
         guard let group = earlier.group(id) else { return }
         let names = group.entries.map { $0.id.uuidString } + group.properties.map { $0.id.uuidString }
             + group.categories.map { $0.id.uuidString } + group.unparsedRecords.map(\.recordName)
+        // The delete is queued like any other (tombstones + R11), so it reaches iCloud even when
+        // made offline, and a copy pulled meanwhile can't bring the group back as a new question.
+        var hashes: [String: String] = [:]
+        for e in group.entries { hashes[e.id.uuidString] = RecordLedger.version(e).hash }
+        for p in group.properties { hashes[p.id.uuidString] = RecordLedger.version(p).hash }
+        for c in group.categories { hashes[c.id.uuidString] = RecordLedger.version(c).hash }
+        tracker.addTombstones(names)
+        noteDeleted(Set(names), hashes: hashes)
         if !names.isEmpty, await source.accountState() == .available, await confirmAccount() == .same {
-            _ = await source.push([], deletes: names)
+            let report = await source.push([], deletes: names)
+            tracker.clearTombstones(Array(report.deletedNames))
         }
         earlier.removeGroup(id)
         updateGroup(id) { $0.status = .notNeeded; $0.entryCount = 0; $0.propertyCount = 0; $0.hours = 0 }
