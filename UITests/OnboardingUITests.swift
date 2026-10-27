@@ -143,10 +143,15 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["guidedSetup.overlay"].exists, "No coach mark")
         tap(inboxTab)
         // Found before the property existed, placed on it when it was saved: Confirm logs in one tap.
-        let confirm = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "inbox.confirm.")).firstMatch
-        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Every Inbox row shows Confirm")
-        XCTAssertGreaterThanOrEqual(confirm.frame.height, 44)
-        XCTAssertEqual(confirm.label, "Confirm", "The word is on the button, not only a checkmark")
+        // Package D: each row is an LHRow.Action whose leading circle is the confirm control (§1.3);
+        // the row's own height carries the 44pt target, and the control speaks "Confirm".
+        // ("inbox.confirm.batch" is the card foot's "Confirm N likely", not a row.)
+        let firstRow = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "inbox.row.")).firstMatch
+        XCTAssertTrue(firstRow.waitForExistence(timeout: 5), "The Inbox lists what was found")
+        XCTAssertGreaterThanOrEqual(firstRow.frame.height, 44)
+        let confirm = firstRow.buttons.firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Every Inbox row carries the confirm control")
+        XCTAssertTrue(confirm.label.hasPrefix("Confirm"), "The control says Confirm, not only a checkmark: \(confirm.label)")
         XCTAssertFalse(app.staticTexts["Pick a property"].exists, "The only property was attached to every suggestion")
         tap(confirm)
         XCTAssertFalse(app.buttons["confirm.log"].waitForExistence(timeout: 2), "No sheet: nothing was missing")

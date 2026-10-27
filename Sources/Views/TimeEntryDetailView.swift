@@ -152,6 +152,7 @@ struct TimeEntryDetailView: View {
         Group {
             if isEditing {
                 LHStepper(hours: $hours, step: 0.25, range: 0.25...24, label: RR.t("record.hours", "Hours"))
+                    .accessibilityIdentifier("record.hours.stepper")
                     .frame(maxWidth: .infinity)
             } else {
                 HoursReadout(hours: hours)

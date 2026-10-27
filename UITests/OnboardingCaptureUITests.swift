@@ -132,7 +132,8 @@ final class OnboardingCaptureUITests: XCTestCase {
         tap(app.buttons["onb-today"])                           // Review → Inbox
         XCTAssertTrue(app.buttons["tab.inbox"].waitForExistence(timeout: 10))
         shot("07d-inbox-review", scheme, suffix)
-        let confirm = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "inbox.confirm.")).firstMatch
+        // The first row's leading confirm control (package D), not the card foot's "Confirm N likely".
+        let confirm = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "inbox.row.")).firstMatch.buttons.firstMatch
         if confirm.waitForExistence(timeout: 5) {
             tap(confirm)
             shot("07e-inbox-confirmed", scheme, suffix)

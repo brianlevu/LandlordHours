@@ -128,9 +128,11 @@ final class HouseRevealUITests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         tapRetrying(row, until: app.buttons["entry.edit"])
         app.buttons["entry.edit"].tap()
-        let more = app.buttons["Fifteen minutes more"]
-        XCTAssertTrue(more.waitForExistence(timeout: 5))
-        for _ in 0..<8 { more.tap() }                       // +2h: 45 → 47, frame70 → framing
+        // Package G: the hours are one adjustable LHStepper (its minus and plus are not separate buttons).
+        let stepper = app.descendants(matching: .any)["record.hours.stepper"]
+        XCTAssertTrue(stepper.waitForExistence(timeout: 5))
+        // Its plus sits at the trailing end (as InboxUITests.tapStepper taps it).
+        for _ in 0..<8 { stepper.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap() }   // +2h: 45 → 47
         app.buttons["entry.save"].tap()
         XCTAssertTrue(app.buttons["entry.edit"].waitForExistence(timeout: 5), "Saved")
         pause(3)

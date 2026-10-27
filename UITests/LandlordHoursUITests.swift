@@ -124,7 +124,7 @@ final class LandlordHoursUITests: XCTestCase {
 
         // State 3: confirmed — the 100-hour test passes.
         answerYes.tap()
-        XCTAssertTrue(app.staticTexts["No one participated more"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["No one did more"].waitForExistence(timeout: 5))   // package G wording
         assertStanding(contains: "Goal met")
         attachScreenshot(named: "mp100-3-confirmed-reports")
     }
@@ -352,7 +352,8 @@ final class LandlordHoursUITests: XCTestCase {
         XCTAssertTrue(entryRow.waitForExistence(timeout: 20))
         tapWhenHittable(entryRow, scrollIfNeeded: true)
 
-        XCTAssertTrue(app.staticTexts["Attachments (1)"].waitForExistence(timeout: 6),
+        // Package G: the record page shows "Attachments" with a count header and the photo grid.
+        XCTAssertTrue(app.descendants(matching: .any)["entry.attachments"].waitForExistence(timeout: 6),
                       "Seeded attachment should render before relaunch")
         attachScreenshot(named: "attachment-before-relaunch")
 
@@ -371,7 +372,7 @@ final class LandlordHoursUITests: XCTestCase {
                       "Persisted entry should still be present after relaunch")
         tapWhenHittable(entryRowAgain, scrollIfNeeded: true)
 
-        XCTAssertTrue(app.staticTexts["Attachments (1)"].waitForExistence(timeout: 6),
+        XCTAssertTrue(app.descendants(matching: .any)["entry.attachments"].waitForExistence(timeout: 6),
                       "Attachment must still render after a true process restart")
         attachScreenshot(named: "attachment-after-relaunch")
     }

@@ -55,6 +55,10 @@ final class TodayConfirmUITests: XCTestCase {
 
     /// The Inbox tab's badge is the system's ("8 items"): the number is what must match Today's.
     private func badgeCount() -> Int {
+        // The native tab bar tucks away while Today scrolls down (§1.25), taking its buttons out of the
+        // tree; bring it back before reading the badge.
+        var tries = 0
+        while !inboxTab.exists && tries < 4 { app.swipeDown(); tries += 1 }
         let text = (inboxTab.value as? String) ?? ""
         return Int(text.prefix(while: \.isNumber)) ?? 0
     }
