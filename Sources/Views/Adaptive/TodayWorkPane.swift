@@ -214,6 +214,9 @@ struct TodayWorkPane: View {
                         if !stacked, state == .rows, !items.isEmpty {
                             confirmCard(items: items, hidden: hidden, total: visible.count, limit: nil, measureKey: measureKey)
                                 .fixedSize(horizontal: false, vertical: true)
+                                // A new key is a new measure: every part reports again (a change
+                                // reports only what moved, and the reset would lose the rest).
+                                .id(measureKey)
                                 .coordinateSpace(.named(Self.confirmSpace))
                         }
                         OnTheRecordCard(rentalID: rentalID)
