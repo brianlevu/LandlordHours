@@ -959,6 +959,46 @@ final class RecordLossRegressionTests: XCTestCase {
         XCTAssertTrue(h.entries.contains { $0.id == e.id }, "the record S8b missed arrives on the first steady pull")
         XCTAssertFalse(zone.lastDeltaWasWholeZone, "from the migration's token, not a whole-zone refetch")
     }
+
+    // MARK: 6 · other paths found while fixing these
+
+    /// Put back on one phone reaches the phone that deleted it (it ignored the record for 90 days,
+    /// and its own Recently removed copy purged at 30: those hours were gone there for good).
+    func testPutBackOnOnePhoneReachesThePhoneThatDeletedIt() async throws {
+        XCTAssertTrue(Fixture.load("D5", into: sandbox))
+        let device = (Fixture.entries(sandbox.defaults, key: "u.\(local).LandlordHours.entries"),
+                      Fixture.properties(sandbox.defaults, key: "u.\(local).LandlordHours.properties"))
+        let zone = FakeZoneSource(records: Fixture.zoneRecords(entries: device.0, properties: device.1, owner: local))
+        let a = EngineHarness(sandbox, zone: zone)
+        try a.device()
+        let doneA = await a.cloud()
+        XCTAssertEqual(doneA, .done)
+        let boxB = IdentitySandbox("put-back-phone-b")
+        defer { boxB.tearDown() }
+        let b = EngineHarness(boxB, zone: zone)
+        try b.device()
+        let doneB = await b.cloud()
+        XCTAssertEqual(doneB, .done)
+        let target = try XCTUnwrap(b.entries.first)
+        let name = target.id.uuidString
+
+        // Phone B deletes it (as recordLocalDeletes does) and pushes the delete.
+        b.live.replaceLive(entries: b.entries.filter { $0.id != target.id }, properties: b.properties, categories: b.live.liveCategories)
+        b.engine.tracker.forget(recordNames: [name])
+        b.engine.tracker.addTombstones([name])
+        b.engine.noteDeleted([name])
+        await b.engine.pushLive()
+        XCTAssertNil(zone.records[name])
+        // Phone A pulls the delete, then the person puts it back there.
+        a.engine.applyPull(ZoneDelta(changed: [], deleted: [name: "TimeEntry"], tokenData: nil, incomplete: false))
+        XCTAssertFalse(a.entries.contains { $0.id == target.id })
+        a.engine.putBack([name])
+        await a.engine.pushLive()
+        let restored = try XCTUnwrap(zone.records[name], "back in iCloud")
+        // Phone B pulls it.
+        b.engine.applyPull(ZoneDelta(changed: [restored], deleted: [:], tokenData: nil, incomplete: false))
+        XCTAssertTrue(b.entries.contains { $0.id == target.id }, "the put-back hours reach the phone that deleted them")
+    }
 }
 
 /// A live set that notes the steady-state token each time the pull writes the live set.

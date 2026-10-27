@@ -948,9 +948,11 @@ final class RecordSetMigration {
         }
         let liveNames = Set((live?.liveEntries.map { $0.id.uuidString } ?? []) + (live?.liveProperties.map { $0.id.uuidString } ?? [])
                             + (live?.liveCategories.map { $0.id.uuidString } ?? []))
+        let deletedMap = (defaults.dictionary(forKey: IdentityKeys.deletedRecordNames) as? [String: Date]) ?? [:]
+        let deleted = deletedNames()
         return MergeRules.RoutingContext(liveNames: liveNames, archiveMembership: membership, unifiedId: unifiedId,
-                                         groups: GroupsFile.load(root: root), deletedNames: deletedNames(),
-                                         tombstones: Set(tracker.pendingDeletes))
+                                         groups: GroupsFile.load(root: root), deletedNames: deleted,
+                                         tombstones: Set(tracker.pendingDeletes), deletedAt: deletedMap.filter { deleted.contains($0.key) })
     }
 
     /// `deleteReason`: `.deletedElsewhere` for delete callbacks (30 days); `.inferredAbsent` for
@@ -965,6 +967,7 @@ final class RecordSetMigration {
         var pulledForBaseline: [ZoneRecord] = []
         var household: (goal: ZoneRecord?, tax: ZoneRecord?) = (nil, nil)
         var mirror: (goal: ZoneRecord?, tax: ZoneRecord?) = (nil, nil)
+        var putBackElsewhere = Set<String>()
 
         for record in delta.changed {
             if record.isSettings {
@@ -1003,6 +1006,7 @@ final class RecordSetMigration {
                 }
                 pulledForBaseline.append(record)
                 outcome.liveChanged += 1
+                if context.deletedNames.contains(record.recordName) { putBackElsewhere.insert(record.recordName) }
             case .archive(let id):
                 let held = earlier.group(id)?.status ?? groups.group(id)?.status
                 earlier.route(entries: record.entry.map { [$0] } ?? [], properties: record.property.map { [$0] } ?? [],
@@ -1061,6 +1065,13 @@ final class RecordSetMigration {
 
         if outcome.liveChanged > 0 || outcome.removed > 0 {
             live.replaceLive(entries: entries, properties: properties, categories: categories)
+        }
+        if !putBackElsewhere.isEmpty {
+            // Put back on another device: live here again, so it leaves Recently removed and R11.
+            earlier.takeRemoved(putBackElsewhere)
+            var map = (defaults.dictionary(forKey: IdentityKeys.deletedRecordNames) as? [String: Date]) ?? [:]
+            for name in putBackElsewhere { map[name] = nil }
+            defaults.set(map, forKey: IdentityKeys.deletedRecordNames)
         }
         try? groups.save(root: root)
 

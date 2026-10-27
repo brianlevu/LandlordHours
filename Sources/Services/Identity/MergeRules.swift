@@ -240,11 +240,17 @@ enum MergeRules {
         var groups: GroupsFile?
         var deletedNames: Set<String>
         var tombstones: Set<String>
+        /// When each of `deletedNames` was deleted. A copy edited after that (Put back on another
+        /// device) is not the deleted record coming back from a 1.1 device: it routes normally.
+        var deletedAt: [String: Date] = [:]
     }
 
     static func route(_ record: ZoneRecord, context: RoutingContext) -> Route {
         let name = record.recordName
-        if context.deletedNames.contains(name) || context.tombstones.contains(name) { return .ignore }
+        if context.tombstones.contains(name) { return .ignore }
+        if context.deletedNames.contains(name) {
+            guard let at = context.deletedAt[name], let edited = record.modifiedAt, edited > at else { return .ignore }
+        }
         let owner = record.appUserId ?? LegacyInventory.unscopedGroupId
         // R12 before R20: a copy tagged with a spouse group's own id comes from the spouse's 2.0.x
         // device, written from their side (participant Self). It is swapped on arrival even when the

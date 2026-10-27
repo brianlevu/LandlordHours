@@ -89,6 +89,8 @@ struct ZoneRecord: Codable, Equatable {
     var entry: TimeEntry? { recordType == "TimeEntry" ? CloudKitSyncService.entry(from: ckRecord()) : nil }
     var property: RentalProperty? { recordType == "Property" ? CloudKitSyncService.property(from: ckRecord()) : nil }
     var category: CustomCategory? { recordType == "CustomCategory" ? CloudKitSyncService.customCategory(from: ckRecord()) : nil }
+    /// The record's own `modifiedAt` (entries, properties, categories).
+    var modifiedAt: Date? { entry?.modifiedAt ?? property?.modifiedAt ?? category?.modifiedAt }
     var isSettings: Bool { recordType == "GoalSettings" || recordType == "TaxProfile" }
     var isUserRecord: Bool { ["TimeEntry", "Property", "CustomCategory"].contains(recordType) }
     var isParseable: Bool {
