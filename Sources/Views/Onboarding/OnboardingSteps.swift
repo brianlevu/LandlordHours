@@ -126,12 +126,12 @@ struct OnbGoalStep: View {
         OnbStepScaffold(title: String(localized: "What do you rent out?", table: "ConversionPath"), showsActions: false) {
             OnbOptionGroup(hasSelection: flow.rental != nil) {
                 OnbOptionRow(symbol: "calendar", title: String(localized: "Short stays", table: "ConversionPath"),
-                             meta: String(localized: "A week or less, on average", table: "ConversionPath"),
+                             meta: String(localized: "A week or less", table: "ConversionPath"),
                              selected: flow.rental == .shortStays) { flow.answerRental(.shortStays, OnbMotion.morph(reduce)) }
                     .accessibilityIdentifier("rental-short")
                 LHDivider(leadingInset: LHRow.browseDividerInset)
                 OnbOptionRow(symbol: "key", title: String(localized: "Long-term", table: "ConversionPath"),
-                             meta: String(localized: "A month or longer, on average", table: "ConversionPath"),
+                             meta: String(localized: "A month or longer", table: "ConversionPath"),
                              selected: flow.rental == .longTerm) { flow.answerRental(.longTerm, OnbMotion.morph(reduce)) }
                     .accessibilityIdentifier("rental-long")
                 LHDivider(leadingInset: LHRow.browseDividerInset)

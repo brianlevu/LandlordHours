@@ -77,7 +77,7 @@
     "A short note after a calendar event, so you log it the same day. At most 2 a day, never at night." : {
 
     },
-    "A week or less, on average" : {
+    "A week or less" : {
 
     },
     "Add %@" : {
@@ -257,7 +257,7 @@
     "LandlordHours Pro" : {
 
     },
-    "A month or longer, on average" : {
+    "A month or longer" : {
 
     },
     "Log 2 hours at %@?" : {
