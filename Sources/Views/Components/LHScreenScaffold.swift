@@ -132,7 +132,9 @@ struct LHScreenHeader<Accessory: View, Trailing: View>: View {
                 Text(subtitle)
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
-                    .lineLimit(ax ? nil : 1)
+                    // One line at default; it wraps from xLarge so it is never cut (owner ruling 2026-10-27).
+                    .lineLimit(typeSize >= .xLarge ? nil : 1)
+                    .lhWrapsText()
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             accessory

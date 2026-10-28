@@ -75,11 +75,33 @@ python3 scripts/qa/frame_check.py breaks <frames...>   # mid-word line breaks ("
 
 **Re-gate discipline.** On a re-gate, a frame whose bytes are unchanged since the previous look gets **no new blocker** unless it is tagged **"missed earlier"** and says why the earlier look could not have seen it. A changed frame is judged fully.
 
+## 1a. Cross-tab consistency (measured, every gate, standard §S)
+
+The gate compares tabs, not a screen alone. On every gate, whatever the diff touches, capture one frame per tab
+root plus the sheets on the same seed and device, at default and XXL, in light and dark, and run:
+
+```bash
+python3 scripts/qa/frame_check.py consistency <inbox> <records> <rentals> <settings> \
+    --hero <today> --sheet <logtime> --sheet <confirm> --json consistency.json
+```
+
+- **S1** every frame has a title; **S2** tab title baselines within 1pt; **S3** first content within 2pt of the same
+  distance under the header's last baseline. Sheets are compared with each other the same way.
+- FAIL is a BLOCKER, but measure it by hand on the frame first (the tool is a heuristic; the 2026-10-27 rule).
+- A screen the diff adds or moves joins the run: a collection root is checked with the tabs; a detail screen with
+  the other detail screens. Empty-state frames are held to S1/S2 only (an empty state carries its own padding).
+- The scroll-away header: one scrolled frame per touched tab must show the compact bar (title, back, the one
+  action) and no header remnant.
+
 ## 2. Component conformance (grep)
 
 ```bash
-python3 scripts/qa/standard_lint.py        # must print 0 NEW violations
+python3 scripts/qa/standard_lint.py        # must print 0 NEW violations; `hand-header` must stay at 0
 ```
+
+Headers come only from the scaffolds (`.lhTabScreen`, `.lhDetailScreen`, `.lhSheetScreen`, standard §S). A screen
+that places its own title, top inset or hidden nav bar is a BLOCKER even when lint misses it (a private `Text`
+title in a `safeAreaInset`, for example).
 
 Then list, in the hand-off, every row, card, tag, chip, button, header, field, segmented control, stepper, empty state, toast, sheet and alert in the diff by its standard component name (`LHRow.Action`, `LHButton.primary`, and so on). A one-off view where a component exists is a finding. Zero new `.system(size:)`, `Color(hex:)`, `Image("bp_tool_`, Lucide, emoji, `.dynamicTypeSize(` clamps outside the two allowed sites, or hand-built cards around rows. `CategoryToolTile(size:)` is 36 or 56 and never inside Today or Inbox decision rows. Radii are in {6, 12, 16, 20, capsule}. Frames at XXL and AX3 show no clipping, no mid-word break and no truncation at AX. **At AX a sheet pins only its primary button** (opaque footer, ~24pt fade); secondary and tertiary choices scroll with the body, so a second pinned button at AX is a finding. **Titles never truncate at AX**: an ellipsis on a title or subtitle at AX is a BLOCKER, and the 2-line title cap applies below AX only (owner rulings, Brian 2026-10-27). **Disclosure chevrons** are one ink (`textSecondary`, >= 3:1 as a UI glyph; a system-grey chevron at 1.72:1 is a BLOCKER) and are not drawn at AX in `LHRow.Browse` / `SettingRow`.
 

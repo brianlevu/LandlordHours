@@ -2,7 +2,7 @@ import SwiftUI
 import MessageUI
 
 /// Contact support: one form on the plain page, one pinned `LHButton.primary`, and what helps us
-/// answer fast. Standard v2 (package H): `LHScreenTitle`, `LHField`, no list chrome.
+/// answer fast. Standard v2 (package H): `.lhDetailScreen`, `LHField`, no list chrome.
 struct ContactSupportView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme

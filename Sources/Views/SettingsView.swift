@@ -4,7 +4,7 @@ import PhotosUI
 // MARK: - Settings
 //
 // Standard v2 (package H): one inset-grouped `List` on the plain canvas (no house here; the page is
-// dusk only on screens that carry the hero). `LHScreenTitle` with a back to Today, an `LHSectionHeader`
+// dusk only on screens that carry the hero). `.lhTabScreen` with a back to Today, an `LHSectionHeader`
 // per group, `LHRow.Browse` / `.Toggle` for rows, the Pro card on `LHButton.secondary`, the
 // appearance choice on `LHSegmented`. Words come from `Settings.xcstrings` through `HS`.
 // The profile and account rows stay as they are: package K replaces them with Settings › iCloud &

@@ -617,5 +617,20 @@ class ConsistencyAX(unittest.TestCase):
         self.assertAlmostEqual(m["title_baseline_pt"], 146.0, delta=0.7)
         self.assertAlmostEqual(m["content_top_pt"], 180.0, delta=0.5)
 
+
+class ConsistencyDark(unittest.TestCase):
+    def test_dark_frame_reads_light_ink(self):
+        s = 3
+        a = np.zeros((H, W, 3), np.uint8)
+        a[:] = (11, 18, 48)                       # night canvas #0B1230
+        a[80 * s:80 * s + 75, 60:480] = (242, 244, 250)   # textPrimary title, 25pt
+        a[130 * s:430 * s, 60:1146] = (20, 28, 63)        # card #141C3F
+        path = os.path.join(tempfile.mkdtemp(prefix="fc-dark-"), "inbox-dark.png")
+        Image.fromarray(a).save(path)
+        m = fc.header_metrics(path, 3.0)
+        self.assertEqual(m["theme"], "dark")
+        self.assertAlmostEqual(m["title_baseline_pt"], 105.0, delta=0.5)
+        self.assertAlmostEqual(m["content_top_pt"], 130.0, delta=0.5)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

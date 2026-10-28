@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Rentals (v2, plan package F, row 10)
 //
 // The Rentals tab root, on the plain canvas (§H.4: lists are paper; the dusk page is for the house).
-// Top to bottom: "Rentals" in Fraunces 34 (`LHScreenTitle(.collection)`) with "3 rentals · 312h this
+// Top to bottom: "Rentals" in Fraunces 34 (`.lhTabScreen`) with "3 rentals · 312h this
 // year" under it (hours only: "All rentals" never shows a goal, summed or otherwise, §H.1 H10) ·
 // a search field from nine rentals · the two-column house gallery (`RentalGallery`, Brian
 // 2026-10-26, standard §1.4 exception): each tile is the house at its stage (lit when hours were

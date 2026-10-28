@@ -17,7 +17,7 @@ Every rule in the standard is tagged **[measured]**, **[grep]** or **[judgment]*
 
 **Type.** SF Pro / SF Pro Rounded (numbers, tabular) / SF Mono (drafting labels, 11pt caps) / Fraunces (tab titles and display, ≥ 28pt only). DM Serif Display and DM Sans are retired. Use text styles, not `.system(size:)`.
 
-**Layout.** Gutter 20, section gap 24, header to content 8, card padding 16. Headers come only from the screen scaffolds (`.lhTabScreen`, `.lhSheetScreen`; standard §S): a screen never places its own title or top inset. Rows live in one grouped container with hairline dividers; a card per list item is a defect.
+**Layout.** Gutter 20, section gap 24, header to content 8, card padding 16. Headers come only from the screen scaffolds (`.lhTabScreen`, `.lhDetailScreen`, `.lhSheetScreen`; standard §S): a screen never places its own title, hides the bar or pads its top. Every gate runs `frame_check.py consistency` across the tabs and sheets (gate_rubric §1a). Rows live in one grouped container with hairline dividers; a card per list item is a defect.
 
 **Corner radius.** Cards 20 (continuous), inner surfaces 12, stat tiles 16, tags 6, buttons and chips capsule. Nothing else.
 

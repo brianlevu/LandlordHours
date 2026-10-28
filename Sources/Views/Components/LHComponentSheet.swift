@@ -83,8 +83,10 @@ struct LHComponentSheet: View {
     // MARK: Page 1
 
     @ViewBuilder private var basicsPage: some View {
-        LHScreenTitle(fx("Components"), subtitle: fx("LHButton, LHTag, LHChip, headers"),
-                      trailingSymbol: "ellipsis", trailingLabel: fx("More"), trailingAction: {})
+        LHScreenHeader(title: fx("Components"), subtitle: fx("LHButton, LHTag, LHChip, headers"),
+                       accessory: { EmptyView() }) {
+            LHHeaderAction(symbol: "ellipsis", label: fx("More")) {}
+        }
         LHSectionHeader(fx("Buttons"))
         VStack(spacing: 12) {
             Button(fx("Log 1h 30m")) {}.buttonStyle(LHButton.primary)
@@ -119,8 +121,8 @@ struct LHComponentSheet: View {
             LHChip(fx("Repairs"), isSelected: filter == 1) { filter = 1 }
             LHChip(fx("Showings"), systemImage: "key", isSelected: filter == 2) { filter = 2 }
         }
-        LHScreenTitle(fx("Pine Cabin"), style: .detail)
-        LHScreenTitle(fx("Log time"), subtitle: fx("Today, Thu Oct 22"), style: .sheet)
+        LHScreenHeader(title: fx("Pine Cabin"), style: .detail, accessory: { EmptyView() }, trailing: { EmptyView() })
+        LHSheetHeader(title: fx("Log time"), subtitle: fx("Today, Thu Oct 22"), onClose: {})
         LHFootnote.cpa
     }
 

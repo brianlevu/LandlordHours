@@ -135,7 +135,6 @@
 		66DB8F60EA7EF3431710C42D /* LandlordHoursWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D050CED31A88DA68A2F3B3 /* LandlordHoursWidget.swift */; };
 		681C65D5CA06A434FCB8D33D /* TodayCaptureUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16BDD6BC4E08300C0F0EA91A /* TodayCaptureUITests.swift */; };
 		68F29D3A79C1E4C089169760 /* OnboardingScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = E608074A1B1B6BCDFA4736E4 /* OnboardingScene.swift */; };
-		6C0042D8C950EC83B4E71239 /* LHScreenTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0829AAA2F9D0B2061DC09D89 /* LHScreenTitle.swift */; };
 		6D3F1416E68718AB9FC7805C /* SyncChangeTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 941819645199CADCCE670A56 /* SyncChangeTracker.swift */; };
 		6D5CF36648DF854DD8526DBD /* AppModelHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B6AD9BA257E78062E5DA39E /* AppModelHost.swift */; };
 		6EE9D69ECD2A392F6B538C2A /* ClassifierKeywords.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CEC2D9DCAA8A77D8C960FA4 /* ClassifierKeywords.swift */; };
@@ -398,7 +397,6 @@
 		05D6E55446ACD86EE664D6EB /* D5-201-local.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "D5-201-local.plist"; sourceTree = "<group>"; };
 		06883004BB1E57213877840B /* Foundations.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Foundations.xcstrings; sourceTree = "<group>"; };
 		07304A69757DB91D8CF20A79 /* IdentityJourneyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityJourneyUITests.swift; sourceTree = "<group>"; };
-		0829AAA2F9D0B2061DC09D89 /* LHScreenTitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHScreenTitle.swift; sourceTree = "<group>"; };
 		090AC6457EB4FB394F170292 /* InboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxTests.swift; sourceTree = "<group>"; };
 		0914D43BECE24E5CB862706D /* LandlordPurchasesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandlordPurchasesTests.swift; sourceTree = "<group>"; };
 		0978D9BA5F8797000E0D0758 /* LHScreenScaffold.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LHScreenScaffold.swift; sourceTree = "<group>"; };
@@ -1206,7 +1204,6 @@
 				2F1E3C866671C47777936C66 /* LHRing.swift */,
 				A8516330DDCA2B7CC2050B26 /* LHRow.swift */,
 				0978D9BA5F8797000E0D0758 /* LHScreenScaffold.swift */,
-				0829AAA2F9D0B2061DC09D89 /* LHScreenTitle.swift */,
 				25592AA9D045230F14E3390A /* LHSectionHeader.swift */,
 				4E78224ED686BF6782F6BDE8 /* LHSegmented.swift */,
 				2783FC6AC767BA3CECF909A3 /* LHSheet.swift */,
@@ -1716,7 +1713,6 @@
 				ED524E075498C222E7573B46 /* LHRing.swift in Sources */,
 				ACD02C124F516712249AAFEA /* LHRow.swift in Sources */,
 				EF21223A16C262FC6C2FFE87 /* LHScreenScaffold.swift in Sources */,
-				6C0042D8C950EC83B4E71239 /* LHScreenTitle.swift in Sources */,
 				F87FAB49553E4595D4C1D27A /* LHSectionHeader.swift in Sources */,
 				BD9C362BDD43E6E640C51BA9 /* LHSegmented.swift in Sources */,
 				C7D105E61DF44191ADC49443 /* LHSheet.swift in Sources */,

@@ -1317,8 +1317,10 @@ def cmd_breaks(args) -> int:
 SAFE_TOP_PT = {874: 62, 956: 62, 852: 59, 932: 59, 844: 47, 926: 47}  # status bar / Dynamic Island inset per height
 TITLE_MIN_PT, TITLE_MAX_PT = 20.0, 96.0   # a large-title glyph band (Fraunces 34: ~25-33pt with descenders at default; ~60-80pt at AX3)
 SHEET_TITLE_MIN_PT = 14.0                  # SF title2 / title1 in sheets (~16-24pt)
+SUBTITLE_LINE_GAP_PT = 8.0                 # a wrapped subtitle's next line starts this close under the last
 SUBTITLE_GAP_PT = 16.0                     # a short text band starting this close under the title (line-box descent + 2pt) is the subtitle
-INK_MAX_MEAN = 110                         # "dark ink": mean RGB below this (textPrimary #121B33, textSecondary #4A5068)
+INK_MAX_MEAN = 110                         # light theme ink: mean RGB below this (textPrimary #121B33, textSecondary #4A5068)
+INK_MIN_MEAN_DARK = 150                    # dark theme ink: mean RGB above this (textPrimary #F2F4FA, textSecondary #A9B0C8)
 FILL_DIFF = 12                             # a pixel differs from the row's edge background by more than this (sum |dRGB|)
 CONSIST_BASELINE_TOL_PT = 1.0
 TRAILING_SLOT_PT = 72.0                   # the right edge kept for one trailing .icon (44pt + gutter)
@@ -1335,7 +1337,8 @@ def header_metrics(path, scale=None, kind="tab", search_to=0.55):
     (a tab with no screen title, the 2.2 Today, is reported as such and fails the cross-tab check).
 
     Heuristics (confirm by eye):
-      ink rows     rows with >= 2 dark pixels (mean RGB < 110) between the gutters
+      ink rows     rows with >= 2 ink pixels between the gutters: mean RGB < 110 on a light page, > 150 on the
+                   night page (the theme is read from the page's edge column)
       title band   the tallest ink band (heavier ink breaks a tie) below the safe area whose height is a large title (20-48pt for tabs,
                    14-48pt for sheets) and which starts within 130pt of the safe area; a band above it (back
                    button, nav-bar button, rental chip) is skipped, and a big numeral lower down is not a title
@@ -1353,7 +1356,10 @@ def header_metrics(path, scale=None, kind="tab", search_to=0.55):
     x0, x1 = int(8 * sc), w - int(8 * sc)
     y0, y1 = int((safe + 2) * sc), int(h * search_to)
     reg = a[y0:y1, x0:x1]
-    dark = reg.mean(axis=2) < INK_MAX_MEAN
+    # Theme from the page under the header (the edge column): on the night canvas ink is light.
+    night = float(a[y0:y1, int(3 * sc)].mean()) < 90
+    is_ink = (lambda m: m > INK_MIN_MEAN_DARK) if night else (lambda m: m < INK_MAX_MEAN)
+    dark = is_ink(reg.mean(axis=2))
     counts = dark.sum(axis=1)
     bands = [(y0 + s, y0 + e) for s, e in runs(counts >= 2, min_len=int(4 * sc), close_gap=int(1.5 * sc))]
     lo = (SHEET_TITLE_MIN_PT if kind == "sheet" else TITLE_MIN_PT) * sc
@@ -1366,7 +1372,7 @@ def header_metrics(path, scale=None, kind="tab", search_to=0.55):
         """A title sits on the page, not inside a card: most of the band differs from a card fill."""
         mid = (b[0] + b[1]) // 2
         row = a[mid, x0:x1]
-        fill = (np.abs(row - edge_col[mid][None, :]).sum(axis=1) > FILL_DIFF) & (row.mean(axis=1) >= INK_MAX_MEAN)
+        fill = (np.abs(row - edge_col[mid][None, :]).sum(axis=1) > FILL_DIFF) & ~is_ink(row.mean(axis=1))
         return fill.mean() < 0.5   # pixels that are neither the page nor ink: a card or field behind the text
 
     cands = [(s, e) for s, e in bands if lo <= e - s <= TITLE_MAX_PT * sc and s <= (safe + TITLE_ZONE_PT) * sc
@@ -1376,7 +1382,7 @@ def header_metrics(path, scale=None, kind="tab", search_to=0.55):
         tallest = max(e - s for s, e in cands)
         near = [b for b in cands if (b[1] - b[0]) >= tallest - 2 * sc]
         title = max(near, key=lambda b: int(counts[b[0] - y0:b[1] - y0].sum()))
-    out = {"frame": path, "scale": sc, "safe_top_pt": safe, "kind": kind,
+    out = {"frame": path, "scale": sc, "safe_top_pt": safe, "kind": kind, "theme": "dark" if night else "light",
            "bands_pt": [[round(s / sc, 1), round(e / sc, 1)] for s, e in bands[:12]],
            "title_top_pt": None, "title_baseline_pt": None, "title_height_pt": None,
            "header_end_pt": None, "last_baseline_pt": None, "content_top_pt": None, "gap_pt": None}
@@ -1396,20 +1402,26 @@ def header_metrics(path, scale=None, kind="tab", search_to=0.55):
 
     header_end = e
     last_base = base + 1
+    merged = 0
     for bs, be in bands:
-        if bs >= header_end and bs - header_end <= SUBTITLE_GAP_PT * sc and be - bs < TITLE_MIN_PT * sc:
+        # The subtitle starts <= 16pt under the title; a wrapped subtitle's next line follows within 8pt.
+        # A band further down (a section header such as "You") is content, not header.
+        reach = SUBTITLE_GAP_PT if merged == 0 else SUBTITLE_LINE_GAP_PT
+        if bs >= header_end and bs - header_end <= reach * sc and be - bs < TITLE_MIN_PT * sc:
             header_end = be
             last_base = baseline_of(bs, be)
+            merged += 1
     # content: first occupied row after the header end
     edge = a[:, int(3 * sc)]
     xr = w - int(TRAILING_SLOT_PT * sc)  # the trailing action's circle hangs below the title band; it is header
     diff = np.abs(a[header_end:y1 + int(200 * sc), x0:xr] - edge[header_end:y1 + int(200 * sc), None, :]).sum(axis=2)
     occ = (diff > FILL_DIFF).mean(axis=1) >= 0.01
     rr = runs(occ, min_len=int(2 * sc))
-    # Header furniture that hangs below the title (a back circle in the leading 72pt) is not content.
+    # Header furniture that hangs just below the title (a back circle in the leading 72pt, starting within
+    # 4pt of the header's end) is not content; a short section header lower down ("You") is.
     while rr:
         cols = np.flatnonzero((diff[rr[0][0]:rr[0][1]] > FILL_DIFF).any(axis=0))
-        if cols.size and (cols.max() + x0) <= TRAILING_SLOT_PT * sc:
+        if cols.size and (cols.max() + x0) <= TRAILING_SLOT_PT * sc and rr[0][0] <= int(4 * sc):
             rr = rr[1:]
             continue
         break

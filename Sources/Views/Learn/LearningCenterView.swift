@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Learning center (v2)
 //
-// Standard v2 (package H): a plain page with no house. `LHScreenTitle` (collection root, back icon),
+// Standard v2 (package H): a plain page with no house. `.lhTabScreen` (collection root, back icon),
 // one `LHCard.Summary` header with no eyebrow, "Start here" and "All topics" as 56pt `LHRow.Browse`
 // rows in one grouped container, the disclaimer last. Words come from the `Learn` String Catalog
 // via `LearnLibrary`; the chrome strings come from `Settings.xcstrings` via `HS`.
