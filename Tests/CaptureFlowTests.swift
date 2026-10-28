@@ -288,7 +288,7 @@ final class CaptureReconciliationTests: CaptureTestCase {
     func testBackfillMatchingManualHoursIsMarkedAndNeverPreselected() {
         let propertyId = UUID()
         let manual = TimeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs,
-                               hours: 2, date: date(2026, 2, 10, 16))
+                               hours: 1.5, date: date(2026, 2, 10, 16))   // the event's length (2.2: hours must match)
         let store = makeStore()
         let sameDay = calendarSuggestion(externalId: "B1", start: date(2026, 2, 10, 9), title: "Plumber visit",
                                          propertyId: propertyId, backfill: true)
@@ -305,7 +305,7 @@ final class CaptureReconciliationTests: CaptureTestCase {
 
         // A manual entry logged later is picked up by reconcile.
         let later = TimeEntry(propertyId: propertyId, participant: .selfParticipant, category: .repairs,
-                              hours: 1, date: date(2026, 2, 11, 18))
+                              hours: 1.5, date: date(2026, 2, 11, 18))
         store.reconcile(with: [manual, later], calendar: calendar)
         XCTAssertTrue(store.suggestion(forKey: otherDay.sourceKey)!.mightAlreadyBeLogged)
     }
