@@ -181,4 +181,34 @@ final class ColorContrastTests: XCTestCase {
         let (r, g, b) = rgb(color, style)
         return String(format: "%02X%02X%02X", Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
     }
+
+    // MARK: Category tags (shot-bug 1, 2026-10-27)
+
+    /// Composite `wash` (any alpha) over `surface`, then measure `ink` against the result.
+    private func tagContrast(ink: Color, wash: Color, surface: Color, _ style: UIUserInterfaceStyle) -> Double {
+        let tc = UITraitCollection(userInterfaceStyle: style)
+        func rgba(_ c: Color) -> (CGFloat, CGFloat, CGFloat, CGFloat) {
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            XCTAssertTrue(UIColor(c).resolvedColor(with: tc).getRed(&r, green: &g, blue: &b, alpha: &a))
+            return (r, g, b, a)
+        }
+        let w = rgba(wash), s = rgba(surface)
+        let bg = (w.0 * w.3 + s.0 * (1 - w.3), w.1 * w.3 + s.1 * (1 - w.3), w.2 * w.3 + s.2 * (1 - w.3))
+        let la = luminance(rgb(ink, style)), lb = luminance(bg)
+        return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+    }
+
+    /// Every category tag, as the rows build it, passes AA on the card in both schemes.
+    func testEveryCategoryTagPassesAAOnItsWash() {
+        for (scheme, style) in [(ColorScheme.light, UIUserInterfaceStyle.light), (.dark, .dark)] {
+            let c = AdaptiveColors(colorScheme: scheme)
+            for category in ActivityCategory.allCases {
+                guard case .custom(let ink, let wash) = LHTag.Tone.category(category, colors: c) else {
+                    return XCTFail("category tone must be .custom")
+                }
+                let r = tagContrast(ink: ink, wash: wash, surface: c.backgroundSecondary, style)
+                XCTAssertGreaterThanOrEqual(r, 4.5, "\(scheme) \(category) tag = \(String(format: "%.2f", r))")
+            }
+        }
+    }
 }

@@ -255,7 +255,7 @@ struct TodayConfirmBlock: View {
             return LHTag(String(localized: "today.tag.notSure", defaultValue: "Not sure", table: "Today"), tone: .neutral)
         }
         guard let category = suggestion.proposedCategory else { return nil }
-        return LHTag(category.inboxLabel, tone: .custom(ink: colors.categoryInk(category), wash: colors.categoryWash(category)))
+        return LHTag(category.inboxLabel, tone: .category(category, colors: colors))
     }
 
     // MARK: Actions

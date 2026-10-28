@@ -24,6 +24,12 @@ struct LHTag: View {
         case action
         /// A category's own ink and wash (from `ActivityCategory`'s colour tokens).
         case custom(ink: Color, wash: Color)
+
+        /// The tone every category tag uses (Inbox and Today rows): the tag ink on its own 12% wash, so
+        /// every pair is >= 4.5:1 (`categoryTagInkHex`). The 14% tile ink (`categoryInk`) is for bars and labels.
+        static func category(_ category: ActivityCategory, colors: AdaptiveColors) -> Tone {
+            .custom(ink: colors.categoryTagInk(category), wash: colors.categoryTagWash(category))
+        }
     }
 
     let text: String
