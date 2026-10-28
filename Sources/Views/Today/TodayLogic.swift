@@ -33,12 +33,19 @@ enum TodayConfirm {
         return .caughtUp(captureOn: captureOn)
     }
 
-    /// The badge number: every visible pending item (the Inbox's `badgeCount`).
-    static func count(visible: [Suggestion]) -> Int { visible.count }
+    /// The items Today counts for the page shown: every visible item on "All rentals" (rentalID nil),
+    /// only that rental's items on a single-rental page.
+    static func scoped(_ visible: [Suggestion], rentalID: UUID?) -> [Suggestion] {
+        guard let rentalID else { return visible }
+        return visible.filter { $0.proposedPropertyId == rentalID }
+    }
+
+    /// The count in the header: the visible pending items for the page shown.
+    static func count(visible: [Suggestion], rentalID: UUID? = nil) -> Int { scoped(visible, rentalID: rentalID).count }
 
     /// The rows Today shows: most likely first (the Inbox's backfill ranking), at most `limit`.
-    static func rows(visible: [Suggestion], limit: Int = rowLimit) -> [Suggestion] {
-        Array(InboxLogic.ranked(visible).prefix(max(0, limit)))
+    static func rows(visible: [Suggestion], rentalID: UUID? = nil, limit: Int = rowLimit) -> [Suggestion] {
+        Array(InboxLogic.ranked(scoped(visible, rentalID: rentalID)).prefix(max(0, limit)))
     }
 
     /// The "See all N" foot shows when more are waiting than the rows hold.

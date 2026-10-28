@@ -48,6 +48,47 @@ final class TodayConfirmLogicTests: CaptureTestCase {
     }
 }
 
+// MARK: - To confirm follows the rental chip (shot-bug 5, 2026-10-27)
+
+@MainActor
+final class TodayConfirmScopeTests: CaptureTestCase {
+    private let pine = UUID(), oak = UUID()
+    private func s(_ key: String, property: UUID?, confidence: Double = 0.9) -> Suggestion {
+        let start = date(2026, 10, 14, 9)
+        return Suggestion(sourceKey: "cal:\(key)", kind: .calendar, detectedAt: start, start: start,
+                          end: start.addingTimeInterval(3600), title: key, containerId: "CAL",
+                          proposedPropertyId: property, proposedCategory: .repairs, proposedHours: 1,
+                          hoursBasis: .scheduled, confidence: confidence)
+    }
+
+    func testASingleRentalCountsOnlyItsOwnItems() {
+        let items = [s("a", property: pine), s("b", property: pine), s("c", property: oak), s("d", property: nil)]
+        XCTAssertEqual(TodayConfirm.count(visible: items, rentalID: pine), 2)
+        XCTAssertEqual(TodayConfirm.count(visible: items, rentalID: oak), 1)
+        XCTAssertEqual(Set(TodayConfirm.rows(visible: items, rentalID: pine).map(\.title)), ["a", "b"])
+        XCTAssertFalse(TodayConfirm.showsReviewAll(count: TodayConfirm.count(visible: items, rentalID: oak)))
+    }
+
+    func testAllRentalsCountsEverything() {
+        let items = [s("a", property: pine), s("b", property: oak), s("c", property: nil)]
+        XCTAssertEqual(TodayConfirm.count(visible: items, rentalID: nil), 3)
+        XCTAssertEqual(TodayConfirm.count(visible: items), 3)
+    }
+
+    func testARentalWithNothingPendingCountsZero() {
+        XCTAssertEqual(TodayConfirm.count(visible: [s("a", property: pine)], rentalID: oak), 0)
+    }
+
+    func testHeaderCountAndRowsAgreeForTheSamePage() {
+        let items = (0..<5).map { s("p\($0)", property: pine) } + (0..<3).map { s("o\($0)", property: oak) }
+        for page in [pine, oak, nil] as [UUID?] {
+            let count = TodayConfirm.count(visible: items, rentalID: page)
+            let rows = TodayConfirm.rows(visible: items, rentalID: page, limit: 99)
+            XCTAssertEqual(rows.count, count, "header N must equal the rows it can open")
+        }
+    }
+}
+
 // MARK: - Today ⇄ Inbox: one list, one count, one write path
 
 @MainActor
