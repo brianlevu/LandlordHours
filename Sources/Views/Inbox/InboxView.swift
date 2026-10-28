@@ -106,7 +106,7 @@ struct InboxView: View {
                 .overlay(alignment: .center) {
                     if barShows && toasts.current == nil {
                         InboxBatchBar(count: batch.count) { confirmLikely() }
-                            .padding(.horizontal, LHMetrics.gutter)
+                            .lhColumnGutter()
                             .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
                     }
                 }
@@ -585,7 +585,7 @@ private struct InboxEmptyPage: View {
         .safeAreaInset(edge: .bottom) {
             if !inFlowButton {
                 button
-                    .padding(.horizontal, LHMetrics.gutter)
+                    .lhColumnGutter()
                     .padding(.bottom, 16)
             }
         }

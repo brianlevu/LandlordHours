@@ -52,6 +52,8 @@ struct ContactSupportView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !typeSize.isAccessibilitySize {
                 sendButton
+                    // Band B: the button keeps the content column's width (§1.27 IP1); no change on iPhone.
+                    .frame(maxWidth: LHMetrics.contentColumn - 2 * LHMetrics.gutter)
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
                     .padding(.bottom, 16)

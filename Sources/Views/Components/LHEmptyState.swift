@@ -118,12 +118,12 @@ extension LHEmptyState {
                     .multilineTextAlignment(.center)
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, LHMetrics.gutter)
+            .lhColumnGutter()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .safeAreaInset(edge: .bottom) {
                 Button(actionTitle, action: action)
                     .buttonStyle(LHButton.primary)
-                    .padding(.horizontal, LHMetrics.gutter)
+                    .lhColumnGutter()
                     .padding(.bottom, 16)
             }
             .background { LHPage() }

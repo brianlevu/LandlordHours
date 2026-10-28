@@ -336,7 +336,21 @@ private struct LHListGutterModifier: ViewModifier {
     }
 }
 
+/// Content that sits outside the scroll view (a bar pinned under a list) keeps the column too.
+private struct LHColumnGutterModifier: ViewModifier {
+    @Environment(\.lhColumnInset) private var inset
+
+    func body(content: Content) -> some View {
+        content.padding(.horizontal, LHMetrics.gutter + inset)
+    }
+}
+
 extension View {
+    /// The 20pt gutter plus the band-B column inset, for content outside the scaffold's scroll view.
+    func lhColumnGutter() -> some View {
+        modifier(LHColumnGutterModifier())
+    }
+
     /// Content margins move the scroll content into the column while the scroll view (and the page
     /// behind it) still fills the window, so the whole width scrolls.
     fileprivate func lhContentColumn(_ inset: CGFloat) -> some View {
