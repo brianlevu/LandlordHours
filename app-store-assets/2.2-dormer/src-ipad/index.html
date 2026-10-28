@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Dormer 2.2 store set</title>
+<style>
+@font-face{font-family:"Fraunces";src:url("Fraunces.ttf");font-weight:100 900;}
+:root{--blue:#1E3FA6;--deep:#10246B;--ink:#FFFFFF;--accent:#8FD3FF;--sub:#C9D6F5}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--deep)}
+.poster{position:relative;width:100vw;height:100vh;overflow:hidden;
+ background:
+  linear-gradient(rgba(143,211,255,.075) 1px,transparent 1px) 0 0/5vw 5vw,
+  linear-gradient(90deg,rgba(143,211,255,.075) 1px,transparent 1px) 0 0/5vw 5vw,
+  radial-gradient(120% 60% at 50% 0%,#2A50C2 0%,rgba(42,80,194,0) 70%),
+  linear-gradient(180deg,#1E3FA6 0%,#16328C 55%,#0F2569 100%);}
+.head{position:absolute;left:0;right:0;top:var(--ht);text-align:center;padding:0 6.5vw;z-index:4}
+h1{font-family:"Fraunces",serif;font-variation-settings:"opsz" 144,"SOFT" 30;font-weight:560;color:var(--ink);
+ font-size:var(--fs);line-height:1.05;letter-spacing:-.012em;text-wrap:balance}
+h1 .hl{color:var(--accent)}
+.device{position:absolute;left:50%;transform:translateX(-50%);width:var(--dw);top:var(--dt);
+ border-radius:var(--dr) var(--dr) var(--drb,var(--dr)) var(--drb,var(--dr));overflow:hidden;z-index:3;background:#fff;
+ box-shadow:0 0 0 .3vw rgba(255,255,255,.85),0 4vw 9vw rgba(4,12,40,.55),0 1.4vw 3vw rgba(4,12,40,.35)}
+.device .crop{width:100%;overflow:hidden;position:relative}
+.device img{display:block;width:100%}
+.garnish{position:absolute;left:50%;transform:translateX(-50%);z-index:5;pointer-events:none}
+.garnish img{display:block;width:100%;filter:drop-shadow(0 2vw 2.5vw rgba(3,8,30,.55))}
+.note{position:absolute;left:0;right:0;text-align:center;z-index:4;font-family:-apple-system,"SF Pro Text",system-ui;color:var(--sub);font-weight:500;line-height:1.35;padding:0 10vw;text-wrap:balance}
+.glow{position:absolute;left:50%;transform:translateX(-50%);border-radius:50%;z-index:1;
+ background:radial-gradient(closest-side,rgba(233,165,88,.42),rgba(233,165,88,0))}
+/* poster 1 */
+.p1 .icon{position:absolute;left:50%;transform:translateX(-50%);top:var(--it);width:var(--iw);aspect-ratio:1;border-radius:22.4%;overflow:hidden;z-index:4;
+ box-shadow:0 2.5vw 5vw rgba(3,8,30,.5)}
+.p1 .icon img{width:100%;display:block}
+.p1 .name{position:absolute;left:0;right:0;top:var(--nt);text-align:center;z-index:4;font-family:-apple-system,"SF Pro Display",system-ui;
+ color:var(--sub);font-size:var(--nfs);font-weight:600;letter-spacing:.02em}
+.p1 .laurel{position:absolute;left:0;right:0;top:var(--lt);text-align:center;z-index:4;font-family:-apple-system,"SF Pro Text",system-ui;
+ color:var(--sub);font-size:var(--lfs);font-weight:500;line-height:1.35;padding:0 10vw;text-wrap:balance}
+</style></head><body>
+<div id="root"></div>
+<script>
+const q=new URLSearchParams(location.search);const mode=q.get('m')||'phone';
+const p=JSON.parse(q.get("d"));
+const ipad=mode==='ipad';
+const r=document.getElementById('root');
+if(p.poster){
+  const v=ipad?`--it:7%;--iw:15vw;--nt:23.5%;--nfs:2.6vw;--ht:28.5%;--fs:7.4vw;--lt:47%;--lfs:2.6vw`
+              :`--it:7.5%;--iw:23vw;--nt:20.6%;--nfs:4.1vw;--ht:25%;--fs:12.4vw;--lt:42%;--lfs:4.6vw`;
+  const hw=ipad?'64vw':'94vw', ht=ipad?'50%':'51%';
+  r.innerHTML=`<section class="poster p1" style="${v}">
+   <div class="icon"><img src="${p.icon}"></div>
+   <div class="name">Dormer</div>
+   <div class="head"><h1>${p.h}</h1></div>
+   <div class="laurel">${p.laurel}</div>
+   <div class="glow" style="width:${ipad?'80vw':'120vw'};height:${ipad?'40vw':'60vw'};top:${ipad?'66%':'66%'}"></div>
+   <div class="garnish" style="width:${hw};top:${ht};margin-left:${ipad?"2vw":"3vw"}"><img src="${p.house}"></div>
+  </section>`;
+} else {
+  const vars=ipad?`--fs:7.4vw;--ht:4.4%;--dw:${p.dwPad||78}vw;--dt:${p.dtPad||19.5}%;--dr:${p.drPad||3.2}vw;--drb:${p.drbPad||p.drPad||3.2}vw`
+                 :`--fs:${p.fs||11.2}vw;--ht:6%;--dw:${p.dw||90}vw;--dt:${p.dt||22}%;--dr:${p.dr||8.2}vw`;
+  // crop: [topFrac, bottomFrac] of the source image to show
+  const c=p.crop||[0,1];
+  const inner=`<div class="crop" style="aspect-ratio:${p.ar}/${(c[1]-c[0])*p.arh}"><img style="margin-top:-${c[0]*100*p.arh/p.ar}%" src="${p.img}"></div>`;
+  let g='';
+  if(p.house){ g=`<div class="glow" style="width:${p.gw||'110vw'};height:${p.gh||'55vw'};top:${p.gt||'70%'};opacity:${p.go||1}"></div><div class="garnish" style="width:${p.hw||'80vw'};top:${p.htop||'60%'}"><img src="${p.house}"></div>`; }
+  const note=p.note?`<div class="note" style="top:${p.nt||(ipad?'33%':'37.5%')};font-size:${ipad?'2.6vw':'4.6vw'}">${p.note}</div>`:'';
+  r.innerHTML=`<section class="poster" style="${vars}"><div class="head"><h1>${p.h}</h1></div><div class="device">${inner}</div>${note}${g}</section>`;
+}
+</script></body></html>
