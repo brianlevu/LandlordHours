@@ -27,7 +27,9 @@ struct EarlierRecordsView: View {
                     .font(.subheadline)
                     .foregroundStyle(colors.textSecondary)
                     .textCase(nil)
-                    .padding(.top, -LHSectionHeader.firstListHeaderInset)
+                    // S6/S9: the list's first header, pulled up like `leadsList`, less the 2pt by which a
+                    // `.subheadline` paragraph's cap line sits higher than a `.headline`'s (measured).
+                    .padding(.top, -LHSectionHeader.firstListHeaderInset + 2)
             }
             if identity.searchFailed {
                 Section {

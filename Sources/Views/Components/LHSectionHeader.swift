@@ -37,18 +37,31 @@ struct LHSectionHeader: View {
     /// The system pads a list's first section header; this takes that back so the header's cap line
     /// sits where a card's edge would (measured on iOS 27; `frame_check.py consistency` holds it).
     var leadsList = false
+    /// S9: the header is the first content of a scroll view (not a List): its cap line is pulled up to
+    /// where a card edge would sit, including the centring inside its 24pt minimum height.
+    var leadsContent = false
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var typeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
+
+    private var contentLeadIn: CGFloat {
+        let style: UIFont.TextStyle = self.style == .day ? .subheadline : .headline
+        let font = UIFont.preferredFont(forTextStyle: style,
+                                        compatibleWith: UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(typeSize)))
+        let minHeight: CGFloat = self.style == .day ? 28 : 24
+        return LHLeadInModifier.inset(style, typeSize) + max(0, (minHeight - font.lineHeight) / 2)
+    }
 
     /// The system's extra top padding on an inset-grouped list's first section header (pt, iOS 27.0; the
     /// same under both header systems).
     static let firstListHeaderInset: CGFloat = 15.5
 
     init(_ title: String, count: Int? = nil, style: Style = .section, tone: Tone = .normal, onPage: Bool = false,
-         trailingTitle: String? = nil, trailingAction: (() -> Void)? = nil, leadsList: Bool = false) {
+         trailingTitle: String? = nil, trailingAction: (() -> Void)? = nil, leadsList: Bool = false,
+         leadsContent: Bool = false) {
         self.leadsList = leadsList
+        self.leadsContent = leadsContent
         self.title = title
         self.count = count
         self.style = style
@@ -89,6 +102,7 @@ struct LHSectionHeader: View {
         .frame(minHeight: style == .day ? 28 : 24)
         // Below AX only: at AX the title wraps and this pull-up would crowd it.
         .padding(.top, leadsList && !typeSize.isAccessibilitySize ? -Self.firstListHeaderInset : 0)
+        .padding(.top, leadsContent ? -contentLeadIn : 0)
     }
 }
 

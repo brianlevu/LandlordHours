@@ -23,8 +23,7 @@ struct ContactSupportView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
                 VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
-                    LHSectionHeader(HS.t("support.section", "Your message"))
-                        .lhLeadsContent(.headline)
+                    LHSectionHeader(HS.t("support.section", "Your message"), leadsContent: true)
                     VStack(spacing: 12) {
                         LHField(HS.t("support.subject", "Subject"), text: $subject,
                                 accessibilityLabel: HS.t("support.subject", "Subject"), identifier: "support.subject")

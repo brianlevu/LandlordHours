@@ -1319,7 +1319,7 @@ TITLE_MIN_PT, TITLE_MAX_PT = 20.0, 96.0   # a large-title glyph band (Fraunces 3
 SHEET_TITLE_MIN_PT = 14.0                  # SF title2 / title1 in sheets (~16-24pt)
 WRAPPED_TITLE_PT = 50.0                    # a title band taller than this below AX is two lines that touch
 SUBTITLE_LINE_GAP_PT = 12.0                # a wrapped subtitle's next line starts this close under the last
-SUBTITLE_FROM_BASELINE_PT = 19.0           # a subtitle starts this close under the title baseline (scaled)
+SUBTITLE_FROM_BASELINE_PT = 21.0           # a subtitle starts this close under the title baseline (never less; scaled up)
 SUBTITLE_GAP_PT = 16.0                     # a short text band starting this close under the title (line-box descent + 2pt) is the subtitle
 INK_MAX_MEAN = 110                         # light theme ink: mean RGB below this (textPrimary #121B33, textSecondary #4A5068)
 INK_MIN_MEAN_DARK = 150                    # dark theme ink: mean RGB above this (textPrimary #F2F4FA, textSecondary #A9B0C8)
@@ -1365,7 +1365,7 @@ def header_metrics(path, scale=None, kind="tab", search_to=0.55):
     counts = dark.sum(axis=1)
     bands = [(y0 + s, y0 + e) for s, e in runs(counts >= 2, min_len=int(4 * sc), close_gap=int(1.5 * sc))]
     lo = (SHEET_TITLE_MIN_PT if kind == "sheet" else TITLE_MIN_PT) * sc
-    # The title is the tallest ink band in the title zone (the largest type on the screen), heavier ink
+    # The title is the tallest ink band in the title zone (the largest type on the screen), the first one
     # breaking a tie within 2pt: a chip, a back chevron, a share glyph or a section header ("To confirm
     # · 8", long but smaller) is shorter than the screen title at every Dynamic Type size.
     edge_col = a[:, int(3 * sc)]
@@ -1383,7 +1383,9 @@ def header_metrics(path, scale=None, kind="tab", search_to=0.55):
     if cands:
         tallest = max(e - s for s, e in cands)
         near = [b for b in cands if (b[1] - b[0]) >= tallest - 2 * sc]
-        title = max(near, key=lambda b: int(counts[b[0] - y0:b[1] - y0].sum()))
+        # Among bands as tall as the tallest, the first is the title (a wrapped title's second line is
+        # as tall and can carry more ink); a chip or glyph above it is shorter and not in `near`.
+        title = min(near, key=lambda b: b[0])
     out = {"frame": path, "scale": sc, "safe_top_pt": safe, "kind": kind, "theme": "dark" if night else "light",
            "bands_pt": [[round(s / sc, 1), round(e / sc, 1)] for s, e in bands[:12]],
            "title_top_pt": None, "title_baseline_pt": None, "title_height_pt": None,
@@ -1432,7 +1434,7 @@ def header_metrics(path, scale=None, kind="tab", search_to=0.55):
         reach = SUBTITLE_GAP_PT if merged == 0 else SUBTITLE_LINE_GAP_PT
         # A subtitle's first line starts close under the title's baseline (<= 19pt at a 25pt cap,
         # scaled with the title); content led in to the S3 gap (~24pt) starts lower.
-        near_base = merged > 0 or (bs - (base + 1)) <= SUBTITLE_FROM_BASELINE_PT * sc * cap_scale
+        near_base = merged > 0 or (bs - (base + 1)) <= SUBTITLE_FROM_BASELINE_PT * sc * max(1.0, cap_scale)
         if bs >= header_end and bs - header_end <= reach * sc and be - bs < TITLE_MIN_PT * sc and near_base:
             header_end = be
             last_base = baseline_of(bs, be)

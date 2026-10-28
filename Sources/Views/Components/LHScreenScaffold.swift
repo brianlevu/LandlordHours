@@ -118,7 +118,9 @@ struct LHScreenHeader<Accessory: View, Trailing: View>: View {
                     .foregroundStyle(colors.textPrimary)
                     // A tab title is one line that shrinks before it breaks a word; detail and sheet titles
                     // wrap to two lines instead (a sheet title that shrank moved its baseline, S2).
-                    .lineLimit(ax ? nil : (style == .collection ? 1 : 2))
+                    .lineLimit(ax ? nil : 2)
+                    // Only a single long word shrinks (so it never breaks inside itself); a title of
+                    // several words wraps instead, keeping its first baseline (S2).
                     .minimumScaleFactor(style == .collection ? 0.6 : 1)
                     .accessibilityAddTraits(.isHeader)
                     // Top-aligned in the row with the one-line centring inset, so a title that wraps keeps
@@ -174,7 +176,9 @@ struct LHScreenHeader<Accessory: View, Trailing: View>: View {
     private var baselineCompensation: CGFloat {
         guard subtitle != nil, Accessory.self == EmptyView.self, !trailingBelow else { return 0 }
         let sub = UIFont.preferredFont(forTextStyle: .subheadline)
-        return max(0, abs(style.uiFont.descender) - abs(sub.descender))
+        // Without a subtitle the header ends at the title row's bottom: the one-line inset plus the
+        // title's descent under its baseline. With one, it ends at the subtitle's descent; add the rest.
+        return max(0, titleRowInset + abs(style.uiFont.descender) - abs(sub.descender))
     }
 }
 
@@ -421,18 +425,7 @@ struct LHLeadInModifier: ViewModifier {
         let font = UIFont.preferredFont(forTextStyle: style,
                                         compatibleWith: UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(size)))
         let halfLeading = max(0, font.lineHeight - (font.ascender - font.descender)) / 2
-        return (halfLeading + font.ascender - font.capHeight + measuredExtra(style, pointSize: font.pointSize)).rounded()
-    }
-
-    /// What the font metrics miss, measured on iOS 27.0 frames (2026-10-27, `frame_check.py consistency`):
-    /// a `.body` paragraph's cap line sat 4.4pt lower than a card edge at 17pt and 1.4pt lower at XXL
-    /// (21pt) after the metric pull-up; a `.headline` section header matched. Linear between the two
-    /// measurements, never negative. Re-measure on an OS update; the cross-group gate catches drift.
-    private static func measuredExtra(_ style: UIFont.TextStyle, pointSize: CGFloat) -> CGFloat {
-        switch style {
-        case .body, .callout, .subheadline: return max(0, 4.4 - (pointSize - 17) * 0.75)
-        default: return 0
-        }
+        return (halfLeading + font.ascender - font.capHeight).rounded()
     }
 
     func body(content: Content) -> some View {
