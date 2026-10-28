@@ -30,6 +30,29 @@ struct PlaceholderCalendarClassifier: CaptureClassifier {
     }
 }
 
+/// Whether a classifier outcome is shown in the Inbox. One answer for the live scan, the backfill
+/// and the one-time cleanup, so they can never disagree about the same event.
+enum CalendarVisibility {
+    /// The classification to show, or nil to hide. A hidden item with a landlord word in its title
+    /// is kept as "Not sure" (confidence at least 0.30), unless the rules marked it as clearly
+    /// not rental work (a personal appointment, a remote place). Muted items are nil: a mute is
+    /// the user's rule, handled by the caller.
+    static func shown(_ outcome: ClassifierOutcome, title: String) -> CaptureClassification? {
+        switch outcome {
+        case .suggest(let classification):
+            return classification
+        case .skip(var classification):
+            guard !classification.evidence.contains(ClassifierThresholds.notRentalEvidence),
+                  RulesEngine.titleHasLandlordKeyword(title) else { return nil }
+            classification.confidence = max(classification.confidence, ClassifierThresholds.notSure)
+            classification.evidence.append(ClassifierThresholds.landlordSignalEvidence)
+            return classification
+        case .muted:
+            return nil
+        }
+    }
+}
+
 /// What the one-time pending cleanup did.
 struct InboxCleanupResult: Equatable {
     var removed = 0
@@ -173,8 +196,9 @@ final class CalendarCaptureCoordinator {
         await withTaskCancellationHandler {
             for await event in events {
                 switch event {
-                case .result(let index, .suggest(let classification)):
-                    guard !Task.isCancelled, candidates.indices.contains(index) else { continue }
+                case .result(let index, let outcome):
+                    guard !Task.isCancelled, candidates.indices.contains(index),
+                          let classification = CalendarVisibility.shown(outcome, title: candidates[index].title) else { continue }
                     let candidate = candidates[index]
                     let suggestion = prepared(Suggestion(candidate: candidate, classification: classification), candidate: candidate, properties: properties)
                     let new = store.ingest([suggestion], existingEntries: entries, calendar: calendar)
@@ -182,8 +206,6 @@ final class CalendarCaptureCoordinator {
                         added.append(contentsOf: new)
                         onIngest(new)
                     }
-                case .result:
-                    continue
                 case .progress(let value):
                     guard !Task.isCancelled else { continue }
                     progress(value)
@@ -223,26 +245,14 @@ final class CalendarCaptureCoordinator {
         var result = InboxCleanupResult()
         var hidden = Set<String>()
         for (candidate, outcome) in zip(candidates, outcomes) {
-            switch outcome {
-            case .skip(let classification):
-                if RulesEngine.titleHasLandlordKeyword(candidate.title) {
-                    // A landlord word in the title: never removed, at most lowered to "Not sure".
-                    var floored = classification
-                    floored.confidence = max(classification.confidence, ClassifierThresholds.notSure)
-                    if let current = store.suggestion(forKey: candidate.sourceKey), floored.confidence < current.confidence {
-                        store.lowerConfidence(forKey: candidate.sourceKey, to: floored)
-                        result.updated += 1
-                    }
-                } else {
-                    hidden.insert(candidate.sourceKey)
-                }
-            case .suggest(let classification):
-                if let current = store.suggestion(forKey: candidate.sourceKey), classification.confidence < current.confidence {
-                    store.lowerConfidence(forKey: candidate.sourceKey, to: classification)
+            if case .muted = outcome { continue }   // a mute is the user's rule: left to the normal flow
+            if let shown = CalendarVisibility.shown(outcome, title: candidate.title) {
+                if let current = store.suggestion(forKey: candidate.sourceKey), shown.confidence < current.confidence {
+                    store.lowerConfidence(forKey: candidate.sourceKey, to: shown)
                     result.updated += 1
                 }
-            case .muted:
-                continue   // a mute is the user's rule: left to the normal flow
+            } else {
+                hidden.insert(candidate.sourceKey)
             }
         }
         result.removed = store.removeHiddenBySystem(keys: hidden)

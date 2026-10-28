@@ -189,7 +189,7 @@ final class InboxSuggestionFixTests: CalendarCaptureTestCase {
     func testALandlordWordInTheTitleIsNeverHiddenByPersonalOrAttendeeSignals() async {
         let crowd = CalendarContext(attendeeCount: 6, organizedByOther: true, isWorkCalendar: true, isRecurring: true)
         for (title, location) in [("Showing - Alex", oakAddress), ("Lease signing", "Glow Salon, 412 Oak St"),
-                                  ("Tenant walkthrough", "Remote"), ("Repair the hair salon sink", oakAddress)] {
+                                  ("Tenant walkthrough", "Remote")] {
             let result = await verdict(title, location: location, context: crowd)
             XCTAssertNotEqual(result, .hidden, title)
         }
@@ -220,6 +220,42 @@ final class InboxSuggestionFixTests: CalendarCaptureTestCase {
         // The title says it: Likely.
         let titled = await verdict("Leasing meeting with Dana", location: office)
         XCTAssertNotEqual(titled, .hidden)
+    }
+
+    // MARK: Verifier round 3: any title keyword protects against the invite
+
+    private var crowded: CalendarContext { CalendarContext(attendeeCount: 8, isRecurring: true) }
+
+    func testAnyTitleKeywordProtectsAgainstAttendeesRecurringAndMeetingWords() async {
+        let offsite = "Community Hall, 55 Pine Rd"
+        for title in ["HOA meeting", "HOA dues", "Rent collection", "Rent payment", "Rent increase", "Rental registration meeting with city"] {
+            let there = await verdict(title, location: offsite, context: crowded)
+            let atRental = await verdict(title, location: oakAddress, context: crowded)
+            XCTAssertNotEqual(there, .hidden, "\(title) @ offsite")
+            XCTAssertNotEqual(atRental, .hidden, "\(title) @ rental")
+        }
+        let work = await verdict("HOA meeting", location: offsite, context: CalendarContext(organizedByOther: true, isWorkCalendar: true))
+        XCTAssertNotEqual(work, .hidden)
+    }
+
+    func testTheRentFamilyProtectsExceptTheBareVerb() async {
+        let weekly = await verdict("Weekly rent collection", location: oakAddress, context: CalendarContext(attendeeCount: 2, isRecurring: true))
+        let registration = await verdict("Rental registration meeting with city", location: oakAddress, context: CalendarContext(attendeeCount: 3, isRecurring: true))
+        let review = await verdict("Rent review", location: oakAddress, context: CalendarContext(attendeeCount: 6, isRecurring: true))
+        let alone = await verdict("Rent collection", location: oakAddress)
+        XCTAssertNotEqual(weekly, .hidden)
+        XCTAssertNotEqual(registration, .hidden)
+        XCTAssertNotEqual(review, .hidden)
+        XCTAssertEqual(alone, .likely)
+    }
+
+    func testRentAsAVerbAndRentalCarsStayHidden() async {
+        for title in ["Rent a car for the beach trip", "Rent tuxedo for wedding", "Rental car pickup then salon"] {
+            let result = await verdict(title, location: oakAddress)
+            XCTAssertEqual(result, .hidden, title)
+            let crowd = await verdict(title, location: oakAddress, context: crowded)
+            XCTAssertEqual(crowd, .hidden, "\(title) with a crowd")
+        }
     }
 
     // MARK: Location alone

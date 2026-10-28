@@ -110,23 +110,47 @@ enum CalendarEventSignals {
 }
 
 extension RulesEngine {
-    /// The strongest positive landlord keyword in a title (0 when none), by table weight.
-    static func titleKeywordStrength(_ title: String) -> Double {
-        evidenceKeywordStrength(evaluate(text: title, properties: []).evidence)
+    /// The landlord words in a title and whether anything in it argues against them.
+    struct TitleKeywords: Equatable {
+        /// Strongest table weight among the words that are not the bare verb "rent"/"rents".
+        var strong = 0.0
+        /// Strongest weight among all of them, the bare verb included.
+        var any = 0.0
+        /// The title also carries a `not landlord:` table hit (wedding, car, tux, ...).
+        var hasNotLandlord = false
+
+        /// The title vouches for rental work. A word other than the bare verb always does ("rental",
+        /// "rent collection", "hoa", "paint"). The bare verb does only with nothing against it:
+        /// "Rent review" yes, "Rent a car" and "Rent tuxedo for wedding" no.
+        var vouches: Bool { strong > 0 || (any > 0 && !hasNotLandlord) }
+        /// Strong enough to outweigh the table's noise words ("Lease signing - Dr Patel dental practice").
+        var isStrong: Bool { strong >= RulesEngine.strongTitleKeyword }
     }
 
-    private static func evidenceKeywordStrength(_ evidence: [String]) -> Double {
-        evidence.compactMap { line -> Double? in
-            guard line.hasPrefix("keyword: ") else { return nil }
+    static let bareRentVerb: Set<String> = ["rent", "rents"]
+
+    static func titleKeywords(_ title: String) -> TitleKeywords {
+        keywords(in: evaluate(text: title, properties: []).evidence)
+    }
+
+    private static func keywords(in evidence: [String]) -> TitleKeywords {
+        let notLandlord = evidence.filter { $0.hasPrefix("not landlord:") }.map { String($0.dropFirst("not landlord: ".count)) }
+        // "Rental car", "car rental": the rental word names a vehicle, not a property.
+        let vehicle = notLandlord.contains("rental car") || notLandlord.contains("car rental")
+        var out = TitleKeywords(hasNotLandlord: !notLandlord.isEmpty)
+        for line in evidence where line.hasPrefix("keyword: ") {
             let phrase = String(line.dropFirst("keyword: ".count))
-            // "rent" is also a verb ("Rent tux for wedding", "Rent the Runway"): it vouches for nothing.
-            if phrase.hasPrefix("rent") { return nil }
-            return ClassifierKeywords.signals.first { $0.phrase == phrase }?.landlord
-        }.max() ?? 0
+            if vehicle && phrase.hasPrefix("rent") { continue }
+            guard let weight = ClassifierKeywords.signals.first(where: { $0.phrase == phrase })?.landlord else { continue }
+            out.any = max(out.any, weight)
+            if !bareRentVerb.contains(phrase) { out.strong = max(out.strong, weight) }
+        }
+        return out
     }
 
-    /// True when a landlord word in the title (lease, repair, tenant, ...) vouches for the event.
-    static func titleHasLandlordKeyword(_ title: String) -> Bool { titleKeywordStrength(title) > 0 }
+    /// True when a landlord word in the title vouches for the event. One answer for both the live
+    /// scan and the cleanup.
+    static func titleHasLandlordKeyword(_ title: String) -> Bool { titleKeywords(title).vouches }
 
     /// A strong landlord word: the table weight is at least this.
     static let strongTitleKeyword = 2.0
@@ -160,9 +184,9 @@ extension RulesEngine {
 
         let propertyCounted = verdict.evidence.contains { $0.hasPrefix("property:") }
         let joinedHasKeyword = verdict.evidence.contains { $0.hasPrefix("keyword:") }
-        let titleStrength = evidenceKeywordStrength(titleOnly.evidence)
+        let keywords = keywords(in: titleOnly.evidence)
         let titleNamesProperty = titleOnly.evidence.contains { $0.hasPrefix("property:") }
-        let locationOnly = (propertyCounted || joinedHasKeyword) && titleStrength == 0 && !titleNamesProperty
+        let locationOnly = (propertyCounted || joinedHasKeyword) && !keywords.vouches && !titleNamesProperty
 
         verdict.evidence.append(contentsOf: penalties.map { "not rental: \($0.reason)" })
 
@@ -183,10 +207,13 @@ extension RulesEngine {
         verdict.confidence = confidence(forScore: verdict.score)
         let stillSignal = before.hasLandlordSignal && verdict.score > 0
             && (verdict.score >= notSureMinScore || propertyCounted)
-        // The title's landlord word is stronger than the invite: it keeps the item visible
-        // against the event signals, and a strong one against the table's noise words too.
-        let visibleBeforeSignals = before.hasLandlordSignal || titleOnly.hasLandlordSignal
-        let titleCarries = (titleStrength > 0 && visibleBeforeSignals) || titleStrength >= strongTitleKeyword
+        // The title's landlord word is stronger than the invite. A strong one (lease, tenant,
+        // showing) keeps the item visible against everything, the table's noise words and a
+        // personal appointment included. Any other vouching word keeps it visible against the
+        // invite (attendees, repeat, meeting word, work organizer), but not against a personal
+        // appointment or a remote place, and not against noise words.
+        let hardPenalty = penalties.contains { $0.reason == "personal appointment words" || $0.reason == "remote location" }
+        let titleCarries = keywords.isStrong || (keywords.vouches && penalty < 0 && !hardPenalty)
         verdict.hasLandlordSignal = stillSignal || titleCarries
         if !verdict.hasLandlordSignal, penalty < 0 {
             return hidden(verdict, score: verdict.score, note: "event signals outweigh the match")
