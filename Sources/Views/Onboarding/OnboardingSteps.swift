@@ -8,9 +8,10 @@ import SwiftUI
 // skip). Words scrolling under the actions fade into the canvas. No Dynamic Type clamps.
 
 struct OnbStepScaffold<Content: View, Actions: View>: View {
+    /// The step title lives in the detail scaffold's header (`.lhDetailScreen`), the same title row,
+    /// top inset and content gap as every pushed screen.
     var title: String
     var subtitle: String? = nil
-    var titleIdentifier: String? = nil
     /// A short note under the content (the CPA line, trust lines, the spouse rule).
     var note: AnyView? = nil
     /// Scrolls this id into view whenever it changes (the property step keeps its field above
@@ -28,26 +29,23 @@ struct OnbStepScaffold<Content: View, Actions: View>: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(title)
-                        .font(.title.weight(.semibold))
-                        .foregroundStyle(colors.textPrimary)
-                        .accessibilityAddTraits(.isHeader)
-                        .modifier(OptionalIdentifier(identifier: titleIdentifier))
+                    // Onboarding copy is longer than a `.subheadline` subtitle, so it stays the first
+                    // content element; the content follows at the section gap.
                     if let subtitle {
                         Text(subtitle)
                             .font(.body)
                             .foregroundStyle(colors.textSecondary)
-                            .padding(.top, 8)
+                            .lhLeadsContent(.body)   // S9: its cap line sits where a card's edge would
                     }
-                    content.padding(.top, LHMetrics.sectionGap)
+                    content.padding(.top, subtitle == nil ? 0 : LHMetrics.sectionGap)
                     if let note { note.padding(.top, 16) }
                 }
                 .padding(.horizontal, LHMetrics.gutter)
-                .padding(.top, 8)
                 .padding(.bottom, LHMetrics.sectionGap)
                 .frame(maxWidth: LHMetrics.readingColumn, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
+            .lhDetailScreen(title)
             .scrollBounceBehavior(.basedOnSize)
             .scrollDismissesKeyboard(.interactively)
             .defaultScrollAnchor(OnbDebugLaunch.scrollToBottom ? .bottom : .top)

@@ -79,6 +79,9 @@ extension LogTimeSheet {
     var notePlaceholder: String {
         if isReviewing { return lt("What did you work on?") }
         if isFirstRun { return lt("What did you do? Try \u{201C}fixed the sink, 1 hour\u{201D}") }
+        // At AX the prompt wraps instead of truncating, so it is the short question: the example
+        // filled four lines and pushed the field under the pinned primary (owner's pick 2026-10-27).
+        if isAX && !manual { return lt("What did you do?") }
         return manual
             ? lt("What did you do? (optional)")
             : lt("What did you do? Try \u{201C}fixed the sink at Pine Cabin, 1 hour\u{201D}")
@@ -154,9 +157,20 @@ extension LogTimeSheet {
                         undo: form.canUndoFill, identifier: "log.noneFound")
         } else if let source = form.fillSource, form.canUndoFill, !noteDirty {
             captionLine(text: source.caption(tier: form.fillTier), sparkle: true, undo: true, identifier: "log.fill.caption")
+        } else if doorInToolsRow {
+            // The manual door shares the row with Done and the mic while the caption is empty, so it
+            // stays above the pinned primary with the keyboard up at every size below AX (§S7).
+            enterDetailsButton
         } else {
             Color.clear.frame(height: LHMetrics.minTap)
         }
+    }
+
+    /// True when the caption slot is free and the door would otherwise sit under the details line.
+    var doorInToolsRow: Bool {
+        guard !unfolded, !showVoiceIntro, !isListening, reviewCaption == nil, !isReading, !noneFound else { return false }
+        if form.fillSource != nil, form.canUndoFill, !noteDirty { return false }
+        return true
     }
 
     func captionLine(text: String, reading: Bool = false, sparkle: Bool = false, caution: Bool = false,

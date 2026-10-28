@@ -6,42 +6,6 @@ import SwiftUI
 // the LH* component that replaces it (docs/design/v2-revamp-plan.md §4). Each lane removes its own
 // uses; the whole file is deleted in cleanup. New code uses LH* directly.
 
-/// Tab-root title. Wraps `LHScreenTitle` (collection style).
-struct BPScreenTitle: View {
-    let text: String
-
-    var body: some View {
-        LHScreenTitle(text)
-    }
-}
-
-/// Reports and Settings open from Today's header, so the shell keeps Today highlighted (WP-D's
-/// tab rule). This back control makes that relationship explicit: the screen belongs to Today,
-/// and "‹ Today" is the way back, the same as tapping the highlighted tab.
-struct BPBackToTodayButton: View {
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        let colors = AdaptiveColors(colorScheme: colorScheme)
-        Button {
-            NotificationCenter.default.post(name: .switchToTab, object: ShellTab.todayIndex)
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "chevron.left")
-                    .font(.body.weight(.semibold))
-                Text("Today")
-                    .font(.body)
-            }
-            .foregroundStyle(colors.action)
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.lhPressable)
-        .accessibilityLabel("Back to Today")
-        .accessibilityIdentifier("shell.backToToday")
-    }
-}
-
 enum AppVersionInfo {
     /// "Version 1.0.6 (202608260402)", read from the bundle at runtime.
     static func display(bundle: Bundle = .main) -> String {

@@ -6,7 +6,7 @@
   "lucide": 2,
   "emoji": 0,
   "banned-word": 40,
-  "button-style": 12,
+  "button-style": 11,
   "custom-swipe": 0,
   "bp-tool-image": 1,
   "dynamic-type-clamp": 3,
@@ -15,7 +15,7 @@
   "onappear-animation": 0,
   "radius": 10,
   "alert": 8,
-  "fixed-size": 47,
+  "fixed-size": 48,
   "craft-image": 0,
   "hero-card": 0,
   "blueprint-retired": 1,
@@ -24,9 +24,12 @@
   "section-header-mono": 20,
   "tab-shell": 0,
   "chevron": 0,
-  "hand-card": 1
+  "hand-card": 1,
+  "hand-header": 0,
+  "tab-top-padding": 5,
+  "tab-scaffold": 0
  },
- "total": 205,
+ "total": 210,
  "entries": {
   "alert|Sources/Views/DeleteAllDataView.swift|.alert(HS.t(\"delete.alert.title\", \"Delete everything?\"), isPresented: $showVoiceOverConfirm) {": 1,
   "alert|Sources/Views/DeleteAllDataView.swift|.alert(HS.t(\"delete.icloud.title\", \"iCloud is off\"), isPresented: $showICloudOffPrompt) {": 1,
@@ -76,7 +79,7 @@
   "blueprint-retired|Sources/Views/Components/LegacyBlueprint.swift|struct InboxBlueprintPaper: View {": 1,
   "bp-tool-image|Sources/Views/Components/CategoryToolTile.swift|Image(\"bp_tool_\\(category.blueprintToolName)_\\(size > 40 ? 56 : 36)\")": 1,
   "button-style|Sources/Views/Components/AppDesignSystem.swift|struct LHPressableButtonStyle: ButtonStyle {": 1,
-  "button-style|Sources/Views/Components/BlueprintList.swift|.buttonStyle(.lhPressable)": 2,
+  "button-style|Sources/Views/Components/BlueprintList.swift|.buttonStyle(.lhPressable)": 1,
   "button-style|Sources/Views/Components/LHToast.swift|.buttonStyle(.lhPressable)": 1,
   "button-style|Sources/Views/Components/LegacyBlueprint.swift|.buttonStyle(NoFadeStyle())": 1,
   "button-style|Sources/Views/Components/LegacyBlueprint.swift|private struct NoFadeStyle: ButtonStyle {": 1,
@@ -115,7 +118,7 @@
   "dynamic-type-clamp|Sources/Views/Onboarding/OnboardingScene.swift|.dynamicTypeSize(.large) // drawn into the scene; the sheet carries the readable copy": 1,
   "fixed-size|Sources/App/LandlordHoursAppIntents.swift|.fixedSize(horizontal: false, vertical: true)": 3,
   "fixed-size|Sources/Views/Components/BlueprintList.swift|.fixedSize()": 1,
-  "fixed-size|Sources/Views/Components/LHScreenTitle.swift|.lhWrapsText()": 1,
+  "fixed-size|Sources/Views/Components/LHScreenScaffold.swift|.lhWrapsText()": 1,
   "fixed-size|Sources/Views/Components/LHToast.swift|.fixedSize(horizontal: false, vertical: true)": 1,
   "fixed-size|Sources/Views/Components/LockedPreview.swift|.fixedSize(horizontal: false, vertical: true)": 2,
   "fixed-size|Sources/Views/Components/LockedPreview.swift|UnlockProButton(entry: entry, action: onUnlock).fixedSize()": 1,
@@ -137,6 +140,7 @@
   "fixed-size|Sources/Views/SettingsView.swift|.fixedSize(horizontal: false, vertical: true)": 4,
   "fixed-size|Sources/Views/TimeEntryDetailView.swift|.fixedSize(horizontal: false, vertical: true)": 1,
   "fixed-size|Sources/Views/Today/TodayComponents.swift|.fixedSize(horizontal: false, vertical: true)": 3,
+  "fixed-size|Sources/Views/Today/TodayComponents.swift|.lhWrapsText()": 1,
   "fixed-size|Sources/Widget/WidgetSurfaceViews.swift|.fixedSize(horizontal: false, vertical: true)": 2,
   "fixed-size|Sources/Widget/WidgetSurfaceViews.swift|Text(s.text).lineLimit(2).minimumScaleFactor(0.9).fixedSize(horizontal: false, vertical: true)": 1,
   "hand-card|Sources/Views/Components/AppDesignSystem.swift|func lhSurfaceCard(cornerRadius: CGFloat = AppCornerRadius.xxl, padding: CGFloat? = nil) -> some View {": 1,
@@ -201,6 +205,10 @@
   "system-size|Sources/Widget/WidgetSurfaceViews.swift|Text(f.text).font(.system(size: 19, weight: .semibold, design: .rounded)).monospacedDigit()": 1,
   "system-size|Sources/Widget/WidgetSurfaceViews.swift|if let symbol = f.symbol { Image(systemName: symbol).font(.system(size: 13, weight: .semibold)) }": 1,
   "system-size|Sources/Widget/WidgetSurfaceViews.swift|self.font(.system(size: size, weight: .bold, design: .rounded)).monospacedDigit()": 1,
-  "system-size|Sources/Widget/WidgetSurfaceViews.swift|self.font(.system(size: size, weight: .medium, design: .monospaced))": 1
+  "system-size|Sources/Widget/WidgetSurfaceViews.swift|self.font(.system(size: size, weight: .medium, design: .monospaced))": 1,
+  "tab-top-padding|Sources/Views/DashboardView.swift|.padding(.top, 12)": 2,
+  "tab-top-padding|Sources/Views/Inbox/InboxView.swift|if inFlowButton { button.padding(.top, 8) }": 1,
+  "tab-top-padding|Sources/Views/LogTime/LogSheetStyle.swift|.padding(.top, 8)": 1,
+  "tab-top-padding|Sources/Views/SettingsView.swift|.padding(.top, 4)": 1
  }
 }

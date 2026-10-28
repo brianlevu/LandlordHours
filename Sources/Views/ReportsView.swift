@@ -139,7 +139,6 @@ struct ReportsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
-                    header
                     controls
                     standingSection
                     if yearEntries.isEmpty {
@@ -162,12 +161,18 @@ struct ReportsView: View {
                     exportCard
                 }
                 .padding(.horizontal, LHMetrics.gutter)
-                .padding(.top, 8)
                 .padding(.bottom, LHMetrics.sectionGap)
             }
             .scrollIndicators(.hidden)
             .background { LHCanvas() }
-            .navigationBarHidden(true)
+            // Screen anatomy: the scaffold owns the title, the back icon, the one trailing action and the gaps.
+            .lhTabScreen(RR.t("reports.title", "Reports"), subtitle: throughLine,
+                         back: LHBackAction(label: RR.t("reports.back", "Back to Today"), identifier: "shell.backToToday") {
+                NotificationCenter.default.post(name: .switchToTab, object: ShellTab.todayIndex)
+            }, trailing: {
+                LHHeaderAction(symbol: "square.and.arrow.up", label: RR.t("reports.export.label", "Export report"),
+                               identifier: "reports.export", action: exportAction)
+            })
             .sheet(isPresented: $showingExportSheet) {
                 ExportPDFView(year: selectedYear)
             }
@@ -190,18 +195,6 @@ struct ReportsView: View {
 
     // MARK: Header and controls
 
-    private var header: some View {
-        ScreenHeader(
-            title: RR.t("reports.title", "Reports"),
-            subtitle: throughLine,
-            back: (label: RR.t("reports.back", "Back to Today"), identifier: "shell.backToToday", action: {
-                NotificationCenter.default.post(name: .switchToTab, object: ShellTab.todayIndex)
-            }),
-            trailing: (symbol: "square.and.arrow.up", label: RR.t("reports.export.label", "Export report"),
-                       identifier: "reports.export", action: exportAction)
-        )
-    }
-
     /// The year chip and the goal switcher share a row while they fit; otherwise the switcher takes
     /// its own row.
     private var controls: some View {
@@ -215,7 +208,9 @@ struct ReportsView: View {
                 goalPicker
             }
         }
-        .padding(.top, -8)
+        // The chips draw 34pt inside a 44pt tap frame: lift the row by the inset so the visible
+        // edge, not the tap frame, sits on the scaffold's content line (S3 is measured in pixels).
+        .padding(.top, -(LHMetrics.minTap - LHChip.height) / 2)
     }
 
     private var yearMenu: some View {

@@ -143,5 +143,54 @@ class V2Rules(unittest.TestCase):
         self.assertNotIn("section-header-mono", rules(fscan({"Sources/PDF/Doc.swift": ".font(.system(.caption, design: .monospaced))\n"})))
 
 
+
+class ScreenAnatomy(unittest.TestCase):
+    """Screen anatomy S1/S4: headers come only from the scaffolds."""
+
+    def test_hand_made_title_counts(self):
+        for src in ('LHScreenTitle("Inbox")\n', 'ScreenHeader(title: "Records")\n', 'LongTailHeader(title: t)\n',
+                    '.navigationTitle("Rentals")\n', '.navigationBarTitleDisplayMode(.inline)\n',
+                    '.toolbar(.hidden, for: .navigationBar)\n', '.navigationBarHidden(true)\n'):
+            self.assertEqual(rules(scan_text(src)).count("hand-header"), 1, src)
+
+    def test_scaffold_file_may_build_headers(self):
+        f = scan_text('.navigationTitle(title)\n.toolbar(.hidden, for: .navigationBar)\n',
+                      name="Sources/Views/Components/LHScreenScaffold.swift")
+        self.assertNotIn("hand-header", rules(f))
+
+    def test_scaffold_call_is_clean(self):
+        f = scan_text('List { rows }\n    .lhTabScreen("Inbox")\n')
+        self.assertNotIn("hand-header", rules(f))
+
+    def test_comment_is_ignored(self):
+        self.assertNotIn("hand-header", rules(scan_text('// was LHScreenTitle("Inbox")\n')))
+
+    def test_legacy_definition_is_not_a_call_site(self):
+        f = scan_text('struct LHScreenTitle: View {\n', name="Sources/Views/Components/LHScreenTitle.swift")
+        self.assertNotIn("hand-header", rules(f))
+
+    def test_tab_root_without_scaffold_fails(self):
+        f = scan_text('struct InboxView: View {\n  var body: some View { List { } }\n}\n',
+                      name="Sources/Views/Inbox/InboxView.swift")
+        self.assertIn("tab-scaffold", rules(f))
+
+    def test_tab_root_with_scaffold_passes(self):
+        f = scan_text('struct InboxView: View {\n  var body: some View { List { }.lhTabScreen("Inbox") }\n}\n',
+                      name="Sources/Views/Inbox/InboxView.swift")
+        self.assertNotIn("tab-scaffold", rules(f))
+
+    def test_log_sheet_needs_sheet_scaffold(self):
+        f = scan_text('ScrollView { }.lhTabScreen("Log time")\n', name="Sources/Views/LogTime/LogSheetStyle.swift")
+        self.assertIn("tab-scaffold", rules(f))
+
+    def test_literal_top_padding_in_tab_root_counts(self):
+        f = scan_text('x.padding(.top, 8)\ny.contentMargins(.top, 0, for: .scrollContent)\n'
+                      'z.padding(.top, LHMetrics.sectionGap)\n', name="Sources/Views/HistoryView.swift")
+        self.assertEqual(rules(f).count("tab-top-padding"), 2)
+
+    def test_literal_top_padding_elsewhere_is_fine(self):
+        f = scan_text('x.padding(.top, 8)\n', name="Sources/Views/Components/LHRow.swift")
+        self.assertNotIn("tab-top-padding", rules(f))
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

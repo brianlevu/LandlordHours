@@ -121,17 +121,11 @@ struct LHSheet<Content: View, Footer: View, Secondary: View>: View {
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            titleBlock
-            closeButton
-        }
-        .padding(.horizontal, LHMetrics.gutter)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
-        .frame(minHeight: 56)
-        // Opaque, so scrolled content never reads through the title (§1.20).
-        .frame(maxWidth: .infinity)
-        .background(colors.backgroundSecondary)
+        // Screen anatomy: the one sheet header (`LHSheetHeader`), opaque so scrolled content never
+        // reads through the title (§1.20).
+        LHSheetHeader(title: title, subtitle: subtitle, onClose: onClose)
+            .frame(maxWidth: .infinity)
+            .background(colors.backgroundSecondary)
     }
 
     /// AX: a slim opaque bar holding only the close button; the title scrolls with the body.

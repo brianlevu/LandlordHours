@@ -9,9 +9,13 @@ struct HistoryView: View {
     @Environment(\.isPresented) private var isPushed
     /// Opens narrowed to one rental (the rental page's "See all in Records").
     var initialPropertyId: UUID? = nil
+    /// Set by a caller that pushes Records onto its own stack (the rental page's "See all"): a nested
+    /// NavigationStack inside a pushed destination renders SwiftUI's missing-destination placeholder, and
+    /// `isPresented` alone was not reliable there.
+    var pushed = false
 
     var body: some View {
-        if isPushed {
+        if pushed || isPushed {
             RecordsScreen(showsBackButton: true, initialPropertyId: initialPropertyId)
         } else {
             NavigationStack {
@@ -64,25 +68,13 @@ private struct RecordsScreen: View {
     var body: some View {
         List {
             Section {
-                ScreenHeader(
-                    title: RR.t("records.title", "Records"),
-                    back: showsBackButton
-                        ? (label: RR.t("records.back", "Back"), identifier: "records.back", action: { dismiss() })
-                        : nil,
-                    trailing: (symbol: "square.and.arrow.up", label: RR.t("records.export.label", "Export records"),
-                               identifier: "records.export", action: { showExport = true })
-                )
-                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 0, trailing: 0))
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-
                 LHField(
                     RR.t("records.search.placeholder", "Search records"),
                     text: $filter.searchText,
                     accessibilityLabel: RR.t("records.search.label", "Search records"),
                     identifier: "records.search"
                 )
-                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 0, trailing: 0))
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
 
@@ -146,8 +138,12 @@ private struct RecordsScreen: View {
             appliedInitialFilter = true
             if let initialPropertyId { filter.propertyId = initialPropertyId }
         }
-        .navigationBarHidden(true)
-        .toolbar(.hidden, for: .navigationBar)
+        // Screen anatomy: the scaffold owns the title, the back icon, the one trailing action and the gaps.
+        .lhTabScreen(RR.t("records.title", "Records"), back: showsBackButton ? LHBackAction(label: RR.t("records.back", "Back"), identifier: "records.back") { dismiss() } : nil,
+                     trailing: {
+            LHHeaderAction(symbol: "square.and.arrow.up", label: RR.t("records.export.label", "Export records"),
+                           identifier: "records.export") { showExport = true }
+        })
         .alert(RR.t("records.delete.title", "Delete this record?"), isPresented: Binding(
             get: { entryToDelete != nil },
             set: { if !$0 { entryToDelete = nil } }

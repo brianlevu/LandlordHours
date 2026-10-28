@@ -444,7 +444,7 @@ struct OnbStakedStep: View {
     var body: some View {
         let colors = AdaptiveColors(colorScheme: colorScheme)
         let headline = flow.stakedHeadline
-        OnbStepScaffold(title: title(headline), titleIdentifier: identifier(headline)) {
+        OnbStepScaffold(title: title(headline)) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
                     OnbHouseThumb(stage: .started, lit: true)
@@ -506,10 +506,5 @@ struct OnbStakedStep: View {
     private func title(_ headline: OnbStakedHeadline) -> String {
         if case .found(let found) = headline { return OnbCopy.foundHeadline(found) }
         return OnbCopy.setUpHeadline(goal: flow.goal)
-    }
-
-    private func identifier(_ headline: OnbStakedHeadline) -> String {
-        if case .found = headline { return "staked-found" }
-        return "staked-setup"
     }
 }

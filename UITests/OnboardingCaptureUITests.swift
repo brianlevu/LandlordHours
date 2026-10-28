@@ -6,6 +6,14 @@ import XCTest
 /// `xcrun xcresulttool export attachments`. Reduce Motion frames: the host turns the simulator's
 /// Reduce Motion on and runs `testCaptureReduceMotionWelcome*`.
 final class OnboardingCaptureUITests: XCTestCase {
+
+    // The staked title is the scaffold header's Text (no per-screen identifier): find it by its words.
+    private var stakedSetup: XCUIElement {
+        app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "You’re set up")).firstMatch
+    }
+    private var stakedFound: XCUIElement {
+        app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", " found. ")).firstMatch
+    }
     private var app: XCUIApplication!
 
     override func setUp() {
@@ -127,7 +135,7 @@ final class OnboardingCaptureUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Want a nudge to log it while it’s fresh?"].waitForExistence(timeout: 6))
         shot("05-notify", scheme, suffix)
         tap(app.buttons["onb-primary"])                         // fake Allow
-        XCTAssertTrue(app.staticTexts["staked-found"].waitForExistence(timeout: 10))
+        XCTAssertTrue(stakedFound.waitForExistence(timeout: 10))
         shot("06-staked", scheme, suffix)
         tap(app.buttons["onb-today"])                           // Review → Inbox
         XCTAssertTrue(app.buttons["tab.inbox"].waitForExistence(timeout: 10))
@@ -156,7 +164,7 @@ final class OnboardingCaptureUITests: XCTestCase {
         let none = app.staticTexts["staked-nothing-countable"]
         XCTAssertTrue(none.waitForExistence(timeout: 10))
         XCTAssertEqual(none.label.lowercased(), "we found 22 things, but none count toward your hours yet.")
-        XCTAssertFalse(app.staticTexts["staked-found"].exists, "Never 0h found")
+        XCTAssertFalse(stakedFound.exists, "Never 0h found")
         shot("06c-staked-none-count", scheme, suffix)
 
         // Record goal, staked without the calendar.

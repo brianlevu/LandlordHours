@@ -28,6 +28,10 @@ struct PropertyDetailView: View {
     /// limit: the page then ends with the same `.row` lock the gallery shows, so the one place a
     /// free owner meets the rental limit still says what stays free before the paywall.
     var onUnlockAtLimit: (() -> Void)?
+    /// Set only when this page IS the Rentals tab (exactly one rental): there is no back, and the
+    /// tab's Add rental, which the header can't hold beside Edit (one action, standard §S5), ends
+    /// the page as a secondary button.
+    var onAddRental: (() -> Void)? = nil
 
     @EnvironmentObject var viewModel: AppViewModel
     @ObservedObject private var goalManager = GoalManager.shared
@@ -66,14 +70,6 @@ struct PropertyDetailView: View {
         }
         .onChange(of: dynamicTypeSize) { _, _ in resolveSide() }
         .onChange(of: band) { _, _ in resolveSide() }
-        .navigationTitle(ax ? (property?.name ?? "") : "")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(RentalsText.edit) { if let property { onEdit(property) } }
-                    .accessibilityIdentifier("property.edit")
-            }
-        }
     }
 
     private var side: CGFloat {
@@ -111,20 +107,18 @@ struct PropertyDetailView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    LHToastChipSlot {
-                        // At AX the name moves to the inline bar (it is also in the number line),
-                        // so the number and the pace sentence stay above the tab bar (§H.1 H3).
-                        if !ax {
-                            LHScreenTitle(property.name, style: .detail)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .accessibilityIdentifier("property.title")
-                        }
-                    }
-                    .padding(.horizontal, LHMetrics.gutter)
                     RentalHero(property: property, side: side, windowHeight: window.height)
                     RentalBody(property: property)
                         .padding(.horizontal, LHMetrics.gutter)
                         .padding(.top, LHMetrics.sectionGap)
+                    if let onAddRental {
+                        Button(RentalsText.addRental, action: onAddRental)
+                            .buttonStyle(LHButton.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityIdentifier("properties.add")
+                            .padding(.horizontal, LHMetrics.gutter)
+                            .padding(.top, LHMetrics.sectionGap)
+                    }
                     if let onUnlockAtLimit {
                         LHRowGroup {
                             PropertiesAtLimitRow(firstPropertyName: property.name, onUnlock: onUnlockAtLimit)
@@ -141,6 +135,16 @@ struct PropertyDetailView: View {
             // Rows that scroll up meet a hard edge under the bar, never the Back and Edit glass
             // with a figure half-read beneath it.
             .modifier(HardTopScrollEdge())
+            // Screen anatomy: a pushed detail about one rental, on the dusk page (§H.5). The name is
+            // the scaffold's title; Edit is the one action.
+            .lhDetailScreen(property.name,
+                            back: onAddRental == nil
+                                ? LHBackAction(label: String(localized: "rentals.page.back", defaultValue: "Back", table: "Rentals"), identifier: "property.back") { dismiss() }
+                                : nil,
+                            onPage: true,
+                            trailing: {
+                LHHeaderAction(title: RentalsText.edit, identifier: "property.edit") { onEdit(property) }
+            })
 #if DEBUG
             .onAppear {
                 if ProcessInfo.processInfo.arguments.contains("-LHOpenFirstPropertyDetailLower") {

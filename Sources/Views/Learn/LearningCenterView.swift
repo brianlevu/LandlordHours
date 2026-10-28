@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Learning center (v2)
 //
-// Standard v2 (package H): a plain page with no house. `LHScreenTitle` (collection root, back icon),
+// Standard v2 (package H): a plain page with no house. `.lhTabScreen` (collection root, back icon),
 // one `LHCard.Summary` header with no eyebrow, "Start here" and "All topics" as 56pt `LHRow.Browse`
 // rows in one grouped container, the disclaimer last. Words come from the `Learn` String Catalog
 // via `LearnLibrary`; the chrome strings come from `Settings.xcstrings` via `HS`.
@@ -17,17 +17,11 @@ struct LearningCenterView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
-                VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
-                    LongTailHeader(
-                        title: HS.t("learnList.title", "Learning center"),
-                        back: (label: HS.t("common.back", "Back"), identifier: "learn.back", action: { dismiss() })
-                    )
-                    LHCard.Summary(
-                        value: HS.f("learnList.count", "%lld short reads", LearnLibrary.shared.count),
-                        label: LearnLibrary.line("learn.hero.line")
-                    )
-                    .accessibilityIdentifier("learn.hero")
-                }
+                LHCard.Summary(
+                    value: HS.f("learnList.count", "%lld short reads", LearnLibrary.shared.count),
+                    label: LearnLibrary.line("learn.hero.line")
+                )
+                .accessibilityIdentifier("learn.hero")
 
                 section(HS.t("learnList.start", "Start here"), articles: LearnLibrary.startHere, numbered: true)
                 section(HS.t("learnList.all", "All topics"), articles: LearnLibrary.allTopics, numbered: false)
@@ -36,12 +30,11 @@ struct LearningCenterView: View {
             }
             .frame(maxWidth: LHMetrics.readingColumn, alignment: .leading)
             .padding(.horizontal, LHMetrics.gutter)
-            .padding(.top, 8)
             .padding(.bottom, 48)
             .frame(maxWidth: .infinity)
         }
         .background { LHCanvas() }
-        .toolbar(.hidden, for: .navigationBar)
+        .lhTabScreen(HS.t("learnList.title", "Learning center"), back: LHBackAction(label: HS.t("common.back", "Back"), identifier: "learn.back") { dismiss() })
         .hidesAppTabBar()
         .navigationDestination(item: $openedArticle) { LearnArticleView(article: $0) }
         .accessibilityIdentifier("learn.screen")
@@ -105,23 +98,19 @@ struct LearnArticleView: View {
     let article: LearnArticle
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var colors: AdaptiveColors { AdaptiveColors(colorScheme: colorScheme) }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                LongTailHeader(
-                    title: article.title,
-                    style: .detail,
-                    back: (label: HS.t("common.back", "Back"), identifier: "learn.article.back", action: { dismiss() })
-                )
-                .accessibilityIdentifier("learn.article.title")
-                ForEach(Array(article.paragraphs.enumerated()), id: \.offset) { _, paragraph in
+                ForEach(Array(article.paragraphs.enumerated()), id: \.offset) { index, paragraph in
                     Text(paragraph)
                         .font(.body)
                         .foregroundStyle(colors.textPrimary)
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, index == 0 ? -LHLeadInModifier.inset(.body, typeSize) : 0)
                 }
                 LHDivider()
                     .padding(.top, 8)
@@ -136,12 +125,11 @@ struct LearnArticleView: View {
             }
             .frame(maxWidth: LHMetrics.readingColumn, alignment: .leading)
             .padding(.horizontal, LHMetrics.gutter)
-            .padding(.top, 8)
             .padding(.bottom, 48)
             .frame(maxWidth: .infinity)
         }
         .background { LHCanvas() }
-        .toolbar(.hidden, for: .navigationBar)
+        .lhDetailScreen(article.title, back: LHBackAction(label: HS.t("common.back", "Back"), identifier: "learn.article.back") { dismiss() })
         .hidesAppTabBar()
         .accessibilityIdentifier("learn.article.\(article.id)")
     }

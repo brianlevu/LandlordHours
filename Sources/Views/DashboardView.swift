@@ -329,7 +329,21 @@ struct DashboardView: View {
                         resolveHeroSide()
                     }
             }
-            .toolbar(.hidden, for: .navigationBar)
+            // Screen anatomy: Today has a title like every tab. The rental picker is the header's
+            // accessory (under the title, or in the bar for Option 1); the account menu is its one action.
+            .lhTabScreen(String(localized: "today.title", defaultValue: "Today", table: "Today"), onPage: true, accessory: {
+                // The rental chip, with the page dots beside it (they left the house base, where they
+                // overlapped the lot): one row that says which rental and where it sits in the swipe.
+                HStack(spacing: 12) {
+                    LHToastChipSlot { switcher }.dynamicTypeSize(...DynamicTypeSize.accessibility2)
+                    if focuses.count > 1 && !ax {
+                        LHPageDots(count: focuses.count, current: focusIndex)
+                            .accessibilityHidden(true)
+                    }
+                }
+            }, trailing: {
+                accountMenu
+            })
             .sensoryFeedback(.selection, trigger: focusID)
             .onAppear(perform: appeared)
             .onDisappear { onScreen = false }
@@ -432,16 +446,13 @@ struct DashboardView: View {
     }
 
     @ViewBuilder private var heroColumn: some View {
-        if ax { chipRow }
         hero
-            .padding(.top, ax ? 0 : 10)   // headroom so the chip clears the roof ridge at "finished"
             .modifier(TodayToastRoom(enabled: !ax))
-            .overlay(alignment: .top) { if !ax { chipRow.padding(.top, 4) } }
         TodayNumberBlock(hours: shownHours, goal: focus?.goal ?? houseGoal.targetHours, year: currentYear,
                          isRecord: isRecord, pace: pace, numeralSize: numeralSize, isPending: hoursPending,
                          onPaceTap: paceTap)
             .dynamicTypeSize(...DynamicTypeSize.accessibility5)
-            .padding(.top, ax ? 0 : -44)   // the number sits in the diorama's shadow (H4)
+            .padding(.top, ax ? 0 : -56)   // the number sits in the diorama's shadow (H4)
         if viewModel.properties.isEmpty {
             Button(String(localized: "today.addRental", defaultValue: "Add a rental", table: "Today")) {
                 NotificationCenter.default.post(name: .switchToPropertiesAndOpenAddProperty, object: nil)
@@ -470,7 +481,7 @@ struct DashboardView: View {
                           onLogged: rowLogged, onNotWork: { _ in
                               AppToastCenter.shared.show(TodayText.markedNotWork, kind: .neutral, undo: { inbox.undo() })
                           })
-            .padding(.top, ax ? 12 : 8)
+            .padding(.top, LHMetrics.sectionGap)
             .padding(.horizontal, LHMetrics.gutter)
         if showsRecordSlot {
             TodayRecordSlot(year: currentYear, confirmedHours: countedHours) { showRecordExport = true }
@@ -482,22 +493,6 @@ struct DashboardView: View {
     }
 
     // MARK: Chip
-
-    /// The rental chip (a `Menu`), with the account menu at the trailing edge. The top toast
-    /// replaces the row while it shows (`LHToastChipSlot`, §H.8).
-    private var chipRow: some View {
-        LHToastChipSlot {
-            ZStack {
-                switcher
-                HStack {
-                    Spacer()
-                    accountMenu
-                }
-                .padding(.horizontal, LHMetrics.gutter)
-            }
-        }
-        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
-    }
 
     @ViewBuilder private var switcher: some View {
         if let focus {
@@ -515,7 +510,8 @@ struct DashboardView: View {
                         LHHeroChip(name, showsChevron: pages.count > 1)
                     }
                 }
-                .frame(maxWidth: max(160, min(window.width > 0 ? window.width : 402, 402) - 2 * (LHMetrics.gutter + LHMetrics.minTap)))
+                .frame(maxWidth: max(160, min(window.width > 0 ? window.width : 402, 402) - 2 * (LHMetrics.gutter + LHMetrics.minTap)),
+                       alignment: .leading)
                 .contentTransition(.opacity)
             }
             .disabled(pages.count < 2)
@@ -575,10 +571,6 @@ struct DashboardView: View {
             .frame(maxWidth: .infinity)
             .clipped()
             .accessibilityIdentifier("today.hero")
-            if pages.count > 1 && !ax {
-                LHPageDots(count: pages.count, current: focusIndex)
-                    .padding(.top, -48)
-            }
         }
     }
 
@@ -623,7 +615,10 @@ struct DashboardView: View {
 
     private func resolveHeroSide() {
         guard window.width > 0, window.height > 0 else { return }
-        heroSide = CraftHeroSide.resolve(previous: heroSide, kind: .hero, window: window, band: band, accessibility: ax)
+        // Screen anatomy: Today now carries the tab header (title row + rental chip), so H1 is taken
+        // from the height under it; the rows and their foot stay above the bar (D3b).
+        let underHeader = CGSize(width: window.width, height: max(0, window.height - (ax ? 0 : LHScreenAnatomy.heroHeaderAllowance)))
+        heroSide = CraftHeroSide.resolve(previous: heroSide, kind: .hero, window: underHeader, band: band, accessibility: ax)
     }
 
     private func stageSettled(_ motion: CraftStageMotion) {

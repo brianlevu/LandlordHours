@@ -7,8 +7,13 @@ extension LogTimeSheet {
     /// from the user's own recent entries. Hidden until there are two past entries. At AX sizes
     /// each pick is a full-width secondary button so the whole phrase can wrap.
     var recentsView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            LHSectionHeader(lt("Recent"), style: .day)
+        VStack(alignment: .leading, spacing: 4) {
+            // The day-header style without its 28pt row: with the keyboard up the strip, the details
+            // line and "Enter details yourself" all sit above the pinned primary (S7).
+            Text(lt("Recent"))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(colors.textSecondary)
+                .accessibilityAddTraits(.isHeader)
             if isAX {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(recents) { recent in
@@ -19,13 +24,20 @@ extension LogTimeSheet {
                     }
                 }
             } else {
-                LogChipFlow(spacing: 8) {
-                    ForEach(recents) { recent in
-                        LHChip(LogRecents.title(recent, properties: properties), isSelected: false) { useRecent(recent) }
-                            .accessibilityLabel(LogRecents.title(recent, properties: properties))
-                            .accessibilityIdentifier("log.recent")
+                // One strip (§1.16), edge to edge with its own 20pt inner gutter, so the recents keep one
+                // row above the keyboard (owner's pick 2026-10-27: the fastest way to log stays visible).
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(recents) { recent in
+                            LHChip(LogRecents.title(recent, properties: properties), isSelected: false) { useRecent(recent) }
+                                .accessibilityLabel(LogRecents.title(recent, properties: properties))
+                                .accessibilityIdentifier("log.recent")
+                        }
                     }
+                    .padding(.horizontal, LHMetrics.gutter)
                 }
+                .scrollIndicators(.hidden)
+                .padding(.horizontal, -LHMetrics.gutter)
             }
         }
         .accessibilityElement(children: .contain)

@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Rentals (v2, plan package F, row 10)
 //
 // The Rentals tab root, on the plain canvas (§H.4: lists are paper; the dusk page is for the house).
-// Top to bottom: "Rentals" in Fraunces 34 (`LHScreenTitle(.collection)`) with "3 rentals · 312h this
+// Top to bottom: "Rentals" in Fraunces 34 (`.lhTabScreen`) with "3 rentals · 312h this
 // year" under it (hours only: "All rentals" never shows a goal, summed or otherwise, §H.1 H10) ·
 // a search field from nine rentals · the two-column house gallery (`RentalGallery`, Brian
 // 2026-10-26, standard §1.4 exception): each tile is the house at its stage (lit when hours were
@@ -97,7 +97,7 @@ struct PropertiesView: View {
                 case .detail(let id):
                     PropertyDetailView(propertyId: id, onEdit: { property in editor = .edit(property) })
                 case .records(let id):
-                    HistoryView(initialPropertyId: id)
+                    HistoryView(initialPropertyId: id, pushed: true)
                 case .record(let id):
                     if let entry = viewModel.timeEntries.first(where: { $0.id == id }) {
                         TimeEntryDetailView(entry: entry)
@@ -135,14 +135,10 @@ struct PropertiesView: View {
 
     @ViewBuilder private var rootContent: some View {
         if let id = singleRentalID {
+            // The page is the tab: Edit is its one header action and Add rental ends the page.
             PropertyDetailView(propertyId: id, onEdit: { property in editor = .edit(property) },
-                               onUnlockAtLimit: atLimit ? { openPaywall() } : nil)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button(RentalsText.addRental, action: openAddProperty)
-                            .accessibilityIdentifier("properties.add")
-                    }
-                }
+                               onUnlockAtLimit: atLimit ? { openPaywall() } : nil,
+                               onAddRental: openAddProperty)
 #if DEBUG
                 .onAppear { handleDebugLaunchSurfaceIfNeeded(proxy: nil) }
 #endif
@@ -155,11 +151,9 @@ struct PropertiesView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    LHScreenTitle(RentalsText.title, subtitle: subtitle, style: .collection)
-                        .accessibilityIdentifier("properties.title")
                     if viewModel.properties.count > 8 && !isLoading {
                         searchField
-                            .padding(.top, 8)
+                            .padding(.bottom, 16)
                     }
                     Group {
                         if isLoading {
@@ -170,7 +164,6 @@ struct PropertiesView: View {
                             galleryGroup
                         }
                     }
-                    .padding(.top, 16)
                     Color.clear.frame(height: 0).id("properties.bottom")
                 }
                 .padding(.horizontal, LHMetrics.gutter(for: band))
@@ -189,15 +182,12 @@ struct PropertiesView: View {
             .onAppear { handleDebugLaunchSurfaceIfNeeded(proxy: proxy) }
 #endif
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
+        // Screen anatomy: the scaffold owns the title, subtitle, the one trailing action and the gaps.
+        .lhTabScreen(RentalsText.title, subtitle: subtitle, trailing: {
             if !viewModel.properties.isEmpty && !isLoading {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(RentalsText.addRental, action: openAddProperty)
-                        .accessibilityIdentifier("properties.add")
-                }
+                LHHeaderAction(title: RentalsText.addRental, identifier: "properties.add", action: openAddProperty)
             }
-        }
+        })
     }
 
     // MARK: Search

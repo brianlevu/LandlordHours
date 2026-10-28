@@ -2,6 +2,7 @@ import SwiftUI
 
 #if DEBUG
 struct EngagementLabView: View {
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @State private var selectedScenario: EngagementLabScenario = .recentlyActive
     @State private var selectedSurface: EngagementLabSurface
@@ -34,8 +35,7 @@ struct EngagementLabView: View {
         .background {
             LHMobileCanvas()
         }
-        .navigationTitle("Engagement Lab")
-        .navigationBarTitleDisplayMode(.inline)
+        .lhDetailScreen("Engagement Lab", back: LHBackAction { dismiss() })
         .hidesAppTabBar()
         .accessibilityIdentifier("settings.engagementLab")
     }

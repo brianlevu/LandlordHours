@@ -149,6 +149,22 @@ final class RecordsReportsSettingsUITests: XCTestCase {
 
     // MARK: Frames
 
+    /// The record detail at rest and in edit, in the capture seed's world (`LH_CAPTURE_SCHEME`,
+    /// default light; the size is the simulator's).
+    func testCaptureRecordDetailFrames() {
+        let scheme = ProcessInfo.processInfo.environment["LH_CAPTURE_SCHEME"] ?? "light"
+        launch(tab: 6, scheme: scheme, scenario: "emptyMainTabs",
+               extra: ["-LHPropertiesSeed", "layouts3", "-LHPropertiesGoal", "mp100", "-LHGoalChoice", "mp100",
+                       "-LHSeedSuggestions", "inbox", "-LHFakeZone", "empty"])
+        let row = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "records.row.")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        tapRetrying(row, until: app.buttons["entry.edit"])
+        settleAndCapture("record-detail")
+        app.buttons["entry.edit"].tap()
+        XCTAssertTrue(app.buttons["entry.save"].waitForExistence(timeout: 5))
+        settleAndCapture("record-edit")
+    }
+
     func testCaptureWPRFramesLight() { captureAll(scheme: "light") }
     func testCaptureWPRFramesDark() { captureAll(scheme: "dark") }
     func testCaptureWPRFramesLargeText() {

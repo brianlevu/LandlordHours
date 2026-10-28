@@ -2,7 +2,7 @@ import SwiftUI
 import MessageUI
 
 /// Contact support: one form on the plain page, one pinned `LHButton.primary`, and what helps us
-/// answer fast. Standard v2 (package H): `LHScreenTitle`, `LHField`, no list chrome.
+/// answer fast. Standard v2 (package H): `.lhDetailScreen`, `LHField`, no list chrome.
 struct ContactSupportView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
@@ -22,15 +22,8 @@ struct ContactSupportView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
-                LongTailHeader(
-                    title: HS.t("support.title", "Get help"),
-                    subtitle: HS.t("support.subtitle", "Write to Brian. You’ll hear back by email."),
-                    style: .detail,
-                    back: (label: HS.t("common.back", "Back"), identifier: "support.back", action: { dismiss() })
-                )
-
                 VStack(alignment: .leading, spacing: LHMetrics.headerToContent) {
-                    LHSectionHeader(HS.t("support.section", "Your message"))
+                    LHSectionHeader(HS.t("support.section", "Your message"), leadsContent: true)
                     VStack(spacing: 12) {
                         LHField(HS.t("support.subject", "Subject"), text: $subject,
                                 accessibilityLabel: HS.t("support.subject", "Subject"), identifier: "support.subject")
@@ -48,7 +41,6 @@ struct ContactSupportView: View {
             }
             .frame(maxWidth: LHMetrics.readingColumn, alignment: .leading)
             .padding(.horizontal, LHMetrics.gutter)
-            .padding(.top, 8)
             .padding(.bottom, 24)
             .frame(maxWidth: .infinity)
         }
@@ -67,7 +59,9 @@ struct ContactSupportView: View {
                     .background(colors.background)
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
+        .lhDetailScreen(HS.t("support.title", "Get help"),
+                        subtitle: HS.t("support.subtitle", "Write to Brian. You’ll hear back by email."),
+                        back: LHBackAction(label: HS.t("common.back", "Back"), identifier: "support.back") { dismiss() })
         .hidesAppTabBar()
         .sheet(isPresented: $showingMailComposer) {
             MailComposeView(subject: subject, body: message, to: supportEmail)

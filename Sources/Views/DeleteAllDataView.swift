@@ -36,17 +36,10 @@ struct DeleteAllDataView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: LHMetrics.sectionGap) {
-                LongTailHeader(
-                    title: isAppleProfile
-                        ? HS.t("delete.title.account", "Delete account and data")
-                        : HS.t("delete.title", "Delete all data"),
-                    style: .detail,
-                    back: (label: HS.t("common.back", "Back"), identifier: "delete.back", action: { dismiss() })
-                )
-
                 Text(HS.t("delete.subtitle", "This removes everything from this iPhone and iCloud:"))
                     .font(.body)
                     .foregroundStyle(colors.textPrimary)
+                    .lhLeadsContent(.body)
 
                 LHRowGroup {
                     item("house", propertiesText)
@@ -106,12 +99,14 @@ struct DeleteAllDataView: View {
             }
             .frame(maxWidth: LHMetrics.readingColumn, alignment: .leading)
             .padding(.horizontal, LHMetrics.gutter)
-            .padding(.top, 8)
             .padding(.bottom, 48)
             .frame(maxWidth: .infinity)
         }
         .background { LHCanvas() }
-        .toolbar(.hidden, for: .navigationBar)
+        .lhDetailScreen(isAppleProfile
+                            ? HS.t("delete.title.account", "Delete account and data")
+                            : HS.t("delete.title", "Delete all data"),
+                        back: LHBackAction(label: HS.t("common.back", "Back"), identifier: "delete.back") { dismiss() })
         .hidesAppTabBar()
         .accessibilityIdentifier("delete.screen")
         .sheet(isPresented: $showExport) {

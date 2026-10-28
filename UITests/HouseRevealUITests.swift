@@ -136,7 +136,7 @@ final class HouseRevealUITests: XCTestCase {
         app.buttons["entry.save"].tap()
         XCTAssertTrue(app.buttons["entry.edit"].waitForExistence(timeout: 5), "Saved")
         pause(3)
-        app.navigationBars.buttons.firstMatch.tap()         // back to the list (the record hides the bar)
+        app.buttons["entry.back"].tap()                     // back to the list (the record hides the tab bar)
         XCTAssertTrue(app.buttons["tab.today"].waitForExistence(timeout: 5))
 
         app.buttons["tab.today"].tap()
